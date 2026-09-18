@@ -217,6 +217,14 @@ export async function register(): Promise<void> {
     // /api/cron/* and so ran only on an instance where somebody had wired an
     // external scheduler to them - which meant a backup plan was, on most installs,
     // a promise nothing kept.
+    //
+    // After the installed apps' code is here: their jobs are part of that list.
+    // An update lands on this line with the apps' previous build on the volume,
+    // and this is where each is replaced with the one built with this image.
+    const { prepareAppBundles } = await import("./lib/app-bundles/lifecycle");
+    await prepareAppBundles().catch((error: unknown) =>
+        console.error("polaris: the installed apps could not be prepared:", error)
+    );
     const { startScheduledWork } = await import("./lib/cron/scheduler");
     startScheduledWork();
 

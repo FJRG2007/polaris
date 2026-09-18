@@ -33,6 +33,8 @@ export interface AppSlot {
     readonly app: string;
     readonly kind: string;
     readonly props: unknown;
+    /** Where the component that draws it is, when the app came as a bundle. */
+    readonly bundle?: { readonly src: string; readonly name: string };
 }
 
 /** One game server, as the overview card needs it. */

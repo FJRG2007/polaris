@@ -13,6 +13,7 @@ import type { Permission } from "@polaris/core";
 import type { AppSlot } from "@/lib/app-extensions/types";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 import { GameServersSlot } from "@polaris-app/game-servers/src/screens/extension-slot";
+import { AppBundleMount } from "@/components/app-bundles/mount";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 
 /** What an installed-app page hands the panel it draws. */
@@ -27,6 +28,10 @@ export interface InstalledSlotHost {
 }
 
 export function AppSlotView({ slot, host }: { slot: AppSlot; host?: InstalledSlotHost }) {
+    // An app that came as a bundle draws its own slot, from its own module.
+    if (slot.bundle) {
+        return <AppBundleMount src={slot.bundle.src} name={slot.bundle.name} props={{ slot, host }} />;
+    }
     switch (slot.app) {
         case GAME_SERVERS_APP_ID:
             return <GameServersSlot slot={slot} host={host} />;

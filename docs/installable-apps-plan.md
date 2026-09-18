@@ -164,17 +164,69 @@ load those into a core path that never uses them.
      `app-host-contract.test.ts` fails if a module a client component reaches
      imports the server host.
 
-3. **Bundles.** Build each app workspace into a bundle in CI; add the loader,
-   the resolution hook, the catch-all routes and the import map; stop compiling
-   the app workspaces into the dashboard image. Needs a container to verify.
-4. **Install, uninstall and update deliver bundles**, including the updater
-   replacing installed bundles on update, and the migration for existing
-   instances: an instance that has the app installed gets its bundle on the
-   update that ships phase 3, before the old code is gone from the image.
-   Needs a container to verify.
-5. **Places** through the same phases.
+3. **Bundles.** Built and loaded; the in-image copy is still compiled in and is
+   what answers unless a server is switched to bundles. How it was built, and
+   where it departs from the model above:
 
-Phases 3 and 4 change how every deployment is updated and cannot be exercised
-on the development machine, which has no Docker. They are verified on a staging
-host before release, and phase 3 ships with the in-image copy still present so a
-bundle that fails to load falls back to it for one release.
+   - **The bundler** is `packages/app-host/bundler/build.mjs` (esbuild). An app
+     says what it is in its package.json under `polaris`: its catalog id, its
+     extension, the component that draws its slots. The server half is one
+     CommonJS file whose entry lists the extension, every route by the path it
+     answers (the file's place under `src/routes`) and every server action
+     module; routes and actions load on first use. The browser half is ES
+     modules, one entry per `"use client"` module plus shared chunks. A bundle
+     is a zip, deterministic: an app that did not change between two builds has
+     the same digest, so an update does not download it again.
+   - **Shared libraries** are not resolved by a Node module hook but by a table
+     the dashboard fills from its own webpack-compiled modules
+     (`lib/app-bundles/shared-server.ts`, `components/app-bundles/runtime.ts`).
+     A hook would have resolved `@polaris/db` to the copy in `node_modules`,
+     which is a second database client, not the dashboard's. Every name is read
+     when the app reads it, because Next compiles the dashboard once per layer
+     and the layer that draws server components (React without hooks, client
+     components as references) may register its copies after an app has loaded.
+   - **Screens.** An app page is a server component drawn by a catch-all route
+     per surface (`/places/[[...path]]`, `/apps/games/[[...path]]`; API routes
+     under `/api/home`, `/api/minecraft`, `/api/apps/games`,
+     `/api/apps/installed/[id]`), matched against the bundle's route list with
+     Next's precedence (`lib/app-bundles/route-match.ts`). Where the app imported
+     a client component, the server half has a reference that draws
+     `AppBundleMount`, which imports the app's browser module (no import map:
+     the dashboard's chunks are not ES modules) and draws it with the same props.
+   - **Server actions** cannot be registered with Next after the build, so the
+     browser half's are calls to `/api/app-bundles/action`, which runs only a
+     function the bundle declares as an action, refuses another origin as Next
+     does, carries `Date`/`Map`/`Set`/`BigInt` (`wire.ts`), and answers a
+     `redirect()` and a revalidation the way Next's own actions do.
+   - **Verified** against a production build served locally: every Places page
+     and the Game servers page rendered from the bundles, their client modules
+     loaded, their actions answered, a mutation revalidated, a call with no
+     session was sent to sign-in and one from another origin refused.
+     `test/app-bundles/bundles.test.ts` builds both real bundles, unpacks them
+     and evaluates every route and action module in Node.
+
+4. **Delivery.** CI builds the bundles in the image build (`app-bundles` stage)
+   and the image keeps only `app-bundles/index.json`: each app's bundle by
+   digest. They are published into the dashboard's own GHCR package as OCI
+   artifacts (`docker/app-bundles.sh`), pushed untagged with the image and
+   tagged `latest-app-<id>` by the job that moves `latest`; `ghcr-prune.yml`
+   keeps those tags and deletes every older bundle like an older image. A
+   separate package would have needed making public by hand.
+
+   The dashboard fetches what it needs itself (`lib/app-bundles/lifecycle.ts`),
+   at boot for every installed app - `isAppInstalled`, which counts a game
+   server or a per-game manager as Game servers installed - and on install. A
+   bundle is accepted only if it hashes to the digest its own image names, and
+   is unpacked onto `polaris-data` (`/var/lib/polaris/apps/<id>/<digest>`), the
+   previous build's removed. So an update needs no updater support and works the
+   same in the limited edition: the new dashboard boots, finds no bundle for its
+   build, fetches it from the registry it has just been pulled from. An image
+   built on the host (the `build` update source) carries its bundles inside,
+   since nothing published them. Uninstalling unloads the app and deletes its
+   folder; its data stays.
+
+   During this release a server serves apps from bundles only when
+   `/var/lib/polaris/apps/use-bundles` exists, and falls back to the in-image
+   copy for any app whose bundle is not loaded. Removing the in-image copy is
+   the next step, once a live box has run on bundles.
+5. **Places** went through the same phases with Game servers.

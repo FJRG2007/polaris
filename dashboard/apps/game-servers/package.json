@@ -4,6 +4,11 @@
     "private": true,
     "type": "module",
     "description": "Game servers: Minecraft, ARK and FiveM servers, their players, worlds and settings. An installable Polaris app.",
+    "polaris": {
+        "id": "game-servers",
+        "extension": "src/lib/games-extension.ts#gameServersExtension",
+        "slot": "src/screens/extension-slot.tsx#GameServersSlot"
+    },
     "dependencies": {
         "@polaris/app-host": "0.1.0",
         "@polaris/auth": "0.1.0",

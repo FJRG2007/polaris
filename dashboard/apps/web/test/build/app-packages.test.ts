@@ -7,8 +7,9 @@
  * where it is installed. What it needs from the dashboard it takes from
  * `@polaris/app-host`.
  *
- * And the other way: the dashboard names an app's package only in the app
- * registry and in the one-line bridges Next needs for the app's routes.
+ * And the other way: the dashboard names an app's package only in the tables of
+ * what this image compiled in (`lib/app-bundles/in-image*.ts`), which a bundle
+ * replaces, and in the client registry of the slots an app draws.
  */
 
 import tailwind from "../../tailwind.config";
@@ -20,32 +21,21 @@ const DASHBOARD = resolve(__dirname, "../../../..");
 const WEB = join(DASHBOARD, "apps/web");
 const WEB_SRC = join(WEB, "src");
 
-/** The apps that have moved into packages of their own, and where their routes are. */
-const PACKAGES: Readonly<Record<string, { dir: string; routes: readonly RegExp[] }>> = {
-    "@polaris-app/places": {
-        dir: join(DASHBOARD, "apps/places"),
-        routes: [/^app\/\(app\)\/places\//, /^app\/api\/home\//]
-    },
-    "@polaris-app/game-servers": {
-        dir: join(DASHBOARD, "apps/game-servers"),
-        routes: [
-            /^app\/\(app\)\/apps\/games\//,
-            /^app\/api\/apps\/games\//,
-            /^app\/api\/apps\/installed\/\[id\]\/(ark|fivem|game|minecraft)\//,
-            /^app\/api\/minecraft\//
-        ]
-    }
+/** The apps that have moved into packages of their own. */
+const PACKAGES: Readonly<Record<string, { dir: string }>> = {
+    "@polaris-app/places": { dir: join(DASHBOARD, "apps/places") },
+    "@polaris-app/game-servers": { dir: join(DASHBOARD, "apps/game-servers") }
 };
 
-const ROUTE_FILE = /\/(page|layout|route|loading|error|not-found|template|default)\.tsx?$/;
+/** The only places the dashboard names an app's code: the tables of what this
+ *  image compiled in, and the client registry of the slots apps draw. */
 const REGISTRY = [
-    /^lib\/app-extensions\/installed\.ts$/,
+    /^lib\/app-bundles\/in-image\.ts$/,
+    /^lib\/app-bundles\/in-image-pages\.ts$/,
     /^components\/app-extensions\/installed-client\.tsx$/
 ];
 /** What provides the host, which the app's module reads as it is evaluated. */
 const HOST_IMPORT = /^import "@\/lib\/app-host\/server";$/;
-/** What hands the request on, and so evaluates the app's module. */
-const HAND_OFF = /^export \{/;
 
 function walk(directory: string, found: string[] = []): string[] {
     for (const entry of readdirSync(directory)) {
@@ -63,6 +53,23 @@ function specifiers(text: string): string[] {
 }
 
 const posix = (path: string) => path.split("\\").join("/");
+
+/** Every route the in-image tables list, as `<path> -> <module>`. */
+function inImageRoutes(): string[] {
+    const routes = readFileSync(join(WEB_SRC, "lib/app-bundles/in-image.ts"), "utf8");
+    const pages = readFileSync(join(WEB_SRC, "lib/app-bundles/in-image-pages.ts"), "utf8");
+    const modules = new Map(
+        [...pages.matchAll(/^import \* as (\w+) from "([^"]+)";$/gm)].map((match) => [match[1], match[2]])
+    );
+    return [
+        ...[...routes.matchAll(/"(\/[^"]*)":\s*\(\)\s*=>\s*import\(\s*"([^"]+)"\s*\)/g)].map(
+            (match) => `${match[1]} -> ${match[2]}`
+        ),
+        ...[...pages.matchAll(/"(\/[^"]*)":\s*(\w+)/g)].map(
+            (match) => `${match[1]} -> ${modules.get(match[2] ?? "")}`
+        )
+    ];
+}
 
 describe("apps in packages of their own", () => {
     for (const [name, app] of Object.entries(PACKAGES)) {
@@ -93,64 +100,34 @@ describe("apps in packages of their own", () => {
             expect(scanned).toContain(posix(join(app.dir, "src/**/*.{ts,tsx}")));
         });
 
-        it(`the dashboard names ${name} only in the registry and the route bridges`, () => {
+        it(`the dashboard names ${name} only in the in-image tables`, () => {
             const reaches: string[] = [];
             for (const file of walk(WEB_SRC)) {
                 const where = posix(relative(WEB_SRC, file));
                 if (REGISTRY.some((pattern) => pattern.test(where))) continue;
                 const text = readFileSync(file, "utf8");
-                if (!specifiers(text).some((specifier) => specifier.startsWith(name))) continue;
-                const bridge =
-                    app.routes.some((pattern) => pattern.test(where)) && ROUTE_FILE.test(`/${where}`);
-                if (!bridge) reaches.push(where);
+                if (specifiers(text).some((specifier) => specifier.startsWith(name))) reaches.push(where);
             }
             expect(reaches).toEqual([]);
         });
 
-        const bridges = (): { where: string; code: string[] }[] => {
-            const found: { where: string; code: string[] }[] = [];
-            for (const file of walk(WEB_SRC)) {
-                const where = posix(relative(WEB_SRC, file));
-                if (!app.routes.some((pattern) => pattern.test(where)) || !ROUTE_FILE.test(`/${where}`)) continue;
-                const code = readFileSync(file, "utf8")
-                    .split("\n")
-                    .filter((line) => line.trim() && !line.trim().startsWith("//"));
-                found.push({ where, code });
-            }
-            return found;
-        };
-
-        // An app's route lives at the path it answers, route groups aside, so a
-        // bundle's routes can be served by matching the URL against its own tree
-        // with no table in between.
-        it(`a ${name} route bridge hands on the app's file at the same path`, () => {
-            const moved: string[] = [];
-            for (const { where, code } of bridges()) {
-                const target = code
-                    .map((line) => /^export \{[^}]*\} from "([^"]+)";$/.exec(line)?.[1])
-                    .find(Boolean);
-                const expected = `${name}/src/routes/${where
-                    .replace(/^app\//, "")
-                    .replace(/\([^)]+\)\//g, "")
-                    .replace(/\.tsx?$/, "")}`;
-                if (target !== expected) moved.push(`${where} -> ${target ?? "nothing"}`);
-            }
-            expect(moved).toEqual([]);
-        });
-
-        it(`a ${name} route bridge only hands the request to the app`, () => {
-            const bloated: string[] = [];
-            for (const { where, code } of bridges()) {
-                const allowed = code.every(
-                    (line) =>
-                        /^"use client";$/.test(line) ||
-                        HOST_IMPORT.test(line) ||
-                        HAND_OFF.test(line) ||
-                        /^export const (dynamic|runtime|revalidate|maxDuration|dynamicParams|fetchCache) = /.test(line)
-                );
-                if (!allowed) bloated.push(where);
-            }
-            expect(bloated).toEqual([]);
+        // The tables are what a bundle replaces, so they have to be the app's
+        // routes exactly: each named by the path it answers, which is where its
+        // file sits under the app's `src/routes`.
+        it(`the in-image tables list every route of ${name}, at its own path`, () => {
+            const routes = join(app.dir, "src", "routes");
+            const expected = walk(routes)
+                .filter((file) => /[/\\](page\.tsx|route\.ts)$/.test(file))
+                .map((file) => {
+                    const rel = posix(relative(routes, file));
+                    const path = `/${dirname(rel)}`.replace(/\/\.$/, "/");
+                    return `${path} -> ${name}/src/routes/${rel.replace(/\.tsx?$/, "")}`;
+                })
+                .sort();
+            const listed = inImageRoutes()
+                .filter((entry) => entry.includes(` -> ${name}/`))
+                .sort();
+            expect(listed).toEqual(expected);
         });
 
         // An app's module takes the dashboard's services from the host as it is
@@ -176,7 +153,43 @@ describe("apps in packages of their own", () => {
                 if (provides < 0 || provides > loads) cold.push(posix(relative(WEB_SRC, file)));
             }
             expect(cold).toEqual([]);
-            expect(loaders).toBeGreaterThan(5);
+            expect(loaders).toBeGreaterThanOrEqual(2);
         });
     }
+});
+
+/** A catch-all's path with its route groups dropped and its catch-all segment
+ *  cut off: what every URL it answers starts with. */
+function surfaceOf(file: string): string {
+    return `/${posix(relative(join(WEB_SRC, "app"), dirname(file)))}`
+        .replace(/\/\([^)]+\)/g, "")
+        .replace(/\/\[\[?\.\.\.\w+\]\]?$/, "");
+}
+
+describe("the catch-alls that serve apps", () => {
+    const surfaces = walk(join(WEB_SRC, "app"))
+        .filter((file) => /lib\/app-bundles\/serve-(page|route)"/.test(readFileSync(file, "utf8")))
+        .map((file) => ({ kind: file.endsWith("page.tsx") ? "page" : "route", prefix: surfaceOf(file) }));
+
+    it("are found at all, so this cannot pass by reading nothing", () => {
+        expect(surfaces.length).toBeGreaterThan(3);
+    });
+
+    // A route an app has that no catch-all's surface covers is a 404 the
+    // in-image tables and the bundle both claim to answer.
+    it("answer every route an app has", () => {
+        const under = (path: string, prefix: string) => {
+            const want = prefix.split("/");
+            const have = path.split("/");
+            return want.every((part, index) => part === have[index] || /^\[\w+\]$/.test(part));
+        };
+        const orphans = inImageRoutes()
+            .map((entry) => entry.split(" -> "))
+            .filter(([path = "", module = ""]) => {
+                const kind = module.endsWith("/page") ? "page" : "route";
+                return !surfaces.some((surface) => surface.kind === kind && under(path, surface.prefix));
+            })
+            .map(([path]) => path);
+        expect(orphans).toEqual([]);
+    });
 });
