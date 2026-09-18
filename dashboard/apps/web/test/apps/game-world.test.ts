@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as world from "@/lib/apps/minecraft/world";
+import * as world from "@polaris-app/game-servers/src/lib/minecraft/world";
 
 describe("level names", () => {
     it("accepts the names both editions actually use", () => {

@@ -19,7 +19,8 @@ import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 const here = dirname(fileURLToPath(import.meta.url));
 const source = join(here, "..", "..", "..", "resources", "arkicons", "icons");
 const target = join(here, "..", "public", "arkicons");
-const catalogFile = join(here, "..", "src", "lib", "apps", "ark", "item-catalog.json");
+// The catalog belongs to the Game servers app, which lives in its own package.
+const catalogFile = join(here, "..", "..", "game-servers", "src", "lib", "ark", "item-catalog.json");
 
 rmSync(target, { recursive: true, force: true });
 mkdirSync(target, { recursive: true });

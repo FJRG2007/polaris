@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { arkItems, findArkItem } from "@/lib/apps/ark/item-catalog";
+import { arkItems, findArkItem } from "@polaris-app/game-servers/src/lib/ark/item-catalog";
 import {
     ARK_BLUEPRINT_PATH,
     arkGiveCommand,
@@ -18,7 +18,7 @@ import {
     MAX_ARK_GIVE,
     readArkItemCatalog,
     searchArkItems
-} from "@/lib/apps/ark/items";
+} from "@polaris-app/game-servers/src/lib/ark/items";
 
 const WOOD = "/Game/PrimalEarth/CoreBlueprints/Resources/PrimalItemResource_Wood.PrimalItemResource_Wood";
 

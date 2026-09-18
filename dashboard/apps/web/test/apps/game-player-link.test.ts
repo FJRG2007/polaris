@@ -117,12 +117,12 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-vi.mock("@/lib/apps/game-sign-in-addresses", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/game-sign-in-addresses", () => ({
     signInAddresses: async (userIds: string[]) =>
         new Map(userIds.map((user) => [user, signedInFrom[user] ?? []]))
 }));
 
-vi.mock("@/lib/apps/minecraft/service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     editionOf: () => "java",
     getServerPlayers: async () => ({
         answering: true,
@@ -137,20 +137,20 @@ vi.mock("@/lib/apps/minecraft/service", () => ({
 }));
 
 vi.mock("@/lib/deploy-service", () => ({ readAppRuntimeLog: async () => joinLog }));
-vi.mock("@/lib/apps/minecraft/reach", () => ({ noteReachedFrom: async () => false }));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/reach", () => ({ noteReachedFrom: async () => false }));
 vi.mock("@/lib/apps/install-config", () => ({
     readInstallConfig: (raw: string | null) => (raw ? JSON.parse(raw) : {}),
     patchInstallConfig: async (_id: string, patch: Record<string, unknown>) => {
         config = { ...config, ...patch };
     }
 }));
-vi.mock("@/lib/apps/container-files", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
     readContainerFile: async () => null,
     readContainerFileState: async () => null,
     writeContainerFile: async () => undefined
 }));
 
-const service = await import("@/lib/apps/minecraft/player-access");
+const service = await import("@polaris-app/game-servers/src/lib/minecraft/player-access");
 
 function joined(name: string, address: string): string {
     return `[00:41:02 INFO]: ${name}[/${address}:52344] logged in with entity id 214 at (1.5, 64.0, 2.5)`;

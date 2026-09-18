@@ -12,7 +12,7 @@
 import type { Permission } from "@polaris/core";
 import type { AppSlot } from "@/lib/app-extensions/types";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
-import { GameServersSlot } from "@/app/(app)/apps/games/extension-slot";
+import { GameServersSlot } from "@polaris-app/game-servers/src/screens/extension-slot";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 
 /** What an installed-app page hands the panel it draws. */

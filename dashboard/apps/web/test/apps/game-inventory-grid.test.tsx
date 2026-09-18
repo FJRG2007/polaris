@@ -14,7 +14,7 @@ import {
     DRAG_EFFECT_ALLOWED,
     InventoryGrid,
     SLOT_DROP_EFFECT
-} from "@/app/(app)/apps/installed/[id]/minecraft-inventory";
+} from "@polaris-app/game-servers/src/screens/installed/minecraft-inventory";
 
 /** Every slot the grid draws, filled or not. */
 function slotCount(markup: string): number {

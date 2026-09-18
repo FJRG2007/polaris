@@ -6,6 +6,7 @@
  * in-memory queue - no external broker - so two deploys of one app never race.
  */
 
+import { hostPortForApp } from "@/lib/deploy/host-port";
 import { prisma } from "@polaris/db";
 import * as follow from "./follow/follow";
 import { createWriteStream } from "node:fs";
@@ -2274,11 +2275,7 @@ export async function duplicateApplication(
 
 // --- deployment pipeline ----------------------------------------------------
 
-/** A stable host port (20000-39999) for an app, derived from its id so it is
- *  collision-resistant and consistent across redeploys without a schema column. */
-export function hostPortForApp(id: string): number {
-    return 20000 + (parseInt(shortHash(id, 4), 16) % 20000);
-}
+export { hostPortForApp } from "@/lib/deploy/host-port";
 
 /**
  * Build the runtime plan for an application from its stored config. Given the

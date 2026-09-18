@@ -29,15 +29,10 @@
 import { prisma } from "@polaris/db";
 import { hostPortForApp } from "@/lib/deploy-service";
 import { getPortBlocks } from "@/lib/apps/port-block-store";
+import { portKey, type PortKey } from "./port-key";
 import { describeBlock, inBlock, type PortProtocol } from "@/lib/apps/port-block";
 
-/** A port on one transport. TCP 25565 and UDP 25565 are different doors, and
- *  treating them as one was costing a usable port every time. */
-export type PortKey = `${PortProtocol}:${number}`;
-
-export function portKey(port: number, protocol: PortProtocol): PortKey {
-    return `${protocol}:${port}`;
-}
+export { portKey, type PortKey } from "./port-key";
 
 /** What an app's stored config says about the ports it publishes. */
 interface StoredPorts {

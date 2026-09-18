@@ -12,8 +12,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { isPluginOf } from "@/lib/apps/minecraft/world";
-import { startupPhase } from "@/lib/apps/minecraft/parse";
+import { isPluginOf } from "@polaris-app/game-servers/src/lib/minecraft/world";
+import { startupPhase } from "@polaris-app/game-servers/src/lib/minecraft/parse";
 
 /** The first minute of a server being built, as the image narrates it. */
 const BOOTING = [

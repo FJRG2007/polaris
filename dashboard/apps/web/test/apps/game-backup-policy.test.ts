@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as policy from "@/lib/apps/minecraft/backup-policy";
+import * as policy from "@polaris-app/game-servers/src/lib/minecraft/backup-policy";
 
 const HOUR = 60 * 60 * 1000;
 const NOW = new Date("2026-08-09T12:00:00.000Z");

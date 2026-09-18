@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { readRoutineRuns, readSchedule, routinesDue, type GameSchedule } from "@/lib/apps/minecraft/schedule";
+import { readRoutineRuns, readSchedule, routinesDue, type GameSchedule } from "@polaris-app/game-servers/src/lib/minecraft/schedule";
 
 /** A schedule with one nightly restart at 04:00 UTC. */
 function nightly(over: Partial<GameSchedule> = {}): GameSchedule {

@@ -14,10 +14,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { seenKey } from "@/lib/apps/games-activity";
-import { foldPlayers } from "@/lib/apps/minecraft/players";
-import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
-import type { MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
+import { seenKey } from "@polaris-app/game-servers/src/lib/games-activity";
+import { foldPlayers } from "@polaris-app/game-servers/src/lib/minecraft/players";
+import type { PlayerAccessView } from "@polaris-app/game-servers/src/lib/minecraft/player-access";
+import type { MinecraftRoster, MinecraftStatus } from "@polaris-app/game-servers/src/lib/minecraft/service";
 
 /** The server's clock when the lists were read, which is what the log's stamps
  *  are compared against. */

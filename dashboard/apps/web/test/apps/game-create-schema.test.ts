@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { createGameServerSchema } from "@/lib/apps/games-schema";
+import { createGameServerSchema } from "@polaris-app/game-servers/src/lib/games-schema";
 
 const minecraft = {
     game: "minecraft" as const,

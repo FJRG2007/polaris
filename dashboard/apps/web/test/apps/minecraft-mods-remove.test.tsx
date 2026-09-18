@@ -13,9 +13,11 @@ import userEvent from "@testing-library/user-event";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MinecraftMods } from "@/app/(app)/apps/installed/[id]/minecraft-mods";
+import { MinecraftMods } from "@polaris-app/game-servers/src/screens/installed/minecraft-mods";
+// The dashboard's pieces the screen takes, as the layout provides them.
+import "@/components/app-host/client";
 
-vi.mock("@/app/(app)/apps/installed/[id]/minecraft-actions", () => ({
+vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-actions", () => ({
     updateServerSettingsAction: vi.fn()
 }));
 

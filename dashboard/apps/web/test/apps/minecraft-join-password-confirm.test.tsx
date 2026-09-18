@@ -10,17 +10,19 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import * as actions from "@/app/(app)/apps/installed/[id]/minecraft-actions";
+import * as actions from "@polaris-app/game-servers/src/screens/installed/minecraft-actions";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import * as loginActions from "@/app/(app)/apps/installed/[id]/minecraft-login-actions";
-import { MinecraftJoinPassword } from "@/app/(app)/apps/installed/[id]/minecraft-join-password";
+import * as loginActions from "@polaris-app/game-servers/src/screens/installed/minecraft-login-actions";
+import { MinecraftJoinPassword } from "@polaris-app/game-servers/src/screens/installed/minecraft-join-password";
+// The dashboard's pieces the screen takes, as the layout provides them.
+import "@/components/app-host/client";
 
-vi.mock("@/app/(app)/apps/installed/[id]/minecraft-actions", () => ({
+vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-actions", () => ({
     projectFitsAction: vi.fn(),
     updateServerSettingsAction: vi.fn()
 }));
 
-vi.mock("@/app/(app)/apps/installed/[id]/minecraft-login-actions", () => ({
+vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-login-actions", () => ({
     loginStateAction: vi.fn(),
     setLoginAction: vi.fn(),
     forgetLoginAction: vi.fn()

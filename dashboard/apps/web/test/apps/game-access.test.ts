@@ -10,8 +10,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { parseJoinAddresses } from "@/lib/apps/minecraft/parse";
-import { describePorts, gameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
+import { parseJoinAddresses } from "@polaris-app/game-servers/src/lib/minecraft/parse";
+import { describePorts, gameReachAdvice } from "@polaris-app/game-servers/src/lib/minecraft/reach-advice";
 import {
     accessRefusal,
     addressesFor,
@@ -21,7 +21,7 @@ import {
     joinAccess,
     missingWhitelistNames,
     parseWhitelistNames
-} from "@/lib/apps/minecraft/access";
+} from "@polaris-app/game-servers/src/lib/minecraft/access";
 
 describe("addressMatches", () => {
     it("accepts the exact address it was given", () => {

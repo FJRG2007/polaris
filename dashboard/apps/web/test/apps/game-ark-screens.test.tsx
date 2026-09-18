@@ -21,10 +21,10 @@ vi.stubEnv("POLARIS_MASTER_KEY", Buffer.alloc(32, 7).toString("base64"));
 
 // Server actions, which these screens only call from an effect or an event
 // handler. Rendering must not drag the database and the session into the test.
-vi.mock("@/app/(app)/apps/installed/[id]/ark-actions", () => ({}));
+vi.mock("@polaris-app/game-servers/src/screens/installed/ark-actions", () => ({}));
 
-const { ArkRules } = await import("@/app/(app)/apps/installed/[id]/ark-rules");
-const { ArkMods } = await import("@/app/(app)/apps/installed/[id]/ark-mods");
+const { ArkRules } = await import("@polaris-app/game-servers/src/screens/installed/ark-rules");
+const { ArkMods } = await import("@polaris-app/game-servers/src/screens/installed/ark-mods");
 
 describe("the ARK rules screen", () => {
     const markup = renderToStaticMarkup(

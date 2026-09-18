@@ -7,7 +7,7 @@ import {
     withSavedCommand,
     withoutSavedCommand,
     type SavedCommand
-} from "@/lib/apps/console-commands";
+} from "@polaris-app/game-servers/src/lib/console-commands";
 
 const entry = (id: string, command = "SaveWorld", label?: string): SavedCommand => {
     const normalized = normalizeSavedCommand({ id, command, label });

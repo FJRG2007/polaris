@@ -13,15 +13,17 @@
  * is turned on, not discovered afterwards by someone already locked out.
  */
 
-import { joinGuardFor } from "@/lib/apps/minecraft/join-guard";
+import { joinGuardFor } from "@polaris-app/game-servers/src/lib/minecraft/join-guard";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LoginState } from "@/lib/apps/minecraft/polaris-login-service";
-import * as actions from "@/app/(app)/apps/installed/[id]/minecraft-actions";
+import type { LoginState } from "@polaris-app/game-servers/src/lib/minecraft/polaris-login-service";
+import * as actions from "@polaris-app/game-servers/src/screens/installed/minecraft-actions";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import * as loginActions from "@/app/(app)/apps/installed/[id]/minecraft-login-actions";
-import { MinecraftJoinPassword } from "@/app/(app)/apps/installed/[id]/minecraft-join-password";
+import * as loginActions from "@polaris-app/game-servers/src/screens/installed/minecraft-login-actions";
+import { MinecraftJoinPassword } from "@polaris-app/game-servers/src/screens/installed/minecraft-join-password";
+// The dashboard's pieces the screen takes, as the layout provides them.
+import "@/components/app-host/client";
 
-vi.mock("@/app/(app)/apps/installed/[id]/minecraft-actions", () => ({
+vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-actions", () => ({
     projectFitsAction: vi.fn(),
     updateServerSettingsAction: vi.fn()
 }));
@@ -32,7 +34,7 @@ const { confirm } = vi.hoisted(() => ({
 
 vi.mock("@/components/confirm-dialog", () => ({ useConfirm: () => [confirm, null] }));
 
-vi.mock("@/app/(app)/apps/installed/[id]/minecraft-login-actions", () => ({
+vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-login-actions", () => ({
     loginStateAction: vi.fn(),
     setLoginAction: vi.fn(),
     forgetLoginAction: vi.fn()

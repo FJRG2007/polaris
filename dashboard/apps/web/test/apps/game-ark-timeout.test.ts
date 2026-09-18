@@ -35,7 +35,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-vi.mock("@/lib/apps/ark/service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/ark/service", () => ({
     messageArkPlayer: async (_owner: string, _install: string, steamId: string, message: string) => {
         if (!reachable) throw new Error("Nobody by that id is on the server");
         sent.push(`ServerChatTo ${steamId} ${message}`);
@@ -44,8 +44,8 @@ vi.mock("@/lib/apps/ark/service", () => ({
     unbanArkPlayer: async (_owner: string, _install: string, steamId: string) => void sent.push(`UnbanPlayer ${steamId}`)
 }));
 
-const { timeoutArkPlayer, liftArkTimeout, sweepArkTimeouts } = await import("@/lib/apps/ark/timeout-service");
-const { readPlayerTimeouts } = await import("@/lib/apps/player-timeout-service");
+const { timeoutArkPlayer, liftArkTimeout, sweepArkTimeouts } = await import("@polaris-app/game-servers/src/lib/ark/timeout-service");
+const { readPlayerTimeouts } = await import("@polaris-app/game-servers/src/lib/player-timeout-service");
 
 beforeEach(() => {
     install = { id: INSTALL, config: "{}" };

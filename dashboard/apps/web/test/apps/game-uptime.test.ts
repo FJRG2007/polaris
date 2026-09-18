@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { readServerUptime, uptimePatch, NO_UPTIME } from "@/lib/apps/games-uptime";
+import { readServerUptime, uptimePatch, NO_UPTIME } from "@polaris-app/game-servers/src/lib/games-uptime";
 
 const NOW = new Date("2026-08-13T21:00:00.000Z");
 

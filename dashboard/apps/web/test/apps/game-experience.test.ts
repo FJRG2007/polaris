@@ -7,8 +7,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { experienceCommand, MAX_EXPERIENCE } from "@/lib/apps/minecraft/experience";
-import { arkExperienceCommand, MAX_ARK_EXPERIENCE } from "@/lib/apps/ark/experience";
+import { experienceCommand, MAX_EXPERIENCE } from "@polaris-app/game-servers/src/lib/minecraft/experience";
+import { arkExperienceCommand, MAX_ARK_EXPERIENCE } from "@polaris-app/game-servers/src/lib/ark/experience";
 
 describe("experienceCommand", () => {
     it("gives levels", () => {

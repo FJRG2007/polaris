@@ -21,7 +21,7 @@
  */
 
 import { findApp } from "@/lib/apps/catalog";
-import { minecraftImageFor } from "@/lib/apps/minecraft/runtime";
+import { minecraftImageFor } from "@polaris-app/game-servers/src/lib/minecraft/runtime";
 import { describe, expect, it } from "vitest";
 
 describe("the Minecraft server's image", () => {

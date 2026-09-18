@@ -17,8 +17,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as access from "@/lib/apps/fivem/access";
-import { guardAccessFile } from "@/lib/apps/fivem/guard";
+import * as access from "@polaris-app/game-servers/src/lib/fivem/access";
+import { guardAccessFile } from "@polaris-app/game-servers/src/lib/fivem/guard";
 
 const ALICE = "license:0123456789abcdef0123456789abcdef01234567";
 const BOB = "discord:112233445566778899";

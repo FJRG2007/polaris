@@ -30,7 +30,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { rememberLevels } = await import("@/lib/apps/minecraft/level-memory");
+const { rememberLevels } = await import("@polaris-app/game-servers/src/lib/minecraft/level-memory");
 
 const SERVER = "server";
 const START = new Date("2026-01-01T00:00:00Z");

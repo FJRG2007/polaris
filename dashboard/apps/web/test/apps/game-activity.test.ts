@@ -18,7 +18,7 @@ import {
     rosterChange,
     seenFor,
     seenKey
-} from "@/lib/apps/games-activity";
+} from "@polaris-app/game-servers/src/lib/games-activity";
 
 const NOW = new Date("2026-08-13T21:00:00.000Z");
 

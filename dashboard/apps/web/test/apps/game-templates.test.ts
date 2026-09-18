@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { copyable, isTemplateName, readTemplateSettings, templateSettings } from "@/lib/apps/game-templates";
+import { copyable, isTemplateName, readTemplateSettings, templateSettings } from "@polaris-app/game-servers/src/lib/game-templates";
 
 const map = (entries: Record<string, string>) => new Map(Object.entries(entries));
 

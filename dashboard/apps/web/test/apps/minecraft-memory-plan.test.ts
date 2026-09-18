@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as plan from "@/lib/apps/minecraft/memory-plan";
+import * as plan from "@polaris-app/game-servers/src/lib/minecraft/memory-plan";
 
 describe("what a server is planned", () => {
     it("gives a vanilla server for a few friends about what it always got", () => {

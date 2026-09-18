@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { pinnedBuild, repinEntry } from "@/lib/apps/minecraft/modrinth";
+import { pinnedBuild, repinEntry } from "@polaris-app/game-servers/src/lib/minecraft/modrinth";
 
 describe("what an entry is nailed to", () => {
     it("finds a version", () => {

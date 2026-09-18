@@ -19,7 +19,13 @@ import { describe, expect, it } from "vitest";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 
 const SRC = resolve(__dirname, "../../src");
-const HOST = readFileSync(join(SRC, "lib/app-host/server.ts"), "utf8");
+/** The host as the formatter wrote it, with any `later(...)` it wrapped put back
+ *  on one line - the checks below read the file a line at a time, and a service
+ *  whose name made the line too long must not drop out of them. */
+const HOST = readFileSync(join(SRC, "lib/app-host/server.ts"), "utf8").replace(
+    /later\(\s*(load\.\w+),\s*("\w+")\s*\)/g,
+    "later($1, $2)"
+).replace(/once\(\s*(\(\) => import\("[^"]+"\))\s*\)/g, "once($1)");
 
 /** Each area loaded on first use, and the module it loads. */
 const loads = new Map(
@@ -44,8 +50,9 @@ const offered = (() => {
     for (const line of body.split("\n")) {
         const opens = /^\s{4}(\w+): \{$/.exec(line);
         if (opens) area = opens[1] ?? "";
-        const entry = /^\s{8}(\w+): (.+?),?$/.exec(line);
-        if (entry) found.push({ area, name: entry[1] ?? "", from: entry[2] ?? "" });
+        // `name: value`, or the shorthand `name` for a binding imported whole.
+        const entry = /^\s{8}(\w+)(?:: (.+?))?,?$/.exec(line);
+        if (entry) found.push({ area, name: entry[1] ?? "", from: entry[2] ?? entry[1] ?? "" });
     }
     return found;
 })();
@@ -57,7 +64,46 @@ const offered = (() => {
  * nothing a test replaces - and an app filters it synchronously, which a promise
  * cannot be. Everything else loads on first use.
  */
-const EAGER = ["appsCatalog.catalogApps", "appsCatalog.findApp"];
+const EAGER = [
+    "appsCatalog.catalogApps",
+    "appsCatalog.findApp",
+    // The rest of the catalogue's own vocabulary - what a setting accepts, how it
+    // is spelled back, which ones are asked at install - read while a form is
+    // being checked, synchronously, from the same list.
+    "appsCatalog.envFormatHint",
+    "appsCatalog.isAllowedEnvValue",
+    "appsCatalog.isGameServerApp",
+    "appsCatalog.normalizeEnvValue",
+    "appsCatalog.promptedEnvVars",
+    "appsCatalog.tunableEnvVars",
+    "appsInstallDefaults.defaultInstallInput",
+    // Arithmetic over values the app already has: a fuzzy search over a list it
+    // passes in, what a port range means, what a reading of ports says, how a
+    // backup selector is built, what an address is, how wide a chart window is,
+    // what kind of image some bytes are. No database, no session, no network,
+    // and each is called inside a synchronous render or a sort comparator.
+    "appsCatalogSearch.searchCatalog",
+    "appsInstallConfig.readInstallConfig",
+    "appsPortAdvice.describeBlocksFor",
+    "appsPortAdvice.describePorts",
+    "appsPortAdvice.gameReachAdvice",
+    "appsPortAdvice.gameStoppedAdvice",
+    "appsPortBlock.describeBlock",
+    "appsPortBlock.inBlock",
+    "appsPortRegistry.portKey",
+    "backupsSchemas.buildSelector",
+    "deployService.hostPortForApp",
+    "hostAddress.isLanAddress",
+    "metricsShared.resolveRange",
+    "mime.imageTypeOfBytes",
+    // The staging helpers a backup source is written against, and the error it
+    // throws to say it cannot be reached: a class, which a stand-in could not be.
+    "backupsSourcesTypes.SourceUnavailableError",
+    "backupsSourcesTypes.shellQuote",
+    "backupsSourcesTypes.stageDir",
+    "backupsSourcesTypes.stagedFrom",
+    "hostAddress.getHostLanIp"
+];
 
 const CLIENT = readFileSync(join(SRC, "components/app-host/client.tsx"), "utf8");
 
@@ -70,6 +116,10 @@ const drawnLater = new Set(
 
 /** What the client host is given, one area to a line. */
 const clientBody = (/^export const clientHost = \{$([\s\S]*?)^\};$/m.exec(CLIENT)?.[1] ?? "")
+    // An area the formatter spread over several lines, put back on one.
+    .replace(/^(\s{4}\w+: \{)\n([\s\S]*?)\n\s{4}\}/gm, (_, open: string, inner: string) =>
+        `${open} ${inner.trim().split(/\s*\n\s*/).join(" ")} }`
+    )
     .split("\n")
     .filter((line) => line.trim() !== "");
 
@@ -102,7 +152,34 @@ const EAGER_UI = [
     "brandIcons.TpLinkMark",
     "displayFormat.useDisplayFormat",
     "logos.IntegrationLogo",
-    "runAction.runAction"
+    "runAction.runAction",
+    // The same kind for Game servers: hooks and helpers the shell's own screens
+    // already load, a button, a logo of a few paths, the specs a chart is handed
+    // (the chart itself is drawn later), and the tabs a server page is cut into.
+    "appAppsInstalledIdTabs.canOpenGameTab",
+    "appAppsInstalledIdTabs.gameTabHref",
+    "appAppsInstalledIdTabs.gameTabLabel",
+    "appAppsInstalledIdTabs.isGameTab",
+    "appAppsInstalledIdTabs.visibleGameTabs",
+    "appAppsInstalledIdUseRuntimeLog.useRuntimeLog",
+    "confirmDialog.useConfirm",
+    "copyButton.CopyButton",
+    "gameLogo.GameLogo",
+    "metricsHistory.CONSUMPTION_METRICS",
+    "metricsHistory.PLAYER_METRICS",
+    "relativeTime.RelativeTime",
+    "relativeTime.relativeTime",
+    "sessionScope.useSessionScope",
+    "sharedStream.subscribeSharedStream",
+    "snapshotCache.dropSnapshots",
+    "snapshotCache.readSnapshot",
+    "snapshotCache.writeSnapshot",
+    "toolbarSwitch.ToolbarSwitch",
+    // Not pieces at all but calls, each a wrapper that loads its server action
+    // the first time it is made - which is the point the dynamic pieces make.
+    "appAppsInstalledIdAccessActions.installAccessAction",
+    "appAppsInstalledIdAccessActions.revokeInstallAccessAction",
+    "appAppsInstalledIdAccessActions.shareInstallAction"
 ];
 
 function sourceOf(module: string): string {
@@ -223,7 +300,14 @@ describe("the client pieces the dashboard offers apps", () => {
 });
 
 /** Synchronous in the dashboard, so asynchronous for an app: every call awaits it. */
-const AWAITED = ["hostPortForApp", "publishChatChange", "safeName", "serviceRef"];
+const AWAITED = [
+    "installRef",
+    "peekServerMetrics",
+    "publishChatChange",
+    "requestOrigin",
+    "safeName",
+    "serviceRef"
+];
 
 /** Where the arguments that open at `from` are closed. */
 function past(text: string, from: number): number {

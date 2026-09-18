@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { isSeed, randomSeed } from "@/lib/apps/minecraft/world";
+import { isSeed, randomSeed } from "@polaris-app/game-servers/src/lib/minecraft/world";
 
 describe("a seed for a world nobody chose one for", () => {
     it("is different every time", () => {

@@ -17,10 +17,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { CreateArkServerInput } from "@/lib/apps/games-schema";
-import { EXCLUSIVE_JOIN, GAME_LOG, hasLaunchFlag, isJoinPassword } from "@/lib/apps/ark/access";
-import { parseArkPlayers, isRconRefusal } from "@/lib/apps/ark/parse";
-import { arkPortsFrom, arkServerEnv, expectedArkMemoryMb, normalizeModIds } from "@/lib/apps/ark/config";
+import type { CreateArkServerInput } from "@polaris-app/game-servers/src/lib/games-schema";
+import { EXCLUSIVE_JOIN, GAME_LOG, hasLaunchFlag, isJoinPassword } from "@polaris-app/game-servers/src/lib/ark/access";
+import { parseArkPlayers, isRconRefusal } from "@polaris-app/game-servers/src/lib/ark/parse";
+import { arkPortsFrom, arkServerEnv, expectedArkMemoryMb, normalizeModIds } from "@polaris-app/game-servers/src/lib/ark/config";
 
 /** The admin password the install mints. Short enough that ARK takes it at the
  *  enablecheats prompt, which is the whole reason it is not the 48-hex value the

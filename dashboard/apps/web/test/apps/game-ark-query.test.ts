@@ -9,7 +9,7 @@
  */
 
 import { createSocket } from "node:dgram";
-import { pingSteamQuery } from "@/lib/apps/ark/a2s";
+import { pingSteamQuery } from "@polaris-app/game-servers/src/lib/ark/a2s";
 import { afterEach, describe, expect, it } from "vitest";
 
 /** Answer one A2S query the way a Steam server does, and hand back the port it is

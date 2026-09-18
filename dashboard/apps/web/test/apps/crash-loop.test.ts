@@ -19,7 +19,7 @@ import {
     outlivedTheLoop,
     reachedReady,
     watchesRestarts
-} from "@/lib/apps/crash-loop";
+} from "@polaris-app/game-servers/src/lib/crash-loop";
 
 const NOW = new Date("2026-08-12T21:05:30.000Z");
 

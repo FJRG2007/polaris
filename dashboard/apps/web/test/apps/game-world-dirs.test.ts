@@ -42,7 +42,7 @@ function answer(argv: readonly string[]): { code: number; output: string } {
     return { code: 0, output: "" };
 }
 
-vi.mock("@/lib/apps/minecraft/service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     withServerContainer: async (_ownerId: string, installedAppId: string, work: (server: unknown) => Promise<unknown>) =>
         work({
             installedAppId,
@@ -92,7 +92,7 @@ vi.mock("@/lib/apps/install-config", () => ({
     readInstallConfig: () => ({})
 }));
 
-const { newWorld, restoreWorldBackup } = await import("@/lib/apps/minecraft/world-service");
+const { newWorld, restoreWorldBackup } = await import("@polaris-app/game-servers/src/lib/minecraft/world-service");
 
 /** What was done to one path from the moment it was made, as verbs in order. */
 function verbsFor(path: string): string[] {

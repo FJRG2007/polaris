@@ -11,7 +11,7 @@
  * new line every time is a file that stops being editable by hand within a month.
  */
 
-import * as cfg from "@/lib/apps/fivem/cfg";
+import * as cfg from "@polaris-app/game-servers/src/lib/fivem/cfg";
 import { describe, expect, it } from "vitest";
 
 const HOSTNAME = { key: "sv_hostname", prefix: "" } as const;

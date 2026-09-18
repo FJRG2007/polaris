@@ -7,7 +7,7 @@ import {
     windowCovers,
     zonedMoment,
     type GameSchedule
-} from "@/lib/apps/minecraft/schedule";
+} from "@polaris-app/game-servers/src/lib/minecraft/schedule";
 
 /** The rule everybody actually asks for: quiet overnight, up the rest of the day. */
 const OVERNIGHT: GameSchedule = {

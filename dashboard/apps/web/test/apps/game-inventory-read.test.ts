@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { replyIsWhole } from "@/lib/apps/minecraft/snbt";
-import { readLiveInventory } from "@/lib/apps/minecraft/inventory-service";
+import { replyIsWhole } from "@polaris-app/game-servers/src/lib/minecraft/snbt";
+import { readLiveInventory } from "@polaris-app/game-servers/src/lib/minecraft/inventory-service";
 
 /** A reply the way the server writes one. */
 function said(player: string, value: string): string {

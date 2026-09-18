@@ -10,7 +10,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ServerPresence } from "@/lib/apps/games-service";
+import type { ServerPresence } from "@polaris-app/game-servers/src/lib/games-service";
 
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const ONE = "aaaaaaaa-1111-4111-8111-111111111111";
@@ -21,14 +21,14 @@ let answer: ServerPresence[] = [];
 const reads: { only: readonly string[] | undefined }[] = [];
 const sweeps: { only: unknown; known: ReadonlyMap<string, number | null> | undefined }[] = [];
 
-vi.mock("@/lib/apps/games-service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/games-service", () => ({
     listGameServerPresence: async (_ownerId: string, _alsoIds: readonly string[], only?: readonly string[]) => {
         reads.push({ only });
         return answer;
     }
 }));
 
-vi.mock("@/lib/apps/minecraft/schedule-service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/schedule-service", () => ({
     sweepGameSchedules: async (
         _ownerId: string,
         _at: Date,
@@ -39,7 +39,7 @@ vi.mock("@/lib/apps/minecraft/schedule-service", () => ({
     }
 }));
 
-const { subscribeGamePresence } = await import("@/lib/apps/games-presence");
+const { subscribeGamePresence } = await import("@polaris-app/game-servers/src/lib/games-presence");
 
 function playing(id: string, names: string[]): ServerPresence {
     return {

@@ -13,11 +13,11 @@
  * the map is gone.
  */
 
-import { isLevelName } from "@/lib/apps/minecraft/world";
+import { isLevelName } from "@polaris-app/game-servers/src/lib/minecraft/world";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { blueprintFor, minecraftShapeEnv } from "@/lib/apps/games-create";
-import { GAME_BLUEPRINTS, findBlueprint } from "@/lib/apps/minecraft/blueprints";
-import { MAP_CATEGORIES, WORLD_MAPS, findMap, mapsFor } from "@/lib/apps/minecraft/maps";
+import { blueprintFor, minecraftShapeEnv } from "@polaris-app/game-servers/src/lib/games-create";
+import { GAME_BLUEPRINTS, findBlueprint } from "@polaris-app/game-servers/src/lib/minecraft/blueprints";
+import { MAP_CATEGORIES, WORLD_MAPS, findMap, mapsFor } from "@polaris-app/game-servers/src/lib/minecraft/maps";
 
 /** Modrinth as these tests need it: enough for the version pin to resolve, since
  *  a map with no plugins asks it nothing and a blueprint without one still does. */

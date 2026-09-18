@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { applyMotdHex, hexColorAt, hexMotdCode, motdLineWidth, motdSpans } from "@/lib/apps/minecraft/motd";
+import { applyMotdHex, hexColorAt, hexMotdCode, motdLineWidth, motdSpans } from "@polaris-app/game-servers/src/lib/minecraft/motd";
 
 const S = "§";
 const ORANGE = `${S}x${S}f${S}f${S}8${S}8${S}0${S}0`;

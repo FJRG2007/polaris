@@ -15,7 +15,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CONFIG_ASIDE_DIR, DATA_DIR, VERSIONED_CONFIG, folderStamp } from "@/lib/apps/minecraft/world";
+import { CONFIG_ASIDE_DIR, DATA_DIR, VERSIONED_CONFIG, folderStamp } from "@polaris-app/game-servers/src/lib/minecraft/world";
 
 /** Every command the fake container was asked to run, in order. */
 let ran: string[][] = [];
@@ -24,7 +24,7 @@ let present: string[] = [];
 /** Which edition the fake server is. */
 let edition: "java" | "bedrock" = "java";
 
-vi.mock("@/lib/apps/minecraft/service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     withServerContainer: async (_ownerId: string, _installedAppId: string, run: (server: unknown) => unknown) =>
         run({
             installedAppId: "install",
@@ -63,7 +63,7 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@/lib/env-var-service", () => ({ setEnvVars: async () => undefined, listEnvVars: async () => [] }));
 vi.mock("@/lib/notification-service", () => ({ createNotification: async () => undefined }));
 
-const { setAsideVersionedConfig } = await import("@/lib/apps/minecraft/world-service");
+const { setAsideVersionedConfig } = await import("@polaris-app/game-servers/src/lib/minecraft/world-service");
 
 beforeEach(() => {
     ran = [];

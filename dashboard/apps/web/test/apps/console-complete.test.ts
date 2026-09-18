@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { applyCompletion, completeConsole, type CompletionSources } from "@/lib/apps/console-complete";
+import { applyCompletion, completeConsole, type CompletionSources } from "@polaris-app/game-servers/src/lib/console-complete";
 
 const SOURCES: CompletionSources = {
     game: "java",

@@ -10,7 +10,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GameSchedule } from "@/lib/apps/minecraft/schedule";
+import type { GameSchedule } from "@polaris-app/game-servers/src/lib/minecraft/schedule";
 
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const INSTALL = "aaaaaaaa-1111-4111-8111-111111111111";
@@ -49,23 +49,23 @@ vi.mock("@/lib/deploy-service", () => ({
     }
 }));
 
-vi.mock("@/lib/apps/games-flush", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/games-flush", () => ({
     flushGameWorld: async (_ownerId: string, installedAppId: string) => {
         flushed.push(installedAppId);
     }
 }));
 
-vi.mock("@/lib/apps/ark/service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/ark/service", () => ({
     getArkPlayers: async () => arkPlayers ?? { answering: false, containerRunning: null, players: [], message: "no" }
 }));
 
-vi.mock("@/lib/apps/minecraft/service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     getServerPlayers: async () => {
         throw new Error("an ARK server must never be asked over rcon-cli");
     }
 }));
 
-const { sweepGameSchedules } = await import("@/lib/apps/minecraft/schedule-service");
+const { sweepGameSchedules } = await import("@polaris-app/game-servers/src/lib/minecraft/schedule-service");
 
 /** Sleep once nobody has played for five minutes, which is what the screen writes
  *  when somebody types 5 into "Empty for". */

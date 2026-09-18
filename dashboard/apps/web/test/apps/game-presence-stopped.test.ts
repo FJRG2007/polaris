@@ -54,7 +54,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-vi.mock("@/lib/apps/minecraft/service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     getServerPlayers: async () => {
         throw new Error("a server that is not running must not be knocked on");
     },
@@ -62,14 +62,14 @@ vi.mock("@/lib/apps/minecraft/service", () => ({
     editionOf: () => "java"
 }));
 
-vi.mock("@/lib/apps/ark/service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/ark/service", () => ({
     getArkPlayers: async () => {
         throw new Error("a server that is not running must not be knocked on");
     },
     applyAllowList: async () => undefined
 }));
 
-const { listGameServerPresence } = await import("@/lib/apps/games-service");
+const { listGameServerPresence } = await import("@polaris-app/game-servers/src/lib/games-service");
 
 beforeEach(() => {
     install = {

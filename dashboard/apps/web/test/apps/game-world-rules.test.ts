@@ -103,7 +103,7 @@ let opened = 0;
 /** What the server answers to a `gamerule` set, when that differs from `talking`. */
 let setReply: string | null = null;
 
-vi.mock("@/lib/apps/minecraft/service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     editionOf: () => "java",
     withServerContainer: async (
         _ownerId: string,
@@ -134,7 +134,7 @@ const {
     rememberDifficulty,
     setWorldDifficulty,
     setWorldRule
-} = await import("@/lib/apps/minecraft/rules-service");
+} = await import("@polaris-app/game-servers/src/lib/minecraft/rules-service");
 
 const OWNER = "0190c1d2-0000-7000-8000-000000000001";
 const SERVER = "0190c1d2-0000-7000-8000-0000000000a1";

@@ -86,7 +86,7 @@ vi.mock("@polaris/db", () => ({
 
 const rules = vi.hoisted(() => ({ value: [] as { username: string; address: string }[] }));
 const bound = vi.hoisted(() => ({ value: true }));
-vi.mock("@/lib/apps/minecraft/player-access", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/player-access", () => ({
     playerAccessRules: vi.fn(async () => rules.value)
 }));
 
@@ -116,7 +116,7 @@ const switchedOn = [
 const env = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock("@/lib/env-var-service", () => ({ listEnvVars: env.list, setEnvVars: vi.fn() }));
 
-const route = await import("../../src/app/api/minecraft/login/[id]/[action]/route");
+const route = await import("@polaris-app/game-servers/src/routes/api/minecraft/login/[id]/[action]/route");
 
 function ask(action: string, body: unknown, options: { id?: string; token?: string } = {}) {
     const request = new Request(`https://polaris.example/api/minecraft/login/x/${action}`, {

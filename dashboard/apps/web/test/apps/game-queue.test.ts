@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { maxStackFor } from "@/lib/apps/minecraft/items";
+import { maxStackFor } from "@polaris-app/game-servers/src/lib/minecraft/items";
 import {
     NEEDS_PLAYER,
     QUEUED_KINDS,
@@ -16,7 +16,7 @@ import {
     parseQueuedPayload,
     waitingOn,
     type QueuedAction
-} from "@/lib/apps/minecraft/queue";
+} from "@polaris-app/game-servers/src/lib/minecraft/queue";
 
 function waiting(overrides: Partial<QueuedAction> = {}): QueuedAction {
     return {

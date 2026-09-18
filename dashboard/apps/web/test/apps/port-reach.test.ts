@@ -56,7 +56,7 @@ vi.mock("@polaris/core", async (importActual) => ({
 }));
 
 const { noteReachedFrom, probeListening, probeReach, reachAdviceFor } = await import(
-    "@/lib/apps/minecraft/reach"
+    "@polaris-app/game-servers/src/lib/minecraft/reach"
 );
 const { probeTcpPort } = await import("@/lib/net/port-probe");
 

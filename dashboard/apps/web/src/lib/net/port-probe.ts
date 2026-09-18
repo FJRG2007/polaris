@@ -11,11 +11,11 @@
  */
 
 import { connect } from "node:net";
+import { PROBE_TIMEOUT_MS } from "./probe-timeout";
 import { detectPublicIp } from "@/lib/network-service";
 import { isCarrierGradeNat, isPublicIpv4 } from "@polaris/core";
 
-/** How long to wait on a port before calling the probe inconclusive. */
-export const PROBE_TIMEOUT_MS = 4000;
+export { PROBE_TIMEOUT_MS } from "./probe-timeout";
 
 /**
  * Try to open the port from here, through the public address.

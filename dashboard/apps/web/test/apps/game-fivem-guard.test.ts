@@ -20,7 +20,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as guard from "@/lib/apps/fivem/guard";
+import * as guard from "@polaris-app/game-servers/src/lib/fivem/guard";
 
 describe("the manifest", () => {
     it("names the script, the manifest version and the game", () => {

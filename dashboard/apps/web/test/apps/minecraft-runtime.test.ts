@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { javaTagFor, minecraftImageFor } from "@/lib/apps/minecraft/runtime";
+import { javaTagFor, minecraftImageFor } from "@polaris-app/game-servers/src/lib/minecraft/runtime";
 
 describe("the runtime a release needs", () => {
     it("is Java 25 from 26.x, and for LATEST, snapshots and the image's default", () => {

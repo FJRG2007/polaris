@@ -19,6 +19,8 @@ export * from "./camera-tracking.js";
 export * from "./camera-zones.js";
 export * from "./cidr.js";
 export * from "./geo.js";
+export * from "./games-catalog.js";
+export * from "./probe-timeout.js";
 export * from "./hostnames.js";
 export * from "./local-network.js";
 export * from "./names.js";

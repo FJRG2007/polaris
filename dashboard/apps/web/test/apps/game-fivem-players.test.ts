@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as players from "@/lib/apps/fivem/players";
+import * as players from "@polaris-app/game-servers/src/lib/fivem/players";
 
 const ALICE = {
     endpoint: "203.0.113.9:52000",

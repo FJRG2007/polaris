@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import * as rcon from "@/lib/apps/fivem/rcon";
+import * as rcon from "@polaris-app/game-servers/src/lib/fivem/rcon";
 
 const HEADER = Buffer.from([0xff, 0xff, 0xff, 0xff]);
 

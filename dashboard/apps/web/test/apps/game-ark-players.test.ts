@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { foldArkPlayers, matchesArkPlayer } from "@/lib/apps/ark/players";
+import { foldArkPlayers, matchesArkPlayer } from "@polaris-app/game-servers/src/lib/ark/players";
 
 const ALICE = "76561198000000001";
 const BOB = "76561198000000002";

@@ -79,7 +79,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-vi.mock("@/lib/apps/minecraft/service", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     withServerContainer: async (
         _ownerId: string,
         _installedAppId: string,
@@ -87,10 +87,10 @@ vi.mock("@/lib/apps/minecraft/service", () => ({
     ) => run({ edition: "java", say, run: async () => ({ code: 0, output: "" }) })
 }));
 
-vi.mock("@/lib/apps/recent-items", () => ({ recentlyGivenItems: async () => [] }));
+vi.mock("@polaris-app/game-servers/src/lib/recent-items", () => ({ recentlyGivenItems: async () => [] }));
 
 const { clearInventory, transferInventory, transferStack } = await import(
-    "@/lib/apps/minecraft/item-service"
+    "@polaris-app/game-servers/src/lib/minecraft/item-service"
 );
 
 const OWNER = "owner";
