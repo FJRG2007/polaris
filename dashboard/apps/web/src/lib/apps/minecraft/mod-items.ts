@@ -12,8 +12,8 @@
  *
  * - `assets/<mod>/items/<path>.json` is the item definition the game loads, so
  *   its filename is the registry path: `<mod>:<path>` is an id `/give` accepts.
- *   Mods built before that directory existed (1.21.4) are read from their
- *   translations instead, which name the same things one layer further away.
+ *   Mods built before that directory existed (1.21.4) are read from their item
+ *   models instead, and from the block models the translations name as blocks.
  * - `assets/<mod>/lang/en_us.json` holds `item.<mod>.<path>` and
  *   `block.<mod>.<path>`, which is the label the game itself shows. Far better
  *   than title-casing the id: `keycard_lv1` is "Level 1 Keycard", which no
@@ -361,27 +361,28 @@ function namespacesIn(paths: ReadonlySet<string>): string[] {
  *
  * The item definitions when the jar has them, because a filename in that folder
  * is a registered item and nothing else is. Only when it has none - a mod built
- * before 1.21.4 - are the translations read instead, where a `block.` key can
- * also belong to a block that is never an item. That is a `/give` the game
- * refuses rather than a wrong picture, and it is the price of covering a mod that
- * ships no item definitions at all.
+ * before 1.21.4 - are the models read instead: every item model, and every block
+ * model the translations carry a `block.` label for. The translations only ever
+ * confirm a path a model file already named, so a key like
+ * `item.<mod>.<path>.tooltip` is never taken for an item.
  */
 function itemPathsIn(
     paths: ReadonlySet<string>,
     namespace: string,
     words: Record<string, unknown>
 ): string[] {
-    const prefix = `assets/${namespace}/items/`;
-    const defined = [...paths]
-        .filter((path) => path.startsWith(prefix) && path.endsWith(".json"))
-        .map((path) => path.slice(prefix.length, -".json".length))
-        .sort();
+    const namesIn = (folder: string): string[] => {
+        const root = `assets/${namespace}/${folder}/`;
+        return [...paths]
+            .filter((path) => path.startsWith(root) && path.endsWith(".json"))
+            .map((path) => path.slice(root.length, -".json".length));
+    };
+    const defined = namesIn("items").sort();
     if (defined.length > 0) return defined;
 
-    const named = new Set<string>();
-    for (const key of Object.keys(words)) {
-        const match = /^(?:item|block)\.([a-z0-9_.-]+)\.(.+)$/.exec(key);
-        if (match && match[1] === namespace && match[2]) named.add(match[2]);
+    const named = new Set(namesIn("models/item"));
+    for (const path of namesIn("models/block")) {
+        if (words[`block.${namespace}.${path.replace(/\//g, ".")}`] !== undefined) named.add(path);
     }
-    return [...named].sort();
+    return [...named].filter((path) => !path.includes(".")).sort();
 }

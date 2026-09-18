@@ -213,9 +213,6 @@ export function defaultModFor(env: ReadonlyMap<string, string>): string | null {
  */
 export const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
-/** The release a server is pinned to, or LATEST. */
-export const VERSION_KEY = "VERSION";
-
 /**
  * The environment key the server's software is saved under.
  *

@@ -226,6 +226,34 @@ describe("what a jar says a mod adds", () => {
         expect(items[0]?.icon).toMatchObject({ kind: "mod" });
     });
 
+    it("takes an older mod's ids from its models and never from a translation alone", async () => {
+        const { items } = await readJarItems(
+            await jarOf({
+                "assets/securitycraft/lang/en_us.json": JSON.stringify({
+                    "item.securitycraft.keycard_lv1": "Level 1 Keycard",
+                    "item.securitycraft.keycard_lv1.tooltip": "Opens a level 1 reader",
+                    "block.securitycraft.keypad": "Keypad",
+                    "block.securitycraft.keypad.desc": "A keypad",
+                    "block.securitycraft.fake_water": "Fake Water"
+                }),
+                "assets/securitycraft/models/item/keycard_lv1.json": JSON.stringify({
+                    textures: { layer0: "securitycraft:item/keycard_lv1" }
+                }),
+                "assets/securitycraft/models/block/keypad.json": JSON.stringify({
+                    textures: { all: "minecraft:block/iron_block" }
+                }),
+                "assets/securitycraft/models/block/keypad_active.json": JSON.stringify({
+                    textures: { all: "minecraft:block/iron_block" }
+                })
+            })
+        );
+        expect(items.map((item) => item.id)).toEqual([
+            "securitycraft:keycard_lv1",
+            "securitycraft:keypad"
+        ]);
+        expect(items.map((item) => item.label)).toEqual(["Level 1 Keycard", "Keypad"]);
+    });
+
     it("reads a jar that adds no items as no items", async () => {
         // A data pack, which is what three of the six mods on the server this was
         // built for turned out to be.

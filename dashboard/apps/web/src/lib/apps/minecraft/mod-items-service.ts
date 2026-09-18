@@ -119,6 +119,7 @@ export async function serverModItems(ownerId: string, installedAppId: string): P
     if (entries.length === 0) return EMPTY;
 
     const items: ServerModItem[] = [];
+    const taken = new Set<string>();
     const unread: string[] = [];
     const until = Date.now() + READ_BUDGET_MS;
     for (const entry of entries) {
@@ -127,15 +128,8 @@ export async function serverModItems(ownerId: string, installedAppId: string): P
         // Out of time is not the same as unreadable, and is not reported as it:
         // what is left is read on the next open, from a cache that is by then one
         // mod shorter.
-        const left = until - Date.now();
-        if (left <= 0) break;
-        const read = await catalogFor(
-            entry,
-            slug,
-            loader,
-            settings.version,
-            Math.min(DOWNLOAD_TIMEOUT_MS, left)
-        ).catch(() => null);
+        if (Date.now() >= until) break;
+        const read = await catalogFor(entry, slug, loader, settings.version, until).catch(() => null);
         if (read === null) {
             // A download the clock cut short is that same case rather than a mod
             // whose jar cannot be read, so it is left rather than reported.
@@ -145,6 +139,8 @@ export async function serverModItems(ownerId: string, installedAppId: string): P
         }
         for (const item of read.items) {
             if (items.length >= MAX_ITEMS) break;
+            if (taken.has(item.id)) continue;
+            taken.add(item.id);
             items.push({ ...item, mod: read.title, build: read.build });
         }
         // Past the cap the rest of the list is jars downloaded and read for items
@@ -211,9 +207,9 @@ async function catalogFor(
     slug: string,
     loader: string,
     version: string | null,
-    timeoutMs: number
+    until: number
 ): Promise<BuildCatalog> {
-    const build = await buildFor(entry, loader, version);
+    const build = await beforeDeadline(buildFor(entry, loader, version), until);
     if (build === null) throw new Error(`No build of ${slug} to read`);
 
     const kept = await readCatalog(build.sha1);
@@ -222,7 +218,7 @@ async function catalogFor(
     const key = build.sha1;
     const inFlight =
         reading.get(key) ??
-        readBuild(build.sha1, build.url, slug, timeoutMs).finally(() => reading.delete(key));
+        readBuild(build.sha1, build.url, slug, until).finally(() => reading.delete(key));
     reading.set(key, inFlight);
     const read = await inFlight;
     if (read === null) throw new Error(`Could not read ${build.filename}`);
@@ -257,11 +253,15 @@ async function readBuild(
     sha1: string,
     url: string,
     slug: string,
-    timeoutMs: number
+    until: number
 ): Promise<BuildCatalog | null> {
     let bytes: Uint8Array;
     try {
-        const answer = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+        const left = until - Date.now();
+        if (left <= 0) return null;
+        const answer = await fetch(url, {
+            signal: AbortSignal.timeout(Math.min(DOWNLOAD_TIMEOUT_MS, left))
+        });
         if (!answer.ok || answer.body === null) return null;
         const length = Number(answer.headers.get("content-length") ?? "0");
         if (length > MAX_JAR_BYTES) return null;
@@ -280,6 +280,7 @@ async function readBuild(
         read = await modItems.readJarItems({
             paths: Object.keys(zip.files),
             read: async (path: string) => {
+                if (Date.now() >= until) throw new Error("Out of time reading the jar");
                 const entry = zip.files[path];
                 if (!entry || entry.dir) return null;
                 const body = await inflated(entry, MAX_READ_BYTES - spent);
@@ -296,6 +297,18 @@ async function readBuild(
     const catalog = { title: slug, items: read.items };
     await keep(sha1, catalog, read.icons);
     return { build: sha1, title: catalog.title, items: catalog.items };
+}
+
+/** A promise that settles no later than `until`, rejecting when it would not. The
+ *  work behind it carries on and is kept by whatever else is waiting on it. */
+function beforeDeadline<T>(work: Promise<T>, until: number): Promise<T> {
+    const left = until - Date.now();
+    if (left <= 0) return Promise.reject(new Error("Out of time"));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Out of time")), left);
+    });
+    return Promise.race([work, late]).finally(() => clearTimeout(timer));
 }
 
 /**
