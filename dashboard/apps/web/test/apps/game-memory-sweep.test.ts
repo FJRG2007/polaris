@@ -28,9 +28,12 @@ let env: Record<string, string> = {};
 let saved: Array<{ key: string; value: string }> = [];
 let patched: Array<Record<string, unknown>> = [];
 let log = "";
+let logReads = 0;
 let playersNow = 0;
 let busiest = 0;
 let deployed: string[] = [];
+let deployFails = false;
+let redeployed = false;
 let notified: Array<{ type: string; title: string; body: string }> = [];
 let machines: Array<{ id: string; memoryTotalBytes: number | null; committedMb: number }> = [];
 
@@ -43,6 +46,7 @@ vi.mock("@polaris/db", () => ({
         },
         application: { findFirst: async () => ({ desiredState: "running" }) },
         deployTarget: { findFirst: async () => null },
+        deployment: { findFirst: async () => (redeployed ? { id: "deployment" } : null) },
         gameSample: {
             aggregate: async () => ({ _max: { playersOnline: busiest } }),
             findFirst: async () => ({ playersOnline: playersNow })
@@ -65,8 +69,12 @@ vi.mock("@/lib/env-var-service", () => ({
 }));
 
 vi.mock("@/lib/deploy-service", () => ({
-    readAppRuntimeLog: async () => log,
+    readAppRuntimeLog: async () => {
+        logReads += 1;
+        return log;
+    },
     deployApplication: async (applicationId: string) => {
+        if (deployFails) throw new Error("daemon refused");
         deployed.push(applicationId);
     }
 }));
@@ -119,9 +127,12 @@ beforeEach(() => {
     saved = [];
     patched = [];
     log = "";
+    logReads = 0;
     playersNow = 0;
     busiest = 5;
     deployed = [];
+    deployFails = false;
+    redeployed = false;
     notified = [];
     machines = [{ id: "local", memoryTotalBytes: 32 * 1024 * 1024 * 1024, committedMb: 1536 }];
 });
@@ -167,6 +178,68 @@ describe("the memory sweep", () => {
         expect(swept.raised).toBe(1);
         expect(deployed).toEqual([]);
         expect(notified[0]?.body).toContain("next restart");
+    });
+
+    it("does not claim a restart that did not go through", async () => {
+        log = "java.lang.OutOfMemoryError: Java heap space";
+        deployFails = true;
+
+        const swept = await sweepMemoryPlans(OWNER);
+
+        expect(swept.restarted).toBe(0);
+        expect(notified[0]?.body).not.toContain("It was restarted");
+        expect(notified[0]?.body).toContain("did not go through");
+    });
+
+    it("acts on one out-of-memory once, until the server is deployed again", async () => {
+        log = "java.lang.OutOfMemoryError: Java heap space";
+        playersNow = 3;
+        await sweepMemoryPlans(OWNER, new Date("2026-09-18T01:00:00Z"));
+        const acted = patched.find((patch) => "memoryExhaustedAt" in patch);
+        expect(acted?.memoryExhaustedAt).toBe("2026-09-18T01:00:00.000Z");
+        expect(env.MEMORY).toBe("3G");
+
+        // A quarter of an hour later the same run is still in the log, and nobody
+        // has restarted it onto the new figure: that is not new evidence.
+        installs = [
+            server({
+                memoryMode: "auto",
+                memoryWatch: "2026-09-18T01:00:00.000Z",
+                memoryExhaustedAt: "2026-09-18T01:00:00.000Z"
+            })
+        ];
+        saved = [];
+        notified = [];
+        const again = await sweepMemoryPlans(OWNER, new Date("2026-09-18T01:15:00Z"));
+        expect(again.raised).toBe(0);
+        expect(saved).toEqual([]);
+        expect(notified).toEqual([]);
+
+        // Deployed onto it and out of memory again: that one counts.
+        redeployed = true;
+        const after = await sweepMemoryPlans(OWNER, new Date("2026-09-18T01:30:00Z"));
+        expect(after.raised).toBe(1);
+        expect(env.MEMORY).toBe("4G");
+    });
+
+    it("raises a server whose plan is one step above what it has", async () => {
+        env.MEMORY = "2560M";
+
+        const swept = await sweepMemoryPlans(OWNER);
+
+        expect(swept.raised).toBe(1);
+        expect(saved).toEqual([{ key: "MEMORY", value: "3G", isSecret: false }]);
+    });
+
+    it("does not read the log of a server with no heap", async () => {
+        installs = [{ ...server({ memoryMode: "auto" }), catalogId: "minecraft-bedrock" }];
+        env = { LEVEL_NAME: "world" };
+
+        const swept = await sweepMemoryPlans(OWNER);
+
+        expect(swept.checked).toBe(0);
+        expect(logReads).toBe(0);
+        expect(patched).toEqual([]);
     });
 
     it("never goes past the ceiling the operator set", async () => {

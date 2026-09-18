@@ -15,13 +15,12 @@
  * makes choosing the wrong blueprint survivable.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { findMap } from "@/lib/apps/minecraft/maps";
 import { resetGameServerAction } from "./minecraft-actions";
-import { saveServerAsTemplateAction } from "@/app/(app)/apps/games/actions";
+import { expectedMemoryAction, saveServerAsTemplateAction } from "@/app/(app)/apps/games/actions";
 import { BookmarkPlus, Loader2, RotateCcw, TriangleAlert } from "lucide-react";
-import { formatMemory, findBlueprint } from "@/lib/apps/minecraft/blueprints";
-import { blueprintHeapMb } from "@/lib/apps/minecraft/memory-plan";
+import { findBlueprint } from "@/lib/apps/minecraft/blueprints";
 import {
     BlueprintFields,
     DEFAULT_SHAPE,
@@ -41,6 +40,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    Skeleton,
     cn
 } from "@polaris/ui";
 
@@ -156,9 +156,37 @@ function ResetDialog({
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const blueprint = findBlueprint(shape.blueprintId);
     const seedError = shapeError(shape);
-    const memory = formatMemory(blueprintHeapMb(concurrentPlayers, blueprint));
+    /** Undefined while it is being asked for, null for an edition with no heap. */
+    const [memory, setMemory] = useState<string | null | undefined>(undefined);
+    useEffect(() => {
+        let active = true;
+        const timer = setTimeout(() => {
+            void expectedMemoryAction({
+                edition,
+                blueprintId: shape.blueprintId,
+                software: edition === "java" && shape.software ? shape.software : undefined,
+                mapId: shape.mapId || undefined,
+                crossplay,
+                concurrentPlayers,
+                installedAppId
+            })
+                .then((figure) => active && setMemory(figure))
+                .catch(() => undefined);
+        }, 250);
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [
+        edition,
+        shape.blueprintId,
+        shape.software,
+        shape.mapId,
+        crossplay,
+        concurrentPlayers,
+        installedAppId
+    ]);
     // Bedrock keeps player data inside the level database, where it cannot be
     // separated from the terrain, so there it is not offered.
     // Not onto a map, and not as a preference: carrying players means creating the
@@ -223,9 +251,18 @@ function ResetDialog({
                             }
                         />
                         <span className="text-xs text-muted-foreground">
-                            The rebuilt server is given{" "}
-                            <strong className="text-foreground">{memory}</strong> of memory. Player
-                            slots and everything else on Settings are left as they are.
+                            {memory === null ? null : (
+                                <>
+                                    The rebuilt server is given{" "}
+                                    {memory === undefined ? (
+                                        <Skeleton className="inline-block h-3 w-10 align-middle" />
+                                    ) : (
+                                        <strong className="text-foreground">{memory}</strong>
+                                    )}{" "}
+                                    of memory.{" "}
+                                </>
+                            )}
+                            Player slots and everything else on Settings are left as they are.
                         </span>
                     </label>
 

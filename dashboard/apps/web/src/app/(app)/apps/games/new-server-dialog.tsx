@@ -36,11 +36,11 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
 import { createGameServerSchema, isModIdList } from "@/lib/apps/games-schema";
 import { Gamepad2, Loader2, MemoryStick, RefreshCw, ShieldCheck, Users } from "lucide-react";
-import { findBlueprint, formatMemory } from "@/lib/apps/minecraft/blueprints";
-import { blueprintHeapMb } from "@/lib/apps/minecraft/memory-plan";
+import { formatMemory } from "@/lib/apps/minecraft/blueprints";
 import type { ServerTemplateView } from "@/lib/apps/game-templates";
 import {
     createGameServerAction,
+    expectedMemoryAction,
     gameMachinesAction,
     gameSetupAction,
     listServerTemplatesAction,
@@ -168,18 +168,50 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
         };
     }, []);
 
-    const blueprint = findBlueprint(shape.blueprintId);
     const offered = useMemo(
         () => GAMES.filter((entry) => setup?.games.includes(entry.id) ?? false),
         [setup]
     );
 
+    /** The Minecraft figure, from the server: undefined while it is being asked
+     *  for, null for an edition that runs no JVM. */
+    const [minecraftMemory, setMinecraftMemory] = useState<string | null | undefined>(undefined);
+    useEffect(() => {
+        if (game !== "minecraft") return;
+        let active = true;
+        const timer = setTimeout(() => {
+            void expectedMemoryAction({
+                edition,
+                blueprintId: shape.blueprintId,
+                software: edition === "java" && shape.software ? shape.software : undefined,
+                mapId: shape.mapId || undefined,
+                crossplay,
+                concurrentPlayers,
+                serverId
+            })
+                .then((figure) => active && setMinecraftMemory(figure))
+                .catch(() => undefined);
+        }, 250);
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [
+        game,
+        edition,
+        shape.blueprintId,
+        shape.software,
+        shape.mapId,
+        crossplay,
+        concurrentPlayers,
+        serverId
+    ]);
     const memory =
         game === "ark"
             ? formatMemory(expectedArkMemoryMb(concurrentPlayers))
             : game === "fivem"
               ? formatMemory(expectedFivemMemoryMb(concurrentPlayers))
-              : formatMemory(blueprintHeapMb(concurrentPlayers, blueprint));
+              : minecraftMemory;
     const machine = setup?.machines.find((entry) => entry.id === serverId) ?? null;
 
     // Crossplay is a Java server Bedrock can also join, so it cannot survive a
@@ -578,35 +610,43 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                         </label>
                     </div>
 
-                    <p className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted-foreground">
-                        <MemoryStick className="size-4 shrink-0" />
-                        <span>
-                            {game === "ark" ? (
-                                <>
-                                    An ARK server for {concurrentPlayers}{" "}
-                                    {concurrentPlayers === 1 ? "player" : "players"} at once uses
-                                    around <strong className="text-foreground">{memory}</strong> of
-                                    memory and about 30 GB of disk, downloaded the first time it
-                                    starts.
-                                </>
-                            ) : game === "fivem" ? (
-                                <>
-                                    A FiveM server for {concurrentPlayers}{" "}
-                                    {concurrentPlayers === 1 ? "player" : "players"} at once uses
-                                    around <strong className="text-foreground">{memory}</strong> of
-                                    memory, plus whatever the resources you install weigh.
-                                </>
-                            ) : (
-                                <>
-                                    Polaris will give it{" "}
-                                    <strong className="text-foreground">{memory}</strong> of memory
-                                    for {concurrentPlayers}{" "}
-                                    {concurrentPlayers === 1 ? "player" : "players"} at once. You
-                                    can change it later under Settings.
-                                </>
-                            )}
-                        </span>
-                    </p>
+                    {memory !== null && (
+                        <p className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted-foreground">
+                            <MemoryStick className="size-4 shrink-0" />
+                            <span>
+                                {game === "ark" ? (
+                                    <>
+                                        An ARK server for {concurrentPlayers}{" "}
+                                        {concurrentPlayers === 1 ? "player" : "players"} at once
+                                        uses around{" "}
+                                        <strong className="text-foreground">{memory}</strong> of
+                                        memory and about 30 GB of disk, downloaded the first time it
+                                        starts.
+                                    </>
+                                ) : game === "fivem" ? (
+                                    <>
+                                        A FiveM server for {concurrentPlayers}{" "}
+                                        {concurrentPlayers === 1 ? "player" : "players"} at once
+                                        uses around{" "}
+                                        <strong className="text-foreground">{memory}</strong> of
+                                        memory, plus whatever the resources you install weigh.
+                                    </>
+                                ) : (
+                                    <>
+                                        Polaris will give it{" "}
+                                        {memory === undefined ? (
+                                            <Skeleton className="inline-block h-3 w-10 align-middle" />
+                                        ) : (
+                                            <strong className="text-foreground">{memory}</strong>
+                                        )}{" "}
+                                        of memory for {concurrentPlayers}{" "}
+                                        {concurrentPlayers === 1 ? "player" : "players"} at once.
+                                        You can change it later under Settings.
+                                    </>
+                                )}
+                            </span>
+                        </p>
+                    )}
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Runs on</span>

@@ -29,7 +29,15 @@ function inGigabytes(megabytes: number): string {
     return megabytes % 1024 === 0 ? `${megabytes / 1024} GB` : `${megabytes} MB`;
 }
 
-export function MinecraftMemory({ installedAppId }: { installedAppId: string }) {
+export function MinecraftMemory({
+    installedAppId,
+    refresh = 0
+}: {
+    installedAppId: string;
+    /** Changes whenever something else on the page saved, so the card reads the
+     *  figure that save left behind. */
+    refresh?: number;
+}) {
     const [plan, setPlan] = useState<MemoryPlanView | null>(null);
     /** Null while the first read is out; a sentence when there is nothing to plan
      *  (a Bedrock server runs no JVM) or the read failed. */
@@ -48,7 +56,7 @@ export function MinecraftMemory({ installedAppId }: { installedAppId: string }) 
 
     useEffect(() => {
         void read();
-    }, [read]);
+    }, [read, refresh]);
 
     function save(next: Partial<Pick<MemoryPlanView, "mode" | "ceilingMb">>): void {
         if (!plan) return;

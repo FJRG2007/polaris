@@ -25,8 +25,10 @@ import { allocateFivemPort } from "@/lib/apps/fivem/create";
 import { availableHostPort } from "@/lib/apps/port-registry";
 import { promptedEnvVars, findApp } from "@/lib/apps/catalog";
 import { setGameHostname } from "@/lib/apps/minecraft/address";
+import { prisma } from "@polaris/db";
+import { listEnvVars } from "@/lib/env-var-service";
 import { patchInstallConfig } from "@/lib/apps/install-config";
-import { MEMORY_MODE_KEY, plannedHeapMb } from "@/lib/apps/minecraft/memory-plan";
+import * as memoryPlan from "@/lib/apps/minecraft/memory-plan";
 import { normalizeIdentifier } from "@/lib/apps/fivem/players";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import { ALLOW_LIST_KEY, withPlayer } from "@/lib/apps/ark/access";
@@ -261,39 +263,12 @@ export async function minecraftShapeEnv(
 
     // Only the Java image runs a JVM to give a heap to.
     if (edition === "java") {
-        // What the operator chose, then what the blueprint insists on: a blueprint
-        // that needs Paper is not a suggestion, it is what its plugins load into.
-        const software = blueprint.software ?? shape.software ?? "PAPER";
-        env.set(SOFTWARE_KEY, software);
-        // Polaris's login mod, on a server being reset that already runs it: kept
-        // when it has a build for where the server is going, taken off when it
-        // does not - and then the project guard below takes its place.
-        const mod = polarisLogin.modMovedTo(env, software, env.get("VERSION") ?? "");
-        for (const [key, value] of mod ?? []) env.set(key, value);
-        env.set(
-            PROJECTS_KEY,
-            protectionFor(
-                edition,
-                software,
-                projectList(blueprint, env.get(PROJECTS_KEY), shape.crossplay, map),
-                polarisLogin.loginOn(env)
-            )
-        );
-        // The heap last, because it is decided by the two lines above it: a mod
+        javaSoftwareEnv(env, blueprint, shape, map);
+        // The heap last, because it is decided by the line above it: a mod
         // loader costs about a gigabyte before a single mod is installed on it,
         // and each mod on the list costs again. A server sized as if it were
         // vanilla is one that runs out of memory while generating the world.
-        env.set(
-            "MEMORY",
-            formatMemory(
-                plannedHeapMb({
-                    concurrentPlayers: shape.concurrentPlayers,
-                    weight: blueprint.weight,
-                    loader: loaderForType(software) ?? "",
-                    mods: parseProjectList(env.get(PROJECTS_KEY) ?? "").length
-                })
-            )
-        );
+        env.set("MEMORY", formatMemory(shapeHeapMb(env, blueprint, shape.concurrentPlayers)));
     }
     for (const [key, value] of Object.entries(blueprint.env ?? {})) env.set(key, value);
     // Last, over the blueprint's own: where the two disagree the map is the one
@@ -322,6 +297,123 @@ function resourcePackEnv(
     if (map?.resourcePack)
         return { RESOURCE_PACK: map.resourcePack.url, RESOURCE_PACK_SHA1: map.resourcePack.sha1 };
     return isMapResourcePack(current) ? { RESOURCE_PACK: "", RESOURCE_PACK_SHA1: "" } : {};
+}
+
+/** The software a Java server runs and the projects its list carries, written
+ *  onto `env`. Shared by building a server and quoting its heap, so the two agree
+ *  on what the list ends up holding. */
+function javaSoftwareEnv(
+    env: Map<string, string>,
+    blueprint: GameBlueprint,
+    shape: Pick<MinecraftShape, "software" | "crossplay">,
+    map: WorldMap | undefined
+): void {
+    // What the operator chose, then what the blueprint insists on: a blueprint
+    // that needs Paper is not a suggestion, it is what its plugins load into.
+    const software = blueprint.software ?? shape.software ?? "PAPER";
+    env.set(SOFTWARE_KEY, software);
+    // Polaris's login mod, on a server being reset that already runs it: kept
+    // when it has a build for where the server is going, taken off when it
+    // does not - and then the project guard below takes its place.
+    const mod = polarisLogin.modMovedTo(env, software, env.get("VERSION") ?? "");
+    for (const [key, value] of mod ?? []) env.set(key, value);
+    env.set(
+        PROJECTS_KEY,
+        protectionFor(
+            "java",
+            software,
+            projectList(blueprint, env.get(PROJECTS_KEY), shape.crossplay, map),
+            polarisLogin.loginOn(env)
+        )
+    );
+}
+
+/** The heap a Java server of this shape is given, from the software and the
+ *  projects already on `env`, never past the default ceiling: a figure planned
+ *  for a thousand people is a container that cannot start. */
+export function shapeHeapMb(
+    env: ReadonlyMap<string, string>,
+    blueprint: GameBlueprint,
+    concurrentPlayers: number
+): number {
+    return memoryPlan.clampHeapMb(
+        memoryPlan.plannedHeapMb({
+            concurrentPlayers,
+            weight: blueprint.weight,
+            loader: loaderForType(env.get(SOFTWARE_KEY) ?? "") ?? "",
+            mods: parseProjectList(env.get(PROJECTS_KEY) ?? "").length
+        }),
+        { ceilingMb: memoryPlan.DEFAULT_CEILING_MB }
+    );
+}
+
+/** A heap bounded by what the machine it is going onto can still spare. */
+async function heapForMachine(ownerId: string, machineId: string, heapMb: number): Promise<number> {
+    const { listGameMachines } = await import("@/lib/apps/games-service");
+    const machines = await listGameMachines(ownerId, false).catch(() => []);
+    return memoryPlan.clampHeapMb(heapMb, {
+        ceilingMb: memoryPlan.DEFAULT_CEILING_MB,
+        ...memoryPlan.machineHeapBounds(machines.find((entry) => entry.id === machineId))
+    });
+}
+
+/**
+ * The heap a server would be given, for the create and reset screens to quote
+ * before anything is written.
+ *
+ * Built by the same steps that build the server, so the figure reflects the
+ * software actually chosen and every project the list ends up carrying - the
+ * crossplay pair, the protection, the login - rather than the blueprint alone.
+ * A reset starts from the server's own list, which is where a mod somebody
+ * installed afterwards lives. Null for an edition that runs no JVM.
+ */
+export async function expectedMinecraftHeapMb(
+    ownerId: string,
+    input: {
+        readonly edition: "java" | "bedrock";
+        readonly blueprintId: string;
+        readonly software?: string;
+        readonly mapId?: string;
+        readonly crossplay: boolean;
+        readonly concurrentPlayers: number;
+        /** The machine a new server is going onto. */
+        readonly serverId?: string;
+        /** The server being reset, whose list the new one starts from. */
+        readonly installedAppId?: string;
+    }
+): Promise<number | null> {
+    if (input.edition !== "java") return null;
+    const blueprint = blueprintFor(input.edition, input.blueprintId);
+    let env: Map<string, string>;
+    if (input.installedAppId) {
+        const install = await prisma.installedApp.findFirst({
+            where: { id: input.installedAppId, ownerId, status: { not: "removed" } },
+            select: { applicationId: true }
+        });
+        if (!install?.applicationId) return null;
+        const vars = await listEnvVars("application", install.applicationId, ownerId);
+        env = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
+        env.set(PROJECTS_KEY, withoutBlueprintProjects(env.get(PROJECTS_KEY)));
+    } else {
+        const manifest = findApp(TEMPLATE_BY_EDITION[input.edition]);
+        if (!manifest) return null;
+        env = new Map(
+            defaultInstallInput(manifest, input.serverId).env.map((entry) => [
+                entry.key,
+                entry.value
+            ])
+        );
+    }
+    javaSoftwareEnv(
+        env,
+        blueprint,
+        { ...(input.software ? { software: input.software } : {}), crossplay: input.crossplay },
+        mapFor(blueprint, input.mapId)
+    );
+    const heapMb = shapeHeapMb(env, blueprint, input.concurrentPlayers);
+    return input.installedAppId
+        ? heapMb
+        : heapForMachine(ownerId, input.serverId ?? "local", heapMb);
 }
 
 /** The blueprint a shape names, refusing one this edition cannot be built from. */
@@ -374,6 +466,10 @@ async function createMinecraftServer(
         new Map(base.env.map((entry) => [entry.key, entry.value]))
     );
     env.set("MAX_PLAYERS", String(input.maxPlayers));
+    if (input.edition === "java") {
+        const heapMb = shapeHeapMb(env, blueprint, input.concurrentPlayers);
+        env.set("MEMORY", formatMemory(await heapForMachine(ownerId, input.serverId, heapMb)));
+    }
 
     // A server somebody already built, applied over the blueprint's answer and
     // under the ones below it. Over, because the whole point of saving one is that
@@ -430,7 +526,7 @@ async function createMinecraftServer(
         // the people, so nobody has to notice that installing a mod loader made
         // the figure chosen today wrong. Servers made before this keep theirs -
         // see `memory-plan.ts` for why that asymmetry is deliberate.
-        [MEMORY_MODE_KEY]: "auto"
+        [memoryPlan.MEMORY_MODE_KEY]: "auto"
     });
 
     // The address half of the pair, which the game has nowhere to keep. The image

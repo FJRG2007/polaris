@@ -189,33 +189,37 @@ export function memoryCeilingMb(value: unknown): number {
         : DEFAULT_CEILING_MB;
 }
 
-/**
- * The same plan, from a blueprint - what the create and reset screens can say
- * before a server exists.
- *
- * A blueprint knows what it will run and what it installs, so the figure quoted
- * there is the figure the server is actually created with rather than a vanilla
- * estimate somebody then has to correct.
- */
-export function blueprintHeapMb(
-    concurrentPlayers: number,
-    blueprint?: {
-        readonly weight?: BlueprintWeight;
-        readonly software?: string;
-        readonly projects?: readonly string[];
-    } | null
-): number {
-    const software = (blueprint?.software ?? "").toLowerCase();
-    return plannedHeapMb({
-        concurrentPlayers,
-        weight: blueprint?.weight ?? "normal",
-        // The blueprint names its server software the way the image does
-        // ("PAPER", "NEOFORGE"); the plan wants the loader, and those spellings
-        // are the same word in lower case.
-        loader: software,
-        mods: blueprint?.projects?.length ?? 0
-    });
+/** What a machine bounds a server's heap by: all it has, less what its other
+ *  servers are promised. `ownMb` is the heap this server already holds there, taken
+ *  back out because the plan replaces it rather than adding to it. A machine that
+ *  is not listed, or not measured, bounds nothing. */
+export function machineHeapBounds(
+    machine: { readonly memoryTotalBytes: number | null; readonly committedMb: number } | undefined,
+    ownMb = 0
+): { machineTotalMb: number | null; otherServersMb: number } {
+    if (!machine) return { machineTotalMb: null, otherServersMb: 0 };
+    return {
+        machineTotalMb:
+            machine.memoryTotalBytes !== null
+                ? Math.floor(machine.memoryTotalBytes / (1024 * 1024))
+                : null,
+        otherServersMb: Math.max(0, machine.committedMb - ownMb)
+    };
 }
 
 /** The figure as the image wants it, for the caller that writes the environment. */
 export { formatMemory };
+
+/** A heap the plan moved, as a save reports it back. */
+export interface MemoryChange {
+    readonly fromMb: number;
+    readonly toMb: number;
+    readonly reason: string;
+}
+
+/** The sentence a screen shows after a save moved the heap. */
+export function memoryChangeSentence(change: MemoryChange, restarted: boolean): string {
+    return `Memory went from ${formatMemory(change.fromMb)} to ${formatMemory(change.toMb)} for ${change.reason}. ${
+        restarted ? "The restart applies it." : "It applies at the next restart."
+    }`;
+}

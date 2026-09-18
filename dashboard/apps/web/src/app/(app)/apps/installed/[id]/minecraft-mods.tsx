@@ -23,6 +23,7 @@
 import { useConfirm } from "@/components/confirm-dialog";
 import { updateServerSettingsAction } from "./minecraft-actions";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
+import { memoryChangeSentence } from "@/lib/apps/minecraft/memory-plan";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "@/lib/apps/minecraft/join-guard";
 import { Badge, Button, Card, CardBody, cn, Input, ScrollRow, Select, Skeleton } from "@polaris/ui";
@@ -100,6 +101,8 @@ export function MinecraftMods({
      *  restarts - see `readRequirements`. */
     const [requires, setRequires] = useState<modrinth.ModrinthRequirement[]>([]);
     const [error, setError] = useState<string | null>(null);
+    /** What the last save did to the heap: more mods can mean more memory. */
+    const [memoryNote, setMemoryNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
 
@@ -262,6 +265,7 @@ export function MinecraftMods({
 
     async function save(): Promise<void> {
         setError(null);
+        setMemoryNote(null);
         const warning =
             playersOnline > 0
                 ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`
@@ -284,6 +288,7 @@ export function MinecraftMods({
                 setError(result.error);
                 return;
             }
+            setMemoryNote(result.memory ? memoryChangeSentence(result.memory, true) : null);
             onSaved();
         });
     }
@@ -311,6 +316,7 @@ export function MinecraftMods({
     return (
         <div className="flex flex-col gap-4">
             {error && <p className="text-sm text-danger">{error}</p>}
+            {memoryNote && <p className="text-sm text-muted-foreground">{memoryNote}</p>}
 
             <InstalledList
                 installedAppId={installedAppId}

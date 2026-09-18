@@ -31,7 +31,13 @@ import { resetMinecraftServer } from "@/lib/apps/games-reset";
 import { userSessionAddresses } from "@/lib/session-directory";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
-import { memoryCeilingMb, memoryMode, MEMORY_CEILING_KEY, MEMORY_MODE_KEY } from "@/lib/apps/minecraft/memory-plan";
+import {
+    memoryCeilingMb,
+    memoryMode,
+    MEMORY_CEILING_KEY,
+    MEMORY_MODE_KEY,
+    type MemoryChange
+} from "@/lib/apps/minecraft/memory-plan";
 import {
     applyPlannedMemory,
     MEMORY_KEY,
@@ -47,13 +53,13 @@ import { DIFFICULTIES, isDifficulty } from "@/lib/apps/minecraft/rules";
 import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
 import { readMinecraftStats } from "@/lib/apps/minecraft/stats-service";
 import { gameOfServer, routesByHostname } from "@/lib/apps/games-catalog";
+import { guardForSave, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
 import { setGameHostname, setGameRouted } from "@/lib/apps/minecraft/address";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { liftTimeout, timeoutPlayer } from "@/lib/apps/minecraft/timeout-service";
 import { EXPERIENCE_UNITS, MAX_EXPERIENCE } from "@/lib/apps/minecraft/experience";
 import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "@/lib/apps/minecraft/backup-policy";
 import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-service";
-import { guardForSave, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
 import { cancelAction, pendingFor, queueAction } from "@/lib/apps/minecraft/queue-service";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "@/lib/apps/minecraft/world";
 import { parseDimension, parsePosition, type PlayerPosition } from "@/lib/apps/minecraft/position";
@@ -1871,8 +1877,10 @@ export async function updateServerSettingsAction(
 ): Promise<{
     error?: string;
     /** What the heap was moved to, when saving this changed what the server has
-     *  to hold. Null-ish on every ordinary save. */
-    memory?: { fromMb: number; toMb: number; reason: string };
+     *  to hold. Absent on every ordinary save. */
+    memory?: MemoryChange;
+    /** True when a figure typed here took the heap back from the plan. */
+    memoryFixed?: boolean;
 }> {
     const parsed = settingsSchema.safeParse({ installedAppId, values });
     if (!parsed.success)
@@ -1945,7 +1953,7 @@ export async function updateServerSettingsAction(
             await recordDifficulty(parsed.data.installedAppId, difficulty, user.id);
         }
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
-        return memory ? { memory } : {};
+        return memory ?? {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the settings" };
     }
@@ -1962,15 +1970,18 @@ async function memoryAfterSave(
     installedAppId: string,
     ownerId: string,
     typedByHand: boolean
-): Promise<{ fromMb: number; toMb: number; reason: string } | null> {
-    if (typedByHand) {
-        await patchInstallConfig(installedAppId, { [MEMORY_MODE_KEY]: "fixed" }).catch(
-            () => undefined
-        );
-        return null;
-    }
+): Promise<{ memory: MemoryChange } | { memoryFixed: true } | null> {
     const context = await planContextFor(installedAppId, ownerId);
-    return context ? await applyPlannedMemory(context).catch(() => null) : null;
+    if (!context) return null;
+    if (typedByHand) {
+        if (memoryMode(readInstallConfig(context.config)[MEMORY_MODE_KEY]) !== "auto") return null;
+        const fixed = await patchInstallConfig(installedAppId, { [MEMORY_MODE_KEY]: "fixed" })
+            .then(() => true)
+            .catch(() => false);
+        return fixed ? { memoryFixed: true } : null;
+    }
+    const memory = await applyPlannedMemory(context).catch(() => null);
+    return memory ? { memory } : null;
 }
 
 /**

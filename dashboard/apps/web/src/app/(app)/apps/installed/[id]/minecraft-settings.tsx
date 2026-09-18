@@ -21,6 +21,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { updateServerSettingsAction } from "./minecraft-actions";
 import { Button, Card, CardBody, Input, Select } from "@polaris/ui";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
+import { memoryChangeSentence } from "@/lib/apps/minecraft/memory-plan";
 
 export function MinecraftSettings({
     installedAppId,
@@ -41,6 +42,10 @@ export function MinecraftSettings({
         Object.fromEntries(settings.map((setting) => [setting.key, setting.value]))
     );
     const [error, setError] = useState<string | null>(null);
+    /** What the last save did to the heap, said once under the fields. */
+    const [memoryNote, setMemoryNote] = useState<string | null>(null);
+    /** Bumped on every save so the memory card reads what was just stored. */
+    const [saves, setSaves] = useState(0);
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
     /** Something was saved and deliberately not applied, so the restart card is
@@ -70,6 +75,7 @@ export function MinecraftSettings({
 
     async function save(restart: boolean): Promise<void> {
         setError(null);
+        setMemoryNote(null);
         const warning =
             playersOnline > 0
                 ? `${playersOnline} ${playersOnline === 1 ? "player is" : "players are"} connected and will be disconnected.`
@@ -96,6 +102,14 @@ export function MinecraftSettings({
                 setError(result.error);
                 return;
             }
+            setMemoryNote(
+                result.memory
+                    ? memoryChangeSentence(result.memory, restart)
+                    : result.memoryFixed
+                      ? "The memory you typed is now the server's figure, and Polaris no longer adjusts it. Switch it back under Memory above."
+                      : null
+            );
+            setSaves((count) => count + 1);
             // Saved and not applied: the card below is how it gets applied later.
             setWaiting(!restart && running);
             onSaved();
@@ -116,7 +130,7 @@ export function MinecraftSettings({
         <div className="flex flex-col gap-4">
             {/* Above the fields, because it decides whether one of them is still
                 the thing that settles the heap. */}
-            <MinecraftMemory installedAppId={installedAppId} />
+            <MinecraftMemory installedAppId={installedAppId} refresh={saves} />
 
             {groups.map(({ group, fields }) => (
                 <Card key={group}>
@@ -149,6 +163,7 @@ export function MinecraftSettings({
             ))}
 
             {error && <p className="text-sm text-danger">{error}</p>}
+            {memoryNote && <p className="text-sm text-muted-foreground">{memoryNote}</p>}
 
             {/* Saved and waiting: now, when the last person leaves, or at a time. */}
             <RestartPlanner

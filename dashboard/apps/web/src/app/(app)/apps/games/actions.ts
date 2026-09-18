@@ -7,6 +7,7 @@
  * turns the answers into an install.
  */
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { clientIp } from "@/lib/request-context";
 import { requirePermission } from "@/lib/session";
@@ -21,7 +22,7 @@ import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
 import { clearQueue } from "@/lib/apps/minecraft/queue-service";
 import { clearSnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { releaseVersions } from "@/lib/apps/minecraft/blueprint-version";
-import { blueprintVersions, createGameServer } from "@/lib/apps/games-create";
+import { blueprintVersions, createGameServer, expectedMinecraftHeapMb } from "@/lib/apps/games-create";
 import { listGameMachines, type GameMachine } from "@/lib/apps/games-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import { clearGameServerPrefs, setGameServerPref } from "@/lib/apps/games-prefs";
@@ -34,7 +35,6 @@ import {
     GAME_BLUEPRINTS,
     formatMemory
 } from "@/lib/apps/minecraft/blueprints";
-import { blueprintHeapMb } from "@/lib/apps/minecraft/memory-plan";
 import {
     deleteServerTemplate,
     listServerTemplates,
@@ -114,15 +114,30 @@ async function installedGameIds(ownerId: string): Promise<GameId[]> {
     return installedAppId === null ? [] : GAMES.map((game) => game.id);
 }
 
-/** What memory a server for this many players would be given, so the dialog can
- *  say it before anything is created. */
-export async function suggestedMemoryAction(
-    concurrentPlayers: number,
-    blueprintId: string
-): Promise<string> {
-    await requirePermission("games.read");
-    const blueprint = GAME_BLUEPRINTS.find((entry) => entry.id === blueprintId);
-    return formatMemory(blueprintHeapMb(concurrentPlayers, blueprint));
+const expectedMemorySchema = z.object({
+    edition: z.enum(["java", "bedrock"]),
+    blueprintId: z.string().trim().min(1).max(64),
+    software: z.string().trim().min(1).max(32).optional(),
+    mapId: z.string().trim().min(1).max(64).optional(),
+    crossplay: z.boolean(),
+    concurrentPlayers: z.number().int().min(1).max(1000),
+    serverId: z.string().trim().min(1).max(64).optional(),
+    installedAppId: z.string().uuid().optional()
+});
+
+/** What memory a server of this shape would be given, so the create and reset
+ *  dialogs can say it before anything is written. Null for an edition that runs no
+ *  JVM, or a shape that cannot be read. */
+export async function expectedMemoryAction(
+    input: z.input<typeof expectedMemorySchema>
+): Promise<string | null> {
+    const parsed = expectedMemorySchema.safeParse(input);
+    if (!parsed.success) return null;
+    const ownerId = parsed.data.installedAppId
+        ? (await requireGameServer("games.read", parsed.data.installedAppId)).access.ownerId
+        : (await requirePermission("games.read")).id;
+    const heapMb = await expectedMinecraftHeapMb(ownerId, parsed.data).catch(() => null);
+    return heapMb === null ? null : formatMemory(heapMb);
 }
 
 /** The releases a blueprint can be built on, and the newest of them. */

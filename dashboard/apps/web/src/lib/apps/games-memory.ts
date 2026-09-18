@@ -28,13 +28,13 @@ import { prisma } from "@polaris/db";
 import { readAppRuntimeLog } from "@/lib/deploy-service";
 import * as plan from "@/lib/apps/minecraft/memory-plan";
 import { isGameServerApp } from "@/lib/apps/games-service";
-import { loaderForType } from "@/lib/apps/minecraft/modrinth";
 import { formatMemory } from "@/lib/apps/minecraft/blueprints";
 import { createNotification } from "@/lib/notification-service";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
-import { listGameMachines, parseMemoryMb } from "@/lib/apps/games-service";
 import { PROJECTS_KEY, SOFTWARE_KEY } from "@/lib/apps/minecraft/join-guard";
+import { loaderForType, parseProjectList } from "@/lib/apps/minecraft/modrinth";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
+import { listGameMachines, parseMemoryMb, type GameMachine } from "@/lib/apps/games-service";
 
 /** The environment key the heap is handed to the image as. */
 export const MEMORY_KEY = "MEMORY";
@@ -43,6 +43,11 @@ export const MEMORY_KEY = "MEMORY";
  *  times an hour for a planned server rather than once a minute for every server
  *  on the platform. */
 export const MEMORY_WATCH_KEY = "memoryWatch";
+
+/** When an out-of-memory in the log was last acted on. The same run stays in the
+ *  log until the server is deployed again, so it is only evidence once more after
+ *  that. */
+export const MEMORY_EXHAUSTED_KEY = "memoryExhaustedAt";
 
 /** How often a planned server's log is read for evidence it ran out. */
 const WATCH_EVERY_MS = 15 * 60 * 1000;
@@ -54,8 +59,8 @@ const WATCH_TAIL = 400;
 /** What the JVM prints when it runs out, and what nothing else prints. */
 const OUT_OF_MEMORY = /java\.lang\.OutOfMemoryError/;
 
-/** A server whose heap could differ from its plan by less than this is left alone:
- *  the restart is not worth half a gigabyte. */
+/** A server whose heap differs from its plan by less than this is left alone: the
+ *  restart is not worth less than half a gigabyte. */
 const TOLERANCE_MB = 512;
 
 export interface MemorySweep {
@@ -100,17 +105,27 @@ export async function planContextFor(
     };
 }
 
+/** What one server's plan comes to, and what bounded it. */
+export interface PlannedMemory {
+    readonly wantedMb: number;
+    readonly currentMb: number;
+    readonly reason: string;
+    readonly bounds: plan.HeapBounds;
+}
+
 /**
  * What one server's heap should be, from what it actually is.
  *
  * Every input is read from things Polaris already keeps: the environment the
  * container is built with, and the once-a-minute player samples. Nothing is
- * written down twice to answer this.
+ * written down twice to answer this. `machines` is the owner's machine list, for
+ * a caller that already has it.
  */
 export async function plannedMemoryFor(
     context: PlanContext,
-    now: Date = new Date()
-): Promise<{ wantedMb: number; currentMb: number; reason: string } | null> {
+    now: Date = new Date(),
+    machines?: readonly GameMachine[]
+): Promise<PlannedMemory | null> {
     const env = await listEnvVars("application", context.applicationId, context.ownerId).catch(
         () => []
     );
@@ -121,10 +136,7 @@ export async function plannedMemoryFor(
     if (currentMb <= 0) return null;
 
     const loader = loaderForType(value(SOFTWARE_KEY)) ?? "";
-    const mods = value(PROJECTS_KEY)
-        .split(/[,\n]/)
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0).length;
+    const mods = parseProjectList(value(PROJECTS_KEY)).length;
     const maxPlayers = Number.parseInt(value("MAX_PLAYERS"), 10);
 
     const since = new Date(now.getTime() - plan.PEAK_DAYS * 86_400_000);
@@ -141,22 +153,20 @@ export async function plannedMemoryFor(
 
     const input = { concurrentPlayers: players, loader, mods };
     const config = readInstallConfig(context.config);
-    const bounds = await machineBounds(context, currentMb);
-    const wantedMb = plan.clampHeapMb(plan.plannedHeapMb(input), {
+    const listed = machines ?? (await listGameMachines(context.ownerId, false).catch(() => []));
+    const bounds: plan.HeapBounds = {
         ceilingMb: plan.memoryCeilingMb(config[plan.MEMORY_CEILING_KEY]),
-        ...bounds
-    });
-    return { wantedMb, currentMb, reason: plan.planReason(input) };
+        ...plan.machineHeapBounds(await machineOf(context, listed), currentMb)
+    };
+    const wantedMb = plan.clampHeapMb(plan.plannedHeapMb(input), bounds);
+    return { wantedMb, currentMb, reason: plan.planReason(input), bounds };
 }
 
-/** What the machine this server runs on has left, with this server's own heap
- *  taken back out of the promised total - it is about to be replaced, not added
- *  to. */
-async function machineBounds(
+/** The machine this server runs on, out of the owner's list. */
+async function machineOf(
     context: PlanContext,
-    currentMb: number
-): Promise<{ machineTotalMb: number | null; otherServersMb: number }> {
-    const machines = await listGameMachines(context.ownerId, false).catch(() => []);
+    machines: readonly GameMachine[]
+): Promise<GameMachine | undefined> {
     const target = context.targetId
         ? await prisma.deployTarget
               .findFirst({
@@ -166,15 +176,7 @@ async function machineBounds(
               .catch(() => null)
         : null;
     const machineId = target?.kind === "host" && target.hostId ? target.hostId : "local";
-    const machine = machines.find((entry) => entry.id === machineId);
-    if (!machine) return { machineTotalMb: null, otherServersMb: 0 };
-    return {
-        machineTotalMb:
-            machine.memoryTotalBytes !== null
-                ? Math.floor(machine.memoryTotalBytes / (1024 * 1024))
-                : null,
-        otherServersMb: Math.max(0, machine.committedMb - currentMb)
-    };
+    return machines.find((entry) => entry.id === machineId);
 }
 
 /**
@@ -186,25 +188,34 @@ async function machineBounds(
  */
 export async function applyPlannedMemory(
     context: PlanContext,
-    options: { atLeastMb?: number } = {},
     now: Date = new Date()
-): Promise<{ fromMb: number; toMb: number; reason: string } | null> {
+): Promise<{ fromMb: number; toMb: number; reason: string; } | null> {
     if (plan.memoryMode(readInstallConfig(context.config)[plan.MEMORY_MODE_KEY]) !== "auto") return null;
-    const wanted = await plannedMemoryFor(context, now);
-    if (!wanted) return null;
-    const target = Math.max(wanted.wantedMb, options.atLeastMb ?? 0);
+    const planned = await plannedMemoryFor(context, now);
+    return planned ? writePlannedMemory(context, planned, false) : null;
+}
+
+/** Writes a plan already worked out. A server seen running out (`exhausted`) is
+ *  given a step past what it has, whatever the plan says - the plan is an estimate
+ *  and the crash is a fact. */
+async function writePlannedMemory(
+    context: PlanContext,
+    planned: PlannedMemory,
+    exhausted: boolean
+): Promise<{ fromMb: number; toMb: number; reason: string; } | null> {
+    const floor = exhausted ? (plan.raisedHeapMb(planned.currentMb, planned.bounds) ?? 0) : 0;
+    const target = Math.max(planned.wantedMb, floor);
     // Only upwards, and - for a server that is merely growing - only when the
     // difference is worth the restart it will be picked up by. A server that has
     // already run out is the exception: half a gigabyte it can actually use beats
-    // a tidy figure it cannot, so the caller that has seen the evidence passes a
-    // floor and the tolerance stands aside for it.
-    const floor = options.atLeastMb ?? 0;
-    const worthIt = floor > 0 ? target > wanted.currentMb : target > wanted.currentMb + TOLERANCE_MB;
+    // a tidy figure it cannot, so the tolerance stands aside for it.
+    const worthIt =
+        floor > 0 ? target > planned.currentMb : target >= planned.currentMb + TOLERANCE_MB;
     if (!worthIt) return null;
     await setEnvVars("application", context.applicationId, context.ownerId, [
         { key: MEMORY_KEY, value: formatMemory(target), isSecret: false }
     ]);
-    return { fromMb: wanted.currentMb, toMb: target, reason: wanted.reason };
+    return { fromMb: planned.currentMb, toMb: target, reason: planned.reason };
 }
 
 /**
@@ -212,8 +223,9 @@ export async function applyPlannedMemory(
  *
  * Runs beside the crash-loop sweep, on the same minute, and is deliberately
  * lopsided: the plan is recomputed for every planned server (a handful of indexed
- * reads), while the log - the expensive part - is only read for a server that has
- * not been looked at for a quarter of an hour.
+ * reads, against one machine list for the whole sweep), while the log - the
+ * expensive part - is only read for a server that has a heap and has not been
+ * looked at for a quarter of an hour.
  */
 export async function sweepMemoryPlans(
     ownerId: string,
@@ -231,6 +243,7 @@ export async function sweepMemoryPlans(
         }
     });
 
+    let machines: GameMachine[] | null = null;
     let checked = 0;
     let raised = 0;
     let restarted = 0;
@@ -244,7 +257,6 @@ export async function sweepMemoryPlans(
             .findFirst({ where: { id: applicationId }, select: { desiredState: true } })
             .catch(() => null);
         if (app?.desiredState !== "running") continue;
-        checked += 1;
 
         const context: PlanContext = {
             installedAppId: install.id,
@@ -254,43 +266,45 @@ export async function sweepMemoryPlans(
             config: install.config,
             targetId: install.targetId
         };
+        machines ??= await listGameMachines(ownerId, false).catch(() => []);
+        const planned = await plannedMemoryFor(context, now, machines);
+        if (!planned) continue;
+        checked += 1;
 
         // Has it actually run out? Only asked of a server that has not been asked
         // recently, because this is the one expensive read here.
-        const watched = watchedAt(config);
+        const watched = recordedAt(config[MEMORY_WATCH_KEY]);
         const due = watched === null || now.getTime() - watched >= WATCH_EVERY_MS;
         let exhausted = false;
         if (due) {
             const log = await readAppRuntimeLog(applicationId, ownerId, WATCH_TAIL).catch(() => "");
-            exhausted = OUT_OF_MEMORY.test(log);
+            exhausted =
+                OUT_OF_MEMORY.test(log) &&
+                (await redeployedSince(applicationId, recordedAt(config[MEMORY_EXHAUSTED_KEY])));
             await patchInstallConfig(install.id, {
-                [MEMORY_WATCH_KEY]: now.toISOString()
+                [MEMORY_WATCH_KEY]: now.toISOString(),
+                ...(exhausted ? { [MEMORY_EXHAUSTED_KEY]: now.toISOString() } : {})
             }).catch(() => undefined);
         }
 
-        const current = await plannedMemoryFor(context, now);
-        if (!current) continue;
-        // A server that has run out needs more than it is running on, whatever the
-        // plan says - the plan is an estimate and the crash is a fact.
-        const floor = exhausted
-            ? (plan.raisedHeapMb(current.currentMb, {
-                  ceilingMb: plan.memoryCeilingMb(config[plan.MEMORY_CEILING_KEY]),
-                  ...(await machineBounds(context, current.currentMb))
-              }) ?? 0)
-            : 0;
-        const applied = await applyPlannedMemory(context, { atLeastMb: floor }, now).catch(
-            () => null
-        );
+        const applied = await writePlannedMemory(context, planned, exhausted).catch(() => null);
         if (!applied) continue;
         raised += 1;
+        const machine = await machineOf(context, machines);
+        machines = machines.map((entry) =>
+            entry === machine
+                ? { ...entry, committedMb: entry.committedMb + applied.toMb - applied.fromMb }
+                : entry
+        );
 
         // Restarting is only ever the repair for a server that has already broken,
         // and only when it costs nobody their evening.
         const playing = await playersOnline(install.id, now);
         const repairNow = exhausted && playing === 0;
+        let done = false;
         if (repairNow) {
             const { deployApplication } = await import("@/lib/deploy-service");
-            const done = await deployApplication(applicationId, ownerId, null)
+            done = await deployApplication(applicationId, ownerId, null)
                 .then(() => true)
                 .catch(() => false);
             if (done) restarted += 1;
@@ -302,9 +316,11 @@ export async function sweepMemoryPlans(
             title: `${install.name} was given more memory`,
             body: exhausted
                 ? `It ran out of memory, so its heap went from ${formatMemory(applied.fromMb)} to ${formatMemory(applied.toMb)}.${
-                      repairNow
+                      done
                           ? " It was restarted onto it, since nobody was playing."
-                          : " It picks that up at its next restart."
+                          : repairNow
+                            ? " Restarting it onto that did not go through, so it picks it up at its next restart."
+                            : " It picks that up at its next restart."
                   }`
                 : `Its heap went from ${formatMemory(applied.fromMb)} to ${formatMemory(applied.toMb)} for ${applied.reason}. It picks that up at its next restart.`,
             href: `/apps/installed/${install.id}`,
@@ -315,13 +331,30 @@ export async function sweepMemoryPlans(
     return { checked, raised, restarted };
 }
 
-/** When this server was last read for an out-of-memory, in milliseconds, or null
- *  for one that never has been. */
-function watchedAt(config: Record<string, unknown>): number | null {
-    const value = config[MEMORY_WATCH_KEY];
+/** A time recorded on the install, in milliseconds, or null for one that never
+ *  was. */
+function recordedAt(value: unknown): number | null {
     if (typeof value !== "string") return null;
     const at = Date.parse(value);
     return Number.isFinite(at) ? at : null;
+}
+
+/** Whether the server has been deployed again since its last out-of-memory was
+ *  acted on. Until it has, the log still holds that same run - and a raised heap
+ *  is only picked up by a deploy, so there is nothing new to act on. */
+async function redeployedSince(applicationId: string, actedAt: number | null): Promise<boolean> {
+    if (actedAt === null) return true;
+    const deployment = await prisma.deployment
+        .findFirst({
+            where: {
+                deployableType: "application",
+                deployableId: applicationId,
+                createdAt: { gt: new Date(actedAt) }
+            },
+            select: { id: true }
+        })
+        .catch(() => null);
+    return deployment !== null;
 }
 
 /** How many people were on a minute ago, from the samples already being taken. A
