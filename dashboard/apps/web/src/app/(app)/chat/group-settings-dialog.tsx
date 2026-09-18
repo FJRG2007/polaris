@@ -102,7 +102,8 @@ export function GroupSettingsDialog({
                 <DialogHeader>
                     <DialogTitle>Group settings</DialogTitle>
                     <DialogDescription>
-                        Yours, because you run this group. Everything else about it is everybody&apos;s.
+                        Yours, because you run this group. Everything else about it is
+                        everybody&apos;s.
                     </DialogDescription>
                 </DialogHeader>
 

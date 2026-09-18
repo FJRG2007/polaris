@@ -80,9 +80,12 @@ export function NotificationFavicon() {
         };
     }, [style, waiting]);
 
-    useEffect(() => () => {
-        if (plain.current) applyFavicon(plain.current);
-    }, []);
+    useEffect(
+        () => () => {
+            if (plain.current) applyFavicon(plain.current);
+        },
+        []
+    );
 
     return null;
 }

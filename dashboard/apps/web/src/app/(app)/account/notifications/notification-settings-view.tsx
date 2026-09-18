@@ -78,7 +78,9 @@ export function NotificationSettingsView({
     senders: SmsSenderView[];
     deliveries: DeliveryView[];
 }) {
-    const [state, setState] = useState(() => new Map(rules.map((entry) => [entry.event, entry.rule])));
+    const [state, setState] = useState(
+        () => new Map(rules.map((entry) => [entry.event, entry.rule]))
+    );
     const [error, setError] = useState<string | null>(null);
     const [, startSaving] = useTransition();
 
@@ -123,7 +125,10 @@ export function NotificationSettingsView({
                 />
             ))}
 
-            <DestinationsCard destinations={destinations} smsReady={senders.some((s) => s.status === "connected")} />
+            <DestinationsCard
+                destinations={destinations}
+                smsReady={senders.some((s) => s.status === "connected")}
+            />
             <DeliveryLog deliveries={deliveries} />
         </div>
     );
@@ -161,12 +166,9 @@ function BrowserNoticesCard() {
 
     const said: Record<Standing, string> = {
         app: "The Polaris app draws these itself. Nothing to allow.",
-        granted:
-            "Polaris can tell you about a call or a message while you are on another tab.",
-        denied:
-            "This browser is blocking them. Allow notifications for this site in its settings to turn them back on.",
-        askable:
-            "Let Polaris tell you about a call or a message while you are on another tab.",
+        granted: "Polaris can tell you about a call or a message while you are on another tab.",
+        denied: "This browser is blocking them. Allow notifications for this site in its settings to turn them back on.",
+        askable: "Let Polaris tell you about a call or a message while you are on another tab.",
         unsupported: "This browser cannot show them."
     };
 
@@ -448,7 +450,9 @@ function EventGroup({
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <p className="text-sm font-medium">{entry.label}</p>
-                                        <p className="text-xs text-muted-foreground">{entry.description}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {entry.description}
+                                        </p>
                                     </div>
                                     {isMuted(rule) ? <Badge>Muted</Badge> : null}
                                 </div>
@@ -486,7 +490,9 @@ function RuleChips({
         const on = rule.destinations.includes(id);
         onChange(eventId, {
             ...rule,
-            destinations: on ? rule.destinations.filter((entry) => entry !== id) : [...rule.destinations, id]
+            destinations: on
+                ? rule.destinations.filter((entry) => entry !== id)
+                : [...rule.destinations, id]
         });
     }
 
@@ -515,7 +521,11 @@ function RuleChips({
                     label={destination.name}
                     on={rule.destinations.includes(destination.id)}
                     disabled={!destination.enabled}
-                    title={destination.enabled ? destination.targetHint : "This destination is switched off"}
+                    title={
+                        destination.enabled
+                            ? destination.targetHint
+                            : "This destination is switched off"
+                    }
                     onClick={() => toggleDestination(destination.id)}
                 />
             ))}

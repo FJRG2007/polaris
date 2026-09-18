@@ -97,7 +97,9 @@ export function onFaviconStyleChange(listener: () => void): () => void {
 
 /** A stored value that may have been written by another build, or by hand. */
 export function asFaviconStyle(value: string | null | undefined): FaviconStyle {
-    return FAVICON_STYLES.includes(value as FaviconStyle) ? (value as FaviconStyle) : DEFAULT_FAVICON_STYLE;
+    return FAVICON_STYLES.includes(value as FaviconStyle)
+        ? (value as FaviconStyle)
+        : DEFAULT_FAVICON_STYLE;
 }
 
 /**

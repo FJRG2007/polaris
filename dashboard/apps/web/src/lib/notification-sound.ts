@@ -145,7 +145,10 @@ export function onSoundVolumeChange(listener: () => void): () => void {
  * reflects the same alerts read on another device is not news here, and the
  * snapshot taken at first paint must not chime for everything already waiting.
  */
-export function hasNewArrival(seen: Set<string>, rows: Array<{ id: string; read: boolean; }>): boolean {
+export function hasNewArrival(
+    seen: Set<string>,
+    rows: Array<{ id: string; read: boolean }>
+): boolean {
     let arrived = false;
     for (const row of rows) {
         if (seen.has(row.id)) continue;
@@ -171,7 +174,11 @@ export function playNotificationSound(): void {
         };
         // A context created before the page was interacted with starts suspended,
         // and notes scheduled while it is are dropped, so it is resumed first.
-        if (audio.state === "suspended") void audio.resume().then(ring).catch(() => undefined);
+        if (audio.state === "suspended")
+            void audio
+                .resume()
+                .then(ring)
+                .catch(() => undefined);
         else ring();
     } catch {
         // No audio device, or a browser that will not start one. Nothing to recover.

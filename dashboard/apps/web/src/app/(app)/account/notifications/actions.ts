@@ -16,7 +16,10 @@ import { testDestination } from "@/lib/notifications/dispatch";
 import { soundVolumeSchema } from "@/lib/notifications/sound-volume";
 import { saveSoundVolume } from "@/lib/notifications/sound-volume-service";
 import { destinationInputSchema, isNotificationEvent, notificationRuleSchema } from "@polaris/core";
-import { getNotificationPreferences, saveNotificationPreferences } from "@/lib/notifications/preferences";
+import {
+    getNotificationPreferences,
+    saveNotificationPreferences
+} from "@/lib/notifications/preferences";
 import {
     createDestination,
     deleteDestination,
@@ -129,7 +132,10 @@ export async function saveNotificationRuleAction(input: unknown): Promise<{ erro
     }
 
     const preferences = await getNotificationPreferences(user.id);
-    await saveNotificationPreferences(user.id, { ...preferences, [parsed.data.event]: parsed.data.rule });
+    await saveNotificationPreferences(user.id, {
+        ...preferences,
+        [parsed.data.event]: parsed.data.rule
+    });
     revalidatePath("/account/notifications");
     return {};
 }

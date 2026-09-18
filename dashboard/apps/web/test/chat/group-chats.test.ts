@@ -160,7 +160,9 @@ describe("naming a group", () => {
 
     it("is not a thing a one-to-one conversation has", async () => {
         kind = "dm";
-        await expect(chat.renameGroup(ada, "channel-1", "Us two")).rejects.toThrow(/no name to set/);
+        await expect(chat.renameGroup(ada, "channel-1", "Us two")).rejects.toThrow(
+            /no name to set/
+        );
     });
 });
 
@@ -172,9 +174,9 @@ describe("adding people", () => {
 
     it("stops at the size a group holds", async () => {
         members = Array.from({ length: 25 }, (_, index) => `person-${index}`).concat("ada");
-        await expect(
-            chat.addChannelMembers(ada, "channel-1", ["one-too-many"])
-        ).rejects.toThrow(/Make a channel/);
+        await expect(chat.addChannelMembers(ada, "channel-1", ["one-too-many"])).rejects.toThrow(
+            /Make a channel/
+        );
     });
 });
 
@@ -241,9 +243,9 @@ describe("leaving", () => {
 
     it("is not something they may do to somebody else", async () => {
         // The rule that keeps a group a group.
-        await expect(
-            chat.removeChannelMember(ada, "channel-1", "grace")
-        ).rejects.toThrow(/Only the person leaving/);
+        await expect(chat.removeChannelMember(ada, "channel-1", "grace")).rejects.toThrow(
+            /Only the person leaving/
+        );
         expect(written.removed).toBeUndefined();
     });
 

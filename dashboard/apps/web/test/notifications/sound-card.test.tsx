@@ -29,7 +29,9 @@ describe("the sound setting", () => {
         const markup = renderToStaticMarkup(
             <NotificationSettingsView rules={[]} destinations={[]} senders={[]} deliveries={[]} />
         );
-        const switchMarkup = markup.slice(markup.indexOf('aria-label="Play a sound when a notification arrives"') - 200);
+        const switchMarkup = markup.slice(
+            markup.indexOf('aria-label="Play a sound when a notification arrives"') - 200
+        );
         expect(markup).toContain("Play a chime when a notification or message arrives");
         expect(switchMarkup).toContain('aria-checked="true"');
     });
