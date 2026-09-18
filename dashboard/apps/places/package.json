@@ -4,6 +4,10 @@
     "private": true,
     "type": "module",
     "description": "Places: cameras, devices, people and alerts for the places somebody looks after. An installable Polaris app.",
+    "polaris": {
+        "id": "home",
+        "extension": "src/lib/places-extension.ts#placesExtension"
+    },
     "dependencies": {
         "@polaris/app-host": "0.1.0",
         "@polaris/config": "0.1.0",

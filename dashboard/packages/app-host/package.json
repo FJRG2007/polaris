@@ -23,6 +23,8 @@
     },
     "devDependencies": {
         "@types/react": "19.0.7",
+        "esbuild": "0.28.1",
+        "jszip": "3.10.1",
         "react": "19.0.0"
     }
 }

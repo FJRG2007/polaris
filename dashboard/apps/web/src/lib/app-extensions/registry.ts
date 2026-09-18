@@ -9,6 +9,7 @@
  * Server-only.
  */
 
+import { withBundleSlot } from "@/lib/app-bundles/code";
 import { installedExtensions } from "./installed";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import type { BackupSource } from "@/lib/backups/sources/types";
@@ -137,7 +138,7 @@ export async function firewallSlot(
 ): Promise<AppSlot | null> {
     for (const extension of extensions()) {
         const slot = await extension.firewallSlot?.(ownerId, applicationId);
-        if (slot) return slot;
+        if (slot) return withBundleSlot(slot);
     }
     return null;
 }
@@ -163,7 +164,7 @@ export async function appReaches(appId: string, userId: string): Promise<boolean
 export async function installedPanelSlot(install: ExtensionInstall): Promise<AppSlot | null> {
     for (const extension of extensions()) {
         const slot = await extension.installedPanelSlot?.(install);
-        if (slot) return slot;
+        if (slot) return withBundleSlot(slot);
     }
     return null;
 }

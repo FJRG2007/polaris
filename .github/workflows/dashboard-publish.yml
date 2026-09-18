@@ -204,6 +204,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       digest: ${{ steps.build.outputs.digest }}
+      # {"<app>": "<manifest digest>"} for the bundles this image names.
+      bundles: ${{ steps.bundles.outputs.list }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -220,6 +222,7 @@ jobs:
           build-args: |
             POLARIS_BUILD_SHA=${{ github.sha }}
             NODE_BUILD_OPTIONS=--max-old-space-size=8192
+            POLARIS_APP_BUNDLES=publish
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
           cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web,mode=max
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=true
@@ -232,6 +235,32 @@ jobs:
           # so the index carries the two images and nothing else.
           provenance: false
           sbom: false
+      # The installable apps' bundles, from the same build: every layer is already
+      # in this builder, so this only writes out the stage the image took its
+      # index from - the files the image names by digest, and nothing else.
+      - name: Export the app bundles
+        uses: docker/build-push-action@v6
+        with:
+          context: dashboard
+          file: dashboard/docker/Dockerfile
+          target: app-bundles
+          build-args: |
+            POLARIS_BUILD_SHA=${{ github.sha }}
+            NODE_BUILD_OPTIONS=--max-old-space-size=8192
+            POLARIS_APP_BUNDLES=publish
+          cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
+          outputs: type=local,dest=${{ runner.temp }}/app-bundles
+      # Pushed untagged, like the image; the `tag` job names them once the suites
+      # are green. A dashboard downloads a bundle only by the digest its image
+      # names, so one pushed here and never tagged is never fetched by anybody.
+      - name: Publish the app bundles
+        id: bundles
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash dashboard/docker/app-bundles.sh push "$RUNNER_TEMP/app-bundles"
+          echo "list=$(jq -c '.apps | map_values(.manifest)' "$RUNNER_TEMP/app-bundles/index.json")" >> "$GITHUB_OUTPUT"
 
   mdns:
     needs: changes
@@ -566,6 +595,20 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+        if: ${{ needs.web.result == 'success' }}
+        with:
+          sparse-checkout: dashboard/docker/app-bundles.sh
+          sparse-checkout-cone-mode: false
+      # Before the dashboard: a `latest` that names bundles nobody tagged would
+      # lose them to the next prune.
+      - name: Tag the app bundles
+        if: ${{ needs.web.result == 'success' && needs.web.outputs.bundles != '' }}
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLES: ${{ needs.web.outputs.bundles }}
+        run: bash dashboard/docker/app-bundles.sh tag "$BUNDLES"
       - name: Tag the dashboard
         if: ${{ needs.web.result == 'success' }}
         run: |

@@ -168,6 +168,8 @@ export async function installApp(
         // An app the switcher only draws once it exists has to appear on the next
         // screen, not at the end of a cache window.
         invalidateInstallPresence(app.id);
+        // Its code, when it comes as a bundle.
+        await (await import("@/lib/app-bundles/lifecycle")).appInstalled(app.id);
         // The helper containers an earlier uninstall brought down, with their
         // settings and data, come back with the app.
         await resumeOwnedServices(app.id, actorId).catch(() => undefined);
@@ -588,6 +590,7 @@ export async function uninstallApp(ownerId: string, id: string): Promise<void> {
     // The helper containers it ran come down with it; their data stays.
     if (!(await isStillInstalled(row.catalogId))) {
         await pauseOwnedServices(row.catalogId).catch(() => undefined);
+        await (await import("@/lib/app-bundles/lifecycle")).appUninstalled(row.catalogId);
     }
     // And gone: a switcher still offering it opens a screen for something that
     // is no longer installed.

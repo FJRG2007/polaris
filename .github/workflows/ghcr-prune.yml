@@ -12,7 +12,9 @@ name: Prune published images
 # publish red, which is right - this is housekeeping, not delivery.
 #
 # What is never deleted: the version carrying the `latest` tag, and every digest
-# that version references. A multi-arch image is an index whose per-architecture
+# that version references. In the dashboard's package, also the installable apps'
+# bundles the latest dashboard names, which carry a `latest-app-<id>` tag moved in
+# the same job as `latest`; every older bundle goes like an older image. A multi-arch image is an index whose per-architecture
 # manifests are themselves untagged, and a build attestation is another untagged
 # child - deleting those would leave `latest` pointing at manifests the registry
 # no longer holds, which breaks the pull for everyone. When the tag cannot be
@@ -153,6 +155,12 @@ jobs:
                 [ -z "${tags:-}" ] || continue
               else
                 case ",${tags:-}," in *,latest,*) continue;; esac
+                # The installable apps' bundles live in the dashboard's package,
+                # each tagged `latest-app-<id>` by the job that moves `latest`
+                # (see dashboard/docker/app-bundles.sh). The tag is what the
+                # latest dashboard downloads; a bundle it has moved off is a
+                # replaced build like any other.
+                case ",${tags:-}," in *,latest-app-*) continue;; esac
                 # Fed by a here-string, not a pipe: `grep -q` closing the pipe on
                 # its first hit fails the writer under `pipefail`, and a digest
                 # that is on the keep list would read as one that is not.
