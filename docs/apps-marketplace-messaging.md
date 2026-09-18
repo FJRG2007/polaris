@@ -526,6 +526,26 @@ configured means the machine's own address, as before.
   drag is refused and says which. Vanilla has no `/data modify` for players, so a
   move is two `item replace` writes and each re-reads its slot first; a stack the
   player moved underneath refuses instead of overwriting.
+- **The item palette searches what the server's mods add, not only vanilla's
+  1396.** The grid draws the vanilla catalogue at once and appends a second
+  batch fetched from the server's own route
+  (`/api/apps/installed/[id]/minecraft/items`) as soon as it arrives, so a slow
+  first read on a heavily-modded server never blocks the picker opening.
+  The route (`lib/apps/minecraft/mod-items-service.ts`) reads the server's
+  `MODRINTH_PROJECTS` list, fetches each mod's jar once per build (verified
+  against Modrinth's own SHA-1, capped in size and in decompressed bytes) and
+  keeps the result on disk keyed by the jar's hash, so a build already read is
+  never downloaded twice. `lib/apps/minecraft/mod-items.ts` is the pure reader
+  that turns a jar into ids, labels and pictures: ids and labels come from the
+  mod's own item definitions (or, for a mod built before that format existed,
+  from its models) and `en_us` translations, and a picture follows the model
+  chain to a texture in the jar or, when the model points at a vanilla one
+  Polaris already ships, borrows that instead. A plugin server or one with no
+  mods triggers none of this. Past 24 mods on the list, or past 45 seconds
+  spent reading, the rest is left for the next time the picker opens rather
+  than waited on or silently dropped: the panel is told which mods were
+  skipped, which could not be read, and whether the list is still incomplete,
+  and says so under the grid.
 - **Decisions that wait.** Giving an item needs the player present; banning only
   needs the server up. Either way the decision gets made while they are asleep, so
   it is written down (`PlayerActionQueue`) and applied by the same passes that
