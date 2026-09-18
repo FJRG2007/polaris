@@ -325,11 +325,12 @@ for a record they will never use.
 **What creating a server asks, and what it works out.** Who plays on it (Java,
 Bedrock, or a Java world Bedrock joins through Geyser), what it plays (a
 blueprint), and how many people will be on it at once. From that: the image, the
-heap (`recommendedMemoryMb` - sized from concurrent players, not from the slot
-count), the plugins the blueprint needs, whether a second UDP port has to be
-published for crossplay, and the address. The machine picker shows what each
-machine has free and what its game servers are already promised, so a server is
-not put where it does not fit.
+heap (`plannedHeapMb` - sized from concurrent players, not from the slot count,
+plus what the software and the mod list on it cost, see "A heap planned from what
+the server is" below), the plugins the blueprint needs, whether a second UDP port
+has to be published for crossplay, and the address. The machine picker shows what
+each machine has free and what its game servers are already promised, so a server
+is not put where it does not fit.
 
 **Blueprints are presets, not content.** Each names real Modrinth projects the
 image installs itself, with `?` so a Minecraft release they have no build for yet
@@ -344,6 +345,29 @@ runs on and a server that is never created downloads nothing. A map settles what
 the blueprint had guessed at - its release, its settings, and its plugins, which
 it removes rather than adds to, since a map carrying its own game does not want a
 plugin providing a second one. Every map credits its author and links its page.
+
+**A heap planned from what the server is, not from what it was created with.**
+The figure typed at creation was never revisited, which is survivable for a
+vanilla server and wrong for one later given a mod loader and six mods: a loader
+alone costs about a gigabyte before a single mod is installed, and what that
+looks like from inside the game is not an error - chunks stop generating and
+mobs stop moving while the tick rate still reads twenty, because the thread that
+died is the one nobody watches. A new Java server is created in `auto` mode, and
+its heap is planned from its loader, its mod list and the busiest player count
+its samples have actually seen in the last `PEAK_DAYS`
+(`lib/apps/minecraft/memory-plan.ts`), bounded by a per-server ceiling (the
+Memory card on Settings, 2-16 GB) and by what its machine can still spare
+(`lib/apps/games-memory.ts`).
+The plan only ever raises the figure and only ever at a restart already
+happening for another reason - create, settings save, reset - except a server
+that has already run out of memory with nobody on it, which the same cron pass
+that sweeps crash loops (`runGameHealth` in `games-jobs.ts`) restarts onto a
+raised heap, since restarting is the repair there. A server made before this, or
+an operator typing a figure into Settings by hand, keeps `fixed` mode and is left
+exactly as it was - nothing here ever changes a deployment that did not ask for
+it, and the plan never lowers a heap on its own. Both moves and every exhausted
+server produce a notification, so an operator finds out from Polaris rather than
+from players.
 
 **The address is a name.** `<label>.mc.<baseDomain>`, with an A record and - for
 Java - a `_minecraft._tcp` SRV record, so players type a name and no port at all.
