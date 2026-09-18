@@ -518,7 +518,11 @@ export function CallRoom({
     }
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+        // Clipped, because the band this is drawn in is capped and nothing in it
+        // may paint over the conversation underneath - which is what a short
+        // window with a notice up used to look like: the messages drawn under
+        // the call's own rows.
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3">
             {/* What is not a control: bringing somebody in, and writing the call
                 down. Both are one-off decisions rather than things anybody
                 reaches for mid-sentence, so they sit up here as icons and leave
@@ -575,6 +579,13 @@ export function CallRoom({
                 </p>
             )}
 
+            {/* What the call says about itself, in a strip of its own that
+                shrinks and scrolls before anything else gives way. On a square
+                or short screen these notices used to take their full height
+                out of a band that had none to give, and the rows below them -
+                the pictures, and the controls somebody needs to leave the call
+                - were pushed out over the conversation. */}
+            <div className="flex min-h-12 shrink flex-col gap-3 overflow-y-auto overscroll-contain empty:hidden">
             {/* Why the call is silent, when it is. Everything else on this
                 screen is true before any sound has moved, so a call carrying
                 nothing looked exactly like one that worked. See
@@ -608,6 +619,7 @@ export function CallRoom({
                     </span>
                 </p>
             )}
+            </div>
 
             <CombineStrip call={call} />
 
