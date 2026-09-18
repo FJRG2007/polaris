@@ -10,7 +10,7 @@
 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 
 const folder = await mkdtemp(join(tmpdir(), "polaris-mod-items-"));
@@ -23,6 +23,9 @@ process.env.POLARIS_AUTH_SECRET ??= "a-long-enough-string-for-the-schema";
 process.env.POLARIS_MASTER_KEY ??= Buffer.alloc(32, 7).toString("base64");
 
 const { modItemIcon } = await import("@/lib/apps/minecraft/mod-items-service");
+const { forgetModItems, loadModItems } = await import(
+    "@/app/(app)/apps/installed/[id]/minecraft-mod-items"
+);
 
 const BUILD = "d45f4a0290360cc5bcbe241cd35785a8085d1d1b";
 const NAME = "securitycraft.item.keycard_lv1";
@@ -48,5 +51,65 @@ describe("a kept picture", () => {
         expect(await modItemIcon(BUILD, "../../../.env")).toBeNull();
         expect(await modItemIcon(BUILD, "a/b")).toBeNull();
         expect(await modItemIcon(BUILD, "")).toBeNull();
+    });
+});
+
+/**
+ * What the panel keeps, and for how long.
+ *
+ * The server reads what it can inside a budget and says whether it got to the end
+ * of the list. Keeping a half-read answer for the full five minutes is the rest of
+ * the server's mods not appearing until somebody reloads the tab - and the reading
+ * that would have finished them is one the cache never asks for. A failed request
+ * is the same trap with a worse shape.
+ */
+describe("the panel's copy of the modded catalogue", () => {
+    const server = "8f1b6b2e-0000-4000-8000-000000000000";
+    let asked: string[] = [];
+
+    function answers(body: unknown, ok = true): void {
+        vi.stubGlobal("fetch", async (url: string) => {
+            asked.push(url);
+            if (url.includes("mcicons")) return { ok: true, json: async () => [] };
+            return { ok, status: ok ? 200 : 500, json: async () => body };
+        });
+    }
+
+    beforeEach(() => {
+        asked = [];
+        forgetModItems();
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    const one = {
+        id: "securitycraft:keycard_lv1",
+        label: "Level 1 Keycard",
+        mod: "security-craft",
+        build: BUILD,
+        icon: null
+    };
+
+    it("asks once for an answer that is the whole list", async () => {
+        answers({ items: [one], unread: [], complete: true });
+        expect((await loadModItems(server)).items).toHaveLength(1);
+        await loadModItems(server);
+        expect(asked.filter((url) => url.includes("/minecraft/items"))).toHaveLength(1);
+    });
+
+    it("asks again after one the server could not finish", async () => {
+        answers({ items: [one], unread: [], complete: false });
+        expect((await loadModItems(server)).items).toHaveLength(1);
+        await loadModItems(server);
+        expect(asked.filter((url) => url.includes("/minecraft/items"))).toHaveLength(2);
+    });
+
+    it("asks again after one that failed, rather than keeping the failure", async () => {
+        answers({}, false);
+        expect((await loadModItems(server)).items).toEqual([]);
+        await loadModItems(server);
+        expect(asked.filter((url) => url.includes("/minecraft/items"))).toHaveLength(2);
     });
 });

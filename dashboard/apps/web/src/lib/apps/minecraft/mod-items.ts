@@ -361,10 +361,17 @@ function namespacesIn(paths: ReadonlySet<string>): string[] {
  *
  * The item definitions when the jar has them, because a filename in that folder
  * is a registered item and nothing else is. Only when it has none - a mod built
- * before 1.21.4 - are the models read instead: every item model, and every block
- * model the translations carry a `block.` label for. The translations only ever
- * confirm a path a model file already named, so a key like
- * `item.<mod>.<path>.tooltip` is never taken for an item.
+ * before 1.21.4 - are the models read instead, and then only the ones the
+ * translations name: a model folder also holds the states a thing is drawn in
+ * and the templates others are built from, and none of those is an item.
+ *
+ * Both halves are needed and neither is enough. The models say what exists as a
+ * file; the translations say which of those the game has a name for, and a thing
+ * the game never names is a thing an operator cannot be handed. On SecurityCraft's
+ * 1.20.1 build that is 642 items out of 672 model files, and the 30 it drops are
+ * `camera_monitor_idle`, `codebreaker_decoding` and the other drawing states.
+ * Reading the translations alone would be worse in the other direction, because
+ * `item.<mod>.<path>.tooltip` is a key and not an item.
  */
 function itemPathsIn(
     paths: ReadonlySet<string>,
@@ -380,9 +387,13 @@ function itemPathsIn(
     const defined = namesIn("items").sort();
     if (defined.length > 0) return defined;
 
-    const named = new Set(namesIn("models/item"));
-    for (const path of namesIn("models/block")) {
-        if (words[`block.${namespace}.${path.replace(/\//g, ".")}`] !== undefined) named.add(path);
-    }
-    return [...named].filter((path) => !path.includes(".")).sort();
+    const labelled = (path: string): boolean => {
+        const key = path.replace(/\//g, ".");
+        return (
+            typeof words[`item.${namespace}.${key}`] === "string" ||
+            typeof words[`block.${namespace}.${key}`] === "string"
+        );
+    };
+    const named = new Set([...namesIn("models/item"), ...namesIn("models/block")]);
+    return [...named].filter((path) => !path.includes(".") && labelled(path)).sort();
 }

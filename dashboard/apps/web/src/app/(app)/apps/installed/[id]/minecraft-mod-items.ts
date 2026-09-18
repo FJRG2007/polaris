@@ -90,7 +90,14 @@ let filled = 0;
 export function loadModItems(installedAppId: string): Promise<ModItemsLoad> {
     const held = loads.get(installedAppId);
     if (held && Date.now() - held.at < TTL_MS) return held.load;
-    const load = fetchModItems(installedAppId).catch(() => ({ items: [], note: null }));
+    const load = fetchModItems(installedAppId).catch(() => {
+        // Not kept as a failure, for the reason the vanilla loader does not keep
+        // one either: the next open should be allowed to try rather than inherit
+        // this one. It still resolves - a picker with no modded items is where
+        // this started, and not something to fail a grid over.
+        loads.delete(installedAppId);
+        return { items: [], note: null };
+    });
     loads.set(installedAppId, { at: Date.now(), load });
     return load;
 }
@@ -114,6 +121,13 @@ async function fetchModItems(installedAppId: string): Promise<ModItemsLoad> {
     if (items.length > 0) {
         filled += 1;
         for (const listener of listeners) listener();
+    }
+
+    // A half-read answer is kept only until the next open: the server reads what
+    // it did not reach then, and a five-minute cache would be the rest of the
+    // server's mods missing until somebody reloaded the tab.
+    if ((payload as { complete?: unknown } | null)?.complete === false) {
+        loads.delete(installedAppId);
     }
 
     return { items: modCatalogItems(items), note: noteFor(payload, items.length) };
@@ -143,6 +157,12 @@ export function noteFor(payload: unknown, found: number): string | null {
         lines.push(`Could not read the items ${names.join(", ")} adds. They can still be typed as ids.`);
     }
     return lines.length > 0 ? lines.join(" ") : null;
+}
+
+/** Drop everything held, so a test starts from the state a fresh tab is in. */
+export function forgetModItems(): void {
+    loads.clear();
+    pictures.clear();
 }
 
 /** The picture for a modded item, once its server's catalogue has been read. */

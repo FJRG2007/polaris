@@ -213,6 +213,9 @@ export function defaultModFor(env: ReadonlyMap<string, string>): string | null {
  */
 export const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
+/** The release a server is pinned to, or LATEST. */
+export const VERSION_KEY = "VERSION";
+
 /**
  * The environment key the server's software is saved under.
  *
@@ -226,18 +229,6 @@ export const PROJECTS_KEY = "MODRINTH_PROJECTS";
  * the string, those cannot drift from it.
  */
 export const SOFTWARE_KEY = "TYPE";
-
-/**
- * The environment key the release is saved under.
- *
- * Beside the other two because the three are always read together: which builds
- * of a project fit this server is the loader and the release at once, and every
- * screen that asks Modrinth anything asks it with both.
- *
- * `LATEST` is a legitimate value and it is not a release, so a reader has to
- * decide what an unknown release means to it rather than compare the string.
- */
-export const VERSION_KEY = "VERSION";
 
 /**
  * The same list with the password-on-join project on it.

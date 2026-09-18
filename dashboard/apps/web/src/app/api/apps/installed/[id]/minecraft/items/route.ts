@@ -26,5 +26,9 @@ export async function GET(
     const { id } = await params;
     const { access } = await requireGameServer("games.read", id);
     const read = await serverModItems(access.ownerId, id).catch(() => null);
-    return NextResponse.json(read ?? { items: [], unread: [] });
+    // `complete` is false when the budget ran out with mods still to read, and the
+    // panel needs it: what it does with an answer is keep it for a few minutes,
+    // and keeping a half-read one that long is the rest of the list not appearing
+    // until somebody reloads the tab.
+    return NextResponse.json(read ?? { items: [], unread: [], complete: false });
 }

@@ -94,12 +94,22 @@ export interface ServerModItem extends modItems.ModItem {
 
 export interface ServerModItems {
     readonly items: readonly ServerModItem[];
+    /**
+     * Whether this is the whole list.
+     *
+     * False when the budget ran out with entries still to read. The panel needs
+     * to be told, because what it does with an answer is keep it: a partial one
+     * held for five minutes is a server whose remaining mods do not appear until
+     * somebody reloads the tab, and the reading that would have finished them is
+     * one the cache never asks for.
+     */
+    readonly complete: boolean;
     /** Mods whose jar could not be read, by the name on the list. The screen says
      *  so rather than quietly showing a shorter catalogue than the server has. */
     readonly unread: readonly string[];
 }
 
-const EMPTY: ServerModItems = { items: [], unread: [] };
+const EMPTY: ServerModItems = { items: [], unread: [], complete: true };
 
 /**
  * Everything the mods on one server add.
@@ -122,18 +132,27 @@ export async function serverModItems(ownerId: string, installedAppId: string): P
     const taken = new Set<string>();
     const unread: string[] = [];
     const until = Date.now() + READ_BUDGET_MS;
+    let complete = true;
     for (const entry of entries) {
         const slug = projectSlug(entry);
         if (slug === null) continue;
         // Out of time is not the same as unreadable, and is not reported as it:
         // what is left is read on the next open, from a cache that is by then one
         // mod shorter.
-        if (Date.now() >= until) break;
-        const read = await catalogFor(entry, slug, loader, settings.version, until).catch(() => null);
+        if (Date.now() >= until) {
+            complete = false;
+            break;
+        }
+        const read = await catalogFor(entry, slug, loader, settings.version, until).catch(
+            (caught: unknown) => (caught instanceof OutOfTime ? "out of time" : null)
+        );
+        // A read the clock cut short is not a mod whose jar cannot be read, so it
+        // is left for the next open rather than reported as broken.
+        if (read === "out of time") {
+            complete = false;
+            break;
+        }
         if (read === null) {
-            // A download the clock cut short is that same case rather than a mod
-            // whose jar cannot be read, so it is left rather than reported.
-            if (Date.now() >= until) break;
             unread.push(slug);
             continue;
         }
@@ -147,7 +166,7 @@ export async function serverModItems(ownerId: string, installedAppId: string): P
         // that are then dropped, so the walk stops here and not just the copy.
         if (items.length >= MAX_ITEMS) break;
     }
-    return { items, unread };
+    return { items, unread, complete };
 }
 
 /** One kept picture, or null when nothing was ever kept under that name. */
@@ -190,17 +209,30 @@ interface BuildCatalog {
     readonly items: readonly modItems.ModItem[];
 }
 
-/** Builds already being read, so two tabs opening the picker at the same moment
- *  fetch one jar between them rather than one each. */
-const reading = new Map<string, Promise<BuildCatalog | null>>();
+/**
+ * Builds already being read, so two tabs opening the picker at the same moment
+ * fetch one jar between them rather than one each.
+ *
+ * Each carries the deadline it was started under, because that is what decides
+ * whether its answer is one a joiner may take: a read that ended because the
+ * first caller's clock ran out says nothing about the jar, and a second caller
+ * who still has time should do it rather than inherit it.
+ */
+const reading = new Map<string, { until: number; work: Promise<BuildCatalog | null> }>();
+
+/** Thrown when the budget ran out rather than the jar being unreadable. The two
+ *  are different sentences on the screen: one names a mod as broken, the other
+ *  is a list that finishes assembling on the next open. */
+class OutOfTime extends Error {}
 
 /**
  * What one entry on the list adds, from the cache or from the jar.
  *
- * Throws only when the entry could not be resolved to a build at all - which is
- * the case the screen reports. A build that resolves and turns out to add no
- * items is an empty catalogue, and that is an ordinary answer: half the mods on a
- * normal server are libraries, data packs, or changes to how the game behaves.
+ * Throws `OutOfTime` when the clock ended it and an ordinary error when the entry
+ * could not be resolved or read - which is the one the screen reports. A build
+ * that resolves and turns out to add no items is an empty catalogue, and that is
+ * an ordinary answer: half the mods on a normal server are libraries, data packs,
+ * or changes to how the game behaves.
  */
 async function catalogFor(
     entry: string,
@@ -215,14 +247,33 @@ async function catalogFor(
     const kept = await readCatalog(build.sha1);
     if (kept !== null) return { build: build.sha1, title: kept.title, items: kept.items };
 
-    const key = build.sha1;
-    const inFlight =
-        reading.get(key) ??
-        readBuild(build.sha1, build.url, slug, until).finally(() => reading.delete(key));
-    reading.set(key, inFlight);
-    const read = await inFlight;
-    if (read === null) throw new Error(`Could not read ${build.filename}`);
+    const read = await sharedRead(build.sha1, build.url, slug, until);
+    if (read === null) {
+        if (Date.now() >= until) throw new OutOfTime(`Out of time reading ${build.filename}`);
+        throw new Error(`Could not read ${build.filename}`);
+    }
     return read;
+}
+
+/** One read of one build at a time, joined by anybody asking for the same build -
+ *  unless what they would join ended on a deadline earlier than their own, which
+ *  is a verdict about a clock rather than about a jar. */
+async function sharedRead(
+    sha1: string,
+    url: string,
+    slug: string,
+    until: number
+): Promise<BuildCatalog | null> {
+    const held = reading.get(sha1);
+    if (held) {
+        const joined = await held.work;
+        if (joined !== null || held.until >= until || Date.now() >= until) return joined;
+    }
+    const work = readBuild(sha1, url, slug, until).finally(() => {
+        if (reading.get(sha1)?.work === work) reading.delete(sha1);
+    });
+    reading.set(sha1, { until, work });
+    return work;
 }
 
 /** The catalogue kept for one build, or null when there is not one. */
@@ -294,19 +345,26 @@ async function readBuild(
         return null;
     }
 
-    const catalog = { title: slug, items: read.items };
-    await keep(sha1, catalog, read.icons);
-    return { build: sha1, title: catalog.title, items: catalog.items };
+    // Checked against the schema that reads it back, and the items that do not fit
+    // dropped rather than kept: one over-long texture or namespace in a file that
+    // is parsed on the way in would make the whole kept catalogue unreadable, and
+    // an unreadable one is the jar downloaded again on every single open.
+    const catalog = catalogSchema.safeParse({ title: slug, items: read.items });
+    const kept = catalog.success
+        ? catalog.data
+        : { title: slug, items: read.items.filter((item) => modItemSchema.safeParse(item).success) };
+    await keep(sha1, kept, read.icons);
+    return { build: sha1, title: kept.title, items: kept.items };
 }
 
 /** A promise that settles no later than `until`, rejecting when it would not. The
  *  work behind it carries on and is kept by whatever else is waiting on it. */
 function beforeDeadline<T>(work: Promise<T>, until: number): Promise<T> {
     const left = until - Date.now();
-    if (left <= 0) return Promise.reject(new Error("Out of time"));
+    if (left <= 0) return Promise.reject(new OutOfTime("Out of time"));
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("Out of time")), left);
+        timer = setTimeout(() => reject(new OutOfTime("Out of time")), left);
     });
     return Promise.race([work, late]).finally(() => clearTimeout(timer));
 }

@@ -244,6 +244,12 @@ describe("what a jar says a mod adds", () => {
                 }),
                 "assets/securitycraft/models/block/keypad_active.json": JSON.stringify({
                     textures: { all: "minecraft:block/iron_block" }
+                }),
+                // A model for a state the thing is drawn in, which the game never
+                // names because it is not a thing anybody can be handed. Thirty of
+                // SecurityCraft's 672 model files on 1.20.1 are these.
+                "assets/securitycraft/models/item/camera_monitor_idle.json": JSON.stringify({
+                    textures: { layer0: "securitycraft:item/camera_monitor" }
                 })
             })
         );
