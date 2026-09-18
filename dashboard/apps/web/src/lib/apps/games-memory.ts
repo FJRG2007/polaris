@@ -105,6 +105,28 @@ export async function planContextFor(
     };
 }
 
+/**
+ * The heap a reset settles on for a server that already exists.
+ *
+ * The shape's figure knows nothing about the server it lands on, so it is bounded
+ * here the way any plan is: by the operator's ceiling and by what the machine can
+ * spare. A server in automatic mode is also never taken below what it has - a
+ * reset is not a reason to undo a raise it grew or ran out into.
+ */
+export async function resetHeapMb(
+    ownerId: string,
+    installedAppId: string,
+    heapMb: number
+): Promise<number> {
+    const context = await planContextFor(installedAppId, ownerId);
+    const planned = context ? await plannedMemoryFor(context) : null;
+    if (!context || !planned) return heapMb;
+    const bounded = plan.clampHeapMb(heapMb, planned.bounds);
+    return plan.memoryMode(readInstallConfig(context.config)[plan.MEMORY_MODE_KEY]) === "auto"
+        ? Math.max(bounded, planned.currentMb)
+        : bounded;
+}
+
 /** What one server's plan comes to, and what bounded it. */
 export interface PlannedMemory {
     readonly wantedMb: number;
@@ -281,14 +303,38 @@ export async function sweepMemoryPlans(
             exhausted =
                 OUT_OF_MEMORY.test(log) &&
                 (await redeployedSince(applicationId, recordedAt(config[MEMORY_EXHAUSTED_KEY])));
-            await patchInstallConfig(install.id, {
-                [MEMORY_WATCH_KEY]: now.toISOString(),
-                ...(exhausted ? { [MEMORY_EXHAUSTED_KEY]: now.toISOString() } : {})
-            }).catch(() => undefined);
         }
 
-        const applied = await writePlannedMemory(context, planned, exhausted).catch(() => null);
-        if (!applied) continue;
+        let failed = false;
+        const applied = await writePlannedMemory(context, planned, exhausted).catch(() => {
+            failed = true;
+            return null;
+        });
+        if (due) {
+            await patchInstallConfig(install.id, {
+                [MEMORY_WATCH_KEY]: now.toISOString(),
+                ...(exhausted && !failed ? { [MEMORY_EXHAUSTED_KEY]: now.toISOString() } : {})
+            }).catch(() => undefined);
+        }
+        if (failed) continue;
+        if (!applied) {
+            if (exhausted) {
+                await createNotification({
+                    userId: ownerId,
+                    type: "games.memory-exhausted",
+                    title: `${install.name} ran out of memory`,
+                    body: `It ran out at ${formatMemory(planned.currentMb)}, which is as far as it may go: ${
+                        planned.currentMb >= plan.memoryCeilingMb(config[plan.MEMORY_CEILING_KEY])
+                            ? "that is its memory limit"
+                            : "that is all its machine can spare"
+                    }. Raise the limit under Memory, or free up memory on the machine, and restart it.`,
+                    href: `/apps/installed/${install.id}`,
+                    level: "warning",
+                    actionRequired: true
+                }).catch(() => undefined);
+            }
+            continue;
+        }
         raised += 1;
         const machine = await machineOf(context, machines);
         machines = machines.map((entry) =>

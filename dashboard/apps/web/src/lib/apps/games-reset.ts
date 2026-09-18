@@ -25,8 +25,9 @@ import { prisma } from "@polaris/db";
 import { PROJECTS_KEY } from "@/lib/apps/minecraft/join-guard";
 import { findMap, pinnedRelease } from "@/lib/apps/minecraft/maps";
 import { editionOf } from "@/lib/apps/minecraft/service";
-import { hasCrossplay } from "@/lib/apps/minecraft/blueprints";
+import { formatMemory, hasCrossplay } from "@/lib/apps/minecraft/blueprints";
 import { patchInstallConfig } from "@/lib/apps/install-config";
+import { parseMemoryMb } from "@/lib/apps/games-service";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { DEFAULT_LEVEL_TYPE } from "@/lib/apps/minecraft/world";
 import type { ResetMinecraftServerInput } from "@/lib/apps/games-schema";
@@ -125,6 +126,14 @@ export async function resetMinecraftServer(
         },
         current
     );
+    const shapedHeap = env.get("MEMORY");
+    if (shapedHeap) {
+        const { resetHeapMb } = await import("@/lib/apps/games-memory");
+        env.set(
+            "MEMORY",
+            formatMemory(await resetHeapMb(ownerId, installedAppId, parseMemoryMb(shapedHeap)))
+        );
+    }
 
     // Before anything is written, because starting the server is what applies the
     // environment: a set-aside that ran after this would boot the new release

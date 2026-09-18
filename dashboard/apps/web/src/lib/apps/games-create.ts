@@ -411,9 +411,9 @@ export async function expectedMinecraftHeapMb(
         mapFor(blueprint, input.mapId)
     );
     const heapMb = shapeHeapMb(env, blueprint, input.concurrentPlayers);
-    return input.installedAppId
-        ? heapMb
-        : heapForMachine(ownerId, input.serverId ?? "local", heapMb);
+    if (!input.installedAppId) return heapForMachine(ownerId, input.serverId ?? "local", heapMb);
+    const { resetHeapMb } = await import("@/lib/apps/games-memory");
+    return resetHeapMb(ownerId, input.installedAppId, heapMb);
 }
 
 /** The blueprint a shape names, refusing one this edition cannot be built from. */

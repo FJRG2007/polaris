@@ -33,6 +33,7 @@ let playersNow = 0;
 let busiest = 0;
 let deployed: string[] = [];
 let deployFails = false;
+let writeFails = false;
 let redeployed = false;
 let notified: Array<{ type: string; title: string; body: string }> = [];
 let machines: Array<{ id: string; memoryTotalBytes: number | null; committedMb: number }> = [];
@@ -62,6 +63,7 @@ vi.mock("@/lib/env-var-service", () => ({
         _ownerId: string,
         vars: Array<{ key: string; value: string }>
     ) => {
+        if (writeFails) throw new Error("database unavailable");
         saved.push(...vars);
         for (const item of vars) env[item.key] = item.value;
         return vars.length;
@@ -100,7 +102,7 @@ vi.mock("@/lib/apps/games-service", async (importOriginal) => {
     return { ...real, listGameMachines: async () => machines };
 });
 
-const { sweepMemoryPlans } = await import("@/lib/apps/games-memory");
+const { resetHeapMb, sweepMemoryPlans } = await import("@/lib/apps/games-memory");
 
 function server(config: Record<string, unknown>): Install {
     return {
@@ -132,6 +134,7 @@ beforeEach(() => {
     busiest = 5;
     deployed = [];
     deployFails = false;
+    writeFails = false;
     redeployed = false;
     notified = [];
     machines = [{ id: "local", memoryTotalBytes: 32 * 1024 * 1024 * 1024, committedMb: 1536 }];
@@ -278,5 +281,63 @@ describe("the memory sweep", () => {
         expect(patched.some((patch) => "memoryWatch" in patch)).toBe(false);
         // The heap it wants is applied all the same - that costs no log read.
         expect(swept.restarted).toBe(0);
+    });
+
+    it("says so when a server runs out with nothing left to give it", async () => {
+        installs = [server({ memoryMode: "auto", memoryCeilingMb: 2048 })];
+        env.MEMORY = "2G";
+        log = "java.lang.OutOfMemoryError: Java heap space";
+
+        const swept = await sweepMemoryPlans(OWNER);
+
+        expect(swept.raised).toBe(0);
+        expect(saved).toEqual([]);
+        expect(notified).toHaveLength(1);
+        expect(notified[0]?.type).toBe("games.memory-exhausted");
+        expect(notified[0]?.body).toContain("memory limit");
+    });
+
+    it("looks at an out-of-memory again when the raise could not be written", async () => {
+        log = "java.lang.OutOfMemoryError: Java heap space";
+        writeFails = true;
+
+        await sweepMemoryPlans(OWNER, new Date("2026-09-18T01:00:00Z"));
+
+        expect(patched.some((patch) => "memoryExhaustedAt" in patch)).toBe(false);
+        expect(notified).toEqual([]);
+
+        writeFails = false;
+        installs = [server({ memoryMode: "auto", memoryWatch: "2026-09-18T01:00:00.000Z" })];
+        const again = await sweepMemoryPlans(OWNER, new Date("2026-09-18T01:15:00Z"));
+        expect(again.raised).toBe(1);
+        expect(again.restarted).toBe(1);
+    });
+});
+
+describe("the heap a reset settles on", () => {
+    it("never passes the ceiling the operator set", async () => {
+        installs = [server({ memoryMode: "auto", memoryCeilingMb: 2048 })];
+
+        expect(await resetHeapMb(OWNER, INSTALL, 4096)).toBe(1536 + 512);
+    });
+
+    it("never lowers a planned server that grew", async () => {
+        env.MEMORY = "4G";
+
+        expect(await resetHeapMb(OWNER, INSTALL, 2048)).toBe(4096);
+    });
+
+    it("lets a reset settle a fixed server wherever the shape says, within bounds", async () => {
+        installs = [server({})];
+        env.MEMORY = "4G";
+
+        expect(await resetHeapMb(OWNER, INSTALL, 2048)).toBe(2048);
+    });
+
+    it("never promises a machine memory it has not got", async () => {
+        installs = [server({})];
+        machines = [{ id: "local", memoryTotalBytes: 4608 * 1024 * 1024, committedMb: 1536 }];
+
+        expect(await resetHeapMb(OWNER, INSTALL, 4096)).toBe(2560);
     });
 });

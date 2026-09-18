@@ -133,11 +133,15 @@ export async function expectedMemoryAction(
 ): Promise<string | null> {
     const parsed = expectedMemorySchema.safeParse(input);
     if (!parsed.success) return null;
-    const ownerId = parsed.data.installedAppId
-        ? (await requireGameServer("games.read", parsed.data.installedAppId)).access.ownerId
-        : (await requirePermission("games.read")).id;
-    const heapMb = await expectedMinecraftHeapMb(ownerId, parsed.data).catch(() => null);
-    return heapMb === null ? null : formatMemory(heapMb);
+    try {
+        const ownerId = parsed.data.installedAppId
+            ? (await requireGameServer("games.read", parsed.data.installedAppId)).access.ownerId
+            : (await requirePermission("games.read")).id;
+        const heapMb = await expectedMinecraftHeapMb(ownerId, parsed.data);
+        return heapMb === null ? null : formatMemory(heapMb);
+    } catch {
+        return null;
+    }
 }
 
 /** The releases a blueprint can be built on, and the newest of them. */

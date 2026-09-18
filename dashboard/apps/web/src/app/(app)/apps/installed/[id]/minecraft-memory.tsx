@@ -63,11 +63,20 @@ export function MinecraftMemory({
         const wanted = { mode: plan.mode, ceilingMb: plan.ceilingMb, ...next };
         // Shown as chosen straight away; the answer replaces it with what was
         // actually stored, including the new figure the plan settled on.
+        const previous = plan;
         setPlan({ ...plan, ...wanted });
+        setNote(null);
         startTransition(async () => {
-            const answer = await setMemoryPlanAction(installedAppId, wanted);
-            if (answer.plan) setPlan(answer.plan);
-            else if (answer.error) setNote(answer.error);
+            const answer = await setMemoryPlanAction(installedAppId, wanted).catch(() => ({
+                plan: undefined,
+                error: "Could not save the plan"
+            }));
+            if (answer.plan) {
+                setPlan(answer.plan);
+                return;
+            }
+            setPlan(previous);
+            setNote(answer.error ?? "Could not save the plan");
         });
     }
 

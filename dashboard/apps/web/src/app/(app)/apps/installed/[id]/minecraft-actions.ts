@@ -31,6 +31,7 @@ import { resetMinecraftServer } from "@/lib/apps/games-reset";
 import { userSessionAddresses } from "@/lib/session-directory";
 import type { QueuedAction } from "@/lib/apps/minecraft/queue";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
+import { parseMemoryMb } from "@/lib/apps/games-service";
 import {
     memoryCeilingMb,
     memoryMode,
@@ -1918,6 +1919,11 @@ export async function updateServerSettingsAction(
         // up with nobody asked for a password and nothing saying so - or, for the
         // mod, not come up at all.
         const applicationId = install.applicationId;
+        const storedMemory = vars.some((entry) => entry.key === MEMORY_KEY)
+            ? ((await listEnvVars("application", applicationId, access.ownerId)).find(
+                  (entry) => entry.key === MEMORY_KEY
+              )?.value ?? "")
+            : "";
         const moved = await guardForSave(vars, async () => {
             const current = await listEnvVars("application", applicationId, access.ownerId);
             return new Map(current.map((entry) => [entry.key, entry.value ?? ""]));
@@ -1934,7 +1940,11 @@ export async function updateServerSettingsAction(
         const memory = await memoryAfterSave(
             parsed.data.installedAppId,
             access.ownerId,
-            vars.some((entry) => entry.key === MEMORY_KEY)
+            vars.some(
+                (entry) =>
+                    entry.key === MEMORY_KEY &&
+                    parseMemoryMb(entry.value) !== parseMemoryMb(storedMemory)
+            )
         );
 
         if (restart) await deployApplication(install.applicationId, access.ownerId, user.id);

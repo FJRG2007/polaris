@@ -28,6 +28,7 @@ export function MinecraftSettings({
     settings,
     playersOnline,
     running = true,
+    withMemory = false,
     onSaved
 }: {
     installedAppId: string;
@@ -36,11 +37,33 @@ export function MinecraftSettings({
     /** Whether the server is up. A stopped one needs no restart at all: what was
      *  saved is what it will start with. */
     running?: boolean;
+    /** Whether the Memory card belongs above these fields. Only the Minecraft
+     *  Settings tab carries the heap. */
+    withMemory?: boolean;
     onSaved: () => void;
 }) {
-    const [values, setValues] = useState<Record<string, string>>(() =>
-        Object.fromEntries(settings.map((setting) => [setting.key, setting.value]))
+    const stored = useMemo(
+        () => Object.fromEntries(settings.map((setting) => [setting.key, setting.value])),
+        [settings]
     );
+    const [values, setValues] = useState<Record<string, string>>(stored);
+    /** What the fields were last seeded from. When the stored values move under
+     *  them (a save, a planned heap), every field nobody is editing follows. */
+    const [seeded, setSeeded] = useState<Record<string, string>>(stored);
+    if (
+        Object.keys(stored).length !== Object.keys(seeded).length ||
+        Object.keys(stored).some((key) => stored[key] !== seeded[key])
+    ) {
+        setSeeded(stored);
+        setValues((current) =>
+            Object.fromEntries(
+                Object.entries(stored).map(([key, value]) => [
+                    key,
+                    current[key] !== undefined && current[key] !== seeded[key] ? current[key] : value
+                ])
+            )
+        );
+    }
     const [error, setError] = useState<string | null>(null);
     /** What the last save did to the heap, said once under the fields. */
     const [memoryNote, setMemoryNote] = useState<string | null>(null);
@@ -130,7 +153,7 @@ export function MinecraftSettings({
         <div className="flex flex-col gap-4">
             {/* Above the fields, because it decides whether one of them is still
                 the thing that settles the heap. */}
-            <MinecraftMemory installedAppId={installedAppId} refresh={saves} />
+            {withMemory && <MinecraftMemory installedAppId={installedAppId} refresh={saves} />}
 
             {groups.map(({ group, fields }) => (
                 <Card key={group}>
