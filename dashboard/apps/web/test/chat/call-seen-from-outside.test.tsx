@@ -23,8 +23,22 @@ const state = vi.hoisted(() => ({
         meetingId: "m1",
         count: 2,
         people: [
-            { id: "seat-bo", userId: "bo", name: "Bo Diaz", muted: false, deafened: false },
-            { id: "seat-cat", userId: "cat", name: "Cat Ruiz", muted: true, deafened: false }
+            {
+                id: "seat-bo",
+                userId: "bo",
+                name: "Bo Diaz",
+                muted: false,
+                deafened: false,
+                streaming: true
+            },
+            {
+                id: "seat-cat",
+                userId: "cat",
+                name: "Cat Ruiz",
+                muted: true,
+                deafened: false,
+                streaming: false
+            }
         ]
     } as { meetingId: string; count: number; people: unknown[] } | null,
     started: [] as string[]
@@ -158,6 +172,16 @@ describe("a call running in a group somebody is only reading", () => {
         expect(state.started).toEqual(["c1"]);
     });
 
+    it("says who is sharing a screen, without a way to watch it from outside", async () => {
+        render(<ChannelView channelId="c1" />);
+
+        const panel = await screen.findByRole("region", { name: "Call in progress" });
+        const live = within(panel).getAllByRole("img", { name: "Sharing a screen" });
+        expect(live).toHaveLength(1);
+        expect(within(panel).getByText("Bo Diaz").closest("li")!.contains(live[0]!)).toBe(true);
+        expect(within(panel).queryByRole("button", { name: /Watch/ })).toBeNull();
+    });
+
     it("can be put away, and brought back", async () => {
         render(<ChannelView channelId="c1" />);
 
@@ -212,5 +236,6 @@ describe("a voice room somebody has not walked into", () => {
         expect(within(rows[0]!).getByText("Bo Diaz")).toBeTruthy();
         expect(within(rows[1]!).getByText("Cat Ruiz")).toBeTruthy();
         expect(within(list).getByLabelText("Microphone off")).toBeTruthy();
+        expect(within(rows[0]!).getByRole("img", { name: "Sharing a screen" })).toBeTruthy();
     });
 });

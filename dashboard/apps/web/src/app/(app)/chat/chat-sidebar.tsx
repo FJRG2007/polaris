@@ -33,7 +33,7 @@ import { openSearch } from "@/lib/search/open-search";
 import { useAppUrl } from "@/components/app-url";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { NewDirectDialog } from "./new-direct-dialog";
-import { VoiceStateIcons } from "./call-roster";
+import { LiveBadge, VoiceStateIcons } from "./call-roster";
 import { useChatStream } from "./use-chat-stream";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { PersonName, PersonRow } from "@/components/person-name";
@@ -711,6 +711,7 @@ function ChannelRows({
                                         <span className="truncate" title={person.name}>
                                             <PersonName id={person.userId} name={person.name} />
                                         </span>
+                                        {person.streaming && <LiveBadge />}
                                         <VoiceStateIcons person={person} />
                                     </PersonRow>
                                 ))}

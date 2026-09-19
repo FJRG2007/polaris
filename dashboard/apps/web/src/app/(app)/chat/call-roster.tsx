@@ -5,10 +5,12 @@
  *
  * Read from the seats Polaris keeps, never from the media server: somebody
  * looking at a conversation is not connected to the call, cannot hear it and is
- * not sent a frame of it - they are only told who is sitting there, and whether
- * each of them has their microphone or their headphones off.
+ * not sent a frame of it - they are only told who is sitting there, whether
+ * each of them has their microphone or their headphones off, and who is sharing
+ * a screen.
  */
 
+import { cn } from "@polaris/ui";
 import { Avatar } from "@/components/avatar";
 import { HeadphoneOff, MicOff } from "lucide-react";
 import type { VoicePresence } from "@/lib/chat/meetings";
@@ -20,6 +22,28 @@ type Seated = Pick<VoicePresence, "muted" | "deafened">;
  *  as well, and one mark is all there is room for. */
 export function callBadgeOf(person: Seated): "muted" | "deafened" | null {
     return person.deafened ? "deafened" : person.muted ? "muted" : null;
+}
+
+/**
+ * Somebody is sharing a screen.
+ *
+ * A mark, not a way in: somebody outside the call is told a screen is up and is
+ * not sent a frame of it. Watching it is joining the call and pressing it there.
+ */
+export function LiveBadge({ className }: { className?: string }) {
+    return (
+        <span
+            role="img"
+            aria-label="Sharing a screen"
+            title="Sharing a screen"
+            className={cn(
+                "shrink-0 rounded bg-danger px-1 text-[0.625rem] font-bold uppercase leading-4 text-danger-foreground",
+                className
+            )}
+        >
+            Live
+        </span>
+    );
 }
 
 /** The same mark as icons after a name, for a row too small to badge a face. */
@@ -61,6 +85,7 @@ export function CallRoster({ people }: { people: readonly VoicePresence[] }) {
                     <span className="max-w-32 truncate">
                         <PersonName id={person.userId} name={person.name} />
                     </span>
+                    {person.streaming && <LiveBadge />}
                 </PersonRow>
             ))}
         </ul>
@@ -105,6 +130,7 @@ export function CallRosterList({
                     <span className="min-w-0 flex-1 truncate">
                         <PersonName id={person.userId} name={person.name} />
                     </span>
+                    {person.streaming && <LiveBadge />}
                     <VoiceStateIcons person={person} />
                 </PersonRow>
             ))}

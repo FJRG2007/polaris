@@ -10,9 +10,10 @@
  *
  * Proved by a seat rather than by a session, like everything else about a call.
  *
- * "Still here" also carries whether the person is muted or deafened, which is
- * how the people outside the call - never connected to the media server - can
- * see it. A beat without a body, from a tab older than that, only keeps the seat.
+ * "Still here" also carries whether the person is muted or deafened, and whether
+ * they are sharing a screen, which is how the people outside the call - never
+ * connected to the media server - can see it. A beat without a body, from a tab
+ * older than that, only keeps the seat.
  */
 
 import { z } from "zod";
@@ -24,7 +25,11 @@ export const dynamic = "force-dynamic";
 
 const meetingIdSchema = z.string().uuid();
 
-const voiceSchema = z.object({ muted: z.boolean(), deafened: z.boolean() }).strict();
+// `streaming` is optional because a tab opened before it existed does not send
+// it, and a beat from that tab must still keep the seat.
+const voiceSchema = z
+    .object({ muted: z.boolean(), deafened: z.boolean(), streaming: z.boolean().optional() })
+    .strict();
 
 type Params = { params: Promise<{ meetingId: string }> };
 

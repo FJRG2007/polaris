@@ -10,9 +10,10 @@
  * faces the call itself draws, at the same size, with the way in beside them.
  *
  * Nothing of the call reaches this browser. The faces come from the seats
- * Polaris keeps (see `call-roster`), which is why they carry a picture, a name
- * and whether that person is muted, and nothing else: no video, no sound, and
- * nobody in the call is told anybody is looking.
+ * Polaris keeps (see `call-roster`), which is why they carry a picture, a name,
+ * whether that person is muted and whether they are sharing a screen, and
+ * nothing else: no video, no sound, no way to watch the screen short of joining,
+ * and nobody in the call is told anybody is looking.
  *
  * It can be put away, because a call somebody has decided not to join must not
  * take a third of their conversation for as long as it runs. Putting it away
@@ -20,7 +21,7 @@
  */
 
 import { Button } from "@polaris/ui";
-import { callBadgeOf } from "./call-roster";
+import { LiveBadge, callBadgeOf } from "./call-roster";
 import { Avatar } from "@/components/avatar";
 import { Mic, Video, X } from "lucide-react";
 import type { VoicePresence } from "@/lib/chat/meetings";
@@ -56,31 +57,18 @@ export function CallPreview({
     onHide: () => void;
 }) {
     return (
+        // The same frame the call draws once somebody is in it - a band over the
+        // conversation, the faces in the middle of it and the way in under
+        // them - so joining changes what the band holds rather than what it
+        // looks like.
         <section
             aria-label="Call in progress"
-            className="flex shrink-0 flex-col gap-3 border-b border-border bg-card px-4 py-3"
+            className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3"
         >
             <div className="flex items-center gap-2">
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
                     {callSummary(count)}
                 </span>
-                {canJoin && (
-                    <>
-                        <Button size="xs" disabled={busy} onClick={() => onJoin(false)}>
-                            <Mic className="size-3.5" />
-                            Join
-                        </Button>
-                        <Button
-                            size="xs"
-                            variant="secondary"
-                            disabled={busy}
-                            onClick={() => onJoin(true)}
-                        >
-                            <Video className="size-3.5" />
-                            With video
-                        </Button>
-                    </>
-                )}
                 <button
                     type="button"
                     onClick={onHide}
@@ -109,12 +97,33 @@ export function CallPreview({
                             person={{ id: person.userId, name: person.name }}
                             callBadge={callBadgeOf(person)}
                         />
-                        <span className="w-full truncate text-center text-xs">
-                            <PersonName id={person.userId} name={person.name} />
+                        <span className="flex w-full items-center justify-center gap-1 text-xs">
+                            <span className="min-w-0 truncate">
+                                <PersonName id={person.userId} name={person.name} />
+                            </span>
+                            {person.streaming && <LiveBadge />}
                         </span>
                     </PersonRow>
                 ))}
             </ul>
+
+            {canJoin && (
+                <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
+                    <Button size="sm" disabled={busy} onClick={() => onJoin(false)}>
+                        <Mic className="size-3.5" />
+                        Join
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => onJoin(true)}
+                    >
+                        <Video className="size-3.5" />
+                        With video
+                    </Button>
+                </div>
+            )}
         </section>
     );
 }

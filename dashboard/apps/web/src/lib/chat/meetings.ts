@@ -417,10 +417,13 @@ export async function keepSeat(
     await endIfAlone(seat.meetingId);
 }
 
-/** Whether somebody in a call can be heard, and whether they can hear. */
+/** Whether somebody in a call can be heard, whether they can hear, and whether
+ *  they are sharing a screen. `streaming` is absent from a tab older than it,
+ *  which leaves whatever the seat last said. */
 export interface VoiceState {
     readonly muted: boolean;
     readonly deafened: boolean;
+    readonly streaming?: boolean;
 }
 
 /**
@@ -435,14 +438,19 @@ async function setVoiceState(
     seat: { meetingId: string; participantId: string },
     voice: VoiceState
 ): Promise<void> {
+    const said = {
+        muted: voice.muted,
+        deafened: voice.deafened,
+        ...(voice.streaming === undefined ? {} : { streaming: voice.streaming })
+    };
     const changed = await prisma.meetingParticipant.updateMany({
         where: {
             id: seat.participantId,
             meetingId: seat.meetingId,
             leftAt: null,
-            NOT: { muted: voice.muted, deafened: voice.deafened }
+            NOT: said
         },
-        data: { muted: voice.muted, deafened: voice.deafened }
+        data: said
     });
     if (changed.count > 0) await announceCall(seat.meetingId, "moved", "", undefined, true);
 }
@@ -750,6 +758,8 @@ export interface VoicePresence {
     readonly userId: string | null;
     readonly muted: boolean;
     readonly deafened: boolean;
+    /** Sharing a screen - the LIVE mark somebody outside the call sees. */
+    readonly streaming: boolean;
 }
 
 const PRESENCE_FIELDS = {
@@ -757,7 +767,8 @@ const PRESENCE_FIELDS = {
     name: true,
     userId: true,
     muted: true,
-    deafened: true
+    deafened: true,
+    streaming: true
 } as const;
 
 /**

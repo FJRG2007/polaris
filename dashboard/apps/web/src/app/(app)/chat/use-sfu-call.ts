@@ -126,17 +126,20 @@ function seatUrl(meetingId: string): string {
     return `/api/chat/meetings/${encodeURIComponent(meetingId)}/seat`;
 }
 
-/** Whether this person can be heard and can hear, as the seat reports it. */
+/** Whether this person can be heard and can hear, and whether they are
+ *  sharing a screen, as the seat reports it. */
 interface VoiceState {
     readonly muted: boolean;
     readonly deafened: boolean;
+    readonly streaming: boolean;
 }
 
 /**
  * Keep the seat, failing on anything but a success so the beat can count it.
  *
  * Carries the controls too: the people outside the call are never connected to
- * the media server, so the seat is where they read who is muted or deafened.
+ * the media server, so the seat is where they read who is muted or deafened, and
+ * who is sharing a screen.
  */
 async function keepSeat(meetingId: string, voice: VoiceState): Promise<void> {
     const response = await fetch(seatUrl(meetingId), {
@@ -327,7 +330,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** What the seat is told on every beat. A ref, because the beat is set up
      *  once per room and would otherwise keep reporting the state it started
      *  with. */
-    const voiceRef = useRef<VoiceState>({ muted: false, deafened: false });
+    const voiceRef = useRef<VoiceState>({ muted: false, deafened: false, streaming: false });
     const [ended, setEnded] = useState(false);
     /** When the room last said something in its own chat. A moment rather than
      *  the messages themselves: what was said is read from the server by
@@ -2043,11 +2046,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     // watching the conversation from outside the call sees the mute when it
     // happens. A browser that was displaced no longer speaks for the seat.
     useEffect(() => {
-        const voice = { muted: !micOn || deafened, deafened };
+        const voice = { muted: !micOn || deafened, deafened, streaming: sharing };
         voiceRef.current = voice;
         if (!meetingId || !participantId || displaced.current) return;
         void keepSeat(meetingId, voice).catch(() => undefined);
-    }, [meetingId, participantId, micOn, deafened]);
+    }, [meetingId, participantId, micOn, deafened, sharing]);
 
     const toggleMic = useCallback(() => {
         const track = mic.current;

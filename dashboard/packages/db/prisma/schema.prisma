@@ -8997,6 +8997,9 @@ model MeetingParticipant {
     // the media server to find out.
     muted      Boolean   @default(false)
     deafened   Boolean   @default(false)
+    // Sharing a screen, reported the same way, so the people outside the call
+    // can see who is live without being able to watch it.
+    streaming  Boolean   @default(false)
 
     meeting  Meeting           @relation(fields: [meetingId], references: [id], onDelete: Cascade)
     messages MeetingMessage[]

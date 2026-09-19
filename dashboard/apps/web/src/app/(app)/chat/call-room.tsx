@@ -53,6 +53,7 @@ import {
     type Reaction,
     type ShownReaction
 } from "./call-signals";
+import { LiveBadge } from "./call-roster";
 import { useSpeakers } from "./speaker-device";
 import { HandStrip } from "./call-hands-panel";
 import { useCallVolume } from "./call-volumes";
@@ -376,6 +377,7 @@ export function CallRoom({
                 }
                 muted={!call.micOn}
                 deafened={call.deafened}
+                sharing={call.sharing}
                 hand={call.handRaised}
                 handPlace={
                     queued && call.participantId ? (places.get(call.participantId) ?? null) : null
@@ -395,6 +397,7 @@ export function CallRoom({
                         speaking={call.speaking.has(person.id)}
                         muted={call.states.get(person.id)?.muted}
                         deafened={call.states.get(person.id)?.deafened}
+                        sharing={call.screens.has(person.id)}
                         hand={call.states.get(person.id)?.hand}
                         handPlace={queued ? (places.get(person.id) ?? null) : null}
                         reactions={reactionsFor(person.id)}
@@ -938,6 +941,7 @@ export function CallRoom({
                                 speaking={call.speaking.has(person.id)}
                                 muted={call.states.get(person.id)?.muted}
                                 deafened={call.states.get(person.id)?.deafened}
+                                sharing={call.screens.has(person.id)}
                                 recording={call.states.get(person.id)?.recording}
                                 hand={call.states.get(person.id)?.hand}
                                 handPlace={queued ? (places.get(person.id) ?? null) : null}
@@ -1502,6 +1506,7 @@ function Face({
     speaking = false,
     muted = false,
     deafened = false,
+    sharing = false,
     sameRoom = false,
     hand = false,
     handPlace = null,
@@ -1519,6 +1524,8 @@ function Face({
     speaking?: boolean;
     muted?: boolean;
     deafened?: boolean;
+    /** Sharing a screen: the LIVE mark beside the name. */
+    sharing?: boolean;
     /** Whether this person is sitting in the same room as the reader, sharing
      *  one microphone between their devices - see `call-combine`. Said here for
      *  the reason a tile says it: otherwise they are somebody muted for no
@@ -1575,6 +1582,7 @@ function Face({
             </span>
             <span className="flex max-w-full items-center gap-1 text-xs">
                 <span className="truncate">{name}</span>
+                {sharing && <LiveBadge />}
                 {/* Muted and deafened are on the face itself, the way a voice
                     channel shows them - see `callBadge`. */}
                 {/* Said for the same reason a tile says it: somebody turned all
@@ -1659,9 +1667,9 @@ function Tile({
     zoomable?: boolean;
     guest?: boolean;
     cameraOff?: boolean;
-    /** Whether you are sharing a screen. Said on your own tile because the
-     *  screen itself is up on the stage rather than in it, so nothing else on
-     *  this tile would tell you it is going out. */
+    /** Whether this person is sharing a screen. Said on the tile because the
+     *  screen itself is up on the stage, or put away, rather than in it - the
+     *  LIVE mark every voice client puts beside somebody streaming. */
     sharing?: boolean;
     speaking?: boolean;
     /** This person's microphone is off, or they have stopped listening
@@ -1944,7 +1952,7 @@ function Tile({
             <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[0.6875rem]">
                 {name}
                 {guest && <span className="text-muted-foreground">guest</span>}
-                {sharing && <span className="text-primary">sharing</span>}
+                {sharing && <LiveBadge />}
                 {/* Drawn because this person cannot be heard, yours included -
                     and only while the picture is a video: with the camera off
                     the face carries it instead (see `callBadge`). Deafened wins

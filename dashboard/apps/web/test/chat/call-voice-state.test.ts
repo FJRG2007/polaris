@@ -17,6 +17,7 @@ interface Row {
     lastSeenAt: Date;
     muted: boolean;
     deafened: boolean;
+    streaming: boolean;
 }
 
 let rows: Row[] = [];
@@ -134,7 +135,8 @@ function seated(id: string): Row {
         leftAt: null,
         lastSeenAt: new Date(),
         muted: false,
-        deafened: false
+        deafened: false,
+        streaming: false
     };
 }
 
@@ -169,6 +171,22 @@ describe("a seat's microphone and headphones", () => {
         rows[0]!.muted = true;
         await meetings.keepSeat(seat);
         expect(rows[0]!.muted).toBe(true);
+        expect(calls()).toHaveLength(0);
+    });
+
+    it("records a screen going up, and tells the conversation", async () => {
+        await meetings.keepSeat(seat, { muted: false, deafened: false, streaming: true });
+        expect(rows[0]).toMatchObject({ streaming: true });
+        expect(calls()).toHaveLength(1);
+
+        await meetings.keepSeat(seat, { muted: false, deafened: false, streaming: true });
+        expect(calls()).toHaveLength(1);
+    });
+
+    it("leaves the screen alone on a beat from a tab that does not say", async () => {
+        rows[0]!.streaming = true;
+        await meetings.keepSeat(seat, { muted: false, deafened: false });
+        expect(rows[0]!.streaming).toBe(true);
         expect(calls()).toHaveLength(0);
     });
 
