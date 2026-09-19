@@ -14,11 +14,10 @@
 
 import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
-import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { ArrowLeftRight } from "lucide-react";
 import { conversationsElsewhereAction } from "./actions";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import type { ChatElsewhere } from "@/lib/chat/chat-service";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
 
@@ -29,9 +28,8 @@ export function Elsewhere({
 }: {
     revision: unknown;
 }) {
-    const router = useRouter();
     const [chats, setChats] = useState<readonly ChatElsewhere[]>([]);
-    const [pending, startTransition] = useTransition();
+    const [pending, setPending] = useState(false);
 
     useEffect(() => {
         let alive = true;
@@ -45,13 +43,16 @@ export function Elsewhere({
 
     if (chats.length === 0) return null;
 
+    // Not a transition and no refresh after it, as in the header's switch: an
+    // async transition holds every navigation until it ends, and the action
+    // already answers with the new shelf's render.
     const go = (orgId: string | null) => {
-        startTransition(async () => {
-            await setWorkspaceScopeAction(
-                orgId ? core.formatScope({ kind: "org", orgId }) : core.PERSONAL_SCOPE
-            );
-            router.refresh();
-        });
+        setPending(true);
+        void setWorkspaceScopeAction(
+            orgId ? core.formatScope({ kind: "org", orgId }) : core.PERSONAL_SCOPE
+        )
+            .catch(() => undefined)
+            .finally(() => setPending(false));
     };
 
     return (
