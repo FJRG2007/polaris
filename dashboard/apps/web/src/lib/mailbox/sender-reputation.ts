@@ -1,11 +1,13 @@
 /**
  * What the outside world already knows about a sender.
  *
- * Two questions, asked of two services Polaris may already have configured: is
- * this address one that defrauds people or cannot receive mail at all (Dymo),
- * and is the domain behind it one the security engines have flagged
- * (VirusTotal). Both are billed per request, so both go through the platform's
- * one reputation cache (`lib/reputation`), which is keyed on the question rather
+ * Three questions, asked of two services Polaris may already have configured:
+ * is the DOMAIN a message came from one that defrauds people, is the ADDRESS at
+ * it one that defrauds people or cannot receive mail at all (Dymo, in that
+ * order - the domain's answer covers every address that will ever write from
+ * it), and is the domain one the security engines have flagged (VirusTotal).
+ * Every one of them is billed per request, so all of them go through the one
+ * reputation cache (`lib/reputation`), which is keyed on the question rather
  * than on who asked it - so the same domain is bought once however many times
  * Polaris wants to know about it.
  *
@@ -25,8 +27,8 @@
 
 import * as core from "@polaris/core";
 import { lookupDomain } from "@/lib/integrations/virustotal";
-import { MAIL_DENY_RULES, verifyEmail } from "@/lib/integrations/dymo";
 import { knownReputation, rememberReputation } from "@/lib/reputation";
+import { MAIL_DENY_RULES, verifyDomain, verifyEmail } from "@/lib/integrations/dymo";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 /** What a lookup adds to a message's score. */
@@ -50,8 +52,40 @@ const WEIGHTS = {
     domainFlagged: 30,
     domainClean: -5,
     addressFlagged: 22,
-    addressClean: -4
+    addressClean: -4,
+    /**
+     * Named as fraud, by a provider that has the address or the domain on file
+     * as defrauding people.
+     *
+     * The one outside opinion that is a verdict rather than evidence, and it is
+     * scored exactly at the junk line so it is one on its own - the same weight
+     * the local filter gives a credential phish. It is deliberately not higher:
+     * a mailbox that has written to this sender is worth more than this and
+     * should be, because the person who corresponds with somebody knows
+     * something the provider does not.
+     */
+    fraud: core.SPAM_THRESHOLDS.junk
 } as const;
+
+/**
+ * The exact sentence a fraud verdict is written down as.
+ *
+ * The cache stores what the provider said in the words the reader sees, not the
+ * rule name behind it, so this constant is what a remembered answer is
+ * recognised by on the way back out. Change it and a remembered fraud verdict
+ * quietly demotes itself to the ordinary flagged weight, which is why it is one
+ * constant rather than a sentence typed twice.
+ */
+const FRAUD_SAID = "this address is known for fraud";
+
+/** What a fraudulent domain is written down as, for the same reason. */
+const DOMAIN_FRAUD_SAID = "this domain is known for fraud";
+
+/** What is asked about a domain, as the cache records the question. Held apart
+ *  from `MAIL_DENY_RULES` because it is a different question with a different
+ *  answer, and a cache that could not tell them apart would answer one with the
+ *  other. */
+const DOMAIN_RULES: readonly string[] = ["FRAUD"];
 
 /** The provider names the cache stores these under. Named here rather than at
  *  each call so one string decides what a remembered answer is filed under. */
@@ -84,23 +118,20 @@ export async function senderReputation(fromAddress: string): Promise<ReputationF
     const domain = core.baseDomain(core.domainOf(address)) || core.domainOf(address);
     if (!domain) return [];
 
-    const findings: ReputationFinding[] = [];
-    const [fromDomain, fromAddressCheck] = await inTime(
-        Promise.all([domainOpinion(domain), addressOpinion(address)])
+    const findings = await inTime(
+        Promise.all([domainOpinion(domain), senderIsFraud(address, domain)])
     );
-    if (fromDomain) findings.push(fromDomain);
-    if (fromAddressCheck) findings.push(fromAddressCheck);
-    return findings;
+    return findings.filter((one): one is ReputationFinding => Boolean(one));
 }
 
-/** The pair of opinions, or neither of them once the deadline passes. The work
- *  is not cancelled - what it writes to the cache is still worth having for the
- *  next message from that sender. */
+/** The opinions, or none of them once the deadline passes. The work is not
+ *  cancelled - what it writes to the cache is still worth having for the next
+ *  message from that sender. */
 function inTime(
-    work: Promise<[ReputationFinding | null, ReputationFinding | null]>
-): Promise<[ReputationFinding | null, ReputationFinding | null]> {
+    work: Promise<(ReputationFinding | null)[]>
+): Promise<(ReputationFinding | null)[]> {
     return new Promise((resolve) => {
-        const timer = setTimeout(() => resolve([null, null]), MOST_WAIT_MS);
+        const timer = setTimeout(() => resolve([]), MOST_WAIT_MS);
         // Never holds the process open on its own account: this is a deadline on
         // work somebody is already waiting for.
         timer.unref?.();
@@ -111,10 +142,58 @@ function inTime(
             },
             () => {
                 clearTimeout(timer);
-                resolve([null, null]);
+                resolve([]);
             }
         );
     });
+}
+
+/**
+ * What the address-reputation provider has on this sender - the domain first,
+ * then the address.
+ *
+ * That order is the whole design. A campaign registers one domain and writes
+ * from a different address at it every hour, so an answer about the domain is
+ * the one that is still worth something an hour later and the one the next
+ * thousand messages read out of the cache for nothing. Once it comes back as
+ * fraudulent the address is not bought at all: the question has been answered,
+ * and the second lookup would be a second charge for it.
+ *
+ * Both halves answer nothing when the provider is switched off, holds no key,
+ * or fails - which between them is nearly every deployment, since the provider
+ * is something an operator turns on in Integrations rather than something
+ * Polaris ships with.
+ */
+async function senderIsFraud(address: string, domain: string): Promise<ReputationFinding | null> {
+    const state = await getIntegrationState(DYMO);
+    if (!state?.enabled) return null;
+    return (await domainIsFraud(domain)) ?? (await addressOpinion(address));
+}
+
+/** Whether the provider holds the sending domain itself as fraudulent. A clean
+ *  answer contributes nothing: an unflagged domain is the normal state of every
+ *  domain there is, including the one registered this morning. */
+async function domainIsFraud(domain: string): Promise<ReputationFinding | null> {
+    const said = `The domain it came from, ${domain}, is known for defrauding people`;
+    const known = await knownReputation("domain", domain, DYMO, DOMAIN_RULES);
+    if (known) return known.allow ? null : { id: "domain_fraud", score: WEIGHTS.fraud, reason: said };
+
+    const apiKey = await getIntegrationSecret(DYMO);
+    if (!apiKey) return null;
+    try {
+        const { fraud } = await verifyDomain(apiKey, domain);
+        await rememberReputation(
+            "domain",
+            domain,
+            DYMO,
+            { allow: !fraud, reason: fraud ? DOMAIN_FRAUD_SAID : null },
+            DOMAIN_RULES
+        );
+        return fraud ? { id: "domain_fraud", score: WEIGHTS.fraud, reason: said } : null;
+    } catch {
+        // A provider that failed has no opinion, and nothing is written down.
+        return null;
+    }
 }
 
 /**
@@ -153,12 +232,10 @@ async function domainOpinion(domain: string): Promise<ReputationFinding | null> 
     return fromVerdict("domain", domain, remembered);
 }
 
-/** What the address itself is, cached. Asked in the same order as the domain,
- *  and for the same two reasons. */
+/** What the address itself is, cached. Reached only once the domain behind it
+ *  has answered that it is not already a fraud, because that answer would have
+ *  covered this one. */
 async function addressOpinion(address: string): Promise<ReputationFinding | null> {
-    const state = await getIntegrationState(DYMO);
-    if (!state?.enabled) return null;
-
     const known = await knownReputation("email", address, DYMO, MAIL_DENY_RULES);
     if (known) return fromVerdict("email", address, known);
 
@@ -199,17 +276,28 @@ function fromVerdict(
                   reason: verdict.reason ?? `${subject} is flagged by security engines`
               };
     }
-    return verdict.allow
-        ? {
-              id: "address_reputation_clean",
-              score: WEIGHTS.addressClean,
-              reason: "The sending address checks out"
-          }
-        : {
-              id: "address_reputation_flagged",
-              score: WEIGHTS.addressFlagged,
-              reason: verdict.reason ?? "The sending address is flagged"
-          };
+    if (verdict.allow) {
+        return {
+            id: "address_reputation_clean",
+            score: WEIGHTS.addressClean,
+            reason: "The sending address checks out"
+        };
+    }
+    // Fraud is the one answer that is a verdict rather than evidence, and it is
+    // recognised by the sentence it was written down as - the cache keeps what
+    // was said, not the rule name it came from.
+    if (verdict.reason === FRAUD_SAID) {
+        return {
+            id: "address_fraud",
+            score: WEIGHTS.fraud,
+            reason: `${subject} is known for defrauding people`
+        };
+    }
+    return {
+        id: "address_reputation_flagged",
+        score: WEIGHTS.addressFlagged,
+        reason: verdict.reason ?? "The sending address is flagged"
+    };
 }
 
 /** The provider's rule names, as a sentence somebody can act on. A reader
@@ -217,7 +305,7 @@ function fromVerdict(
  *  address it names cannot receive a reply. */
 function readable(reasons: readonly string[]): string {
     const said: Record<string, string> = {
-        FRAUD: "this address is known for fraud",
+        FRAUD: FRAUD_SAID,
         INVALID: "this address cannot exist",
         NO_MX_RECORDS: "its domain cannot receive mail at all",
         HIGH_RISK_SCORE: "this address scores as high risk"
