@@ -433,13 +433,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      */
     const hosting = Boolean(
         participantId &&
-            meeting &&
-            meeting.participants.some(
-                (person) =>
-                    person.id === participantId &&
-                    person.userId !== null &&
-                    person.userId === meeting.hostId
-            )
+        meeting &&
+        meeting.participants.some(
+            (person) =>
+                person.id === participantId &&
+                person.userId !== null &&
+                person.userId === meeting.hostId
+        )
     );
     /**
      * Whether this browser is holding a room nobody else is in.
@@ -1561,6 +1561,17 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 // without this a press opens a microphone - see `call-muted`.
                 if (mic.current && callMuted()) {
                     mic.current.enabled = false;
+                    setMicOn(false);
+                }
+                // Deafened already - pressed while the microphone was still
+                // opening, or carried over from the last call - is muted too, as
+                // it is when deafening mid-call. Opening it live left a person
+                // shown as not listening talking into the room; undeafening
+                // gives back what they would have opened with.
+                if (mic.current && deafenedRef.current) {
+                    micBeforeDeafen.current = mic.current.enabled;
+                    mic.current.enabled = false;
+                    micOnRef.current = false;
                     setMicOn(false);
                 }
                 setMicrophoneId(mic.current?.getSettings().deviceId ?? null);

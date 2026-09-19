@@ -182,27 +182,6 @@ export function CallRoom({
     const [asking, setAsking] = useState(false);
 
     const canShare = Boolean(viewerId) && call.meeting?.hostId === viewerId;
-    /**
-     * The two keys every voice application has: F9 mutes, F10 deafens.
-     *
-     * Bound while the room is on screen and nowhere else, and taken from the
-     * browser rather than left to it - F10 opens a menu bar in some of them, and
-     * a shortcut that sometimes opens a menu instead of muting you is worse than
-     * no shortcut. Function keys type nothing, so this is safe over a composer
-     * somebody is writing in.
-     */
-    useEffect(() => {
-        const onKey = (event: KeyboardEvent) => {
-            if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
-            if (event.key !== "F9" && event.key !== "F10") return;
-            event.preventDefault();
-            if (event.key === "F9") call.toggleMic();
-            else call.toggleDeafen();
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [call]);
-
     const admitted = call.meeting?.participants.filter((person) => person.admission === "admitted");
     /** Whether the call is being written down, and by whom - this browser
      *  included, since the person recording needs telling as much as anybody. */
@@ -586,13 +565,13 @@ export function CallRoom({
                 the pictures, and the controls somebody needs to leave the call
                 - were pushed out over the conversation. */}
             <div className="flex min-h-12 shrink flex-col gap-3 overflow-y-auto overscroll-contain empty:hidden">
-            {/* Why the call is silent, when it is. Everything else on this
+                {/* Why the call is silent, when it is. Everything else on this
                 screen is true before any sound has moved, so a call carrying
                 nothing looked exactly like one that worked. See
                 `call-diagnosis`. */}
-            <CallDiagnosisPanel audio={call.audio} />
+                <CallDiagnosisPanel audio={call.audio} />
 
-            {/* A microphone that opened but is picking nothing up looks exactly
+                {/* A microphone that opened but is picking nothing up looks exactly
                 like somebody who is not talking, and the person it is happening
                 to has no way of telling. See `no-audio-notice`.
 
@@ -600,25 +579,25 @@ export function CallRoom({
                 a noise filter running they are two different tracks, and a graph
                 that has stopped producing anything leaves the device reading
                 perfectly while the call carries silence. */}
-            <NoAudioNotice
-                track={call.outgoing}
-                device={call.localStream?.getAudioTracks()[0] ?? null}
-                micOn={call.micOn}
-            />
+                <NoAudioNotice
+                    track={call.outgoing}
+                    device={call.localStream?.getAudioTracks()[0] ?? null}
+                    micOn={call.micOn}
+                />
 
-            {/* Said before anything else on the screen, and to everybody: a
+                {/* Said before anything else on the screen, and to everybody: a
                 call being written down is the one fact in a room that changes
                 what people are willing to say in it. */}
-            {recorded && (
-                <p className="flex shrink-0 items-center gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
-                    <Circle className="size-3 shrink-0 fill-current" />
-                    <span className="min-w-0 flex-1">
-                        {call.recording
-                            ? "You are recording this call. Everybody in it can see that."
-                            : `${recordedBy} is recording this call.`}
-                    </span>
-                </p>
-            )}
+                {recorded && (
+                    <p className="flex shrink-0 items-center gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
+                        <Circle className="size-3 shrink-0 fill-current" />
+                        <span className="min-w-0 flex-1">
+                            {call.recording
+                                ? "You are recording this call. Everybody in it can see that."
+                                : `${recordedBy} is recording this call.`}
+                        </span>
+                    </p>
+                )}
             </div>
 
             <CombineStrip call={call} />
