@@ -382,6 +382,9 @@ const someBuilds = <T extends z.ZodTypeAny>(build: T) =>
 
 const versionSchema = someBuilds(
     z.object({
+        version_number: z.string().max(64).catch(""),
+        version_type: z.string().max(32).catch("release"),
+        game_versions: z.array(z.string().max(32)).max(200).catch([]),
         dependencies: z
             .array(
                 z.object({
@@ -415,7 +418,8 @@ export interface ModrinthConflict {
  */
 export async function readConflicts(
     slugs: readonly string[],
-    loader: string
+    loader: string,
+    version: string | null = null
 ): Promise<ModrinthConflict[]> {
     const asked = slugs.map(projectSlug).filter((slug): slug is string => slug !== null);
     if (asked.length < 2) return [];
@@ -430,15 +434,21 @@ export async function readConflicts(
     if (!listed.success) return [];
     const slugById = new Map(listed.data.map((entry) => [entry.id, entry.slug]));
     const onList = new Set(listed.data.map((entry) => entry.slug.toLowerCase()));
+    const wanted = (version ?? "").trim();
+    const entryFor = entriesBySlug(slugs);
 
-    const releases = await walk(listed.data, (entry) => projectVersions(entry.slug, loader));
+    const releases = await walk(listed.data, (entry) =>
+        projectVersions(entry.slug, loader, wanted)
+    );
     const conflicts: ModrinthConflict[] = [];
     for (const [index, entry] of listed.data.entries()) {
         const versions = versionSchema.safeParse(releases[index]);
         if (!versions.success) continue;
-        // The newest release only: an incompatibility declared two years ago and
-        // since resolved is not something to warn a person about today.
-        for (const dependency of versions.data[0]?.dependencies ?? []) {
+        // The build this server installs: an incompatibility declared two years
+        // ago and since resolved is not something to warn a person about today,
+        // and neither is one declared by a build for another release.
+        const build = installedBuildOf(versions.data, entryFor.get(entry.slug.toLowerCase()) ?? entry.slug, wanted);
+        for (const dependency of build?.dependencies ?? []) {
             if (dependency.dependency_type !== "incompatible" || !dependency.project_id) continue;
             const other = slugById.get(dependency.project_id);
             if (!other || !onList.has(other.toLowerCase())) continue;
@@ -489,6 +499,55 @@ async function askModrinth(url: string): Promise<unknown> {
     });
     if (!response.ok) throw new Error(`Modrinth answered ${response.status}`);
     return response.json();
+}
+
+/** How many files one question about their contents may name. More than any
+ *  mods folder anybody plays with; a bound on what a stranger can make us ask. */
+const HASHES_ASKED = 500;
+
+const byHashSchema = z.record(
+    z.string(),
+    z.object({ project_id: z.string().max(64).catch("") }).catch({ project_id: "" })
+);
+
+/**
+ * Which Modrinth project each file is, by its sha1.
+ *
+ * What a jar is called says nothing - somebody renames one, a launcher adds its
+ * own prefix - and what is in it says everything: Modrinth answers a list of
+ * hashes with the build each one is, in one request. A file it has never seen is
+ * simply absent from the answer.
+ *
+ * Empty when Modrinth cannot be asked, which every caller reads as "nothing is
+ * known about these", never as "none of them are anything".
+ */
+export async function projectsByHash(hashes: readonly string[]): Promise<Map<string, string>> {
+    const asked = [
+        ...new Set(hashes.map((hash) => hash.toLowerCase()).filter((hash) => SHA1.test(hash)))
+    ].slice(0, HASHES_ASKED);
+    const found = new Map<string, string>();
+    if (asked.length === 0) return found;
+    try {
+        const response = await fetch(`${modrinthApi}/version_files`, {
+            method: "POST",
+            headers: {
+                "User-Agent": USER_AGENT,
+                Accept: "application/json",
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ hashes: asked, algorithm: "sha1" }),
+            signal: AbortSignal.timeout(TIMEOUT_MS)
+        });
+        if (!response.ok) return found;
+        const parsed = byHashSchema.safeParse(await response.json());
+        if (!parsed.success) return found;
+        for (const [hash, build] of Object.entries(parsed.data)) {
+            if (build.project_id) found.set(hash.toLowerCase(), build.project_id);
+        }
+    } catch {
+        // Nothing known is the answer.
+    }
+    return found;
 }
 
 /** Drop every kept answer. For tests, which answer the same address differently. */
@@ -673,6 +732,16 @@ export function repinEntry(entry: string, build: string): string {
 const buildSchema = someBuilds(
     z.object({
         id: z.string().max(64).catch(""),
+        project_id: z.string().max(64).catch(""),
+        dependencies: z
+            .array(
+                z.object({
+                    project_id: z.string().max(64).nullish().catch(null),
+                    dependency_type: z.string().max(32).catch("")
+                })
+            )
+            .max(64)
+            .catch([]),
         version_number: z.string().max(64).catch(""),
         version_type: z.string().max(32).catch("release"),
         game_versions: z.array(z.string().max(32)).max(200).catch([]),
@@ -725,10 +794,54 @@ async function admittedBuild(
     return admitted?.version_number ?? null;
 }
 
+/**
+ * Which of a project's builds an entry installs here.
+ *
+ * One rule for the three readers that need it: the file a player downloads, what
+ * it requires, and what it clashes with. They used to disagree - the file came
+ * from this server's release while its requirements came from the newest build
+ * for any release - and a mod that needs Sodium on 1.21.4 was handed out without
+ * it because its 1.21.5 build needs nothing.
+ *
+ * The loader, the release, the release type the entry admits and a pinned
+ * version, all at once. Undefined when no build qualifies, which is an entry that
+ * installs nothing and so needs and clashes with nothing either.
+ */
+function installedBuildOf<
+    T extends { version_number: string; version_type: string; game_versions: string[] }
+>(builds: readonly T[], entry: string, wanted: string): T | undefined {
+    const pin = pinnedBuild(entry);
+    const release = entryReleaseType(entry);
+    // Newest first is Modrinth's own order.
+    return builds.find(
+        (build) =>
+            build.version_number.length > 0 &&
+            (pin === null || build.version_number === pin) &&
+            admitsBuild(release, build.version_type) &&
+            (!isGameVersion(wanted) || build.game_versions.includes(wanted))
+    );
+}
+
+/** Each entry by the project it names, so a project read back from Modrinth can
+ *  be traced to the entry - and the pin and release type - that asked for it. */
+function entriesBySlug(entries: readonly string[]): Map<string, string> {
+    const bySlug = new Map<string, string>();
+    for (const entry of entries) {
+        const slug = projectSlug(entry);
+        if (slug) bySlug.set(slug.toLowerCase(), entry);
+    }
+    return bySlug;
+}
+
 /** One build of one project, as the file it actually is. */
 export interface ModrinthBuild {
     /** Modrinth's own id for the build. */
     readonly versionId: string;
+    /** And for the project it is a build of, which is what tells two files of
+     *  the same mod apart from two mods. */
+    readonly projectId: string;
+    /** The projects this build's publisher says it cannot run beside. */
+    readonly incompatible: readonly string[];
     /** What the publisher numbered it. */
     readonly version: string;
     readonly filename: string;
@@ -766,22 +879,18 @@ export async function buildFor(
     const slug = projectSlug(entry);
     if (!slug) return null;
     const wanted = (version ?? "").trim();
-    const pin = pinnedBuild(entry);
     const builds = buildSchema.safeParse(await projectVersions(slug, loader, wanted));
     if (!builds.success) return null;
-    const release = entryReleaseType(entry);
-    const admitted = builds.data.find(
-        (build) =>
-            build.version_number.length > 0 &&
-            (pin === null || build.version_number === pin) &&
-            admitsBuild(release, build.version_type) &&
-            (!isGameVersion(wanted) || build.game_versions.includes(wanted))
-    );
+    const admitted = installedBuildOf(builds.data, entry, wanted);
     const file = admitted?.files.find((one) => one.primary) ?? admitted?.files[0];
     const sha1 = (file?.hashes?.sha1 ?? "").toLowerCase();
     if (!admitted || !file || !isModrinthUrl(file.url) || !SHA1.test(sha1)) return null;
     return {
         versionId: admitted.id,
+        projectId: admitted.project_id,
+        incompatible: admitted.dependencies
+            .filter((one) => one.dependency_type === "incompatible" && one.project_id)
+            .map((one) => one.project_id as string),
         version: admitted.version_number,
         filename: file.filename,
         url: file.url,
@@ -884,14 +993,12 @@ export async function readRequirements(
 
     // Which entry each project came from, so a dependency is judged by the same
     // release type the entry that needs it asks for.
-    const entryFor = new Map<string, string>();
-    for (const entry of entries) {
-        const slug = projectSlug(entry);
-        if (slug) entryFor.set(slug.toLowerCase(), entry);
-    }
+    const entryFor = entriesBySlug(entries);
 
     const needed: { by: string; id: string; release: ReleaseType }[] = [];
-    const releases = await walk(listed.data, (project) => projectVersions(project.slug, loader));
+    const releases = await walk(listed.data, (project) =>
+        projectVersions(project.slug, loader, wanted)
+    );
     for (const [index, project] of listed.data.entries()) {
         const entry =
             entryFor.get(project.slug.toLowerCase()) ??
@@ -899,9 +1006,12 @@ export async function readRequirements(
             project.slug;
         const versions = versionSchema.safeParse(releases[index]);
         if (!versions.success) continue;
-        // The newest release only, for the reason `readConflicts` gives: what a
-        // project needed two years ago is not what it needs today.
-        for (const dependency of versions.data[0]?.dependencies ?? []) {
+        // The build this server installs, for the reason `readConflicts` gives.
+        // Reading the newest build for any release is how Sodium Dynamic Lights
+        // came to need nothing: its 1.21.5 build declares no dependencies, and the
+        // 1.21.4 one a player installs needs Sodium.
+        const build = installedBuildOf(versions.data, entry, wanted);
+        for (const dependency of build?.dependencies ?? []) {
             if (dependency.dependency_type !== "required" || !dependency.project_id) continue;
             needed.push({
                 by: project.slug,

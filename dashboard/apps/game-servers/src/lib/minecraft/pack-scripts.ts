@@ -2,11 +2,13 @@
  * The two installers a player runs, written here so they can be read, tested and
  * changed like anything else.
  *
- * Both do the same four things: work out where this machine keeps its `mods`
+ * Both do the same five things: work out where this machine keeps its `mods`
  * folder, read the list Polaris resolved, download what is missing or changed,
- * and take away what the pack no longer carries. Neither touches a jar it did not
- * put there - a player's own map mod stays - and both are safe to run again,
- * which is how somebody updates after the server's list changes.
+ * take away what the pack no longer carries, and move aside a jar of the player's
+ * own that is another copy of a mod on the list or one a mod on it cannot run
+ * beside. Anything else of theirs - a map mod, a shader loader - stays, and both
+ * are safe to run again, which is how somebody updates after the server's list
+ * changes.
  *
  * The list is a tab-separated line per mod rather than JSON, because the shell
  * that reads it on a Mac has no JSON parser it can count on, and a mod list with
@@ -21,6 +23,12 @@ export const PACK_RECORD = ".polaris-pack.txt";
 /** The first field of a line that names an entry the pack could not resolve. No
  *  mod can wear it: a filename is a bare jar name and this is not one. */
 export const UNRESOLVED = "!";
+
+/**
+ * Where a jar the installers take out of the way goes: beside `mods`, not in it,
+ * so the loader stops seeing it, and not deleted, because it is the player's.
+ */
+export const SET_ASIDE = "mods-polaris-removed";
 
 /**
  * The server's name, as a line of somebody else's script may carry it.
@@ -77,10 +85,12 @@ export function scriptUrl(url: string): string {
 export function shellInstaller(manifestUrl: string, server: string): string {
     return `#!/bin/sh
 # Installs the mods for "${scriptName(server)}" into this machine's Minecraft folder.
-# Run it again to update. It only ever touches jars it installed itself.
+# Run it again to update. Of your own jars it only moves aside one that is another
+# copy of a mod on the list, or one a mod on the list cannot run beside.
 set -eu
 
 manifest="${scriptUrl(manifestUrl)}"
+foreign="\${manifest%pack.tsv}foreign.tsv"
 dir="\${POLARIS_MC_DIR:-}"
 if [ -z "$dir" ]; then
     case "$(uname -s)" in
@@ -145,6 +155,42 @@ while IFS="$tab" read -r name sha url; do
     added=$((added + 1))
 done < "$tmp/pack.tsv"
 
+# The jars in the folder this pack did not put there, named by their contents.
+# Polaris answers with the ones that are another copy of a mod on the list - a
+# different version under a different name, which the loader refuses to start
+# with - or that a mod on the list cannot run beside. Those are moved out of the
+# folder, never deleted; everything else of the player's is left where it is.
+aside=0
+: > "$tmp/foreign"
+for jar in "$dir"/*.jar; do
+    [ -f "$jar" ] || continue
+    name=\${jar##*/}
+    if grep -Fxq "$name" "$tmp/wanted"; then continue; fi
+    if [ -f "$record" ] && grep -Fxq "$name" "$record"; then continue; fi
+    sum=$(sha_of "$jar")
+    [ -n "$sum" ] || continue
+    printf '%s\\t%s\\n' "$sum" "$name" >> "$tmp/foreign"
+done
+if [ -s "$tmp/foreign" ]; then
+    if curl -fsSL -X POST -H "Content-Type: text/plain" --data-binary @"$tmp/foreign" "$foreign" -o "$tmp/aside"; then
+        away="$(dirname "$dir")/${SET_ASIDE}"
+        cut -f2 "$tmp/foreign" > "$tmp/foreign-names"
+        while IFS="$tab" read -r name why; do
+            [ -n "$name" ] || continue
+            # Only a name this run sent, and only a file in this folder.
+            case "$name" in */*) continue ;; esac
+            grep -Fxq "$name" "$tmp/foreign-names" || continue
+            [ -f "$dir/$name" ] || continue
+            mkdir -p "$away" || die "could not make $away"
+            mv "$dir/$name" "$away/$name" || die "could not move $name out of the way"
+            aside=$((aside + 1))
+            say "moved $name to $away ($why)"
+        done < "$tmp/aside"
+    else
+        say "polaris: could not check your other jars, so none were moved"
+    fi
+fi
+
 # Only what this pack installed before and the server no longer lists. A jar the
 # player added themselves is not in the record and is left alone, and a run that
 # could not resolve everything takes nothing away at all: an entry missing from a
@@ -173,17 +219,19 @@ else
 fi
 
 say ""
-say "polaris: $added installed, $kept already current, $removed removed"
+say "polaris: $added installed, $kept already current, $removed removed, $aside moved aside"
 say "polaris: mods folder $dir"
 `;
 }
 
 export function powershellInstaller(manifestUrl: string, server: string): string {
     return `# Installs the mods for "${scriptName(server)}" into this machine's Minecraft folder.
-# Run it again to update. It only ever touches jars it installed itself.
+# Run it again to update. Of your own jars it only moves aside one that is another
+# copy of a mod on the list, or one a mod on the list cannot run beside.
 $ErrorActionPreference = "Stop"
 
 $manifest = "${scriptUrl(manifestUrl)}"
+$foreign = $manifest -replace 'pack\\.tsv$', 'foreign.tsv'
 $dir = $env:POLARIS_MC_DIR
 if (-not $dir) { $dir = Join-Path $env:APPDATA ".minecraft\\mods" }
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -227,6 +275,48 @@ foreach ($line in ("$list" -split "\`n")) {
     $added++
 }
 
+# The jars in the folder this pack did not put there, named by their contents.
+# Polaris answers with the ones that are another copy of a mod on the list or that
+# a mod on it cannot run beside. Those are moved out of the folder, never deleted.
+$aside = 0
+$recorded = @()
+if (Test-Path -LiteralPath $record) { $recorded = @(Get-Content -LiteralPath $record) }
+$found = New-Object System.Collections.Generic.List[string]
+$sent = New-Object System.Collections.Generic.List[string]
+foreach ($jar in (Get-ChildItem -LiteralPath $dir -Filter *.jar -File)) {
+    if ($wanted -contains $jar.Name -or $recorded -contains $jar.Name) { continue }
+    $sum = (Get-FileHash -Algorithm SHA1 -LiteralPath $jar.FullName).Hash.ToLower()
+    $found.Add("$sum\`t$($jar.Name)") | Out-Null
+    $sent.Add($jar.Name) | Out-Null
+}
+if ($found.Count -gt 0) {
+    $answer = $null
+    try {
+        $answer = (Invoke-WebRequest -UseBasicParsing -Method Post -ContentType "text/plain; charset=utf-8" -Body ([string]::Join("\`n", $found)) -Uri $foreign).Content
+    } catch {
+        Write-Host "polaris: could not check your other jars, so none were moved"
+    }
+    if ($answer) {
+        $away = Join-Path (Split-Path -Parent $dir) "${SET_ASIDE}"
+        foreach ($line in ("$answer" -split "\`n")) {
+            $line = $line.Trim("\`r")
+            if (-not $line) { continue }
+            $parts = $line -split "\`t"
+            $name = $parts[0]
+            $why = ""
+            if ($parts.Count -gt 1) { $why = $parts[1] }
+            # Only a name this run sent, and only a file in this folder.
+            if ($sent -notcontains $name) { continue }
+            $source = Join-Path $dir $name
+            if (-not (Test-Path -LiteralPath $source)) { continue }
+            New-Item -ItemType Directory -Force -Path $away | Out-Null
+            Move-Item -LiteralPath $source -Destination (Join-Path $away $name) -Force
+            $aside++
+            Write-Host "moved $name to $away ($why)"
+        }
+    }
+}
+
 # Only what this pack installed before and the server no longer lists, and
 # nothing at all on a run whose list came back partial.
 $removed = 0
@@ -255,7 +345,7 @@ if ($partial -and (Test-Path -LiteralPath $record)) {
 Set-Content -LiteralPath $record -Value $keep -Encoding utf8
 
 Write-Host ""
-Write-Host "polaris: $added installed, $kept already current, $removed removed"
+Write-Host "polaris: $added installed, $kept already current, $removed removed, $aside moved aside"
 Write-Host "polaris: mods folder $dir"
 `;
 }
@@ -275,4 +365,13 @@ export function packTable(
     const lines = mods.map((mod) => `${mod.filename}\t${mod.sha1}\t${mod.url}\n`);
     for (const entry of missing) lines.push(`${UNRESOLVED}\t${oneLine(entry)}\n`);
     return lines.join("");
+}
+
+/**
+ * Polaris's answer about a player's own jars: one per line, the name and why it
+ * is being moved aside. Both reach a script on somebody else's machine, so each
+ * is kept to one line with no tab of its own.
+ */
+export function asideTable(moves: readonly { name: string; reason: string }[]): string {
+    return moves.map((move) => `${oneLine(move.name)}\t${oneLine(move.reason)}\n`).join("");
 }

@@ -31,6 +31,7 @@ import {
     loaderForType,
     parseProjectList,
     projectSlug,
+    projectsByHash,
     readInstalledProjects,
     readRequirements,
     walk,
@@ -58,6 +59,79 @@ export interface PackMod {
     readonly version: string;
     /** Whether it is on the server too, or only in the player's folder. */
     readonly where: "server" | "player";
+    /** The Modrinth project, which is what makes a jar of the player's own with
+     *  another name the same mod as this one. Empty when it is not known. */
+    readonly projectId: string;
+    /** The projects this build cannot run beside. */
+    readonly incompatible: readonly string[];
+}
+
+/** A jar in a player's folder that the pack did not put there, as the installer
+ *  reports it: its name and what is in it. */
+export interface ForeignJar {
+    readonly name: string;
+    readonly sha1: string;
+}
+
+/** One of those the installer is to move out of the folder, and why. */
+export interface SetAside {
+    readonly name: string;
+    readonly reason: string;
+}
+
+/**
+ * Which of a player's own jars stop the pack from working.
+ *
+ * Two kinds, both the publisher's statement rather than a guess: a jar that is a
+ * build of the same Modrinth project as a mod in the pack - another version under
+ * another name, which the loader refuses to start with - and one whose project a
+ * mod in the pack declares it cannot run beside. Everything else is the player's
+ * business and is not named. A jar Modrinth does not know is not named either:
+ * with no project to go on there is nothing to say it is either of those.
+ *
+ * Pure: `projectOf` is Modrinth's answer, by sha1, asked by the caller.
+ */
+export function setAsidePlan(
+    mods: readonly PackMod[],
+    jars: readonly ForeignJar[],
+    projectOf: ReadonlyMap<string, string>
+): SetAside[] {
+    const shipped = new Set(mods.map((mod) => mod.filename));
+    const sameProject = new Map<string, PackMod>();
+    const clashes = new Map<string, PackMod>();
+    for (const mod of mods) {
+        if (mod.projectId) sameProject.set(mod.projectId, mod);
+        for (const id of mod.incompatible) if (!clashes.has(id)) clashes.set(id, mod);
+    }
+    const moves: SetAside[] = [];
+    for (const jar of jars) {
+        if (shipped.has(jar.name)) continue;
+        const project = projectOf.get(jar.sha1.toLowerCase());
+        if (!project) continue;
+        const same = sameProject.get(project);
+        const clash = clashes.get(project);
+        if (same) {
+            moves.push({ name: jar.name, reason: `another copy of ${nameOf(same)}, installed as ${same.filename}` });
+        } else if (clash) {
+            moves.push({ name: jar.name, reason: `${nameOf(clash)} cannot run beside it` });
+        }
+    }
+    return moves;
+}
+
+/** A pack mod as a sentence names it. */
+function nameOf(mod: PackMod): string {
+    return projectSlug(mod.entry) ?? mod.filename;
+}
+
+/** The same, asking Modrinth which project each jar is. */
+export async function setAside(
+    mods: readonly PackMod[],
+    jars: readonly ForeignJar[]
+): Promise<SetAside[]> {
+    if (jars.length === 0 || mods.length === 0) return [];
+    const projectOf = await projectsByHash(jars.map((jar) => jar.sha1));
+    return setAsidePlan(mods, jars, projectOf);
 }
 
 export interface ClientPack {
@@ -275,8 +349,16 @@ async function withRequirements(
 }
 
 /** A jar name and nothing else: no folder to escape the mods folder with, no tab
- *  or newline to shift the line the installers read it off. */
-const JAR = /^(?!\.)[A-Za-z0-9._+ ()-]{1,120}\.jar$/;
+ *  or newline to shift the line the installers read it off. Square brackets are a
+ *  name, not a pattern, to both installers - they only ever reach a file by its
+ *  literal name - and SecurityCraft publishes as "[1.21.4] SecurityCraft ...jar",
+ *  which without them was never handed to a player at all. */
+const JAR = /^(?!\.)[A-Za-z0-9._+ ()[\]-]{1,120}\.jar$/;
+
+/** Whether a name is one the installers may be told about. */
+export function isJarName(name: string): boolean {
+    return JAR.test(name) && !name.includes("..");
+}
 
 /** Modrinth's own sha1, as the installers compare it. Anything else is no
  *  checksum rather than a checksum that can never match. */
@@ -292,7 +374,7 @@ const CHECKSUM = /^[A-Fa-f0-9]{40}$/;
  * unresolved, which is what "we could not get you this one" already means here.
  */
 function installableFile(build: ModrinthBuild): boolean {
-    return JAR.test(build.filename) && !build.filename.includes("..") && isModrinthUrl(build.url);
+    return isJarName(build.filename) && isModrinthUrl(build.url);
 }
 
 /** The address a player is given, for one machine's kind of shell. */

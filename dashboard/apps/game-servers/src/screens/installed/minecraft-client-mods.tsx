@@ -22,7 +22,7 @@ import { ProjectIcon } from "./minecraft-project-icon";
 import * as modrinth from "../../lib/minecraft/modrinth";
 import { updateClientModsAction } from "./minecraft-actions";
 import type { PackEntry } from "../../lib/minecraft/client-pack";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, CardBody, Input, Skeleton } from "@polaris/ui";
 import { Download, ExternalLink, Loader2, Plus, Search, Trash2 } from "lucide-react";
 
@@ -60,11 +60,12 @@ export function MinecraftClientMods({
     const [results, setResults] = useState<modrinth.ModrinthProject[] | null>(null);
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-
-    // What the screen was given is what is saved; a list edited and not saved is
-    // the only thing that differs from it.
-    const changed = list.join(",") !== [...entries].join(",");
+    /** Saves still on their way, for the indicator. */
+    const [saving, setSaving] = useState(0);
+    /** What the server holds, so a save that fails puts the list back to it. */
+    const saved = useRef<string[]>([...entries]);
+    /** Saves in the order they were made, so an earlier one cannot land last. */
+    const queue = useRef<Promise<void>>(Promise.resolve());
 
     const query_ = useCallback(
         (extra: Record<string, string>) =>
@@ -188,12 +189,32 @@ export function MinecraftClientMods({
         };
     }, [query, browse]);
 
-    function save(): void {
+    /**
+     * Change the list, and keep the change.
+     *
+     * Saved as it is made. It restarts nothing, so there was never anything to
+     * confirm - and a Save button up in the corner of the card, away from the
+     * search where Add is pressed, was a change that stayed on screen, looked
+     * done, and was lost the moment the page reloaded under it.
+     */
+    function change(next: string[]): void {
+        if (next.join(",") === list.join(",")) return;
         setError(null);
-        startTransition(async () => {
-            const result = await updateClientModsAction(installedAppId, list);
-            if (result.error) setError(result.error);
-        });
+        setList(next);
+        setSaving((count) => count + 1);
+        queue.current = queue.current
+            .then(async () => {
+                const result = await updateClientModsAction(installedAppId, next).catch(() => ({
+                    error: "Could not save the list"
+                }));
+                if (result.error) {
+                    setError(result.error);
+                    setList(saved.current);
+                } else {
+                    saved.current = next;
+                }
+            })
+            .finally(() => setSaving((count) => count - 1));
     }
 
     const fromServer = Array.isArray(pack) ? pack.filter((mod) => mod.where === "server") : [];
@@ -211,11 +232,11 @@ export function MinecraftClientMods({
                             mods, and the ones that only run in the game.
                         </p>
                     </div>
-                    {changed && (
-                        <Button size="sm" onClick={save} disabled={pending}>
-                            {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                            Save
-                        </Button>
+                    {saving > 0 && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Loader2 className="size-3.5 animate-spin" />
+                            Saving
+                        </span>
                     )}
                 </div>
 
@@ -329,9 +350,7 @@ export function MinecraftClientMods({
                                     variant="ghost"
                                     aria-label={`Remove ${project.title}`}
                                     onClick={() =>
-                                        setList((current) =>
-                                            current.filter((item) => item !== project.entry)
-                                        )
+                                        change(list.filter((item) => item !== project.entry))
                                     }
                                 >
                                     <Trash2 className="size-4" />
@@ -386,9 +405,7 @@ export function MinecraftClientMods({
                                         size="sm"
                                         variant={added ? "ghost" : "secondary"}
                                         disabled={added}
-                                        onClick={() =>
-                                            setList((current) => [...current, project.slug])
-                                        }
+                                        onClick={() => change([...list, project.slug])}
                                     >
                                         <Plus className="size-4" />
                                         {added ? "Added" : "Add"}
@@ -408,14 +425,11 @@ export function MinecraftClientMods({
                                 {Array.isArray(pack) ? `the ${pack.length} mods` : "the mods"} for
                                 this server into their game, and running it again is how they
                                 update: it replaces what changed and takes away what came off the
-                                lists. Anything else in their mods folder is left alone. The link
-                                needs no account here.
+                                lists. A mod of theirs that is another copy of one here, or that
+                                one here cannot run beside, is moved to a mods-polaris-removed
+                                folder; anything else of theirs is left alone. The link needs no
+                                account here.
                             </p>
-                            {changed && (
-                                <p className="mt-1 text-xs text-warning">
-                                    What you just changed is not in it yet. Save first.
-                                </p>
-                            )}
                         </div>
                         {SYSTEMS.map((system) => (
                             <div key={system.key} className="flex items-center gap-2">

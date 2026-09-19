@@ -130,7 +130,7 @@ export async function GET(
         // which is most lists.
         const [projects, conflicts, newest, requires] = await Promise.all([
             readInstalledProjects(entries, parsed.data.loader, parsed.data.version || null),
-            readConflicts(entries, parsed.data.loader).catch(() => []),
+            readConflicts(entries, parsed.data.loader, parsed.data.version || null).catch(() => []),
             newestBuilds(entries, parsed.data.loader, parsed.data.version || null).catch(
                 () => new Map()
             ),

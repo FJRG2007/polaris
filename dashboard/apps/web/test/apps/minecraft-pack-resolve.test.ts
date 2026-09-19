@@ -65,7 +65,17 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/modrinth", async (importOri
     };
 });
 
-const { clientMods, packCommands, packEntries, packToken, packTokenMatches, packUrl, resolvePack } =
+const {
+    clientMods,
+    isJarName,
+    packCommands,
+    packEntries,
+    packToken,
+    packTokenMatches,
+    packUrl,
+    resolvePack,
+    setAsidePlan
+} =
     await import("@polaris-app/game-servers/src/lib/minecraft/client-pack");
 
 function build(slug: string) {
@@ -358,5 +368,70 @@ describe("the link the players are given", () => {
         expect(commands.mac).toContain("curl -fsSL");
         expect(commands.mac).toContain("install.sh");
         expect(commands.linux).toBe(commands.mac);
+    });
+});
+
+describe("a player's own jars", () => {
+    function mod(entry: string, projectId: string, incompatible: string[] = []) {
+        return {
+            entry,
+            filename: `${entry}-1.0.jar`,
+            url: `https://cdn.modrinth.com/${entry}.jar`,
+            sha1: "a".repeat(40),
+            version: "1.0",
+            where: "player" as const,
+            projectId,
+            incompatible
+        };
+    }
+    const mods = [mod("sodium", "SODIUM", ["EMBEDDIUM"]), mod("balm", "BALM")];
+    const jar = (name: string, sha1: string) => ({ name, sha1 });
+    const projects = new Map([
+        ["1".repeat(40), "SODIUM"],
+        ["2".repeat(40), "EMBEDDIUM"],
+        ["3".repeat(40), "XAERO"]
+    ]);
+
+    it("moves aside another copy of a mod in the pack, whatever it is called", () => {
+        expect(setAsidePlan(mods, [jar("sodium-0.6.9-old.jar", "1".repeat(40))], projects)).toEqual([
+            {
+                name: "sodium-0.6.9-old.jar",
+                reason: "another copy of sodium, installed as sodium-1.0.jar"
+            }
+        ]);
+    });
+
+    it("moves aside a mod a mod in the pack cannot run beside", () => {
+        expect(setAsidePlan(mods, [jar("embeddium.jar", "2".repeat(40))], projects)).toEqual([
+            { name: "embeddium.jar", reason: "sodium cannot run beside it" }
+        ]);
+    });
+
+    it("leaves every other jar of theirs alone, known to Modrinth or not", () => {
+        expect(
+            setAsidePlan(
+                mods,
+                [jar("xaeros-minimap.jar", "3".repeat(40)), jar("homemade.jar", "4".repeat(40))],
+                projects
+            )
+        ).toEqual([]);
+    });
+
+    it("never names a file the pack itself installs", () => {
+        expect(setAsidePlan(mods, [jar("sodium-1.0.jar", "1".repeat(40))], projects)).toEqual([]);
+    });
+});
+
+describe("a jar name the installers may be told", () => {
+    it("takes square brackets, which SecurityCraft publishes with", () => {
+        expect(isJarName("[1.21.4] SecurityCraft v1.10.1.jar")).toBe(true);
+    });
+
+    it("refuses anything that could reach outside the mods folder", () => {
+        expect(isJarName("../evil.jar")).toBe(false);
+        expect(isJarName("mods/evil.jar")).toBe(false);
+        expect(isJarName("a..b.jar")).toBe(false);
+        expect(isJarName(".hidden.jar")).toBe(false);
+        expect(isJarName("evil.jar\nrm -rf")).toBe(false);
     });
 });

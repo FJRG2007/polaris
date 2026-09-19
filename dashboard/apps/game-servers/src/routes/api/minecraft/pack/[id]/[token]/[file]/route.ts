@@ -16,8 +16,21 @@
 
 import { prisma } from "@polaris/db";
 import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "../../../../../../../lib/minecraft/join-guard";
-import { packTokenMatches, packUrl, resolvePack } from "../../../../../../../lib/minecraft/client-pack";
-import { packTable, powershellInstaller, shellInstaller } from "../../../../../../../lib/minecraft/pack-scripts";
+import {
+    isJarName,
+    packTokenMatches,
+    packUrl,
+    resolvePack,
+    setAside,
+    type ClientPack,
+    type ForeignJar
+} from "../../../../../../../lib/minecraft/client-pack";
+import {
+    asideTable,
+    packTable,
+    powershellInstaller,
+    shellInstaller
+} from "../../../../../../../lib/minecraft/pack-scripts";
 import { host } from "@polaris/app-host";
 
 const { readInstallConfig } = host.appsInstallConfig;
@@ -54,6 +67,18 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
         return text(script, "text/plain; charset=utf-8");
     }
 
+    const pack = await packOf(install as Install);
+
+    if (file === "manifest.json") {
+        return Response.json(pack, { headers: { "cache-control": "no-store" } });
+    }
+    return text(packTable(pack.mods, pack.missing), "text/plain; charset=utf-8");
+}
+
+type Install = { name: string; config: string | null; applicationId: string };
+
+/** The pack as the server's lists stand right now. */
+async function packOf(install: Install): Promise<ClientPack> {
     const env = await prisma.envVar.findMany({
         where: {
             scopeType: "application",
@@ -63,19 +88,58 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
         select: { key: true, value: true }
     });
     const value = (key: string): string => env.find((row) => row.key === key)?.value ?? "";
-
-    const pack = await resolvePack({
+    return resolvePack({
         name: install.name,
         software: value(SOFTWARE_KEY),
         version: value(VERSION_KEY),
         projects: value(PROJECTS_KEY),
         config: readInstallConfig(install.config)
     });
+}
 
-    if (file === "manifest.json") {
-        return Response.json(pack, { headers: { "cache-control": "no-store" } });
+/** How much of a player's folder one question may carry. */
+const FOREIGN_BYTES = 64 * 1024;
+const FOREIGN_JARS = 500;
+const SHA1 = /^[0-9a-f]{40}$/;
+
+/**
+ * The installer asking about the jars it did not put there.
+ *
+ * It sends one line per jar - its sha1 and its name - and is answered with the
+ * ones it should move out of the folder, and why: another copy of a mod in the
+ * pack, or one a mod in the pack cannot run beside. See `setAsidePlan`.
+ *
+ * The same token as the list, for the same reason, and it hands back nothing the
+ * installer did not send: names only, and only names it asked about. A line that
+ * is not a sha1 and a jar name is dropped rather than answered.
+ */
+export async function POST(request: Request, { params }: Params): Promise<Response> {
+    const { id, token, file } = await params;
+    if (file !== "foreign.tsv") return new Response("Not found", { status: 404 });
+    if (!packTokenMatches(id, token)) return new Response("Not found", { status: 404 });
+    const length = Number(request.headers.get("content-length") ?? "0");
+    if (length > FOREIGN_BYTES) return new Response("Too much", { status: 413 });
+
+    const install = await prisma.installedApp.findFirst({
+        where: { id, status: { not: "removed" } },
+        select: { name: true, config: true, applicationId: true }
+    });
+    if (!install?.applicationId) return new Response("Not found", { status: 404 });
+
+    const body = (await request.text()).slice(0, FOREIGN_BYTES);
+    const jars: ForeignJar[] = [];
+    for (const line of body.split("\n")) {
+        const [sha1 = "", ...rest] = line.replace(/\r$/, "").split("\t");
+        const name = rest.join("\t");
+        const sum = sha1.trim().toLowerCase();
+        if (!SHA1.test(sum) || !isJarName(name)) continue;
+        jars.push({ name, sha1: sum });
+        if (jars.length >= FOREIGN_JARS) break;
     }
-    return text(packTable(pack.mods, pack.missing), "text/plain; charset=utf-8");
+    if (jars.length === 0) return text("", "text/plain; charset=utf-8");
+
+    const pack = await packOf(install as Install);
+    return text(asideTable(await setAside(pack.mods, jars)), "text/plain; charset=utf-8");
 }
 
 /**

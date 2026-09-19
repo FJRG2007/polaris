@@ -212,9 +212,14 @@ describe("conflicts between them", () => {
             ],
             [
                 "/project/one/version",
-                [{ dependencies: [{ project_id: targetId, dependency_type: dependencyType }] }]
+                [
+                    {
+                        version_number: "1.0",
+                        dependencies: [{ project_id: targetId, dependency_type: dependencyType }]
+                    }
+                ]
             ],
-            ["/project/two/version", [{ dependencies: [] }]]
+            ["/project/two/version", [{ version_number: "1.0", dependencies: [] }]]
         ]);
     }
 
@@ -242,6 +247,63 @@ describe("conflicts between them", () => {
     it("does not go looking when there is only one thing installed", async () => {
         expect(await modrinth.readConflicts(["one"], "paper")).toEqual([]);
         expect(asked).toEqual([]);
+    });
+});
+
+describe("what a mod needs and clashes with, on this server's release", () => {
+    /**
+     * Sodium Dynamic Lights, as Modrinth really lists it for NeoForge: its newest
+     * build is for 1.21.5 and declares nothing, and the 1.21.4 one a server on
+     * 1.21.4 installs requires Sodium. Reading the newest for any release handed
+     * players the mod without Sodium.
+     */
+    function lights() {
+        answers = new Map<string, unknown>([
+            [
+                "/projects?ids=",
+                [
+                    { id: "LLLL", slug: "lights", title: "Lights", game_versions: [], loaders: [] },
+                    { id: "SSSS", slug: "sodium", title: "Sodium", game_versions: [], loaders: [] }
+                ]
+            ],
+            [
+                "/project/lights/version",
+                [
+                    { version_number: "1.0.10-1.21.5", game_versions: ["1.21.5"], dependencies: [] },
+                    {
+                        version_number: "1.0.10-1.21.4",
+                        game_versions: ["1.21.4"],
+                        dependencies: [
+                            { project_id: "SSSS", dependency_type: "required" },
+                            { project_id: "EEEE", dependency_type: "incompatible" }
+                        ]
+                    }
+                ]
+            ],
+            [
+                "/project/sodium/version",
+                [{ version_number: "0.6.13", game_versions: ["1.21.4"], dependencies: [] }]
+            ]
+        ]);
+    }
+
+    it("reads what the build for this release requires", async () => {
+        lights();
+        const needs = await modrinth.readRequirements(["lights"], "neoforge", "1.21.4");
+        expect(needs.map((need) => need.needs)).toEqual(["sodium"]);
+    });
+
+    it("asks Modrinth for this release's builds rather than every build", async () => {
+        lights();
+        await modrinth.readRequirements(["lights"], "neoforge", "1.21.4");
+        const versions = asked.filter((url) => url.includes("/project/lights/version"));
+        expect(versions.length).toBeGreaterThan(0);
+        for (const url of versions) expect(decodeURIComponent(url)).toContain('game_versions=["1.21.4"]');
+    });
+
+    it("reads nothing for a pin no build of this release matches", async () => {
+        lights();
+        expect(await modrinth.readRequirements(["lights:9.9"], "neoforge", "1.21.4")).toEqual([]);
     });
 });
 

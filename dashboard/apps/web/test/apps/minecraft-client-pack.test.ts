@@ -18,9 +18,11 @@ import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { execFileSync, spawn } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import {
     PACK_RECORD,
+    SET_ASIDE,
+    asideTable,
     packTable,
     powershellInstaller,
     scriptName,
@@ -129,10 +131,26 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
     let origin = "";
     let list: string[] = [];
     let missing: string[] = [];
+    /** What Polaris says about a player's own jars, by what is in them. */
+    let aside: Record<string, string> = {};
 
     beforeAll(async () => {
         server = createServer((request, response) => {
             const name = (request.url ?? "").replace(/^\/+/, "");
+            if (name === "foreign.tsv" && request.method === "POST") {
+                let body = "";
+                request.on("data", (chunk: Buffer) => (body += chunk.toString()));
+                request.on("end", () => {
+                    const moves = body
+                        .split("\n")
+                        .map((line) => line.replace(/\r$/, "").split("\t"))
+                        .filter(([sum]) => sum && aside[sum])
+                        .map(([sum, jar]) => ({ name: jar ?? "", reason: aside[sum ?? ""] ?? "" }));
+                    response.writeHead(200, { "content-type": "text/plain" });
+                    response.end(asideTable(moves));
+                });
+                return;
+            }
             if (name === "pack.tsv") {
                 const body = packTable(
                     list.map((jar) => ({
@@ -291,6 +309,56 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
             rmSync(dir, { recursive: true, force: true });
         }
     }
+
+    /**
+     * A player who installed mods by hand before ever running this: another
+     * version of one in the pack, under its own name, and something of theirs the
+     * pack has nothing to do with. The first stops the game from starting next to
+     * the pack's copy, so it is moved out of the folder - not deleted - and the
+     * second is left exactly where it was.
+     */
+    async function setsAside(kind: "sh" | "ps1"): Promise<void> {
+        const root = mkdtempSync(join(tmpdir(), "polaris-minecraft-"));
+        const dir = join(root, "mods");
+        mkdirSync(dir);
+        missing = [];
+        try {
+            writeFileSync(join(dir, "alpha-0.9-by-hand.jar"), "old alpha", "utf8");
+            writeFileSync(join(dir, "their-own-minimap.jar"), "not ours", "utf8");
+            aside = { [sha1("old alpha")]: "another copy of alpha, installed as alpha-1.0.jar" };
+            list = ["alpha-1.0.jar"];
+
+            const run1 = await run(kind, dir);
+            expect(run1.code, run1.output).toBe(0);
+            expect(run1.output).toContain("moved alpha-0.9-by-hand.jar");
+            expect(run1.output).toContain("1 moved aside");
+            expect(readdirSync(dir).sort()).toEqual(
+                [PACK_RECORD, "alpha-1.0.jar", "their-own-minimap.jar"].sort()
+            );
+            expect(readFileSync(join(root, SET_ASIDE, "alpha-0.9-by-hand.jar"), "utf8")).toBe(
+                "old alpha"
+            );
+
+            // Nothing left to move the next time round.
+            const run2 = await run(kind, dir);
+            expect(run2.code, run2.output).toBe(0);
+            expect(run2.output).toContain("0 moved aside");
+        } finally {
+            aside = {};
+            rmSync(root, { recursive: true, force: true });
+        }
+    }
+
+    it.runIf(HAS_SH)("move aside a hand-installed copy of a pack mod, from a shell", async () => {
+        await setsAside("sh");
+    });
+
+    it.runIf(POWERSHELL)(
+        "move aside a hand-installed copy of a pack mod, from PowerShell",
+        async () => {
+            await setsAside("ps1");
+        }
+    );
 
     it.runIf(HAS_SH)("install, keep and update a mods folder, from a shell", async () => {
         await exercise("sh");
