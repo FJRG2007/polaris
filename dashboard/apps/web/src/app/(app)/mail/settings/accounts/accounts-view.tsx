@@ -86,11 +86,11 @@ export function AccountsView({
         }
         if (movedTo.current === moveShelf) return;
         movedTo.current = moveShelf;
-        void setWorkspaceScopeAction(moveShelf).then(
-            () => router.refresh(),
-            () => undefined
-        );
-    }, [moveShelf, router]);
+        // The action revalidates every layout and answers with the new render,
+        // which the router applies; refreshing after it drew the whole frame a
+        // second time while the reader waited.
+        void setWorkspaceScopeAction(moveShelf).catch(() => undefined);
+    }, [moveShelf]);
     const [adding, setAdding] = useState(connectNow);
     const [editing, setEditing] = useState<{ id: string; focusPassword: boolean } | null>(() => {
         const asked = accounts.find((account) => account.id === editNow);

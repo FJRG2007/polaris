@@ -13,8 +13,7 @@
  */
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { OrgAvatar } from "@/components/avatar";
 import { PERSONAL_SCOPE, formatScope } from "@polaris/core";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
@@ -26,7 +25,8 @@ import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
-    DropdownMenuTrigger
+    DropdownMenuTrigger,
+    useToast
 } from "@polaris/ui";
 
 export interface ScopeOption {
@@ -46,20 +46,32 @@ export function ScopeSwitcher({
     /** The organization currently open, or null for the personal shelf. */
     current: ScopeOption | null;
 }) {
-    const router = useRouter();
+    const toast = useToast();
     const [open, setOpen] = useState(false);
-    const [pending, startTransition] = useTransition();
+    const [pending, setPending] = useState(false);
 
     if (organizations.length === 0) return null;
 
+    /**
+     * Move to another shelf.
+     *
+     * Not a transition, and no refresh after it. An async transition holds every
+     * other transition until it ends, and every navigation is one - so while the
+     * server rendered the new shelf, nothing on screen could be pressed or left.
+     * And the action already answers with that render: it revalidates every
+     * layout, the router applies what comes back, and asking the router to
+     * refresh after it rendered the whole signed-in frame a second time for
+     * nothing.
+     */
     const choose = (value: string) => {
         setOpen(false);
-        startTransition(async () => {
-            await setWorkspaceScopeAction(value);
-            // The action revalidates every layout; this is what makes the screen
-            // already on the page redraw from the shelf that was just picked.
-            router.refresh();
-        });
+        setPending(true);
+        void setWorkspaceScopeAction(value)
+            .then((outcome) => {
+                if (outcome.error) toast.show({ title: outcome.error });
+            })
+            .catch(() => toast.show({ title: "That could not be switched. Try again." }))
+            .finally(() => setPending(false));
     };
 
     return (
