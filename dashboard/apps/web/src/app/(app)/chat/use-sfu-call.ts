@@ -59,6 +59,7 @@ import {
 import { useVoiceGate } from "./voice-gate";
 import { voiceSettings } from "./voice-settings";
 import { playCallSound } from "@/lib/call-sounds";
+import { shareSound } from "./call-share-sound";
 import { withCameraDevice } from "./camera-device";
 import { callMuted, setCallMuted } from "./call-muted";
 import type { MeetingView } from "@/lib/chat/meetings";
@@ -1132,6 +1133,19 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setNearby(new Set());
     }, []);
 
+    /**
+     * A sound, unless this device is quiet for a room.
+     *
+     * A companion's speakers are the one thing it must not use: whatever it
+     * would have played is already coming out of the speakers next to it, a
+     * moment earlier, and a room full of laptops chiming one after another for
+     * the same arrival is exactly the noise combining was pressed to stop.
+     */
+    const sound = useCallback((name: Parameters<typeof playCallSound>[0]) => {
+        if (roleRef.current === "companion") return;
+        playCallSound(name);
+    }, []);
+
     /** Open the devices, connect, publish, and take it all down again. */
     useEffect(() => {
         if (!meetingId) return;
@@ -1328,8 +1342,29 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 // ever fires: the room kept the last stream it had been given,
                 // so a screen that had stopped went on holding the big place
                 // above everybody's faces, frozen, until somebody reloaded.
-                .on(RoomEvent.TrackPublished, () => resort())
-                .on(RoomEvent.TrackUnpublished, () => resort())
+                //
+                // They are also where somebody else's screen is heard going up
+                // or coming down - see `call-share-sound`. Only fired for what
+                // changes after this browser is in the room, so walking into a
+                // call with a screen already up is not announced.
+                .on(RoomEvent.TrackPublished, (publication) => {
+                    resort();
+                    const cue = shareSound({
+                        source: publication.source,
+                        published: true,
+                        stillHere: true
+                    });
+                    if (cue) sound(cue);
+                })
+                .on(RoomEvent.TrackUnpublished, (publication, participant) => {
+                    resort();
+                    const cue = shareSound({
+                        source: publication.source,
+                        published: false,
+                        stillHere: joined.remoteParticipants.has(participant.identity)
+                    });
+                    if (cue) sound(cue);
+                })
                 .on(RoomEvent.LocalTrackPublished, () => publishLocalPreview())
 
                 // The sharer's own copy of the same thing, and the button that
@@ -1723,22 +1758,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         resortStates,
         say,
         setVoiceEnabled,
+        sound,
         startFilter,
         withVideo
     ]);
-
-    /**
-     * A sound, unless this device is quiet for a room.
-     *
-     * A companion's speakers are the one thing it must not use: whatever it
-     * would have played is already coming out of the speakers next to it, a
-     * moment earlier, and a room full of laptops chiming one after another for
-     * the same arrival is exactly the noise combining was pressed to stop.
-     */
-    const sound = useCallback((name: Parameters<typeof playCallSound>[0]) => {
-        if (roleRef.current === "companion") return;
-        playCallSound(name);
-    }, []);
 
     /** Say something to one person in the call and to nobody else: the two things
      *  that cannot be read off an attribute - see `call-combine` - and the one
