@@ -330,7 +330,9 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                         </span>
                     </div>
 
-                    <div className="max-h-[55vh] min-h-[16rem] overflow-hidden">
+                    {/* A column, for the reason the public reader gives: the
+                        surface only scrolls inside a height it is handed. */}
+                    <div className="flex max-h-[55vh] min-h-[16rem] flex-col overflow-hidden">
                         <CodeSurface
                             code={current.body}
                             language={sealed ? null : languageOf(current) || null}

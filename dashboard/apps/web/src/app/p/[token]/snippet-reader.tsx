@@ -229,7 +229,12 @@ export function SnippetReader({
                                 ) : null}
                             </div>
                         </div>
-                        <div className="max-h-[70vh] overflow-hidden">
+                        {/* A column, so the surface below takes this height as
+                            its own and scrolls inside it. As a plain block it grew
+                            to the length of the file and was cut off here: the
+                            end of a long snippet could not be reached and the
+                            wheel over it moved nothing. */}
+                        <div className="flex max-h-[70vh] flex-col overflow-hidden">
                             <CodeSurface code={current.body} language={current.language || null} />
                         </div>
                     </CardBody>

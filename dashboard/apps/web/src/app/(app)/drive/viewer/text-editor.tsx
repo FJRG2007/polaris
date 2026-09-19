@@ -94,9 +94,13 @@ export function PlainTextEditor({
                         className="h-full min-h-[50vh] w-full resize-none border-0 bg-transparent p-4 font-mono text-xs leading-relaxed outline-none"
                     />
                 ) : (
-                    <pre className="overflow-auto overscroll-contain p-4 text-xs leading-relaxed">
-                        {file.text}
-                    </pre>
+                    // Sideways only, and never contained. The box around it is
+                    // what scrolls down; this only has a long line to reach. A
+                    // `pre` that could scroll both ways and kept its scrolling to
+                    // itself took every turn of the wheel over the text and had
+                    // nowhere to spend it - so the text did not move unless the
+                    // scrollbar was dragged.
+                    <pre className="overflow-x-auto p-4 text-xs leading-relaxed">{file.text}</pre>
                 )}
             </div>
         </div>

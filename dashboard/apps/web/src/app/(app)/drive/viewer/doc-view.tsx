@@ -159,8 +159,13 @@ export function DocView({
                     />
                 </div>
             ) : (
-                <div className="mx-auto max-w-3xl overflow-auto overscroll-contain p-6">
-                    <style>{`
+                // The whole width scrolls, and the page is centred inside it.
+                // The column itself used to be the scroller, and a column only
+                // as wide as its longest line left the margins either side of it
+                // dead to the wheel.
+                <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
+                    <div className="mx-auto max-w-3xl p-6">
+                        <style>{`
                 .doc-preview { line-height: 1.6; }
                 .doc-preview h1 { font-size: 1.5rem; font-weight: 600; margin: 1rem 0 0.5rem; }
                 .doc-preview h2 { font-size: 1.25rem; font-weight: 600; margin: 1rem 0 0.5rem; }
@@ -170,10 +175,11 @@ export function DocView({
                 .doc-preview td, .doc-preview th { border: 1px solid hsl(var(--border)); padding: 4px 8px; }
                 .doc-preview a { color: hsl(var(--primary)); text-decoration: underline; }
             `}</style>
-                    <div
-                        className="doc-preview text-sm"
-                        dangerouslySetInnerHTML={{ __html: html }}
-                    />
+                        <div
+                            className="doc-preview text-sm"
+                            dangerouslySetInnerHTML={{ __html: html }}
+                        />
+                    </div>
                 </div>
             )}
         </div>
