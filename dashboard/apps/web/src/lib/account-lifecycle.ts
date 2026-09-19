@@ -29,6 +29,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { openLockdownCase } from "@/lib/safety-queue";
 import { notify } from "@/lib/notifications/dispatch";
 import { revokeStepUpGrants } from "@/lib/step-up-grant";
+import { revokeExtensionSessions } from "@/lib/extension/sessions";
 
 /** Where the account itself reads about any of this. */
 const SECURITY_HREF = "/account/security";
@@ -150,6 +151,7 @@ export async function closeAccount(
                 : { disabledAt: now }
     });
     await prisma.session.deleteMany({ where: { userId } });
+    await revokeExtensionSessions(userId);
     await revokeStepUpGrants(userId);
     await recordAudit({
         actorId: userId,

@@ -3100,6 +3100,10 @@ model ExtensionSession {
     lastSeenAt DateTime  @default(now())
     // Set when it was ended. The row stays so the account's history still has it.
     revokedAt  DateTime?
+    // Tied to the address it was last seen at (true), free of it (false), or
+    // following the account's own rule for sessions (null) - the same three
+    // answers a browser session has.
+    pinToAddress Boolean?
 
     user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
     vaultDevices VaultDevice[]

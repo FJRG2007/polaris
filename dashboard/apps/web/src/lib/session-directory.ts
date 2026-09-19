@@ -15,6 +15,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { recordAudit } from "@/lib/audit-service";
+import { revokeExtensionSessions } from "@/lib/extension/sessions";
 import { networkPublicIp } from "@/lib/network-service";
 import { sessionClient, sessionDevice } from "@/lib/session-device";
 import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
@@ -507,19 +508,22 @@ export async function revokeOtherSessions(
     const result = await prisma.session.deleteMany({
         where: { userId, id: { not: currentSessionId } }
     });
-    if (result.count > 0) {
+    // The extensions as well: each is this account signed in somewhere, and one
+    // left behind would be the device the press was meant to reach.
+    const count = result.count + (await revokeExtensionSessions(userId));
+    if (count > 0) {
         await recordAudit({
             actorId: userId,
             action: "account.session.revoked-others",
-            metadata: { count: result.count }
+            metadata: { count }
         });
         await notifySessionsClosed({
             userId,
-            count: result.count,
+            count,
             reason: "Everything signed in to your account except the device this was done from."
         });
     }
-    return result.count;
+    return count;
 }
 
 /**

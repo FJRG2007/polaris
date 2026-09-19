@@ -199,7 +199,13 @@ export async function connectAuthorize(context: VaultContext): Promise<Response>
     // not only the extension - but a token that IS presented has to be a live
     // one, so a connection somebody ended cannot go on opening vaults.
     const extensionToken = typeof body.extensionToken === "string" ? body.extensionToken : null;
-    const connection = extensionToken ? await readExtensionToken(extensionToken) : null;
+    const connection = extensionToken
+        ? await readExtensionToken(extensionToken, {
+              ip: ip ?? null,
+              userAgent: (await clientUserAgent()) ?? null,
+              host: (await clientHost()) ?? null
+          })
+        : null;
     if (extensionToken && !connection) {
         return grantError(
             "This extension's connection to Polaris has ended. Connect it again.",

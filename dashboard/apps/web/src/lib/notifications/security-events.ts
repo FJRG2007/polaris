@@ -61,6 +61,7 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
     // has its own alert, with the whole account of who turned up - see
     // notifications/session-breach.
     "account.session.pinned": { title: "A session was tied to its address", href: SESSIONS },
+    "account.extension.pinned": { title: "A browser extension was tied to its address", href: SESSIONS },
     "account.successor.set": { title: "An account successor was named", href: SECURITY },
     "account.successor.cleared": { title: "The account successor was removed", href: SECURITY },
     "connection.signin.allowed": { title: "A connected account may now sign you in", href: SECURITY },

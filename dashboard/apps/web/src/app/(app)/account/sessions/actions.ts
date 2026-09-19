@@ -22,7 +22,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { revokeTrustedDevice, revokeTrustedDevices } from "@polaris/auth";
-import { revokeExtensionSession } from "@/lib/extension/sessions";
+import { pinExtensionSession, revokeExtensionSession } from "@/lib/extension/sessions";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import {
     decideLoginApproval,
@@ -277,6 +277,35 @@ export async function disconnectExtensionAction(id: unknown): Promise<{ error?: 
         action: "account.extension.disconnected",
         targetType: "extension",
         targetId: parsed.data
+    });
+    revalidatePath("/account/sessions");
+    return {};
+}
+
+/**
+ * Tie one extension's connection to its address, untie it, or hand it back to
+ * the account's rule - the same three answers, and the same gate, as a session.
+ */
+export async function pinExtensionAction(
+    id: unknown,
+    pinned: unknown
+): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+    const parsed = sessionIdSchema.safeParse(id);
+    if (!parsed.success) return { error: "Unknown connection." };
+    if (pinned !== null && typeof pinned !== "boolean") return { error: "Unknown setting." };
+
+    if (!(await pinExtensionSession(user.id, parsed.data, pinned))) {
+        return { error: "That connection has already ended." };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "account.extension.pinned",
+        targetType: "extension",
+        targetId: parsed.data,
+        metadata: { pinToAddress: pinned }
     });
     revalidatePath("/account/sessions");
     return {};

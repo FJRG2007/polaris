@@ -324,18 +324,29 @@ describe("a browser extension's connection", () => {
         host: "polaris.local",
         createdAt: "2026-09-01T10:00:00.000Z",
         lastSeenAt: "2026-09-17T10:00:00.000Z",
-        vaultClients: 1
+        vaultClients: 1,
+        pinToAddress: null,
+        pinnedByRule: false
     };
 
-    function renderWithExtension(onDisconnect?: () => void): string {
+    function renderWithExtension(
+        onDisconnect?: () => void,
+        pin?: { onPinExtension: () => void; pinToAddress?: boolean | null; pinnedByRule?: boolean }
+    ): string {
+        const shown = {
+            ...connection,
+            pinToAddress: pin?.pinToAddress ?? null,
+            pinnedByRule: pin?.pinnedByRule ?? false
+        };
         return renderToStaticMarkup(
             <SessionsTable
                 sessions={[]}
-                extensions={[connection]}
+                extensions={[shown]}
                 busyId={null}
                 emptyLabel="Nothing is signed in."
                 onRevoke={() => {}}
                 {...(onDisconnect ? { onDisconnect } : {})}
+                {...(pin ? { onPinExtension: pin.onPinExtension } : {})}
             />
         );
     }
@@ -359,5 +370,24 @@ describe("a browser extension's connection", () => {
 
     it("does not read as an empty list", () => {
         expect(renderWithExtension(() => {})).not.toContain("Nothing is signed in.");
+    });
+
+    it("can be locked to its address, like a session", () => {
+        const markup = renderWithExtension(() => {}, { onPinExtension: () => {} });
+        expect(markup).toContain("Address lock for Chrome extension");
+        expect(markup).not.toContain("Address-locked");
+    });
+
+    it("says it is locked when its own answer or the account's rule says so", () => {
+        expect(
+            renderWithExtension(() => {}, { onPinExtension: () => {}, pinToAddress: true })
+        ).toContain("Address-locked");
+        expect(
+            renderWithExtension(() => {}, { onPinExtension: () => {}, pinnedByRule: true })
+        ).toContain("Address-locked");
+    });
+
+    it("offers no lock to a reader who is not its owner", () => {
+        expect(renderWithExtension()).not.toContain("Address lock for");
     });
 });

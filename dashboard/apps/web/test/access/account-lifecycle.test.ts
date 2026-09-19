@@ -34,6 +34,7 @@ let security: { lockdownAt: Date | null; lockdownNote: string | null } | null;
 const sessionsDeleted = vi.fn(async () => ({ count: 3 }));
 const caseOpened = vi.fn(async () => undefined);
 const grantsRevoked = vi.fn(async () => undefined);
+const extensionsEnded = vi.fn(async () => 1);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -64,6 +65,7 @@ vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }));
 vi.mock("@/lib/safety-queue", () => ({ openLockdownCase: caseOpened }));
 vi.mock("@/lib/step-up-grant", () => ({ revokeStepUpGrants: grantsRevoked }));
+vi.mock("@/lib/extension/sessions", () => ({ revokeExtensionSessions: extensionsEnded }));
 
 const lifecycle = await import("@/lib/account-lifecycle");
 
@@ -107,6 +109,11 @@ describe("switching off and deleting", () => {
     it("ends every session, the one asking included", async () => {
         await lifecycle.closeAccount("ada", "disabled");
         expect(sessionsDeleted).toHaveBeenCalledWith({ where: { userId: "ada" } });
+    });
+
+    it("ends the browser extensions' connections with them", async () => {
+        await lifecycle.closeAccount("ada", "disabled");
+        expect(extensionsEnded).toHaveBeenCalledWith("ada");
     });
 
     it("marks a deletion as switched off as well, so it disappears straight away", async () => {

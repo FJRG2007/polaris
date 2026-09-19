@@ -29,6 +29,7 @@ import {
     disconnectExtensionAction,
     noteSignOutAction,
     revokeOtherSessionsAction,
+    pinExtensionAction,
     pinSessionAction,
     revokeSessionAction
 } from "./actions";
@@ -90,6 +91,8 @@ export function SessionsView({
     const pending = sessions.filter((session) => session.approval === "pending");
     const active = sessions.filter((session) => session.approval !== "pending");
     const others = active.filter((session) => !session.current);
+    // What "everywhere else" reaches: the other browsers and every extension.
+    const elsewhere = others.length + extensions.length;
 
     /** Refusing is immediate; allowing goes through the PIN prompt first. */
     async function deny(sessionId: string) {
@@ -155,6 +158,16 @@ export function SessionsView({
         else router.refresh();
     }
 
+    /** The same three answers for an extension's connection. */
+    async function pinExtension(extension: ExtensionSessionView, pinned: boolean | null) {
+        setBusyId(extension.id);
+        setError(null);
+        const result = await pinExtensionAction(extension.id, pinned);
+        setBusyId(null);
+        if (result.error) setError(result.error);
+        else router.refresh();
+    }
+
     /** Ending your own session goes through the auth client, so the cookie is
      *  dropped here too - deleting the row alone would leave a stale one. */
     async function signOutHere() {
@@ -167,7 +180,10 @@ export function SessionsView({
     async function revokeOthers() {
         const ok = await confirm({
             title: "Sign out everywhere else?",
-            description: `${others.length} other session${others.length === 1 ? "" : "s"} will end immediately.`,
+            description:
+                extensions.length > 0
+                    ? `${others.length} other session${others.length === 1 ? "" : "s"} and ${extensions.length} browser extension${extensions.length === 1 ? "" : "s"} will end immediately.`
+                    : `${others.length} other session${others.length === 1 ? "" : "s"} will end immediately.`,
             confirmLabel: "Sign them out",
             danger: true
         });
@@ -239,7 +255,7 @@ export function SessionsView({
                                     Scan a code
                                 </Button>
                             </Link>
-                            {others.length > 0 ? (
+                            {elsewhere > 0 ? (
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -256,6 +272,7 @@ export function SessionsView({
                     <SessionsTable
                         extensions={extensions}
                         onDisconnect={disconnect}
+                        onPinExtension={(extension, pinned) => void pinExtension(extension, pinned)}
                         sessions={active}
                         clients={clients}
                         busyId={busyId}

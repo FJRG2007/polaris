@@ -22,12 +22,21 @@
  * of any client that connection let in, because a connection that is cut off must
  * not leave a vault open behind it.
  *
+ * **It answers to the same controls a browser session does.** It can be tied to
+ * the address it was last seen at, by its own row or by the account's rule for
+ * computers, and a connection that turns up from somewhere else is ended the way
+ * a session is. Signing the account out everywhere, closing it or having an
+ * administrator end its sessions ends these too - a connection that outlived
+ * all of those would be the one way into the account nothing on screen reached.
+ *
  * Server-only.
  */
 
 import { prisma } from "@polaris/db";
-import { describeClient } from "@polaris/core";
+import { recordAudit } from "@/lib/audit-service";
 import { generateToken, hashToken } from "@polaris/core/tokens";
+import { notifySessionsClosed } from "@/lib/notifications/session-events";
+import { addressPinned, describeClient, isHandheld, type AddressPinScope } from "@polaris/core";
 import { AUTHORIZATION_POLL_MS, AUTHORIZATION_TTL_MS, newUserCode } from "@/lib/device-code";
 
 /** What the extension is handed when it asks. */
@@ -77,6 +86,11 @@ export interface ExtensionSessionView {
     /** How many vault clients this connection let in, so ending it says what
      *  else it takes with it. */
     readonly vaultClients: number;
+    /** This connection's own answer to the address lock, or null to follow the
+     *  account's rule. */
+    readonly pinToAddress: boolean | null;
+    /** What the account's rule says for it, which is what null means. */
+    readonly pinnedByRule: boolean;
 }
 
 /** The connection behind a token on a request. */
@@ -316,11 +330,43 @@ export async function readExtensionToken(
             userId: true,
             deviceId: true,
             name: true,
+            browser: true,
+            os: true,
+            ip: true,
             revokedAt: true,
-            user: { select: { bannedAt: true } }
+            pinToAddress: true,
+            user: {
+                select: {
+                    bannedAt: true,
+                    disabledAt: true,
+                    security: { select: { pinSessionsToAddress: true } }
+                }
+            }
         }
     });
-    if (!row || row.revokedAt || row.user.bannedAt) return null;
+    if (!row || row.revokedAt || row.user.bannedAt || row.user.disabledAt) return null;
+
+    // The address lock, judged the way a session's is: against where it was last
+    // seen, and only where both ends name an address. A request with nothing to
+    // compare is not a move.
+    const moved = Boolean(seen?.ip && row.ip && seen.ip !== row.ip);
+    if (moved && isPinned(row, row.user.security?.pinSessionsToAddress)) {
+        await endConnections(row.userId, [row.id]);
+        await recordAudit({
+            actorId: row.userId,
+            action: "account.extension.compromised",
+            targetType: "extension",
+            targetId: row.id,
+            metadata: { from: row.ip, to: seen?.ip ?? null }
+        });
+        await notifySessionsClosed({
+            userId: row.userId,
+            count: 1,
+            reason: `The ${row.browser ?? "browser"} extension was used from a different network address than the one it is locked to, so it was disconnected.`
+        });
+        return null;
+    }
+
     await prisma.extensionSession
         .update({
             where: { id: row.id },
@@ -336,6 +382,10 @@ export async function readExtensionToken(
 
 /** Every live connection this account has, most recently active first. */
 export async function listExtensionSessions(userId: string): Promise<ExtensionSessionView[]> {
+    const security = await prisma.userSecurity.findUnique({
+        where: { userId },
+        select: { pinSessionsToAddress: true }
+    });
     const rows = await prisma.extensionSession.findMany({
         where: { userId, revokedAt: null },
         orderBy: { lastSeenAt: "desc" },
@@ -349,6 +399,7 @@ export async function listExtensionSessions(userId: string): Promise<ExtensionSe
             userAgent: true,
             createdAt: true,
             lastSeenAt: true,
+            pinToAddress: true,
             _count: { select: { vaultDevices: true } }
         }
     });
@@ -363,9 +414,51 @@ export async function listExtensionSessions(userId: string): Promise<ExtensionSe
             host: row.host,
             createdAt: row.createdAt.toISOString(),
             lastSeenAt: row.lastSeenAt.toISOString(),
-            vaultClients: row._count.vaultDevices
+            vaultClients: row._count.vaultDevices,
+            pinToAddress: row.pinToAddress ?? null,
+            pinnedByRule: isPinned(
+                { os: row.os ?? client.os, pinToAddress: null },
+                security?.pinSessionsToAddress
+            )
         };
     });
+}
+
+/**
+ * Whether a connection is tied to its address: its own answer where it gave one,
+ * the account's rule for sessions where it did not. The rule's own function, so
+ * "computers only" means the same thing for an extension as for the browser it
+ * runs in.
+ */
+function isPinned(
+    row: { readonly os: string | null; readonly pinToAddress: boolean | null },
+    scope: string | null | undefined
+): boolean {
+    const os = row.os ?? "Unknown OS";
+    return addressPinned(
+        {
+            bindClient: false,
+            pinScope: (scope ?? "off") as AddressPinScope,
+            pinThisSession: row.pinToAddress ?? null
+        },
+        { os, browser: "", ip: null, handheld: isHandheld(os) }
+    );
+}
+
+/**
+ * Tie one connection to its address, untie it, or hand it back to the account's
+ * rule. Scoped to the owner, so an id from another account changes nothing.
+ */
+export async function pinExtensionSession(
+    userId: string,
+    id: string,
+    pinned: boolean | null
+): Promise<boolean> {
+    const written = await prisma.extensionSession.updateMany({
+        where: { id, userId, revokedAt: null },
+        data: { pinToAddress: pinned }
+    });
+    return written.count > 0;
 }
 
 /**
@@ -386,9 +479,38 @@ export async function revokeExtensionSession(
         select: { id: true, name: true }
     });
     if (!row) return { revoked: false, name: null };
+    await endConnections(userId, [row.id], now);
+    return { revoked: true, name: row.name };
+}
 
+/**
+ * End every connection an account has. Returns how many were live.
+ *
+ * What signing out everywhere, closing the account and an administrator ending
+ * its sessions call alongside ending the sessions themselves.
+ */
+export async function revokeExtensionSessions(userId: string, now = new Date()): Promise<number> {
+    const rows = await prisma.extensionSession.findMany({
+        where: { userId, revokedAt: null },
+        select: { id: true }
+    });
+    await endConnections(
+        userId,
+        rows.map((row) => row.id),
+        now
+    );
+    return rows.length;
+}
+
+/** End these connections and the vault clients they let in. */
+async function endConnections(
+    userId: string,
+    ids: readonly string[],
+    now = new Date()
+): Promise<void> {
+    if (ids.length === 0) return;
     const devices = await prisma.vaultDevice.findMany({
-        where: { extensionSessionId: row.id },
+        where: { extensionSessionId: { in: [...ids] } },
         select: { id: true }
     });
     if (devices.length > 0) {
@@ -397,13 +519,14 @@ export async function revokeExtensionSession(
             data: { revokedAt: now }
         });
     }
-    await prisma.extensionSession.update({
-        where: { id: row.id },
-        // The token goes with the row: a hash nothing can present again is one
-        // less way for a revoked connection to come back.
-        data: { revokedAt: now, tokenHash: `revoked:${row.id}` }
-    });
-    return { revoked: true, name: row.name };
+    // One write per row: the token goes with it, and a hash nothing can present
+    // again is one less way for a revoked connection to come back.
+    for (const id of ids) {
+        await prisma.extensionSession.updateMany({
+            where: { id, userId, revokedAt: null },
+            data: { revokedAt: now, tokenHash: `revoked:${id}` }
+        });
+    }
 }
 
 /** End the connection presenting this token - the extension disconnecting

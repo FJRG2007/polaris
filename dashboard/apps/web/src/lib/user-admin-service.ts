@@ -20,6 +20,7 @@ import { discardPersonalDrive } from "@/lib/personal-drive";
 import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
 import { parseStringList, type AccessRulesInput } from "@polaris/core";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
+import { revokeExtensionSessions } from "@/lib/extension/sessions";
 import { markPrincipalsMoved, updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
 
 /** One person, as the directory lists them. */
@@ -181,8 +182,9 @@ async function wouldStrandInstance(userId: string): Promise<boolean> {
  */
 async function dropSessions(userId: string): Promise<number> {
     const { count } = await prisma.session.deleteMany({ where: { userId } });
+    const extensions = await revokeExtensionSessions(userId);
     await markPrincipalsMoved([userId]);
-    return count;
+    return count + extensions;
 }
 
 /** The longest a suspension can run before it is simply a ban. A year, so a

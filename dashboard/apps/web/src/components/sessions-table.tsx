@@ -117,6 +117,7 @@ export function SessionsTable({
     activityHref,
     onRevoke,
     onDisconnect,
+    onPinExtension,
     onPin,
     emptyLabel,
     compact = false
@@ -148,6 +149,8 @@ export function SessionsTable({
     extensions?: ExtensionSessionView[];
     /** Ends one connection. Left out where the reader is not its owner. */
     onDisconnect?: (extension: ExtensionSessionView) => void;
+    /** The address lock for one connection, as `onPin` is for a session. */
+    onPinExtension?: (extension: ExtensionSessionView, pinned: boolean | null) => void;
     /** The session with an action in flight, or "all" while every other one ends. */
     busyId: string | null;
     /** Where this session's history is read. Left out where the reader has no
@@ -327,9 +330,11 @@ export function SessionsTable({
                                         ) : null}
                                         {onPin ? (
                                             <PinButton
-                                                session={session}
+                                                label={session.device}
+                                                pinToAddress={session.pinToAddress}
+                                                pinnedByRule={session.pinnedByRule}
                                                 busy={busyId !== null}
-                                                onPin={onPin}
+                                                onPin={(pinned) => onPin(session, pinned)}
                                             />
                                         ) : null}
                                         <Button
@@ -351,7 +356,13 @@ export function SessionsTable({
                         a connection Polaris made and watches, so it carries the same
                         columns a session does and the same way of ending it. */}
                     {extensions.map((extension) => (
-                        <tr key={`extension-${extension.id}`} className="border-t border-border">
+                        <tr
+                            key={`extension-${extension.id}`}
+                            className={cn(
+                                "border-t border-border",
+                                busyId === extension.id && "opacity-60"
+                            )}
+                        >
                             <td className="w-full max-w-0 px-3 py-2">
                                 <div className="flex items-center gap-3">
                                     <BrowserMark browser={extension.browser} />
@@ -364,6 +375,11 @@ export function SessionsTable({
                                                 {extension.os}
                                             </span>
                                             <Badge variant="neutral">Extension</Badge>
+                                            {(extension.pinToAddress ?? extension.pinnedByRule) ? (
+                                                <Badge title="This extension only works from the address it was last seen at">
+                                                    Address-locked
+                                                </Badge>
+                                            ) : null}
                                         </p>
                                         <p
                                             className={cn(
@@ -408,6 +424,15 @@ export function SessionsTable({
                             )}
                             <td className="px-3 py-2">
                                 <div className="flex justify-end gap-1">
+                                    {onPinExtension ? (
+                                        <PinButton
+                                            label={`${extension.browser} extension`}
+                                            pinToAddress={extension.pinToAddress}
+                                            pinnedByRule={extension.pinnedByRule}
+                                            busy={busyId !== null}
+                                            onPin={(pinned) => onPinExtension(extension, pinned)}
+                                        />
+                                    ) : null}
                                     {onDisconnect ? (
                                         <Button
                                             variant="ghost"
@@ -544,20 +569,25 @@ export function SessionsTable({
  * actually is and what pressing will do.
  */
 function PinButton({
-    session,
+    label,
+    pinToAddress,
+    pinnedByRule,
     busy,
     onPin
 }: {
-    session: SessionView;
+    /** What the row is called, for the button's accessible name. */
+    label: string;
+    pinToAddress: boolean | null;
+    pinnedByRule: boolean;
     busy: boolean;
-    onPin: (session: SessionView, pinned: boolean | null) => void;
+    onPin: (pinned: boolean | null) => void;
 }) {
-    const state = session.pinToAddress;
-    const effective = state ?? session.pinnedByRule;
+    const state = pinToAddress;
+    const effective = state ?? pinnedByRule;
     const next = state === null ? true : state === true ? false : null;
     const says =
         state === null
-            ? `Following your account setting, which is currently ${session.pinnedByRule ? "locked" : "not locked"}`
+            ? `Following your account setting, which is currently ${pinnedByRule ? "locked" : "not locked"}`
             : state
               ? "Locked to the address it was opened at"
               : "Not locked, whatever your account setting says";
@@ -574,8 +604,8 @@ function PinButton({
             size="icon"
             disabled={busy}
             title={`${says}. Press to ${then}.`}
-            aria-label={`Address lock for ${session.device}: ${says}`}
-            onClick={() => onPin(session, next)}
+            aria-label={`Address lock for ${label}: ${says}`}
+            onClick={() => onPin(next)}
         >
             {effective ? (
                 <Lock className={cn("size-4", state !== null && "text-primary")} />

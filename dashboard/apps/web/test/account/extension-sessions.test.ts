@@ -5,7 +5,9 @@
  * that is only ever stored hashed, an approval that can be collected exactly
  * once, a connection that is cut off the moment it is ended - along with the
  * vault client it let in - and an extension that was signed in to a vault before
- * connections existed being adopted rather than left unmanaged.
+ * connections existed being adopted rather than left unmanaged - and the same
+ * controls a browser session answers to: the address lock, signing out
+ * everywhere, and an account that has been closed.
  */
 
 import { hashToken } from "@polaris/core/tokens";
@@ -22,6 +24,7 @@ let sessions: Row[] = [];
 let devices: Row[] = [];
 let refreshTokens: Row[] = [];
 let users: Row[] = [];
+let securities: Row[] = [];
 
 function match(row: Row, where: Row): boolean {
     return Object.entries(where).every(([key, value]) => {
@@ -117,10 +120,11 @@ vi.mock("@polaris/db", () => ({
             return table(
                 () => sessions,
                 (next) => (sessions = next),
-                (row) => ({
-                    ...row,
-                    user: users.find((one) => one["id"] === row["userId"]) ?? null
-                })
+                (row) => {
+                    const user = users.find((one) => one["id"] === row["userId"]);
+                    const security = securities.find((one) => one["userId"] === row["userId"]);
+                    return { ...row, user: user ? { ...user, security: security ?? null } : null };
+                }
             );
         },
         get vaultDevice() {
@@ -140,8 +144,23 @@ vi.mock("@polaris/db", () => ({
                 () => users,
                 (next) => (users = next)
             );
+        },
+        get userSecurity() {
+            return table(
+                () => securities,
+                (next) => (securities = next)
+            );
         }
     }
+}));
+
+const audited: Row[] = [];
+const closed: Row[] = [];
+vi.mock("@/lib/audit-service", () => ({
+    recordAudit: async (entry: Row) => void audited.push(entry)
+}));
+vi.mock("@/lib/notifications/session-events", () => ({
+    notifySessionsClosed: async (entry: Row) => void closed.push(entry)
 }));
 
 const {
@@ -150,8 +169,10 @@ const {
     describeExtensionConnection,
     listExtensionSessions,
     openExtensionConnection,
+    pinExtensionSession,
     readExtensionToken,
-    revokeExtensionSession
+    revokeExtensionSession,
+    revokeExtensionSessions
 } = await import("@/lib/extension/sessions");
 
 const SEEN = {
@@ -168,7 +189,12 @@ beforeEach(() => {
     sessions = [];
     devices = [];
     refreshTokens = [];
-    users = [{ id: ALICE, name: "Ada", email: "ada@example.com", bannedAt: null }];
+    users = [
+        { id: ALICE, name: "Ada", email: "ada@example.com", bannedAt: null, disabledAt: null }
+    ];
+    securities = [];
+    audited.length = 0;
+    closed.length = 0;
 });
 
 async function connect(): Promise<{ token: string; sessionId: string }> {
@@ -333,6 +359,69 @@ describe("the token", () => {
         users[0]!["bannedAt"] = new Date();
         expect(await readExtensionToken(token)).toBeNull();
     });
+
+    it("is refused for an account its owner closed", async () => {
+        const { token } = await connect();
+        users[0]!["disabledAt"] = new Date();
+        expect(await readExtensionToken(token)).toBeNull();
+    });
+});
+
+describe("the address lock", () => {
+    const ELSEWHERE = { ...SEEN, ip: "198.51.100.9" };
+
+    it("leaves a connection that is not locked working from anywhere", async () => {
+        const { token } = await connect();
+
+        expect(await readExtensionToken(token, ELSEWHERE)).toMatchObject({ userId: ALICE });
+        expect(sessions[0]?.["ip"]).toBe(ELSEWHERE.ip);
+    });
+
+    it("ends a locked connection that turns up from another address, and says so", async () => {
+        const { token, sessionId } = await connect();
+        expect(await pinExtensionSession(ALICE, sessionId, true)).toBe(true);
+
+        expect(await readExtensionToken(token, SEEN)).toMatchObject({ userId: ALICE });
+        expect(await readExtensionToken(token, ELSEWHERE)).toBeNull();
+        expect(sessions[0]?.["revokedAt"]).toBeInstanceOf(Date);
+        // Ended, not just refused once: the same address does not bring it back.
+        expect(await readExtensionToken(token, SEEN)).toBeNull();
+        expect(audited.map((entry) => entry["action"])).toContain("account.extension.compromised");
+        expect(closed).toHaveLength(1);
+    });
+
+    it("follows the account's rule for computers when the row says nothing", async () => {
+        const { token } = await connect();
+        securities.push({ userId: ALICE, pinSessionsToAddress: "desktop" });
+
+        expect(await readExtensionToken(token, ELSEWHERE)).toBeNull();
+    });
+
+    it("lets the row's own answer win over the account's rule", async () => {
+        const { token, sessionId } = await connect();
+        securities.push({ userId: ALICE, pinSessionsToAddress: "all" });
+        await pinExtensionSession(ALICE, sessionId, false);
+
+        expect(await readExtensionToken(token, ELSEWHERE)).toMatchObject({ userId: ALICE });
+    });
+
+    it("does not treat a request with no address as a move", async () => {
+        const { token, sessionId } = await connect();
+        await pinExtensionSession(ALICE, sessionId, true);
+
+        expect(await readExtensionToken(token, { ...SEEN, ip: null })).toMatchObject({
+            userId: ALICE
+        });
+    });
+
+    it("is changed only by the connection's owner", async () => {
+        const { sessionId } = await connect();
+
+        expect(
+            await pinExtensionSession("22222222-2222-4222-8222-222222222222", sessionId, true)
+        ).toBe(false);
+        expect(sessions[0]?.["pinToAddress"]).toBeUndefined();
+    });
 });
 
 describe("ending a connection", () => {
@@ -365,6 +454,25 @@ describe("ending a connection", () => {
     });
 });
 
+describe("ending all of them", () => {
+    it("ends every live connection an account has, with the vault clients they let in", async () => {
+        const { token, sessionId } = await connect();
+        devices.push({
+            id: "device-1",
+            userId: ALICE,
+            identifier: "install-1",
+            extensionSessionId: sessionId
+        });
+        refreshTokens.push({ id: "token-1", deviceId: "device-1", revokedAt: null });
+
+        expect(await revokeExtensionSessions(ALICE)).toBe(1);
+        expect(await readExtensionToken(token)).toBeNull();
+        expect(refreshTokens[0]?.["revokedAt"]).toBeInstanceOf(Date);
+        // Nothing left to end the second time.
+        expect(await revokeExtensionSessions(ALICE)).toBe(0);
+    });
+});
+
 describe("the list", () => {
     it("says what the request said about the browser, and how many vaults hang off it", async () => {
         const { sessionId } = await connect();
@@ -378,7 +486,19 @@ describe("the list", () => {
             os: "Windows",
             ip: SEEN.ip,
             host: SEEN.host,
-            vaultClients: 1
+            vaultClients: 1,
+            pinToAddress: null,
+            pinnedByRule: false
         });
+    });
+
+    it("says when the account's rule locks it", async () => {
+        await connect();
+        sessions[0]!["_count"] = { vaultDevices: 0 };
+        securities.push({ userId: ALICE, pinSessionsToAddress: "desktop" });
+
+        const [listed] = await listExtensionSessions(ALICE);
+
+        expect(listed?.pinnedByRule).toBe(true);
     });
 });
