@@ -13,8 +13,9 @@
  * So both devices are tested here. The microphone draws its own level while
  * somebody talks into it, which is the only way a threshold can be set and the
  * only honest answer to "is it picking me up". The camera shows itself. Neither
- * test touches a call, and neither runs unless somebody pressed it: a settings
- * screen that holds the microphone open is one nobody leaves open.
+ * test touches a call. The level is live on arrival only where the browser has
+ * already been allowed the microphone, and in a call it reads the call's own -
+ * see `MicLevelMeter`; everything else waits for somebody to press it.
  *
  * Everything here is per browser. A headset is plugged into a machine, not into
  * an account, and the laptop in the kitchen and the desk with the headset want
@@ -27,7 +28,8 @@ import { Camera, Loader2, Mic, Square } from "lucide-react";
 import { useCameras } from "@/app/(app)/chat/camera-device";
 import { useMicrophones } from "@/app/(app)/chat/mic-device";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { measureVoice, speaking } from "@/app/(app)/chat/voice-level";
+import { useHeldCall } from "@/app/(app)/chat/call-hold";
+import { MicLevelMeter } from "@/app/(app)/chat/mic-level-meter";
 import { Button, Card, CardBody, Select, Switch, cn } from "@polaris/ui";
 import { useMicGain, GAIN_MAX, GAIN_MIN } from "@/app/(app)/chat/mic-gain";
 import { NOISE_LEVELS, micConstraints, useMicCleanup } from "@/app/(app)/chat/mic-cleanup";
@@ -92,14 +94,17 @@ function MicrophoneCard({
      *  the test has run, and null again when it is stopped. */
     const [filterState, setFilterState] = useState<FilteredMic | null>(null);
     const filter = useRef<FilteredMic | null>(null);
-    const [level, setLevel] = useState(0);
     const [error, setError] = useState("");
     const stream = useRef<MediaStream | null>(null);
-    const reading = useRef<ReturnType<typeof setInterval> | null>(null);
+    /** The microphone the test opened, which the meter reads rather than opening
+     *  another. */
+    const [tested, setTested] = useState<MediaStreamTrack | null>(null);
+    /** The call's own microphone, when there is a call: the meter reads it rather
+     *  than asking the browser for the same device a second time. */
+    const held = useHeldCall();
+    const inCall = held?.session ? (held.call.localStream?.getAudioTracks()[0] ?? null) : null;
 
     const stop = useCallback(() => {
-        if (reading.current) clearInterval(reading.current);
-        reading.current = null;
         // The graph goes before the device does: it holds an audio context, and
         // a context left open on a screen somebody wandered away from is the
         // same light left on as an open microphone.
@@ -107,8 +112,8 @@ function MicrophoneCard({
         filter.current = null;
         for (const track of stream.current?.getTracks() ?? []) track.stop();
         stream.current = null;
+        setTested(null);
         setTesting(false);
-        setLevel(0);
         setFilterState(null);
     }, []);
 
@@ -128,17 +133,8 @@ function MicrophoneCard({
             });
             stream.current = opened;
             const track = opened.getAudioTracks()[0] ?? null;
-            const meter = track ? measureVoice(track) : null;
-            if (!meter) {
-                stop();
-                setError("This browser will not measure sound.");
-                return;
-            }
+            setTested(track);
             setTesting(true);
-            reading.current = setInterval(() => {
-                if (!stream.current) return;
-                setLevel(meter.read());
-            }, 60);
 
             // Built for real, with the settings on this screen, because the only
             // honest answer to "is the noise model working" is to start it. It
@@ -155,8 +151,6 @@ function MicrophoneCard({
             stop();
         }
     };
-
-    const open = speaking(level, threshold, false);
 
     return (
         <Card>
@@ -205,29 +199,18 @@ function MicrophoneCard({
 
                 <div className="flex flex-col gap-1.5">
                     <span className="text-sm">Level</span>
-                    {/* Drawn whether or not the test is running: an empty bar is
-                        what says the test is the thing that fills it. */}
-                    <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                            className={cn(
-                                "h-full rounded-full transition-[width] duration-75",
-                                open ? "bg-success" : "bg-primary"
-                            )}
-                            style={{ width: `${level}%` }}
-                        />
-                        {showThreshold ? (
-                            <span
-                                aria-hidden
-                                title="Anything past this counts as you speaking"
-                                className="absolute inset-y-0 w-0.5 bg-foreground/60"
-                                style={{ left: `${threshold}%` }}
-                            />
-                        ) : null}
-                    </div>
+                    {/* Drawn whether or not anything is being measured: an empty
+                        row is what says the test is the thing that fills it. */}
+                    <MicLevelMeter
+                        track={tested ?? inCall}
+                        listen
+                        deviceId={chosenId}
+                        threshold={showThreshold ? threshold : undefined}
+                    />
                     <span className="text-xs text-muted-foreground">
                         {testing
-                            ? "Say something. The bar should move."
-                            : "Press Test it and talk - this is what the room hears."}
+                            ? "Say something. The bars should move."
+                            : "Talk and watch the bars. If they stay dark, press Test it."}
                     </span>
                 </div>
 

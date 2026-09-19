@@ -54,6 +54,7 @@ import {
     type ShownReaction
 } from "./call-signals";
 import { LiveBadge } from "./call-roster";
+import { MicLevelMeter } from "./mic-level-meter";
 import { useSpeakers } from "./speaker-device";
 import { HandStrip } from "./call-hands-panel";
 import { useCallVolume } from "./call-volumes";
@@ -990,6 +991,9 @@ export function CallRoom({
                     onCleanMic={call.setCleanMic}
                     filterRunning={call.micFilter}
                     licensedOffered={call.licensedFilter}
+                    // The call's own microphone, never a second one - see
+                    // `MicLevelMeter`.
+                    meter={call.localStream?.getAudioTracks()[0] ?? null}
                 />
 
                 <Split
@@ -1208,6 +1212,7 @@ function Split({
     qualityLabel,
     mirrored,
     onMirror,
+    meter,
     title
 }: {
     label: string;
@@ -1246,6 +1251,10 @@ function Split({
      *  somebody opens when the picture looks wrong. */
     mirrored?: boolean;
     onMirror?: () => void;
+    /** Microphone only: the track whose level the menu draws while it is open.
+     *  Null while the call has no microphone open yet - the meter then stays
+     *  empty rather than opening one of its own. */
+    meter?: MediaStreamTrack | null;
 }) {
     // Worth a menu for the setting alone: a machine with one microphone still
     // sits in a room with a fan in it, and a machine with one screen still has a
@@ -1428,6 +1437,18 @@ function Split({
                                 </span>
                             </DropdownMenuItem>
                         ))}
+                        {/* Whether the microphone picked is hearing anything,
+                            under the list it was picked from. Only measured
+                            while the menu is open - see `MicLevelMeter`. */}
+                        {meter !== undefined && (
+                            <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel>Input level</DropdownMenuLabel>
+                                <div className="px-2 pb-2">
+                                    <MicLevelMeter track={meter} />
+                                </div>
+                            </>
+                        )}
                     </DropdownMenuContent>
                 </DropdownMenu>
             )}
