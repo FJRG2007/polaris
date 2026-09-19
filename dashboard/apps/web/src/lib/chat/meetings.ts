@@ -37,10 +37,13 @@ import { ChatAccessError, channelAccess, requireChannel, type ChatActor } from "
 
 /** How many browsers one call holds.
  *
- *  Every browser sends its own video to every other one, so eight people is
- *  fifty-six streams and a laptop fan. Past this the answer is a server that
- *  mixes the call, which Polaris deliberately does not run. */
-export const MAX_IN_CALL = 8;
+ *  It was eight while every browser sent its video straight to every other
+ *  one - eight people was fifty-six streams. Calls go through the media server
+ *  now, which takes one stream from each browser and hands each one only what it
+ *  is showing, so the room is no longer what runs out first. This is the same
+ *  ceiling a voice channel's own limit goes up to, so a limit somebody sets can
+ *  always be filled. */
+export const MAX_IN_CALL = core.MAX_VOICE_USER_LIMIT;
 
 /** How long a participant may go quiet before they are treated as gone. Their
  *  browser refreshes this while the call is on screen; a closed laptop stops. */
