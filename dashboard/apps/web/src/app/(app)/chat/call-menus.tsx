@@ -8,6 +8,7 @@
  */
 
 import { useVoiceSettings } from "./voice-settings";
+import { ModerationItems, type SeatModeration } from "./call-moderation-menu";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { Check, Headphones, PictureInPicture2, Users, Volume2, VolumeX } from "lucide-react";
 import {
@@ -48,6 +49,7 @@ export function PersonMenu({
     onAskCombine,
     combineAsked = false,
     combineLocked = false,
+    moderation,
     children
 }: {
     name: string;
@@ -61,6 +63,9 @@ export function PersonMenu({
     combineAsked?: boolean;
     /** Whether the call is too small to combine in, which disables both. */
     combineLocked?: boolean;
+    /** Present for somebody who moderates the conversation the call is in:
+     *  mute, deafen and disconnect this person for everybody. */
+    moderation?: SeatModeration;
     children: React.ReactNode;
 }) {
     const [volume, setVolume] = useCallVolume(volumeKey);
@@ -150,6 +155,7 @@ export function PersonMenu({
                         Needs at least three people in the call.
                     </p>
                 )}
+                {moderation && <ModerationItems seat={moderation} name={name} />}
             </ContextMenuContent>
         </ContextMenu>
     );

@@ -79,6 +79,7 @@ function call(over: Partial<CallState> = {}): CallState {
         cameraOn: false,
         sharing: false,
         deafened: false,
+        moderation: { serverMuted: false, serverDeafened: false },
         ended: false,
         error: "",
         microphones: [],

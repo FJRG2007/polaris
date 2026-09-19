@@ -11,8 +11,9 @@ import type { MeetingView } from "@/lib/chat/meetings";
 import type { CallAudioReport } from "./call-diagnosis";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import type { CallLevel, CallQuality } from "./call-quality";
-import type { AudioRole, CombineRequest } from "./call-combine";
 import type { Reaction, ShownReaction } from "./call-signals";
+import type { AudioRole, CombineRequest } from "./call-combine";
+import type { SeatRestriction } from "@/lib/chat/voice-moderation";
 
 /** What somebody else's controls are set to, as far as they have said. */
 export interface PeerState {
@@ -85,6 +86,9 @@ export interface CallState {
     /** Whether everybody else is silenced here. Nobody else is told: it is a
      *  decision about this pair of ears. */
     readonly deafened: boolean;
+    /** What a moderator has put on this browser's seat. The media server
+     *  enforces it; the buttons read it so they do not offer to undo it. */
+    readonly moderation: SeatRestriction;
     readonly ended: boolean;
     /** When the room's own chat last changed, as a moment in time. What was said
      *  is read from the server by whatever draws it; this is the nudge that

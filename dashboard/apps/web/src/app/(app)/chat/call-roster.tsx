@@ -16,12 +16,14 @@ import { HeadphoneOff, MicOff } from "lucide-react";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { PersonName, PersonRow } from "@/components/person-name";
 
-type Seated = Pick<VoicePresence, "muted" | "deafened">;
+type Seated = Pick<VoicePresence, "muted" | "deafened"> &
+    Partial<Pick<VoicePresence, "serverMuted" | "serverDeafened">>;
 
 /** The mark a face in a call wears. Deafened wins: it silences the microphone
  *  as well, and one mark is all there is room for. */
 export function callBadgeOf(person: Seated): "muted" | "deafened" | null {
-    return person.deafened ? "deafened" : person.muted ? "muted" : null;
+    if (person.deafened || person.serverDeafened) return "deafened";
+    return person.muted || person.serverMuted ? "muted" : null;
 }
 
 /**
@@ -48,6 +50,18 @@ export function LiveBadge({ className }: { className?: string }) {
 
 /** The same mark as icons after a name, for a row too small to badge a face. */
 export function VoiceStateIcons({ person }: { person: Seated }) {
+    // A moderator's mark outranks the person's own, and is drawn in the danger
+    // colour the way every voice client draws it: it is the one they cannot
+    // take off themselves.
+    if (person.serverDeafened || person.serverMuted) {
+        const Icon = person.serverDeafened ? HeadphoneOff : MicOff;
+        const words = person.serverDeafened ? "Deafened by a moderator" : "Muted by a moderator";
+        return (
+            <span role="img" aria-label={words} title={words} className="ml-auto shrink-0">
+                <Icon className="size-3 text-danger" />
+            </span>
+        );
+    }
     const badge = callBadgeOf(person);
     if (!badge) return null;
     const Icon = badge === "deafened" ? HeadphoneOff : MicOff;

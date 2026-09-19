@@ -9004,6 +9004,14 @@ model MeetingParticipant {
     // Sharing a screen, reported the same way, so the people outside the call
     // can see who is live without being able to watch it.
     streaming  Boolean   @default(false)
+    // Set by somebody who moderates the conversation the call belongs to, and
+    // enforced by the media server rather than by this browser: a seat muted
+    // here cannot publish its microphone, and one deafened here receives
+    // nothing. Only a moderator lifts either. A new seat in the same space or
+    // group starts with whatever that account's last seat there carried, so
+    // leaving and walking back in does not lift it.
+    serverMuted    Boolean @default(false)
+    serverDeafened Boolean @default(false)
 
     meeting  Meeting           @relation(fields: [meetingId], references: [id], onDelete: Cascade)
     messages MeetingMessage[]
@@ -9011,6 +9019,9 @@ model MeetingParticipant {
 
     @@index([meetingId, leftAt])
     @@index([meetingId, admission])
+    // An account's latest seat, which is where a moderator's mute is carried
+    // from into the next call in the same space or group.
+    @@index([userId, joinedAt])
 }
 // One capability switched on or off for one account, regardless of their role.
 //

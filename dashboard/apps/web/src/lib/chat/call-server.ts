@@ -19,10 +19,11 @@
 
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
-import { AccessToken } from "livekit-server-sdk";
 import { isPolarisPart } from "@/lib/polaris-parts";
 import { ensureCallKey } from "@/lib/chat/call-keys";
 import { localDockerDriver } from "@/lib/docker-service";
+import { AccessToken, RoomServiceClient, type TrackSource } from "livekit-server-sdk";
+import { mediaPermissions, MEDIA_SOURCE, type SeatRestriction } from "./voice-moderation";
 import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 
 /** Where the pairing is kept. One per instance: a call server is infrastructure,
@@ -231,7 +232,14 @@ export async function joinToken(
     // cannot decide what somebody is called on the way through.
     const participant = await prisma.meetingParticipant.findUnique({
         where: { id: participantId },
-        select: { name: true }
+        select: { name: true, serverMuted: true, serverDeafened: true }
+    });
+    // What a moderator has done to this seat travels in the ticket itself, so a
+    // browser that reconnects, or leaves and walks back in, arrives already
+    // held to it - the media server believes the token and nothing else.
+    const held = mediaPermissions({
+        serverMuted: participant?.serverMuted ?? false,
+        serverDeafened: participant?.serverDeafened ?? false
     });
 
     const token = new AccessToken(endpoint.apiKey, endpoint.apiSecret, {
@@ -243,7 +251,12 @@ export async function joinToken(
         room,
         roomJoin: true,
         canPublish: true,
-        canSubscribe: true,
+        canSubscribe: held.canSubscribe,
+        // Only said when something is held back: left out, every source may be
+        // published, which is every ordinary seat.
+        ...(held.canPublishSources.length > 0
+            ? { canPublishSources: held.canPublishSources as unknown as TrackSource[] }
+            : {}),
         // Two browsers in a call need to be able to say one thing to each other
         // that Polaris is not in the middle of: "go quiet, I will carry this
         // room" and the refusal of it - see `call-combine`. Asking a server to
@@ -267,6 +280,96 @@ export async function joinToken(
         canUpdateOwnMetadata: true
     });
     return token.toJwt();
+}
+
+/** What a moderator's decision does to a seat on the media server: hold it to a
+ *  restriction, or show it out of the room. */
+export type SeatMediaChange =
+    | { readonly kind: "restrict"; readonly restriction: SeatRestriction }
+    | { readonly kind: "remove" };
+
+/** How long one request to the media server may take, in seconds. A moderator
+ *  pressing a button is waiting on it. */
+const ADMIN_TIMEOUT_S = 5;
+
+/**
+ * Make the media server enforce what a moderator decided about one seat.
+ *
+ * The seat's row is what the next ticket is written from; this is the half that
+ * reaches a browser already in the room. A mute takes the microphone off the
+ * seat's allowed sources and mutes the one it is already sending, a deafen stops
+ * everything arriving, and a removal closes the connection.
+ *
+ * True when the media server confirmed it, and when it answered that the seat is
+ * not connected at all - there is nothing to enforce on a browser that is not
+ * there, and its next ticket carries the restriction. False when no media server
+ * could be asked, which the caller says out loud rather than pretending.
+ *
+ * The admin API answers on the same port a browser dials, over HTTP. For the
+ * shipped server that is the host, reached the way `answering` reaches it.
+ */
+export async function applyToSeat(
+    meetingId: string,
+    participantId: string,
+    change: SeatMediaChange
+): Promise<boolean> {
+    const endpoint = await callServer();
+    if (!endpoint) return false;
+    const hosts = endpoint.shipped
+        ? INTERNAL_CALL_SERVER
+        : [endpoint.url.replace(/^ws:/, "http:").replace(/^wss:/, "https:")];
+
+    let failure: unknown = null;
+    for (const host of hosts) {
+        const rooms = new RoomServiceClient(host, endpoint.apiKey, endpoint.apiSecret, {
+            requestTimeout: ADMIN_TIMEOUT_S,
+            failover: false
+        });
+        try {
+            if (change.kind === "remove") {
+                await rooms.removeParticipant(meetingId, participantId);
+                return true;
+            }
+            const permissions = mediaPermissions(change.restriction);
+            if (permissions.canPublishSources.length > 0) {
+                // Muted first, so the room goes quiet before the permission
+                // change is even processed.
+                const seat = await rooms.getParticipant(meetingId, participantId);
+                for (const track of seat.tracks) {
+                    if (Number(track.source) !== MEDIA_SOURCE.MICROPHONE || track.muted) continue;
+                    await rooms
+                        .mutePublishedTrack(meetingId, participantId, track.sid, true)
+                        .catch(() => undefined);
+                }
+            }
+            // Replaced as a whole by the media server, so everything the ticket
+            // grants is said again - left out, a field would be taken away.
+            await rooms.updateParticipant(meetingId, participantId, {
+                permission: {
+                    canPublish: permissions.canPublish,
+                    canSubscribe: permissions.canSubscribe,
+                    canPublishData: permissions.canPublishData,
+                    canPublishSources: permissions.canPublishSources as unknown as TrackSource[],
+                    canUpdateMetadata: true
+                }
+            });
+            return true;
+        } catch (caught) {
+            if (notConnected(caught)) return true;
+            failure = caught;
+        }
+    }
+    console.error(
+        "polaris: the call server did not take a moderator's decision:",
+        failure instanceof Error ? failure.message : failure
+    );
+    return false;
+}
+
+/** Whether the media server answered that the seat is not in the room. */
+function notConnected(caught: unknown): boolean {
+    const error = caught as { status?: number; code?: string } | null;
+    return error?.status === 404 || error?.code === "not_found";
 }
 
 /** The compose service the media server runs as. What a screen looks for when

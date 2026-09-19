@@ -20,15 +20,15 @@
  */
 
 import Link from "next/link";
-import { CallAudio } from "./call-audio";
-import { RecordingPanel } from "./recording-panel";
-import { useCallRecorder } from "./call-recorder";
-import { Button, cn } from "@polaris/ui";
-import { useChatStream } from "./use-chat-stream";
-import { usePresenceRefresh } from "@/components/presence-store";
-import { playCallSound } from "@/lib/call-sounds";
 import { useCall } from "./use-call";
+import { CallAudio } from "./call-audio";
+import { Button, cn } from "@polaris/ui";
 import { useCallHotkeys } from "./call-hotkeys";
+import { useCallRecorder } from "./call-recorder";
+import { useChatStream } from "./use-chat-stream";
+import { playCallSound } from "@/lib/call-sounds";
+import { RecordingPanel } from "./recording-panel";
+import { usePresenceRefresh } from "@/components/presence-store";
 import { rememberCall, takeRememberedCall } from "./call-resume";
 import { handsQueueSummary, type HandInQueue } from "./call-signals";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -307,7 +307,13 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                     type="button"
                     onClick={call.toggleMic}
                     aria-label={call.micOn ? "Mute" : "Unmute"}
-                    title={call.micOn ? "Mute (F9)" : "Unmute (F9)"}
+                    title={
+                        call.moderation.serverMuted || call.moderation.serverDeafened
+                            ? "A moderator muted you"
+                            : call.micOn
+                              ? "Mute (F9)"
+                              : "Unmute (F9)"
+                    }
                     className={cn(
                         "rounded-full p-1.5 transition-colors hover:bg-muted",
                         call.micOn ? "text-foreground" : "text-danger"
@@ -319,7 +325,13 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                     type="button"
                     onClick={call.toggleDeafen}
                     aria-label={call.deafened ? "Undeafen" : "Deafen"}
-                    title={call.deafened ? "Undeafen (F10)" : "Deafen (F10)"}
+                    title={
+                        call.moderation.serverDeafened
+                            ? "A moderator deafened you"
+                            : call.deafened
+                              ? "Undeafen (F10)"
+                              : "Deafen (F10)"
+                    }
                     className={cn(
                         "rounded-full p-1.5 transition-colors hover:bg-muted",
                         call.deafened ? "text-danger" : "text-foreground"

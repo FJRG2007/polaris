@@ -100,6 +100,9 @@ vi.mock("@polaris/db", () => ({
                 return { count };
             }
         },
+        // Asked whether the reader moderates the conversation the call is in;
+        // this call belongs to none that the suite knows about.
+        chatChannel: { findUnique: async () => null },
         $transaction: async (operations: Promise<unknown>[]) => Promise.all(operations)
     }
 }));

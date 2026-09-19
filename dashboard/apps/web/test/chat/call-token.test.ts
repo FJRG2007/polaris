@@ -18,8 +18,13 @@ import { join } from "node:path";
 import { mkdtemp } from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const participants: Record<string, { name: string }> = {
-    "seat-1": { name: "Ada" }
+const participants: Record<
+    string,
+    { name: string; serverMuted?: boolean; serverDeafened?: boolean }
+> = {
+    "seat-1": { name: "Ada" },
+    "seat-muted": { name: "Grace", serverMuted: true },
+    "seat-deaf": { name: "Linus", serverDeafened: true }
 };
 
 vi.mock("@polaris/db", () => ({
@@ -144,6 +149,31 @@ describe("the ticket for the media server", () => {
         // still the identity, so the media server refuses it on its own terms.
         expect(grant.sub).toBe("gone");
         expect(grant.name ?? "").toBe("");
+    });
+});
+
+describe("what a moderator put on a seat", () => {
+    it("leaves every source open to an ordinary seat", async () => {
+        const video = claims(await calls.joinToken(endpoint, "meeting-9", "seat-1"))
+            .video as Record<string, unknown>;
+        expect(video.canPublishSources).toBeUndefined();
+        expect(video.canSubscribe).toBe(true);
+    });
+
+    it("keeps a muted seat's microphone off the call even after it reconnects", async () => {
+        const video = claims(await calls.joinToken(endpoint, "meeting-9", "seat-muted"))
+            .video as Record<string, unknown>;
+        // The media server believes the ticket and nothing else, so the mute
+        // has to be in it: a browser that walks back in is still quiet.
+        expect(video.canPublishSources).toEqual(["camera", "screen_share", "screen_share_audio"]);
+        expect(video.canSubscribe).toBe(true);
+    });
+
+    it("sends nothing to a deafened seat, and takes its microphone too", async () => {
+        const video = claims(await calls.joinToken(endpoint, "meeting-9", "seat-deaf"))
+            .video as Record<string, unknown>;
+        expect(video.canSubscribe).toBe(false);
+        expect(video.canPublishSources).not.toContain("microphone");
     });
 });
 

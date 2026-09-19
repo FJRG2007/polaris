@@ -23,7 +23,9 @@ import * as room from "@/lib/chat/meeting-chat";
 import * as calls from "@/lib/chat/call-server";
 import { mayRing } from "@/lib/privacy-service";
 import { requirePermission } from "@/lib/session";
+import * as moderation from "@/lib/chat/call-moderation";
 import { createNotification } from "@/lib/notification-service";
+import { callModerationSchema } from "@/lib/chat/voice-moderation";
 import { ChatAccessError, requireChannel } from "@/lib/chat/access";
 import type { MeetingView, VoicePresence } from "@/lib/chat/meetings";
 import { MAX_MEETING_LINE, MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
@@ -301,6 +303,28 @@ export async function admitAction(
     const seat = await resolveSeat(meetingId);
     if (!seat) return { error: "You are not in that call" };
     return guard(() => meetings.decideAdmission(seat, participantId, admitted));
+}
+
+/**
+ * Mute, deafen or disconnect somebody in a conversation's call, or undo it.
+ *
+ * Proved by the conversation rather than by a seat: a moderator does not have to
+ * be in the call to act on it - the rail lists who is in a voice channel to
+ * everybody who can see the channel, and that is where most of this is done
+ * from. Whether they moderate the conversation is asked by the service.
+ */
+export async function moderateCallAction(
+    input: unknown
+): Promise<{ warning?: string; error?: string }> {
+    const user = await requirePermission("chat.use");
+    const parsed = callModerationSchema.safeParse(input);
+    if (!parsed.success) return { error: "That could not be done" };
+
+    const result = await guard(() =>
+        moderation.moderateSeat({ id: user.id }, parsed.data.participantId, parsed.data.action)
+    );
+    if (result.error) return { error: result.error };
+    return result.value?.unconfirmed ? { warning: moderation.NOT_ENFORCED_YET } : {};
 }
 
 export async function endCallAction(meetingId: string): Promise<{ error?: string }> {

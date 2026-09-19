@@ -29,6 +29,7 @@ import { postNotice, postNoticeBody } from "./notices";
 import { publishMeetingEvent } from "./meeting-events";
 import { publishChatChange, type CallState } from "./live";
 import { announcesCalls, callEndedBody } from "./notice-text";
+import { UNRESTRICTED, type SeatRestriction } from "./voice-moderation";
 import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { chatAlertShelf } from "./isolation";
@@ -67,6 +68,11 @@ export interface MeetingParticipantView {
     readonly admission: "admitted" | "waiting" | "denied";
     readonly guest: boolean;
     readonly joinedAt: string;
+    /** Whether a moderator muted them. Enforced by the media server; this is
+     *  what the screens draw it from. */
+    readonly serverMuted: boolean;
+    /** Whether a moderator deafened them. */
+    readonly serverDeafened: boolean;
 }
 
 export interface MeetingView {
@@ -89,6 +95,11 @@ export interface MeetingView {
      *  What can be done to it differs - a conversation's call has no host to
      *  hand over and no door to lock. */
     readonly standalone: boolean;
+    /** Whether the reader may mute, deafen and disconnect the people in it:
+     *  whoever may moderate the conversation the call belongs to. Never true of
+     *  a meeting of its own, whose host has their own ways to show somebody
+     *  out, nor of anybody who has not been let in. */
+    readonly mayModerate: boolean;
     readonly participants: readonly MeetingParticipantView[];
 }
 
@@ -668,6 +679,7 @@ export async function readMeeting(seat: {
             requireAccount: false,
             scheduledAt: meeting.scheduledAt?.toISOString() ?? null,
             standalone: meeting.channelId === null,
+            mayModerate: false,
             participants: [
                 {
                     id: seated.id,
@@ -675,7 +687,9 @@ export async function readMeeting(seat: {
                     name: seated.name,
                     admission: seated.admission,
                     guest: seated.userId === null,
-                    joinedAt: seated.joinedAt.toISOString()
+                    joinedAt: seated.joinedAt.toISOString(),
+                    serverMuted: false,
+                    serverDeafened: false
                 }
             ]
         };
@@ -702,12 +716,21 @@ export async function readMeeting(seat: {
                     userId: true,
                     name: true,
                     admission: true,
-                    joinedAt: true
+                    joinedAt: true,
+                    serverMuted: true,
+                    serverDeafened: true
                 }
             }
         }
     });
     if (!meeting) return null;
+    // Asked of the conversation, the same question every other moderation in it
+    // asks. A guest has no standing in any conversation.
+    const mayModerate =
+        meeting.channelId && seated.userId
+            ? ((await channelAccess({ id: seated.userId }, meeting.channelId))?.mayModerate ??
+              false)
+            : false;
 
     return {
         id: meeting.id,
@@ -721,13 +744,16 @@ export async function readMeeting(seat: {
         requireAccount: meeting.requireAccount,
         scheduledAt: meeting.scheduledAt?.toISOString() ?? null,
         standalone: meeting.channelId === null,
+        mayModerate,
         participants: meeting.participants.map((row) => ({
             id: row.id,
             userId: row.userId,
             name: row.name,
             admission: row.admission as MeetingParticipantView["admission"],
             guest: row.userId === null,
-            joinedAt: row.joinedAt.toISOString()
+            joinedAt: row.joinedAt.toISOString(),
+            serverMuted: row.serverMuted,
+            serverDeafened: row.serverDeafened
         }))
     };
 }
@@ -767,6 +793,9 @@ export interface VoicePresence {
     readonly deafened: boolean;
     /** Sharing a screen - the LIVE mark somebody outside the call sees. */
     readonly streaming: boolean;
+    /** What a moderator put on them, which their own controls cannot lift. */
+    readonly serverMuted: boolean;
+    readonly serverDeafened: boolean;
 }
 
 const PRESENCE_FIELDS = {
@@ -775,7 +804,9 @@ const PRESENCE_FIELDS = {
     userId: true,
     muted: true,
     deafened: true,
-    streaming: true
+    streaming: true,
+    serverMuted: true,
+    serverDeafened: true
 } as const;
 
 /**
@@ -908,12 +939,46 @@ async function seatFor(
     // not in it, and a full call must still let people knock - the host decides
     // who comes in as somebody else leaves.
     if (admission === "admitted") await requireRoom(meetingId, options?.pastLimit ?? false);
+    // A mute or a deafen a moderator put on this account in this space or group
+    // is carried into the new seat, so leaving and walking back in is not how
+    // one is lifted.
+    const held = await carriedRestriction(meetingId, userId);
     const participant = await prisma.meetingParticipant.create({
-        data: { meetingId, userId, name, admission },
+        data: { meetingId, userId, name, admission, ...held },
         select: { id: true }
     });
     publishMeetingEvent({ meetingId, kind: "roster" });
     return { meetingId, participantId: participant.id, admission };
+}
+
+/**
+ * What the last seat this account held in the same space or group was carrying
+ * from a moderator.
+ *
+ * Read off the seats rather than kept in a table of its own: a restriction is
+ * put on somebody while they are in a call, and the seat they were in when it
+ * happened is exactly the record of it. A space is one standing across all of its
+ * voice channels, so a seat in any of them counts; a group is its own.
+ */
+async function carriedRestriction(meetingId: string, userId: string): Promise<SeatRestriction> {
+    const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: { channelId: true, channel: { select: { spaceId: true } } }
+    });
+    if (!meeting?.channelId) return UNRESTRICTED;
+    const spaceId = meeting.channel?.spaceId ?? null;
+    const last = await prisma.meetingParticipant.findFirst({
+        where: {
+            userId,
+            meeting: spaceId ? { channel: { spaceId } } : { channelId: meeting.channelId }
+        },
+        orderBy: { joinedAt: "desc" },
+        select: { serverMuted: true, serverDeafened: true }
+    });
+    return {
+        serverMuted: last?.serverMuted === true,
+        serverDeafened: last?.serverDeafened === true
+    };
 }
 
 /**
@@ -1036,6 +1101,12 @@ async function announceCall(
             ...(voice ? { voice } : {})
         }
     });
+}
+
+/** Tell the people outside a call that somebody's voice changed - a moderator's
+ *  mark on them, which the rail draws under a voice channel. */
+export async function announceVoiceChange(meetingId: string): Promise<void> {
+    await announceCall(meetingId, "moved", "", undefined, true);
 }
 
 /** The caller's own row, which is both the proof and the answer to "what am I

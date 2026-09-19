@@ -63,6 +63,7 @@ import { useZoomPan } from "@/components/use-zoom-pan";
 import { setWatchedStreams } from "./call-stream-audio";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
 import { callBareFaces, directLayout, type CallPlace } from "./call-band";
+import type { SeatModeration } from "./call-moderation-menu";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
@@ -229,6 +230,26 @@ export function CallRoom({
             // Offered but greyed out with two people: the two devices would be
             // the whole call. Follows the roster live - see `combineOffered`.
             combineLocked: !call.combineOpen
+        };
+    };
+    /**
+     * What a moderator's right-click on this person offers, or nothing for
+     * everybody else. Only where the reader moderates the conversation the call
+     * belongs to - the server asks again, this only decides what is drawn.
+     */
+    const moderating = (seatId: string): { moderation?: SeatModeration } => {
+        if (!call.meeting?.mayModerate) return {};
+        const person = call.meeting.participants.find((entry) => entry.id === seatId);
+        if (!person) return {};
+        return {
+            moderation: {
+                participantId: seatId,
+                restriction: {
+                    serverMuted: person.serverMuted,
+                    serverDeafened: person.serverDeafened
+                },
+                onDone: call.refresh
+            }
         };
     };
     /** What this person has reacted with in the last few seconds. Grouped here
@@ -400,6 +421,7 @@ export function CallRoom({
                         handPlace={queued ? (places.get(person.id) ?? null) : null}
                         reactions={reactionsFor(person.id)}
                         {...combining(person.id)}
+                        {...moderating(person.id)}
                         // The same key a tile uses, so turning somebody down in a
                         // conversation and turning them down in a room are the
                         // one decision: their account where they have one, their
@@ -860,6 +882,7 @@ export function CallRoom({
                                     reactions={reactionsFor(personId)}
                                     volumeKey={person?.userId ?? personId}
                                     {...combining(personId)}
+                                    {...moderating(personId)}
                                 />
                             );
                         })()
@@ -962,6 +985,7 @@ export function CallRoom({
                                 focused={live === `camera:${person.id}`}
                                 onFocus={() => focus(`camera:${person.id}`)}
                                 {...combining(person.id)}
+                                {...moderating(person.id)}
                                 // Their account where they have one, so turning
                                 // somebody down holds across calls; their seat
                                 // where they do not, which lasts as long as the
@@ -979,6 +1003,13 @@ export function CallRoom({
             <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
                 <Split
                     label={call.micOn ? "Mute" : "Unmute"}
+                    // Only a moderator lifts their own mute, so the button says
+                    // who has it rather than offering to undo it.
+                    title={
+                        call.moderation.serverMuted || call.moderation.serverDeafened
+                            ? "A moderator muted you"
+                            : undefined
+                    }
                     icon={call.micOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
                     variant={call.micOn ? "secondary" : "danger"}
                     pressed={!call.micOn}
@@ -1054,9 +1085,11 @@ export function CallRoom({
                 <Split
                     label={call.deafened ? "Undeafen" : "Deafen"}
                     title={
-                        call.deafened
-                            ? "You cannot hear anybody, and nobody can hear you (F10)"
-                            : "Silence everybody, and yourself with them (F10)"
+                        call.moderation.serverDeafened
+                            ? "A moderator deafened you"
+                            : call.deafened
+                              ? "You cannot hear anybody, and nobody can hear you (F10)"
+                              : "Silence everybody, and yourself with them (F10)"
                     }
                     icon={
                         call.deafened ? (
@@ -1546,6 +1579,7 @@ function Face({
     onAskCombine,
     combineAsked = false,
     combineLocked = false,
+    moderation,
     volumeKey
 }: {
     name: string;
@@ -1568,6 +1602,8 @@ function Face({
     onAskCombine?: () => void;
     combineAsked?: boolean;
     combineLocked?: boolean;
+    /** Mute, deafen and disconnect, for a reader who moderates the call. */
+    moderation?: SeatModeration;
     /** Who this face's volume is remembered against. Absent on your own, which
      *  has no volume to set - it is never played back. */
     volumeKey?: string;
@@ -1644,6 +1680,7 @@ function Face({
             onAskCombine={onAskCombine}
             combineAsked={combineAsked}
             combineLocked={combineLocked}
+            moderation={moderation}
         >
             {face}
         </PersonMenu>
@@ -1676,6 +1713,7 @@ function Tile({
     combineAsked = false,
     combineLocked = false,
     streamMenu,
+    moderation,
     volumeKey
 }: {
     stream: MediaStream | null;
@@ -1736,6 +1774,8 @@ function Tile({
     combineLocked?: boolean;
     /** Set on a stream somebody else is sharing: its right-click menu. */
     streamMenu?: StreamMenuFor;
+    /** Mute, deafen and disconnect, for a reader who moderates the call. */
+    moderation?: SeatModeration;
     /** Who this tile's volume is remembered against. Absent on your own tile,
      *  which has no volume to set - it is never played back. */
     volumeKey?: string;
@@ -2077,6 +2117,7 @@ function Tile({
             onAskCombine={onAskCombine}
             combineAsked={combineAsked}
             combineLocked={combineLocked}
+            moderation={moderation}
         >
             {tile}
         </PersonMenu>

@@ -56,7 +56,16 @@ import {
     type Reaction,
     type ShownReaction
 } from "./call-signals";
+import { useToast } from "@polaris/ui";
 import { useVoiceGate } from "./voice-gate";
+import {
+    CALL_MODERATIONS,
+    heldBack,
+    microphoneAllowed,
+    moderationNotice,
+    UNRESTRICTED,
+    type SeatRestriction
+} from "@/lib/chat/voice-moderation";
 import { voiceSettings } from "./voice-settings";
 import { playCallSound } from "@/lib/call-sounds";
 import { shareSound } from "./call-share-sound";
@@ -276,8 +285,17 @@ const frameSchema = z.discriminatedUnion("kind", [
     // connection nobody needs.
     z.object({ kind: z.literal("said") }),
     /** Another browser of this same account took the call. */
-    z.object({ kind: z.literal("claimed"), deviceId: z.string().optional() })
+    z.object({ kind: z.literal("claimed"), deviceId: z.string().optional() }),
+    /** A moderator muted, deafened or disconnected this seat, or undid it. */
+    z.object({ kind: z.literal("moderated"), action: z.enum(CALL_MODERATIONS) })
 ]);
+
+/**
+ * Why the media server closed a connection, when it was a moderator showing the
+ * seat out. The value of the media client's own enum, spelled out for the reason
+ * `MICROPHONE` is below.
+ */
+const PARTICIPANT_REMOVED = 4;
 
 /** Whether two verdicts say the same thing, so a call that has not changed does
  *  not re-render every screen drawing one every few seconds. */
@@ -545,6 +563,26 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** Whether this pair of ears is switched off, held beside the state it
      *  mirrors so a connection made after the press still says so. */
     const deafenedRef = useRef(false);
+    /**
+     * What a moderator has put on this seat, and what it took away.
+     *
+     * The media server is what enforces it; this is the half that keeps the
+     * buttons honest - a mute button offering to unmute a seat the server will
+     * not take a microphone from is a button that lies. Read off the roster,
+     * which is where the seat's row reaches this browser.
+     */
+    const [moderation, setModeration] = useState<SeatRestriction>(UNRESTRICTED);
+    const forced = useRef<SeatRestriction>(UNRESTRICTED);
+    /** Whether the microphone was on, and the ears off, before a moderator took
+     *  them, so lifting it gives back what the person had rather than a default. */
+    const micBeforeForce = useRef(true);
+    const deafenedBeforeForce = useRef(false);
+    /** Whether a moderator showed this seat out, so the connection closing is
+     *  not reported as the call server going away. */
+    const removed = useRef(false);
+    const toast = useToast();
+    const toastRef = useRef(toast);
+    toastRef.current = toast;
     /** The same, for the two facts a reconnection has to say again: the seat
      *  this device is listening through, and whether it is recording. */
     const groupRef = useRef<string | null>(null);
@@ -1070,6 +1108,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         if (!current || current.state !== CONNECTED) return;
         if (!device || device.readyState !== "live") return;
         if (current.localParticipant.getTrackPublication(MICROPHONE)?.track) return;
+        // Held back by a moderator: the media server will refuse it, and three
+        // refusals would end in telling the person their device is broken.
+        if (forced.current.serverMuted || forced.current.serverDeafened) return;
+        if (!microphoneAllowed(current.localParticipant.permissions)) return;
         if (micRepairs.current >= MIC_REPAIR_TRIES) return;
         micRepairs.current += 1;
 
@@ -1102,6 +1144,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const forget = useCallback(() => {
         setMeeting(null);
         setEnded(false);
+        // A moderator's decision is about one seat in one call. The next call's
+        // roster says whatever is true there.
+        forced.current = UNRESTRICTED;
+        setModeration(UNRESTRICTED);
+        removed.current = false;
         setError("");
         setRemote(new Map());
         setScreens(new Map());
@@ -1407,12 +1454,37 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     resortStates();
                 })
                 .on(RoomEvent.ActiveSpeakersChanged, onSpeakers)
-                .on(RoomEvent.Disconnected, () => {
+                // A moderator's mute lifted reaches the media server's side of
+                // the seat first. Once the microphone is allowed again it goes
+                // back up, with a fresh budget - the refusals it met while held
+                // were not the device's fault.
+                .on(RoomEvent.ParticipantPermissionsChanged, (_before, participant) => {
+                    if (participant !== joined.localParticipant) return;
+                    if (forced.current.serverMuted || forced.current.serverDeafened) return;
+                    micRepairs.current = 0;
+                    void repairMic();
+                })
+                .on(RoomEvent.Disconnected, (reason?: number) => {
                     // Only ever after it has given up: a connection that drops is
                     // retried by the client on its own, and only the last one is
                     // reported here. Not on the way out, where a disconnection is
                     // what leaving is.
                     if (stopped) return;
+                    // Shown out by a moderator, which is not the call server
+                    // going away. Usually already said by the stream; said here
+                    // too for the case it arrived second.
+                    if (removed.current || reason === PARTICIPANT_REMOVED) {
+                        if (!removed.current) {
+                            removed.current = true;
+                            toastRef.current.show({
+                                key: "call-moderated",
+                                title: moderationNotice("disconnect"),
+                                life: 0
+                            });
+                        }
+                        setEnded(true);
+                        return;
+                    }
                     setRemote(new Map());
                     setScreens(new Map());
                     report(
@@ -1683,6 +1755,25 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 }
                 if (frame.data.kind === "said") {
                     setSaidAt(Date.now());
+                    return;
+                }
+                // Told what a moderator did, so the person it happened to reads
+                // that rather than finding a dead microphone. Shown out, the
+                // call is over for this browser - the note stays until it is
+                // dismissed, because the call screen it would sit over is gone.
+                if (frame.data.kind === "moderated") {
+                    const out = frame.data.action === "disconnect";
+                    toastRef.current.show({
+                        key: "call-moderated",
+                        title: moderationNotice(frame.data.action),
+                        ...(out ? { life: 0 } : {})
+                    });
+                    if (out) {
+                        removed.current = true;
+                        setEnded(true);
+                    } else {
+                        refresh();
+                    }
                     return;
                 }
                 if (frame.data.kind === "ended") setEnded(true);
@@ -2053,6 +2144,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     }, [meetingId, participantId, micOn, deafened, sharing]);
 
     const toggleMic = useCallback(() => {
+        // A moderator's mute is not this button's to lift. Said rather than
+        // ignored, so a press that does nothing explains itself.
+        const held = heldBack(forced.current);
+        if (held) {
+            toastRef.current.show({ key: "call-moderated", title: held });
+            return;
+        }
         const track = mic.current;
         if (!track) return;
         // The same trap as the camera: a track that has ended - a headset
@@ -2240,6 +2338,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * exactly what an attentive one does.
      */
     const toggleDeafen = useCallback(() => {
+        if (forced.current.serverDeafened) {
+            toastRef.current.show({ key: "call-moderated", title: moderationNotice("deafen") });
+            return;
+        }
         // Undeafening gives back the microphone as it was before, and never to
         // a device that is quiet for a room: that one is silent because the
         // laptop next to it is carrying the call, and handing it a live
@@ -2256,10 +2358,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         deafenedRef.current = next.deafened;
         micBeforeDeafen.current = next.micBeforeDeafen;
         setDeafened(next.deafened);
+        // Undeafening under a moderator's mute gives nothing back: what the
+        // microphone would have been is kept for when the mute is lifted.
+        const micOnNow = next.micOn && !forced.current.serverMuted;
+        if (forced.current.serverMuted) micBeforeForce.current = next.micOn;
         if (mic.current) {
-            micOnRef.current = next.micOn;
-            setVoiceEnabled(next.micOn);
-            setMicOn(next.micOn);
+            micOnRef.current = micOnNow;
+            setVoiceEnabled(micOnNow);
+            setMicOn(micOnNow);
         }
         say({ [DEAFENED]: next.deafened ? "1" : "" });
     }, [say, setVoiceEnabled]);
@@ -3001,6 +3107,67 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         else if (before.some((id) => !inside.includes(id))) sound("leave");
     }, [meeting, sound]);
 
+    /**
+     * Follow what a moderator has put on this seat, as the roster reports it.
+     *
+     * Taking: the microphone goes off and, for a deafen, so do the ears, with
+     * what they were remembered. Lifting: they come back as they were, the
+     * microphone is put back on the call if the media server had taken it off,
+     * and everything arriving is asked for again - the server stopped sending it
+     * while the seat was deafened.
+     */
+    useEffect(() => {
+        const own = meeting?.participants.find((person) => person.id === participantId);
+        const next: SeatRestriction = {
+            serverMuted: own?.serverMuted ?? false,
+            serverDeafened: own?.serverDeafened ?? false
+        };
+        const was = forced.current;
+        if (was.serverMuted === next.serverMuted && was.serverDeafened === next.serverDeafened) {
+            return;
+        }
+        forced.current = next;
+        setModeration(next);
+        const quietBefore = was.serverMuted || was.serverDeafened;
+        const quietNow = next.serverMuted || next.serverDeafened;
+
+        if (next.serverDeafened && !was.serverDeafened) {
+            deafenedBeforeForce.current = deafenedRef.current;
+            deafenedRef.current = true;
+            setDeafened(true);
+            say({ [DEAFENED]: "1" });
+        }
+        if (!next.serverDeafened && was.serverDeafened) {
+            const back = deafenedBeforeForce.current;
+            deafenedRef.current = back;
+            setDeafened(back);
+            say({ [DEAFENED]: back ? "1" : "" });
+            for (const person of room.current?.remoteParticipants.values() ?? []) {
+                for (const publication of person.trackPublications.values()) {
+                    publication.setSubscribed(true);
+                }
+            }
+        }
+        if (quietNow && !quietBefore) {
+            micBeforeForce.current = micOnRef.current;
+            if (mic.current) {
+                micOnRef.current = false;
+                setVoiceEnabled(false);
+                setMicOn(false);
+            }
+        }
+        if (!quietNow && quietBefore) {
+            const back = micBeforeForce.current && !deafenedRef.current;
+            if (mic.current) {
+                micOnRef.current = back;
+                setVoiceEnabled(back);
+                setMicOn(back);
+            }
+            micRepairs.current = 0;
+            void repairMic();
+        }
+    }, [meeting, participantId, repairMic, say, setVoiceEnabled]);
+
     return {
         meeting,
         participantId,
@@ -3019,6 +3186,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         hasCamera,
         sharing,
         deafened,
+        moderation,
         ended,
         saidAt,
         error,

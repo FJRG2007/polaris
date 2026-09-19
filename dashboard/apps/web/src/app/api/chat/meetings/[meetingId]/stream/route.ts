@@ -83,7 +83,14 @@ export async function GET(
                 // own, which is what separates "another of my devices took it"
                 // from "this is my own claim coming back".
                 if (event.kind === "claimed" && event.participantId !== participantId) return;
-                send({ kind: event.kind, ...(event.deviceId ? { deviceId: event.deviceId } : {}) });
+                // What a moderator did to one seat is that seat's business. The
+                // rest of the room sees it on the roster.
+                if (event.kind === "moderated" && event.participantId !== participantId) return;
+                send({
+                    kind: event.kind,
+                    ...(event.deviceId ? { deviceId: event.deviceId } : {}),
+                    ...(event.action ? { action: event.action } : {})
+                });
                 // The roster moving is the only thing that can admit somebody,
                 // and only a stream that is still waiting has to ask.
                 if (event.kind === "roster" && !admitted) void recheckAdmission();

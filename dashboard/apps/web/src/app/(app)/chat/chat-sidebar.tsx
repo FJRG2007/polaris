@@ -35,6 +35,7 @@ import { ChatAvatar } from "@/components/chat-avatar";
 import { NewDirectDialog } from "./new-direct-dialog";
 import * as core from "@polaris/core";
 import { LiveBadge, VoiceStateIcons } from "./call-roster";
+import { ModerationItems } from "./call-moderation-menu";
 import { useChatStream } from "./use-chat-stream";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { PersonName, PersonRow } from "@/components/person-name";
@@ -80,6 +81,7 @@ import {
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
+    ContextMenuLabel,
     ContextMenuSeparator,
     ContextMenuSub,
     ContextMenuSubContent,
@@ -450,6 +452,7 @@ export function ChatSidebar() {
                                 channels={inSpace.filter((channel) => channel.categoryId === null)}
                                 open={open}
                                 inRoom={inRoom}
+                                onModerated={readPresence}
                                 drag={drag}
                                 manages={manages}
                                 onManage={setManaging}
@@ -534,6 +537,7 @@ export function ChatSidebar() {
                                         )}
                                         open={open}
                                         inRoom={inRoom}
+                                        onModerated={readPresence}
                                         drag={drag}
                                         manages={manages}
                                         onManage={setManaging}
@@ -617,11 +621,15 @@ function ChannelRows({
     drag,
     manages,
     onManage,
+    onModerated,
     empty
 }: {
     channels: readonly ChatChannelView[];
     open: string | null;
     inRoom: Record<string, VoicePresence[]>;
+    /** Called once a moderator's press has been taken, so the names under the
+     *  voice rooms redraw with its mark. */
+    onModerated?: () => void;
     /** Absent in the direct-message list, which has no order to arrange. */
     drag?: ReturnType<typeof useRailDrag>;
     manages?: boolean;
@@ -701,30 +709,12 @@ function ChannelRows({
                         {inside.length > 0 && (
                             <ul className="mb-1 ml-7 flex flex-col gap-0.5">
                                 {inside.map((person) => (
-                                    <PersonRow
-                                        as="li"
+                                    <VoicePerson
                                         key={person.id}
-                                        personId={person.userId}
-                                        className="flex items-center gap-1.5 rounded px-1 text-xs text-muted-foreground"
-                                        title={person.name}
-                                    >
-                                        <Avatar
-                                            size={16}
-                                            person={{
-                                                // A guest has no account behind
-                                                // them, so no picture to ask
-                                                // for: the initials of the name
-                                                // they gave is all there is.
-                                                id: person.userId,
-                                                name: person.name
-                                            }}
-                                        />
-                                        <span className="truncate" title={person.name}>
-                                            <PersonName id={person.userId} name={person.name} />
-                                        </span>
-                                        {person.streaming && <LiveBadge />}
-                                        <VoiceStateIcons person={person} />
-                                    </PersonRow>
+                                        person={person}
+                                        moderates={channel.mayModerate}
+                                        onModerated={onModerated}
+                                    />
                                 ))}
                             </ul>
                         )}
@@ -819,6 +809,70 @@ function Section({
             </div>
             {!folded && <div className="mt-0.5 flex flex-col gap-px">{children}</div>}
         </div>
+    );
+}
+
+/**
+ * One person sitting in a voice room, under its name in the rail.
+ *
+ * Right-clicking them is where a moderator mutes, deafens or disconnects them -
+ * the rail is where a server's voice rooms are watched from, and nobody should
+ * have to join a call to act on it. Offered only to a reader who moderates the
+ * channel, and never over their own row: their own buttons do that.
+ */
+function VoicePerson({
+    person,
+    moderates,
+    onModerated
+}: {
+    person: VoicePresence;
+    moderates: boolean;
+    onModerated?: () => void;
+}) {
+    const { viewerId } = useChat();
+    const row = (
+        <PersonRow
+            as="li"
+            personId={person.userId}
+            className="flex items-center gap-1.5 rounded px-1 text-xs text-muted-foreground data-[state=open]:bg-card-hover"
+            title={person.name}
+        >
+            <Avatar
+                size={16}
+                person={{
+                    // A guest has no account behind them, so no picture to ask
+                    // for: the initials of the name they gave is all there is.
+                    id: person.userId,
+                    name: person.name
+                }}
+            />
+            <span className="truncate" title={person.name}>
+                <PersonName id={person.userId} name={person.name} />
+            </span>
+            {person.streaming && <LiveBadge />}
+            <VoiceStateIcons person={person} />
+        </PersonRow>
+    );
+    if (!moderates || person.userId === viewerId) return row;
+
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+            <ContextMenuContent className="w-52">
+                <ContextMenuLabel className="truncate">{person.name}</ContextMenuLabel>
+                <ModerationItems
+                    name={person.name}
+                    seat={{
+                        participantId: person.id,
+                        restriction: {
+                            serverMuted: person.serverMuted,
+                            serverDeafened: person.serverDeafened
+                        },
+                        onDone: onModerated
+                    }}
+                />
+            </ContextMenuContent>
+        </ContextMenu>
     );
 }
 
