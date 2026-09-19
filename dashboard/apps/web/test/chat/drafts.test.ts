@@ -23,9 +23,16 @@ vi.stubGlobal("window", {
     }
 });
 
-const { channelDraftKey, dropDraft, keepDraft, readDraft, threadDraftKey } = await import(
-    "../../src/app/(app)/chat/drafts"
-);
+const {
+    channelDraftKey,
+    dropDraft,
+    keepDraft,
+    readDraft,
+    removeSavedDraft,
+    saveDraft,
+    savedDrafts,
+    threadDraftKey
+} = await import("../../src/app/(app)/chat/drafts");
 
 const KEY = channelDraftKey("general");
 
@@ -114,5 +121,48 @@ describe("what comes back out of storage", () => {
         expect(readDraft(KEY)).toBe("last winter");
         keepDraft(channelDraftKey("other"), "today");
         expect(readDraft(KEY)).toBe("");
+    });
+});
+
+describe("putting a draft aside", () => {
+    it("keeps it beside the box's own draft rather than in place of it", () => {
+        keepDraft(KEY, "what is in the box");
+        saveDraft(KEY, "what was put aside");
+        expect(readDraft(KEY)).toBe("what is in the box");
+        expect(savedDrafts(KEY).map((draft) => draft.body)).toEqual(["what was put aside"]);
+    });
+
+    it("lists them newest first, and only under their own conversation", () => {
+        const now = Date.now();
+        saveDraft(KEY, "older", now - 2000);
+        saveDraft(KEY, "newer", now - 1000);
+        saveDraft(channelDraftKey("elsewhere"), "not here", now);
+        expect(savedDrafts(KEY).map((draft) => draft.body)).toEqual(["newer", "older"]);
+    });
+
+    it("keeps two saved in the same moment as two", () => {
+        const now = Date.now();
+        saveDraft(KEY, "one", now);
+        saveDraft(KEY, "two", now);
+        expect(savedDrafts(KEY)).toHaveLength(2);
+    });
+
+    it("keeps nothing that is only whitespace", () => {
+        expect(saveDraft(KEY, "   ")).toBeNull();
+        expect(savedDrafts(KEY)).toEqual([]);
+    });
+
+    it("forgets one that is brought back or thrown away, and only that one", () => {
+        const now = Date.now();
+        const first = saveDraft(KEY, "first", now - 1)!;
+        saveDraft(KEY, "second", now);
+        removeSavedDraft(first);
+        expect(savedDrafts(KEY).map((draft) => draft.body)).toEqual(["second"]);
+    });
+
+    it("does not mistake a thread's drafts for its channel's", () => {
+        saveDraft(threadDraftKey("m1"), "in the thread");
+        expect(savedDrafts(KEY)).toEqual([]);
+        expect(savedDrafts(threadDraftKey("m1"))).toHaveLength(1);
     });
 });

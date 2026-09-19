@@ -140,3 +140,58 @@ export function dropDraft(key: string): void {
     delete drafts[key];
     writeAll(drafts);
 }
+
+/**
+ * Drafts put aside on purpose, as opposed to what is sitting in the box.
+ *
+ * The box keeps one draft per conversation on its own, and that one is whatever
+ * is being written now. "Save as draft" is for the other case: somebody has
+ * something half-written they are not going to send yet, and wants the box back
+ * for something else. So it is kept beside the box's own draft rather than in
+ * place of it, as many as they like, until they bring one back or throw it away.
+ *
+ * Same storage, same month, same ceiling as the box's own: these are drafts
+ * too, they belong to this browser for the same reasons, and a second store
+ * would be a second set of rules to keep in step.
+ */
+export interface SavedDraft {
+    /** Where it is kept, which is also how it is brought back or deleted. */
+    readonly key: string;
+    readonly body: string;
+    /** When it was put aside. */
+    readonly at: number;
+}
+
+/** What separates the box's own key from the ones set aside under it. A box key
+ *  is `channel:<id>` or `thread:<id>`, so nothing a box is called contains it. */
+const SET_ASIDE = "#saved:";
+
+/**
+ * Put this aside under the box it was written in, and say where.
+ *
+ * Null when there is nothing in it - whitespace is not a draft here any more
+ * than it is in the box.
+ */
+export function saveDraft(boxKey: string, body: string, now: number = Date.now()): string | null {
+    if (isBlankMarkdown(body)) return null;
+    const drafts = readAll();
+    let key = `${boxKey}${SET_ASIDE}${now.toString(36)}`;
+    // Two saved in the same millisecond - a double press - are still two.
+    for (let n = 1; key in drafts; n++) key = `${boxKey}${SET_ASIDE}${now.toString(36)}-${n}`;
+    drafts[key] = { body, at: now };
+    writeAll(drafts);
+    return key;
+}
+
+/** Everything put aside under this box, newest first. */
+export function savedDrafts(boxKey: string): SavedDraft[] {
+    const prefix = `${boxKey}${SET_ASIDE}`;
+    return Object.entries(readAll())
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, draft]) => ({ key, body: draft.body, at: draft.at }))
+        .sort((one, other) => other.at - one.at);
+}
+
+/** One put-aside draft is gone: brought back into the box, or thrown away. The
+ *  same removal the box's own uses. */
+export const removeSavedDraft = dropDraft;

@@ -37,7 +37,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { dropDraft, keepDraft, readDraft } from "./drafts";
+import { dropDraft, keepDraft, readDraft, type SavedDraft } from "./drafts";
 import {
     canRecord,
     MAX_VOICE_SECONDS,
@@ -47,7 +47,6 @@ import {
 } from "./voice-recorder";
 import {
     BarChart3,
-    CalendarClock,
     Camera,
     ChevronDown,
     CornerUpLeft,
@@ -69,6 +68,8 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger
 } from "@polaris/ui";
+import { SendButton } from "./send-button";
+import { SavedDraftsBar, useSavedDrafts } from "./saved-drafts";
 
 /** How often, at most, the server is told somebody is typing. */
 const TYPING_EVERY_MS = 2500;
@@ -330,6 +331,9 @@ export function Composer({
         [draftKey, editing]
     );
 
+    /** The drafts put aside in this conversation, beside the one in the box. */
+    const aside = useSavedDrafts(draftKey);
+
     // What is being written changes when the message being rewritten changes,
     // and not when the same message arrives again: a reload that replaced the
     // object would otherwise wipe what has been typed into it. Backing out of an
@@ -533,6 +537,42 @@ export function Composer({
     };
 
     /**
+     * Put what is in the box aside, and give the box back.
+     *
+     * Text only. A staged file is bytes held in this tab, and a draft lives in
+     * this browser's storage, which is no place for a forty-megabyte video - so
+     * with files staged the item says so rather than quietly keeping the words
+     * and dropping the rest.
+     */
+    const putAside = () => {
+        if (!draftKey || editing || files.length > 0) return;
+        if (!aside.save(body)) return;
+        setBody("");
+        setRefused("");
+        emptyTheBox();
+        // The box is empty now, and so is its own draft - what was in it is
+        // kept in the list instead.
+        dropDraft(draftKey);
+    };
+
+    /**
+     * Bring a put-aside draft back into the box.
+     *
+     * Whatever is in the box already is not thrown away to make room for it: it
+     * is put aside in its place, so bringing one back never costs another.
+     */
+    const bringBack = (draft: SavedDraft) => {
+        if (!draftKey || editing) return;
+        if (!isBlankMarkdown(body)) aside.save(body);
+        aside.remove(draft.key);
+        setBody(draft.body);
+        keepDraft(draftKey, draft.body);
+        emptyTheBox();
+        setFocusWhere("end");
+        setFocusAt((current) => current + 1);
+    };
+
+    /**
      * Send the poll.
      *
      * Nothing in the box is touched either way. A poll is its own message and
@@ -663,6 +703,10 @@ export function Composer({
                 dragging && "bg-primary/10"
             )}
         >
+            {!editing && (
+                <SavedDraftsBar drafts={aside.drafts} onRestore={bringBack} onDelete={aside.remove} />
+            )}
+
             {replyingTo && !editing && (
                 <div className="mb-2 flex items-center gap-2 rounded-md bg-muted px-2 py-1 text-xs">
                     <CornerUpLeft className="size-3 shrink-0 text-muted-foreground" />
@@ -1010,45 +1054,29 @@ export function Composer({
                                 </Button>
                             </>
                         ) : (
-                            <>
-                                <button
-                                    type="button"
-                                    disabled={disabled || tooLong || (blank && files.length === 0)}
-                                    onClick={() => void submit(body)}
-                                    aria-label="Send"
-                                    title="Send"
-                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
-                                >
-                                    <SendHorizontal className="size-4" />
-                                </button>
-                                {/* Beside the send button, because it is the same
-                                    act at a different hour - and dead until
-                                    there is something to send, since "when" is
-                                    not a question about nothing.
-
-                                    A button rather than a menu holding one item:
-                                    a press that only opens a list with a single
-                                    thing on it is a press nobody wanted, and the
-                                    dialog it leads to is where the choosing
-                                    actually happens. */}
-                                {onSchedule && (
-                                    <button
-                                        type="button"
-                                        disabled={
-                                            disabled || tooLong || (blank && files.length === 0)
-                                        }
-                                        onClick={() => {
-                                            setScheduleError("");
-                                            setScheduling(true);
-                                        }}
-                                        aria-label="Schedule this message"
-                                        title="Send later"
-                                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
-                                    >
-                                        <CalendarClock className="size-4" />
-                                    </button>
-                                )}
-                            </>
+                            // Sending later and putting it aside are behind the
+                            // chevron, each only where this box has somewhere for
+                            // it to go - see `SendButton`.
+                            <SendButton
+                                disabled={disabled || tooLong || (blank && files.length === 0)}
+                                onSend={() => void submit(body)}
+                                onSchedule={
+                                    onSchedule
+                                        ? () => {
+                                              setScheduleError("");
+                                              setScheduling(true);
+                                          }
+                                        : undefined
+                                }
+                                onSaveDraft={draftKey ? putAside : undefined}
+                                draftRefusal={
+                                    files.length > 0
+                                        ? "Drafts keep text only. Send or remove the files first."
+                                        : blank
+                                          ? "Write something first."
+                                          : undefined
+                                }
+                            />
                         )}
                     </span>
                 </div>
