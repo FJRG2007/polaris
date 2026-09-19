@@ -57,6 +57,8 @@ export function MinecraftClientMods({
     const [rows, setRows] = useState<modrinth.InstalledProject[] | null>(null);
     const [query, setQuery] = useState("");
     const [pack, setPack] = useState<PackEntry[] | "unread" | null>(null);
+    /** The server's mods a player is not handed, so their absence is explained. */
+    const [serverOnly, setServerOnly] = useState<{ key: string; title: string }[]>([]);
     const [results, setResults] = useState<modrinth.ModrinthProject[] | null>(null);
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -111,6 +113,7 @@ export function MinecraftClientMods({
                         author: null,
                         clientOnly: true,
                         serverOnly: false,
+                        clientOptional: false,
                         known: true,
                         fitsVersion: null,
                         fitsLoader: true
@@ -132,8 +135,12 @@ export function MinecraftClientMods({
                     { cache: "no-store", signal }
                 );
                 if (!response.ok) throw new Error("unread");
-                const data = (await response.json()) as { pack?: PackEntry[] };
+                const data = (await response.json()) as {
+                    pack?: PackEntry[];
+                    serverOnly?: { key: string; title: string }[];
+                };
                 setPack(data.pack ?? []);
+                setServerOnly(data.serverOnly ?? []);
             } catch {
                 if (!signal.aborted) setPack("unread");
             }
@@ -302,6 +309,12 @@ export function MinecraftClientMods({
                                 </li>
                             ))}
                         </ul>
+                    )}
+                    {Array.isArray(pack) && serverOnly.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                            Only on the server, so players need nothing for them:{" "}
+                            {serverOnly.map((mod) => mod.title).join(", ")}.
+                        </p>
                     )}
                 </div>
 

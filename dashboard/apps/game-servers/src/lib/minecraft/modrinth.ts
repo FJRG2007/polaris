@@ -132,6 +132,10 @@ export interface ModrinthProject {
      *  a player does not put in their own game - everything else there has a part
      *  in it, and a player without it cannot join. */
     readonly serverOnly: boolean;
+    /** Whether the player's game can do without it - a datapack in a jar, a
+     *  server tweak. The publisher's own "optional on the client": a player joins
+     *  the same with it or without it, so nobody is handed it. */
+    readonly clientOptional: boolean;
 }
 
 /** A Minecraft version, as Modrinth writes them. Kept strict because it is put
@@ -176,7 +180,8 @@ function hitToProject(hit: z.infer<typeof searchResponseSchema>["hits"][number])
         iconUrl: isModrinthUrl(hit.icon_url) ? (hit.icon_url ?? null) : null,
         author: hit.author ?? null,
         clientOnly: hit.server_side === "unsupported",
-        serverOnly: hit.client_side === "unsupported"
+        serverOnly: hit.client_side === "unsupported",
+        clientOptional: hit.client_side === "optional"
     };
 }
 
@@ -337,6 +342,7 @@ export async function readInstalledProjects(
                 author: null,
                 clientOnly: false,
                 serverOnly: false,
+                clientOptional: false,
                 known: false,
                 fitsVersion: null,
                 fitsLoader: true
@@ -353,6 +359,7 @@ export async function readInstalledProjects(
             author: null,
             clientOnly: project.server_side === "unsupported",
             serverOnly: project.client_side === "unsupported",
+            clientOptional: project.client_side === "optional",
             known: true,
             fitsVersion: isGameVersion(pinned) ? project.game_versions.includes(pinned) : null,
             // A project that lists no loader at all is a datapoint Modrinth is

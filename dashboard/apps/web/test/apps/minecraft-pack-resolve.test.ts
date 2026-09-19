@@ -13,7 +13,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_AUTH_SECRET: "test-secret" }) }));
 
 const builds = new Map<string, { version: string; filename: string; url: string; sha1: string }>();
-/** Modrinth's client_side, by slug: "unsupported" is a server-only mod. */
+/** Modrinth's client_side, by slug: "unsupported" is a server-only mod and
+ *  "optional" one the game can do without. */
 const sides = new Map<string, string>();
 /** Required dependencies, by the slug that needs them. */
 const needs = new Map<string, string[]>();
@@ -40,7 +41,8 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/modrinth", async (importOri
                     title: slug.toUpperCase(),
                     description: `${slug} does things`,
                     iconUrl: null,
-                    serverOnly: sides.get(slug) === "unsupported"
+                    serverOnly: sides.get(slug) === "unsupported",
+                    clientOptional: sides.get(slug) === "optional"
                 };
             })
         ),
@@ -68,6 +70,7 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/modrinth", async (importOri
 const {
     clientMods,
     isJarName,
+    notForPlayers,
     packCommands,
     packEntries,
     packToken,
@@ -442,5 +445,62 @@ describe("a jar name the installers may be told", () => {
         expect(isJarName("a..b.jar")).toBe(false);
         expect(isJarName(".hidden.jar")).toBe(false);
         expect(isJarName("evil.jar\nrm -rf")).toBe(false);
+    });
+});
+
+describe("what the game can do without", () => {
+    it("leaves a server mod the client may skip out of the pack, and names it", async () => {
+        builds.set("lights", build("lights"));
+        sides.set("lights", "optional");
+        const pack = await resolvePack({
+            name: "Offgrid",
+            software: "NEOFORGE",
+            version: "1.21.4",
+            projects: "securitycraft?,lights?",
+            config: {}
+        });
+        expect(pack.mods.map((mod) => mod.entry)).toEqual(["securitycraft?"]);
+
+        const entries = await packEntries({
+            server: ["securitycraft?", "lights?"],
+            player: [],
+            loader: "neoforge",
+            version: "1.21.4"
+        });
+        expect(
+            await notForPlayers({
+                server: ["securitycraft?", "lights?"],
+                pack: entries,
+                loader: "neoforge",
+                version: "1.21.4"
+            })
+        ).toEqual([{ key: "lights", title: "LIGHTS" }]);
+    });
+
+    it("still hands out a library the game may skip when a required mod needs it", async () => {
+        builds.set("trashslot", build("trashslot"));
+        builds.set("balm", build("balm"));
+        sides.set("balm", "optional");
+        needs.set("trashslot", ["balm"]);
+        const pack = await resolvePack({
+            name: "Offgrid",
+            software: "NEOFORGE",
+            version: "1.21.4",
+            projects: "trashslot,balm?",
+            config: {}
+        });
+        expect(pack.mods.map((mod) => mod.entry)).toEqual(["trashslot", "balm"]);
+    });
+
+    it("keeps whatever the operator put on the players' own list", async () => {
+        sides.set("xaeros-minimap", "optional");
+        const pack = await resolvePack({
+            name: "Offgrid",
+            software: "NEOFORGE",
+            version: "1.21.4",
+            projects: "",
+            config: { clientMods: ["xaeros-minimap"] }
+        });
+        expect(pack.mods.map((mod) => mod.entry)).toEqual(["xaeros-minimap"]);
     });
 });

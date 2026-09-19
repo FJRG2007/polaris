@@ -269,8 +269,14 @@ export async function packEntries(input: {
 }
 
 /**
- * The entries a player puts in their own game: all of them but the server-only,
- * once each.
+ * The entries a player puts in their own game, once each.
+ *
+ * Of the server's list, only what the game cannot join without: a mod its
+ * publisher marks required on the client. One marked optional there - Dynamic
+ * Lights, a datapack in a jar that does all its work on the server - is a file a
+ * player downloads for nothing. It still arrives if something that is required
+ * needs it, since that is a declaration of its own. Of the players' own list,
+ * everything the operator put on it but a server-only mod.
  *
  * A server-only mod in a player's folder is at best a jar that does nothing and at
  * worst one that stops the game from starting. When Modrinth cannot be asked, the
@@ -290,6 +296,7 @@ async function playerSide(
     for (const [index, { entry, where }] of listed.entries()) {
         const project = projects[index];
         if (project?.serverOnly) continue;
+        if (where === "server" && project?.clientOptional) continue;
         const key = (project?.slug ?? projectSlug(entry) ?? entry).toLowerCase();
         if (kept.has(key)) continue;
         kept.set(key, {
@@ -303,6 +310,33 @@ async function playerSide(
         });
     }
     return [...kept.values()];
+}
+
+/**
+ * The server's mods a player is not handed, by title.
+ *
+ * So the screen can say why a mod on the server's list is missing from what the
+ * players install, rather than leaving an operator to wonder whether the list is
+ * broken. Asked of the same answers `packEntries` read, which are kept a while,
+ * so it costs nothing new.
+ */
+export async function notForPlayers(input: {
+    readonly server: readonly string[];
+    readonly pack: readonly PackEntry[];
+    readonly loader: string;
+    readonly version: string;
+}): Promise<{ key: string; title: string }[]> {
+    const handed = new Set(input.pack.map((entry) => entry.key));
+    const listed = input.server.filter((entry) => projectSlug(entry));
+    const projects = await readInstalledProjects(listed, input.loader, input.version || null);
+    const left: { key: string; title: string }[] = [];
+    for (const [index, entry] of listed.entries()) {
+        const project = projects[index];
+        const key = (project?.slug ?? projectSlug(entry) ?? entry).toLowerCase();
+        if (handed.has(key) || left.some((one) => one.key === key)) continue;
+        left.push({ key, title: project?.title || key });
+    }
+    return left;
 }
 
 /** How many layers of "needs" are followed. Libraries rarely need more than one;

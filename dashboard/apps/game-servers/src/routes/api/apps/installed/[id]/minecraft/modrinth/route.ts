@@ -10,7 +10,7 @@ import {
     searchModrinth
 } from "../../../../../../../lib/minecraft/modrinth";
 import { host } from "@polaris/app-host";
-import { packEntries } from "../../../../../../../lib/minecraft/client-pack";
+import { notForPlayers, packEntries } from "../../../../../../../lib/minecraft/client-pack";
 
 const { requireGameServer } = host.appsInstallAccess;
 
@@ -102,13 +102,17 @@ export async function GET(
                 { error: "Could not read this server's lists" },
                 { status: 400 }
             );
+        const server = entriesOf(parsed.data.server);
+        const version = parsed.data.version ?? "";
+        const pack = await packEntries({
+            server,
+            player: entriesOf(parsed.data.player),
+            loader: parsed.data.loader,
+            version
+        });
         return NextResponse.json({
-            pack: await packEntries({
-                server: entriesOf(parsed.data.server),
-                player: entriesOf(parsed.data.player),
-                loader: parsed.data.loader,
-                version: parsed.data.version ?? ""
-            })
+            pack,
+            serverOnly: await notForPlayers({ server, pack, loader: parsed.data.loader, version })
         });
     }
 

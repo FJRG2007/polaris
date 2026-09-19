@@ -594,6 +594,7 @@ function unreadRow(entry: string): InstalledRow {
         author: null,
         clientOnly: false,
         serverOnly: false,
+        clientOptional: false,
         known: true,
         fitsVersion: null,
         fitsLoader: true
