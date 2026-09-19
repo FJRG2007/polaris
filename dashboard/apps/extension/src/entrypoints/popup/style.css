@@ -183,20 +183,6 @@ h2 {
     color: hsl(var(--primary));
 }
 
-/* A button that reads as a link, for an offer made inside a sentence. It is a
-   button because it does something here rather than going anywhere, and nothing
-   about that should make it look like the block buttons below. */
-.notice .as-link {
-    width: auto;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: hsl(var(--primary));
-    font: inherit;
-    text-decoration: underline;
-    cursor: pointer;
-}
-
 input {
     width: 100%;
     padding: 8px 10px;

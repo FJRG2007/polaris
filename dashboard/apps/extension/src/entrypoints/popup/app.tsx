@@ -1,4 +1,5 @@
 import { TIMEOUT_CHOICES } from "@/lib/lock";
+import { screenFor } from "@/lib/screen";
 import { readIntendedLogin } from "@/lib/save";
 import type { UpdateNotice } from "@/lib/update";
 import { looksLikeAddress, readOrigin } from "@/lib/address";
@@ -115,46 +116,29 @@ export function App(): React.JSX.Element {
     // sign-in screen at somebody whose vault is open would be lying for a frame.
     if (!status) return <main className="pad" />;
 
-    // The order is the product's: which Polaris, then this browser connected to
-    // the account, then a vault if the account has one. The connection is what
-    // makes this extension somebody's - it is listed on their Sessions screen and
-    // ended from there - and the vault is one thing it may then be used for.
-    //
-    // The exception is a browser that was signed in to a vault before connections
-    // existed. It keeps working exactly as it did, and is asked to connect by a
-    // line above its own list rather than by a screen standing in front of it:
-    // taking somebody's logins away to make a point about a new step would be a
-    // worse thing to do than the step is worth.
-    const legacyVault = !status.linked && status.connected;
-    const screen = !status.server ? (
-        <Connect onDone={refresh} />
-    ) : !status.linked && !legacyVault ? (
-        <LinkPolaris server={status.server} onDone={refresh} />
-    ) : // A vault token with no account credential is one opened by typing the
-    // master password before the approval was required; it goes back through the
-    // approval rather than carrying on, because the extension has no idea whose
-    // account it is sitting on until it does.
-    !status.connected || !status.polarisSession ? (
-        <SignIn
-            server={status.server}
-            connected={status.connected}
-            canVault={status.canVault}
-            account={status.linkedAccount}
-            onDone={refresh}
-        />
-    ) : !status.unlocked ? (
-        <Unlock onDone={refresh} />
-    ) : (
-        <Items status={status} onChange={refresh} />
-    );
+    const shown = screenFor(status);
+    const screen =
+        shown === "server" || !status.server ? (
+            <Connect onDone={refresh} />
+        ) : shown === "link" ? (
+            <LinkPolaris server={status.server} onDone={refresh} />
+        ) : shown === "signIn" ? (
+            <SignIn
+                server={status.server}
+                connected={status.connected}
+                canVault={status.canVault}
+                account={status.linkedAccount}
+                onDone={refresh}
+            />
+        ) : shown === "unlock" ? (
+            <Unlock onDone={refresh} />
+        ) : (
+            <Items status={status} onChange={refresh} />
+        );
 
     return (
         <>
             <UpdateBanner notice={update} server={status.server} />
-            {/* Above whatever is showing, because it is about all of it: an
-                extension that is not connected is one this account cannot see or
-                end from Polaris. */}
-            {legacyVault ? <LinkBanner onDone={refresh} /> : null}
             {screen}
             {/* Under whichever screen is showing, rather than only over the item
                 list. A vault that is locked, and an account just set aside to add
@@ -362,42 +346,6 @@ function LinkPolaris({
                 Use a different Polaris
             </button>
         </main>
-    );
-}
-
-/** The line offered to a browser signed in to a vault from before connections
- *  existed. Its vault keeps working; this is how it joins the list. */
-function LinkBanner({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element {
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    // The refusal is the answer this press is most likely to get: the browser it
-    // is offered to is, by definition, one that was signed in before any of this
-    // existed, and the server it is signed in to may well predate it too. Shown
-    // rather than swallowed - a button that goes quiet is one somebody presses
-    // again all afternoon.
-    const ask = async (): Promise<void> => {
-        setBusy(true);
-        setError(null);
-        const reply = await askBackground({ kind: "link" });
-        setBusy(false);
-        if (!reply.ok) {
-            setError(reply.error);
-            return;
-        }
-        await onDone();
-    };
-
-    return (
-        <div className="notice small">
-            This browser is not connected to your Polaris account yet, so it does not appear under
-            Sessions.{" "}
-            <button className="as-link" disabled={busy} onClick={() => void ask()}>
-                Connect it
-            </button>
-            .
-            <Problem text={error} />
-        </div>
     );
 }
 

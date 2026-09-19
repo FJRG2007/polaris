@@ -302,6 +302,11 @@ const TIMEOUT = storage.defineItem<number>("local:vault.timeoutMs", {
  */
 async function vault(): Promise<OpenVault | null> {
     if (!open) return null;
+    // A vault is something a connected extension is let into, never the way in.
+    // A browser still holding one from before connections existed keeps it in
+    // memory, untouched, and gets it back the moment it connects - but nothing
+    // is filled, listed or copied out of it until then.
+    if ((await LINK_TOKEN.getValue()) === null) return null;
     if (hasExpired(Date.now(), await LOCK_AT.getValue())) {
         open = null;
         return null;

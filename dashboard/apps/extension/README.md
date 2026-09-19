@@ -21,9 +21,16 @@ More than one account in this browser means more than one connection: Polaris
 issues and ends them per account, so each one is approved on its own and travels
 with the account you switch to. Ending one says nothing about the others.
 
-An extension that was signed in to a vault before any of this existed keeps
-working exactly as it did, and is asked to connect by a line above its own list.
-Connecting adopts what it already had rather than replacing it.
+An extension that was signed in to a vault before any of this existed is asked to
+connect like any other, and fills nothing until it has. Its vault is kept rather
+than discarded: connecting adopts it, and it is usable again the moment the
+connection is approved.
+
+A connection answers to the same controls a browser session does. It can be tied
+to the address it was last seen at, from its row or by the account's rule for
+computers, and one that turns up from another address is ended. Signing out
+everywhere else, closing the account or an administrator ending its sessions
+ends the extension's connections too.
 
 The routes involved are `POST /api/extension/authorize`, its `/claim`, and
 `GET`/`DELETE /api/extension/session` - the last of which is what a disconnection
