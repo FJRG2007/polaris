@@ -119,23 +119,27 @@ export interface MediaPermissions {
 }
 
 /**
- * What a seat may send and receive, given what a moderator has done to it.
+ * What a seat may send, given what a moderator has done to it.
  *
  * Muted: everything but the microphone, so a camera and a shared screen keep
- * going - which is what every voice client does. Deafened: nothing arrives at
- * all, and the microphone goes with it, because somebody who cannot hear the room
- * is not talking to it. The media server enforces both, so a browser that ignores
- * the notice is still silent and still deaf.
+ * going - which is what every voice client does. Deafened: the microphone goes
+ * too, because somebody who cannot hear the room is not talking to it. The media
+ * server enforces this, so a browser that ignores the notice is still silent.
  *
- * A deafened seat also stops receiving pictures. The media server has one switch
- * for everything arriving, not one per kind, and a deafen that the browser could
- * lift by asking for the audio again would be a request rather than a rule.
+ * What a deafened seat RECEIVES is not decided here. Deafening takes the sound
+ * away and leaves the cameras and the shared screens, as Discord does - and the
+ * media server's own switch for receiving is one switch for everything. So the
+ * sound is held back by the people sending it instead: each of their browsers
+ * tells the media server the deafened seat may not have its audio (see
+ * `subscriptionRules`). That is still the server refusing, not the deafened
+ * browser choosing not to listen, because the deafened browser is not the one
+ * that grants it.
  */
 export function mediaPermissions(restriction: SeatRestriction): MediaPermissions {
     const quiet = restriction.serverMuted || restriction.serverDeafened;
     return {
         canPublish: true,
-        canSubscribe: !restriction.serverDeafened,
+        canSubscribe: true,
         canPublishData: true,
         canPublishSources: quiet
             ? [MEDIA_SOURCE.CAMERA, MEDIA_SOURCE.SCREEN_SHARE, MEDIA_SOURCE.SCREEN_SHARE_AUDIO]
@@ -184,4 +188,46 @@ export function heldBack(restriction: SeatRestriction): string | null {
     if (restriction.serverDeafened) return moderationNotice("deafen");
     if (restriction.serverMuted) return moderationNotice("mute");
     return null;
+}
+
+/** One entry of what a browser tells the media server about who may receive its
+ *  tracks, in the shape the media client takes. */
+export interface TrackPermission {
+    readonly participantIdentity: string;
+    readonly allowAll: boolean;
+    readonly allowedTrackSids?: string[];
+}
+
+/**
+ * Who may receive this browser's tracks, given which seats a moderator deafened.
+ *
+ * Everybody gets everything, unless somebody in the room is deafened: then every
+ * other seat is still allowed everything, and a deafened one is allowed only the
+ * tracks that are not sound - the camera and the shared screen, never the
+ * microphone or a shared screen's audio.
+ *
+ * The list has to name everybody once it is used at all, because a seat left out
+ * of it receives nothing; so it is worked out again whenever somebody arrives or
+ * this browser publishes something new.
+ */
+export function subscriptionRules(input: {
+    /** Every other seat in the room, by the identity the media server knows it by. */
+    readonly others: readonly string[];
+    /** The seats a moderator has deafened. */
+    readonly deafened: ReadonlySet<string>;
+    /** What this browser publishes. */
+    readonly tracks: readonly { readonly sid: string; readonly kind: string }[];
+}): { allParticipantsAllowed: boolean; participantTrackPermissions: TrackPermission[] } {
+    if (!input.others.some((identity) => input.deafened.has(identity))) {
+        return { allParticipantsAllowed: true, participantTrackPermissions: [] };
+    }
+    const pictures = input.tracks.filter((track) => track.kind !== "audio").map((track) => track.sid);
+    return {
+        allParticipantsAllowed: false,
+        participantTrackPermissions: input.others.map((identity) =>
+            input.deafened.has(identity)
+                ? { participantIdentity: identity, allowAll: false, allowedTrackSids: pictures }
+                : { participantIdentity: identity, allowAll: true }
+        )
+    };
 }

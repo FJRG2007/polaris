@@ -63,6 +63,7 @@ import {
     heldBack,
     microphoneAllowed,
     moderationNotice,
+    subscriptionRules,
     UNRESTRICTED,
     type SeatRestriction
 } from "@/lib/chat/voice-moderation";
@@ -573,6 +574,32 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      */
     const [moderation, setModeration] = useState<SeatRestriction>(UNRESTRICTED);
     const forced = useRef<SeatRestriction>(UNRESTRICTED);
+    /** The other seats a moderator has deafened, by the identity the media server
+     *  knows them by - the ones this browser must not send its sound to. */
+    const deafenedSeats = useRef<ReadonlySet<string>>(new Set());
+    /**
+     * Tell the media server who may receive this browser's tracks: everybody
+     * everything, except a deafened seat, which gets the pictures and no sound.
+     * Held in a ref so the room's own event handlers, registered once, call the
+     * current one.
+     */
+    const guardEars = useRef<() => void>(() => undefined);
+    guardEars.current = () => {
+        const joined = room.current;
+        if (!joined) return;
+        const rules = subscriptionRules({
+            others: [...joined.remoteParticipants.keys()],
+            deafened: deafenedSeats.current,
+            tracks: [...joined.localParticipant.trackPublications.values()].map((publication) => ({
+                sid: publication.trackSid,
+                kind: publication.kind
+            }))
+        });
+        joined.localParticipant.setTrackSubscriptionPermissions(
+            rules.allParticipantsAllowed,
+            rules.participantTrackPermissions
+        );
+    };
     /** Whether the microphone was on, and the ears off, before a moderator took
      *  them, so lifting it gives back what the person had rather than a default. */
     const micBeforeForce = useRef(true);
@@ -1415,7 +1442,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     });
                     if (cue) sound(cue);
                 })
-                .on(RoomEvent.LocalTrackPublished, () => publishLocalPreview())
+                .on(RoomEvent.LocalTrackPublished, () => {
+                    publishLocalPreview();
+                    // A new track is nobody's until the rules name it, while a
+                    // deafened seat is in the room.
+                    guardEars.current();
+                })
 
                 // The sharer's own copy of the same thing, and the button that
                 // says whether they are sharing along with it: what is true is
@@ -1423,6 +1455,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 // the ways out of one it took.
                 .on(RoomEvent.LocalTrackUnpublished, () => {
                     publishLocalPreview();
+                    guardEars.current();
                     setSharing(screen.current !== null);
                 })
                 .on(RoomEvent.TrackMuted, onMuteChanged)
@@ -1432,6 +1465,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 .on(RoomEvent.ParticipantConnected, () => {
                     resort();
                     resortStates();
+                    // Somebody left out of the rules receives nothing, so the
+                    // rules are said again whenever the room changes.
+                    guardEars.current();
                     // Say what this browser is again, to whoever just walked in.
                     //
                     // An attribute is meant to be handed to somebody arriving
@@ -3116,6 +3152,23 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * and everything arriving is asked for again - the server stopped sending it
      * while the seat was deafened.
      */
+    /**
+     * Hold this browser's sound back from every seat a moderator deafened, and
+     * give it back when the deafen is lifted. Their cameras and screens still
+     * reach them, as they do in Discord.
+     */
+    useEffect(() => {
+        const deaf = new Set(
+            (meeting?.participants ?? [])
+                .filter((person) => person.serverDeafened && person.id !== participantId)
+                .map((person) => person.id)
+        );
+        const was = deafenedSeats.current;
+        if (deaf.size === was.size && [...deaf].every((id) => was.has(id))) return;
+        deafenedSeats.current = deaf;
+        guardEars.current();
+    }, [meeting, participantId]);
+
     useEffect(() => {
         const own = meeting?.participants.find((person) => person.id === participantId);
         const next: SeatRestriction = {

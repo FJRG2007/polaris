@@ -20,7 +20,8 @@ import {
     microphoneAllowed,
     moderationNotice,
     moderationRefusal,
-    restrictionAfter
+    restrictionAfter,
+    subscriptionRules
 } from "@/lib/chat/voice-moderation";
 
 const base = {
@@ -124,9 +125,10 @@ describe("what the media server enforces", () => {
         expect(muted.canPublishSources).toContain(MEDIA_SOURCE.SCREEN_SHARE);
     });
 
-    it("stops everything arriving at a deafened seat, and its microphone with it", () => {
+    it("takes a deafened seat's microphone and leaves it able to receive pictures", () => {
         const deaf = mediaPermissions({ serverMuted: false, serverDeafened: true });
-        expect(deaf.canSubscribe).toBe(false);
+        // The sound is held back by the people sending it - see subscriptionRules.
+        expect(deaf.canSubscribe).toBe(true);
         expect(deaf.canPublishSources).not.toContain(MEDIA_SOURCE.MICROPHONE);
     });
 
@@ -155,5 +157,53 @@ describe("what the person it happened to is told", () => {
         expect(heldBack({ serverMuted: false, serverDeafened: true })).toBe(
             moderationNotice("deafen")
         );
+    });
+});
+
+describe("who may receive a browser's tracks", () => {
+    const TRACKS = [
+        { sid: "mic", kind: "audio" },
+        { sid: "cam", kind: "video" },
+        { sid: "screen", kind: "video" },
+        { sid: "screen-audio", kind: "audio" }
+    ];
+
+    it("lets everybody have everything while nobody is deafened", () => {
+        expect(
+            subscriptionRules({ others: ["a", "b"], deafened: new Set(), tracks: TRACKS })
+        ).toEqual({ allParticipantsAllowed: true, participantTrackPermissions: [] });
+    });
+
+    it("gives a deafened seat the camera and the screen, and no sound", () => {
+        const rules = subscriptionRules({
+            others: ["a", "deaf"],
+            deafened: new Set(["deaf"]),
+            tracks: TRACKS
+        });
+        expect(rules.allParticipantsAllowed).toBe(false);
+        expect(rules.participantTrackPermissions).toEqual([
+            { participantIdentity: "a", allowAll: true },
+            { participantIdentity: "deaf", allowAll: false, allowedTrackSids: ["cam", "screen"] }
+        ]);
+    });
+
+    it("names everybody else, since a seat left out of the list receives nothing", () => {
+        const rules = subscriptionRules({
+            others: ["a", "b", "deaf"],
+            deafened: new Set(["deaf"]),
+            tracks: TRACKS
+        });
+        expect(rules.participantTrackPermissions.map((one) => one.participantIdentity)).toEqual([
+            "a",
+            "b",
+            "deaf"
+        ]);
+    });
+
+    it("ignores a deafened seat that is not in the room", () => {
+        expect(
+            subscriptionRules({ others: ["a"], deafened: new Set(["gone"]), tracks: TRACKS })
+                .allParticipantsAllowed
+        ).toBe(true);
     });
 });

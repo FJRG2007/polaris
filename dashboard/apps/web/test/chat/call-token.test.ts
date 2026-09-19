@@ -169,10 +169,10 @@ describe("what a moderator put on a seat", () => {
         expect(video.canSubscribe).toBe(true);
     });
 
-    it("sends nothing to a deafened seat, and takes its microphone too", async () => {
+    it("takes a deafened seat's microphone, and leaves it the pictures", async () => {
         const video = claims(await calls.joinToken(endpoint, "meeting-9", "seat-deaf"))
             .video as Record<string, unknown>;
-        expect(video.canSubscribe).toBe(false);
+        expect(video.canSubscribe).toBe(true);
         expect(video.canPublishSources).not.toContain("microphone");
     });
 });
