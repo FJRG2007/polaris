@@ -223,7 +223,11 @@ async function syncFolders(client: ImapFlow, accountId: string): Promise<void> {
         // not a place to sync.
         if (entry.flags.has("\\Noselect") || entry.flags.has("\\NonExistent")) continue;
         seen.add(entry.path);
-        const role = core.folderRole(entry.path, [...entry.flags], entry.delimiter);
+        const { role, flagged } = core.folderRoleFrom(
+            entry.path,
+            [...entry.flags],
+            entry.delimiter
+        );
         const existing = await prisma.mailFolder.findUnique({
             where: { accountId_path: { accountId, path: entry.path } },
             select: { id: true, subscribed: true, roleLocked: true }
@@ -234,7 +238,7 @@ async function syncFolders(client: ImapFlow, accountId: string): Promise<void> {
             // A role its owner chose survives every pass. Reading it off the
             // server again would forget what they told us, which is what makes
             // "this one is my Trash" worth asking for at all.
-            ...(existing?.roleLocked ? {} : { role }),
+            ...(existing?.roleLocked ? {} : { role, roleFlagged: flagged }),
             total: entry.status?.messages ?? 0,
             unread: entry.status?.unseen ?? 0
         };
@@ -255,6 +259,8 @@ async function syncFolders(client: ImapFlow, accountId: string): Promise<void> {
             });
         }
     }
+
+    await settleDuplicateRoles(accountId);
 
     const gone = await prisma.mailFolder.findMany({
         where: { accountId, path: { notIn: [...seen] } },
@@ -1294,4 +1300,32 @@ export async function accountsToSync(): Promise<string[]> {
             return now - account.lastSyncAt.getTime() >= seconds * 1000;
         })
         .map((account) => account.id);
+}
+
+/**
+ * One folder per role, where the server has said which one is its own.
+ *
+ * A mailbox can hold two folders that read as the same role: the one its
+ * provider files into, named in the account's language, and an English one
+ * another client left behind years ago - "Elementos enviados" and "Sent" side by
+ * side. Both matched, so the rail drew both as Sent and Polaris filed its copy
+ * into whichever the database happened to answer with, which is how a message
+ * sent from here ends up somewhere the provider's own webmail never looks.
+ *
+ * The server settles it: the folder it marked with SPECIAL-USE keeps the role
+ * and the one that only matched a name loses it. It stays in the rail as the
+ * ordinary folder it is - it exists on the server, and hiding it would be
+ * pretending otherwise - and a role somebody chose themselves is never touched.
+ */
+async function settleDuplicateRoles(accountId: string): Promise<void> {
+    const rows = await prisma.mailFolder.findMany({
+        where: { accountId, role: { not: "none" }, roleLocked: false },
+        select: { id: true, role: true, roleFlagged: true }
+    });
+    const flagged = new Set(rows.filter((row) => row.roleFlagged).map((row) => row.role));
+    const losing = rows
+        .filter((row) => !row.roleFlagged && flagged.has(row.role))
+        .map((row) => row.id);
+    if (losing.length === 0) return;
+    await prisma.mailFolder.updateMany({ where: { id: { in: losing } }, data: { role: "none" } });
 }

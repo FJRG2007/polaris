@@ -221,6 +221,22 @@ describe("folders", () => {
         expect(mailbox.folderRole("Projects/2026", [], "/")).toBe("none");
     });
 
+    it("says whether the server itself marked the folder, or only its name matched", () => {
+        // The case this exists for: a mailbox holding the provider's own Sent,
+        // named in its language and marked by the server, beside an English one
+        // another client left behind.
+        expect(mailbox.folderRoleFrom("Elementos enviados", ["\\Sent"], "/")).toEqual({
+            role: "sent",
+            flagged: true
+        });
+        expect(mailbox.folderRoleFrom("Sent", [], "/")).toEqual({ role: "sent", flagged: false });
+        expect(mailbox.folderRoleFrom("INBOX", [], "/")).toEqual({ role: "inbox", flagged: true });
+        expect(mailbox.folderRoleFrom("Projects/2026", [], "/")).toEqual({
+            role: "none",
+            flagged: false
+        });
+    });
+
     it("draws INBOX as a word rather than a shout", () => {
         expect(mailbox.folderLabel("INBOX", "/")).toBe("Inbox");
         expect(mailbox.folderLabel("INBOX/Clients/Acme", "/")).toBe("Acme");

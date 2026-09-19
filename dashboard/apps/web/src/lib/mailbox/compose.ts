@@ -14,6 +14,7 @@
  * lost.
  */
 
+import { findFolderForRole } from "./folder-roles";
 import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
 import * as core from "@polaris/core";
@@ -394,10 +395,9 @@ async function fileInSent(
     mime: Buffer
 ): Promise<void> {
     if (!account.appendToSent) return;
-    const sent = await prisma.mailFolder.findFirst({
-        where: { accountId: account.id, role: "sent" },
-        select: { path: true }
-    });
+    // Through the one place that decides which folder holds a role: with two
+    // folders that both read as Sent, this is the one the provider itself uses.
+    const sent = await findFolderForRole(account.id, "sent");
     if (!sent) return;
     try {
         await withImap(account, async (client) => {

@@ -10298,6 +10298,12 @@ model MailFolder {
     // name match. Their answer outlives a resync: without this the next pass
     // would read the role off the server again and forget what they told us.
     roleLocked Boolean @default(false)
+    // Whether the role came from the server marking this folder as its own Sent,
+    // Drafts, Trash and so on, rather than from its name. A mailbox can hold two
+    // folders that both read as Sent - the provider's, in the account's own
+    // language, and an English one another client left behind - and this is what
+    // keeps Polaris filing into the one the provider actually uses.
+    roleFlagged Boolean @default(false)
     // Whether this folder is known to store keywords such as `$Important`:
     // learned the first time a writable open accepts one or a message arrives
     // carrying one. Until then the server's silence about a keyword is not an

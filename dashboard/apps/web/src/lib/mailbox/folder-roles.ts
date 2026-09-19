@@ -6,10 +6,15 @@
  * the junk filter, which the actions in turn call. A shared question with three
  * callers in a cycle is exactly what a small module is for.
  *
- * The subtlety worth keeping in one place is the ordering. A role its owner
- * pointed at wins over one matched from a folder's name, so a mailbox where both
- * a "Spam" and a "Junk" folder exist settles on whichever one somebody said,
- * and settles the same way everywhere.
+ * The subtlety worth keeping in one place is the ordering, and it is why every
+ * caller comes through here rather than asking for a folder with a role itself.
+ * A role its owner pointed at wins; then the one the server marked as its own
+ * with SPECIAL-USE, which is where that provider's webmail looks; then a name
+ * match, and between two of those the earlier path, so the answer is the same
+ * one every time rather than whatever the database happens to return first.
+ *
+ * That is what stops a mailbox holding both "Elementos enviados" and "Sent" from
+ * having its sent copies filed into the one nobody reads.
  */
 
 import { prisma } from "@polaris/db";
@@ -41,7 +46,7 @@ export async function findFolderForRole(
 ): Promise<{ id: string; path: string } | null> {
     return prisma.mailFolder.findFirst({
         where: { accountId, role },
-        orderBy: { roleLocked: "desc" },
+        orderBy: [{ roleLocked: "desc" }, { roleFlagged: "desc" }, { path: "asc" }],
         select: { id: true, path: true }
     });
 }

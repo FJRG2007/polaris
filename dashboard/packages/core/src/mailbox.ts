@@ -795,19 +795,39 @@ const ROLE_BY_NAME: Readonly<Record<string, MailFolderRole>> = {
     "alle nachrichten": "all"
 };
 
+/**
+ * The role of a folder, and whether the server itself said so.
+ *
+ * The second half matters as much as the first. A mailbox can hold two folders
+ * that both look like Sent - the one its own provider files into, named in the
+ * account's language, and an English one some other client left behind - and
+ * only one of them is where that provider's webmail looks. The server marks its
+ * own with SPECIAL-USE, so a role read off a flag is worth more than one matched
+ * from a name, and this says which happened.
+ */
+export function folderRoleFrom(
+    path: string,
+    flags: readonly string[],
+    delimiter: string
+): { role: MailFolderRole; flagged: boolean } {
+    for (const flag of flags) {
+        const role = ROLE_BY_FLAG[flag];
+        if (role) return { role, flagged: true };
+    }
+    const leaf = (delimiter ? path.split(delimiter).at(-1) : path) ?? path;
+    // The inbox is the one folder the protocol names itself, so a server that
+    // flags nothing still has one.
+    if (path.trim().toLowerCase() === "inbox") return { role: "inbox", flagged: true };
+    return { role: ROLE_BY_NAME[leaf.trim().toLowerCase()] ?? "none", flagged: false };
+}
+
 /** The role of a folder, from what the server flagged it and then from its name. */
 export function folderRole(
     path: string,
     flags: readonly string[],
     delimiter: string
 ): MailFolderRole {
-    for (const flag of flags) {
-        const role = ROLE_BY_FLAG[flag];
-        if (role) return role;
-    }
-    const leaf = (delimiter ? path.split(delimiter).at(-1) : path) ?? path;
-    if (path.trim().toLowerCase() === "inbox") return "inbox";
-    return ROLE_BY_NAME[leaf.trim().toLowerCase()] ?? "none";
+    return folderRoleFrom(path, flags, delimiter).role;
 }
 
 /** The order the roles are read in down the rail. Everything else follows,
