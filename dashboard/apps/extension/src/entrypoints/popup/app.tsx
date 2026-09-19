@@ -1,5 +1,6 @@
 import { TIMEOUT_CHOICES } from "@/lib/lock";
 import { screenFor } from "@/lib/screen";
+import { Home, SectionBar, TopBar, useSection } from "./shell";
 import { readIntendedLogin } from "@/lib/save";
 import type { UpdateNotice } from "@/lib/update";
 import { looksLikeAddress, readOrigin } from "@/lib/address";
@@ -40,6 +41,31 @@ import {
  * the worker, and a worker has no document to write a clipboard from.
  */
 const CLEAR_AFTER_MS = 30_000;
+
+/**
+ * Which copy was just acknowledged, for the check mark that replaces the copy
+ * mark - the same acknowledgement Polaris gives. Set only once the clipboard
+ * write has actually happened, so a check never stands for a copy that failed.
+ */
+function useCopied(): [string | null, (key: string) => void] {
+    const [copied, setCopied] = useState<string | null>(null);
+    const timer = useRef<number | null>(null);
+    useEffect(
+        () => () => {
+            if (timer.current !== null) window.clearTimeout(timer.current);
+        },
+        []
+    );
+    const mark = useCallback((key: string) => {
+        setCopied(key);
+        if (timer.current !== null) window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(() => setCopied(null), COPIED_MS);
+    }, []);
+    return [copied, mark];
+}
+
+/** How long the check mark stays after a copy. */
+const COPIED_MS = 1500;
 
 function useStatus(): [VaultStatus | null, () => Promise<void>] {
     const [status, setStatus] = useState<VaultStatus | null>(null);
@@ -111,41 +137,56 @@ function UpdateBanner({
 export function App(): React.JSX.Element {
     const [status, refresh] = useStatus();
     const update = useUpdate();
+    const [section, setSection] = useSection();
 
     // Nothing at all until the worker has answered: a popup that flashed the
     // sign-in screen at somebody whose vault is open would be lying for a frame.
     if (!status) return <main className="pad" />;
 
     const shown = screenFor(status);
-    const screen =
-        shown === "server" || !status.server ? (
-            <Connect onDone={refresh} />
-        ) : shown === "link" ? (
-            <LinkPolaris server={status.server} onDone={refresh} />
-        ) : shown === "signIn" ? (
-            <SignIn
-                server={status.server}
-                connected={status.connected}
-                canVault={status.canVault}
-                account={status.linkedAccount}
-                onDone={refresh}
-            />
-        ) : shown === "unlock" ? (
-            <Unlock onDone={refresh} />
-        ) : (
-            <Items status={status} onChange={refresh} />
-        );
 
+    // Before the account: which Polaris, then connecting this browser to it. The
+    // accounts line stays under these, because adding a second account is exactly
+    // when somebody needs the way back to the first.
+    if (shown === "server" || shown === "link" || !status.server) {
+        return (
+            <div className="app">
+                <UpdateBanner notice={update} server={status.server} />
+                {shown === "link" && status.server ? (
+                    <LinkPolaris server={status.server} onDone={refresh} />
+                ) : (
+                    <Connect onDone={refresh} />
+                )}
+                <Accounts status={status} onChange={refresh} />
+            </div>
+        );
+    }
+
+    // Connected: the frame, and either the home screen or the section open in it.
     return (
-        <>
+        <div className="app">
             <UpdateBanner notice={update} server={status.server} />
-            {screen}
-            {/* Under whichever screen is showing, rather than only over the item
-                list. A vault that is locked, and an account just set aside to add
-                another, are exactly the moments somebody needs the way back - and
-                those are the screens the list would otherwise be missing from. */}
-            <Accounts status={status} onChange={refresh} />
-        </>
+            <TopBar status={status} onChange={refresh} />
+            {section === "home" ? (
+                <Home status={status} onOpen={setSection} />
+            ) : (
+                <>
+                    <SectionBar title="Vault" onBack={() => setSection("home")} />
+                    {shown === "signIn" ? (
+                        <SignIn
+                            server={status.server}
+                            connected={status.connected}
+                            canVault={status.canVault}
+                            onDone={refresh}
+                        />
+                    ) : shown === "unlock" ? (
+                        <Unlock onDone={refresh} />
+                    ) : (
+                        <Items status={status} onChange={refresh} />
+                    )}
+                </>
+            )}
+        </div>
     );
 }
 
@@ -368,16 +409,12 @@ function SignIn({
     server,
     connected,
     canVault,
-    account,
     onDone
 }: {
     server: string;
     connected: boolean;
     /** Whether this account may use a vault at all. */
     canVault: boolean;
-    /** Who this browser is connected as, so the screen says whose vault it is
-     *  about to open rather than naming a server. */
-    account: { name: string | null; email: string | null } | null;
     onDone: () => Promise<void>;
 }): React.JSX.Element {
     const [error, setError] = useState<string | null>(null);
@@ -399,9 +436,7 @@ function SignIn({
         }
     };
 
-    const leave = async (
-        request: { kind: "signOut" } | { kind: "forgetServer" } | { kind: "unlink" }
-    ): Promise<void> => {
+    const leave = async (request: { kind: "signOut" }): Promise<void> => {
         setError(null);
         const reply = await askBackground(request);
         if (!reply.ok) setError(reply.error);
@@ -490,23 +525,16 @@ function SignIn({
     if (!canVault) {
         return (
             <main className="pad">
-                <h1>Connected</h1>
-                <p className="muted">{account?.email ?? new URL(server).host}</p>
                 <p className="muted small">
-                    This account does not have a vault, so there are no logins to fill here yet.
-                    Everything else this extension learns to do will work from this connection.
+                    This account does not have a vault on {new URL(server).host}, so there are no
+                    logins to fill here.
                 </p>
-                <button className="ghost" onClick={() => void leave({ kind: "unlink" })}>
-                    Disconnect this browser
-                </button>
             </main>
         );
     }
 
     return (
         <main className="pad">
-            <h1>Your vault</h1>
-            <p className="muted">{account?.email ?? new URL(server).host}</p>
             <Problem text={error} />
             <button disabled={busy} onClick={() => void ask()}>
                 {busy ? "Asking" : "Connect your vault"}
@@ -536,11 +564,6 @@ function SignIn({
                     Sign out of the vault
                 </button>
             ) : null}
-            {/* Ending the connection, which is the same act as ending it from the
-                account's Sessions screen and takes the vault with it. */}
-            <button className="ghost" onClick={() => void leave({ kind: "unlink" })}>
-                Disconnect this browser
-            </button>
         </main>
     );
 }
@@ -617,9 +640,17 @@ function Generator({ onUse }: { onUse: (value: string) => void }): React.JSX.Ele
         make(length);
     };
 
+    const [copied, markCopied] = useCopied();
+
     const copy = async (): Promise<void> => {
         if (!value) return;
-        await navigator.clipboard.writeText(value);
+        try {
+            await navigator.clipboard.writeText(value);
+        } catch {
+            setNote("The browser refused the clipboard. Try again.");
+            return;
+        }
+        markCopied("generated");
         setNote("Copied. Cleared in 30 seconds if this stays open.");
         if (clearing.current !== null) window.clearTimeout(clearing.current);
         clearing.current = window.setTimeout(() => {
@@ -657,8 +688,18 @@ function Generator({ onUse }: { onUse: (value: string) => void }): React.JSX.Ele
                 <button className="ghost" title="Make another" onClick={() => make(length)}>
                     Again
                 </button>
-                <button className="ghost" disabled={!value} onClick={() => void copy()}>
-                    Copy
+                <button
+                    className={copied === "generated" ? "ghost copied" : "ghost"}
+                    disabled={!value}
+                    onClick={() => void copy()}
+                >
+                    {copied === "generated" ? (
+                        <>
+                            <CheckMark /> Copied
+                        </>
+                    ) : (
+                        "Copy"
+                    )}
                 </button>
                 <button
                     className="ghost"
@@ -732,7 +773,16 @@ function CountdownRing({ left, of }: { left: number; of: number }): React.JSX.El
     );
 }
 
-function TotpCell({ id, onCopy }: { id: string; onCopy: () => void }): React.JSX.Element | null {
+function TotpCell({
+    id,
+    done,
+    onCopy
+}: {
+    id: string;
+    /** Whether this code was just copied. */
+    done: boolean;
+    onCopy: () => void;
+}): React.JSX.Element | null {
     const [code, setCode] = useState<string | null>(null);
     const [left, setLeft] = useState(0);
 
@@ -777,7 +827,7 @@ function TotpCell({ id, onCopy }: { id: string; onCopy: () => void }): React.JSX
         >
             <CountdownRing left={left} of={30} />
             <span className="code">{shown}</span>
-            <CopyMark />
+            {done ? <CheckMark /> : <CopyMark />}
         </button>
     );
 }
@@ -800,6 +850,16 @@ function CopyMark(): React.JSX.Element {
     );
 }
 
+/** What the copy mark turns into once the value is on the clipboard: a green
+ *  check that pops in, as Polaris's copy buttons do. */
+function CheckMark(): React.JSX.Element {
+    return (
+        <svg className="copy-mark done" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 6 9 17l-5-5" />
+        </svg>
+    );
+}
+
 /**
  * One value on a login, as a line that copies itself when pressed.
  *
@@ -813,11 +873,14 @@ function Field({
     label,
     shown,
     mono,
+    done,
     onCopy
 }: {
     label: string;
     shown: string;
     mono?: boolean;
+    /** Whether this value was just copied. */
+    done?: boolean;
     onCopy: (() => void) | null;
 }): React.JSX.Element {
     if (!onCopy) {
@@ -836,7 +899,7 @@ function Field({
             onClick={onCopy}
         >
             <span className={mono ? "shown mono" : "shown"}>{shown}</span>
-            <CopyMark />
+            {done ? <CheckMark /> : <CopyMark />}
         </button>
     );
 }
@@ -1260,13 +1323,21 @@ function Items({
         []
     );
 
+    const [copied, markCopied] = useCopied();
+
     const copy = async (item: ItemSummary, field: "username" | "password" | "totp") => {
         const reply = await askBackground({ kind: "copy", id: item.id, field });
         if (!reply.ok || !("value" in reply)) {
             setNote(reply.ok ? null : reply.error);
             return;
         }
-        await navigator.clipboard.writeText(reply.value);
+        try {
+            await navigator.clipboard.writeText(reply.value);
+        } catch {
+            setNote("The browser refused the clipboard. Try again.");
+            return;
+        }
+        markCopied(`${item.id}:${field}`);
         setNote(
             field === "username"
                 ? "Username copied."
@@ -1317,16 +1388,22 @@ function Items({
                 <Field
                     label="Username"
                     shown={item.username ?? item.host ?? "No username"}
+                    done={copied === `${item.id}:username`}
                     onCopy={item.username === null ? null : () => void copy(item, "username")}
                 />
                 <Field
                     label="Password"
                     shown="••••••••••"
                     mono
+                    done={copied === `${item.id}:password`}
                     onCopy={() => void copy(item, "password")}
                 />
                 {item.totp ? (
-                    <TotpCell id={item.id} onCopy={() => void copy(item, "totp")} />
+                    <TotpCell
+                        id={item.id}
+                        done={copied === `${item.id}:totp`}
+                        onCopy={() => void copy(item, "totp")}
+                    />
                 ) : null}
             </div>
             {/* What is left is the two things that are not "copy that": putting it
@@ -1444,22 +1521,6 @@ function Items({
                 >
                     Lock
                 </button>
-                {/* The way out of a 360-pixel panel and into the whole thing.
-                    Everything this extension cannot do - and that is most of
-                    Polaris - is one press away instead of an address somebody
-                    has to remember they configured here. */}
-                {status.server ? (
-                    <button
-                        className="ghost"
-                        title={`Open ${new URL(status.server).host}`}
-                        onClick={() => {
-                            void browser.tabs.create({ url: status.server as string });
-                            window.close();
-                        }}
-                    >
-                        Open Polaris
-                    </button>
-                ) : null}
                 <button
                     className="ghost"
                     onClick={() => void askBackground({ kind: "signOut" }).then(onChange)}

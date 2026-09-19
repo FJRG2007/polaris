@@ -3,6 +3,7 @@ import * as link from "@/lib/link";
 import * as protocol from "@/lib/protocol";
 import * as messages from "@/lib/messages";
 import * as accounts from "@/lib/accounts";
+import { onShelf } from "@/lib/shelf";
 import { searchLogins } from "@/lib/search";
 import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
@@ -188,6 +189,20 @@ const LINK_ACCOUNT = storage.defineItem<messages.ExtensionAccount | null>("local
 });
 /** What the connection reaches, as the server last answered. */
 const LINK_VAULT = storage.defineItem<boolean>("local:link.vault", { fallback: true });
+/** The organizations the connected account belongs to, as the server last
+ *  answered, with the vault each one holds. */
+const LINK_ORGS = storage.defineItem<link.LinkOrganization[]>("local:link.orgs", {
+    fallback: []
+});
+/** The faces drawn in the popup, fetched with the connection's token because the
+ *  popup has no session to fetch them with. */
+const LINK_FACES = storage.defineItem<{ self: string | null; orgs: Record<string, string | null> }>(
+    "local:link.faces",
+    { fallback: { self: null, orgs: {} } }
+);
+/** The organization whose shelf is open in the popup, or null for the account's
+ *  own. Per account: switching accounts goes back to the personal shelf. */
+const LINK_SHELF = storage.defineItem<string | null>("local:link.shelf", { fallback: null });
 /** When the server was last asked about it, so opening the popup twenty times
  *  does not ask twenty times. */
 const LINK_CHECKED = storage.defineItem<number | null>("session:link.checkedAt", {
@@ -773,7 +788,10 @@ async function forgetLink(): Promise<void> {
         LINK_ACCOUNT.setValue(null),
         LINK_VAULT.setValue(true),
         LINK_CHECKED.setValue(null),
-        LINK_WAITING.setValue(null)
+        LINK_WAITING.setValue(null),
+        LINK_ORGS.setValue([]),
+        LINK_FACES.setValue({ self: null, orgs: {} }),
+        LINK_SHELF.setValue(null)
     ]);
 }
 
@@ -819,9 +837,31 @@ async function refreshLink(force = false): Promise<void> {
         await dropLink();
         return;
     }
+    const [held, shelf] = await Promise.all([LINK_FACES.getValue(), LINK_SHELF.getValue()]);
+    // Every face at once, and each one kept as it was when its answer is "could
+    // not find out" - a slow server should not turn a photo back into initials.
+    const [self, ...orgFaces] = await Promise.all([
+        link.fetchFace(origin, token, null),
+        ...state.organizations.map((org) => link.fetchFace(origin, token, org.id))
+    ]);
+    const orgs: Record<string, string | null> = {};
+    state.organizations.forEach((org, index) => {
+        const found = orgFaces[index];
+        orgs[org.id] = found === undefined ? (held.orgs[org.id] ?? null) : found;
+    });
     await Promise.all([
-        LINK_ACCOUNT.setValue({ name: state.account.name || null, email: state.account.email }),
+        LINK_ACCOUNT.setValue({
+            id: state.account.id,
+            name: state.account.name || null,
+            email: state.account.email
+        }),
         LINK_VAULT.setValue(state.vault),
+        LINK_ORGS.setValue([...state.organizations]),
+        LINK_FACES.setValue({ self: self === undefined ? held.self : self, orgs }),
+        // A shelf the account has since left goes back to its own.
+        shelf !== null && !state.organizations.some((org) => org.id === shelf)
+            ? LINK_SHELF.setValue(null)
+            : Promise.resolve(),
         LINK_CHECKED.setValue(Date.now())
     ]);
 }
@@ -874,6 +914,7 @@ async function collectLink(): Promise<void> {
         await Promise.all([
             LINK_TOKEN.setValue(claim.token),
             LINK_ACCOUNT.setValue({
+                id: claim.account.id,
                 name: claim.account.name || null,
                 email: claim.account.email
             }),
@@ -1236,6 +1277,11 @@ async function makeActive(account: accounts.ParkedAccount): Promise<void> {
             account.link ? { name: account.link.name, email: account.link.email } : null
         ),
         LINK_VAULT.setValue(account.link?.vault ?? true),
+        // Another account's organizations, faces and open shelf are not this
+        // one's. Emptied here and asked for again on the next check.
+        LINK_ORGS.setValue([]),
+        LINK_FACES.setValue({ self: null, orgs: {} }),
+        LINK_SHELF.setValue(null),
         // Asked again on the next draw rather than trusted from before it was set
         // aside: a connection somebody ended while this account was parked is one
         // this browser has to find out about on the way back to it.
@@ -1259,7 +1305,10 @@ async function status(): Promise<messages.VaultStatus> {
         accountKey,
         linkToken,
         linkAccount,
-        canVault
+        canVault,
+        linkOrgs,
+        faces,
+        shelf
     ] = await Promise.all([
         currentOrigin(),
         EMAIL.getValue(),
@@ -1271,7 +1320,10 @@ async function status(): Promise<messages.VaultStatus> {
         ACCOUNT_KEY.getValue(),
         LINK_TOKEN.getValue(),
         LINK_ACCOUNT.getValue(),
-        LINK_VAULT.getValue()
+        LINK_VAULT.getValue(),
+        LINK_ORGS.getValue(),
+        LINK_FACES.getValue(),
+        LINK_SHELF.getValue()
     ]);
     // Only worth asking for once there is a session to ask about: a browser that
     // has not been let in yet would spend a request on every poll of a screen
@@ -1308,8 +1360,22 @@ async function status(): Promise<messages.VaultStatus> {
         syncedAt,
         timeoutMs: readTimeout(timeout),
         accounts: known,
-        activeId
+        activeId,
+        organizations: linkOrgs.map((org) => ({
+            id: org.id,
+            name: org.name,
+            face: faces.orgs[org.id] ?? null
+        })),
+        shelf,
+        face: faces.self
     };
+}
+
+/** The logins the open shelf shows. What fills a page is not narrowed - a
+ *  shelf decides what is listed, not what a site may be signed in with. */
+async function onOpenShelf(found: readonly Login[]): Promise<Login[]> {
+    const [shelf, orgs] = await Promise.all([LINK_SHELF.getValue(), LINK_ORGS.getValue()]);
+    return found.filter((login) => onShelf(login.organizationId, shelf, orgs));
 }
 
 /**
@@ -2062,6 +2128,17 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 return { ok: true, status: await status() };
             }
 
+            case "setShelf": {
+                // Only an organization the account is in, as the server last said.
+                const orgs = await LINK_ORGS.getValue();
+                const orgId = request.orgId;
+                if (orgId !== null && !orgs.some((org) => org.id === orgId)) {
+                    return { ok: false, error: "You are not part of that organization." };
+                }
+                await LINK_SHELF.setValue(orgId);
+                return { ok: true, status: await status() };
+            }
+
             case "sync":
                 return (await inTurn(() => sync(true)))
                     ? { ok: true, status: await status() }
@@ -2071,12 +2148,14 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 const vaults = await vaultNames();
                 return {
                     ok: true,
-                    items: (await forUrl(request.url)).map((login) => summarize(login, vaults))
+                    items: (await onOpenShelf(await forUrl(request.url))).map((login) =>
+                        summarize(login, vaults)
+                    )
                 };
             }
 
             case "items": {
-                const all = await logins();
+                const all = await onOpenShelf(await logins());
                 // Matched the way somebody actually remembers a login rather than
                 // by a run of characters, and ranked as well as filtered. Both
                 // rules, and what a one-letter query does about them, are in

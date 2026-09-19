@@ -54,6 +54,14 @@ export type LinkClaim =
     | { readonly status: "pending" | "denied" | "expired" }
     | { readonly status: "approved"; readonly token: string; readonly account: LinkedAccount };
 
+/** One organization the account belongs to, as the dashboard's switcher offers
+ *  it, with the vault it holds when it has one. */
+export interface LinkOrganization {
+    readonly id: string;
+    readonly name: string;
+    readonly vaultId: string | null;
+}
+
 /** What the connection reaches, as the server answers it. */
 export interface LinkState {
     readonly account: LinkedAccount;
@@ -61,6 +69,9 @@ export interface LinkState {
     /** Whether this account may use a vault at all, so the popup offers one only
      *  where there is one to offer. */
     readonly vault: boolean;
+    /** Empty from a server too old to list them, which is also an account that
+     *  belongs to none. */
+    readonly organizations: readonly LinkOrganization[];
 }
 
 function url(origin: string, path: string): string {
@@ -95,6 +106,64 @@ function readAccount(value: unknown): LinkedAccount | null {
         name: typeof row["name"] === "string" ? row["name"] : "",
         email: row["email"]
     };
+}
+
+/** The organizations in an answer, keeping only rows that are whole. */
+export function readOrganizations(value: unknown): LinkOrganization[] {
+    if (!Array.isArray(value)) return [];
+    const found: LinkOrganization[] = [];
+    for (const entry of value) {
+        if (typeof entry !== "object" || entry === null) continue;
+        const row = entry as Record<string, unknown>;
+        if (typeof row["id"] !== "string" || typeof row["name"] !== "string") continue;
+        found.push({
+            id: row["id"],
+            name: row["name"],
+            vaultId: typeof row["vaultId"] === "string" ? row["vaultId"] : null
+        });
+    }
+    return found;
+}
+
+/** Bytes as base64, in slices so a large picture does not overflow the stack. */
+function base64(bytes: Uint8Array): string {
+    let text = "";
+    for (let index = 0; index < bytes.length; index += 0x8000) {
+        text += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+    }
+    return btoa(text);
+}
+
+/** The largest picture kept. A face is drawn at 28 pixels; anything bigger than
+ *  this is somebody's original upload and not worth holding in storage. */
+const MAX_FACE_BYTES = 256 * 1024;
+
+/**
+ * The account's own face, or an organization's, as something an <img> can show.
+ *
+ * A data address rather than the server's URL because the popup has no session
+ * to fetch it with - the worker asks with the connection's token, and hands the
+ * popup the picture itself. Null is "there is none", which draws initials;
+ * undefined is "could not find out", which keeps whatever was held.
+ */
+export async function fetchFace(
+    origin: string,
+    token: string,
+    orgId: string | null
+): Promise<string | null | undefined> {
+    const query = orgId ? `?org=${encodeURIComponent(orgId)}` : "";
+    const reply = await ask(url(origin, `avatar${query}`), {
+        method: "GET",
+        headers: { authorization: `Bearer ${token}` }
+    });
+    if (!reply) return undefined;
+    if (reply.status === 204) return null;
+    if (!reply.ok) return undefined;
+    const type = reply.headers.get("content-type") ?? "";
+    if (!type.startsWith("image/")) return null;
+    const bytes = new Uint8Array(await reply.arrayBuffer().catch(() => new ArrayBuffer(0)));
+    if (bytes.length === 0 || bytes.length > MAX_FACE_BYTES) return null;
+    return `data:${type.split(";")[0]};base64,${base64(bytes)}`;
 }
 
 /**
@@ -193,7 +262,8 @@ export async function checkLink(
     return {
         account,
         connectionName: typeof connection?.["name"] === "string" ? connection["name"] : "",
-        vault: can?.["vault"] === true
+        vault: can?.["vault"] === true,
+        organizations: readOrganizations(body["organizations"])
     };
 }
 

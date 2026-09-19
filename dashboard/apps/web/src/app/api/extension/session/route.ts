@@ -15,24 +15,16 @@
 import { prisma } from "@polaris/db";
 import { userHasPermission } from "@polaris/auth";
 import { clientHost, clientIp, clientUserAgent } from "@/lib/request-context";
-import { readExtensionToken, revokeExtensionToken } from "@/lib/extension/sessions";
+import { scopeChoices } from "@/lib/workspace-scope";
+import { bearerToken, readExtensionToken, revokeExtensionToken } from "@/lib/extension/sessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** The bearer token on a request, or null. */
-function bearer(request: Request): string | null {
-    const header = request.headers.get("authorization");
-    if (!header) return null;
-    const [scheme, value] = header.split(" ");
-    if (!scheme || scheme.toLowerCase() !== "bearer" || !value) return null;
-    return value.trim() || null;
-}
-
 const gone = () => Response.json({ error: "connection-ended" }, { status: 401 });
 
 export async function GET(request: Request): Promise<Response> {
-    const principal = await readExtensionToken(bearer(request), {
+    const principal = await readExtensionToken(bearerToken(request), {
         ip: (await clientIp()) ?? null,
         userAgent: (await clientUserAgent()) ?? null,
         host: (await clientHost()) ?? null
@@ -48,15 +40,33 @@ export async function GET(request: Request): Promise<Response> {
     // What this account may do, so the extension offers a vault only where there
     // is one to offer rather than leading somebody to a refusal.
     const vault = await userHasPermission(principal.userId, "vault.use");
+
+    // The organizations it may switch between, as the header switcher in the
+    // dashboard offers them - with the vault each one holds, so the extension can
+    // narrow its list to one organization's logins the way the dashboard's shelf
+    // narrows the vault screen. At most one vault per organization.
+    const organizations = await scopeChoices(principal.userId);
+    const vaults = organizations.length
+        ? await prisma.vaultOrganization.findMany({
+              where: { organizationId: { in: organizations.map((org) => org.id) } },
+              select: { id: true, organizationId: true }
+          })
+        : [];
     return Response.json({
         connection: { id: principal.id, name: principal.name },
         account: { id: account.id, name: account.name ?? "", email: account.email },
+        organizations: organizations.map((org) => ({
+            id: org.id,
+            name: org.name,
+            slug: org.slug,
+            vaultId: vaults.find((one) => one.organizationId === org.id)?.id ?? null
+        })),
         can: { vault }
     });
 }
 
 export async function DELETE(request: Request): Promise<Response> {
-    const token = bearer(request);
+    const token = bearerToken(request);
     if (!token) return gone();
     await revokeExtensionToken(token);
     // Ended either way: a token nothing recognises is a connection that is

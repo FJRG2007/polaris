@@ -10,7 +10,14 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { checkLink, claimLink, endLink, openLink } from "../src/lib/link";
+import {
+    checkLink,
+    claimLink,
+    endLink,
+    fetchFace,
+    openLink,
+    readOrganizations
+} from "../src/lib/link";
 
 const ORIGIN = "https://polaris.example";
 
@@ -146,8 +153,29 @@ describe("asking whether the connection still stands", () => {
         expect(state).toEqual({
             account: { id: "u1", name: "Ada", email: "ada@example.com" },
             connectionName: "Chrome on Windows",
-            vault: true
+            vault: true,
+            organizations: []
         });
+    });
+
+    it("reads the organizations the account can switch to, with their vaults", async () => {
+        answering(200, {
+            connection: { id: "c1", name: "Chrome on Windows" },
+            account: { id: "u1", name: "Ada", email: "ada@example.com" },
+            organizations: [
+                { id: "o1", name: "Acme", slug: "acme", vaultId: "v1" },
+                { id: "o2", name: "Empty", slug: "empty", vaultId: null },
+                { name: "No id" }
+            ],
+            can: { vault: true }
+        });
+
+        const state = await checkLink(ORIGIN, "connection-token");
+
+        expect(state !== null && state !== "ended" ? state.organizations : null).toEqual([
+            { id: "o1", name: "Acme", vaultId: "v1" },
+            { id: "o2", name: "Empty", vaultId: null }
+        ]);
     });
 
     it("says the connection has ended when the server refuses the token", async () => {
@@ -186,5 +214,59 @@ describe("ending it from this side", () => {
     it("does not throw at a server that is not there", async () => {
         unreachable();
         await expect(endLink(ORIGIN, "connection-token")).resolves.toBeUndefined();
+    });
+});
+
+describe("organizations from an older server", () => {
+    it("are none rather than a failure", () => {
+        expect(readOrganizations(undefined)).toEqual([]);
+        expect(readOrganizations("nope")).toEqual([]);
+    });
+});
+
+describe("a face", () => {
+    function picture(status: number, type: string, bytes: number[]): void {
+        vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+            const headers = (init?.headers ?? {}) as Record<string, string>;
+            asked.push({
+                url: String(url),
+                method: init?.method ?? "GET",
+                body: "",
+                auth: headers["authorization"] ?? null
+            });
+            return {
+                ok: status >= 200 && status < 300,
+                status,
+                headers: new Headers({ "content-type": type }),
+                arrayBuffer: async () => new Uint8Array(bytes).buffer
+            } as unknown as Response;
+        });
+    }
+
+    it("comes back as an image address, asked for with the token", async () => {
+        picture(200, "image/png", [1, 2, 3]);
+        expect(await fetchFace(ORIGIN, "connection-token", null)).toBe(
+            "data:image/png;base64,AQID"
+        );
+        expect(asked[0]?.url).toBe(`${ORIGIN}/api/extension/avatar`);
+        expect(asked[0]?.auth).toBe("Bearer connection-token");
+    });
+
+    it("asks for an organization's mark by its id", async () => {
+        picture(200, "image/webp", [1]);
+        await fetchFace(ORIGIN, "connection-token", "org 1");
+        expect(asked[0]?.url).toBe(`${ORIGIN}/api/extension/avatar?org=org%201`);
+    });
+
+    it("is none when there is no picture, and unknown when nobody answered", async () => {
+        picture(204, "", []);
+        expect(await fetchFace(ORIGIN, "t", null)).toBeNull();
+        unreachable();
+        expect(await fetchFace(ORIGIN, "t", null)).toBeUndefined();
+    });
+
+    it("refuses anything that is not a picture", async () => {
+        picture(200, "text/html", [60]);
+        expect(await fetchFace(ORIGIN, "t", null)).toBeNull();
     });
 });

@@ -101,6 +101,15 @@ export interface ExtensionPrincipal {
     readonly name: string;
 }
 
+/** The bearer token on a request from the extension, or null. */
+export function bearerToken(request: Request): string | null {
+    const header = request.headers.get("authorization");
+    if (!header) return null;
+    const [scheme, value] = header.split(" ");
+    if (!scheme || scheme.toLowerCase() !== "bearer" || !value) return null;
+    return value.trim() || null;
+}
+
 /** Whether a thrown Prisma error is a unique-constraint violation (P2002) - here,
  *  a short code another opener wrote first. */
 function isUniqueViolation(caught: unknown): boolean {

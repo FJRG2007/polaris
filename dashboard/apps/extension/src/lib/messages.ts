@@ -96,11 +96,29 @@ export interface VaultStatus {
     readonly accounts: readonly AccountRef[];
     /** Which of them is in front, or null while none is. */
     readonly activeId: string | null;
+    /** The organizations the connected account can switch to, as the dashboard's
+     *  header offers them. Empty for an account in none. */
+    readonly organizations: readonly ShelfChoice[];
+    /** The organization whose shelf is open, or null for the account's own. */
+    readonly shelf: string | null;
+    /** The connected account's face as an image address, or null to draw its
+     *  initials. */
+    readonly face: string | null;
+}
+
+/** One organization in the switcher, with its mark when it has one. */
+export interface ShelfChoice {
+    readonly id: string;
+    readonly name: string;
+    readonly face: string | null;
 }
 
 /** The person this extension is signed in as, as little of them as the popup
  *  needs to say so. */
 export interface ExtensionAccount {
+    /** The account's id, which is what its initials are coloured by - the same
+     *  colour the dashboard gives it. Absent until the server has been asked. */
+    readonly id?: string | null;
     readonly name: string | null;
     readonly email: string | null;
 }
@@ -233,7 +251,9 @@ export type Request =
      * Refused while an account is signed in, since that would leave a session with
      * no address to reach its own server at.
      */
-    | { readonly kind: "forgetServer" };
+    | { readonly kind: "forgetServer" }
+    /** Open an organization's shelf, or the account's own with null. */
+    | { readonly kind: "setShelf"; readonly orgId: string | null };
 
 export type Reply =
     | { readonly ok: true; readonly status: VaultStatus }
