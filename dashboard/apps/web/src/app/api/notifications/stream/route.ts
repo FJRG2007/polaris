@@ -23,6 +23,7 @@ import {
     openLiveClient,
     touchLiveClient
 } from "@/lib/notifications/live-clients";
+import { openShelfFor } from "@/lib/workspace-scope";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +57,11 @@ export async function GET(request: Request): Promise<Response> {
     const declared = clientSchema.safeParse(asked.get("client"));
     const kind = declared.success ? declared.data : null;
     const rings = soundSchema.parse(asked.get("sound")) === "on";
+    // The shelf open when the connection was made, from the switch's own cookie
+    // and checked against the roster like every other read of it - never from
+    // the address, which only names the shelf so that switching opens a new
+    // connection rather than reusing this one. See `stream-path`.
+    const shelf = await openShelfFor(userId);
     // Names this connection and nothing else. Minted here rather than taken from
     // the client, so nothing can claim to be somebody else's connection.
     const connection = randomUUID();
@@ -83,7 +89,7 @@ export async function GET(request: Request): Promise<Response> {
                 let payload: string;
                 try {
                     payload = JSON.stringify({
-                        items: await listNotifications(userId, NOTIFICATION_FEED_LIMIT),
+                        items: await listNotifications(userId, shelf, NOTIFICATION_FEED_LIMIT),
                         // Whether this connection is the one to make the sound. It
                         // rides the frame rather than being asked for separately
                         // because it can change while a connection is open - the

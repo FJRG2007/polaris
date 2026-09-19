@@ -31,9 +31,10 @@ import {
     useState,
     type ReactNode
 } from "react";
+import { useShelfSeed } from "@/components/shelf-scope";
 
 export interface MailUnread {
-    /** Unread messages across every mailbox in the merged views. */
+    /** Unread messages across the open shelf's mailboxes - the ones Mail lists. */
     readonly messages: number;
     /** How many mailboxes have any, for a screen that wants to say "in two of
      *  your mailboxes" rather than a bare number. */
@@ -195,7 +196,8 @@ export function MailUnreadProvider({
     children: ReactNode;
 }) {
     const scope = useSessionScope();
-    const [unread, setUnread] = useState(initial);
+    // The open shelf's count, taken again from the server's seed on a switch.
+    const [unread, setUnread] = useShelfSeed(initial);
     // Nothing is waiting, so neither is the notice that said how many were. The
     // named ones are withdrawn as each conversation is read; this is the one
     // that stood for the rest.

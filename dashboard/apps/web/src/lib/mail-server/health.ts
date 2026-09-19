@@ -223,7 +223,8 @@ export async function sweepMailServers(): Promise<{ checked: number; changed: nu
             level: up ? "success" : "warning",
             title: up ? `${server.hostname} is answering again` : `${server.hostname} stopped answering`,
             body: up ? null : (engine.note ?? "The mail server is not answering."),
-            href: `/apps/mail-server/${server.id}`
+            href: `/apps/mail-server/${server.id}`,
+            shelf: { orgId: server.orgId }
         });
     }
     return { checked: servers.length, changed };

@@ -12,9 +12,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** The rows the queries below read, per case. */
 let members: { channelId: string; lastReadAt: Date | null; muted: boolean; mutedUntil: Date | null }[] = [];
-let channels: { id: string }[] = [];
+let channels: { id: string; spaceId: string | null; orgId: string | null }[] = [];
+let spaces: { id: string; orgId: string | null }[] = [];
 let grouped: { channelId: string; _count: { _all: number } }[] = [];
 let sinceCounts: Record<string, number> = {};
+/** The chats the open shelf shows: the shared one unless a case says otherwise. */
+let shelfChats = new Set<string | null>([null]);
+
+vi.mock("@/lib/chat/isolation", () => ({
+    readableChatScopes: async () => shelfChats,
+    currentChatOrgId: async () => null,
+    orgChatPeople: async () => new Set()
+}));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -22,6 +31,10 @@ vi.mock("@polaris/db", () => ({
         userBlock: { findMany: async () => [] },
         chatChannelMember: { findMany: async () => members },
         chatChannel: { findMany: async () => channels },
+        chatSpace: {
+            findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
+                spaces.filter((space) => where.id.in.includes(space.id))
+        },
         chatMessage: {
             groupBy: async () => grouped,
             count: async ({ where }: { where: { channelId: string } }) => sinceCounts[where.channelId] ?? 0
@@ -36,11 +49,18 @@ function member(channelId: string, at: Date | null = null, mute?: { muted: boole
     return { channelId, lastReadAt: at, muted: mute?.muted ?? false, mutedUntil: mute?.mutedUntil ?? null };
 }
 
+/** A live conversation, in the shared chat unless it is filed elsewhere. */
+function room(id: string, filed: { spaceId?: string; orgId?: string } = {}) {
+    return { id, spaceId: filed.spaceId ?? null, orgId: filed.orgId ?? null };
+}
+
 beforeEach(() => {
     members = [];
     channels = [];
+    spaces = [];
     grouped = [];
     sinceCounts = {};
+    shelfChats = new Set([null]);
 });
 
 describe("what is waiting in Chat", () => {
@@ -50,7 +70,7 @@ describe("what is waiting in Chat", () => {
 
     it("adds up the conversations that have something in them", async () => {
         members = [member("a"), member("b"), member("c")];
-        channels = [{ id: "a" }, { id: "b" }, { id: "c" }];
+        channels = [room("a"), room("b"), room("c")];
         grouped = [
             { channelId: "a", _count: { _all: 3 } },
             { channelId: "b", _count: { _all: 2 } }
@@ -62,7 +82,7 @@ describe("what is waiting in Chat", () => {
     it("counts only what arrived after they last caught up", async () => {
         const read = new Date("2026-08-18T10:00:00Z");
         members = [member("a", read)];
-        channels = [{ id: "a" }];
+        channels = [room("a")];
         grouped = [{ channelId: "a", _count: { _all: 40 } }];
         sinceCounts = { a: 2 };
         expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 2, conversations: 1 });
@@ -71,7 +91,7 @@ describe("what is waiting in Chat", () => {
     it("says nothing about a muted conversation", async () => {
         // A mute is somebody asking not to be told, and a badge is being told.
         members = [member("a", null, { muted: true, mutedUntil: null })];
-        channels = [{ id: "a" }];
+        channels = [room("a")];
         grouped = [{ channelId: "a", _count: { _all: 9 } }];
         expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 0, conversations: 0 });
     });
@@ -80,7 +100,7 @@ describe("what is waiting in Chat", () => {
         // Nothing runs to clear the flag when the end passes, so it is worked
         // out rather than read - the same way the rail works it out.
         members = [member("a", null, { muted: true, mutedUntil: new Date("2020-01-01T00:00:00Z") })];
-        channels = [{ id: "a" }];
+        channels = [room("a")];
         grouped = [{ channelId: "a", _count: { _all: 4 } }];
         expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 4, conversations: 1 });
     });
@@ -88,11 +108,48 @@ describe("what is waiting in Chat", () => {
     it("leaves out an archived conversation", async () => {
         members = [member("a"), member("b")];
         // Only the live one comes back from the channel query.
-        channels = [{ id: "a" }];
+        channels = [room("a")];
         grouped = [
             { channelId: "a", _count: { _all: 1 } },
             { channelId: "b", _count: { _all: 50 } }
         ];
         expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 1, conversations: 1 });
+    });
+});
+
+describe("what is waiting in Chat, on the open shelf", () => {
+    it("leaves out an organization's own chat while somebody is on another shelf", async () => {
+        // The rail on the personal shelf does not list Acme's conversations,
+        // so the badge there must not count them either.
+        members = [member("mine"), member("acme")];
+        channels = [room("mine"), room("acme", { orgId: "acme" })];
+        grouped = [
+            { channelId: "mine", _count: { _all: 1 } },
+            { channelId: "acme", _count: { _all: 7 } }
+        ];
+        expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 1, conversations: 1 });
+    });
+
+    it("counts only that organization's chat on its own shelf", async () => {
+        shelfChats = new Set(["acme"]);
+        members = [member("mine"), member("acme")];
+        channels = [room("mine"), room("acme", { orgId: "acme" })];
+        grouped = [
+            { channelId: "mine", _count: { _all: 1 } },
+            { channelId: "acme", _count: { _all: 7 } }
+        ];
+        expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 7, conversations: 1 });
+    });
+
+    it("files a room in a space by the space, as the rail does", async () => {
+        shelfChats = new Set(["acme"]);
+        spaces = [{ id: "eng", orgId: "acme" }];
+        members = [member("general")];
+        channels = [room("general", { spaceId: "eng" })];
+        grouped = [{ channelId: "general", _count: { _all: 3 } }];
+        expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 3, conversations: 1 });
+
+        shelfChats = new Set([null]);
+        expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 0, conversations: 0 });
     });
 });

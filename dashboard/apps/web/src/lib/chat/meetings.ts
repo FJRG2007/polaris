@@ -31,6 +31,7 @@ import { publishChatChange, type CallState } from "./live";
 import { ChatAccessError, requireChannel, type ChatActor } from "./access";
 import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
+import { chatAlertShelf } from "./isolation";
 
 /** How many browsers one call holds.
  *
@@ -1196,7 +1197,14 @@ async function noteCallOutcome(meetingId: string): Promise<void> {
                 scheduledAt: true,
                 startedAt: true,
                 endedAt: true,
-                channel: { select: { kind: true, members: { select: { userId: true } } } }
+                channel: {
+                    select: {
+                        kind: true,
+                        orgId: true,
+                        space: { select: { orgId: true } },
+                        members: { select: { userId: true } }
+                    }
+                }
             }
         });
         // A room somebody put in the diary and sent an address for is not a
@@ -1253,6 +1261,7 @@ async function noteCallOutcome(meetingId: string): Promise<void> {
             select: { name: true }
         });
         const channelId = meeting.channelId;
+        const shelf = meeting.channel ? await chatAlertShelf(meeting.channel) : undefined;
         await Promise.all(
             missed.map((userId) =>
                 notify({
@@ -1260,7 +1269,8 @@ async function noteCallOutcome(meetingId: string): Promise<void> {
                     event: "chat.callMissed",
                     title: `Missed call from ${caller?.name || "somebody"}`,
                     body: "Nobody picked it up.",
-                    href: `/chat/c/${channelId}`
+                    href: `/chat/c/${channelId}`,
+                    shelf
                 }).catch(() => undefined)
             )
         );

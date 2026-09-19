@@ -37,9 +37,14 @@ let kind: string | null = null;
  * by all asking here and all reconnecting on `NOTIFICATION_SOUND_CHANGED`
  * together. Two spellings alive at once would be two connections, and only one of
  * them elected.
+ *
+ * The shelf is here because the feed is the open shelf's (see `lib/shelf`), and
+ * a connection is served the shelf that was open when it opened. Switching has
+ * to be a new address or the bell goes on counting the shelf just left. Every
+ * subscriber reads it from `useShelfScope`, so they still agree.
  */
-export function notificationStreamPath(): string {
+export function notificationStreamPath(shelf: string): string {
     kind ??= desktopBridge() ? "desktop" : "browser";
     const sound = notificationSoundEnabled() ? "on" : "off";
-    return `${STREAM_PATH}?client=${kind}&sound=${sound}`;
+    return `${STREAM_PATH}?client=${kind}&sound=${sound}&shelf=${encodeURIComponent(shelf)}`;
 }

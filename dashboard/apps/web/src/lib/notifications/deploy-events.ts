@@ -23,13 +23,16 @@ interface Deployable {
     href: string;
     /** The project it belongs to, so its own webhooks hear about it too. */
     projectId: string;
+    /** The organization that project belongs to, null for somebody's own: the
+     *  shelf Deploy lists it on, and so the shelf the alert is counted on. */
+    orgId: string | null;
 }
 
 async function describeDeployable(type: string, id: string): Promise<Deployable | null> {
     if (type === "application") {
         const app = await prisma.application.findUnique({
             where: { id },
-            select: { name: true, environment: { select: { project: { select: { id: true, name: true } } } } }
+            select: { name: true, environment: { select: { project: { select: { id: true, name: true, orgId: true } } } } }
         });
         if (!app) return null;
         const project = app.environment.project;
@@ -38,13 +41,14 @@ async function describeDeployable(type: string, id: string): Promise<Deployable 
         return {
             label: `${project.name} / ${app.name}`,
             href: `/apps/deploy/${project.id}?service=${id}`,
-            projectId: project.id
+            projectId: project.id,
+            orgId: project.orgId
         };
     }
     if (type === "database") {
         const database = await prisma.managedDatabase.findUnique({
             where: { id },
-            select: { name: true, environment: { select: { id: true, project: { select: { id: true, name: true } } } } }
+            select: { name: true, environment: { select: { id: true, project: { select: { id: true, name: true, orgId: true } } } } }
         });
         if (!database) return null;
         const project = database.environment.project;
@@ -53,7 +57,8 @@ async function describeDeployable(type: string, id: string): Promise<Deployable 
         return {
             label: `${project.name} / ${database.name}`,
             href: `/apps/deploy/${project.id}?env=${database.environment.id}`,
-            projectId: project.id
+            projectId: project.id,
+            orgId: project.orgId
         };
     }
     return null;
@@ -121,6 +126,7 @@ export async function notifyDeployFinished(input: {
                 title,
                 body,
                 href: deployable.href,
+                shelf: { orgId: deployable.orgId },
                 actionRequired: !input.ok,
                 metadata: {
                     deploymentId: input.deploymentId,

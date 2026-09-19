@@ -20,9 +20,10 @@
  * because it is a key as much as a fact, and a name can be changed.
  */
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { PERSONAL_SHELF } from "@/lib/shelf";
 
-const ShelfContext = createContext("personal");
+const ShelfContext = createContext(PERSONAL_SHELF);
 
 export function ShelfScopeProvider({ shelf, children }: { shelf: string; children: ReactNode }) {
     return <ShelfContext.Provider value={shelf}>{children}</ShelfContext.Provider>;
@@ -37,4 +38,27 @@ export function ShelfScopeProvider({ shelf, children }: { shelf: string; childre
  */
 export function useShelfScope(): string {
     return useContext(ShelfContext);
+}
+
+/**
+ * State seeded by the server for the open shelf, and seeded again on a switch.
+ *
+ * What the badges above every screen hold. `useState(initial)` reads its seed
+ * once, so the switch re-rendered the frame with the new shelf's count and the
+ * badge went on showing the old one until something happened to recount it -
+ * the number that says Mail has three waiting, over a shelf whose Mail has
+ * none. The seed and the shelf arrive in the same render, so taking the seed
+ * whenever the shelf moves is taking the right count, with no request.
+ */
+export function useShelfSeed<T>(initial: T): [T, Dispatch<SetStateAction<T>>] {
+    const shelf = useShelfScope();
+    const [value, setValue] = useState(initial);
+    const [seededFor, setSeededFor] = useState(shelf);
+    if (seededFor !== shelf) {
+        // Set during render rather than in an effect, so the frame that shows
+        // the new shelf never shows the old shelf's number beside it.
+        setSeededFor(shelf);
+        setValue(initial);
+    }
+    return [value, setValue];
 }

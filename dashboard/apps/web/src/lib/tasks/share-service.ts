@@ -23,6 +23,7 @@ import { generateToken } from "@polaris/core/tokens";
 import * as follow from "@/lib/follow/follow";
 import { notify } from "@/lib/notifications/dispatch";
 import { appBaseUrl, sharingBaseUrl } from "@/lib/domain-service";
+import { taskShelf } from "./shelf";
 
 /** A task's public link as its owner sees it. */
 export interface TaskShareView {
@@ -321,7 +322,8 @@ export async function sendTaskByEmail(
             event: "tasks.shared",
             title: `${sender.name} sent you ${reference}: ${task.name}`,
             body: input.note || null,
-            href: `/tasks/t/${input.taskId}`
+            href: `/tasks/t/${input.taskId}`,
+            shelf: await taskShelf(input.taskId)
         });
         sent.push(member.name);
     }

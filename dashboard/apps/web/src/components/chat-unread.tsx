@@ -19,10 +19,11 @@
  */
 
 import { z } from "zod";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from "react";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
 import { announceAppearance } from "@/components/profile-style-store";
+import { useShelfSeed } from "@/components/shelf-scope";
 
 export interface ChatUnread {
     readonly messages: number;
@@ -67,7 +68,8 @@ export function ChatUnreadProvider({
     children: ReactNode;
 }) {
     const scope = useSessionScope();
-    const [unread, setUnread] = useState(initial);
+    // The open shelf's count, taken again from the server's seed on a switch.
+    const [unread, setUnread] = useShelfSeed(initial);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const recount = useCallback(() => {

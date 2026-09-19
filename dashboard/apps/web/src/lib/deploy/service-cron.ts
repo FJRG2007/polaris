@@ -280,7 +280,7 @@ async function execute(runId: string): Promise<void> {
                     application: {
                         include: {
                             target: true,
-                            environment: { select: { project: { select: { id: true, name: true, slug: true, ownerId: true } } } }
+                            environment: { select: { project: { select: { id: true, name: true, slug: true, ownerId: true, orgId: true } } } }
                         }
                     }
                 }
@@ -365,6 +365,7 @@ async function execute(runId: string): Promise<void> {
             title: `Scheduled job failed: ${project.name} / ${app.name} / ${cron.name}`,
             body: error ?? "It did not finish.",
             href: `/apps/deploy/${project.id}?service=${app.id}`,
+            shelf: { orgId: project.orgId },
             actionRequired: true,
             metadata: { cronId: cron.id, runId, applicationId: app.id }
         }).catch(() => undefined);

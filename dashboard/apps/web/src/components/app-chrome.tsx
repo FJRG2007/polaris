@@ -42,7 +42,7 @@ import { UpdateIndicator } from "@/components/update-indicator";
 import { SessionScopeProvider } from "@/components/session-scope";
 import { ShelfScopeProvider } from "@/components/shelf-scope";
 import { NotificationBell } from "@/components/notification-bell";
-import { resolveScope, scopeChoices } from "@/lib/workspace-scope";
+import { openShelfFor, resolveScope, scopeChoices } from "@/lib/workspace-scope";
 import { RouteSkeletonCapture } from "@/components/route-skeleton";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { VisitRecorder } from "@/components/overview/visit-recorder";
@@ -51,12 +51,10 @@ import { TimeZoneReporter } from "@/components/time-zone-reporter";
 import { ServiceWorkerRegistration } from "@/components/installed-app";
 import { getReportedTimeZone, resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { PresenceReporter } from "@/components/notifications/presence-reporter";
-import { unreadTotal } from "@/lib/chat/chat-service";
 import { ChatUnreadProvider } from "@/components/chat-unread";
 import { MailUnreadProvider } from "@/components/mail-unread";
 import { adminWaiting as countAdminWaiting } from "@/lib/admin-waiting";
 import { AdminWaitingProvider, NO_ADMIN_WAITING } from "@/components/admin-waiting";
-import { EVERY_SHELF, unreadCounts } from "@/lib/mailbox/views";
 import { NotificationFavicon } from "@/components/notifications/notification-favicon";
 import { SoundVolumeSeed } from "@/components/sound-volume-seed";
 import { getSoundVolume } from "@/lib/notifications/sound-volume-service";
@@ -65,6 +63,8 @@ import { buildStamp } from "@/lib/build-stamp";
 import { NewBuildBanner } from "@/components/new-build-banner";
 import { SnapshotBuild } from "@/components/snapshot-build";
 import { NotificationsProvider } from "@/components/notifications/notifications-provider";
+import { shelfKey } from "@/lib/shelf";
+import { chatWaitingOnShelf, mailWaitingOnShelf, NO_CHAT_WAITING, NO_MAIL_WAITING } from "@/lib/shelf-counts";
 
 /**
  * The capability snapshot is handed to the client provider so features degrade
@@ -77,10 +77,6 @@ import { NotificationsProvider } from "@/components/notifications/notifications-
  * once for the whole shell, so a screen added anywhere turns up on their
  * Overview without doing anything.
  */
-/** Nothing waiting. Named so the two branches below cannot drift apart. */
-const NO_CHAT_UNREAD = { messages: 0, conversations: 0 };
-const NO_MAIL_UNREAD = { messages: 0, mailboxes: 0 };
-
 export async function AppChrome({ user, children }: { user: SessionUser; children: ReactNode }) {
     const capabilities = getCapabilities();
     const [
@@ -97,7 +93,8 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         status,
         soundVolume
     ] = await Promise.all([
-        listNotifications(user.id),
+        // The open shelf's, as the bell shows them - see `lib/shelf`.
+        openShelfFor(user.id).then((shelf) => listNotifications(user.id, shelf)),
         resolveDisplayPreferencesFor(user.id),
         // What this account's browser last said. Read beside the preferences
         // it resolves - the same memoized row - so the reporter below stays
@@ -119,20 +116,16 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
     // page - which reads as a message that has just arrived when it has been
     // waiting since yesterday. Only for somebody who has Chat: the count is
     // zero for everybody else and asking would be a query per page load.
+    // Both for the open shelf, as the apps list it - see `shelf-counts`.
     const chatUnread = apps.ids.includes("chat")
-        ? await unreadTotal({ id: user.id }).catch(() => NO_CHAT_UNREAD)
-        : NO_CHAT_UNREAD;
+        ? await chatWaitingOnShelf(user.id).catch(() => NO_CHAT_WAITING)
+        : NO_CHAT_WAITING;
 
     // The same, for mail. A person who spends the day in Deploy is told a
     // message arrived by the same badge that tells them about a chat.
     const mailUnread = apps.ids.includes("mail")
-        ? await unreadCounts(user.id, EVERY_SHELF)
-              .then((counts) => ({
-                  messages: counts.total,
-                  mailboxes: Object.values(counts.byAccount).filter((one) => one > 0).length
-              }))
-              .catch(() => NO_MAIL_UNREAD)
-        : NO_MAIL_UNREAD;
+        ? await mailWaitingOnShelf(user.id).catch(() => NO_MAIL_WAITING)
+        : NO_MAIL_WAITING;
 
     // And the same for Management. Only for an administrator: nobody else can
     // act on any of it, so for everybody else the honest count is nothing and
@@ -156,7 +149,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                 {/* Which shelf is open, as a value every screen that fetches its
                     own data can depend on. Without it the switch changed what
                     the server rendered and nothing else - see `shelf-scope`. */}
-                <ShelfScopeProvider shelf={scope.org?.id ?? "personal"}>
+                <ShelfScopeProvider shelf={shelfKey(scope.org?.id ?? null)}>
                 <DisplayFormatProvider preferences={display}>
                     <SessionScopeProvider userId={user.id}>
                         <ChatUnreadProvider

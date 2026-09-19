@@ -10,6 +10,7 @@
 
 import { prisma } from "@polaris/db";
 import type { NotificationLevel } from "@polaris/core";
+import { shelfFilter } from "@/lib/shelf";
 
 export type { NotificationLevel };
 
@@ -31,6 +32,12 @@ export interface NotificationInput {
     audienceLabel?: string | null;
     actionRequired?: boolean;
     metadata?: Record<string, unknown> | null;
+    /**
+     * The shelf the alert is filed under: `personal`, an organization's id, or
+     * null (the default) for one about the account, shown on every shelf. The
+     * dispatcher works this out for the recipient - see `recipientShelf`.
+     */
+    shelf?: string | null;
     /**
      * Write it already read. For an alert about something the recipient is
      * demonstrably looking at: it belongs in the history, but there is nothing
@@ -160,6 +167,7 @@ export async function createNotification(input: NotificationInput): Promise<void
                 audienceLabel: input.audienceLabel ?? null,
                 actionRequired: input.actionRequired ?? false,
                 metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+                shelf: input.shelf ?? null,
                 readAt: input.read ? new Date() : null
             }
         });
@@ -172,10 +180,20 @@ export async function createNotification(input: NotificationInput): Promise<void
  *  so there is a single list to keep in sync rather than two. */
 export const NOTIFICATION_FEED_LIMIT = 50;
 
-/** A user's notifications, newest first. */
-export async function listNotifications(userId: string, limit = NOTIFICATION_FEED_LIMIT): Promise<NotificationView[]> {
+/**
+ * A user's notifications on the open shelf, newest first.
+ *
+ * The shelf is required rather than defaulted, for the reason Mail's listings
+ * take it: a feed that forgot it looks like a feed that works, and it is the
+ * bell counting a company's alerts for somebody looking at their own shelf.
+ */
+export async function listNotifications(
+    userId: string,
+    shelf: string,
+    limit = NOTIFICATION_FEED_LIMIT
+): Promise<NotificationView[]> {
     const rows = await prisma.notification.findMany({
-        where: { userId },
+        where: { userId, ...shelfFilter(shelf) },
         orderBy: { createdAt: "desc" },
         take: limit,
         select: ROW_FIELDS
@@ -201,11 +219,13 @@ export interface NotificationPage {
  */
 export async function listNotificationHistory(
     userId: string,
+    shelf: string,
     options: { before?: string | null; event?: string | null; unreadOnly?: boolean } = {}
 ): Promise<NotificationPage> {
     const rows = await prisma.notification.findMany({
         where: {
             userId,
+            ...shelfFilter(shelf),
             ...(options.before ? { createdAt: { lt: new Date(options.before) } } : {}),
             ...(options.event ? { type: options.event } : {}),
             ...(options.unreadOnly ? { readAt: null } : {})
@@ -269,9 +289,13 @@ export async function markNotificationRead(userId: string, id: string): Promise<
     await prisma.notification.updateMany({ where: { id, userId, readAt: null }, data: { readAt: new Date() } });
 }
 
-/** Mark every unread notification read for a user. */
-export async function markAllNotificationsRead(userId: string): Promise<void> {
-    await prisma.notification.updateMany({ where: { userId, readAt: null }, data: { readAt: new Date() } });
+/** Mark every unread notification on the open shelf read - the ones the bell
+ *  is showing, and not a company's that nobody on this shelf has looked at. */
+export async function markAllNotificationsRead(userId: string, shelf: string): Promise<void> {
+    await prisma.notification.updateMany({
+        where: { userId, readAt: null, ...shelfFilter(shelf) },
+        data: { readAt: new Date() }
+    });
 }
 
 /**
@@ -321,7 +345,8 @@ export async function deleteNotification(userId: string, id: string): Promise<vo
     await prisma.notification.deleteMany({ where: { id, userId } });
 }
 
-/** Delete all of a user's notifications. */
-export async function clearNotifications(userId: string): Promise<void> {
-    await prisma.notification.deleteMany({ where: { userId } });
+/** Delete every notification on the open shelf, for the same reason reading
+ *  them all stops there. */
+export async function clearNotifications(userId: string, shelf: string): Promise<void> {
+    await prisma.notification.deleteMany({ where: { userId, ...shelfFilter(shelf) } });
 }

@@ -67,6 +67,25 @@ export async function currentChatOrgId(userId: string): Promise<string | null> {
 }
 
 /**
+ * The shelf an alert about a conversation is counted on.
+ *
+ * Only an organization keeping its own chat puts its conversations on one
+ * shelf: that is the only chat the rail shows there, and nowhere else shows it.
+ * Everything else - the shared chat, and what an organization filed while it
+ * kept its own and no longer does - is listed on every shelf, so an alert about
+ * it is about the account and goes on every shelf's bell. See `lib/shelf`.
+ *
+ * `channel` is filed by its space when it has one, as `readableChatScopes` reads it.
+ */
+export async function chatAlertShelf(channel: {
+    readonly orgId: string | null;
+    readonly space: { readonly orgId: string | null } | null;
+}): Promise<{ orgId: string } | undefined> {
+    const orgId = channel.space ? channel.space.orgId : channel.orgId;
+    return orgId && (await orgChatIsolated(orgId)) ? { orgId } : undefined;
+}
+
+/**
  * Which chats this reader's rail may show at once.
  *
  * On an organization's own chat, that one and nothing else - which is the whole

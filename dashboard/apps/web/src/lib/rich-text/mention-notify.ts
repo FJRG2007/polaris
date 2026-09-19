@@ -16,6 +16,7 @@ import { prisma, VISIBLE_USER } from "@polaris/db";
 import * as access from "@/lib/tasks/access";
 import { notify } from "@/lib/notifications/dispatch";
 import { extractReferences } from "@/components/rich-text/markdown";
+import { spaceShelf } from "@/lib/tasks/shelf";
 
 export interface MentionNotice {
     /** The Markdown that was just stored. */
@@ -67,13 +68,15 @@ export async function notifyMentions(input: MentionNotice): Promise<void> {
         if (recipients.size === 0) return;
 
         const allowed = await reachable([...recipients].slice(0, MAX_RECIPIENTS), input.spaceId);
+        const shelf = allowed.length > 0 ? await spaceShelf(input.spaceId) : undefined;
         for (const userId of allowed) {
             await notify({
                 userId,
                 event: "tasks.mentioned",
                 title: input.title,
                 body: "You were mentioned.",
-                href: input.href
+                href: input.href,
+                shelf
             });
         }
     } catch (caught) {

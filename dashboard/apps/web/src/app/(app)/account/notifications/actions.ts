@@ -34,6 +34,7 @@ import {
     markNotificationsRead,
     type NotificationPage
 } from "@/lib/notification-service";
+import { openShelfFor } from "@/lib/workspace-scope";
 
 /** How many test alerts one account may send, and over what span. */
 const TEST_LIMIT = 10;
@@ -44,9 +45,10 @@ export async function markNotificationReadAction(id: string): Promise<void> {
     await markNotificationRead(user.id, id);
 }
 
+/** Every one on the open shelf: the ones the bell shows. See `lib/shelf`. */
 export async function markAllNotificationsReadAction(): Promise<void> {
     const user = await requireUser();
-    await markAllNotificationsRead(user.id);
+    await markAllNotificationsRead(user.id, await openShelfFor(user.id));
 }
 
 export async function deleteNotificationAction(id: string): Promise<void> {
@@ -56,7 +58,7 @@ export async function deleteNotificationAction(id: string): Promise<void> {
 
 export async function clearNotificationsAction(): Promise<void> {
     const user = await requireUser();
-    await clearNotifications(user.id);
+    await clearNotifications(user.id, await openShelfFor(user.id));
 }
 
 /**
@@ -93,7 +95,7 @@ export async function loadNotificationHistoryAction(input: unknown): Promise<Not
     const user = await requireUser();
     const parsed = historyQuerySchema.safeParse(input);
     if (!parsed.success) return { items: [], cursor: null };
-    return listNotificationHistory(user.id, {
+    return listNotificationHistory(user.id, await openShelfFor(user.id), {
         before: parsed.data.before ?? null,
         event: parsed.data.event ?? null,
         unreadOnly: parsed.data.unreadOnly ?? false

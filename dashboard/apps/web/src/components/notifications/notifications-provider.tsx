@@ -44,6 +44,7 @@ import {
     markNotificationReadAction,
     markNotificationsReadAction
 } from "@/app/(app)/account/notifications/actions";
+import { useShelfScope, useShelfSeed } from "@/components/shelf-scope";
 
 export interface NotificationFeed {
     items: NotificationView[];
@@ -68,7 +69,12 @@ export function useNotificationFeed(): NotificationFeed {
 
 export function NotificationsProvider({ initial, children }: { initial: NotificationView[]; children: ReactNode }) {
     const scope = useSessionScope();
-    const [items, setItems] = useState(initial);
+    // The feed is the open shelf's: an alert about a company's work is on that
+    // company's shelf and nowhere else, and one about the account is on all of
+    // them. See `lib/shelf`. The server seeds it for the shelf it rendered, and
+    // a switch re-seeds it rather than keeping the shelf just left.
+    const shelf = useShelfScope();
+    const [items, setItems] = useShelfSeed(initial);
     // A snapshot the server took before an in-flight mutation landed would undo
     // the optimistic update, so stream frames are ignored while one is running -
     // whether it is running here or in another tab of this device.
@@ -78,9 +84,18 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
     // What this tab has already shown. Seeded from the first paint so the alerts
     // that were waiting when the page opened do not all chime at once.
     const seen = useRef(new Set(initial.map((row) => row.id)));
+    // The same after a switch: the alerts waiting on the shelf just opened were
+    // already there, and the first frame of its stream must not chime for them.
+    useEffect(() => {
+        for (const row of initial) seen.current.add(row.id);
+        // Only on a switch - `initial` is a new array on every server render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [shelf]);
 
     useEffect(() => {
-        const channel = openPeerChannel<FeedMessage>(FEED_CHANNEL, scope, (message) => {
+        // Per shelf, like the feed: "read them all" in a tab on one shelf is
+        // not a write to the rows another tab is showing for a different one.
+        const channel = openPeerChannel<FeedMessage>(`${FEED_CHANNEL}:${shelf}`, scope, (message) => {
             const parsed = feedMessageSchema.safeParse(message);
             if (!parsed.success) return;
             if (parsed.data.kind === "end") {
@@ -96,7 +111,7 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
             peers.current = null;
             channel.close();
         };
-    }, [scope]);
+    }, [scope, shelf]);
 
     /**
      * Bumped when the sound switch moves, which reconnects the stream below.
@@ -117,7 +132,7 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
 
     useEffect(
         () =>
-            subscribeSharedStream(notificationStreamPath(), scope, ({ data }) => {
+            subscribeSharedStream(notificationStreamPath(shelf), scope, ({ data }) => {
                 if (inFlight.current > 0 || Date.now() < peerWriteUntil.current) return;
                 try {
                     const payload = JSON.parse(data) as {
@@ -171,7 +186,7 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
                     // A malformed frame is not worth recovering from; the next tick resends the state.
                 }
             }),
-        [scope, soundChanged]
+        [scope, shelf, soundChanged]
     );
 
     /** Apply a change here and in the other tabs, run it on the server, and

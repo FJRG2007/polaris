@@ -24,6 +24,8 @@ interface DomainContext {
     label: string;
     href: string;
     projectId: string;
+    /** The project's organization, null for somebody's own - its shelf. */
+    orgId: string | null;
     recipients: string[];
 }
 
@@ -139,7 +141,7 @@ async function describeDomains(
                     id: true,
                     name: true,
                     environment: {
-                        select: { project: { select: { id: true, name: true, ownerId: true } } }
+                        select: { project: { select: { id: true, name: true, ownerId: true, orgId: true } } }
                     }
                 }
             }
@@ -163,6 +165,7 @@ async function describeDomains(
             label: `${domain.hostname} (${project.name} / ${app.name})`,
             href: `/apps/deploy/${project.id}?service=${app.id}`,
             projectId: project.id,
+            orgId: project.orgId,
             recipients: recipients.get(project.id) ?? [project.ownerId]
         });
     }
@@ -196,6 +199,7 @@ export async function notifyDomainHealthChanged(input: DomainHealthChange): Prom
                 title,
                 body,
                 href: context.href,
+                shelf: { orgId: context.orgId },
                 actionRequired: down,
                 metadata: { domainId: input.domainId, status: input.status }
             });
@@ -255,7 +259,12 @@ export async function notifyDomainHealthChanges(
     try {
         const contexts = await describeDomains(changes.map((change) => change.domainId));
 
-        const perUser = new Map<string, { up: Moved[]; down: Moved[] }>();
+        // Per person and per shelf: one person's services on two shelves are two
+        // alerts, each counted on the shelf whose Deploy lists those services.
+        const perUser = new Map<
+            string,
+            { userId: string; orgId: string | null; up: Moved[]; down: Moved[] }
+        >();
         const perProject = new Map<string, { up: Moved[]; down: Moved[] }>();
         for (const change of changes) {
             const context = contexts.get(change.domainId);
@@ -263,9 +272,10 @@ export async function notifyDomainHealthChanges(
             const moved: Moved = { domainId: change.domainId, context, detail: change.detail };
             const where = change.status === "down" ? "down" : "up";
             for (const userId of context.recipients) {
-                const held = perUser.get(userId) ?? { up: [], down: [] };
+                const key = `${userId}:${context.orgId ?? ""}`;
+                const held = perUser.get(key) ?? { userId, orgId: context.orgId, up: [], down: [] };
                 held[where].push(moved);
-                perUser.set(userId, held);
+                perUser.set(key, held);
             }
             const held = perProject.get(context.projectId) ?? { up: [], down: [] };
             held[where].push(moved);
@@ -274,7 +284,7 @@ export async function notifyDomainHealthChanges(
 
         // Down first: a pass that took some things down and brought others back
         // says each once, and the one that needs somebody is the one read first.
-        for (const [userId, held] of perUser) {
+        for (const { userId, orgId, ...held } of perUser.values()) {
             for (const status of ["down", "up"] as const) {
                 const bucket = held[status];
                 if (bucket.length === 0) continue;
@@ -290,6 +300,7 @@ export async function notifyDomainHealthChanges(
                     title,
                     body,
                     href: one?.context.href ?? SWEEP_HREF,
+                    shelf: { orgId },
                     actionRequired: status === "down",
                     metadata: one
                         ? { domainId: one.domainId, status }

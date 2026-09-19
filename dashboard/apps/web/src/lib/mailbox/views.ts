@@ -664,27 +664,24 @@ export async function readThreadView(
     };
 }
 
-/** Every shelf at once, for the badges outside Mail: a message arriving in a
- *  company mailbox is one somebody wants to be told about whichever shelf they
- *  happen to be looking at. Named so that asking for it is a decision. */
-export const EVERY_SHELF = "every" as const;
-
 /**
  * How many unread messages are waiting, per mailbox and in total, for the badge
  * on the app switcher and the number beside each account.
  *
  * The shelf has to be written down. Mail's own rail asks for the one it is
  * drawing, or its total counts mailboxes that are not on the screen and quietly
- * disagrees with the numbers beside them.
+ * disagrees with the numbers beside them. The badge outside Mail asks for the
+ * open shelf too (`shelf-counts`): it used to be able to ask for every shelf at
+ * once, and counted mail that opening Mail on the shelf in view never showed.
  */
 export async function unreadCounts(
     userId: string,
-    shelfOrgId: string | null | typeof EVERY_SHELF
+    shelfOrgId: string | null
 ): Promise<{ total: number; byAccount: Record<string, number> }> {
     const rows = await prisma.mailMessage.groupBy({
         by: ["accountId"],
         where: {
-            account: { userId, ...(shelfOrgId === EVERY_SHELF ? {} : { orgId: shelfOrgId }) },
+            account: { userId, orgId: shelfOrgId },
             folder: { role: "inbox" },
             seen: false,
             OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }]

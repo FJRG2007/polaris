@@ -45,7 +45,7 @@ export async function recordCredentialRefusal(accountId: string, detail: string)
 
     const account = await prisma.mailAccount.findUnique({
         where: { id: accountId },
-        select: { userId: true, address: true, auth: true }
+        select: { userId: true, address: true, auth: true, orgId: true }
     });
     if (!account) return;
     const authorized = account.auth === "oauth";
@@ -65,6 +65,8 @@ export async function recordCredentialRefusal(accountId: string, detail: string)
                 ? "Its authorization was refused or withdrawn, so Polaris paused checking it. Reconnect it in Mail to start again."
                 : "If you changed it recently, update it in Mail. Polaris paused checking this mailbox so the server does not lock it for repeated failed sign-ins.",
             href: refusedMailboxHref(accountId),
+            // The shelf Mail lists this mailbox on.
+            shelf: { orgId: account.orgId },
             actionRequired: true,
             metadata: { accountId }
         });

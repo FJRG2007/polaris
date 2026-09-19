@@ -36,6 +36,7 @@ import {
     useState,
     type ReactNode
 } from "react";
+import { useShelfScope } from "@/components/shelf-scope";
 
 export interface AdminWaiting {
     readonly reports: number;
@@ -84,6 +85,9 @@ export function AdminWaitingProvider({
     children: ReactNode;
 }) {
     const scope = useSessionScope();
+    // Not what this counts - the queue is the instance's, on every shelf - but
+    // part of the address it shares with the bell. See `notifications/stream-path`.
+    const shelf = useShelfScope();
     const [waiting, setWaiting] = useState(initial);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -124,7 +128,7 @@ export function AdminWaitingProvider({
         // connection per device: `subscribeSharedStream` shares by the path it is
         // given, so a second spelling would be a second stream - and only one of
         // the two is the one the server elects to chime.
-        const stop = subscribeSharedStream(notificationStreamPath(), scope, () => {
+        const stop = subscribeSharedStream(notificationStreamPath(shelf), scope, () => {
             // Every frame, without reading it. What arrives on this stream is a
             // notification for this account, and the cheap recount below is a
             // better answer than teaching this component the vocabulary of every
@@ -140,7 +144,7 @@ export function AdminWaitingProvider({
             clearInterval(sweep);
             stop();
         };
-    }, [enabled, scope, recount, soundChanged]);
+    }, [enabled, scope, shelf, recount, soundChanged]);
 
     return <WaitingContext.Provider value={waiting}>{children}</WaitingContext.Provider>;
 }

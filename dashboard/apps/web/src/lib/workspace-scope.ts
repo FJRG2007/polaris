@@ -23,6 +23,7 @@ import { cache } from "react";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { cookies } from "next/headers";
+import { PERSONAL_SHELF, shelfKey } from "@/lib/shelf";
 
 /** The cookie the switch writes. Not http-only: the switcher reads it to draw
  *  itself, and it carries no secret - the id it names is checked server-side on
@@ -107,4 +108,33 @@ export async function scopeChoices(userId: string): Promise<ScopeChoice[]> {
  *  What most callers actually want, since `orgId` is the column they filter. */
 export async function scopeOrgIdFor(userId: string): Promise<string | null> {
     return (await resolveScope(userId)).org?.id ?? null;
+}
+
+/** The open shelf as the string a notification row stores and the client's
+ *  `useShelfScope` returns: `personal`, or an organization's id. */
+export async function openShelfFor(userId: string): Promise<string> {
+    return shelfKey(await scopeOrgIdFor(userId));
+}
+
+/**
+ * The shelf to file an alert about work under, for the person receiving it.
+ *
+ * `undefined` is an alert about the account itself, filed under no shelf and so
+ * shown on every one. Otherwise the work's own shelf - with one exception: an
+ * organization this person cannot switch to. Somebody given a single space of a
+ * company they are not on the roster of has no shelf to open it from, and an
+ * alert filed there would be one they could never see; it is theirs, so it goes
+ * where every shelf shows it.
+ */
+export async function recipientShelf(
+    userId: string,
+    about: { readonly orgId: string | null } | undefined
+): Promise<string | null> {
+    if (!about) return null;
+    if (!about.orgId) return PERSONAL_SHELF;
+    const member = await prisma.organization.findFirst({
+        where: { id: about.orgId, OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
+        select: { id: true }
+    });
+    return member ? about.orgId : null;
 }

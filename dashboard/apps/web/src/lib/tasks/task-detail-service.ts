@@ -15,6 +15,7 @@ import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
 import { runAutomations } from "./automation-service";
 import { notifyMentions } from "@/lib/rich-text/mention-notify";
+import { spaceShelf } from "./shelf";
 
 // ---------------------------------------------------------------------------
 // Comments
@@ -57,13 +58,15 @@ export async function addComment(actorId: string, input: core.CommentInput): Pro
     // were already following the task.
     if (input.assignedToId && input.assignedToId !== actorId) recipients.add(input.assignedToId);
 
+    const shelf = await spaceShelf(task?.spaceId ?? null);
     for (const userId of recipients) {
         await notify({
             userId,
             event: "tasks.comment",
             title: task?.name ?? "A task",
             body: input.body.slice(0, 200),
-            href: `/tasks/t/${input.taskId}`
+            href: `/tasks/t/${input.taskId}`,
+            shelf
         });
     }
     // Being named in a comment reaches somebody who follows none of this. The
@@ -398,7 +401,7 @@ export async function dispatchDueReminders(now = new Date()): Promise<number> {
             note: true,
             taskId: true,
             remindAt: true,
-            task: { select: { name: true } }
+            task: { select: { name: true, space: { select: { orgId: true } } } }
         }
     });
 
@@ -412,7 +415,8 @@ export async function dispatchDueReminders(now = new Date()): Promise<number> {
                     event: "tasks.due",
                     title: reminder.task.name,
                     body: reminder.note || "The reminder you set on this task.",
-                    href: `/tasks/t/${reminder.taskId}`
+                    href: `/tasks/t/${reminder.taskId}`,
+                    shelf: { orgId: reminder.task.space.orgId }
                 });
                 sent += 1;
             } catch (error) {

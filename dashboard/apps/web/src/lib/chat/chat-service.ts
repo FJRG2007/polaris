@@ -614,6 +614,26 @@ async function spaceOrgIds(
     return new Map(spaces.map((space) => [space.id, space.orgId]));
 }
 
+/**
+ * The channels of these that the open shelf's chat shows.
+ *
+ * A room in a space is filed by its space, so its chat is the space's; anything
+ * else by its own organization. Shared by the rail and the badge, so the number
+ * on the app switcher is never a count of rooms opening Chat would not list.
+ */
+async function onOpenShelf<T extends { spaceId: string | null; orgId: string | null }>(
+    actor: ChatActor,
+    channels: readonly T[]
+): Promise<T[]> {
+    const [scopes, spaceOrgs] = await Promise.all([
+        readableChatScopes(actor.id),
+        spaceOrgIds(channels.map((channel) => channel.spaceId))
+    ]);
+    return channels.filter((channel) =>
+        scopes.has(channel.spaceId ? (spaceOrgs.get(channel.spaceId) ?? null) : channel.orgId)
+    );
+}
+
 export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]> {
     const spaces = await reachableSpaceIds(actor);
     const [memberships, administered] = await Promise.all([
@@ -668,13 +688,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
     // filed by its space, so its chat is the space's - and a space somebody is
     // in but can no longer reach still has to be answered for, which a query
     // over reachable spaces would not do.
-    const [scopes, spaceOrgs] = await Promise.all([
-        readableChatScopes(actor.id),
-        spaceOrgIds(found.map((channel) => channel.spaceId))
-    ]);
-    const channels = found.filter((channel) =>
-        scopes.has(channel.spaceId ? (spaceOrgs.get(channel.spaceId) ?? null) : channel.orgId)
-    );
+    const channels = await onOpenShelf(actor, found);
     if (channels.length === 0) return [];
 
     const unread = await unreadCounts(actor, channels, mine);
@@ -1692,10 +1706,15 @@ export async function unreadTotal(actor: ChatActor): Promise<ChatUnread> {
     const heard = memberships.filter((row) => !core.muteInForce(row));
     if (heard.length === 0) return { messages: 0, conversations: 0 };
 
-    const live = await prisma.chatChannel.findMany({
-        where: { id: { in: heard.map((row) => row.channelId) }, archived: false },
-        select: { id: true }
-    });
+    // The open shelf's chat only, as the rail lists it: an organization keeping
+    // its own chat is a count on its shelf, not on every shelf the reader has.
+    const live = await onOpenShelf(
+        actor,
+        await prisma.chatChannel.findMany({
+            where: { id: { in: heard.map((row) => row.channelId) }, archived: false },
+            select: { id: true, spaceId: true, orgId: true }
+        })
+    );
     if (live.length === 0) return { messages: 0, conversations: 0 };
 
     const counts = await unreadCounts(

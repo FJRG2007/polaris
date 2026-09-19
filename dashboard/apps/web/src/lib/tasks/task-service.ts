@@ -28,6 +28,7 @@ import { listCommits, type CommitLink } from "./commit-service";
 import { listAttachments, type AttachmentView } from "./attachment-service";
 import { hasAutomationsFor, runAutomations, runAutomationsFor } from "./automation-service";
 import { pushTaskStatus } from "./trackers/push";
+import { taskShelf } from "./shelf";
 
 // ---------------------------------------------------------------------------
 // Reading
@@ -695,14 +696,17 @@ async function announceAssignment(
     assigneeIds: readonly string[],
     actorId: string | null
 ): Promise<void> {
-    for (const userId of assigneeIds) {
-        if (userId === actorId) continue;
+    const recipients = assigneeIds.filter((userId) => userId !== actorId);
+    if (recipients.length === 0) return;
+    const shelf = await taskShelf(taskId);
+    for (const userId of recipients) {
         await notify({
             userId,
             event: "tasks.assigned",
             title: taskName,
             body: "You were assigned this task.",
-            href: `/tasks/t/${taskId}`
+            href: `/tasks/t/${taskId}`,
+            shelf
         });
     }
 }
@@ -1405,12 +1409,19 @@ async function announceHandover(
             await announceAssignment(first, names.get(first) ?? "A task", [userId], actorId);
             continue;
         }
+        // One shelf when every task is on it, which is every selection a
+        // shelf's own screens can make; the account when they are spread
+        // across several, since no one shelf shows all of them.
+        const shelves = await Promise.all(taskIds.map((taskId) => taskShelf(taskId)));
+        const lead = shelves[0];
+        const shared = shelves.every((one) => one && lead && one.orgId === lead.orgId);
         await notify({
             userId,
             event: "tasks.assigned",
             title: `${taskIds.length} tasks assigned to you`,
             body: "You were put on them in one change.",
-            href: "/tasks"
+            href: "/tasks",
+            shelf: shared ? lead : undefined
         });
     }
 }

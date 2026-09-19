@@ -36,6 +36,8 @@ import { onlineUserIds } from "@/lib/notifications/presence";
 import { createNotification } from "@/lib/notification-service";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { channelMentions } from "@/components/rich-text/markdown";
+import { chatAlertShelf } from "./isolation";
+import { recipientShelf } from "@/lib/workspace-scope";
 
 /**
  * Tell the room, if the message named it.
@@ -61,7 +63,15 @@ export async function announceRoomMention(
 
     const channel = await prisma.chatChannel.findUnique({
         where: { id: channelId },
-        select: { id: true, name: true, kind: true, spaceId: true, private: true }
+        select: {
+            id: true,
+            name: true,
+            kind: true,
+            spaceId: true,
+            private: true,
+            orgId: true,
+            space: { select: { orgId: true } }
+        }
     });
     // A one-to-one conversation has nobody in it who is not already being
     // written to.
@@ -86,6 +96,7 @@ export async function announceRoomMention(
         select: { name: true }
     });
     const authorName = author?.name ?? "Somebody";
+    const about = await chatAlertShelf(channel);
 
     await Promise.all(
         [...audience]
@@ -94,14 +105,15 @@ export async function announceRoomMention(
             .filter((userId) => !silenced.has(userId))
             .filter((userId) => !shut.has(userId))
             .filter((userId) => online === null || online.has(userId))
-            .map((userId) =>
+            .map(async (userId) =>
                 createNotification({
                     userId,
                     type: "chat.mention",
                     title: `${authorName} used ${label} in ${where}`,
                     body: plainExcerpt(body, 140),
                     href: `/chat/c/${channelId}/${messageId}`,
-                    level: "info"
+                    level: "info",
+                    shelf: await recipientShelf(userId, about).catch(() => null)
                 })
             )
     );

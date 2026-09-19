@@ -29,6 +29,7 @@ import {
     type NotificationRule,
     type WebhookFormat
 } from "@polaris/core";
+import { recipientShelf } from "@/lib/workspace-scope";
 
 /** One thing worth telling somebody about. */
 export interface NotifyInput {
@@ -45,6 +46,15 @@ export interface NotifyInput {
     audienceLabel?: string | null;
     actionRequired?: boolean;
     metadata?: Record<string, unknown> | null;
+    /**
+     * The shelf the work this is about sits on: the organization that owns the
+     * task, project or mailbox, or null for somebody's own. Left out for an
+     * alert about the account or the instance, which every shelf shows. Given,
+     * the bell counts it only while that shelf is open - so a company's deploy
+     * failing is not a number on somebody's personal shelf that opening Deploy
+     * there cannot explain.
+     */
+    shelf?: { readonly orgId: string | null };
 }
 
 /** Log one attempt. Best effort: a history row is never worth failing over. */
@@ -243,6 +253,7 @@ export async function notify(input: NotifyInput): Promise<void> {
             audienceLabel: input.audienceLabel,
             actionRequired: input.actionRequired,
             metadata: input.metadata,
+            shelf: await recipientShelf(input.userId, input.shelf).catch(() => null),
             read: watching
         });
         await record({

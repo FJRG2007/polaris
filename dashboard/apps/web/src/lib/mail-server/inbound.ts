@@ -101,6 +101,7 @@ async function fire(server: MailServer, rule: MailInboundRule, event: core.Inbou
         title: `${rule.name}: mail arrived at ${server.hostname}`,
         body,
         href: `/apps/mail-server/${server.id}?tab=rules`,
+        shelf: { orgId: server.orgId },
         metadata: { serverId: server.id, ruleId: rule.id }
     });
 }

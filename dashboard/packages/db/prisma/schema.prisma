@@ -3392,6 +3392,13 @@ model Notification {
     actionRequired Boolean   @default(false)
     // Stringified JSON metadata (connectionId, path, submissionId, ...).
     metadata       String?
+    // Which shelf of the header switch the alert is about: "personal", an
+    // organization's id, or null for one about the account itself (a sign-in,
+    // an invitation, the instance) which is shown on every shelf. Rows written
+    // before this existed are null, so nothing already on the bell disappears.
+    // No foreign key, like AuditLog.orgId: a row about an organization that is
+    // gone simply stops matching any shelf anybody can open.
+    shelf          String?
     readAt         DateTime?
     createdAt      DateTime  @default(now())
 

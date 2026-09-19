@@ -40,6 +40,7 @@ import {
     topologyRequest
 } from "@polaris/core";
 import { listOpenPullRequests, pullRequestIsOpen, type OpenPullRequest } from "../github-service";
+import { recipientShelf } from "../workspace-scope";
 
 /** What makes an environment a preview. */
 export interface PreviewOrigin {
@@ -388,6 +389,7 @@ async function projectsPreviewing(repo: string) {
         select: {
             id: true,
             ownerId: true,
+            orgId: true,
             flags: true,
             environments: {
                 where: { isDefault: true },
@@ -401,7 +403,9 @@ async function projectsPreviewing(repo: string) {
         const base = project.environments[0];
         if (!base) return [];
         const builds = base.applications.some((one) => repositoryOf(one.sourceConfig) === wanted);
-        return builds ? [{ projectId: project.id, ownerId: project.ownerId, baseEnvironmentId: base.id }] : [];
+        return builds
+            ? [{ projectId: project.id, ownerId: project.ownerId, orgId: project.orgId, baseEnvironmentId: base.id }]
+            : [];
     });
 }
 
@@ -475,6 +479,7 @@ export async function ensurePullRequestPreview(
                     title: `The preview of ${repo}#${pull.number} has no secrets`,
                     body: `Secrets are not copied into pull request previews, so it starts without ${keyList(environment.withheld)}. Set any it needs on the preview.`,
                     href: `/apps/deploy/${project.projectId}?env=${environment.id}`,
+                    shelf: await recipientShelf(project.ownerId, { orgId: project.orgId }),
                     level: "warning",
                     metadata: { environmentId: environment.id, pullRequest: pull.number, repo }
                 });
