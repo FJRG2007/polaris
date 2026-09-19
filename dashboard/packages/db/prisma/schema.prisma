@@ -10501,6 +10501,10 @@ model MailMessage {
     // The heaviest thing said against it, in the words the reader sees. Empty
     // for a message that arrived without objection, which is nearly all of them.
     spamReason     String    @default("")
+    // Everything else that was said against it, strongest first, for a message
+    // that was filed away and whose reader is entitled to the whole case rather
+    // than its headline. Empty for every message that arrived without objection.
+    spamReasons    String[]
     snoozedUntil   DateTime?
     // Where it came back to when the snooze ends.
     snoozeFolderId String?   @db.Uuid

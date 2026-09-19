@@ -274,7 +274,11 @@ export async function judgeArrival(
 
         await prisma.mailMessage.update({
             where: { id: row.id },
-            data: { spamScore: judged.score, spamReason: judged.reason }
+            data: {
+                spamScore: judged.score,
+                spamReason: judged.reason,
+                spamReasons: [...judged.reasons]
+            }
         });
         if (judged.verdict !== "junk") return false;
 
@@ -474,8 +478,14 @@ export async function teachSpam(
             where: { accountId, messageId: key },
             data:
                 verdict === "good"
-                    ? { spamScore: 0, spamReason: "" }
-                    : { spamScore: 100, spamReason: "You marked this as junk" }
+                    ? { spamScore: 0, spamReason: "", spamReasons: [] }
+                    : {
+                          spamScore: 100,
+                          spamReason: "You marked this as junk",
+                          // Whatever the filter had thought is no longer the
+                          // reason it is there: somebody said so themselves.
+                          spamReasons: []
+                      }
         });
     } catch (caught) {
         // Teaching is a side effect of filing a message. It must never be the

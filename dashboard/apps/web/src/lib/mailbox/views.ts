@@ -479,6 +479,9 @@ export interface MailMessageView {
     readonly spamScore: number | null;
     /** The heaviest thing said against it, in the reader's words, or "". */
     readonly spamReason: string;
+    /** Everything else said against it, strongest first, for the message that
+     *  was filed away. Empty for one that arrived without objection. */
+    readonly spamReasons: readonly string[];
     readonly attachments: readonly {
         id: string;
         name: string;
@@ -513,6 +516,7 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
             listId: true,
             spamScore: true,
             spamReason: true,
+            spamReasons: true,
             folder: { select: { role: true } },
             attachments: {
                 select: {
@@ -548,6 +552,7 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
         listId: message.listId,
         spamScore: message.spamScore,
         spamReason: message.spamReason,
+        spamReasons: message.spamReasons,
         attachments: message.attachments.map((file) => ({
             id: file.id,
             name: file.name,

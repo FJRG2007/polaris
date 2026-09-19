@@ -928,21 +928,42 @@ function MessageCard({
                                 act on; "a link says bank.example.com and goes
                                 to evil.example.ru" is. */}
                             {message.spamReason ? (
-                                <p className="mb-3 flex items-start gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-3 py-1.5 text-[12px] text-foreground">
+                                <div className="mb-3 flex items-start gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-3 py-1.5 text-[12px] text-foreground">
                                     <ShieldAlert
                                         className="mt-px size-3.5 shrink-0 text-warning"
                                         aria-hidden
                                     />
-                                    <span className="min-w-0">
-                                        {message.folderRole === "junk"
-                                            ? "Polaris filed this as junk. "
-                                            : "This one looks off. "}
-                                        {message.spamReason}.{" "}
-                                        {message.folderRole === "junk"
-                                            ? "Not junk puts it back and teaches the filter."
-                                            : "Junk files it and teaches the filter."}
-                                    </span>
-                                </p>
+                                    <div className="min-w-0">
+                                        <p>
+                                            {message.folderRole === "junk"
+                                                ? "Polaris filed this as junk. "
+                                                : "This one looks off. "}
+                                            {message.spamReason}.{" "}
+                                            {message.folderRole === "junk"
+                                                ? "Not junk puts it back and teaches the filter."
+                                                : "Junk files it and teaches the filter."}
+                                        </p>
+                                        {/* The rest of the case, and only for a
+                                            message that was actually filed
+                                            away. A warning somebody can see the
+                                            message behind needs one line; a
+                                            message that was moved out of the
+                                            way without being asked is one where
+                                            the reader is deciding whether the
+                                            filter was right, and one line is
+                                            not enough to decide on. */}
+                                        {message.folderRole === "junk" &&
+                                        message.spamReasons.length > 1 ? (
+                                            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-foreground-subtle">
+                                                {message.spamReasons
+                                                    .slice(1)
+                                                    .map((said) => (
+                                                        <li key={said}>{said}</li>
+                                                    ))}
+                                            </ul>
+                                        ) : null}
+                                    </div>
+                                </div>
                             ) : null}
                             {/* Gmail's one good idea about mailing lists: the
                                 way out at the top, beside who sent it, rather
