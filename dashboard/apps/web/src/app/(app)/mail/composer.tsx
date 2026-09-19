@@ -54,6 +54,7 @@ import {
     X
 } from "lucide-react";
 import * as outbox from "./outbox";
+import { rememberSender } from "./default-sender";
 import { useDisplayFormat } from "@/components/display-format";
 import {
     attachFromAddressAction,
@@ -102,7 +103,8 @@ const writeDraft: DraftWriter = async (fields, id) => {
 };
 
 export function Composer() {
-    const { accounts, identities, composing, openComposer, refreshMailbox, viewerName } = useMail();
+    const { accounts, identities, composing, openComposer, refreshMailbox, viewerName, shelf } =
+        useMail();
     const toast = useToast();
     const [sending, startSending] = useBusy();
 
@@ -327,6 +329,9 @@ export function Composer() {
                 }
                 saves.current?.adopt(outcome.draftId, fields);
                 setQueued({ draftId: outcome.draftId, until: new Date(outcome.sendAt).getTime() });
+                // The mailbox somebody actually wrote from is the one the next
+                // message starts on, wherever they write it from.
+                rememberSender(shelf, accountId);
                 refreshMailbox();
             });
         },
@@ -341,7 +346,8 @@ export function Composer() {
             files,
             composing,
             refreshMailbox,
-            startSending
+            startSending,
+            shelf
         ]
     );
 

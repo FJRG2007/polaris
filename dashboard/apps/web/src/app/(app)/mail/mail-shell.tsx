@@ -34,6 +34,7 @@ import { useNudgeMailUnread } from "@/components/mail-unread";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
 import { FolderRoleDialog, type MissingFolderRole } from "./folder-role-dialog";
+import { defaultSender, mailboxInView, rememberSender, rememberedSender } from "./default-sender";
 import {
     useRef,
     useMemo,
@@ -582,15 +583,43 @@ export function MailShell({
      * instead. Closing is always allowed.
      */
     const hasMailbox = accounts.length > 0;
+
+    /**
+     * The mailbox on screen, and the one a new message starts on.
+     *
+     * Being in a mailbox's inbox or one of its folders is the clearest thing
+     * anybody says about which address they are working as, so it is what Write
+     * starts from - and it is remembered, so a message written from the merged
+     * inbox, a settings page or after a reload starts on the mailbox they were
+     * last in rather than on whichever happens to be first. See `default-sender`.
+     */
+    const inView = useMemo(() => mailboxInView(pathname, folders), [pathname, folders]);
+    useEffect(() => {
+        if (inView && accounts.some((account) => account.id === inView)) rememberSender(shelf, inView);
+    }, [inView, accounts, shelf]);
+
     const openComposer = useCallback(
         (draft: ComposerSeed | null) => {
             if (draft && !hasMailbox) {
                 router.push(CONNECT_MAILBOX_HREF);
                 return;
             }
-            setComposing(draft);
+            // A seed that names its mailbox - a reply, a reopened draft - keeps
+            // it. Anything else starts where the reader is.
+            setComposing(
+                draft && !draft.accountId
+                    ? {
+                          ...draft,
+                          accountId: defaultSender({
+                              inView,
+                              remembered: rememberedSender(shelf),
+                              visible: accounts
+                          })
+                      }
+                    : draft
+            );
         },
-        [hasMailbox, router]
+        [hasMailbox, router, inView, shelf, accounts]
     );
 
     const value = useMemo<MailContextValue>(
