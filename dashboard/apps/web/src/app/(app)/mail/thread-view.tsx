@@ -29,6 +29,7 @@ import { leavesTheView, scopeOf } from "./mail-actions";
 import { missingFolderRole, refusalOf } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
 import { isViewable } from "@/app/(app)/drive/viewer/kind";
+import { openableAttachments, positionOf, stepFrom } from "./attachment-steps";
 import type { ViewerTarget } from "@/app/(app)/drive/viewer/types";
 
 /**
@@ -752,6 +753,9 @@ function MessageCard({
     const format = useDisplayFormat();
     const { refreshMailbox } = useMail();
     const [viewing, setViewing] = useState<ViewerTarget | null>(null);
+    /** The files the viewer steps through, and where the open one is among them. */
+    const openable = useMemo(() => openableAttachments(message.attachments), [message.attachments]);
+    const viewingAt = viewing ? positionOf(openable, viewing.path) : -1;
     const [readable, setReadable] = useState<ReadableMessage | null>(null);
     const [failed, setFailed] = useState("");
 
@@ -1001,11 +1005,7 @@ function MessageCard({
                                                         type="button"
                                                         className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-muted-foreground hover:text-foreground"
                                                         onClick={() =>
-                                                            setViewing({
-                                                                path: file.id,
-                                                                name: file.name,
-                                                                size: String(file.size)
-                                                            })
+                                                            setViewing(viewerTargetOf(file))
                                                         }
                                                     >
                                                         <Paperclip
@@ -1112,9 +1112,27 @@ function MessageCard({
                     `/api/mail/attachments/${target.path}${inline ? "?inline=1" : ""}`
                 }
                 onOpenChange={(open) => (open ? undefined : setViewing(null))}
+                steps={
+                    viewing && viewingAt !== -1
+                        ? {
+                              index: viewingAt,
+                              count: openable.length,
+                              onStep: (by) => {
+                                  const next = stepFrom(openable, viewing.path, by);
+                                  if (next) setViewing(viewerTargetOf(next));
+                              }
+                          }
+                        : undefined
+                }
             />
         </li>
     );
+}
+
+/** An attachment, as the viewer addresses it: by id, which `urlFor` turns into
+ *  the address its bytes are served from. */
+function viewerTargetOf(file: { id: string; name: string; size: number }): ViewerTarget {
+    return { path: file.id, name: file.name, size: String(file.size) };
 }
 
 /** The date beside a collapsed message: the time if it arrived today, the date
