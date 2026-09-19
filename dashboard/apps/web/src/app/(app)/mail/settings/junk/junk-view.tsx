@@ -10,10 +10,10 @@
  * one people switch off the first time it is wrong.
  */
 
-import { ShieldCheck } from "lucide-react";
 import { useState } from "react";
-import { useBusy } from "@/app/(app)/mail/use-busy";
+import { ShieldCheck } from "lucide-react";
 import { AccountPicker } from "../account-picker";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
@@ -99,7 +99,9 @@ export function JunkView({
                 Your provider filters this mailbox before Polaris ever sees it, so what this catches
                 is what got through - and it catches it using things your provider cannot know: who
                 you write to, what you have already called junk, and what you fished back out. It
-                runs here, on this machine. Nothing about your mail is sent anywhere to be scored.
+                runs here, on this machine, and no message is sent anywhere to be scored. If an
+                address-reputation service is switched on in Integrations, the sender&apos;s address
+                and the domain behind it are checked against it - the address, never the message.
             </p>
 
             <section className="mt-4 rounded-md border border-border">
@@ -130,8 +132,9 @@ export function JunkView({
                     <p className="mt-1 text-[12px] text-muted-foreground">
                         Nothing yet. Pressing Junk on a message teaches it, and Not junk on one in
                         the Junk folder teaches it the other way. Until then it goes on what it can
-                        check: who the sending server says the message is from, where its links go,
-                        and whether you have written to the sender.
+                        check: who the sending server says the message is from, whether the name on
+                        it belongs to the address behind it, where its links go, and whether you
+                        have written to the sender.
                     </p>
                 ) : (
                     <>

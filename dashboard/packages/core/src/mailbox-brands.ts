@@ -111,6 +111,10 @@ export const IMPERSONATED_BRANDS: readonly ImpersonatedBrand[] = [
         domains: ["facebook.com", "instagram.com", "whatsapp.com", "meta.com", "facebookmail.com"]
     },
     { id: "linkedin", label: "LinkedIn", names: ["linkedin"], domains: ["linkedin.com"] },
+    // Added after a "your recording is ready" message wearing this name reached
+    // an inbox. A meeting tool is phished with for the same reason a courier is:
+    // everybody is expecting one, and nobody reads the address on it.
+    { id: "zoom", label: "Zoom", names: ["zoom"], domains: ["zoom.us", "zoom.com"] },
     { id: "telegram", label: "Telegram", names: ["telegram"], domains: ["telegram.org"] },
     {
         id: "steam",
@@ -413,6 +417,60 @@ export function brandClaim(
             if (owned && [...linked].some((host) => owned.has(host))) return null;
             return { brand, obfuscated: dressing(found[0], pattern.spacing) };
         }
+    }
+    return null;
+}
+
+/**
+ * A name from the table worn by the sending DOMAIN, at an address that is not
+ * the name's.
+ *
+ * A different lie from the one above, and the one that catches `zoom.net` when
+ * the real address is `zoom.us`. `brandClaim` reads the words a person sees -
+ * the subject and the display name - and says nothing at all about a message
+ * whose display name is honest and whose domain is the forgery. Registering the
+ * same word under another ending is the cheapest cousin domain there is, and it
+ * survives every check that only compares what the message *says*.
+ *
+ * Narrow on purpose, in three ways, because the cost of getting this wrong is a
+ * real company's mail in Junk:
+ *
+ * - only the registrable domain's own first label is read, so `evil.com` is
+ *   never accused of the `zoom.us.evil.com` it was pointed at, and a name that
+ *   merely starts a longer word (`zoominfo`) is a different word;
+ * - names that are also ordinary words are skipped entirely - `visa.gov` and
+ *   `orange.fr` are nobody's impersonation - as are names written in more than
+ *   one word, which no domain label carries;
+ * - and a message that links to the name's own site is exempt, exactly as it is
+ *   above: the table of domains is hand-written, and a message that sends the
+ *   reader to the brand is the brand's.
+ */
+export function lookalikeBrand(input: {
+    readonly fromDomain: string;
+    readonly linkHosts: readonly string[];
+}): ImpersonatedBrand | null {
+    const from = baseDomain(input.fromDomain);
+    if (!from || ALL_OWNED.has(from) || PUBLIC_MAILBOXES.has(from)) return null;
+
+    const words = new Set(
+        squash(from.split(".")[0] ?? "")
+            .split(" ")
+            .filter(Boolean)
+    );
+    if (words.size === 0) return null;
+
+    const linked = new Set(input.linkHosts.map((host) => baseDomain(host)));
+    for (const brand of IMPERSONATED_BRANDS) {
+        const owned = OWNED.get(brand.id);
+        if (owned?.has(from)) continue;
+        const wears = brand.names.some((name) => {
+            if (brand.common?.includes(name)) return false;
+            const written = squash(name);
+            return Boolean(written) && !written.includes(" ") && words.has(written);
+        });
+        if (!wears) continue;
+        if (owned && [...linked].some((host) => owned.has(host))) return null;
+        return brand;
     }
     return null;
 }

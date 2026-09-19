@@ -35,7 +35,8 @@
  */
 
 import { baseDomain } from "./vault-uris.js";
-import { brandClaim } from "./mailbox-brands.js";
+import { unsubscribeInBody } from "./mailbox-unsubscribe.js";
+import { brandClaim, lookalikeBrand } from "./mailbox-brands.js";
 
 /** What each band means. Two numbers, and the whole of the policy. */
 export const SPAM_THRESHOLDS = { suspicious: 40, junk: 70 } as const;
@@ -61,6 +62,15 @@ export interface SpamJudgement {
     readonly signals: readonly SpamSignal[];
     /** The strongest reason, for the one line a message view has room for. */
     readonly reason: string;
+    /**
+     * Every accusation that was actually made, strongest first, for the message
+     * that has been filed and whose reader deserves more than one line of it.
+     *
+     * Only the ones arguing against the message, and never more than a few: the
+     * point is a reader deciding whether the filter was right, and a list of a
+     * dozen items is one nobody finishes.
+     */
+    readonly reasons: readonly string[];
     /** What this message looks like, for recognising the next copy of it. */
     readonly fingerprint: string;
 }
@@ -694,17 +704,29 @@ export function asksForAccount(message: JudgeableMessage): boolean {
  */
 export function brandSignals(message: JudgeableMessage): SpamSignal[] {
     const bait = asksForAccount(message);
+    const hosts = linkHosts(message);
+    const fromDomain = domainOf(message.fromAddress);
     const claim = brandClaim(
-        {
-            subject: message.subject,
-            fromName: message.fromName,
-            fromDomain: domainOf(message.fromAddress),
-            linkHosts: linkHosts(message)
-        },
+        { subject: message.subject, fromName: message.fromName, fromDomain, linkHosts: hosts },
         bait
     );
 
     const signals: SpamSignal[] = [];
+    // The domain's own lie, which stacks with the name's because they are two
+    // separate claims: `zoom.net` is a name somebody registered, and "ZOOM
+    // RECORDING" on the front of it is a name somebody typed. Modest on its own
+    // - a cousin domain is evidence, not a verdict - and it is the piece that
+    // catches the message whose display name never mentions the brand at all.
+    const cousin = lookalikeBrand({ fromDomain, linkHosts: hosts });
+    if (cousin) {
+        const home = cousin.domains[0] ?? "";
+        const sent = baseDomain(fromDomain);
+        signals.push({
+            id: "lookalike_domain",
+            score: 14,
+            reason: `It came from ${sent}, which borrows ${cousin.label}'s name and is not theirs (${home} is)`
+        });
+    }
     if (bait) {
         signals.push({
             id: "account_bait",
@@ -834,6 +856,239 @@ export function structureSignals(message: JudgeableMessage): SpamSignal[] {
     return signals;
 }
 
+/* -------------------------------------------------------------------------- */
+/* The footer                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The line of small links every bulk sender puts at the bottom.
+ *
+ * Written from the message's own markup and nothing else: no address here is
+ * resolved, requested or followed. The body is a stranger's HTML and it is read
+ * as text.
+ */
+const FOOTER_LINKS: readonly string[] = [
+    "privacy policy",
+    "privacy notice",
+    "terms of service",
+    "terms of use",
+    "terms and conditions",
+    "help center",
+    "help centre",
+    "support center",
+    "contact us",
+    "unsubscribe",
+    "manage preferences",
+    "email preferences",
+    "view in browser",
+    "cookie policy",
+    "about us",
+    "imprint",
+    // The same row of links as it is written in the languages this mailbox
+    // receives mail in.
+    "politica de privacidad",
+    "aviso legal",
+    "terminos de servicio",
+    "terminos y condiciones",
+    "centro de ayuda",
+    "darse de baja",
+    "cancelar suscripcion",
+    "politica de cookies",
+    "politique de confidentialite",
+    "conditions d utilisation",
+    "datenschutz",
+    "impressum"
+];
+
+/** An address that goes nowhere: empty, the page itself, a fragment, or a
+ *  scheme that never leaves the message. */
+function goesNowhere(href: string): boolean {
+    const value = href.trim();
+    if (!value || value === "#" || value === "/" || value.startsWith("#")) return true;
+    return /^(?:javascript|about|data):/i.test(value);
+}
+
+/** Every anchor in the markup, as its address and the words on it. */
+function anchors(html: string): { href: string; text: string }[] {
+    return [...html.matchAll(/<a\b([^>]*)>([\s\S]{0,300}?)<\/a>/gi)].map((match) => {
+        const attributes = match[1] ?? "";
+        const found = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s">]+))/i.exec(attributes);
+        return {
+            href: found?.[1] ?? found?.[2] ?? found?.[3] ?? "",
+            text: flatten((match[2] ?? "").replace(/<[^>]*>/g, " "))
+        };
+    });
+}
+
+/**
+ * A footer that is a picture of a footer.
+ *
+ * The row of links under a real mailing - Privacy Policy, Terms of Service,
+ * Help Center - is a row of real addresses on the sender's own site, because a
+ * company that publishes those words has the pages behind them. A phishing kit
+ * copies the words and not the pages, so the same row arrives as `href="#"`, an
+ * empty attribute, a `javascript:` that does nothing, or the one link the
+ * message actually wants pressed, repeated under every heading.
+ *
+ * Only the boilerplate links are read. An anchor in the body of a message is
+ * allowed to be a fragment - that is what fragments are for - and the ordinary
+ * `#` in a newsletter's "back to top" must never be worth a point.
+ */
+export function footerSignals(message: JudgeableMessage): SpamSignal[] {
+    if (!message.bodyHtml) return [];
+    const boilerplate = anchors(message.bodyHtml).filter((one) =>
+        FOOTER_LINKS.some((word) => one.text.includes(word))
+    );
+    if (boilerplate.length < 2) return [];
+
+    if (boilerplate.every((one) => goesNowhere(one.href))) {
+        return [
+            {
+                id: "footer_links_nowhere",
+                score: 14,
+                reason: "Its Privacy and Terms links do not go anywhere"
+            }
+        ];
+    }
+
+    // The other half of the same forgery: the words differ and the destination
+    // does not, because there is only one page and it is the one after the
+    // reader's password. Three before it counts, not two - plenty of real
+    // mailings point Privacy and Terms at one page of legal text.
+    const destinations = new Set(boilerplate.map((one) => one.href.trim().toLowerCase()));
+    const wording = new Set(boilerplate.map((one) => one.text));
+    if (boilerplate.length >= 3 && destinations.size === 1 && wording.size > 1) {
+        return [
+            {
+                id: "footer_links_identical",
+                score: 10,
+                reason: "Every link under it goes to the same page, whatever it says"
+            }
+        ];
+    }
+    return [];
+}
+
+/* -------------------------------------------------------------------------- */
+/* A first message from a stranger                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Pressure words that a colleague also writes.
+ *
+ * Held apart from `URGENCY`, which is the set of constructions nobody uses
+ * innocently. These are ordinary words, and the only thing that makes one worth
+ * a point is that it is the first thing a stranger ever said to this mailbox.
+ */
+const PRESSURE: readonly string[] = [
+    "urgent",
+    "urgente",
+    "asap",
+    "immediately",
+    "inmediatamente",
+    "imediatamente",
+    "dringend"
+];
+
+/**
+ * The sentences a message calls itself a mailing with.
+ *
+ * Read as words rather than as a working way out, because a working way out is
+ * the opposite of what is being looked for here: the message that matters is
+ * the one that says "unsubscribe" and then does not offer anything to press.
+ */
+const MAILING_CLAIM: readonly string[] = [
+    "mailing list",
+    "unsubscribe",
+    "you are receiving this",
+    "you received this",
+    "this is a marketing",
+    "manage your preferences",
+    "lista de correo",
+    "darse de baja",
+    "cancelar la suscripcion",
+    "recibes este",
+    "recibe este correo",
+    "liste de diffusion",
+    "se desinscrire"
+];
+
+/** How much of a message is read for that claim. It lives in the footer, and a
+ *  footer is at the end - but the window is bounded the same way everything
+ *  else here is. */
+const CLAIM_WINDOW = 8000;
+
+/** Whether a message says it is a mailing, in its words or in a way out it
+ *  actually published in its markup. */
+function claimsToBeAMailing(message: JudgeableMessage): boolean {
+    const plain = message.bodyText || message.snippet;
+    // Bounded before the markup is undressed rather than after, so a megabyte
+    // of somebody else's HTML is never a megabyte of work on the arrival path.
+    const markup = message.bodyHtml.slice(0, CLAIM_WINDOW).replace(/<[^>]*>/g, " ");
+    const text = flatten(`${plain.slice(0, CLAIM_WINDOW)} ${markup}`);
+    if (MAILING_CLAIM.some((phrase) => text.includes(phrase))) return true;
+    return Boolean(unsubscribeInBody(message.bodyHtml, message.bodyText || message.snippet));
+}
+
+/**
+ * What a first message from a stranger is allowed to be short of.
+ *
+ * None of these means anything on mail from somebody this mailbox already
+ * knows, which is why they live here rather than with the analysers that read
+ * the message alone: a supplier writes URGENT in a subject, a small server
+ * writes no authentication headers, and a newsletter somebody signed up for is
+ * a newsletter. What is worth a point is the combination of one of those with
+ * "and nobody here has ever heard of you" - and each is worth a point rather
+ * than a verdict, because a real first message from a real person looks exactly
+ * like this apart from all of them at once.
+ */
+export function strangerSignals(message: JudgeableMessage, known: SpamKnowledge): SpamSignal[] {
+    if (known.writtenTo || known.knownContact) return [];
+    const signals: SpamSignal[] = [];
+
+    // Skipped when the subject already carries one of the constructions that is
+    // never innocent: that is the same accusation, made better. Compared in the
+    // form each list is written in - `URGENCY` holds its accents and the words
+    // below do not.
+    if (!URGENCY.some((phrase) => message.subject.toLowerCase().includes(phrase))) {
+        const subject = flatten(message.subject);
+        const pressing = PRESSURE.find((word) => new RegExp(`\\b${word}\\b`).test(subject));
+        if (pressing) {
+            signals.push({
+                id: "stranger_pressure",
+                score: 8,
+                reason: `It pushes ("${pressing}") and nobody here has written to this sender`
+            });
+        }
+    }
+
+    // A mailing with no way out published in its headers. Real bulk senders
+    // publish `List-Unsubscribe` because every mailbox provider on earth makes
+    // them; the ones that only print the word in a footer are the ones with
+    // nobody to answer to. Narrowed to a stranger's first message, because a
+    // list somebody actually signed up for is exactly the mail this must not
+    // touch.
+    if (claimsToBeAMailing(message) && !message.headers?.["list-unsubscribe"] && !message.listId) {
+        signals.push({
+            id: "list_without_unsubscribe",
+            score: 10,
+            reason: "It says it is a mailing list but publishes no way to leave it"
+        });
+    }
+
+    // Nothing vouched for it. Not a failure - a failure is worth far more, and
+    // is counted where the checks are read - but a first message from a domain
+    // that no check spoke up for at all.
+    if (!authenticationSignals(message.headers).some((one) => one.score < 0)) {
+        signals.push({
+            id: "stranger_unvouched",
+            score: 6,
+            reason: "Nothing vouches for the domain it says it came from"
+        });
+    }
+    return signals;
+}
+
 /** What this mailbox already knows about the sender. */
 export function relationshipSignals(known: SpamKnowledge): SpamSignal[] {
     if (known.writtenTo) {
@@ -917,6 +1172,7 @@ export function judgeSpam(message: JudgeableMessage, known: SpamKnowledge): Spam
             verdict: "junk",
             signals: [signal],
             reason: signal.reason,
+            reasons: [signal.reason],
             fingerprint
         };
     }
@@ -930,6 +1186,10 @@ export function judgeSpam(message: JudgeableMessage, known: SpamKnowledge): Spam
         // here reads a message that lies about who sent it: every other signal
         // is about wording, and this one is about identity.
         ...brandSignals(message),
+        ...footerSignals(message),
+        // Read last of the message's own signals because it is the only one that
+        // needs to know whether this sender is a stranger.
+        ...strangerSignals(message, known),
         ...relationshipSignals(known),
         // Whatever a provider outside this mailbox said. Added as ordinary
         // signals so an outside opinion is weighed against the rest rather than
@@ -968,12 +1228,19 @@ export function judgeSpam(message: JudgeableMessage, known: SpamKnowledge): Spam
     // The heaviest accusation, for the one line a message view has room for.
     // Never a reason the message is fine: nobody needs telling why their mail
     // arrived.
-    const worst = [...signals].sort((left, right) => right.score - left.score)[0];
+    const accusations = signals
+        .filter((signal) => signal.score > 0)
+        .sort((left, right) => right.score - left.score);
+    const worst = accusations[0];
+    const said = verdict === "clean" || !worst ? "" : worst.reason;
     return {
         score,
         verdict,
         signals,
-        reason: verdict === "clean" || !worst || worst.score <= 0 ? "" : worst.reason,
+        reason: said,
+        // Four is what fits under a banner without becoming a report. Empty
+        // whenever the one line is, so nothing explains a message that arrived.
+        reasons: said ? accusations.slice(0, 4).map((signal) => signal.reason) : [],
         fingerprint
     };
 }
