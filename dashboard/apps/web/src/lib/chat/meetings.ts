@@ -18,20 +18,21 @@
  *     them - a link that can be forwarded is a link that will be.
  */
 
-import { postNotice, postNoticeBody } from "./notices";
-import { announcesCalls, callEndedBody } from "./notice-text";
+import * as core from "@polaris/core";
 import { randomBytes } from "node:crypto";
 import { blockersOf } from "@/lib/blocks";
 import { whoMissedTheCall } from "./missed-call";
 import { prisma, type Prisma } from "@polaris/db";
 import { discardMeetingChat } from "./meeting-files";
 import { notify } from "@/lib/notifications/dispatch";
+import { postNotice, postNoticeBody } from "./notices";
 import { publishMeetingEvent } from "./meeting-events";
 import { publishChatChange, type CallState } from "./live";
-import { ChatAccessError, requireChannel, type ChatActor } from "./access";
+import { announcesCalls, callEndedBody } from "./notice-text";
 import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { chatAlertShelf } from "./isolation";
+import { ChatAccessError, channelAccess, requireChannel, type ChatActor } from "./access";
 
 /** How many browsers one call holds.
  *
@@ -185,7 +186,10 @@ export async function startOrJoin(
         ({ meetingId, created } = await liveMeetingId(actor, channelId));
         wasEmpty = (await admittedCount(meetingId)) === 0;
     }
-    const seat = await seatFor(meetingId, actor.id, actor.name);
+    const seat = await seatFor(meetingId, actor.id, actor.name, {
+        admission: "admitted",
+        pastLimit: access.mayModerate
+    });
     await announceCall(meetingId, wasEmpty ? "ringing" : "moved", actor.id, actor.name);
     // Written by whoever created the call and nobody else: two people pressing
     // call at the same moment make one call, and must make one line.
@@ -320,10 +324,13 @@ export async function join(
         select: { channelId: true, endedAt: true }
     });
     if (!meeting || meeting.endedAt) throw new ChatAccessError("That call has ended");
-    if (meeting.channelId) await requireChannel(actor, meeting.channelId);
-    else throw new ChatAccessError("That call has ended");
+    if (!meeting.channelId) throw new ChatAccessError("That call has ended");
+    const access = await requireChannel(actor, meeting.channelId);
 
-    const seat = await seatFor(meetingId, actor.id, actor.name);
+    const seat = await seatFor(meetingId, actor.id, actor.name, {
+        admission: "admitted",
+        pastLimit: access.mayModerate
+    });
     await announceCall(meetingId, "moved", actor.id, actor.name);
     return seat;
 }
@@ -873,7 +880,12 @@ async function seatFor(
      *  may be in the room; at the door for a meeting of its own, whose host
      *  asked to see who turns up. Never applied to a seat that already exists -
      *  somebody in the room does not go back to the lobby by reloading. */
-    options?: { admission: MeetingSeat["admission"] }
+    options?: {
+        admission: MeetingSeat["admission"];
+        /** Whether this person is let in past a voice channel's limit - whoever
+         *  may moderate the room, the way every voice client lets them. */
+        pastLimit?: boolean;
+    }
 ): Promise<MeetingSeat> {
     const existing = await prisma.meetingParticipant.findFirst({
         where: { meetingId, userId, leftAt: null },
@@ -895,7 +907,7 @@ async function seatFor(
     // Only what would take a place in the room. Somebody waiting at the door is
     // not in it, and a full call must still let people knock - the host decides
     // who comes in as somebody else leaves.
-    if (admission === "admitted") await requireRoom(meetingId);
+    if (admission === "admitted") await requireRoom(meetingId, options?.pastLimit ?? false);
     const participant = await prisma.meetingParticipant.create({
         data: { meetingId, userId, name, admission },
         select: { id: true }
@@ -904,12 +916,82 @@ async function seatFor(
     return { meetingId, participantId: participant.id, admission };
 }
 
-/** Refuse a join that would take the call past what a mesh can carry. */
-async function requireRoom(meetingId: string): Promise<void> {
+/**
+ * Refuse a join that would take the call past what it holds.
+ *
+ * Two ceilings. The instance's own, which nobody passes. And a voice channel's
+ * limit, which whoever set it chose, and which a moderator of the room walks
+ * past - the way every voice client lets them.
+ */
+async function requireRoom(meetingId: string, pastLimit = false): Promise<void> {
     await sweep(meetingId);
-    if ((await admittedCount(meetingId)) >= MAX_IN_CALL) {
+    const present = await admittedCount(meetingId);
+    if (present >= MAX_IN_CALL) {
         throw new ChatAccessError("That call is full");
     }
+    if (pastLimit) return;
+    const limit = await voiceLimitOf(meetingId);
+    if (core.voiceRoomFull({ limit, present })) throw new ChatAccessError(roomFull(limit));
+}
+
+/** What somebody walking into a full voice channel is told. */
+function roomFull(limit: number): string {
+    return `This voice channel is full. It holds ${limit} ${limit === 1 ? "person" : "people"} at a time.`;
+}
+
+/** A call's voice channel limit, or zero when it has none - including every
+ *  call that is not in a voice channel at all. */
+async function voiceLimitOf(meetingId: string): Promise<number> {
+    const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: { channel: { select: { kind: true, userLimit: true } } }
+    });
+    return meeting?.channel?.kind === "voice" ? meeting.channel.userLimit : 0;
+}
+
+/**
+ * Refuse the ticket to a seat that is over its voice channel's limit.
+ *
+ * The join already refused the person who would have made the room too full;
+ * this is the same rule asked again where the media server's ticket is signed,
+ * because that ticket is the only thing the media server believes. Two people
+ * pressing join in the same instant both pass a count taken before either seat
+ * existed, and without this both would be let in.
+ *
+ * A seat is counted by when it sat down: the first `limit` seats keep their
+ * place, so lowering the limit under a room that is already fuller than that
+ * does not throw out somebody reconnecting - only the seats past it are refused.
+ * A moderator of the room is let in past it, as they are at the join.
+ */
+export async function requireWithinLimit(seat: {
+    meetingId: string;
+    participantId: string;
+}): Promise<void> {
+    const limit = await voiceLimitOf(seat.meetingId);
+    if (limit <= 0) return;
+    const mine = await prisma.meetingParticipant.findFirst({
+        where: { id: seat.participantId, meetingId: seat.meetingId, leftAt: null },
+        select: { userId: true, joinedAt: true, meeting: { select: { channelId: true } } }
+    });
+    if (!mine) throw new ChatAccessError("You are not in that call");
+    const ahead = await prisma.meetingParticipant.count({
+        where: {
+            meetingId: seat.meetingId,
+            leftAt: null,
+            admission: "admitted",
+            id: { not: seat.participantId },
+            OR: [
+                { joinedAt: { lt: mine.joinedAt } },
+                { joinedAt: mine.joinedAt, id: { lt: seat.participantId } }
+            ]
+        }
+    });
+    if (!core.voiceRoomFull({ limit, present: ahead })) return;
+    if (mine.userId && mine.meeting.channelId) {
+        const access = await channelAccess({ id: mine.userId }, mine.meeting.channelId);
+        if (access?.mayModerate) return;
+    }
+    throw new ChatAccessError(roomFull(limit));
 }
 
 /** How many browsers are in the room right now. */

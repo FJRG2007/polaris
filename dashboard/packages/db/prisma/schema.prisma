@@ -7840,6 +7840,10 @@ model ChatChannel {
     // may moderate the room is not held by it - a moderator who cannot answer
     // for five minutes cannot moderate.
     slowmode      Int       @default(0)
+    // How many people a voice channel holds at once. Zero is no limit, which is
+    // every channel until whoever runs it decides otherwise. Only read for a
+    // voice channel, and whoever may moderate the room is let in past it.
+    userLimit     Int       @default(0)
     // Denormalized so the rail can sort conversations by what is happening
     // without reading every message table.
     lastMessageAt DateTime?

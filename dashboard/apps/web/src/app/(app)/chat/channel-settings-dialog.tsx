@@ -25,6 +25,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import {
     Button,
+    cn,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -50,6 +51,9 @@ export function ChannelSettingsDialog({
     const [name, setName] = useState("");
     const [topic, setTopic] = useState("");
     const [slowmode, setSlowmode] = useState(0);
+    /** The voice room's limit as typed. Text rather than a number, so an emptied
+     *  box reads as "no limit" instead of snapping back to a zero. */
+    const [limitText, setLimitText] = useState("");
     const [busy, setBusy] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [error, setError] = useState("");
@@ -63,22 +67,40 @@ export function ChannelSettingsDialog({
         setName(channel.name);
         setTopic(channel.topic ?? "");
         setSlowmode(channel.slowmode);
+        setLimitText(channel.userLimit > 0 ? String(channel.userLimit) : "");
         setError("");
     }, [channel]);
 
     const stored = useMemo(() => core.normalizeChannelName(name), [name]);
+    const voice = channel?.kind === "voice";
+    /** The limit, checked against the same rule the server applies. Empty is no
+     *  limit, which is what most rooms want. */
+    const limit = useMemo(() => {
+        const typed = limitText.trim();
+        return core.chatVoiceUserLimitSchema.safeParse(typed === "" ? 0 : Number(typed));
+    }, [limitText]);
+    const limitError = voice && !limit.success ? (limit.error.issues[0]?.message ?? "") : "";
+    const userLimit = limit.success ? limit.data : null;
     const dirty =
         channel !== null &&
         (stored !== channel.name ||
             topic !== (channel.topic ?? "") ||
-            slowmode !== channel.slowmode);
+            slowmode !== channel.slowmode ||
+            (voice && userLimit !== null && userLimit !== channel.userLimit));
 
     const save = async () => {
         if (!channel) return;
         setBusy(true);
         setError("");
         const result = await runAction(
-            () => actions.updateChannelAction({ channelId: channel.id, name, topic, slowmode }),
+            () =>
+                actions.updateChannelAction({
+                    channelId: channel.id,
+                    name,
+                    topic,
+                    slowmode,
+                    ...(voice && userLimit !== null ? { userLimit } : {})
+                }),
             setError
         );
         setBusy(false);
@@ -148,6 +170,38 @@ export function ChannelSettingsDialog({
                                 }))}
                             />
                         </label>
+
+                        {/* How many people the room holds at once. Somebody
+                            walking into a full room is turned away with a
+                            sentence that says so, and whoever moderates the
+                            room is let in past it. */}
+                        {voice && (
+                            <label className="flex flex-col gap-1">
+                                <span className="text-[0.75rem] font-medium text-muted-foreground">
+                                    User limit
+                                </span>
+                                <Input
+                                    value={limitText}
+                                    inputMode="numeric"
+                                    aria-label="User limit"
+                                    aria-invalid={limitError ? true : undefined}
+                                    placeholder="No limit"
+                                    maxLength={2}
+                                    onChange={(event) =>
+                                        setLimitText(event.target.value.replace(/[^0-9]/g, ""))
+                                    }
+                                />
+                                <span
+                                    className={cn(
+                                        "text-xs",
+                                        limitError ? "text-danger" : "text-muted-foreground"
+                                    )}
+                                >
+                                    {limitError ||
+                                        `Up to ${core.MAX_VOICE_USER_LIMIT}. Empty or 0 is no limit.`}
+                                </span>
+                            </label>
+                        )}
 
                         {/* A private room handed to a team or a role rather than
                             a person at a time - which is the whole of "the
@@ -221,7 +275,7 @@ export function ChannelSettingsDialog({
                             </Button>
                             <Button
                                 size="sm"
-                                disabled={busy || !stored || !dirty}
+                                disabled={busy || !stored || !dirty || Boolean(limitError)}
                                 onClick={() => void save()}
                             >
                                 {busy && <Loader2 className="size-4 animate-spin" />}

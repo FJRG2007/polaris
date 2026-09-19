@@ -247,6 +247,11 @@ export async function callTokenAction(
     const endpoint = await calls.callServer();
     if (!endpoint) return { error: calls.NO_CALL_SERVER };
 
+    // A voice channel's limit, asked again where the ticket is signed: the
+    // ticket is the only thing the media server believes.
+    const within = await guard(() => meetings.requireWithinLimit(seat));
+    if (within.error) return { error: within.error };
+
     const token = await calls.joinToken(endpoint, meetingId, seat.participantId);
     return { url: endpoint.url, token };
 }

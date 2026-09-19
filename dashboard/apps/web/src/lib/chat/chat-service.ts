@@ -117,6 +117,9 @@ export interface ChatChannelView {
      *  Read by the composer so the wait is shown while it applies rather than
      *  discovered by being refused. */
     readonly slowmode: number;
+    /** How many people a voice channel holds at once. Zero is no limit, and is
+     *  what every other kind of conversation reads. */
+    readonly userLimit: number;
     /** The other people in a direct message, for the avatars beside it. Empty
      *  for a named channel, where the name is the whole label. */
     readonly others: readonly { id: string; name: string }[];
@@ -677,6 +680,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             membersMayEdit: true,
             membersMayInvite: true,
             slowmode: true,
+            userLimit: true,
             members: { select: { userId: true, user: { select: { name: true } } } }
         }
     });
@@ -755,6 +759,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             membersMayInvite: channel.membersMayInvite,
             mayInvite: invitesAllowed({ ...channel, mayAdminister }, actor.id),
             slowmode: channel.slowmode,
+            userLimit: channel.kind === "voice" ? channel.userLimit : 0,
             others: channel.spaceId ? [] : others,
             blocked: channel.kind === "dm" && others.some((other) => shut.has(other.id))
         };
@@ -982,6 +987,9 @@ export async function updateChannel(
     const access = await requireChannel(actor, input.channelId);
     if (!access.mayAdminister) throw new ChatAccessError("You cannot change that channel");
     if (!access.spaceId) throw new ChatAccessError("A direct message has no name to change");
+    if (input.userLimit !== undefined && access.kind !== "voice") {
+        throw new ChatAccessError("Only a voice channel holds a number of people");
+    }
 
     await prisma.chatChannel.update({
         where: { id: input.channelId },
@@ -990,7 +998,8 @@ export async function updateChannel(
             ...(input.topic !== undefined ? { topic: input.topic } : {}),
             ...(input.archived !== undefined ? { archived: input.archived } : {}),
             ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
-            ...(input.slowmode !== undefined ? { slowmode: input.slowmode } : {})
+            ...(input.slowmode !== undefined ? { slowmode: input.slowmode } : {}),
+            ...(input.userLimit !== undefined ? { userLimit: input.userLimit } : {})
         }
     });
     publishChatChange({ channelId: input.channelId, kind: "channels", actorId: actor.id });

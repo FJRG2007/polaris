@@ -33,6 +33,7 @@ import { openSearch } from "@/lib/search/open-search";
 import { useAppUrl } from "@/components/app-url";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { NewDirectDialog } from "./new-direct-dialog";
+import * as core from "@polaris/core";
 import { LiveBadge, VoiceStateIcons } from "./call-roster";
 import { useChatStream } from "./use-chat-stream";
 import { NewChannelDialog } from "./new-channel-dialog";
@@ -676,6 +677,16 @@ function ChannelRows({
                             unread={channel.unread}
                             muted={channel.muted}
                             label={channel.name}
+                            // How full a limited voice room is, the way every
+                            // voice client writes it beside the name.
+                            occupancy={
+                                channel.kind === "voice"
+                                    ? core.voiceOccupancy({
+                                          limit: channel.userLimit,
+                                          present: inside.length
+                                      })
+                                    : null
+                            }
                             onManage={manages ? onManage : undefined}
                             icon={
                                 channel.kind === "voice" ? (
@@ -820,7 +831,8 @@ function Row({
     icon,
     personId,
     channel,
-    onManage
+    onManage,
+    occupancy = null
 }: {
     href: string;
     active: boolean;
@@ -828,6 +840,8 @@ function Row({
     muted: boolean;
     label: string;
     icon: React.ReactNode;
+    /** How many are in a limited voice room over how many it holds, or null. */
+    occupancy?: string | null;
     /**
      * Whose conversation it is, for a direct message with one other person.
      *
@@ -893,6 +907,15 @@ function Row({
                 conversation with nothing to explain it reads as a bug. */}
             {channel?.pinned && (
                 <Pin className="size-3 shrink-0 text-foreground-subtle" aria-label="Pinned" />
+            )}
+            {occupancy && (
+                <span
+                    className="shrink-0 rounded bg-muted px-1 text-[0.625rem] font-medium tabular-nums leading-4 text-muted-foreground"
+                    aria-label={`${occupancy.replace("/", " of ")} places taken`}
+                    title={`${occupancy.replace("/", " of ")} places taken`}
+                >
+                    {occupancy}
+                </span>
             )}
             {unread > 0 && (
                 <span

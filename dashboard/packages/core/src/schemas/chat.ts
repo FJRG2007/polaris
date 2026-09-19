@@ -307,6 +307,38 @@ export function slowmodeSpoken(seconds: number): string {
     return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
 }
 
+/**
+ * The most people a voice channel can be limited to. The same ceiling Discord
+ * offers; a room that needs more than this needs no limit at all.
+ */
+export const MAX_VOICE_USER_LIMIT = 99;
+
+/** A voice channel's limit as a schema: a whole number of people, zero for none. */
+export const chatVoiceUserLimitSchema = z
+    .number({ invalid_type_error: "Write a number of people" })
+    .int("Write a whole number of people")
+    .min(0, "Zero is no limit; it cannot go lower")
+    .max(MAX_VOICE_USER_LIMIT, `A voice channel can be limited to ${MAX_VOICE_USER_LIMIT} at most`);
+
+/**
+ * Whether one more person may walk into a voice channel.
+ *
+ * Arithmetic rather than a query, so the rail that draws `3/5` and the server
+ * that refuses the sixth person answer from one rule. A limit of zero - or
+ * anything that is not a positive number - is no limit.
+ */
+export function voiceRoomFull(input: { limit: number; present: number }): boolean {
+    if (!Number.isFinite(input.limit) || input.limit <= 0) return false;
+    return input.present >= input.limit;
+}
+
+/** What the rail writes beside a limited voice channel, or null when it has
+ *  none: how many are in it over how many it holds. */
+export function voiceOccupancy(input: { limit: number; present: number }): string | null {
+    if (!Number.isFinite(input.limit) || input.limit <= 0) return null;
+    return `${Math.max(0, input.present)}/${input.limit}`;
+}
+
 export const chatChannelUpdateSchema = z.object({
     channelId: z.string().uuid(),
     name: channelName.optional(),
@@ -314,8 +346,11 @@ export const chatChannelUpdateSchema = z.object({
     archived: z.boolean().optional(),
     /** Moving it under a different heading, or out from under all of them. */
     categoryId: z.string().uuid().nullable().optional(),
-    slowmode: chatSlowmodeSchema.optional()
+    slowmode: chatSlowmodeSchema.optional(),
+    /** How many people a voice channel holds at once. Zero is no limit. */
+    userLimit: chatVoiceUserLimitSchema.optional()
 });
+
 
 export type ChatChannelUpdateInput = z.infer<typeof chatChannelUpdateSchema>;
 
