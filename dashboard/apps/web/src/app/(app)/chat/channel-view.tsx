@@ -727,6 +727,7 @@ export function ChannelView({
         answered.current = answering;
         router.replace(`/chat/c/${channelId}`, { scroll: false });
         void runAction(() => calls.startCallAction(channelId), setError).then((result) => {
+            if (result?.error) setError(result.error);
             if (result?.meetingId) {
                 enter({ meetingId: result.meetingId, channelId, title: callTitle }, false);
             }
@@ -1016,7 +1017,13 @@ export function ChannelView({
         setJoining(true);
         void runAction(() => calls.startCallAction(channelId), setError).then((result) => {
             setJoining(false);
-            if (!result || result.error) return;
+            if (!result) return;
+            // Said, not swallowed: a full voice room or a person who takes no calls
+            // is a refusal the reader has to be able to read.
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
             if (!result.meetingId) {
                 setError("That room could not be opened. Try again.");
                 return;
@@ -1927,7 +1934,13 @@ export function ChannelView({
         // that throws rather than returning an error would otherwise reject into
         // nowhere, and pressing Join would be silence.
         const result = await runAction(() => calls.startCallAction(channelId), setError);
-        if (!result || result.error) return;
+        if (!result) return;
+        // Said, not swallowed: a full voice room or a person who takes no calls
+        // is a refusal the reader has to be able to read.
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
         if (result.meetingId) {
             enter({ meetingId: result.meetingId, channelId, title: callTitle }, withVideo);
         } else setError("That call could not be joined. Try again.");
@@ -2017,7 +2030,13 @@ export function ChannelView({
                             }
                             void runAction(() => calls.startCallAction(channelId), setError).then(
                                 (result) => {
-                                    if (!result || result.error) return;
+                                    if (!result) return;
+                                    // Said, not swallowed: a full voice room or a person who takes no calls
+                                    // is a refusal the reader has to be able to read.
+                                    if (result.error) {
+                                        setError(result.error);
+                                        return;
+                                    }
                                     if (result.meetingId) {
                                         enter(
                                             {
