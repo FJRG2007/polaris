@@ -11,11 +11,18 @@
  * they left "Notify me" on. And only mail Polaris first saw after the cursor
  * the tab holds - the cursor is the server's clock, handed out by this same
  * call, so a browser whose clock is wrong cannot make a year of mail "new".
+ *
+ * And only the mailboxes Mail is drawing, which is the shelf in the header or
+ * every one of them where somebody asked for that. A notice for mail on a shelf
+ * that is not open sent people to Mail to find nothing there, because the list
+ * they arrived at does not hold it.
  */
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { addressesFrom } from "./json";
+import { onShelf } from "./access";
+import { mailShelfFor } from "./shelf";
 
 /** How many are named, one notice each. Past this it is one notice that says
  *  how many; ten notices at once is a notice nobody reads. */
@@ -56,7 +63,7 @@ export async function arrivalsSince(userId: string, since: Date | null): Promise
     if (!since) return { cursor, named: [], more: 0 };
 
     const where = {
-        account: { userId, notify: true },
+        account: { ...onShelf(userId, await mailShelfFor(userId)), notify: true },
         createdAt: { gt: since, lte: now },
         sentAt: { gt: new Date(now.getTime() - FRESH_MS) },
         seen: false,

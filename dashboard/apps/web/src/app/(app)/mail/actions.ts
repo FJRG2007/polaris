@@ -39,6 +39,7 @@ import * as messages from "@/lib/mailbox/messages";
 import * as contacts from "@/lib/mailbox/contacts";
 import * as templates from "@/lib/mailbox/templates";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { mailShelfFor } from "@/lib/mailbox/shelf";
 import * as attachFrom from "@/lib/mailbox/attach-from";
 import { MailAuthError } from "@/lib/mailbox/credentials";
 import { discoverMailbox } from "@/lib/mailbox/autoconfig";
@@ -381,7 +382,7 @@ export async function syncAllAction() {
     const userId = await actorId();
     // The shelf being looked at, because this is the refresh button on a rail:
     // it syncs what is in front of somebody, not every mailbox they have.
-    const ids = await ownedAccountIds(userId, await scopeOrgIdFor(userId));
+    const ids = await ownedAccountIds(userId, await mailShelfFor(userId));
     for (const id of ids) await syncAccount(id).catch(() => undefined);
     refresh();
     return {};
@@ -559,7 +560,7 @@ export async function suggestContactsAction(query: string) {
     const userId = await actorId();
     // The people this shelf writes to. A company address suggesting a personal
     // contact is the wrong recipient offered on the wrong letterhead.
-    const accountIds = await ownedAccountIds(userId, await scopeOrgIdFor(userId));
+    const accountIds = await ownedAccountIds(userId, await mailShelfFor(userId));
     return { suggestions: await contacts.suggestContacts(accountIds, query) };
 }
 

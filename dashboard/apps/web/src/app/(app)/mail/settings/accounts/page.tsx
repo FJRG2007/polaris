@@ -11,7 +11,7 @@ import { z } from "zod";
 import * as core from "@polaris/core";
 import { AccountsView } from "./accounts-view";
 import { requirePermission } from "@/lib/session";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { listAccountViews } from "@/lib/mailbox/accounts";
 import { mailConnectOptions } from "@/lib/mailbox/connect-options";
 import { MailAccessError, ownedAccount } from "@/lib/mailbox/access";
@@ -47,7 +47,7 @@ export default async function MailAccountsPage({
     const params = await searchParams;
     const editNow = EDIT_PARAM.safeParse(params.edit).data ?? "";
     const [scoped, named] = await Promise.all([
-        scopeOrgIdFor(user.id),
+        mailShelfFor(user.id),
         editNow ? shelfOf(user.id, editNow) : null
     ]);
     const shelf = named ? named.orgId : scoped;

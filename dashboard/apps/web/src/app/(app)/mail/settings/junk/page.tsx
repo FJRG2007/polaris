@@ -11,14 +11,14 @@ import { JunkView } from "./junk-view";
 import { NoMailboxes } from "../empty-accounts";
 import { requirePermission } from "@/lib/session";
 import { spamLearning } from "@/lib/mailbox/spam";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { listAccountViews } from "@/lib/mailbox/accounts";
 
 export const dynamic = "force-dynamic";
 
 export default async function MailJunkPage() {
     const user = await requirePermission("mail.use");
-    const accounts = await listAccountViews(user.id, await scopeOrgIdFor(user.id));
+    const accounts = await listAccountViews(user.id, await mailShelfFor(user.id));
     if (accounts.length === 0) return <NoMailboxes what="Junk" />;
 
     const learning: Record<string, { junk: number; good: number; words: number }> = {};

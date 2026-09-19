@@ -26,7 +26,7 @@
 import * as core from "@polaris/core";
 import { MailOnboarding } from "./onboarding";
 import { requirePermission } from "@/lib/session";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { ownedAccountIds } from "@/lib/mailbox/access";
 import { readMailPreferences } from "@/lib/mailbox/prefs";
 import { MailView, type MailViewContext } from "./mail-view";
@@ -82,7 +82,7 @@ export async function MailListPage({
     // conversations are fetched by the browser.
     const [params, accounts, preferences] = await Promise.all([
         searchParams,
-        ownedAccountIds(user.id, await scopeOrgIdFor(user.id)),
+        ownedAccountIds(user.id, await mailShelfFor(user.id)),
         readMailPreferences(user.id)
     ]);
 

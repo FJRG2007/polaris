@@ -79,6 +79,24 @@ export function mailUndoLabel(seconds: number): string {
 }
 
 /** Everything one person has said about how they read mail. */
+/**
+ * Which mailboxes Mail draws.
+ *
+ * `shelf` follows the switch in the header, as Drive and Tasks do: your own
+ * mailboxes on your own shelf, a company's on its. `all` merges them, so every
+ * mailbox is in one place whichever shelf is open - which is what somebody with
+ * one personal address and one work address usually wants, and what every other
+ * mail client does.
+ */
+export const MAIL_MAILBOX_SCOPES = ["shelf", "all"] as const;
+
+export type MailMailboxScope = (typeof MAIL_MAILBOX_SCOPES)[number];
+
+export const MAIL_MAILBOX_SCOPE_LABELS: Readonly<Record<MailMailboxScope, string>> = {
+    shelf: "The account or organization in view",
+    all: "All of them at once"
+};
+
 export interface MailPreferences {
     /** What every list is ordered by before anybody presses a sort button. The
      *  buttons still win for the page they are on - a sort in the address is a
@@ -90,6 +108,9 @@ export interface MailPreferences {
     /** The shortcuts somebody moved, by command. Empty is every default - see
      *  `mail-keys`. */
     readonly keys: MailKeymap;
+    /** Whether the mailbox list, the counts and the arrival notices follow the
+     *  shelf or take in every mailbox at once. */
+    readonly mailboxes: MailMailboxScope;
 }
 
 /** What Mail does for somebody who has never opened this screen. */
@@ -98,7 +119,8 @@ export const MAIL_PREF_DEFAULTS: MailPreferences = {
     markRead: "open",
     afterFiling: "list",
     undoSeconds: DEFAULT_MAIL_UNDO_SECONDS,
-    keys: {}
+    keys: {},
+    mailboxes: "shelf"
 };
 
 function isMarkRead(value: unknown): value is MailMarkRead {
@@ -107,6 +129,10 @@ function isMarkRead(value: unknown): value is MailMarkRead {
 
 function isAfterFiling(value: unknown): value is MailAfterFiling {
     return typeof value === "string" && (MAIL_AFTER_FILING as readonly string[]).includes(value);
+}
+
+function isMailboxScope(value: unknown): value is MailMailboxScope {
+    return typeof value === "string" && (MAIL_MAILBOX_SCOPES as readonly string[]).includes(value);
 }
 
 function isUndoSeconds(value: unknown): value is number {
@@ -141,7 +167,8 @@ export function parseMailPreferences(raw: string | null | undefined): MailPrefer
         undoSeconds: isUndoSeconds(bag.undoSeconds)
             ? bag.undoSeconds
             : MAIL_PREF_DEFAULTS.undoSeconds,
-        keys: cleanMailKeymap(bag.keys)
+        keys: cleanMailKeymap(bag.keys),
+        mailboxes: isMailboxScope(bag.mailboxes) ? bag.mailboxes : MAIL_PREF_DEFAULTS.mailboxes
     };
 }
 
@@ -170,7 +197,8 @@ export const mailPreferencesSchema = z.object({
      * screens: the reading form does not send the keyboard, and leaving it out
      * means "keep what is there" - which the action decides, not the schema.
      */
-    keys: mailKeymapSchema.optional()
+    keys: mailKeymapSchema.optional(),
+    mailboxes: z.enum(MAIL_MAILBOX_SCOPES)
 });
 
 /** The whole shape on the way out, so what is read back is what was chosen
@@ -181,6 +209,7 @@ export function stringifyMailPreferences(preferences: MailPreferences): string {
         markRead: preferences.markRead,
         afterFiling: preferences.afterFiling,
         undoSeconds: preferences.undoSeconds,
-        keys: preferences.keys
+        keys: preferences.keys,
+        mailboxes: preferences.mailboxes
     });
 }

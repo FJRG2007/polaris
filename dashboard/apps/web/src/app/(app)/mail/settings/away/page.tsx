@@ -9,13 +9,13 @@ import { prisma } from "@polaris/db";
 import { requirePermission } from "@/lib/session";
 import { NoMailboxes } from "../empty-accounts";
 import { listAccountViews } from "@/lib/mailbox/accounts";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { mailShelfFor } from "@/lib/mailbox/shelf";
 
 export const dynamic = "force-dynamic";
 
 export default async function MailAwayPage() {
     const user = await requirePermission("mail.use");
-    const accounts = await listAccountViews(user.id, await scopeOrgIdFor(user.id));
+    const accounts = await listAccountViews(user.id, await mailShelfFor(user.id));
     if (accounts.length === 0) return <NoMailboxes what="An away message" />;
 
     // The message bodies are not on the account view - nothing else needs them -

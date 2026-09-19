@@ -36,7 +36,8 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
         held.sort !== preferences.sort ||
         held.markRead !== preferences.markRead ||
         held.afterFiling !== preferences.afterFiling ||
-        held.undoSeconds !== preferences.undoSeconds;
+        held.undoSeconds !== preferences.undoSeconds ||
+        held.mailboxes !== preferences.mailboxes;
 
     function save(): void {
         startSaving(async () => {
@@ -48,6 +49,26 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
 
     return (
         <div className="space-y-5">
+            <Field
+                label="Mailboxes to show"
+                hint="Mail normally follows the switch at the top of the screen, so you see your own mailboxes on your own shelf and a company's on its. Showing all of them puts every mailbox in one place, whichever is selected - and the counts and the new-mail notices follow whatever you choose here."
+            >
+                <Select
+                    aria-label="Mailboxes to show"
+                    value={held.mailboxes}
+                    onValueChange={(value) =>
+                        setHeld((current) => ({
+                            ...current,
+                            mailboxes: value as core.MailMailboxScope
+                        }))
+                    }
+                    options={core.MAIL_MAILBOX_SCOPES.map((scope) => ({
+                        value: scope,
+                        label: core.MAIL_MAILBOX_SCOPE_LABELS[scope]
+                    }))}
+                />
+            </Field>
+
             <Field
                 label="Sort lists by"
                 hint="What every list opens as. The buttons above a list still win for the page you are on, and that page is a link you can send."

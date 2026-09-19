@@ -17,7 +17,7 @@
  */
 
 import { unreadCounts } from "@/lib/mailbox/views";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { unreadTotal, type ChatUnread } from "@/lib/chat/chat-service";
 
 export interface MailWaiting {
@@ -31,7 +31,7 @@ export const NO_MAIL_WAITING: MailWaiting = { messages: 0, mailboxes: 0 };
 
 /** Unread mail in the open shelf's mailboxes - the ones Mail lists there. */
 export async function mailWaitingOnShelf(userId: string): Promise<MailWaiting> {
-    const counts = await unreadCounts(userId, await scopeOrgIdFor(userId));
+    const counts = await unreadCounts(userId, await mailShelfFor(userId));
     return {
         messages: counts.total,
         mailboxes: Object.values(counts.byAccount).filter((one) => one > 0).length

@@ -17,7 +17,7 @@
 
 import { MailShell } from "./mail-shell";
 import { requirePermission } from "@/lib/session";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { listAccountViews } from "@/lib/mailbox/accounts";
 import { listFolders, unreadCounts } from "@/lib/mailbox/views";
 import { listIdentities, listLabels } from "@/lib/mailbox/labels";
@@ -29,7 +29,7 @@ export default async function MailLayout({ children }: { children: React.ReactNo
     // Which working life this is. Mail draws one shelf at a time, the way Drive
     // and Notes do: somebody's own mailboxes, or the ones an organization handed
     // them - never the two stacked in one rail.
-    const shelfOrgId = await scopeOrgIdFor(user.id);
+    const shelfOrgId = await mailShelfFor(user.id);
     const [accounts, folders, labels, unread] = await Promise.all([
         listAccountViews(user.id, shelfOrgId),
         listFolders(user.id, shelfOrgId),

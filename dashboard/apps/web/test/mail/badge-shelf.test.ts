@@ -18,6 +18,12 @@ const mailboxes = [
 ];
 
 vi.mock("@/lib/workspace-scope", () => ({ scopeOrgIdFor: async () => openOrg }));
+// Mail resolves its own shelf, which is the header's unless somebody asked for
+// every mailbox - a preference this test is not about.
+vi.mock("@/lib/mailbox/shelf", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/lib/mailbox/shelf")>()),
+    mailShelfFor: async () => openOrg
+}));
 vi.mock("@polaris/db", () => ({
     prisma: {
         mailMessage: {

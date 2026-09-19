@@ -6,6 +6,9 @@
  * never a muted conversation or a snoozed message, only mail first seen after
  * the cursor - and a tab's first ask announces nothing at all, so opening
  * Polaris never raises a notice about mail that was already there.
+ *
+ * And only the mailboxes Mail is drawing: the shelf in view, or every one of
+ * them where somebody asked Mail to show them all.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -28,6 +31,15 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
+let shelf: string | null = null;
+vi.mock("@/lib/mailbox/shelf", async () => {
+    const real = await vi.importActual<typeof import("@/lib/mailbox/shelf")>(
+        "@/lib/mailbox/shelf"
+    );
+    return { ...real, mailShelfFor: async () => shelf };
+});
+
+const { EVERY_SHELF } = await import("@/lib/mailbox/shelf");
 const { arrivalsSince } = await import("@/lib/mailbox/arrivals");
 
 beforeEach(() => {
@@ -35,6 +47,7 @@ beforeEach(() => {
     queried = 0;
     rows = [];
     total = 0;
+    shelf = null;
 });
 
 describe("a tab's first ask", () => {
@@ -52,7 +65,7 @@ describe("what is worth announcing", () => {
         const since = new Date("2026-09-10T10:00:00Z");
         await arrivalsSince("u1", since);
         expect(lastWhere).toMatchObject({
-            account: { userId: "u1", notify: true },
+            account: { userId: "u1", orgId: null, notify: true },
             createdAt: { gt: since },
             seen: false,
             deleted: false,
@@ -77,5 +90,21 @@ describe("what is worth announcing", () => {
             { threadId: "t2", from: "bo", subject: "(no subject)" }
         ]);
         expect(answer.more).toBe(5);
+    });
+});
+
+describe("which mailboxes are announced", () => {
+    const since = new Date("2026-09-10T10:00:00Z");
+
+    it("is the shelf in view, so a notice never points at mail Mail is not listing", async () => {
+        shelf = "org-acme";
+        await arrivalsSince("u1", since);
+        expect(lastWhere?.account).toEqual({ userId: "u1", orgId: "org-acme", notify: true });
+    });
+
+    it("is every mailbox once somebody asked Mail to show them all", async () => {
+        shelf = EVERY_SHELF;
+        await arrivalsSince("u1", since);
+        expect(lastWhere?.account).toEqual({ userId: "u1", notify: true });
     });
 });

@@ -112,7 +112,9 @@ describe("what a live frame does", () => {
         // Somebody else's rail is not a thing this can be asked for, and a rail
         // holds one shelf at a time.
         expect(route).toContain('sessionCan(session, "mail.use")');
-        expect(route).toContain("scopeOrgIdFor(session.id)");
+        // Through Mail's own resolver, which is the shelf in the header unless
+        // somebody asked Mail to show every mailbox at once.
+        expect(route).toContain("mailShelfFor(session.id)");
     });
 
     it("validates what comes back rather than blanking the rail on a shape it does not know", () => {

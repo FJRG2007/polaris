@@ -10,14 +10,14 @@ import { ArchiveView } from "./archive-view";
 import { NoMailboxes } from "../empty-accounts";
 import { listFolders } from "@/lib/mailbox/views";
 import { requirePermission } from "@/lib/session";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { listAccountViews } from "@/lib/mailbox/accounts";
 
 export const dynamic = "force-dynamic";
 
 export default async function MailArchivePage() {
     const user = await requirePermission("mail.use");
-    const shelfOrgId = await scopeOrgIdFor(user.id);
+    const shelfOrgId = await mailShelfFor(user.id);
     const accounts = await listAccountViews(user.id, shelfOrgId);
     if (accounts.length === 0) return <NoMailboxes what="Import and export" />;
 

@@ -31,6 +31,7 @@
  * header, and an action fired as it flips must not be refused for it.
  */
 
+import { isEveryShelf, type MailShelf } from "@/lib/mailbox/shelf";
 import { prisma } from "@polaris/db";
 
 /** Raised when a mailbox is asked for by somebody it does not belong to, and
@@ -117,12 +118,16 @@ export async function ownedAccount(userId: string, accountId: string) {
  * an argument that has to be written, because the failure of forgetting it is
  * silent - a screen that lists everything looks like a screen that works.
  */
-function onShelf(userId: string, shelfOrgId: string | null) {
-    return { userId, orgId: shelfOrgId };
+/**
+ * The mailboxes a listing draws from: one shelf's, or every one of them when
+ * somebody asked Mail to merge them - see `mailbox/shelf`.
+ */
+export function onShelf(userId: string, shelfOrgId: MailShelf) {
+    return isEveryShelf(shelfOrgId) ? { userId } : { userId, orgId: shelfOrgId };
 }
 
 /** Every mailbox this person has on this shelf, in rail order. */
-export function ownedAccounts(userId: string, shelfOrgId: string | null) {
+export function ownedAccounts(userId: string, shelfOrgId: MailShelf) {
     return prisma.mailAccount.findMany({
         where: onShelf(userId, shelfOrgId),
         select: ACCOUNT_COLUMNS,
@@ -131,10 +136,7 @@ export function ownedAccounts(userId: string, shelfOrgId: string | null) {
 }
 
 /** The ids of them, for the queries that span all of them. */
-export async function ownedAccountIds(
-    userId: string,
-    shelfOrgId: string | null
-): Promise<string[]> {
+export async function ownedAccountIds(userId: string, shelfOrgId: MailShelf): Promise<string[]> {
     const rows = await prisma.mailAccount.findMany({
         where: onShelf(userId, shelfOrgId),
         select: { id: true }
@@ -170,7 +172,7 @@ export async function everyAccountId(userId: string): Promise<string[]> {
  */
 export async function unifiedAccountIds(
     userId: string,
-    shelfOrgId: string | null
+    shelfOrgId: MailShelf
 ): Promise<string[]> {
     const rows = await prisma.mailAccount.findMany({
         where: { ...onShelf(userId, shelfOrgId), unified: true },

@@ -20,7 +20,7 @@
 
 import * as core from "@polaris/core";
 import { NextResponse } from "next/server";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { apiPermission } from "@/lib/api-session";
 import { readMailPageParams } from "@/lib/mailbox/page-params";
 import { EMPTY_QUERY, listThreads } from "@/lib/mailbox/views";
@@ -47,7 +47,7 @@ export async function GET(request: Request): Promise<Response> {
     const page = await listThreads(
         user.id,
         { ...EMPTY_QUERY, ...narrow, query, cursor },
-        await scopeOrgIdFor(user.id)
+        await mailShelfFor(user.id)
     );
     return NextResponse.json(page, {
         headers: { "cache-control": "private, no-store" }

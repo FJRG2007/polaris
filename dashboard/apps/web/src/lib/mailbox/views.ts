@@ -14,13 +14,14 @@
  * Reaching the end asks for the next page; it never reaches for all of them.
  */
 
+import type { MailShelf } from "@/lib/mailbox/shelf";
 import Fuse from "fuse.js";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { namesFor } from "./contacts";
 import { addressesFrom } from "./json";
 import type { Prisma } from "@polaris/db";
-import { unifiedAccountIds } from "./access";
+import { onShelf, unifiedAccountIds } from "./access";
 import { mailCursorOf, mailCursorWhere, mailOrderBy } from "./list-order";
 
 /** One folder in the rail. */
@@ -49,12 +50,12 @@ export interface MailFolderView {
  */
 export async function listFolders(
     userId: string,
-    shelfOrgId: string | null,
+    shelfOrgId: MailShelf,
     accountId?: string
 ): Promise<MailFolderView[]> {
     const rows = await prisma.mailFolder.findMany({
         where: {
-            account: { userId, orgId: shelfOrgId },
+            account: onShelf(userId, shelfOrgId),
             ...(accountId ? { accountId } : {}),
             hidden: false,
             OR: [{ subscribed: true }, { role: { not: "none" } }]
@@ -199,7 +200,7 @@ export async function listThreads(
      *  organization's id for its work. A separate argument rather than a field
      *  on the query, because the query is built from the address bar and the
      *  shelf never is. */
-    shelfOrgId: string | null
+    shelfOrgId: MailShelf
 ): Promise<{ threads: MailThreadView[]; cursor: string }> {
     // A view that names a mailbox opens that one whatever its switch says; a
     // merged view is only the mailboxes their owner put in it, on this shelf.
@@ -676,12 +677,12 @@ export async function readThreadView(
  */
 export async function unreadCounts(
     userId: string,
-    shelfOrgId: string | null
+    shelfOrgId: MailShelf
 ): Promise<{ total: number; byAccount: Record<string, number> }> {
     const rows = await prisma.mailMessage.groupBy({
         by: ["accountId"],
         where: {
-            account: { userId, orgId: shelfOrgId },
+            account: onShelf(userId, shelfOrgId),
             folder: { role: "inbox" },
             seen: false,
             OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }]

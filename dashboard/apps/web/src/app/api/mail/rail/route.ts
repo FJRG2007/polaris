@@ -17,7 +17,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { listAccountViews } from "@/lib/mailbox/accounts";
 import { resolveSession, sessionCan } from "@/lib/session";
 import { listFolders, unreadCounts } from "@/lib/mailbox/views";
@@ -33,7 +33,7 @@ export async function GET(): Promise<Response> {
     }
     // The shelf being worked from, exactly as the layout reads it: a rail holds
     // somebody's own mailboxes or an organization's, never the two at once.
-    const shelfOrgId = await scopeOrgIdFor(session.id);
+    const shelfOrgId = await mailShelfFor(session.id);
     const [accounts, folders, unread] = await Promise.all([
         listAccountViews(session.id, shelfOrgId),
         listFolders(session.id, shelfOrgId),

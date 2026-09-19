@@ -14,6 +14,7 @@
  * a screen is handed.
  */
 
+import type { MailShelf } from "@/lib/mailbox/shelf";
 import { checkSmtp } from "./send";
 import { checkImap } from "./imap";
 import { prisma } from "@polaris/db";
@@ -116,7 +117,7 @@ export function accountView(row: AccountRow): MailAccountView {
 
 export async function listAccountViews(
     userId: string,
-    shelfOrgId: string | null
+    shelfOrgId: MailShelf
 ): Promise<MailAccountView[]> {
     return (await ownedAccounts(userId, shelfOrgId)).map(accountView);
 }
@@ -542,7 +543,7 @@ export async function removeAccount(userId: string, accountId: string): Promise<
  *  half-applied. */
 export async function reorderAccounts(
     userId: string,
-    shelfOrgId: string | null,
+    shelfOrgId: MailShelf,
     orderedIds: readonly string[]
 ): Promise<void> {
     // One shelf's rail at a time, which is the only rail anybody can drag.

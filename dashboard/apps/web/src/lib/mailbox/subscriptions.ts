@@ -36,6 +36,7 @@
  * the sender instead.
  */
 
+import type { MailShelf } from "@/lib/mailbox/shelf";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { addressesFrom } from "./json";
@@ -209,7 +210,7 @@ const VIEW_SELECT = {
  *  heard from first. */
 export async function listSubscriptions(
     userId: string,
-    shelfOrgId: string | null
+    shelfOrgId: MailShelf
 ): Promise<MailSubscriptionView[]> {
     const accountIds = await ownedAccountIds(userId, shelfOrgId);
     if (accountIds.length === 0) return [];

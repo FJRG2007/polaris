@@ -62,6 +62,7 @@ import {
     Inbox,
     Layers,
     Plus,
+    Settings,
     SendHorizontal,
     Star,
     Tag,
@@ -187,15 +188,29 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                 <p className="text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
                     Mailboxes
                 </p>
-                <Link
-                    href="/mail/settings/accounts"
-                    className="text-foreground-subtle hover:text-foreground"
-                    aria-label="Add a mailbox"
-                    title="Add a mailbox"
-                    onClick={onNavigate}
-                >
-                    <Plus className="size-3.5 shrink-0" aria-hidden />
-                </Link>
+                <span className="flex items-center gap-2">
+                    <Link
+                        href="/mail/settings/accounts"
+                        className="text-foreground-subtle hover:text-foreground"
+                        aria-label="Add a mailbox"
+                        title="Add a mailbox"
+                        onClick={onNavigate}
+                    >
+                        <Plus className="size-3.5 shrink-0" aria-hidden />
+                    </Link>
+                    {/* The way into Mail's own settings, beside the mailboxes
+                        they are mostly about. It was reachable only by knowing
+                        the address, which is not a way of reaching anything. */}
+                    <Link
+                        href="/mail/settings/general"
+                        className="text-foreground-subtle hover:text-foreground"
+                        aria-label="Mail settings"
+                        title="Mail settings"
+                        onClick={onNavigate}
+                    >
+                        <Settings className="size-3.5 shrink-0" aria-hidden />
+                    </Link>
+                </span>
             </div>
 
             {accounts.length === 0 ? (

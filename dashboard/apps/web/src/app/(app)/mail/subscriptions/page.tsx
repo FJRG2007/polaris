@@ -11,7 +11,7 @@
  */
 
 import { requirePermission } from "@/lib/session";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { SubscriptionsView } from "./subscriptions-view";
 import { MOST_SUBSCRIPTIONS, listSubscriptions } from "@/lib/mailbox/subscriptions";
 
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MailSubscriptionsPage() {
     const user = await requirePermission("mail.use");
-    const subscriptions = await listSubscriptions(user.id, await scopeOrgIdFor(user.id));
+    const subscriptions = await listSubscriptions(user.id, await mailShelfFor(user.id));
     return (
         <SubscriptionsView
             subscriptions={subscriptions}

@@ -53,6 +53,7 @@ describe("reading somebody's mail preferences", () => {
         expect(Object.keys(JSON.parse(stringifyMailPreferences(chosen))).sort()).toEqual([
             "afterFiling",
             "keys",
+            "mailboxes",
             "markRead",
             "sort",
             "undoSeconds"
@@ -94,5 +95,29 @@ describe("the undo window in words", () => {
     it("says what off actually means", () => {
         expect(mailUndoLabel(0)).toBe("Send immediately");
         expect(mailUndoLabel(10)).toBe("10 seconds");
+    });
+});
+
+describe("which mailboxes Mail shows", () => {
+    it("follows the shelf for somebody who has never chosen", () => {
+        expect(MAIL_PREF_DEFAULTS.mailboxes).toBe("shelf");
+        expect(parseMailPreferences(null).mailboxes).toBe("shelf");
+        expect(parseMailPreferences(JSON.stringify({ mailboxes: "both" })).mailboxes).toBe("shelf");
+    });
+
+    it("keeps the choice to show them all", () => {
+        expect(parseMailPreferences(JSON.stringify({ mailboxes: "all" })).mailboxes).toBe("all");
+        expect(
+            parseMailPreferences(
+                stringifyMailPreferences({ ...MAIL_PREF_DEFAULTS, mailboxes: "all" })
+            ).mailboxes
+        ).toBe("all");
+    });
+
+    it("refuses a form that asks for something nobody offers", () => {
+        expect(
+            mailPreferencesSchema.safeParse({ ...MAIL_PREF_DEFAULTS, mailboxes: "everything" })
+                .success
+        ).toBe(false);
     });
 });
