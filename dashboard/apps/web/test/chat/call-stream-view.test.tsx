@@ -5,7 +5,8 @@
  *
  * In a direct message a share is offered, not taken, and the offer sits among
  * the people - first, to their left - rather than in a row above them. Once
- * watched, the stream has the room and the people stay beside it. Right-clicking
+ * watched, the stream has the band to itself, and letting go of it brings the
+ * people back; with the call expanded, the people are a row under it. Right-clicking
  * the stream mutes it, sets its volume, pops it out and sets how far voices are
  * lowered while it plays; right-clicking a person in a call of two shows
  * combining greyed out.
@@ -136,13 +137,75 @@ describe("a stream in a direct message", () => {
         expect(watchedStreams()).toEqual([]);
     });
 
-    it("keeps the people beside the stream once it is watched", () => {
+    it("shows only the stream once it is watched, and the people again once let go", () => {
         render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />);
         fireEvent.click(screen.getByTitle("Watch Bo - screen"));
-        const people = screen.getByRole("list", { name: "People in the call" });
-        expect(within(people).getByText("You")).toBeTruthy();
-        expect(within(people).getByText("Bo")).toBeTruthy();
         expect(watchedStreams()).toEqual(["screen:seat-bo"]);
+        expect(document.querySelector("video")).toBeTruthy();
+        // The band holds the picture alone: no faces, no tiles of people.
+        expect(screen.queryByText("You")).toBeNull();
+
+        fireEvent.click(screen.getByRole("button", { name: "Back to the people" }));
+        expect(watchedStreams()).toEqual([]);
+        expect(screen.getByText("You")).toBeTruthy();
+        expect(screen.getByTitle("Watch Bo - screen")).toBeTruthy();
+    });
+
+    it("lists the people in a row under the stream once the call is expanded", () => {
+        render(
+            <CallRoom
+                meetingId="m1"
+                place="direct"
+                call={call()}
+                expanded
+                onExpand={() => undefined}
+                onLeave={() => undefined}
+            />
+        );
+        fireEvent.click(screen.getByTitle("Watch Bo - screen"));
+        const stream = document.querySelector("video")!;
+        const you = screen.getByText("You");
+        // After the stream in the document, which in a column is under it.
+        expect(stream.compareDocumentPosition(you) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(screen.getByText("Bo")).toBeTruthy();
+
+        // Asked for by name, the stream takes the call whole.
+        fireEvent.click(screen.getByRole("button", { name: "Make this bigger" }));
+        expect(screen.queryByText("You")).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Back to the grid" }));
+        expect(screen.getByText("You")).toBeTruthy();
+    });
+
+    it("offers expanding the call, and says which way it goes", () => {
+        const onExpand = vi.fn();
+        const { rerender } = render(
+            <CallRoom
+                meetingId="m1"
+                place="direct"
+                call={call()}
+                onExpand={onExpand}
+                onLeave={() => undefined}
+            />
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Expand the call" }));
+        expect(onExpand).toHaveBeenLastCalledWith(true);
+        rerender(
+            <CallRoom
+                meetingId="m1"
+                place="direct"
+                call={call()}
+                expanded
+                onExpand={onExpand}
+                onLeave={() => undefined}
+            />
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Shrink the call" }));
+        expect(onExpand).toHaveBeenLastCalledWith(false);
+    });
+
+    it("marks somebody sharing a screen as live", () => {
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />);
+        expect(screen.getAllByRole("img", { name: "Sharing a screen" })).toHaveLength(1);
     });
 
     it("offers mute, volume, pop-out and attenuation on right-click", () => {

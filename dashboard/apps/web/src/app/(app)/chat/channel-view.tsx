@@ -266,6 +266,10 @@ export function ChannelView({
     // rather than this screen guessing: what is being watched depends on what
     // somebody in there asked for. It goes back on its own when they stop.
     const [staged, setStaged] = useState(false);
+    // Whether a call in a direct message has been expanded to take the column,
+    // with the conversation put away behind it - see `directLayout`. Held per
+    // call: the next one starts as a band again.
+    const [expandedCall, setExpandedCall] = useState<string | null>(null);
     /**
      * How tall the call is drawn, when somebody has decided for themselves.
      *
@@ -1490,6 +1494,7 @@ export function ChannelView({
      *  the column the call takes and how the people in it are drawn, and those
      *  two answers must not be able to disagree with each other. */
     const callPlace: CallPlace = voiceRoom ? "room" : directCall ? "direct" : "channel";
+    const expanded = callPlace === "direct" && inCall !== null && expandedCall === inCall;
     // Kept per place, because they are different questions: how much of a direct
     // message a call may take is not how much of a channel it may take, and
     // somebody who sized one has said nothing about the other.
@@ -2036,13 +2041,13 @@ export function ChannelView({
                         // Only once somebody has dragged it. Until then the share
                         // decides, which is what keeps it right as the window
                         // changes rather than pinned to one window's pixels.
-                        style={bandHeight === null ? undefined : { height: bandHeight }}
+                        style={bandHeight === null || expanded ? undefined : { height: bandHeight }}
                         className={cn(
                             "flex min-h-0 shrink-0 flex-col overflow-hidden border-b border-border",
                             // How much of the column this is allowed to take -
                             // see `call-band`, which is where the reasoning
                             // lives.
-                            callBandHeight(callPlace, staged)
+                            callBandHeight(callPlace, staged, expanded)
                         )}
                     >
                         <CallRoom
@@ -2056,6 +2061,12 @@ export function ChannelView({
                             // the call moves into a new group instead.
                             mayInvite={channel.kind === "dm" || channel.mayInvite}
                             onStage={setStaged}
+                            expanded={expanded}
+                            onExpand={
+                                callPlace === "direct"
+                                    ? (next) => setExpandedCall(next ? inCall : null)
+                                    : undefined
+                            }
                             onLeave={() => {
                                 leaveCall();
                                 checkCall();
@@ -2082,7 +2093,7 @@ export function ChannelView({
                 {/* Only where there is something to divide. A voice room is the
                     column - the conversation is beside it, not under it - so
                     there is no line between two things to move. */}
-                {inCall && callPlace !== "room" && (
+                {inCall && callPlace !== "room" && !expanded && (
                     <ResizeHandle
                         axis="y"
                         size={bandSize}
@@ -2095,8 +2106,12 @@ export function ChannelView({
                     />
                 )}
 
-                {/* Down the side in a voice room - see `conversation`. */}
-                {!voiceRoom && conversation}
+                {/* Down the side in a voice room - see `conversation`. Put away,
+                    not taken down, behind an expanded call: what somebody was
+                    typing is still there when it shrinks again. */}
+                {!voiceRoom && (
+                    <div className={expanded ? "hidden" : "contents"}>{conversation}</div>
+                )}
             </div>
 
             {/* The record of a voice room, beside the room rather than under

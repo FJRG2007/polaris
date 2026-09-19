@@ -62,12 +62,48 @@ export function callBareFaces(place: CallPlace, staged: boolean, pictures: boole
 }
 
 /**
+ * How a direct message's call is laid out around a stream somebody is watching.
+ *
+ * Three shapes, the three a voice client draws a call of a few people in:
+ *
+ * - `people`: nothing is being watched, so the band is the faces, with any
+ *   screen that is up offered among them.
+ * - `stream`: the stream alone. In the band's ordinary size there is room for a
+ *   picture or for a row of heads, not both - the stream is the thing somebody
+ *   pressed, so it gets the band, and letting go of it brings the people back.
+ *   Also what a stream asked for by name gets once the call is expanded.
+ * - `stream-over-people`: the call expanded to the whole column, where there is
+ *   room for both - the stream on top and the people in a row under it.
+ *
+ * Full screen is not one of these: it is the stream's own tile taken to the
+ * whole display, and a tile holds nothing but its picture.
+ */
+export type DirectLayout = "people" | "stream" | "stream-over-people";
+
+/**
+ * @param watching Whether any stream is being watched here.
+ * @param expanded Whether the call has been expanded to take the column.
+ * @param enlarged Whether a stream was asked for by name ("make this bigger").
+ */
+export function directLayout(
+    watching: boolean,
+    expanded: boolean,
+    enlarged: boolean
+): DirectLayout {
+    if (!watching) return "people";
+    return expanded && !enlarged ? "stream-over-people" : "stream";
+}
+
+/**
  * The height the call is drawn at.
  *
  * `staged` is whether a shared screen - or a face somebody asked to see bigger -
- * currently has the big place in the room.
+ * currently has the big place in the room. `expanded` is a call in a direct
+ * message somebody asked to take the whole column - the one case a direct call
+ * is not capped, with the conversation put away behind it until it is shrunk.
  */
-export function callBandHeight(place: CallPlace, staged: boolean): string {
+export function callBandHeight(place: CallPlace, staged: boolean, expanded = false): string {
+    if (expanded && place === "direct") return "flex-1";
     const cap = bandCap(place, staged);
     // A room has nothing above or below it to share the column with, staged or
     // not: the conversation is beside it.

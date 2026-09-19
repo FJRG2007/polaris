@@ -60,8 +60,8 @@ import { useCallVolume } from "./call-volumes";
 import { PersonMenu, StreamMenu } from "./call-menus";
 import { useZoomPan } from "@/components/use-zoom-pan";
 import { setWatchedStreams } from "./call-stream-audio";
-import { callBareFaces, type CallPlace } from "./call-band";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
+import { callBareFaces, directLayout, type CallPlace } from "./call-band";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
@@ -85,6 +85,8 @@ import {
 import {
     Check,
     ChevronUp,
+    ChevronsDown,
+    ChevronsUp,
     Circle,
     Expand,
     Eye,
@@ -143,6 +145,8 @@ export function CallRoom({
     onLeave,
     onMoved,
     onStage,
+    expanded = false,
+    onExpand,
     /** Whoever is watching, when they have an account. The guest link is the
      *  host's to open and nobody else's, so the control is drawn from who the
      *  call says its host is rather than from who opened this screen - offering
@@ -176,6 +180,12 @@ export function CallRoom({
      *  the room. Must keep its identity across renders, as any state setter
      *  does. */
     onStage?: (staged: boolean) => void;
+    /** A call in a direct message that has been expanded to take the whole
+     *  column - see `directLayout` in `call-band`. */
+    expanded?: boolean;
+    /** Expand the call, or shrink it back to a band. Absent where the call is
+     *  not a band to begin with. */
+    onExpand?: (expanded: boolean) => void;
     viewerId?: string;
     mayInvite?: boolean;
 }) {
@@ -352,22 +362,10 @@ export function CallRoom({
             menu={streamMenu(stage)}
         />
     );
-    /**
-     * Everybody in the call, drawn as faces.
-     *
-     * One list for both places that draw one - the column beside a watched
-     * stream and the row where nothing is being watched - because they are the
-     * same people saying the same things, at two sizes. Written twice they drift,
-     * and they had: the column was a raised hand's place in the queue and your
-     * own reactions short of the row, so a reaction you sent was the one nobody
-     * could see while you were watching a stream.
-     *
-     * @param compact - Smaller, for the column beside a stream.
-     */
-    const faces = (compact: boolean) => (
+    /** Everybody in the call, drawn as faces. */
+    const faces = () => (
         <>
             <Face
-                compact={compact}
                 name="You"
                 personId={mine?.userId ?? viewerId ?? null}
                 speaking={
@@ -390,7 +388,6 @@ export function CallRoom({
                 .map((person) => (
                     <Face
                         key={person.id}
-                        compact={compact}
                         name={person.name}
                         personId={person.userId ?? null}
                         guest={person.guest}
@@ -440,6 +437,9 @@ export function CallRoom({
      *  see `call-band`, which owns both of the questions `place` answers and is
      *  where the reasoning lives. */
     const bareFaces = callBareFaces(place, staged, pictures);
+    /** How a direct message's call is laid out around what is being watched -
+     *  see `directLayout` in `call-band`, which is where the reasoning lives. */
+    const layout = place === "direct" ? directLayout(showing.length > 0, expanded, enlarged) : null;
     /**
      * Whether the people are drawn under whatever is being watched.
      *
@@ -448,19 +448,18 @@ export function CallRoom({
      * a band a few hundred pixels tall, and a screen worth opening plus a strip
      * of heads under it leaves neither of them a usable size: the screen is the
      * thing somebody chose to look at, so it gets the band, and the faces come
-     * back the moment it is closed.
+     * back the moment it is let go of. Expanded, there is room for both, and the
+     * people are a row under the stream.
      */
-    const peopleShown = !enlarged && !(place === "direct" && staged);
-    /**
-     * In a direct message a watched stream sits to the left of the people, the
-     * way every voice client draws a call of a few: the stream gets the room,
-     * and the faces stay in sight in a narrow column beside it - a row under it
-     * on a phone, where there is no width to spare.
-     */
-    const sideBySide = place === "direct" && showing.length > 0 && !enlarged;
+    const peopleShown =
+        !enlarged && !(place === "direct" && staged && layout !== "stream-over-people");
     /** Offered shares sit among the people, first, rather than in a row above
      *  them. Only where the people are drawn in the main area. */
     const offersInline = place === "direct" && peopleShown;
+    /** In the band, a stream being watched is all there is: pressing it again
+     *  lets go of it and brings the people back, rather than enlarging a picture
+     *  that already has the whole band. */
+    const letGo = layout === "stream" && !expanded;
 
     /** Said out loud rather than worked out again outside, because it is decided
      *  here: what is being watched turns on what somebody in this room asked
@@ -509,8 +508,31 @@ export function CallRoom({
                 down. Both are one-off decisions rather than things anybody
                 reaches for mid-sentence, so they sit up here as icons and leave
                 the bar at the bottom to the five that are. */}
-            {(viewerId || canRecord) && (
+            {(viewerId || canRecord || onExpand) && (
                 <div className="flex shrink-0 items-center justify-end gap-1">
+                    {/* The band, made the whole column and back. Where a
+                        watched stream gets the people in a row under it -
+                        see `directLayout`. */}
+                    {onExpand && (
+                        <button
+                            type="button"
+                            onClick={() => onExpand(!expanded)}
+                            aria-pressed={expanded}
+                            aria-label={expanded ? "Shrink the call" : "Expand the call"}
+                            title={
+                                expanded
+                                    ? "Shrink the call - the conversation comes back"
+                                    : "Expand the call to the whole column"
+                            }
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            {expanded ? (
+                                <ChevronsUp className="size-4" />
+                            ) : (
+                                <ChevronsDown className="size-4" />
+                            )}
+                        </button>
+                    )}
                     {canRecord && (
                         <button
                             type="button"
@@ -766,40 +788,30 @@ export function CallRoom({
             {showing.length > 0 && (
                 <div
                     className={cn(
-                        "flex min-h-0 flex-[3] gap-2",
-                        sideBySide ? "flex-col sm:flex-row" : "flex-col"
+                        "grid min-h-0 min-w-0 flex-[3] gap-2",
+                        gridColumns(showing.length)
                     )}
                 >
-                    <div
-                        className={cn(
-                            "grid min-h-0 min-w-0 flex-1 gap-2",
-                            gridColumns(showing.length)
-                        )}
-                    >
-                        {showing.map((stage) => (
-                            <Tile
-                                key={stage.key}
-                                stream={stage.stream}
-                                name={stage.name}
-                                personId={null}
-                                focused={live === stage.key}
-                                onFocus={() => focus(stage.key)}
-                                // A shared screen is usually text, and the reason
-                                // anybody stares at one is to read a line of it.
-                                zoomable
-                                volumeKey={undefined}
-                                streamMenu={streamMenu(stage)}
-                            />
-                        ))}
-                    </div>
-                    {sideBySide && (
-                        <ul
-                            aria-label="People in the call"
-                            className="flex shrink-0 items-start gap-3 overflow-x-auto overscroll-contain sm:w-20 sm:flex-col sm:items-center sm:overflow-y-auto sm:overflow-x-hidden"
-                        >
-                            {faces(true)}
-                        </ul>
-                    )}
+                    {showing.map((stage) => (
+                        <Tile
+                            key={stage.key}
+                            stream={stage.stream}
+                            name={stage.name}
+                            personId={null}
+                            focused={letGo || live === stage.key}
+                            onFocus={
+                                letGo
+                                    ? () => setAway((was) => [...was, stage.key])
+                                    : () => focus(stage.key)
+                            }
+                            backLabel={letGo ? "Back to the people" : undefined}
+                            // A shared screen is usually text, and the reason
+                            // anybody stares at one is to read a line of it.
+                            zoomable
+                            volumeKey={undefined}
+                            streamMenu={streamMenu(stage)}
+                        />
+                    ))}
                 </div>
             )}
 
@@ -873,7 +885,7 @@ export function CallRoom({
                                 {offer(stage, "h-24 w-40")}
                             </li>
                         ))}
-                    {faces(false)}
+                    {faces()}
                 </ul>
             )}
 
@@ -1431,8 +1443,6 @@ function clock(seconds: number): string {
 /** How big the face in an empty tile is. One size for every tile: a grid where
  *  the faces are different sizes reads as a mistake. */
 const AVATAR_SIZE = 72;
-/** The same, beside a stream, where the faces are a column rather than the room. */
-const COMPACT_AVATAR_SIZE = 44;
 
 /** What a stream's menu needs, less the thing it wraps. */
 type StreamMenuFor = Omit<React.ComponentProps<typeof StreamMenu>, "children">;
@@ -1515,7 +1525,6 @@ function Face({
     onAskCombine,
     combineAsked = false,
     combineLocked = false,
-    compact = false,
     volumeKey
 }: {
     name: string;
@@ -1538,8 +1547,6 @@ function Face({
     onAskCombine?: () => void;
     combineAsked?: boolean;
     combineLocked?: boolean;
-    /** Smaller, for the column beside a watched stream. */
-    compact?: boolean;
     /** Who this face's volume is remembered against. Absent on your own, which
      *  has no volume to set - it is never played back. */
     volumeKey?: string;
@@ -1547,10 +1554,10 @@ function Face({
     const [volume] = useCallVolume(volumeKey ?? "");
 
     const face = (
-        <li className={cn("flex shrink-0 flex-col items-center gap-1", compact ? "w-16" : "w-20")}>
+        <li className="flex w-20 shrink-0 flex-col items-center gap-1">
             <span className="relative">
                 <Avatar
-                    size={compact ? COMPACT_AVATAR_SIZE : AVATAR_SIZE}
+                    size={AVATAR_SIZE}
                     person={{ id: personId, name }}
                     callBadge={deafened ? "deafened" : muted ? "muted" : null}
                     className={cn(
@@ -1642,6 +1649,7 @@ function Tile({
     reactions = [],
     focused = false,
     onFocus,
+    backLabel = "Back to the grid",
     onCombine,
     onAskCombine,
     combineAsked = false,
@@ -1696,6 +1704,8 @@ function Tile({
     /** Make this the big one, or put it back. Absent where there is nothing to
      *  enlarge - a tile with no picture in it. */
     onFocus?: () => void;
+    /** What pressing a focused tile goes back to, said on the button. */
+    backLabel?: string;
     /** Go quiet and listen through this person's device, and ask them to go
      *  quiet and listen through this one. Both absent once the two are already
      *  sharing a room, and on a tile that is not somebody else's. */
@@ -1992,8 +2002,8 @@ function Tile({
                         <button
                             type="button"
                             onClick={onFocus}
-                            aria-label={focused ? "Back to the grid" : "Make this bigger"}
-                            title={focused ? "Back to the grid" : "Make this bigger"}
+                            aria-label={focused ? backLabel : "Make this bigger"}
+                            title={focused ? backLabel : "Make this bigger"}
                             className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                         >
                             {focused ? (
