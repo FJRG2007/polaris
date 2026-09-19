@@ -15,6 +15,7 @@
  * contents, so the page does not move under the reader when it does.
  */
 
+import { firstName, greetingFor } from "@polaris/core";
 import { WidgetCard } from "./widget-card";
 import { ShortcutPicker } from "./shortcut-picker";
 import { CustomizeDialog } from "./customize-dialog";
@@ -77,14 +78,6 @@ const SPAN: Record<OverviewWidgetSize, string> = {
 /** The same widths as columns, for the arithmetic that fits a row to the grid. */
 const COLUMNS: Record<OverviewWidgetSize, number> = { sm: 1, md: 2, lg: 3, xl: 4 };
 
-/** "Good morning" and the rest, by the reader's own clock. */
-function greetingFor(date: Date): string {
-    const hour = date.getHours();
-    if (hour < 6) return "Good night";
-    if (hour < 12) return "Good morning";
-    if (hour < 19) return "Good afternoon";
-    return "Good evening";
-}
 
 export function OverviewGrid({
     name,
@@ -340,7 +333,7 @@ export function OverviewGrid({
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">
-                        {greeting ? (hello ? `${hello}, ${name.split(" ")[0]}` : `Welcome back, ${name.split(" ")[0]}`) : "Overview"}
+                        {greeting ? (hello ? `${hello}, ${firstName(name)}` : `Welcome back, ${firstName(name)}`) : "Overview"}
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                         What is running, what needs you, and the places you go most.

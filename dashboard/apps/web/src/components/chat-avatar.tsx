@@ -19,7 +19,8 @@
 import { cn } from "@polaris/ui";
 import { useState } from "react";
 import { chatAvatarUrl } from "@/lib/avatar-url";
-import { Avatar, initials, type AvatarPerson } from "@/components/avatar";
+import { initials } from "@polaris/core";
+import { Avatar, type AvatarPerson } from "@/components/avatar";
 
 /** How many faces fit in the mosaic before the last cell becomes a count. */
 const CELLS = 4;

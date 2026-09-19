@@ -23,7 +23,7 @@
 import { cn } from "@polaris/ui";
 import { useState } from "react";
 import { bannerUrl, orgBannerUrl } from "@/lib/avatar-url";
-import { tintFor } from "@/components/avatar";
+import { tintFor } from "@polaris/core";
 import { accentGradient, useAccent, type AccentSubject } from "@/lib/profile-accent";
 import { fillCss, readFill, type BannerFill } from "@polaris/core";
 import { useProfileStyle } from "@/components/profile-style-store";

@@ -10,7 +10,8 @@
 
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Avatar, AvatarStack, initials } from "@/components/avatar";
+import { initials } from "@polaris/core";
+import { Avatar, AvatarStack } from "@/components/avatar";
 import { gravatarHash, MAX_AVATAR_BYTES, sniffImageMime } from "@/lib/avatar-service";
 
 /** A file with the given first bytes, padded so a signature check has room. */

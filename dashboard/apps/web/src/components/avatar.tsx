@@ -15,6 +15,7 @@
  * four near-copies it replaced.
  */
 
+import { initials, tintFor } from "@polaris/core";
 import { cn } from "@polaris/ui";
 import { createPortal } from "react-dom";
 import { useState, type CSSProperties } from "react";
@@ -58,37 +59,6 @@ export interface AvatarPerson {
 }
 
 /**
- * The colour behind somebody's initials, and the fallback for the band across
- * their profile.
- *
- * Everybody used to get `bg-muted`, which is a surface token: hue 225, so a
- * whole column of faces came out the same faint blue and read as a UI element
- * that had failed to load rather than as a person. A face with no photo still
- * has to look deliberate.
- *
- * So the hue comes from the id - stable, so the same person is the same colour
- * on every screen and across sessions, and spread, so two people in a list are
- * tellable apart before their initials are read. Saturation and lightness are
- * fixed rather than derived: they are what keeps white text legible on all 360
- * of them, and what stops the palette turning into a bag of sweets.
- *
- * Fixed values rather than tokens because they must not move with the theme: the
- * initials are white on this in both, and a background that lightened for the
- * light theme would take the contrast with it.
- *
- * Exported because a profile with no banner falls back to it - somebody whose
- * face is initials should not get a band in a colour they are not associated
- * with anywhere else. See `ProfileBanner`.
- */
-export function tintFor(id: string): string {
-    let hash = 0;
-    for (let index = 0; index < id.length; index += 1) {
-        hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
-    }
-    return `hsl(${hash % 360} 36% 42%)`;
-}
-
-/**
  * Whether a face offers to open the photo behind it.
  *
  * Three things have to hold, and each of them is a different way of being wrong:
@@ -106,16 +76,6 @@ export function photoOpens(input: {
     readonly source: string | null;
 }): boolean {
     return input.openable && input.hasPhoto && input.allowed && input.source !== null;
-}
-
-/** Initials from a display name. Two words give two letters, one word gives two
- *  of its own, and something unnameable gives a question mark. */
-export function initials(name: string): string {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return "?";
-    return (
-        parts.length === 1 ? parts[0]!.slice(0, 2) : `${parts[0]![0]}${parts[1]![0]}`
-    ).toUpperCase();
 }
 
 /**

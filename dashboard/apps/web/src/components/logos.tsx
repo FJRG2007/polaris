@@ -5,7 +5,7 @@
  */
 
 import { cn } from "@polaris/ui";
-import { tintFor } from "./avatar";
+import { tintFor } from "@polaris/core";
 import { Blocks } from "lucide-react";
 import { DymoMark } from "./dymo-mark";
 import * as brand from "./brand-icons";

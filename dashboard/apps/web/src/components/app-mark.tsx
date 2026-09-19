@@ -21,7 +21,7 @@
 
 import { cn } from "@polaris/ui";
 import type { SVGProps } from "react";
-import { tintFor } from "@/components/avatar";
+import { tintFor } from "@polaris/core";
 import type { AppManifest } from "@/lib/apps/catalog";
 import { DiscordMark, SteamMark } from "@/components/brand-icons";
 

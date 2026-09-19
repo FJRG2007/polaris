@@ -67,6 +67,7 @@ export * from "./password-safety.js";
 export * from "./pleasantries.js";
 export * from "./paths.js";
 export * from "./scope.js";
+export * from "./faces.js";
 export * from "./search-text.js";
 export * from "./labels.js";
 export * from "./text-safety.js";

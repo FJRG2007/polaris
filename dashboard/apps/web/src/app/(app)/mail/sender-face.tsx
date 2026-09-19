@@ -27,7 +27,7 @@
 
 import { cn } from "@polaris/ui";
 import { useEffect, useState } from "react";
-import { initials, tintFor } from "@/components/avatar";
+import { initials, tintFor } from "@polaris/core";
 import { markColor, plateFor } from "@/lib/mailbox/mark-plate";
 
 /** How big the mark is sampled at. A logo's colour does not need more, and this
