@@ -27,6 +27,7 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useChatPane } from "./use-chat-pane";
 import { resetPaneLayout } from "./pane-preferences";
+import { PersonCardProvider } from "./person-card";
 
 /**
  * What the thread may be narrowed and widened to.
@@ -107,7 +108,15 @@ export function ThreadPanel({
     );
 
     return (
-        <>
+        // A card opened from a name in the thread writes a mention into the
+        // thread's own box, not the channel's.
+        <PersonCardProvider
+            channelId={root.channelId}
+            viewerId={viewerId}
+            onMention={(text) =>
+                setInserting((current) => ({ token: (current?.token ?? 0) + 1, text }))
+            }
+        >
             {/* The panel is after the line, so dragging towards it widens it -
                 which is what `side` tells the handle. Only where there is a
                 conversation beside it: on a phone the thread is the screen. */}
@@ -261,6 +270,6 @@ export function ThreadPanel({
                     }}
                 />
             </aside>
-        </>
+        </PersonCardProvider>
     );
 }

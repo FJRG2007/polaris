@@ -51,6 +51,7 @@ import { RichText } from "@/components/rich-text/rich-text";
 import { VideoPreview } from "@/components/video-preview";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
 import { AttachmentViewer, previewableAs, type ViewedFile } from "./attachment-viewer";
+import { usePersonPress } from "@/components/person-press";
 
 /**
  * A file on a message that is not a picture, a recording or a clip.
@@ -704,6 +705,10 @@ function Message({
     const [revealed, setRevealed] = useState(false);
     const direct = useOpenDirect(onError);
     const author = message.authorName ?? "Somebody who has left";
+    /** What pressing a name or a face does here: their card, where the screen
+     *  draws cards - see `PersonCardProvider`. Where it does not, a name still
+     *  opens the conversation with them and a face still opens its photo. */
+    const press = usePersonPress();
     /**
      * Rewriting this one, when it is a thing that can be rewritten.
      *
@@ -802,14 +807,35 @@ function Message({
                             onNickname={onNickname}
                             onError={onError}
                         >
-                            <span className="inline-flex">
-                                <Avatar
-                                    openable
-                                    decorated
-                                    person={{ id: message.authorId, name: author }}
-                                    size={28}
-                                />
-                            </span>
+                            {press ? (
+                                // The face opens the card, like the name beside
+                                // it. The photo is one press further, on the
+                                // card's own face.
+                                <button
+                                    type="button"
+                                    aria-label={`View ${author}'s profile`}
+                                    title={author}
+                                    onClick={(event) =>
+                                        press({ id: message.authorId!, name: author }, event.currentTarget)
+                                    }
+                                    className="inline-flex rounded-full"
+                                >
+                                    <Avatar
+                                        decorated
+                                        person={{ id: message.authorId, name: author }}
+                                        size={28}
+                                    />
+                                </button>
+                            ) : (
+                                <span className="inline-flex">
+                                    <Avatar
+                                        openable
+                                        decorated
+                                        person={{ id: message.authorId, name: author }}
+                                        size={28}
+                                    />
+                                </span>
+                            )}
                         </Writer>
                     ) : (
                         <span className="inline-flex size-7 items-center justify-center rounded-full bg-muted text-[0.625rem] text-muted-foreground">
@@ -821,7 +847,32 @@ function Message({
                 <div className="min-w-0 flex-1 pb-0.5">
                     {!grouped && (
                         <p className="flex items-baseline gap-2">
-                            {writer ? (
+                            {press && message.authorId ? (
+                                <Writer
+                                    person={{ userId: message.authorId, name: author }}
+                                    channelId={message.channelId}
+                                    viewerId={viewerId}
+                                    onMention={onMention}
+                                    onNickname={onNickname}
+                                    onError={onError}
+                                >
+                                    {/* Your own name too: the card is how anybody
+                                        sees what they look like to everybody else. */}
+                                    <button
+                                        type="button"
+                                        title={`View ${author}'s profile`}
+                                        onClick={(event) =>
+                                            press(
+                                                { id: message.authorId!, name: author },
+                                                event.currentTarget
+                                            )
+                                        }
+                                        className="rounded text-left text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
+                                    >
+                                        <PersonName id={message.authorId} name={author} />
+                                    </button>
+                                </Writer>
+                            ) : writer ? (
                                 <Writer
                                     person={{ userId: writer, name: author }}
                                     channelId={message.channelId}

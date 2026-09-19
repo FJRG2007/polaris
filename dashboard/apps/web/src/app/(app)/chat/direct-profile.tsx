@@ -43,23 +43,16 @@
  * request for the profile itself, once, and nothing after that.
  */
 
-import Link from "next/link";
-import { AtSign, MoreHorizontal, X } from "lucide-react";
-import { profileAction } from "./actions";
+import { MoreHorizontal, X } from "lucide-react";
 import { useChat } from "./chat-context";
 import { SidePane } from "./side-pane";
 import { useWideScreen } from "./use-wide-screen";
-import { useEffect, useState } from "react";
-import { Avatar } from "@/components/avatar";
+import { useState } from "react";
 import { NicknameDialog } from "./nickname-dialog";
-import type { ChatProfile } from "@/lib/chat/profiles";
-import { MutualPanel } from "@/components/mutual-panel";
 import { MemberMenu, type MenuPerson } from "./member-menu";
-import { usePresence } from "@/components/presence-store";
-import { ProfileBanner } from "@/components/profile-banner";
-import { PersonName } from "@/components/person-name";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Skeleton } from "@polaris/ui";
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
+import { ProfileDetails, useChatProfile } from "./profile-details";
 
 /** Somebody, as this panel draws them. */
 export interface DirectPerson {
@@ -67,167 +60,11 @@ export interface DirectPerson {
     readonly name: string;
 }
 
-/**
- * Their profile, asked for inside the conversation it is being read in.
- *
- * The conversation is not context here, it is the permission: an action that
- * resolved a bare id into somebody's handle would be a directory of the whole
- * instance. See `chatProfile`.
- */
-function useProfile(
-    channelId: string,
-    userId: string | null
-): { profile: ChatProfile | null; loading: boolean } {
-    const [profile, setProfile] = useState<ChatProfile | null>(null);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        if (!userId) {
-            setProfile(null);
-            return;
-        }
-        let live = true;
-        setLoading(true);
-        void profileAction(channelId, userId)
-            .then((result) => {
-                if (live) setProfile(result.profile ?? null);
-            })
-            .catch(() => undefined)
-            .finally(() => {
-                if (live) setLoading(false);
-            });
-        return () => {
-            live = false;
-        };
-    }, [channelId, userId]);
-
-    return { profile, loading };
-}
-
-/** The panel's contents, whichever shape it is drawn in. */
+/** The panel's contents, whichever shape it is drawn in - the same profile the
+ *  card a pressed name opens draws, see `ProfileDetails`. */
 function Body({ person, channelId }: { person: DirectPerson; channelId: string }) {
-    const { profile, loading } = useProfile(channelId, person.id);
-    const where = usePresence(person.id);
-    const name = profile?.name || person.name;
-
-    return (
-        <div className="flex flex-col">
-            <ProfileBanner person={{ id: person.id, name }} className="h-16 shrink-0" />
-
-            <div className="flex flex-col gap-3 px-4 pb-4">
-                {/* Cut out of the band's lower edge, on the left, where a profile
-                    puts a face. The ring is the page's own background rather than
-                    a border: it is the cut-out, not a decoration, so it has to be
-                    the colour of whatever the picture is sitting on. */}
-                <div className="-mt-8">
-                    {/* The dot rides on the face here as it does everywhere else,
-                        rather than being spelled out underneath: somebody who has
-                        learnt the colour in the roster should not have to learn a
-                        second way of being told the same thing about that person. */}
-                    <Avatar
-                        openable
-                        decorated
-                        person={{ id: person.id, name }}
-                        size={72}
-                        className="ring-[3px] ring-background"
-                    />
-                </div>
-
-                <div className="flex min-w-0 flex-col gap-0.5">
-                    {/* Left, like every line under it. The name was centred while
-                        the rest of the panel was not, which read as a mistake
-                        rather than as emphasis. */}
-                    <p
-                        className="flex items-baseline gap-1.5 truncate text-sm font-medium"
-                        title={name}
-                    >
-                        <PersonName id={person.id} name={name} />
-                        {/* Beside the name, because that is what it is about -
-                            and only when they have said. */}
-                        {profile?.pronouns ? (
-                            <span className="text-xs font-normal text-muted-foreground">
-                                {profile.pronouns}
-                            </span>
-                        ) : null}
-                    </p>
-                    {loading && !profile ? (
-                        <Skeleton className="h-3 w-24" />
-                    ) : (
-                        profile?.username && (
-                            // The handle is the address of their own page, so it
-                            // is the way to it: pressing a person's @name and
-                            // being taken to them is what it does everywhere
-                            // else, and this panel is where it is already drawn.
-                            <Link
-                                href={`/u/${profile.username}`}
-                                className="flex items-center gap-0.5 truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
-                            >
-                                <AtSign className="size-3 shrink-0" />
-                                {profile.username}
-                            </Link>
-                        )
-                    )}
-                    {/* Their name, when it is not already what they are called
-                        here. Two lines saying "Rahma Fellah" one under the other
-                        is not more information about anybody. */}
-                    {profile?.fullName && profile.fullName !== name && (
-                        <p
-                            className="truncate text-xs text-muted-foreground"
-                            title={profile.fullName}
-                        >
-                            {profile.fullName}
-                        </p>
-                    )}
-                    {profile?.headline ? (
-                        <p className="mt-1 break-words text-xs text-foreground/90">
-                            {profile.headline}
-                        </p>
-                    ) : null}
-                </div>
-
-                {/* What they are showing, and only that. Where they are is
-                    already on the face above: the dot says it, in the colour it
-                    says it in everywhere else in Polaris, and spelling "Online"
-                    out underneath is the same fact twice. The word is still on
-                    the dot's own label and tooltip, so it is not lost to anybody
-                    who cannot read a colour.
-
-                    The note is a different fact - it is what this person chose to
-                    say - and it is only ever there while they are actually here;
-                    see `presence-service`. */}
-                {where?.note && (
-                    <p className="w-full whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
-                        {where.note}
-                    </p>
-                )}
-
-                {/* What the two of them have in common, drawn from the same
-                    module the page draws it from: this panel is that profile in
-                    a column, and a second answer to the same question is how the
-                    two come to disagree. */}
-                {profile?.mutual ? (
-                    <div className="w-full text-left">
-                        <MutualPanel
-                            compact
-                            friends={profile.mutual.friends}
-                            spaces={profile.mutual.spaces}
-                        />
-                    </div>
-                ) : null}
-
-                {profile?.description && (
-                    <div className="w-full text-left">
-                        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                            About
-                        </p>
-                        <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">
-                            {profile.description}
-                        </p>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
+    const { profile, loading } = useChatProfile(channelId, person.id);
+    return <ProfileDetails person={person} profile={profile} loading={loading} />;
 }
 
 /**

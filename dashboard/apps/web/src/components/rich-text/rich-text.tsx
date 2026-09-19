@@ -23,6 +23,7 @@ import { splitSpoilers } from "@polaris/core";
 import { Spoiler } from "@/app/(app)/chat/spoiler";
 import type { JSONContent } from "@tiptap/core";
 import { markdownToDoc, splitChannelMentions, MARKDOWN_BLOCK, REFERENCE } from "./markdown";
+import { PersonMention } from "@/components/person-press";
 
 /**
  * What a reference turned out to be, for the reader in front of it.
@@ -346,6 +347,9 @@ function Chip({ node }: { node: JSONContent }) {
     }
 
     const label = chipLabel(kind, String(node.attrs?.label ?? ""));
+    // A person has no page of their own to link to from here; what pressing one
+    // does is the screen's to decide - see `PersonMention`.
+    if (kind === "user") return <PersonMention id={id} label={label} className={chipClass(kind)} />;
     const href = refs.referenceHref(kind, id);
     if (!href) return <span className={chipClass(kind)}>{label}</span>;
     return (

@@ -65,7 +65,24 @@ export interface ChatProfile {
         readonly friends: { people: { id: string; name: string; username: string }[]; total: number };
         readonly spaces: { spaces: { id: string; name: string; color: string }[]; total: number };
     };
+    /**
+     * What they are in the place this was asked from, when they are anything.
+     *
+     * `owner` and `admin` of the space the conversation is in, or `owner` of a
+     * group. Null in a direct message and for an ordinary member. Not a
+     * disclosure: the roster beside the same conversation already draws it.
+     */
+    readonly role: ChatRole | null;
 }
+
+/** What somebody can be in a place, beyond being in it. */
+export type ChatRole = "owner" | "admin";
+
+/** Nothing in common, which is what anybody has with themselves. */
+const NOTHING_SHARED: ChatProfile["mutual"] = {
+    friends: { people: [], total: 0 },
+    spaces: { spaces: [], total: 0 }
+};
 
 /**
  * One person's profile, or null when this reader may not be shown it.
@@ -74,13 +91,18 @@ export interface ChatProfile {
  * being in it either, the account being gone, and a block in either direction -
  * one answer, because telling them apart would tell somebody which of them it
  * was.
+ *
+ * Your own is answered too: pressing your own name shows you what everybody
+ * else is shown, which is how anybody checks what they look like here. It is
+ * still asked inside a conversation you are in, and has nothing in common with
+ * itself.
  */
 export async function chatProfile(
     actor: ChatActor,
     channelId: string,
     userId: string
 ): Promise<ChatProfile | null> {
-    if (userId === actor.id) return null;
+    const self = userId === actor.id;
 
     // The reader's own reach first: everything below describes somebody in a
     // conversation, and whether this is a conversation of theirs is the question
@@ -110,15 +132,19 @@ export async function chatProfile(
         blockedBetween(actor.id, [userId]),
         // Never as an administrator, like everything else in chat: whoever runs
         // the instance can read the database, and that is a different and
-        // visible act from a screen Polaris drew for them.
-        maySee(userId, "fullName", { id: actor.id, isAdmin: false })
+        // visible act from a screen Polaris drew for them. Your own name is
+        // yours to read.
+        self || maySee(userId, "fullName", { id: actor.id, isAdmin: false })
     ]);
     if (!person || !together || blocked.has(person.id)) return null;
 
     // Asked after the reach above rather than beside it: there is no point
     // working out what two people have in common before it is settled that this
     // one may be shown the other at all.
-    const mutual = await mutualsBetween(actor.id, person.id);
+    const [mutual, role] = await Promise.all([
+        self ? NOTHING_SHARED : mutualsBetween(actor.id, person.id),
+        roleIn(together, person.id)
+    ]);
 
     return {
         name: person.name,
@@ -129,6 +155,30 @@ export async function chatProfile(
         description: person.description.trim(),
         headline: person.headline?.trim() ?? "",
         pronouns: person.pronouns?.trim() ?? "",
-        mutual
+        mutual,
+        role
     };
+}
+
+/**
+ * What somebody is in the place a conversation belongs to.
+ *
+ * The same answer the roster gives - the space's owner, then its admins - so
+ * the card and the column beside it never disagree. A group has an owner and
+ * nobody else is anything; a direct message has neither.
+ */
+async function roleIn(
+    room: { spaceId: string | null; kind: string; mayModerate: boolean },
+    userId: string
+): Promise<ChatRole | null> {
+    if (!room.spaceId) return room.kind === "group" && room.mayModerate ? "owner" : null;
+    const [space, membership] = await Promise.all([
+        prisma.chatSpace.findUnique({ where: { id: room.spaceId }, select: { ownerId: true } }),
+        prisma.chatSpaceMember.findUnique({
+            where: { spaceId_userId: { spaceId: room.spaceId, userId } },
+            select: { role: true }
+        })
+    ]);
+    if (space?.ownerId === userId) return "owner";
+    return membership?.role === "admin" ? "admin" : null;
 }

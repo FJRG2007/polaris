@@ -78,9 +78,21 @@ vi.mock("@/lib/mutuals", () => ({
 }));
 
 vi.mock("@/lib/chat/access", () => ({
-    channelAccess: async (actor: { id: string }, channelId: string) =>
-        channelId === "d1" && members.has(actor.id) ? { channelId, member: true } : null
+    channelAccess: async (actor: { id: string }, channelId: string) => {
+        if (!members.has(actor.id)) return null;
+        const room = { channelId, member: true, mayModerate: false };
+        if (channelId === "d1") return { ...room, spaceId: null, kind: "dm" };
+        // A group whose owner is grace, and a channel in a space.
+        if (channelId === "g1")
+            return { ...room, spaceId: null, kind: "group", mayModerate: actor.id === "grace" };
+        if (channelId === "s1") return { ...room, spaceId: "space", kind: "text" };
+        return null;
+    }
 }));
+
+/** Who owns the one space, and who administers it. */
+let spaceOwner = "grace";
+let spaceAdmins = new Set<string>();
 
 vi.mock("@polaris/db", () => ({
     // The filter every screen hides a suspended or switched-off account with.
@@ -91,6 +103,14 @@ vi.mock("@polaris/db", () => ({
         user: {
             findFirst: async ({ where }: { where: { id: string; bannedAt: null } }) =>
                 ACCOUNTS.find((person) => person.id === where.id && person.bannedAt === null) ?? null
+        },
+        chatSpace: {
+            findUnique: async () => ({ ownerId: spaceOwner })
+        },
+        chatSpaceMember: {
+            findUnique: async ({ where }: { where: { spaceId_userId: { userId: string } } }) => ({
+                role: spaceAdmins.has(where.spaceId_userId.userId) ? "admin" : "member"
+            })
         }
     }
 }));
@@ -101,6 +121,8 @@ beforeEach(() => {
     members = new Set(["ada", "grace", "banned"]);
     blocked = new Set();
     namesOpen = new Set();
+    spaceOwner = "grace";
+    spaceAdmins = new Set();
 });
 
 describe("somebody in the conversation", () => {
@@ -152,8 +174,44 @@ describe("everybody else", () => {
         expect(await chatProfile({ id: "ada" }, "d1", "grace")).toBeNull();
     });
 
-    it("refuses a suspended account, and your own id", async () => {
+    it("refuses a suspended account", async () => {
         expect(await chatProfile({ id: "ada" }, "d1", "banned")).toBeNull();
-        expect(await chatProfile({ id: "grace" }, "d1", "grace")).toBeNull();
+    });
+});
+
+describe("your own", () => {
+    it("is shown to you, name and all, with nothing in common with yourself", async () => {
+        // What pressing your own name shows: what everybody else is shown, plus
+        // the name on your account, which is yours to see.
+        const profile = await chatProfile({ id: "grace" }, "d1", "grace");
+        expect(profile?.username).toBe("grace");
+        expect(profile?.fullName).toBe("Grace Hopper");
+        expect(profile?.mutual.friends.total).toBe(0);
+        expect(profile?.mutual.spaces.total).toBe(0);
+    });
+
+    it("is still asked inside a conversation you are in", async () => {
+        expect(await chatProfile({ id: "grace" }, "nowhere", "grace")).toBeNull();
+    });
+});
+
+describe("what somebody is in the place it was asked from", () => {
+    it("is nothing in a direct message", async () => {
+        expect((await chatProfile({ id: "ada" }, "d1", "grace"))?.role).toBeNull();
+    });
+
+    it("is the owner of a group they own, and nothing for everybody else in it", async () => {
+        members.add("alan");
+        expect((await chatProfile({ id: "ada" }, "g1", "grace"))?.role).toBe("owner");
+        expect((await chatProfile({ id: "grace" }, "g1", "alan"))?.role).toBeNull();
+    });
+
+    it("is the space's owner or one of its admins, as the roster says", async () => {
+        members.add("alan");
+        spaceAdmins = new Set(["alan"]);
+        expect((await chatProfile({ id: "ada" }, "s1", "grace"))?.role).toBe("owner");
+        expect((await chatProfile({ id: "grace" }, "s1", "alan"))?.role).toBe("admin");
+        spaceAdmins = new Set();
+        expect((await chatProfile({ id: "grace" }, "s1", "alan"))?.role).toBeNull();
     });
 });

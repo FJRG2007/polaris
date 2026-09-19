@@ -81,6 +81,7 @@ import {
     cn,
     useToast
 } from "@polaris/ui";
+import { PersonCardProvider } from "./person-card";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -1947,7 +1948,7 @@ export function ChannelView({
         checkCall();
     }
 
-    return (
+    const view = (
         <div
             className={cn(
                 "flex min-h-0 flex-1 overflow-hidden",
@@ -2257,6 +2258,20 @@ export function ChannelView({
             />
             {confirmElement}
         </div>
+    );
+
+    return (
+        // Every person drawn in the conversation, the roster and the thread
+        // opens the same card when pressed - see `PersonCardProvider`.
+        <PersonCardProvider
+            channelId={channelId}
+            viewerId={viewerId}
+            onMention={(text) =>
+                setInserting((current) => ({ token: (current?.token ?? 0) + 1, text }))
+            }
+        >
+            {view}
+        </PersonCardProvider>
     );
 }
 

@@ -48,6 +48,8 @@ import {
     Skeleton,
     cn
 } from "@polaris/ui";
+import { PersonCardProvider } from "./person-card";
+import { usePersonPress } from "@/components/person-press";
 
 /**
  * What the members list may be narrowed and widened to.
@@ -201,7 +203,10 @@ function MemberRows({
     }
 
     return (
-        <>
+        // Its own card, inside whatever holds the roster: on a narrow screen that
+        // is a dialog, and a card opened from outside it would count as a press
+        // outside the dialog and close it.
+        <PersonCardProvider channelId={channel.id} viewerId={viewerId} onMention={onMention}>
             {error && (
                 <p role="alert" className="px-3 pt-2 text-xs text-danger">
                     {error}
@@ -231,7 +236,7 @@ function MemberRows({
                 onOpenChange={(open) => !open && setNaming(null)}
                 onSaved={onChanged}
             />
-        </>
+        </PersonCardProvider>
     );
 }
 
@@ -276,6 +281,9 @@ function MemberRow({
     // Asked from the same store the face asked, so it is one request for the
     // panel rather than one per member.
     const plate = usePersonNameplate(member.userId);
+    // Pressing somebody in the roster opens their card - yours as well - and the
+    // card is where messaging them is.
+    const press = usePersonPress();
     return (
         <li key={member.userId}>
             <MemberMenu
@@ -289,12 +297,22 @@ function MemberRow({
             >
                 <button
                     type="button"
-                    disabled={you || busy}
-                    title={you ? member.name : `Message ${member.name}`}
-                    onClick={onOpen}
+                    disabled={press ? false : you || busy}
+                    title={
+                        press
+                            ? `View ${member.name}'s profile`
+                            : you
+                              ? member.name
+                              : `Message ${member.name}`
+                    }
+                    onClick={(event) =>
+                        press
+                            ? press({ id: member.userId, name: member.name }, event.currentTarget)
+                            : onOpen()
+                    }
                     className={cn(
                         "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
-                        you ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70",
+                        you && !press ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70",
                         // A plate replaces the row's own hover tint
                         // rather than being tinted by it.
                         plate && platedRow(plate, "hover:bg-transparent")

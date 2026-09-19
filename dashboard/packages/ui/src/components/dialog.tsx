@@ -44,6 +44,35 @@ export const DialogContent = forwardRef<
 ));
 DialogContent.displayName = "DialogContent";
 
+/**
+ * A dialog that opens beside something rather than over everything.
+ *
+ * For a card that belongs to what was pressed - a person's name, say - where a
+ * centred dialog behind a dimmed page would be the wrong weight. No overlay and
+ * no centring: the caller places it (`style`) and opens the root with
+ * `modal={false}`, so the page stays live and a press anywhere else closes it.
+ * Escape closes it too, and it is still a dialog to anybody reading the page
+ * with a screen reader.
+ */
+export const DialogFloating = forwardRef<
+    ElementRef<typeof RadixDialog.Content>,
+    ComponentPropsWithoutRef<typeof RadixDialog.Content>
+>(({ className, children, ...props }, ref) => (
+    <RadixDialog.Portal>
+        <RadixDialog.Content
+            ref={ref}
+            className={cn(
+                "fixed z-50 overflow-y-auto overscroll-contain rounded-xl border border-border-strong bg-elevated shadow-modal outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.98]",
+                className
+            )}
+            {...props}
+        >
+            {children}
+        </RadixDialog.Content>
+    </RadixDialog.Portal>
+));
+DialogFloating.displayName = "DialogFloating";
+
 export function DialogHeader({ className, ...props }: ComponentPropsWithoutRef<"div">) {
     return <div className={cn("mb-4 flex flex-col gap-1", className)} {...props} />;
 }
