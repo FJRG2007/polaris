@@ -27,6 +27,7 @@
  */
 
 import Link from "next/link";
+import { useBusy } from "./use-busy";
 import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
 import { RecipientField } from "./recipient-field";
@@ -35,10 +36,9 @@ import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
 import type { MailTemplateView } from "@/lib/mailbox/templates";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
+import { useRef, useMemo, useState, useEffect, useCallback } from "react";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { keepSignatureDelimiter, signatureBlock, withSignature } from "./signature";
-import { useRef, useMemo, useState, useEffect, useCallback } from "react";
-import { useBusy } from "./use-busy";
 import { draftSaves, type DraftFields, type DraftSaves, type DraftWriter } from "./draft-saves";
 import {
     ChevronDown,
@@ -54,6 +54,7 @@ import {
     X
 } from "lucide-react";
 import * as outbox from "./outbox";
+import { useDisplayFormat } from "@/components/display-format";
 import {
     attachFromAddressAction,
     attachFromDriveAction,
@@ -367,6 +368,24 @@ export function Composer() {
         [openComposer, refreshMailbox, toast]
     );
 
+    /** Skip the rest of the wait. The composer closes at once: the message is
+     *  the queue's now, and a failure reaches Drafts the way any send's does. */
+    const sendRightAway = useCallback(
+        (draftId: string) => {
+            openComposer(null);
+            void (async () => {
+                const outcome = await outbox.sendNow(draftId);
+                if (outbox.isRefused(outcome)) {
+                    toast.show({ title: outcome.error });
+                    return;
+                }
+                if (outcome.sent) toast.show({ title: "Sending it now." });
+                refreshMailbox();
+            })();
+        },
+        [openComposer, refreshMailbox, toast]
+    );
+
     /**
      * Close, keeping what was written.
      *
@@ -436,279 +455,291 @@ export function Composer() {
                 "inset-x-0 bottom-0 mx-auto flex w-full max-w-3xl md:inset-x-auto md:right-6 md:mx-0 md:h-[38rem] md:max-h-[85vh] md:w-[40rem]";
 
     return (
-        <div
-            className={cn(
-                "fixed z-40 flex flex-col rounded-t-lg border border-b-0 border-border bg-elevated shadow-modal",
-                shell
-            )}
-            role="dialog"
-            aria-label="New message"
-        >
-            <header className="flex items-center gap-1 border-b border-border px-3 py-2">
-                <button
-                    type="button"
-                    className="min-w-0 flex-1 truncate text-left text-[13px] font-medium"
-                    onClick={() => setPosture(posture === "minimized" ? "docked" : "minimized")}
-                >
-                    {subject.trim() || "New message"}
-                </button>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={
-                        posture === "minimized" ? "Open the composer" : "Minimize the composer"
-                    }
-                    title={posture === "minimized" ? "Open the composer" : "Minimize the composer"}
-                    onClick={() => setPosture(posture === "minimized" ? "docked" : "minimized")}
-                >
-                    <Minus className="size-4 shrink-0" aria-hidden />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={posture === "full" ? "Shrink the composer" : "Expand the composer"}
-                    title={posture === "full" ? "Shrink the composer" : "Expand the composer"}
-                    onClick={() => setPosture(posture === "full" ? "docked" : "full")}
-                >
-                    {posture === "full" ? (
-                        <Minimize2 className="size-4 shrink-0" aria-hidden />
-                    ) : (
-                        <Maximize2 className="size-4 shrink-0" aria-hidden />
-                    )}
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Close the composer"
-                    title="Close the composer"
-                    onClick={close}
-                >
-                    <X className="size-4 shrink-0" aria-hidden />
-                </Button>
-            </header>
+        <>
+            <div
+                className={cn(
+                    "fixed z-40 flex flex-col rounded-t-lg border border-b-0 border-border bg-elevated shadow-modal",
+                    // Queued, the panel folds down into the corner the countdown
+                    // appears in rather than standing there the same size to say
+                    // one line. It stays mounted underneath: Undo unfolds the same
+                    // message, recipients, cursor and all.
+                    "origin-bottom transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none md:origin-bottom-right",
+                    queued && "pointer-events-none translate-y-6 scale-[0.2] opacity-0",
+                    shell
+                )}
+                role="dialog"
+                aria-label="New message"
+                aria-hidden={queued ? true : undefined}
+                inert={queued ? true : undefined}
+            >
+                <header className="flex items-center gap-1 border-b border-border px-3 py-2">
+                    <button
+                        type="button"
+                        className="min-w-0 flex-1 truncate text-left text-[13px] font-medium"
+                        onClick={() => setPosture(posture === "minimized" ? "docked" : "minimized")}
+                    >
+                        {subject.trim() || "New message"}
+                    </button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={
+                            posture === "minimized" ? "Open the composer" : "Minimize the composer"
+                        }
+                        title={posture === "minimized" ? "Open the composer" : "Minimize the composer"}
+                        onClick={() => setPosture(posture === "minimized" ? "docked" : "minimized")}
+                    >
+                        <Minus className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={posture === "full" ? "Shrink the composer" : "Expand the composer"}
+                        title={posture === "full" ? "Shrink the composer" : "Expand the composer"}
+                        onClick={() => setPosture(posture === "full" ? "docked" : "full")}
+                    >
+                        {posture === "full" ? (
+                            <Minimize2 className="size-4 shrink-0" aria-hidden />
+                        ) : (
+                            <Maximize2 className="size-4 shrink-0" aria-hidden />
+                        )}
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Close the composer"
+                        title="Close the composer"
+                        onClick={close}
+                    >
+                        <X className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                </header>
 
-            {posture === "minimized" ? null : queued ? (
-                <QueuedNotice
-                    until={queued.until}
-                    onUndo={() => undo(queued.draftId)}
-                    onDone={() => openComposer(null)}
-                />
-            ) : (
-                <>
-                    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
-                        <div className="space-y-1.5 border-b border-border px-4 py-3">
-                            <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                                <span className="w-12 shrink-0">From</span>
-                                {accounts.length > 1 || own.length > 0 ? (
-                                    <Select
-                                        value={
-                                            identityId
-                                                ? `identity:${identityId}`
-                                                : `account:${accountId}`
-                                        }
-                                        onValueChange={(next) => {
-                                            const [kind, id] = next.split(":");
-                                            if (kind === "identity") {
-                                                setIdentityId(id ?? "");
-                                                return;
+                {posture === "minimized" ? null : (
+                    <>
+                        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+                            <div className="space-y-1.5 border-b border-border px-4 py-3">
+                                <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                                    <span className="w-12 shrink-0">From</span>
+                                    {accounts.length > 1 || own.length > 0 ? (
+                                        <Select
+                                            value={
+                                                identityId
+                                                    ? `identity:${identityId}`
+                                                    : `account:${accountId}`
                                             }
-                                            setAccountId(id ?? "");
-                                            setIdentityId("");
-                                        }}
-                                        aria-label="The address this is sent from"
-                                        className="min-w-0 flex-1"
-                                        options={accounts.flatMap((one) => [
-                                            {
-                                                value: `account:${one.id}`,
-                                                label: one.label
-                                                    ? `${one.label} - ${one.address}`
-                                                    : one.address
-                                            },
-                                            ...(identities[one.id] ?? []).map((alias) => ({
-                                                value: `identity:${alias.id}`,
-                                                label: `${alias.address} (via ${one.address})`
-                                            }))
-                                        ])}
-                                    />
-                                ) : (
-                                    <span className="min-w-0 truncate text-foreground" title={from}>
-                                        {from}
-                                    </span>
-                                )}
-                            </label>
-
-                            <RecipientField label="To" value={to} onChange={setTo} autoFocus />
-                            {showCopies ? (
-                                <>
-                                    <RecipientField label="Cc" value={cc} onChange={setCc} />
-                                    <RecipientField label="Bcc" value={bcc} onChange={setBcc} />
-                                </>
-                            ) : (
-                                <button
-                                    type="button"
-                                    className="pl-12 text-[12px] text-muted-foreground hover:text-foreground"
-                                    onClick={() => setShowCopies(true)}
-                                >
-                                    Add a copy or a blind copy
-                                </button>
-                            )}
-
-                            <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                                <span className="w-12 shrink-0">Subject</span>
-                                <Input
-                                    value={subject}
-                                    onChange={(event) => setSubject(event.target.value)}
-                                    aria-label="Subject"
-                                    className="h-8 min-w-0 flex-1 text-[13px]"
-                                />
-                            </label>
-                        </div>
-
-                        {/* The body takes whatever is left, so the message is
-                            the biggest thing in the composer rather than a strip
-                            under the headers. */}
-                        <div className="flex min-h-0 flex-1 flex-col px-2 py-2">
-                            <RichTextEditor
-                                value={body}
-                                onChange={(next) => setBody(keepSignatureDelimiter(next))}
-                                insert={insert}
-                                placeholder="Write your message"
-                                className="flex min-h-[14rem] flex-1 flex-col"
-                                // A screenshot pasted in is an attachment rather
-                                // than a picture pasted into the text: a data URI
-                                // that size is refused by mail servers and shows
-                                // up as a broken image at the other end.
-                                onPasteFiles={(dropped) => {
-                                    void attach([...dropped]);
-                                    return true;
-                                }}
-                            />
-                        </div>
-
-                        {carrying ? (
-                            <p className="flex items-center gap-1.5 px-3 pb-2 text-[12px] text-foreground-subtle">
-                                <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
-                                Bringing the files over from the original message
-                            </p>
-                        ) : notCarried.length > 0 ? (
-                            <p className="px-3 pb-2 text-[12px] text-foreground-subtle">
-                                Not carried over: {notCarried.join(", ")}. Attach again if needed.
-                            </p>
-                        ) : null}
-
-                        {files.length > 0 ? (
-                            <ul className="flex flex-wrap gap-2 border-t border-border px-3 py-2">
-                                {files.map((file) => (
-                                    <li
-                                        key={file.id}
-                                        className="flex items-center gap-2 rounded-md border border-border px-2 py-1 text-[12px]"
-                                    >
-                                        <Paperclip
-                                            className="size-3.5 shrink-0 text-foreground-subtle"
-                                            aria-hidden
+                                            onValueChange={(next) => {
+                                                const [kind, id] = next.split(":");
+                                                if (kind === "identity") {
+                                                    setIdentityId(id ?? "");
+                                                    return;
+                                                }
+                                                setAccountId(id ?? "");
+                                                setIdentityId("");
+                                            }}
+                                            aria-label="The address this is sent from"
+                                            className="min-w-0 flex-1"
+                                            options={accounts.flatMap((one) => [
+                                                {
+                                                    value: `account:${one.id}`,
+                                                    label: one.label
+                                                        ? `${one.label} - ${one.address}`
+                                                        : one.address
+                                                },
+                                                ...(identities[one.id] ?? []).map((alias) => ({
+                                                    value: `identity:${alias.id}`,
+                                                    label: `${alias.address} (via ${one.address})`
+                                                }))
+                                            ])}
                                         />
-                                        <span className="max-w-[14rem] truncate" title={file.name}>
-                                            {file.name}
+                                    ) : (
+                                        <span className="min-w-0 truncate text-foreground" title={from}>
+                                            {from}
                                         </span>
-                                        <button
-                                            type="button"
-                                            aria-label={`Remove ${file.name}`}
-                                            title={`Remove ${file.name}`}
-                                            className="text-foreground-subtle hover:text-foreground"
-                                            onClick={() => void remove(file.id)}
-                                        >
-                                            <X className="size-3.5 shrink-0" aria-hidden />
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : null}
-                    </div>
+                                    )}
+                                </label>
 
-                    <footer className="flex flex-wrap items-center gap-1 border-t border-border px-3 py-2">
-                        <div className="flex items-stretch">
-                            <Button
-                                className="rounded-r-none"
-                                onClick={() => send(sendAt)}
-                                disabled={sending || to.length === 0 || !accountId}
-                            >
-                                {sending ? (
-                                    <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                                <RecipientField label="To" value={to} onChange={setTo} autoFocus />
+                                {showCopies ? (
+                                    <>
+                                        <RecipientField label="Cc" value={cc} onChange={setCc} />
+                                        <RecipientField label="Bcc" value={bcc} onChange={setBcc} />
+                                    </>
                                 ) : (
-                                    <Send className="size-4 shrink-0" aria-hidden />
+                                    <button
+                                        type="button"
+                                        className="pl-12 text-[12px] text-muted-foreground hover:text-foreground"
+                                        onClick={() => setShowCopies(true)}
+                                    >
+                                        Add a copy or a blind copy
+                                    </button>
                                 )}
-                                {sendAt ? "Schedule" : "Send"}
-                            </Button>
-                            <SendLaterMenu
-                                disabled={sending || to.length === 0 || !accountId}
-                                chosen={sendAt}
-                                onChoose={(when) => {
-                                    setSendAt(when);
-                                    if (when) send(when);
-                                }}
-                            />
+
+                                <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                                    <span className="w-12 shrink-0">Subject</span>
+                                    <Input
+                                        value={subject}
+                                        onChange={(event) => setSubject(event.target.value)}
+                                        aria-label="Subject"
+                                        className="h-8 min-w-0 flex-1 text-[13px]"
+                                    />
+                                </label>
+                            </div>
+
+                            {/* The body takes whatever is left, so the message is
+                                the biggest thing in the composer rather than a strip
+                                under the headers. */}
+                            <div className="flex min-h-0 flex-1 flex-col px-2 py-2">
+                                <RichTextEditor
+                                    value={body}
+                                    onChange={(next) => setBody(keepSignatureDelimiter(next))}
+                                    insert={insert}
+                                    placeholder="Write your message"
+                                    className="flex min-h-[14rem] flex-1 flex-col"
+                                    // A screenshot pasted in is an attachment rather
+                                    // than a picture pasted into the text: a data URI
+                                    // that size is refused by mail servers and shows
+                                    // up as a broken image at the other end.
+                                    onPasteFiles={(dropped) => {
+                                        void attach([...dropped]);
+                                        return true;
+                                    }}
+                                />
+                            </div>
+
+                            {carrying ? (
+                                <p className="flex items-center gap-1.5 px-3 pb-2 text-[12px] text-foreground-subtle">
+                                    <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                                    Bringing the files over from the original message
+                                </p>
+                            ) : notCarried.length > 0 ? (
+                                <p className="px-3 pb-2 text-[12px] text-foreground-subtle">
+                                    Not carried over: {notCarried.join(", ")}. Attach again if needed.
+                                </p>
+                            ) : null}
+
+                            {files.length > 0 ? (
+                                <ul className="flex flex-wrap gap-2 border-t border-border px-3 py-2">
+                                    {files.map((file) => (
+                                        <li
+                                            key={file.id}
+                                            className="flex items-center gap-2 rounded-md border border-border px-2 py-1 text-[12px]"
+                                        >
+                                            <Paperclip
+                                                className="size-3.5 shrink-0 text-foreground-subtle"
+                                                aria-hidden
+                                            />
+                                            <span className="max-w-[14rem] truncate" title={file.name}>
+                                                {file.name}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                aria-label={`Remove ${file.name}`}
+                                                title={`Remove ${file.name}`}
+                                                className="text-foreground-subtle hover:text-foreground"
+                                                onClick={() => void remove(file.id)}
+                                            >
+                                                <X className="size-3.5 shrink-0" aria-hidden />
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : null}
                         </div>
 
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Attach a file"
-                            title="Attach a file"
-                            onClick={() => setPicking(true)}
-                        >
-                            <Paperclip className="size-4 shrink-0" aria-hidden />
-                        </Button>
+                        <footer className="flex flex-wrap items-center gap-1 border-t border-border px-3 py-2">
+                            <div className="flex items-stretch">
+                                <Button
+                                    className="rounded-r-none"
+                                    onClick={() => send(sendAt)}
+                                    disabled={sending || to.length === 0 || !accountId}
+                                >
+                                    {sending ? (
+                                        <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                                    ) : (
+                                        <Send className="size-4 shrink-0" aria-hidden />
+                                    )}
+                                    {sendAt ? "Schedule" : "Send"}
+                                </Button>
+                                <SendLaterMenu
+                                    disabled={sending || to.length === 0 || !accountId}
+                                    chosen={sendAt}
+                                    onChoose={(when) => {
+                                        setSendAt(when);
+                                        if (when) send(when);
+                                    }}
+                                />
+                            </div>
 
-                        <EmojiPicker
-                            disabled={false}
-                            media={false}
-                            onEmoji={(emoji) => setInsert({ token: Date.now(), text: emoji })}
-                        />
-
-                        <TemplateMenu
-                            accountId={accountId}
-                            onPick={(template) => {
-                                setInsert({ token: Date.now(), text: template.body });
-                                // A template's subject fills an empty line and
-                                // never replaces one somebody already wrote.
-                                if (template.subject && !subject.trim()) setSubject(template.subject);
-                            }}
-                        />
-
-                        {signature ? (
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label="Insert your signature"
-                                title="Insert your signature"
-                                onClick={() =>
-                                    setInsert({
-                                        token: Date.now(),
-                                        text: `\n\n${signatureBlock(signature)}`
-                                    })
-                                }
+                                aria-label="Attach a file"
+                                title="Attach a file"
+                                onClick={() => setPicking(true)}
                             >
-                                <PenLine className="size-4 shrink-0" aria-hidden />
+                                <Paperclip className="size-4 shrink-0" aria-hidden />
                             </Button>
-                        ) : null}
 
-                        {problem ? (
-                            <p className="min-w-0 flex-1 basis-full text-[12px] text-danger">
-                                {problem}
-                            </p>
-                        ) : null}
-                    </footer>
-                </>
-            )}
+                            <EmojiPicker
+                                disabled={false}
+                                media={false}
+                                onEmoji={(emoji) => setInsert({ token: Date.now(), text: emoji })}
+                            />
 
-            {picking ? (
-                <FilePickerDialog
-                    title="Attach to this message"
-                    onClose={() => setPicking(false)}
-                    onPick={(picked) => void attachPicked(picked)}
+                            <TemplateMenu
+                                accountId={accountId}
+                                onPick={(template) => {
+                                    setInsert({ token: Date.now(), text: template.body });
+                                    // A template's subject fills an empty line and
+                                    // never replaces one somebody already wrote.
+                                    if (template.subject && !subject.trim()) setSubject(template.subject);
+                                }}
+                            />
+
+                            {signature ? (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label="Insert your signature"
+                                    title="Insert your signature"
+                                    onClick={() =>
+                                        setInsert({
+                                            token: Date.now(),
+                                            text: `\n\n${signatureBlock(signature)}`
+                                        })
+                                    }
+                                >
+                                    <PenLine className="size-4 shrink-0" aria-hidden />
+                                </Button>
+                            ) : null}
+
+                            {problem ? (
+                                <p className="min-w-0 flex-1 basis-full text-[12px] text-danger">
+                                    {problem}
+                                </p>
+                            ) : null}
+                        </footer>
+                    </>
+                )}
+
+                {picking ? (
+                    <FilePickerDialog
+                        title="Attach to this message"
+                        onClose={() => setPicking(false)}
+                        onPick={(picked) => void attachPicked(picked)}
+                    />
+                ) : null}
+            </div>
+            {queued ? (
+                <QueuedPill
+                    until={queued.until}
+                    onUndo={() => undo(queued.draftId)}
+                    onSendNow={() => sendRightAway(queued.draftId)}
+                    onDone={() => openComposer(null)}
                 />
             ) : null}
-        </div>
+        </>
     );
 }
 
@@ -891,56 +922,97 @@ const SEND_TIMES: readonly { label: string; when: () => Date }[] = [
 ];
 
 /**
- * The countdown after Send.
+ * The countdown after Send, as a pill in the corner the composer folded into.
  *
- * It closes itself when it reaches zero rather than sitting there saying "sent",
- * because a composer that stays open after a message has gone is one somebody
- * sends twice. A message scheduled for next week says so instead of counting
- * down to it.
+ * Small on purpose: the message is written, and the only things left to decide
+ * are to take it back or to stop waiting. It closes itself when it reaches zero
+ * rather than sitting there saying "sent", because a composer that stays open
+ * after a message has gone is one somebody sends twice. A message scheduled for
+ * next week says when instead of counting down to it.
  */
-function QueuedNotice({
+function QueuedPill({
     until,
     onUndo,
+    onSendNow,
     onDone
 }: {
     until: number;
     onUndo: () => void;
+    onSendNow: () => void;
     onDone: () => void;
 }) {
-    const [left, setLeft] = useState(() => Math.max(0, Math.ceil((until - Date.now()) / 1000)));
+    const format = useDisplayFormat();
+    const [left, setLeft] = useState(() => secondsUntil(until));
     // Anything further out than a minute is a scheduled message rather than a
-    // send in progress, and counting down to Thursday would be absurd.
-    const scheduled = until - Date.now() > 60_000;
+    // send in progress, and counting down to Thursday would be absurd. Decided
+    // once: a clock read on every render would flip it as the minute ran out.
+    const [scheduled] = useState(() => until - Date.now() > 60_000);
+    // Held in a ref so the countdown is not restarted by a parent re-render.
+    const done = useRef(onDone);
+    done.current = onDone;
 
     useEffect(() => {
         if (scheduled) return;
         const timer = setInterval(() => {
-            const remaining = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+            const remaining = secondsUntil(until);
             setLeft(remaining);
-            if (remaining === 0) onDone();
+            if (remaining === 0) done.current();
         }, 250);
         return () => clearInterval(timer);
-    }, [until, onDone, scheduled]);
+    }, [until, scheduled]);
+
+    const waiting = scheduled || left > 0;
 
     return (
-        <div className="flex items-center gap-3 px-4 py-6">
-            <p className="min-w-0 flex-1 text-[13px] text-muted-foreground">
+        <div
+            className={cn(
+                "fixed inset-x-4 bottom-4 z-40 flex items-center gap-1 rounded-full border border-border bg-elevated py-1 pl-4 pr-1 shadow-modal md:inset-x-auto md:right-6",
+                "animate-in fade-in slide-in-from-bottom-2 zoom-in-95 duration-300 motion-reduce:animate-none"
+            )}
+        >
+            {scheduled ? (
+                <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            ) : (
+                <Send className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            )}
+            <p
+                className="min-w-0 flex-1 truncate px-1 text-[13px] tabular-nums md:flex-none"
+                role="status"
+                aria-live="polite"
+            >
                 {scheduled
-                    ? "Waiting until it is due."
+                    ? `Scheduled for ${format.dateTime(new Date(until))}`
                     : left > 0
-                      ? `Sending in ${left}s.`
-                      : "Sending."}
+                      ? `Sending in ${left}s`
+                      : "Sending"}
             </p>
-            {scheduled || left > 0 ? (
-                <Button variant="secondary" onClick={onUndo}>
-                    {scheduled ? "Bring it back" : "Undo"}
-                </Button>
+            {waiting ? (
+                <>
+                    <Button size="sm" variant="ghost" className="rounded-full" onClick={onUndo}>
+                        {scheduled ? "Bring it back" : "Undo"}
+                    </Button>
+                    <Button size="sm" variant="secondary" className="rounded-full" onClick={onSendNow}>
+                        Send now
+                    </Button>
+                </>
             ) : null}
             {scheduled ? (
-                <Button variant="ghost" onClick={onDone}>
-                    Done
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    className="rounded-full"
+                    aria-label="Close"
+                    title="Close"
+                    onClick={onDone}
+                >
+                    <X className="size-4 shrink-0" aria-hidden />
                 </Button>
             ) : null}
         </div>
     );
+}
+
+/** Whole seconds left until a moment, never below zero. */
+function secondsUntil(until: number): number {
+    return Math.max(0, Math.ceil((until - Date.now()) / 1000));
 }

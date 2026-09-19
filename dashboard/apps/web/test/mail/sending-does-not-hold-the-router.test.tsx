@@ -152,6 +152,7 @@ describe("the composer's requests", () => {
         expect(composer).toContain("outbox.saveDraft(fields, id)");
         expect(composer).toContain("outbox.queueMessage({");
         expect(composer).toContain("outbox.undoSend(draftId)");
+        expect(composer).toContain("outbox.sendNow(draftId)");
         const outbox = await readFile(`${MAIL}outbox.ts`, "utf8");
         expect(outbox).toContain('"/api/mail/drafts"');
         expect(outbox).toContain('"/api/mail/outbox"');
