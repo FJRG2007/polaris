@@ -56,7 +56,7 @@ export function VaultUnlock({
     }
 
     return (
-        <div className="mx-auto flex max-w-sm flex-col gap-4 py-12">
+        <div className="mx-auto flex w-full max-w-sm flex-col gap-4 py-12">
             <Card>
                 <CardBody>
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
