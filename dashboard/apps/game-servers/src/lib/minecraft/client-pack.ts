@@ -112,9 +112,14 @@ export function setAsidePlan(
         if (!build) continue;
         const same = sameProject.get(build.projectId);
         const clash = clashes.get(build.projectId);
-        const refused = build.incompatible.map((id) => sameProject.get(id)).find((mod) => mod !== undefined);
+        const refused = build.incompatible
+            .map((id) => sameProject.get(id))
+            .find((mod) => mod !== undefined);
         if (same) {
-            moves.push({ name: jar.name, reason: `another copy of ${nameOf(same)}, installed as ${same.filename}` });
+            moves.push({
+                name: jar.name,
+                reason: `another copy of ${nameOf(same)}, installed as ${same.filename}`
+            });
         } else if (clash) {
             moves.push({ name: jar.name, reason: `${nameOf(clash)} cannot run beside it` });
         } else if (refused) {

@@ -269,7 +269,11 @@ describe("what a mod needs and clashes with, on this server's release", () => {
             [
                 "/project/lights/version",
                 [
-                    { version_number: "1.0.10-1.21.5", game_versions: ["1.21.5"], dependencies: [] },
+                    {
+                        version_number: "1.0.10-1.21.5",
+                        game_versions: ["1.21.5"],
+                        dependencies: []
+                    },
                     {
                         version_number: "1.0.10-1.21.4",
                         game_versions: ["1.21.4"],
@@ -298,7 +302,8 @@ describe("what a mod needs and clashes with, on this server's release", () => {
         await modrinth.readRequirements(["lights"], "neoforge", "1.21.4");
         const versions = asked.filter((url) => url.includes("/project/lights/version"));
         expect(versions.length).toBeGreaterThan(0);
-        for (const url of versions) expect(decodeURIComponent(url)).toContain('game_versions=["1.21.4"]');
+        for (const url of versions)
+            expect(decodeURIComponent(url)).toContain('game_versions=["1.21.4"]');
     });
 
     it("reads nothing for a pin no build of this release matches", async () => {

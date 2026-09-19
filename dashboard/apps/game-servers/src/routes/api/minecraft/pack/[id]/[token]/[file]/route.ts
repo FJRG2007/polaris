@@ -15,7 +15,11 @@
  */
 
 import { prisma } from "@polaris/db";
-import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "../../../../../../../lib/minecraft/join-guard";
+import {
+    PROJECTS_KEY,
+    SOFTWARE_KEY,
+    VERSION_KEY
+} from "../../../../../../../lib/minecraft/join-guard";
 import {
     isJarName,
     packTokenMatches,

@@ -75,8 +75,7 @@ const {
     packUrl,
     resolvePack,
     setAsidePlan
-} =
-    await import("@polaris-app/game-servers/src/lib/minecraft/client-pack");
+} = await import("@polaris-app/game-servers/src/lib/minecraft/client-pack");
 
 function build(slug: string) {
     return {
@@ -395,12 +394,14 @@ describe("a player's own jars", () => {
     ]);
 
     it("moves aside another copy of a mod in the pack, whatever it is called", () => {
-        expect(setAsidePlan(mods, [jar("sodium-0.6.9-old.jar", "1".repeat(40))], projects)).toEqual([
-            {
-                name: "sodium-0.6.9-old.jar",
-                reason: "another copy of sodium, installed as sodium-1.0.jar"
-            }
-        ]);
+        expect(setAsidePlan(mods, [jar("sodium-0.6.9-old.jar", "1".repeat(40))], projects)).toEqual(
+            [
+                {
+                    name: "sodium-0.6.9-old.jar",
+                    reason: "another copy of sodium, installed as sodium-1.0.jar"
+                }
+            ]
+        );
     });
 
     it("moves aside a mod a mod in the pack cannot run beside", () => {

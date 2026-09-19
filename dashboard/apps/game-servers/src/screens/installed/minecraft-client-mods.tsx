@@ -431,10 +431,10 @@ export function MinecraftClientMods({
                                 {Array.isArray(pack) ? `the ${pack.length} mods` : "the mods"} for
                                 this server into their game, and running it again is how they
                                 update: it replaces what changed and takes away what came off the
-                                lists. A mod of theirs that is another copy of one here, or that
-                                one here cannot run beside, is moved to a mods-polaris-removed
-                                folder; anything else of theirs is left alone. The link needs no
-                                account here.
+                                lists. A mod of theirs that is another copy of one here, or that one
+                                here cannot run beside, is moved to a mods-polaris-removed folder;
+                                anything else of theirs is left alone. The link needs no account
+                                here.
                             </p>
                         </div>
                         {SYSTEMS.map((system) => (

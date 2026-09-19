@@ -43,7 +43,9 @@ beforeEach(() => {
         "fetch",
         vi.fn(async (input: string | URL) => {
             const url = input.toString();
-            const body = url.includes("query=") ? { projects: [FOUND] } : { projects: [], pack: [] };
+            const body = url.includes("query=")
+                ? { projects: [FOUND] }
+                : { projects: [], pack: [] };
             return { ok: true, json: async () => body } as unknown as Response;
         })
     );

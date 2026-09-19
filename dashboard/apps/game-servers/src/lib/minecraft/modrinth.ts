@@ -449,7 +449,9 @@ export async function readConflicts(
         // and neither is one declared by a build for another release.
         const build = installedBuildOf(
             versions.data,
-            entryFor.get(entry.slug.toLowerCase()) ?? entryFor.get(entry.id.toLowerCase()) ?? entry.slug,
+            entryFor.get(entry.slug.toLowerCase()) ??
+                entryFor.get(entry.id.toLowerCase()) ??
+                entry.slug,
             wanted
         );
         for (const dependency of build?.dependencies ?? []) {
