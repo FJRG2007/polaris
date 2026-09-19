@@ -10,7 +10,8 @@
  * labels are the same thing.
  */
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 import { useRouter } from "next/navigation";
 import { Plus, Tag, Trash2 } from "lucide-react";
 import { refusalOf } from "@/app/(app)/mail/refusal";
@@ -27,7 +28,7 @@ export function LabelsView({ labels }: { labels: MailLabelView[] }) {
     const [name, setName] = useState("");
     const [color, setColor] = useState(DEFAULT_COLOR);
     const [problem, setProblem] = useState("");
-    const [saving, startSaving] = useTransition();
+    const [saving, startSaving] = useBusy();
 
     return (
         <div className="space-y-4">

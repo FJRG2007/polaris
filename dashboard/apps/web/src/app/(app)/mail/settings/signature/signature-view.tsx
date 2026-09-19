@@ -9,7 +9,8 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { editAccountAction } from "@/app/(app)/mail/actions";
@@ -26,7 +27,7 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
     const [signature, setSignature] = useState(account.signature);
     const [above, setAbove] = useState(account.signatureAboveQuote);
     const [auto, setAuto] = useState(account.signatureAuto);
-    const [saving, startSaving] = useTransition();
+    const [saving, startSaving] = useBusy();
 
     function pick(next: string): void {
         const chosen = accounts.find((one) => one.id === next);

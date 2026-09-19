@@ -37,7 +37,8 @@ import type { PickedFile } from "@/components/file-picker/picked-file";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { keepSignatureDelimiter, signatureBlock, withSignature } from "./signature";
-import { useRef, useMemo, useState, useEffect, useCallback, useTransition } from "react";
+import { useRef, useMemo, useState, useEffect, useCallback } from "react";
+import { useBusy } from "./use-busy";
 import { draftSaves, type DraftFields, type DraftSaves, type DraftWriter } from "./draft-saves";
 import {
     ChevronDown,
@@ -52,15 +53,13 @@ import {
     Send,
     X
 } from "lucide-react";
+import * as outbox from "./outbox";
 import {
     attachFromAddressAction,
     attachFromDriveAction,
     attachFromMessageAction,
     fileDraftOnServerAction,
-    listTemplatesAction,
-    saveDraftAction,
-    sendAction,
-    undoSendAction
+    listTemplatesAction
 } from "./actions";
 import {
     Button,
@@ -93,16 +92,18 @@ interface Attached {
     readonly size: number;
 }
 
-/** Where a draft is written, for the composer's `draftSaves` queue. */
+/** Where a draft is written, for the composer's `draftSaves` queue. A request of
+ *  its own rather than a server action, because it fires on a timer - see
+ *  `outbox`. */
 const writeDraft: DraftWriter = async (fields, id) => {
-    const outcome = await saveDraftAction({ id, ...fields });
-    return "draftId" in outcome && outcome.draftId ? outcome.draftId : null;
+    const outcome = await outbox.saveDraft(fields, id);
+    return outbox.isRefused(outcome) ? null : outcome.draftId;
 };
 
 export function Composer() {
     const { accounts, identities, composing, openComposer, refreshMailbox, viewerName } = useMail();
     const toast = useToast();
-    const [sending, startSending] = useTransition();
+    const [sending, startSending] = useBusy();
 
     const [posture, setPosture] = useState<Posture>("docked");
     const [accountId, setAccountId] = useState("");
@@ -311,35 +312,59 @@ export function Composer() {
                 };
                 const draftId = (await saves.current?.after((id) => Promise.resolve(id))) ?? null;
                 saves.current?.hold();
-                const outcome = await sendAction({
+                const outcome = await outbox.queueMessage({
                     ...fields,
                     inReplyToId: composing?.inReplyToId ?? null,
                     forward: composing?.forward ?? false,
                     sendAt: when,
                     draftId
                 });
-                const said = refusalOf(outcome);
-                if (said) {
+                if (outbox.isRefused(outcome)) {
                     saves.current?.release();
-                    setProblem(said);
+                    setProblem(outcome.error);
                     return;
                 }
-                if (
-                    "draftId" in outcome &&
-                    outcome.draftId &&
-                    "sendAt" in outcome &&
-                    outcome.sendAt
-                ) {
-                    saves.current?.adopt(outcome.draftId, fields);
-                    setQueued({
-                        draftId: outcome.draftId,
-                        until: new Date(outcome.sendAt).getTime()
-                    });
-                }
+                saves.current?.adopt(outcome.draftId, fields);
+                setQueued({ draftId: outcome.draftId, until: new Date(outcome.sendAt).getTime() });
                 refreshMailbox();
             });
         },
-        [accountId, identityId, to, cc, bcc, subject, body, files, composing, refreshMailbox]
+        [
+            accountId,
+            identityId,
+            to,
+            cc,
+            bcc,
+            subject,
+            body,
+            files,
+            composing,
+            refreshMailbox,
+            startSending
+        ]
+    );
+
+    /** Take it back out of the queue, and put the composer back as it was. */
+    const undo = useCallback(
+        (draftId: string) => {
+            void (async () => {
+                const outcome = await outbox.undoSend(draftId);
+                if (outbox.isRefused(outcome)) {
+                    toast.show({ title: outcome.error });
+                    return;
+                }
+                if (outcome.undone) {
+                    setQueued(null);
+                    saves.current?.release();
+                    toast.show({ title: "Brought back. Nothing was sent." });
+                    refreshMailbox();
+                    return;
+                }
+                toast.show({ title: "That message has already gone." });
+                openComposer(null);
+            })();
+        },
+        [openComposer, refreshMailbox, toast]
     );
 
     /**
@@ -465,20 +490,7 @@ export function Composer() {
             {posture === "minimized" ? null : queued ? (
                 <QueuedNotice
                     until={queued.until}
-                    onUndo={() =>
-                        void (async () => {
-                            const outcome = await undoSendAction(queued.draftId);
-                            if ("undone" in outcome && outcome.undone) {
-                                setQueued(null);
-                                saves.current?.release();
-                                toast.show({ title: "Brought back. Nothing was sent." });
-                                refreshMailbox();
-                                return;
-                            }
-                            toast.show({ title: "That message has already gone." });
-                            openComposer(null);
-                        })()
-                    }
+                    onUndo={() => undo(queued.draftId)}
                     onDone={() => openComposer(null)}
                 />
             ) : (

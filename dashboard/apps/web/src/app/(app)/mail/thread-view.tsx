@@ -29,8 +29,8 @@ import { leavesTheView, scopeOf } from "./mail-actions";
 import { missingFolderRole, refusalOf } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
 import { isViewable } from "@/app/(app)/drive/viewer/kind";
-import { openableAttachments, positionOf, stepFrom } from "./attachment-steps";
 import type { ViewerTarget } from "@/app/(app)/drive/viewer/types";
+import { openableAttachments, positionOf, stepFrom } from "./attachment-steps";
 
 /**
  * The viewer, fetched when a file is actually opened.
@@ -48,14 +48,15 @@ const FileViewer = dynamic(
     () => import("@/app/(app)/drive/file-viewer").then((module) => module.FileViewer),
     { ssr: false }
 );
+import { useBusy } from "./use-busy";
 import { readMessage } from "./message-store";
 import type { MailViewContext } from "./mail-view";
 import type { MailAction } from "@/lib/mailbox/messages";
 import type { ReadableMessage } from "@/lib/mailbox/reading";
 import { useDisplayFormat } from "@/components/display-format";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import { actOnAction, applyLabelAction, setConversationStateAction } from "./actions";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
     Button,
     DropdownMenu,
@@ -135,8 +136,8 @@ export function ThreadView({
     const { refreshMailbox, reloadLists, openComposer, accounts, accountColor, askFolderRole } =
         useMail();
     const toast = useToast();
-    const [busy, startBusy] = useTransition();
-    const [answering, startAnswering] = useTransition();
+    const [busy, startBusy] = useBusy();
+    const [answering, startAnswering] = useBusy();
     const newest = messages.at(-1);
     const [open, setOpen] = useState<string[]>(newest ? [newest.id] : []);
     const [expandAll, setExpandAll] = useState(false);

@@ -13,7 +13,8 @@
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { refusalOf } from "@/app/(app)/mail/refusal";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 import { FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import type { MailTemplateView } from "@/lib/mailbox/templates";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
@@ -54,7 +55,7 @@ export function TemplatesView({
     /** The template being written: null closed, "" a new one, an id one being changed. */
     const [editing, setEditing] = useState<string | null>(null);
     const [removing, setRemoving] = useState<MailTemplateView | null>(null);
-    const [busy, startBusy] = useTransition();
+    const [busy, startBusy] = useBusy();
 
     const accountLabel = (accountId: string | null): string =>
         accountId
@@ -186,7 +187,7 @@ function TemplateEditor({
     const toast = useToast();
     const [draft, setDraft] = useState<Draft>(initial);
     const [problem, setProblem] = useState<{ field: string; message: string } | null>(null);
-    const [saving, startSaving] = useTransition();
+    const [saving, startSaving] = useBusy();
 
     /** What is missing before Save means anything. Incomplete rather than
      *  wrong: an empty field is marked required, never "not valid". */

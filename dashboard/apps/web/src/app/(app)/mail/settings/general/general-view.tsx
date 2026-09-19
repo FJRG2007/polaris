@@ -21,11 +21,12 @@ import { refusalOf } from "@/app/(app)/mail/refusal";
 import { Button, Select, useToast } from "@polaris/ui";
 import { useMailLayout } from "@/app/(app)/mail/use-mail-layout";
 import { setMailPreferencesAction } from "@/app/(app)/mail/actions";
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 
 export function GeneralView({ preferences }: { preferences: core.MailPreferences }) {
     const toast = useToast();
-    const [saving, startSaving] = useTransition();
+    const [saving, startSaving] = useBusy();
     const [held, setHeld] = useState<core.MailPreferences>(preferences);
     const [layout, chooseLayout] = useMailLayout();
 

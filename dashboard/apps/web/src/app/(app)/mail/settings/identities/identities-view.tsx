@@ -10,7 +10,8 @@
 
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailIdentityView } from "@/lib/mailbox/labels";
@@ -144,7 +145,7 @@ function IdentityForm({
     const [signature, setSignature] = useState("");
     const [isDefault, setIsDefault] = useState(false);
     const [problem, setProblem] = useState("");
-    const [saving, startSaving] = useTransition();
+    const [saving, startSaving] = useBusy();
 
     // Read as it is typed, against the list this screen is already showing.
     const state = addressState(address, taken);

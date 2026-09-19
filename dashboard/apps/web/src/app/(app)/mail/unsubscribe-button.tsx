@@ -38,7 +38,8 @@ import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
 import { useRouter } from "next/navigation";
 import type { ButtonProps } from "@polaris/ui";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useBusy } from "./use-busy";
 import { BellOff, ExternalLink, Loader2 } from "lucide-react";
 import { unsubscribeAction, unsubscribeFromMessageAction } from "./actions";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, useToast } from "@polaris/ui";
@@ -83,7 +84,7 @@ export function UnsubscribeButton({
     /** Set when the only thing left is their page: a plain link nobody has
      *  opened yet, or a one-click their server would not take. */
     const [fallback, setFallback] = useState("");
-    const [working, startWorking] = useTransition();
+    const [working, startWorking] = useBusy();
 
     function run(): void {
         startWorking(async () => {

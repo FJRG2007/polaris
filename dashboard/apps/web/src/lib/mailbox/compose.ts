@@ -135,6 +135,26 @@ export async function cancelSend(userId: string, draftId: string): Promise<boole
     return undone.count > 0;
 }
 
+/**
+ * Skip what is left of the wait and send it now.
+ *
+ * Still through the queue: the hour moves to now and the timer is set for it, so
+ * the claim in `deliverQueued` is what decides who sends it, exactly as when the
+ * wait runs out. Only possible while it is still queued - a message already on
+ * its way has nothing left to skip.
+ */
+export async function sendNow(userId: string, draftId: string): Promise<boolean> {
+    const id = await ownedDraftId(userId, draftId);
+    const now = new Date();
+    const moved = await prisma.mailDraft.updateMany({
+        where: { id, state: "queued" },
+        data: { sendAt: now }
+    });
+    if (moved.count === 0) return false;
+    scheduleQueued(id, now);
+    return true;
+}
+
 /** The draft, if it is on one of this person's mailboxes. */
 async function ownedDraftId(userId: string, draftId: string): Promise<string> {
     const draft = await prisma.mailDraft.findFirst({

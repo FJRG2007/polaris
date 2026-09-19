@@ -19,7 +19,8 @@ import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
 import { useMail } from "./mail-shell";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useBusy } from "./use-busy";
 import { FolderPlus, Loader2 } from "lucide-react";
 import { createFolderForRoleAction, setFolderRoleAction } from "./actions";
 import {
@@ -52,7 +53,7 @@ export function FolderRoleDialog({
     const toast = useToast();
     const { accounts, folders } = useMail();
     const [chosen, setChosen] = useState("");
-    const [working, startWorking] = useTransition();
+    const [working, startWorking] = useBusy();
 
     const account = accounts.find((one) => one.id === missing.accountId);
     const label = core.MAIL_FOLDER_ROLE_LABELS[missing.role] ?? missing.role;

@@ -534,69 +534,12 @@ export async function createFolderForRoleAction(accountId: string, role: string)
 /* Writing                                                                     */
 /* -------------------------------------------------------------------------- */
 
-function composeInput(parsed: core.MailCompose): compose.ComposeInput {
-    return {
-        accountId: parsed.accountId,
-        identityId: parsed.identityId,
-        to: parsed.to,
-        cc: parsed.cc,
-        bcc: parsed.bcc,
-        replyTo: parsed.replyTo,
-        subject: parsed.subject,
-        body: parsed.body,
-        attachmentIds: parsed.attachmentIds,
-        inReplyToId: parsed.inReplyToId,
-        forward: parsed.forward,
-        sendAt: parsed.sendAt,
-        requestReceipt: parsed.requestReceipt,
-        draftId: parsed.draftId
-    };
-}
-
-export async function saveDraftAction(input: unknown) {
-    const userId = await actorId();
-    const parsed = core.mailDraftSchema.safeParse(input);
-    if (!parsed.success) return { error: "That draft could not be saved." };
-    try {
-        const draftId = await compose.saveDraft(userId, {
-            accountId: parsed.data.accountId,
-            identityId: parsed.data.identityId,
-            to: parsed.data.to,
-            cc: parsed.data.cc,
-            bcc: parsed.data.bcc,
-            replyTo: parsed.data.replyTo,
-            subject: parsed.data.subject,
-            body: parsed.data.body,
-            attachmentIds: parsed.data.attachmentIds,
-            inReplyToId: parsed.data.inReplyToId,
-            forward: parsed.data.forward,
-            sendAt: parsed.data.sendAt,
-            requestReceipt: parsed.data.requestReceipt,
-            draftId: parsed.data.id
-        });
-        return { draftId };
-    } catch (caught) {
-        return failure(caught, "That draft could not be saved.");
-    }
-}
-
-export async function sendAction(input: unknown) {
-    const userId = await actorId();
-    const parsed = core.mailComposeSchema.safeParse(input);
-    if (!parsed.success) {
-        const issue = parsed.error.issues[0];
-        return {
-            error: issue?.message ?? "Check the message.",
-            field: String(issue?.path[0] ?? "")
-        };
-    }
-    try {
-        const queued = await compose.queueSend(userId, composeInput(parsed.data));
-        return { draftId: queued.draftId, sendAt: queued.sendAt.toISOString() };
-    } catch (caught) {
-        return failure(caught, "That message could not be sent.");
-    }
-}
+/*
+ * Writing a draft, sending, Undo and Send now are routes under `/api/mail/drafts`
+ * and `/api/mail/outbox`, not actions here: the composer awaited them while every
+ * link in Polaris waited behind it, and an action is the router's to delay or
+ * drop. See `lib/mailbox/outbox-answer`.
+ */
 
 /**
  * Leave a copy of an unsent draft in the mail server's Drafts folder, so it can
@@ -609,17 +552,6 @@ export async function fileDraftOnServerAction(draftId: string) {
     if (!parsed.success) return {};
     await compose.fileDraftOnServer(userId, parsed.data);
     return {};
-}
-
-/** Take a message back out of the queue. Only works while it is still in it. */
-export async function undoSendAction(draftId: string) {
-    const userId = await actorId();
-    try {
-        const undone = await compose.cancelSend(userId, draftId);
-        return { undone };
-    } catch (caught) {
-        return failure(caught, "That message has already gone.");
-    }
 }
 
 /** Who to offer as somebody types a recipient. */

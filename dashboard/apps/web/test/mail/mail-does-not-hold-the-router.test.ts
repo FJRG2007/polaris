@@ -48,9 +48,10 @@ function actionBody(source: string, name: string): string {
 /**
  * The actions that only move mail.
  *
- * Filing, reading, labelling, snoozing, sending, and throwing a draft away. Each
- * changes rows and counts and nothing the server renders, so none of them may
- * revalidate Mail's layout.
+ * Filing, reading, labelling, snoozing, and throwing a draft away. Each changes
+ * rows and counts and nothing the server renders, so none of them may revalidate
+ * Mail's layout. Sending is not here because it is no longer an action at all -
+ * see `sending-does-not-hold-the-router`.
  */
 const MOVES_MAIL = [
     "actOnAction",
@@ -60,8 +61,6 @@ const MOVES_MAIL = [
     "emptyFolderAction",
     "snoozeAction",
     "applyLabelAction",
-    "sendAction",
-    "undoSendAction",
     "discardDraftAction"
 ];
 

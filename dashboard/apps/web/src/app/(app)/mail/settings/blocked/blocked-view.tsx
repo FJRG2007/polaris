@@ -13,7 +13,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Ban, ShieldOff } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { Button, EmptyState, useToast } from "@polaris/ui";
@@ -30,7 +31,7 @@ export function BlockedView({
 }) {
     const router = useRouter();
     const toast = useToast();
-    const [busy, startBusy] = useTransition();
+    const [busy, startBusy] = useBusy();
     const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
     const account = accounts.find((one) => one.id === accountId) ?? accounts[0];
     const list = account ? (blocked[account.id] ?? []) : [];

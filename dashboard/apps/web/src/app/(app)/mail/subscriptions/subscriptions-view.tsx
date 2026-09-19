@@ -20,7 +20,8 @@ import { useRouter } from "next/navigation";
 import { SenderFace } from "../sender-face";
 import { blockSenderAction } from "../actions";
 import { BellOff, MailX, Search } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
+import { useBusy } from "../use-busy";
 import { UnsubscribeButton } from "../unsubscribe-button";
 import { useDisplayFormat } from "@/components/display-format";
 import { Button, EmptyState, Input, useToast } from "@polaris/ui";
@@ -151,7 +152,7 @@ function Row({
 }) {
     const router = useRouter();
     const toast = useToast();
-    const [busy, startBusy] = useTransition();
+    const [busy, startBusy] = useBusy();
 
     const name = subscription.senderName || subscription.sender;
     const messages =

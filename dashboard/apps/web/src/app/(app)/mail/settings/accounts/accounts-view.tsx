@@ -26,11 +26,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 import { refusalOf } from "@/app/(app)/mail/refusal";
-import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { useEffect, useRef, useState, useTransition } from "react";
-import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
 import { MAIL_TRASH_KEEP_CHOICES } from "@polaris/core";
+import type { MailAccountView } from "@/lib/mailbox/accounts";
+import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
 import { Button, ConfirmDeleteDialog, Select, Switch, cn, useToast } from "@polaris/ui";
 import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
 import { AlertTriangle, CheckCircle2, Mail, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
@@ -266,7 +267,7 @@ function AccountRow({
 }) {
     const router = useRouter();
     const toast = useToast();
-    const [busy, startBusy] = useTransition();
+    const [busy, startBusy] = useBusy();
     const [removing, setRemoving] = useState(false);
     const [unified, setUnified] = useState(account.unified);
     const [notify, setNotify] = useState(account.notify);

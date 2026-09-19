@@ -17,7 +17,8 @@
 
 import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { Button, Select, Switch, useToast } from "@polaris/ui";
@@ -67,7 +68,7 @@ export function PrivacyView({
     const toast = useToast();
     const [accountId, setAccountId] = useState(accounts[0]!.id);
     const account = accounts.find((one) => one.id === accountId) ?? accounts[0]!;
-    const [saving, startSaving] = useTransition();
+    const [saving, startSaving] = useBusy();
 
     const [remoteContent, setRemoteContent] = useState(account.remoteContent);
     const [nameTrackers, setNameTrackers] = useState(account.nameTrackers);

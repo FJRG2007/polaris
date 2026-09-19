@@ -17,7 +17,8 @@
 import * as core from "@polaris/core";
 import { Button, cn, useToast } from "@polaris/ui";
 import { refusalOf } from "@/app/(app)/mail/refusal";
-import { useMemo, useState, useTransition, type KeyboardEvent } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 import { setMailKeysAction } from "@/app/(app)/mail/actions";
 
 /** Two keymaps are the same keyboard when every command lands on the same key. */
@@ -36,7 +37,7 @@ function without(keymap: core.MailKeymap, command: core.MailKeyCommand): core.Ma
 
 export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
     const toast = useToast();
-    const [saving, startSaving] = useTransition();
+    const [saving, startSaving] = useBusy();
     const [stored, setStored] = useState<core.MailKeymap>(keymap);
     const [held, setHeld] = useState<core.MailKeymap>(keymap);
     const [recording, setRecording] = useState<core.MailKeyCommand | null>(null);

@@ -11,7 +11,8 @@
  */
 
 import { ShieldCheck } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -34,7 +35,7 @@ export function JunkView({
 }) {
     const toast = useToast();
     const [confirm, confirmDialog] = useConfirm();
-    const [busy, startBusy] = useTransition();
+    const [busy, startBusy] = useBusy();
     const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
     const [on, setOn] = useState<Record<string, boolean>>(
         Object.fromEntries(accounts.map((one) => [one.id, one.spamFilter]))

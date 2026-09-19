@@ -11,7 +11,8 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { setVacationAction } from "@/app/(app)/mail/actions";
@@ -42,7 +43,7 @@ export function AwayView({
 
     const [form, setForm] = useState<Vacation>(held);
     const [problem, setProblem] = useState("");
-    const [saving, startSaving] = useTransition();
+    const [saving, startSaving] = useBusy();
 
     function pick(next: string): void {
         const chosen = vacations[next];

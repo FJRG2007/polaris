@@ -49,10 +49,10 @@ import {
     useMemo,
     useRef,
     useState,
-    useTransition,
     type ComponentPropsWithRef,
     type RefObject
 } from "react";
+import { useBusy } from "./use-busy";
 import { closeDesktopNotice } from "@/lib/desktop-notify";
 import { readMessage, warmMessage } from "./message-store";
 import {
@@ -316,7 +316,7 @@ export function MailView({
     const opened = useMailThread(openThreadId, revision);
     const toast = useToast();
     const [selected, setSelected] = useState<string[]>([]);
-    const [busy, startBusy] = useTransition();
+    const [busy, startBusy] = useBusy();
     // Which row the keyboard is on. Separate from the selection on purpose: the
     // pointer and the keyboard are two ways of pointing at a row, and a keyboard
     // walk that ticked every checkbox on the way past would be unusable.

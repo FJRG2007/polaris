@@ -37,7 +37,8 @@ import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailDiscovery } from "@/lib/mailbox/autoconfig";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { addressState } from "@/app/(app)/mail/address-state";
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useBusy } from "./use-busy";
 import {
     addAccountAction,
     discoverAction,
@@ -253,7 +254,7 @@ export function ConnectMailboxDialog({
     );
     const [problem, setProblem] = useState("");
     const [field, setField] = useState("");
-    const [connecting, startConnecting] = useTransition();
+    const [connecting, startConnecting] = useBusy();
     /**
      * Whether this dialog is the second half of a trip to a provider.
      *

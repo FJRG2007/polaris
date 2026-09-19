@@ -16,7 +16,8 @@
 import type * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useBusy } from "@/app/(app)/mail/use-busy";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { addressState } from "@/app/(app)/mail/address-state";
@@ -225,7 +226,7 @@ function RuleForm({
     const [stop, setStop] = useState(false);
     const [applyToExisting, setApplyToExisting] = useState(false);
     const [problem, setProblem] = useState("");
-    const [saving, startSaving] = useTransition();
+    const [saving, startSaving] = useBusy();
 
     const actionOptions = [
         { value: "archive", label: "archive it" },
