@@ -35,6 +35,7 @@ import {
     readInstalledProjects,
     readRequirements,
     walk,
+    type HashedBuild,
     type ModrinthBuild
 } from "./modrinth";
 import { host } from "@polaris/app-host";
@@ -84,8 +85,9 @@ export interface SetAside {
  *
  * Two kinds, both the publisher's statement rather than a guess: a jar that is a
  * build of the same Modrinth project as a mod in the pack - another version under
- * another name, which the loader refuses to start with - and one whose project a
- * mod in the pack declares it cannot run beside. Everything else is the player's
+ * another name, which the loader refuses to start with - and one that a mod in
+ * the pack declares it cannot run beside, or whose own build declares it cannot
+ * run beside a mod in the pack. Everything else is the player's
  * business and is not named. A jar Modrinth does not know is not named either:
  * with no project to go on there is nothing to say it is either of those.
  *
@@ -94,7 +96,7 @@ export interface SetAside {
 export function setAsidePlan(
     mods: readonly PackMod[],
     jars: readonly ForeignJar[],
-    projectOf: ReadonlyMap<string, string>
+    projectOf: ReadonlyMap<string, HashedBuild>
 ): SetAside[] {
     const shipped = new Set(mods.map((mod) => mod.filename));
     const sameProject = new Map<string, PackMod>();
@@ -106,14 +108,17 @@ export function setAsidePlan(
     const moves: SetAside[] = [];
     for (const jar of jars) {
         if (shipped.has(jar.name)) continue;
-        const project = projectOf.get(jar.sha1.toLowerCase());
-        if (!project) continue;
-        const same = sameProject.get(project);
-        const clash = clashes.get(project);
+        const build = projectOf.get(jar.sha1.toLowerCase());
+        if (!build) continue;
+        const same = sameProject.get(build.projectId);
+        const clash = clashes.get(build.projectId);
+        const refused = build.incompatible.map((id) => sameProject.get(id)).find((mod) => mod !== undefined);
         if (same) {
             moves.push({ name: jar.name, reason: `another copy of ${nameOf(same)}, installed as ${same.filename}` });
         } else if (clash) {
             moves.push({ name: jar.name, reason: `${nameOf(clash)} cannot run beside it` });
+        } else if (refused) {
+            moves.push({ name: jar.name, reason: `it cannot run beside ${nameOf(refused)}` });
         }
     }
     return moves;

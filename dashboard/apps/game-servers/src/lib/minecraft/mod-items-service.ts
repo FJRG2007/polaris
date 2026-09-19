@@ -396,7 +396,7 @@ function beforeDeadline<T>(work: Promise<T>, until: number): Promise<T> {
  * already in this heap by the time anything compares it against the cap. Counted
  * here instead, and the connection dropped the moment it goes past.
  */
-async function bounded(
+export async function bounded(
     body: ReadableStream<Uint8Array>,
     limit: number
 ): Promise<Uint8Array | null> {

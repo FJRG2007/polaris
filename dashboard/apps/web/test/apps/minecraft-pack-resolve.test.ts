@@ -386,10 +386,12 @@ describe("a player's own jars", () => {
     }
     const mods = [mod("sodium", "SODIUM", ["EMBEDDIUM"]), mod("balm", "BALM")];
     const jar = (name: string, sha1: string) => ({ name, sha1 });
+    const build = (projectId: string, incompatible: string[] = []) => ({ projectId, incompatible });
     const projects = new Map([
-        ["1".repeat(40), "SODIUM"],
-        ["2".repeat(40), "EMBEDDIUM"],
-        ["3".repeat(40), "XAERO"]
+        ["1".repeat(40), build("SODIUM")],
+        ["2".repeat(40), build("EMBEDDIUM")],
+        ["3".repeat(40), build("XAERO")],
+        ["5".repeat(40), build("OPTIFINE", ["BALM"])]
     ]);
 
     it("moves aside another copy of a mod in the pack, whatever it is called", () => {
@@ -404,6 +406,12 @@ describe("a player's own jars", () => {
     it("moves aside a mod a mod in the pack cannot run beside", () => {
         expect(setAsidePlan(mods, [jar("embeddium.jar", "2".repeat(40))], projects)).toEqual([
             { name: "embeddium.jar", reason: "sodium cannot run beside it" }
+        ]);
+    });
+
+    it("moves aside a mod whose own build cannot run beside one in the pack", () => {
+        expect(setAsidePlan(mods, [jar("optifine.jar", "5".repeat(40))], projects)).toEqual([
+            { name: "optifine.jar", reason: "it cannot run beside balm" }
         ]);
     });
 

@@ -66,6 +66,9 @@ export function MinecraftClientMods({
     const saved = useRef<string[]>([...entries]);
     /** Saves in the order they were made, so an earlier one cannot land last. */
     const queue = useRef<Promise<void>>(Promise.resolve());
+    /** Bumped by a save that fails, so the saves queued on top of it are dropped
+     *  rather than keeping the change the screen just took back. */
+    const epoch = useRef(0);
 
     const query_ = useCallback(
         (extra: Record<string, string>) =>
@@ -202,12 +205,15 @@ export function MinecraftClientMods({
         setError(null);
         setList(next);
         setSaving((count) => count + 1);
+        const mine = epoch.current;
         queue.current = queue.current
             .then(async () => {
+                if (mine !== epoch.current) return;
                 const result = await updateClientModsAction(installedAppId, next).catch(() => ({
                     error: "Could not save the list"
                 }));
                 if (result.error) {
+                    epoch.current += 1;
                     setError(result.error);
                     setList(saved.current);
                 } else {

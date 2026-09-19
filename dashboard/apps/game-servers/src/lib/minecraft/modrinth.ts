@@ -447,7 +447,11 @@ export async function readConflicts(
         // The build this server installs: an incompatibility declared two years
         // ago and since resolved is not something to warn a person about today,
         // and neither is one declared by a build for another release.
-        const build = installedBuildOf(versions.data, entryFor.get(entry.slug.toLowerCase()) ?? entry.slug, wanted);
+        const build = installedBuildOf(
+            versions.data,
+            entryFor.get(entry.slug.toLowerCase()) ?? entryFor.get(entry.id.toLowerCase()) ?? entry.slug,
+            wanted
+        );
         for (const dependency of build?.dependencies ?? []) {
             if (dependency.dependency_type !== "incompatible" || !dependency.project_id) continue;
             const other = slugById.get(dependency.project_id);
@@ -507,8 +511,28 @@ const HASHES_ASKED = 500;
 
 const byHashSchema = z.record(
     z.string(),
-    z.object({ project_id: z.string().max(64).catch("") }).catch({ project_id: "" })
+    z
+        .object({
+            project_id: z.string().max(64).catch(""),
+            dependencies: z
+                .array(
+                    z.object({
+                        project_id: z.string().max(64).nullish().catch(null),
+                        dependency_type: z.string().max(32).catch("")
+                    })
+                )
+                .max(64)
+                .catch([])
+        })
+        .catch({ project_id: "", dependencies: [] })
 );
+
+/** What Modrinth says one file is: the project it is a build of, and the
+ *  projects that build says it cannot run beside. */
+export interface HashedBuild {
+    readonly projectId: string;
+    readonly incompatible: readonly string[];
+}
 
 /**
  * Which Modrinth project each file is, by its sha1.
@@ -521,11 +545,11 @@ const byHashSchema = z.record(
  * Empty when Modrinth cannot be asked, which every caller reads as "nothing is
  * known about these", never as "none of them are anything".
  */
-export async function projectsByHash(hashes: readonly string[]): Promise<Map<string, string>> {
+export async function projectsByHash(hashes: readonly string[]): Promise<Map<string, HashedBuild>> {
     const asked = [
         ...new Set(hashes.map((hash) => hash.toLowerCase()).filter((hash) => SHA1.test(hash)))
     ].slice(0, HASHES_ASKED);
-    const found = new Map<string, string>();
+    const found = new Map<string, HashedBuild>();
     if (asked.length === 0) return found;
     try {
         const response = await fetch(`${modrinthApi}/version_files`, {
@@ -542,7 +566,13 @@ export async function projectsByHash(hashes: readonly string[]): Promise<Map<str
         const parsed = byHashSchema.safeParse(await response.json());
         if (!parsed.success) return found;
         for (const [hash, build] of Object.entries(parsed.data)) {
-            if (build.project_id) found.set(hash.toLowerCase(), build.project_id);
+            if (!build.project_id) continue;
+            found.set(hash.toLowerCase(), {
+                projectId: build.project_id,
+                incompatible: build.dependencies
+                    .filter((one) => one.dependency_type === "incompatible" && one.project_id)
+                    .map((one) => one.project_id as string)
+            });
         }
     } catch {
         // Nothing known is the answer.

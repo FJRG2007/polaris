@@ -31,6 +31,7 @@ import {
     powershellInstaller,
     shellInstaller
 } from "../../../../../../../lib/minecraft/pack-scripts";
+import { bounded } from "../../../../../../../lib/minecraft/mod-items-service";
 import { host } from "@polaris/app-host";
 
 const { readInstallConfig } = host.appsInstallConfig;
@@ -126,7 +127,9 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     });
     if (!install?.applicationId) return new Response("Not found", { status: 404 });
 
-    const body = (await request.text()).slice(0, FOREIGN_BYTES);
+    const bytes = request.body ? await bounded(request.body, FOREIGN_BYTES) : new Uint8Array(0);
+    if (!bytes) return new Response("Too much", { status: 413 });
+    const body = new TextDecoder().decode(bytes);
     const jars: ForeignJar[] = [];
     for (const line of body.split("\n")) {
         const [sha1 = "", ...rest] = line.replace(/\r$/, "").split("\t");
