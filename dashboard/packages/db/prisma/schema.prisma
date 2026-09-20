@@ -10163,6 +10163,7 @@ model MailAccount {
     subscriptions  MailSubscription[]
     trashOrigins   MailTrashOrigin[]
     templates      MailTemplate[]
+    deliveries     MailDelivery[]
 
     @@unique([userId, address])
     @@index([userId, position])
@@ -10621,13 +10622,25 @@ model MailDraft {
     forward         Boolean @default(false)
     requestReceipt  Boolean @default(false)
 
-    // When to send it. Null is "not yet said".
+    // When to send it. Null is "not yet said", and also what a message the
+    // outgoing server refused for good is left at: nothing is due, so no sweep
+    // picks it up and sends the same rejection again.
     sendAt   DateTime?
     // "draft" | "queued" | "sending" | "failed". A sent one is deleted.
     state    String    @default("draft")
-    // Why the last attempt did not work, in the server's words.
+    // Why the last attempt did not work, in words the writer reads - the
+    // outgoing server's own reply where it gave one.
     failure  String    @default("")
+    // Whether that refusal was final. A server answering 5xx has decided; trying
+    // again only sends the same rejection to the same people, and a screen that
+    // says "Polaris will try again" about it is lying to the person reading it.
+    permanent Boolean  @default(false)
     attempts Int       @default(0)
+
+    // Set on the message a sending check sends to the mailbox's own address, so
+    // the check can recognise its own result. False for everything anybody
+    // wrote.
+    probe Boolean @default(false)
 
     // The uid of the copy on the server's Drafts folder, so editing here
     // replaces it rather than leaving a trail of half-written messages.
@@ -10642,6 +10655,65 @@ model MailDraft {
 
     @@index([accountId, updatedAt])
     @@index([state, sendAt])
+}
+
+// What became of a message after the outgoing server took it.
+//
+// The queue entry is deleted the second a message is gone - it is a queue, not a
+// record - and the copy in Sent belongs to the mail server rather than to
+// Polaris, so without this row there is nothing here that knows a message was
+// ever sent, and nothing a delivery report arriving days later could be tied
+// back to.
+//
+// What it is careful not to claim: for a mailbox at somebody else's provider,
+// "accepted" means the provider took it and said nothing since. That is the
+// whole of what a client can ever know, and it is a different fact from
+// delivered. Only a report coming back moves the row off it.
+model MailDelivery {
+    id        String @id @default(uuid(7)) @db.Uuid
+    accountId String @db.Uuid
+
+    // The Message-Id of what went out, bare. The one handle that survives a
+    // resync, a move, and the queue entry being deleted - and the id a report
+    // names when it says which message it is about.
+    messageId String
+    subject   String @default("")
+    // Who it went to, as {name, address} JSON, the way a message stores it. Kept
+    // here rather than looked up through the Sent copy, which may not exist.
+    toJson    Json   @default("[]")
+
+    // "accepted" - the outgoing server took it and nothing has come back.
+    // "partial"  - it took it for some recipients and refused it for others.
+    // "delayed"  - a report says it has not arrived yet and is still trying.
+    // "bounced"  - a report says it did not arrive.
+    state     String @default("accepted")
+    // Whether a copy was left in Sent: "filed", "automatic" (the service files
+    // its own), "none" (this mailbox has no Sent folder) or "failed".
+    sentCopy  String @default("automatic")
+    // The reporting server's own words, on one line, or "".
+    detail    String @default("")
+    // The address a report was about, or the recipients an outgoing server
+    // refused while taking the rest. "" where nothing named one.
+    detailFor String @default("")
+    // The conversation the report arrived in, so the sender can open the thing
+    // that said so rather than being asked to take Polaris's word for it.
+    reportThreadId String? @db.Uuid
+
+    // Set on the message a sending check sends to the mailbox's own address.
+    probe Boolean @default(false)
+
+    sentAt    DateTime  @default(now())
+    // When a report settled it. Null while nothing has come back.
+    settledAt DateTime?
+
+    account MailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    // One row per message sent, so recording the same send twice cannot make two.
+    @@unique([accountId, messageId])
+    @@index([accountId, sentAt])
+    // "everything still waiting to hear", which is what a report is matched
+    // against.
+    @@index([accountId, state, sentAt])
 }
 
 // A message somebody writes often enough to keep: a subject and a body put into
