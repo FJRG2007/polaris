@@ -74,6 +74,7 @@ import { withCameraDevice } from "./camera-device";
 import { callMuted, setCallMuted } from "./call-muted";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { pressDeafen, pressMic } from "./call-voice-controls";
+import { maskCamera, type MaskedCamera } from "./camera-filter";
 import type { CallDevice, CallState, PeerState } from "./call-state";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
@@ -81,6 +82,7 @@ import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mi
 import { callDevices, isDenial, openMedia, openScreen, refused, settle } from "./call-media";
 import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
 import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
+import { cameraBackground, useCameraBackground, type CameraBackground } from "./camera-background";
 import {
     AUDIO_GROUP,
     audioPlan,
@@ -385,6 +387,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      *  listens to when the reader asked for the better detection. */
     const [filteredTrack, setFilteredTrack] = useState<MediaStreamTrack | null>(null);
     const [licensedFilter, setLicensedFilter] = useState(false);
+    /** Which background is actually being drawn behind this browser, and why
+     *  there is none when one was asked for - see `camera-filter`. */
+    const [cameraMask, setCameraMask] = useState<CameraBackground | null>(null);
+    const [maskProblem, setMaskProblem] = useState<string | null>(null);
     /**
      * Everything about sharing one microphone with the people sitting next to
      * you - see `call-combine` for what a group is and `call-nearby` for how a
@@ -543,6 +549,18 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const screenAudio = useRef<MediaStreamTrack | null>(null);
     // The microphone with a model between it and the call, when one is running.
     const filtered = useRef<FilteredMic | null>(null);
+    // The camera with a background drawn behind it, on the same terms.
+    const masked = useRef<MaskedCamera | null>(null);
+    /**
+     * Which attempt to build one is the current one.
+     *
+     * The microphone graph is built in milliseconds; this one downloads six
+     * megabytes of model the first time, and a menu is a thing people press
+     * twice. Without a round number the slower of two overlapping attempts
+     * wins, and the one that lost is left running a segmenter nobody can
+     * reach to stop.
+     */
+    const maskRound = useRef(0);
     const licensed = useRef<{ moduleUrl: string; token: string } | null>(null);
     const me = useRef<string | null>(null);
     /**
@@ -758,7 +776,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * called on every track event in the call.
      */
     const publishLocalPreview = useCallback(() => {
-        const tracks = [mic.current, camera.current].filter(
+        // The camera as it is being sent, background and all. Anything else is a
+        // self-view that disagrees with every other tile in the room, and the
+        // one person who cannot check what their background looks like is the
+        // person who chose it.
+        const tracks = [mic.current, masked.current?.track ?? camera.current].filter(
             (track): track is MediaStreamTrack => track !== null
         );
         setLocalStream(tracks.length > 0 ? new MediaStream(tracks) : null);
@@ -895,6 +917,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      *  model is running, and the microphone itself otherwise. */
     const outgoingMic = useCallback(
         (): MediaStreamTrack | null => filtered.current?.track ?? mic.current,
+        []
+    );
+
+    /** What the call sends as this browser's picture: the composited canvas when
+     *  a background is running, and the camera itself otherwise. */
+    const outgoingCamera = useCallback(
+        (): MediaStreamTrack | null => masked.current?.track ?? camera.current,
         []
     );
 
@@ -1109,6 +1138,65 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // The gate listens to whichever of the two the reader asked for. Told
         // here because this is where the second one starts existing.
         setFilteredTrack(built.track);
+    }, []);
+
+    /**
+     * Put the chosen background behind the camera, or take away the one that
+     * was there.
+     *
+     * The camera is never reopened. What changes is which track is published -
+     * the device, or the canvas the device is being composited onto - and a swap
+     * of that kind is `replaceTrack` on a publication that is already up, which
+     * nobody in the room notices.
+     *
+     * It is deliberately quiet about a background that will not start. A
+     * microphone that fails is a person nobody can hear; a background that fails
+     * is a picture with a room in it, and the reason is put on the line under
+     * the setting rather than in front of the call.
+     */
+    const startBackground = useCallback(async () => {
+        const round = (maskRound.current += 1);
+        const track = camera.current;
+        // A camera that is off is not something to composite: it delivers black
+        // frames, the model would be asked to find a person in them, and the
+        // canvas would go up carrying that. It is built when the camera is
+        // turned on instead - see `toggleCamera`.
+        const usable = track?.readyState === "live" && track.enabled;
+        const wanted = usable ? cameraBackground() : "off";
+
+        /**
+         * The one that is running stays running until the next one is ready.
+         *
+         * Tearing it down first is the obvious order and the wrong one twice
+         * over: the publication would hold a stopped track for as long as the
+         * new model takes to start, which the room sees as frozen video, and a
+         * background that then failed to build would have taken the working one
+         * with it - leaving the room on screen, which is the one outcome this
+         * whole feature exists to prevent.
+         */
+        const previous = masked.current;
+        const built = wanted === "off" || !track ? null : await maskCamera(track, wanted);
+
+        // Somebody moved on while the model was loading. Whatever was built
+        // belongs to nobody, and the round that came after this one owns what is
+        // running.
+        if (round !== maskRound.current) {
+            await built?.stop();
+            return;
+        }
+
+        if (built && !built.track) {
+            // Asked for and not built. What was already running is left running:
+            // somebody swapping a blur for a picture that will not load is
+            // better off blurred than shown their room.
+            setMaskProblem(built.problem);
+            return;
+        }
+
+        masked.current = built;
+        setCameraMask(built?.using ?? null);
+        setMaskProblem(null);
+        await previous?.stop();
     }, []);
 
     /**
@@ -1604,7 +1692,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // which of those happened, the state is asserted here, in full, in
             // both directions.
             settleMic();
-            await publish(CAMERA, camera.current);
+            await publish(CAMERA, outgoingCamera());
             if (screen.current) await publish(SCREEN, screen.current);
             if (screenAudio.current) await publish(SCREEN_AUDIO, screenAudio.current);
             // Everything else about this browser, including the facts a
@@ -1729,6 +1817,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 // carries the filtered track and nobody hears the raw room for
                 // the second it would take to swap.
                 await startFilter();
+                // The same for the picture, and the stakes are higher: the
+                // second of raw camera a later swap would cost is a second of
+                // somebody's room going out to the call they turned a background
+                // on to keep it out of.
+                await startBackground();
+                publishLocalPreview();
             }
             // A call with no camera, or none with no microphone, is still a call.
             // What could not be opened is said out loud, because sitting in a
@@ -1853,6 +1947,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // nobody ever closes.
             void filtered.current?.stop();
             filtered.current = null;
+            void masked.current?.stop();
+            masked.current = null;
             for (const track of [
                 mic.current,
                 camera.current,
@@ -1879,6 +1975,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         levelNow,
         listDevices,
         meetingId,
+        outgoingCamera,
         outgoingMic,
         publish,
         publishLocalPreview,
@@ -1889,6 +1986,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         say,
         setVoiceEnabled,
         sound,
+        startBackground,
         startFilter,
         withVideo
     ]);
@@ -2262,14 +2360,28 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             existing.stop();
             camera.current = null;
             setHasCamera(false);
+            // Whatever was being composited was being composited from that
+            // camera. It is now a canvas drawing a frozen frame of a device that
+            // has gone, which is worse than no background at all.
+            void masked.current?.stop();
+            masked.current = null;
+            setCameraMask(null);
         }
 
         if (alive) {
             const next = !cameraOn;
             alive.enabled = next;
             setCameraOn(next);
-            void publish(CAMERA, next ? alive : null);
-            publishLocalPreview();
+            void (async () => {
+                // A background chosen while the camera was off was never built
+                // against anything. It is built now, before the first frame goes
+                // anywhere, because the alternative is a second of the room on
+                // its way to a call somebody turned a background on to keep it
+                // out of.
+                if (next && !masked.current) await startBackground();
+                await publish(CAMERA, next ? outgoingCamera() : null);
+                publishLocalPreview();
+            })();
             return;
         }
         void navigator.mediaDevices
@@ -2287,7 +2399,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 setCameraOn(track !== null);
                 setCameraId(track?.getSettings().deviceId ?? null);
                 setCameraFacing(track?.getSettings().facingMode ?? null);
-                await publish(CAMERA, track);
+                // Rebuilt against the camera that has just opened, before it is
+                // published: this is the path a camera turned on mid-call takes,
+                // and the background has to be on the first frame of it.
+                await startBackground();
+                await publish(CAMERA, outgoingCamera());
                 publishLocalPreview();
                 void listDevices();
             })
@@ -2296,7 +2412,15 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // holding and a camera that is not there send somebody to three
             // different places.
             .catch((caught) => setError(refused(caught, "camera")));
-    }, [cameraOn, levelNow, listDevices, publish, publishLocalPreview]);
+    }, [
+        cameraOn,
+        levelNow,
+        listDevices,
+        outgoingCamera,
+        publish,
+        publishLocalPreview,
+        startBackground
+    ]);
 
     /**
      * Share a screen, or stop.
@@ -2439,10 +2563,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         camera.current = track;
                         setCameraId(deviceId);
                         setCameraFacing(track.getSettings().facingMode ?? null);
+                        // Rebuilt against the new device: the old canvas was
+                        // compositing the camera that has just been stopped.
+                        await startBackground();
                         // The screen is its own publication, so a camera swap
                         // never touches it: picking a different camera is not a
                         // decision to stop sharing.
-                        if (cameraOn) await publish(CAMERA, track);
+                        if (cameraOn) await publish(CAMERA, outgoingCamera());
                     }
                     publishLocalPreview();
                 })
@@ -2453,9 +2580,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             deafened,
             levelNow,
             micOn,
+            outgoingCamera,
             outgoingMic,
             publish,
             publishLocalPreview,
+            startBackground,
             startFilter
         ]
     );
@@ -2492,6 +2621,47 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             })();
         },
         [outgoingMic, publish, publishLocalPreview, rememberCleanMic, startFilter]
+    );
+
+    /**
+     * Change what is drawn behind the camera, mid-call.
+     *
+     * The camera is never reopened and nothing is renegotiated: the canvas is
+     * rebuilt beside the device, and what is published is then swapped for it.
+     * The first time somebody turns one on this takes as long as the model takes
+     * to arrive, which is why it is not awaited by anything on screen - the menu
+     * closes, the call carries on, and the background appears when it is ready.
+     */
+    const {
+        background,
+        image: backdrop,
+        choose: rememberBackground,
+        pickImage
+    } = useCameraBackground();
+
+    const swapBackground = useCallback(async () => {
+        await startBackground();
+        if (cameraOn) await publish(CAMERA, outgoingCamera());
+        publishLocalPreview();
+    }, [cameraOn, outgoingCamera, publish, publishLocalPreview, startBackground]);
+
+    const setBackground = useCallback(
+        (next: CameraBackground) => {
+            rememberBackground(next);
+            void swapBackground();
+        },
+        [rememberBackground, swapBackground]
+    );
+
+    /** Take a picture from this machine, keep it, and put it behind the camera.
+     *  Awaited by the caller, which is the half that can fail in a way somebody
+     *  has to be told about - a file that is not an image. */
+    const pickBackground = useCallback(
+        async (file: File) => {
+            await pickImage(file);
+            await swapBackground();
+        },
+        [pickImage, swapBackground]
     );
 
     /**
@@ -2532,7 +2702,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 if (which === "camera") {
                     await quality.retune(camera.current, quality.cameraConstraints(level));
                     if (cameraOn && camera.current) {
-                        await publish(CAMERA, camera.current, { again: true });
+                        // The canvas follows the camera's new size by itself -
+                        // it reads it on every frame - so the background never
+                        // has to be rebuilt for this.
+                        await publish(CAMERA, outgoingCamera(), { again: true });
                     }
                 } else {
                     await quality.retune(screen.current, quality.screenConstraints(level));
@@ -2546,7 +2719,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 publishLocalPreview();
             })();
         },
-        [cameraOn, publish, publishLocalPreview]
+        [cameraOn, outgoingCamera, publish, publishLocalPreview]
     );
 
     const setCameraQuality = useCallback(
@@ -3234,6 +3407,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setCleanMic,
         micFilter,
         licensedFilter,
+        background,
+        setBackground,
+        backgroundImage: backdrop,
+        pickBackground,
+        backgroundRunning: cameraMask,
+        backgroundProblem: maskProblem,
         micOn,
         cameraOn,
         hasCamera,

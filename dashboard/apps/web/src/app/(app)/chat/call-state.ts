@@ -10,6 +10,7 @@
 import type { MeetingView } from "@/lib/chat/meetings";
 import type { CallAudioReport } from "./call-diagnosis";
 import type { FilteredMic, MicFilter } from "./mic-filter";
+import type { CameraBackground } from "./camera-background";
 import type { CallLevel, CallQuality } from "./call-quality";
 import type { Reaction, ShownReaction } from "./call-signals";
 import type { AudioRole, CombineRequest } from "./call-combine";
@@ -132,6 +133,21 @@ export interface CallState {
     readonly micFilter: FilteredMic["using"] | null;
     /** Whether this instance has a licensed filter connected at all. */
     readonly licensedFilter: boolean;
+    /** What is drawn behind the camera, as chosen - see `camera-background`. */
+    readonly background: CameraBackground;
+    setBackground: (value: CameraBackground) => void;
+    /** The picture behind `image`, kept in this browser and nowhere else. Null
+     *  until somebody has chosen one, which is also why the setting that uses it
+     *  is not offered until then. */
+    readonly backgroundImage: string | null;
+    /** Choose a picture from this machine and use it. Rejects with something
+     *  worth reading when the file is not one. */
+    pickBackground: (file: File) => Promise<void>;
+    /** Which background is actually being drawn, or null for none. Not always
+     *  the one asked for: the model has to download and start. */
+    readonly backgroundRunning: CameraBackground | null;
+    /** Why the background that was asked for is not running. */
+    readonly backgroundProblem: string | null;
     toggleMic: () => void;
     toggleCamera: () => void;
     toggleShare: () => void;

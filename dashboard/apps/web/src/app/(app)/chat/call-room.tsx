@@ -40,6 +40,7 @@ import { useHeldCall } from "./call-session";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { NOISE_LEVELS } from "./mic-cleanup";
+import { BACKGROUNDS, type CameraBackground } from "./camera-background";
 import { searchPeopleAction } from "./actions";
 import { NoAudioNotice } from "./no-audio-notice";
 import { playCallSound } from "@/lib/call-sounds";
@@ -1050,6 +1051,12 @@ export function CallRoom({
                     qualityLabel="Video quality"
                     mirrored={call.mirrored}
                     onMirror={call.flipCamera}
+                    background={call.background}
+                    onBackground={call.setBackground}
+                    backgroundImage={call.backgroundImage}
+                    onPickBackground={call.pickBackground}
+                    backgroundRunning={call.backgroundRunning}
+                    backgroundProblem={call.backgroundProblem}
                 />
 
                 <Split
@@ -1246,6 +1253,12 @@ function Split({
     mirrored,
     onMirror,
     meter,
+    background,
+    onBackground,
+    backgroundImage,
+    onPickBackground,
+    backgroundRunning,
+    backgroundProblem,
     title
 }: {
     label: string;
@@ -1288,7 +1301,23 @@ function Split({
      *  Null while the call has no microphone open yet - the meter then stays
      *  empty rather than opening one of its own. */
     meter?: MediaStreamTrack | null;
+    /** Camera only: what is drawn behind you, and the picture it uses when that
+     *  is a picture. The six arrive together or none of them do. */
+    background?: CameraBackground;
+    onBackground?: (value: CameraBackground) => void;
+    backgroundImage?: string | null;
+    onPickBackground?: (file: File) => Promise<void>;
+    /** What is actually being drawn, which for the seconds the model takes to
+     *  arrive is not yet what was asked for. */
+    backgroundRunning?: CameraBackground | null;
+    backgroundProblem?: string | null;
 }) {
+    // The picker lives outside the menu on purpose: a menu that has closed has
+    // unmounted its contents, and a file input that is chosen from after that is
+    // an input nothing is listening to.
+    const picker = useRef<HTMLInputElement>(null);
+    const [pickProblem, setPickProblem] = useState<string | null>(null);
+
     // Worth a menu for the setting alone: a machine with one microphone still
     // sits in a room with a fan in it, and a machine with one screen still has a
     // choice to make about how much of it to send.
@@ -1296,6 +1325,7 @@ function Split({
         devices.length > 1 ||
         onCleanMic !== undefined ||
         onQuality !== undefined ||
+        onBackground !== undefined ||
         onMirror !== undefined;
     const showing = ladder && level ? ladder.rungs[level] : null;
 
@@ -1410,6 +1440,80 @@ function Split({
                                 </DropdownMenuItem>
                             </>
                         )}
+                        {onBackground && background && (
+                            <>
+                                <DropdownMenuLabel>Background</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {BACKGROUNDS.map((choice) => (
+                                    <DropdownMenuItem
+                                        key={choice.value}
+                                        onSelect={(event) => {
+                                            // With no picture chosen yet there
+                                            // is nothing for this row to turn
+                                            // on, so it asks for one instead.
+                                            if (choice.value === "image" && !backgroundImage) {
+                                                event.preventDefault();
+                                                picker.current?.click();
+                                                return;
+                                            }
+                                            onBackground(choice.value);
+                                        }}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "size-3.5 shrink-0",
+                                                background === choice.value
+                                                    ? "opacity-100"
+                                                    : "opacity-0"
+                                            )}
+                                        />
+                                        <span className="flex min-w-0 flex-col">
+                                            <span>{choice.label}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {choice.help}
+                                            </span>
+                                        </span>
+                                        {choice.value === "image" && backgroundImage && (
+                                            <img
+                                                src={backgroundImage}
+                                                alt=""
+                                                className="ml-auto size-8 shrink-0 rounded object-cover"
+                                            />
+                                        )}
+                                    </DropdownMenuItem>
+                                ))}
+                                {backgroundImage && (
+                                    <DropdownMenuItem
+                                        onSelect={(event) => {
+                                            event.preventDefault();
+                                            picker.current?.click();
+                                        }}
+                                    >
+                                        <span className="ml-5">Choose a different picture</span>
+                                    </DropdownMenuItem>
+                                )}
+                                {/* Said only while it is not yet true. The first
+                                    background on a machine waits for a model to
+                                    download, and a menu that looks like it did
+                                    nothing is a menu somebody presses again. */}
+                                {background !== "off" &&
+                                    !pressed &&
+                                    !backgroundProblem &&
+                                    backgroundRunning !== background && (
+                                        <p className="px-2 pb-1 text-xs text-muted-foreground">
+                                            Starting. The model downloads once.
+                                        </p>
+                                    )}
+                                {backgroundProblem && (
+                                    <p className="px-2 pb-1 text-xs text-muted-foreground">
+                                        No background is running. {backgroundProblem}
+                                    </p>
+                                )}
+                                {pickProblem && (
+                                    <p className="px-2 pb-1 text-xs text-danger">{pickProblem}</p>
+                                )}
+                            </>
+                        )}
                         {onCleanMic && (
                             <>
                                 <DropdownMenuLabel>Background noise</DropdownMenuLabel>
@@ -1484,6 +1588,29 @@ function Split({
                         )}
                     </DropdownMenuContent>
                 </DropdownMenu>
+            )}
+            {onPickBackground && (
+                <input
+                    ref={picker}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        // Cleared either way, so choosing the same file twice is
+                        // a second change event rather than silence.
+                        event.target.value = "";
+                        if (!file) return;
+                        setPickProblem(null);
+                        void onPickBackground(file).catch((caught: unknown) =>
+                            setPickProblem(
+                                caught instanceof Error
+                                    ? caught.message
+                                    : "Polaris could not use that picture."
+                            )
+                        );
+                    }}
+                />
             )}
         </span>
     );

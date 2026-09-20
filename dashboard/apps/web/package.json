@@ -5,9 +5,9 @@
     "type": "module",
     "description": "Polaris dashboard - the Next.js control-plane app.",
     "scripts": {
-        "predev": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-audio-assets.mjs && node scripts/copy-office-fonts.mjs",
+        "predev": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-audio-assets.mjs && node scripts/copy-video-assets.mjs && node scripts/copy-office-fonts.mjs",
         "dev": "next dev",
-        "prebuild": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-audio-assets.mjs && node scripts/copy-office-fonts.mjs",
+        "prebuild": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-audio-assets.mjs && node scripts/copy-video-assets.mjs && node scripts/copy-office-fonts.mjs",
         "build": "next build",
         "start": "next start",
         "test": "vitest run --passWithNoTests",
@@ -108,6 +108,7 @@
     },
     "devDependencies": {
         "@breezystack/lamejs": "1.2.7",
+        "@mediapipe/selfie_segmentation": "0.1.1675465747",
         "@polaris-app/game-servers": "0.1.0",
         "@polaris-app/places": "0.1.0",
         "@testing-library/react": "16.3.2",

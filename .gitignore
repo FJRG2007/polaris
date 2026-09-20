@@ -53,6 +53,8 @@ dashboard/apps/*/.assets/
 dashboard/.app-bundles/
 # Noise-suppression worklets and models, staged into public/ at build time
 dashboard/apps/web/public/audio/
+# The selfie-segmentation model calls blur a background with, staged the same way
+dashboard/apps/web/public/video/
 # The embedded editors' fonts, staged into public/ at build time from the
 # genoffice packages and katex - see apps/web/scripts/copy-office-fonts.mjs
 dashboard/apps/web/public/office-fonts/
