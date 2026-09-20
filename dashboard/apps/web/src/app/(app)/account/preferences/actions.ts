@@ -9,7 +9,14 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import * as core from "@polaris/core";
-import { setPresenceChoice, setStatus } from "@/lib/presence-service";
+import {
+    ownStatus,
+    presenceChoiceOf,
+    setPresenceChoice,
+    setStatus,
+    type PresenceChoiceView,
+    type StatusView
+} from "@/lib/presence-service";
 import { userDisplayPreferencesSchema } from "@polaris/core";
 import {
     getUserDisplayPreferences,
@@ -98,10 +105,35 @@ export async function reportTimeZoneAction(zone: unknown): Promise<{ changed: bo
  * minutes or five centuries is refused rather than stored. Neither means "until
  * I change it", which is what a status was before there was a window at all.
  */
+/**
+ * What the menu is handed back after a write, and what it asks for when one of
+ * these lapses.
+ *
+ * Both halves together, because both are resolved in the app layout and the
+ * point of answering at all is to stop the menu reaching for that layout. A
+ * status change used to end in `router.refresh()`, which re-renders the whole
+ * chrome - the navigation, the unread counts, the notifications and whatever
+ * screen happens to be open - to move a tick in a dropdown. On a heavy screen
+ * that is a visible stutter every time somebody sets themselves away.
+ */
+export interface PresenceNow {
+    readonly held: PresenceChoiceView;
+    readonly status: StatusView;
+}
+
+/** Both, as they stand this instant. For the menu's own clock reaching a moment
+ *  the server named - a window opening is not something a browser can work out,
+ *  since it is the account's rules on the account's clock. */
+export async function presenceNowAction(): Promise<PresenceNow> {
+    const user = await requireUser();
+    const [held, status] = await Promise.all([presenceChoiceOf(user.id), ownStatus(user.id)]);
+    return { held, status };
+}
+
 export async function setPresenceAction(
     choice: unknown,
     window?: unknown
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; held?: PresenceChoiceView }> {
     const user = await requireUser();
     const wanted = (PRESENCE_CHOICES as readonly string[]).includes(String(choice))
         ? (String(choice) as PresenceChoice)
@@ -113,7 +145,10 @@ export async function setPresenceAction(
     }
 
     await setPresenceChoice(user.id, wanted, parsed.data);
-    return {};
+    // Resolved rather than echoed back. What was asked for is not always what
+    // holds - an open window keeps the account until it closes - and the moment
+    // the answer next changes is only knowable here.
+    return { held: await presenceChoiceOf(user.id) };
 }
 
 /**
@@ -124,7 +159,9 @@ export async function setPresenceAction(
  * only ever one of the offered ones: it arrives from a browser, and a request
  * naming five years is refused rather than stored.
  */
-export async function setStatusAction(input: unknown): Promise<{ error?: string }> {
+export async function setStatusAction(
+    input: unknown
+): Promise<{ error?: string; status?: StatusView }> {
     const user = await requireUser();
     const parsed = core.userStatusSchema.safeParse(input);
     if (!parsed.success) {
@@ -132,5 +169,5 @@ export async function setStatusAction(input: unknown): Promise<{ error?: string 
     }
 
     await setStatus(user.id, parsed.data.text, parsed.data);
-    return {};
+    return { status: await ownStatus(user.id) };
 }

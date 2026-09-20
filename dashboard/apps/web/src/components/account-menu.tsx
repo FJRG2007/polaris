@@ -6,12 +6,17 @@ import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
 import { Avatar } from "@/components/avatar";
 import { useNow } from "@/components/presence";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { usePresenceRefresh } from "@/components/presence-store";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
 import { noteSignOutAction } from "@/app/(app)/account/sessions/actions";
-import { setPresenceAction, setStatusAction } from "@/app/(app)/account/preferences/actions";
+import {
+    presenceNowAction,
+    setPresenceAction,
+    setStatusAction,
+    type PresenceNow
+} from "@/app/(app)/account/preferences/actions";
 import {
     Bell,
     Download,
@@ -137,6 +142,16 @@ export function AccountMenu({
      *  inside the dialog so the menu can close on the way in - a dialog mounted
      *  inside a menu is unmounted by the item that opens it. */
     const [writing, setWriting] = useState(false);
+    /**
+     * The line as it stands, and when it clears.
+     *
+     * State rather than the props straight through, for the reason the choice
+     * above is: what is written here is true the moment it is written, and the
+     * layout that resolved these renders once a page load. Reaching for a new
+     * one to move a line in a dropdown is what this menu used to do.
+     */
+    const [heldStatus, setHeldStatus] = useState(status);
+    const [heldStatusUntil, setHeldStatusUntil] = useState(statusUntil);
     const [line, setLine] = useState(status);
     const [clears, setClears] = useState<number | null>(null);
     /**
@@ -160,7 +175,25 @@ export function AccountMenu({
         setUntil(presenceUntil);
         setByRule(presenceScheduled);
         setDueAt(presenceNextChange);
-    }, [presence, presenceUntil, presenceScheduled, presenceNextChange]);
+        setHeldStatus(status);
+        setHeldStatusUntil(statusUntil);
+    }, [presence, presenceUntil, presenceScheduled, presenceNextChange, status, statusUntil]);
+
+    /**
+     * Take both halves of the server's answer.
+     *
+     * For the ask that follows a lapse, where either half may have changed: a
+     * line that ran out, a choice that did, or a window that opened over the top
+     * of both. A write applies only the half it wrote.
+     */
+    const settle = useCallback((now: PresenceNow) => {
+        setChosen(now.held.choice);
+        setUntil(now.held.until);
+        setByRule(now.held.scheduled);
+        setDueAt(now.held.nextChangeAt);
+        setHeldStatus(now.status.text);
+        setHeldStatusUntil(now.status.until);
+    }, []);
 
     /**
      * A clock of this menu's own, because the props above are not enough.
@@ -201,9 +234,12 @@ export function AccountMenu({
     // the server applies to it. It lapses on its own exactly as a choice does,
     // and a lapsed one seeded back into the dialog is a moment in the past in a
     // field that refuses moments in the past - the edit cannot be saved at all.
-    const statusLive = statusInForce({ statusText: status, statusUntil }, new Date(now));
-    const shownStatus = statusLive ? status : "";
-    const shownStatusUntil = statusLive ? statusUntil : null;
+    const statusLive = statusInForce(
+        { statusText: heldStatus, statusUntil: heldStatusUntil },
+        new Date(now)
+    );
+    const shownStatus = statusLive ? heldStatus : "";
+    const shownStatusUntil = statusLive ? heldStatusUntil : null;
 
     // Whether what the layout said has stopped being the answer: a choice or a
     // line that has run out, which is visible from here - or the moment the
@@ -213,7 +249,7 @@ export function AccountMenu({
     // not necessarily the one they were written against.
     const overdue =
         shownChoice !== chosen ||
-        (status.trim() !== "" && !statusLive) ||
+        (heldStatus.trim() !== "" && !statusLive) ||
         (dueAt !== null && now >= Date.parse(dueAt));
 
     // And once it has, ask the server what took over. It knows two things this
@@ -235,7 +271,9 @@ export function AccountMenu({
         if (now - askedAt.current < ASK_AGAIN_MS) return;
         askedAt.current = now;
         refreshPresence();
-        router.refresh();
+        void presenceNowAction()
+            .then(settle)
+            .catch(() => undefined);
     }, [overdue, now]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /** What is wrong with the moment being typed, empty when nothing is - and
@@ -253,11 +291,20 @@ export function AccountMenu({
     const saveStatus = async (text: string, window: WindowChoice) => {
         setSaving(true);
         setLine(text);
-        await setStatusAction({ text, ...window });
+        // Under the finger, then corrected by what was actually stored.
+        setHeldStatus(text);
+        setHeldStatusUntil(text.trim() === "" ? null : windowEnd(window));
+        const answer = await setStatusAction({ text, ...window });
+        if (answer.status) {
+            setHeldStatus(answer.status.text);
+            setHeldStatusUntil(answer.status.until);
+        }
         setSaving(false);
         setWriting(false);
+        // Only the dots, which is an answer this menu cannot work out and the
+        // one thing on screen that is genuinely somebody else's: `/api/presence`
+        // asked again for every face already drawn. Nothing re-renders.
         refreshPresence();
-        router.refresh();
     };
 
     /**
@@ -278,11 +325,17 @@ export function AccountMenu({
         setByRule(false);
         setOpen(false);
         setTiming(null);
-        await setPresenceAction(choice, window);
+        const answer = await setPresenceAction(choice, window);
+        // What the server made of it, which is not always what was asked for: a
+        // window that is open keeps the account until it closes, and the moment
+        // this answer next changes is the account's clock to know.
+        if (answer.held) {
+            setChosen(answer.held.choice);
+            setUntil(answer.held.until);
+            setByRule(answer.held.scheduled);
+            setDueAt(answer.held.nextChangeAt);
+        }
         refreshPresence();
-        // The layout resolved the choice server-side, so its own copy is stale
-        // until something asks again.
-        router.refresh();
     };
 
     async function onSignOut() {
