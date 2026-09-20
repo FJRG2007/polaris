@@ -68,6 +68,30 @@ describe("the background a browser remembers", () => {
     });
 });
 
+describe("the picture behind the setting", () => {
+    it("takes one of the scenes Polaris ships", async () => {
+        const { BACKGROUND_SCENES, sceneOf } = await import("@/app/(app)/chat/camera-background");
+        const scene = BACKGROUND_SCENES[0];
+        expect(scene).toBeDefined();
+        store.clear();
+        store.set(KEY, "image");
+        store.set(IMAGE_KEY, scene!.src);
+        expect(cameraBackground()).toBe("image");
+        expect(backgroundImage()).toBe(scene!.src);
+        expect(sceneOf(scene!.src)?.id).toBe(scene!.id);
+    });
+
+    it("takes no other path, whatever local storage says", () => {
+        store.clear();
+        store.set(KEY, "image");
+        // Local storage belongs to whoever owns the browser. A path taken on
+        // trust is a request this origin would make to wherever it pointed.
+        store.set(IMAGE_KEY, "https://example.invalid/track.png");
+        expect(backgroundImage()).toBeNull();
+        expect(cameraBackground()).toBe("off");
+    });
+});
+
 describe("a file somebody picks", () => {
     it("has to be a picture, whatever it is called", async () => {
         const file = new File(["not a picture"], "holiday.jpg", { type: "text/plain" });

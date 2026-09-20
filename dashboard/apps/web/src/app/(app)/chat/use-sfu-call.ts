@@ -74,7 +74,7 @@ import { withCameraDevice } from "./camera-device";
 import { callMuted, setCallMuted } from "./call-muted";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { pressDeafen, pressMic } from "./call-voice-controls";
-import { maskCamera, type MaskedCamera } from "./camera-filter";
+import { afterPaint, maskCamera, type MaskedCamera } from "./camera-filter";
 import type { CallDevice, CallState, PeerState } from "./call-state";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
@@ -82,7 +82,12 @@ import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mi
 import { callDevices, isDenial, openMedia, openScreen, refused, settle } from "./call-media";
 import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
 import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
-import { cameraBackground, useCameraBackground, type CameraBackground } from "./camera-background";
+import {
+    cameraBackground,
+    useCameraBackground,
+    type BackgroundScene,
+    type CameraBackground
+} from "./camera-background";
 import {
     AUDIO_GROUP,
     audioPlan,
@@ -1188,6 +1193,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
          * whole feature exists to prevent.
          */
         const previous = masked.current;
+        // The same yield the devices screen makes, for the same second of main
+        // thread: the menu's "Starting" line, and the call's own controls, get
+        // drawn before it is taken.
+        if (wanted !== "off") await afterPaint();
         const built = wanted === "off" || !track ? null : await maskCamera(track, wanted);
 
         // Somebody moved on while the model was loading. Whatever was built
@@ -2649,6 +2658,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         background,
         image: backdrop,
         choose: rememberBackground,
+        chooseScene,
         pickImage
     } = useCameraBackground();
 
@@ -2675,6 +2685,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             await swapBackground();
         },
         [pickImage, swapBackground]
+    );
+
+    /** One of the pictures Polaris ships. Nothing can fail here - the file is
+     *  already on this origin - so it is not awaited by anything. */
+    const chooseBackgroundScene = useCallback(
+        (scene: BackgroundScene) => {
+            chooseScene(scene);
+            void swapBackground();
+        },
+        [chooseScene, swapBackground]
     );
 
     /**
@@ -3442,6 +3462,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setBackground,
         backgroundImage: backdrop,
         pickBackground,
+        chooseBackgroundScene,
         backgroundRunning: cameraMask,
         backgroundProblem: maskProblem,
         micOn,

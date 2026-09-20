@@ -10,7 +10,7 @@
 import type { MeetingView } from "@/lib/chat/meetings";
 import type { CallAudioReport } from "./call-diagnosis";
 import type { FilteredMic, MicFilter } from "./mic-filter";
-import type { CameraBackground } from "./camera-background";
+import type { BackgroundScene, CameraBackground } from "./camera-background";
 import type { CallLevel, CallQuality } from "./call-quality";
 import type { Reaction, ShownReaction } from "./call-signals";
 import type { AudioRole, CombineRequest } from "./call-combine";
@@ -143,6 +143,8 @@ export interface CallState {
     /** Choose a picture from this machine and use it. Rejects with something
      *  worth reading when the file is not one. */
     pickBackground: (file: File) => Promise<void>;
+    /** Use one of the pictures Polaris ships. */
+    chooseBackgroundScene: (scene: BackgroundScene) => void;
     /** Which background is actually being drawn, or null for none. Not always
      *  the one asked for: the model has to download and start. */
     readonly backgroundRunning: CameraBackground | null;

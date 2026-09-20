@@ -1,0 +1,21 @@
+The backgrounds Polaris offers for a call.
+
+Photographs from Unsplash, used under the Unsplash License, which allows free
+use including commercial use and asks for no permission. Attribution is not
+required by that licence; it is here because the people who took these
+photographs are named on them, and a file in a repository is where that survives.
+
+Each was cropped to 16:9 and re-encoded as WebP at 1280x720, with a 256x144
+thumbnail beside it. The originals are at the addresses below.
+
+  desk             Alesia Kazantceva      https://images.unsplash.com/photo-1497215728101-856f4ea42174
+  gradient-amber   Milad Fakurian         https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe
+  gradient-dusk    MagicPattern           https://images.unsplash.com/photo-1635776062360-af423602aff3
+  gradient-waves   Milad Fakurian         https://images.unsplash.com/photo-1620641788421-7a1c342ea42e
+  library          Iñaki del Olmo         https://images.unsplash.com/photo-1521587760476-6c12a4b040da
+  meeting-room     Nastuh Abootalebi      https://images.unsplash.com/photo-1497366616365-e78dd380d3dd
+  shelves-plants   Mykola Kolya Korzh     https://images.unsplash.com/photo-1551256718-6820c54cf538
+  shelves-window   Mohammadreza Charkhgard https://images.unsplash.com/photo-1699443817739-cf2f7cbcd18d
+  warm-hallway     Jakub Żerdzicki        https://images.unsplash.com/photo-1771147445405-153493dca398
+
+https://unsplash.com/license

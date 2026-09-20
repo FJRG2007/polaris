@@ -27,9 +27,9 @@
 
 import { refused } from "@/app/(app)/chat/call-media";
 import { filterMic, type FilteredMic } from "@/app/(app)/chat/mic-filter";
-import { Camera, Loader2, Mic, Square } from "lucide-react";
+import { Camera, ImagePlus, Loader2, Mic, Square } from "lucide-react";
 import { useCameras } from "@/app/(app)/chat/camera-device";
-import { maskCamera, type MaskedCamera } from "@/app/(app)/chat/camera-filter";
+import { afterPaint, maskCamera, type MaskedCamera } from "@/app/(app)/chat/camera-filter";
 import { useMicrophones } from "@/app/(app)/chat/mic-device";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
@@ -37,7 +37,12 @@ import { MicLevelMeter } from "@/app/(app)/chat/mic-level-meter";
 import { Button, Card, CardBody, Select, Switch, cn } from "@polaris/ui";
 import { useMicGain, GAIN_MAX, GAIN_MIN } from "@/app/(app)/chat/mic-gain";
 import { NOISE_LEVELS, micConstraints, useMicCleanup } from "@/app/(app)/chat/mic-cleanup";
-import { BACKGROUNDS, useCameraBackground } from "@/app/(app)/chat/camera-background";
+import {
+    BACKGROUNDS,
+    BACKGROUND_SCENES,
+    sceneOf,
+    useCameraBackground
+} from "@/app/(app)/chat/camera-background";
 import {
     INPUT_MODES,
     INPUT_MODE_LABELS,
@@ -280,7 +285,15 @@ function MicrophoneCard({
 /** Which camera, what it is pointing at, and what is drawn behind you. */
 function CameraCard() {
     const { devices, chosenId, choose } = useCameras();
-    const { background, image, choose: chooseBackground, pickImage } = useCameraBackground();
+    const {
+        background,
+        image,
+        choose: chooseBackground,
+        chooseScene,
+        pickImage
+    } = useCameraBackground();
+    /** Whether the picture in use is one of theirs rather than one of ours. */
+    const own = image !== null && sceneOf(image) === null;
     const [showing, setShowing] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
@@ -357,6 +370,9 @@ function CameraCard() {
         let dropped = false;
         setBuilding(background !== "off");
         void (async () => {
+            // So the line that says it is starting is on the glass before the
+            // model takes the thread for a second - see `afterPaint`.
+            await afterPaint();
             const built = await maskCamera(camera, background, image);
             // The setting moved again, or the preview was stopped, while the
             // model was loading.
@@ -490,19 +506,56 @@ function CameraCard() {
                     <span className="text-xs text-muted-foreground">{chosen?.help ?? ""}</span>
                 </label>
 
-                <div className="flex flex-wrap items-center gap-3">
-                    {image ? (
-                        <img
-                            src={image}
-                            alt=""
-                            className="size-12 shrink-0 rounded-md object-cover"
-                        />
-                    ) : null}
-                    <Button size="sm" variant="outline" onClick={() => picker.current?.click()}>
-                        {image ? "Change picture" : "Choose a picture"}
-                    </Button>
+                <div className="flex flex-col gap-2">
+                    <span className="text-sm">Pictures</span>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                        {BACKGROUND_SCENES.map((scene) => (
+                            <button
+                                key={scene.id}
+                                type="button"
+                                title={scene.label}
+                                aria-label={scene.label}
+                                aria-pressed={image === scene.src}
+                                onClick={() => chooseScene(scene)}
+                                className={cn(
+                                    "overflow-hidden rounded-md border-2 transition-colors",
+                                    image === scene.src
+                                        ? "border-primary"
+                                        : "border-transparent hover:border-border-strong"
+                                )}
+                            >
+                                <img
+                                    src={scene.thumb}
+                                    alt=""
+                                    className="aspect-video w-full object-cover"
+                                />
+                            </button>
+                        ))}
+                        {/* Theirs, in the same row as the rest: a picture
+                            somebody chose is one of the choices, not a setting
+                            underneath them. */}
+                        <button
+                            type="button"
+                            title={own ? "Change your picture" : "Use a picture of your own"}
+                            aria-label={own ? "Change your picture" : "Use a picture of your own"}
+                            aria-pressed={own}
+                            onClick={() => picker.current?.click()}
+                            className={cn(
+                                "flex aspect-video items-center justify-center overflow-hidden rounded-md border-2 text-xs text-muted-foreground transition-colors",
+                                own
+                                    ? "border-primary"
+                                    : "border-dashed border-border-strong hover:border-primary"
+                            )}
+                        >
+                            {own && image ? (
+                                <img src={image} alt="" className="size-full object-cover" />
+                            ) : (
+                                <ImagePlus className="size-4 shrink-0" />
+                            )}
+                        </button>
+                    </div>
                     <span className="text-xs text-muted-foreground">
-                        Kept in this browser and sent nowhere.
+                        A picture of your own stays in this browser and is sent nowhere.
                     </span>
                 </div>
                 <input

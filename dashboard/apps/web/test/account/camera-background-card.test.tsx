@@ -23,6 +23,9 @@ import type { CameraBackground } from "@/app/(app)/chat/camera-background";
 const asked: { using: CameraBackground; stopped: boolean }[] = [];
 
 vi.mock("@/app/(app)/chat/camera-filter", () => ({
+    // The card waits for a paint before it builds, so the line that says it is
+    // starting is on screen before the model takes the thread.
+    afterPaint: async () => undefined,
     maskCamera: async (_track: MediaStreamTrack, background: CameraBackground) => {
         if (background === "off") return null;
         const built = {

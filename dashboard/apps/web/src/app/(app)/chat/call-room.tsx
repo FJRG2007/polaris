@@ -40,7 +40,13 @@ import { useHeldCall } from "./call-session";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { NOISE_LEVELS } from "./mic-cleanup";
-import { BACKGROUNDS, type CameraBackground } from "./camera-background";
+import {
+    BACKGROUNDS,
+    BACKGROUND_SCENES,
+    sceneOf,
+    type BackgroundScene,
+    type CameraBackground
+} from "./camera-background";
 import { searchPeopleAction } from "./actions";
 import { NoAudioNotice } from "./no-audio-notice";
 import { playCallSound } from "@/lib/call-sounds";
@@ -97,6 +103,7 @@ import {
     Hand,
     Headphones,
     HeadphoneOff,
+    ImagePlus,
     Link2,
     Loader2,
     Maximize2,
@@ -1055,6 +1062,7 @@ export function CallRoom({
                     onBackground={call.setBackground}
                     backgroundImage={call.backgroundImage}
                     onPickBackground={call.pickBackground}
+                    onScene={call.chooseBackgroundScene}
                     backgroundRunning={call.backgroundRunning}
                     backgroundProblem={call.backgroundProblem}
                 />
@@ -1257,6 +1265,7 @@ function Split({
     onBackground,
     backgroundImage,
     onPickBackground,
+    onScene,
     backgroundRunning,
     backgroundProblem,
     title
@@ -1307,6 +1316,7 @@ function Split({
     onBackground?: (value: CameraBackground) => void;
     backgroundImage?: string | null;
     onPickBackground?: (file: File) => Promise<void>;
+    onScene?: (scene: BackgroundScene) => void;
     /** What is actually being drawn, which for the seconds the model takes to
      *  arrive is not yet what was asked for. */
     backgroundRunning?: CameraBackground | null;
@@ -1317,6 +1327,8 @@ function Split({
     // an input nothing is listening to.
     const picker = useRef<HTMLInputElement>(null);
     const [pickProblem, setPickProblem] = useState<string | null>(null);
+    /** Whether the picture in use is one of theirs rather than one of ours. */
+    const ownPicture = Boolean(backgroundImage) && sceneOf(backgroundImage ?? null) === null;
 
     // Worth a menu for the setting alone: a machine with one microphone still
     // sits in a room with a fan in it, and a machine with one screen still has a
@@ -1482,14 +1494,68 @@ function Split({
                                         )}
                                     </DropdownMenuItem>
                                 ))}
-                                {backgroundImage && (
+                                {/* The pictures themselves, because a list of
+                                    words is not how anybody picks one. Kept in
+                                    the menu rather than behind a dialog: this is
+                                    two presses from the call bar and nothing
+                                    about it is worth a screen of its own. */}
+                                {onScene && (
                                     <DropdownMenuItem
-                                        onSelect={(event) => {
-                                            event.preventDefault();
-                                            picker.current?.click();
-                                        }}
+                                        // The grid is a set of targets, not one
+                                        // row: a press inside it is a choice
+                                        // already made by the button under the
+                                        // finger, and closing on the item as
+                                        // well would fire this row's own select.
+                                        onSelect={(event) => event.preventDefault()}
+                                        className="flex-col items-stretch gap-1.5"
                                     >
-                                        <span className="ml-5">Choose a different picture</span>
+                                        <span className="grid grid-cols-4 gap-1">
+                                            {BACKGROUND_SCENES.map((scene) => (
+                                                <button
+                                                    key={scene.id}
+                                                    type="button"
+                                                    title={scene.label}
+                                                    aria-label={scene.label}
+                                                    aria-pressed={backgroundImage === scene.src}
+                                                    onClick={() => onScene(scene)}
+                                                    className={cn(
+                                                        "overflow-hidden rounded border-2 transition-colors",
+                                                        backgroundImage === scene.src
+                                                            ? "border-primary"
+                                                            : "border-transparent hover:border-border-strong"
+                                                    )}
+                                                >
+                                                    <img
+                                                        src={scene.thumb}
+                                                        alt=""
+                                                        className="aspect-video w-full object-cover"
+                                                    />
+                                                </button>
+                                            ))}
+                                            <button
+                                                type="button"
+                                                title="Use a picture of your own"
+                                                aria-label="Use a picture of your own"
+                                                aria-pressed={ownPicture}
+                                                onClick={() => picker.current?.click()}
+                                                className={cn(
+                                                    "flex aspect-video items-center justify-center overflow-hidden rounded border-2 text-muted-foreground transition-colors",
+                                                    ownPicture
+                                                        ? "border-primary"
+                                                        : "border-dashed border-border-strong hover:border-primary"
+                                                )}
+                                            >
+                                                {ownPicture && backgroundImage ? (
+                                                    <img
+                                                        src={backgroundImage}
+                                                        alt=""
+                                                        className="size-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <ImagePlus className="size-3.5 shrink-0" />
+                                                )}
+                                            </button>
+                                        </span>
                                     </DropdownMenuItem>
                                 )}
                                 {/* Said only while it is not yet true. The first

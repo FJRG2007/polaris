@@ -22,11 +22,15 @@
  * about a room and a camera rather than about an account, and the laptop at the
  * kitchen table and the desk in the office want different answers.
  *
- * The image is kept here too, as a data URL, because there is nowhere else for
- * it to be: it never leaves this browser, it is nobody else's business, and
- * uploading a picture of somebody's living room to the server so it can be sent
- * back to the only machine that wanted it would be a worse version of storing
- * it here.
+ * The picture is kept here too, because there is nowhere else for it to be: it
+ * never leaves this browser, it is nobody else's business, and uploading a
+ * picture of somebody's living room to the server so it can be sent back to the
+ * only machine that wanted it would be a worse version of storing it here.
+ *
+ * It is one value whichever kind it is - one of the scenes Polaris ships, which
+ * is a path, or one of theirs, which is a data URL. The filter draws whatever is
+ * in it, so nothing below this file has to know which of the two somebody
+ * picked.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -70,6 +74,56 @@ export const BACKGROUNDS: readonly { value: CameraBackground; label: string; hel
     { value: "off", label: "Off", help: "Send the room as the camera sees it." }
 ];
 
+/** Where the pictures Polaris ships are served from. */
+const SCENES_AT = "/backgrounds";
+
+/** One of them: the file, and what it is called on screen. */
+export interface BackgroundScene {
+    readonly id: string;
+    readonly label: string;
+    /** What is drawn behind somebody. */
+    readonly src: string;
+    /** And the small copy the picker draws, which is a twentieth of the size.
+     *  A menu that opened nine 1280-wide pictures to show nine 40-pixel squares
+     *  would be a megabyte to look at a list. */
+    readonly thumb: string;
+}
+
+/**
+ * The pictures Polaris ships.
+ *
+ * Nine rather than fifty: this is a list somebody reads in one glance while a
+ * call is waiting for them, and the third bookshelf is not a choice anybody
+ * makes. Three kinds, because that is what people actually reach for - a room
+ * that could be an office, something with books in it, and something abstract
+ * for when a real room is exactly what they are trying not to show.
+ *
+ * Photographs are from Unsplash under its licence; who took each one is in
+ * `public/backgrounds/NOTICE.txt`, beside the files.
+ */
+export const BACKGROUND_SCENES: readonly BackgroundScene[] = [
+    { id: "meeting-room", label: "Meeting room" },
+    { id: "desk", label: "Desk by a window" },
+    { id: "warm-hallway", label: "Warm lights" },
+    { id: "library", label: "Library" },
+    { id: "shelves-window", label: "Reading room" },
+    { id: "shelves-plants", label: "Shelves and plants" },
+    { id: "gradient-dusk", label: "Dusk" },
+    { id: "gradient-amber", label: "Amber" },
+    { id: "gradient-waves", label: "Waves" }
+].map((scene) => ({
+    ...scene,
+    src: `${SCENES_AT}/${scene.id}.webp`,
+    thumb: `${SCENES_AT}/${scene.id}-thumb.webp`
+}));
+
+/** The scene a stored value names, or null when it is a picture of somebody's
+ *  own - which is every value that is not one of the nine above. */
+export function sceneOf(image: string | null): BackgroundScene | null {
+    if (!image) return null;
+    return BACKGROUND_SCENES.find((scene) => scene.src === image) ?? null;
+}
+
 /**
  * How much the background is blurred, in pixels of the picture being sent.
  *
@@ -100,12 +154,17 @@ const IMAGE_QUALITY = 0.75;
 const IMAGE_BYTES = 25 * 1024 * 1024;
 
 /**
- * The picture, in memory, so a browser that refused to store it still works.
+ * The picture, in memory, for a browser that would not store it.
  *
- * Local storage is the only place this can persist, and it is also the thing
+ * Local storage is the only place this can persist and it is also the thing
  * most likely to say no - a full quota, a browser with it switched off, a
- * private window. None of those are a reason for the background to fail in the
+ * private window. None of those is a reason for the background to fail in the
  * call somebody just chose it in.
+ *
+ * A fallback and never a cache. Reading this first instead of storage would
+ * make a picture chosen in another tab invisible in this one: the reader below
+ * is what the `storage` event sends every tab to, and it would answer with what
+ * this one happened to write last.
  */
 let held: string | null = null;
 
@@ -139,18 +198,37 @@ export function setCameraBackground(next: CameraBackground): void {
 
 /** The picture somebody chose, or null where they never have. */
 export function backgroundImage(): string | null {
-    if (held) return held;
     if (typeof window === "undefined") return null;
     try {
         const raw = window.localStorage.getItem(IMAGE_KEY);
-        // Anything that is not an image data URL was not written by this file.
-        // It is read back into a canvas below, so what is checked here is only
-        // that it is worth trying.
-        held = raw?.startsWith("data:image/") ? raw : null;
-        return held;
+        // Two shapes and no others: a picture of their own, which this file
+        // encoded, or one of the scenes it ships. Anything else was not written
+        // here - local storage belongs to whoever owns the browser - and a path
+        // taken on trust is a request this origin would make to wherever that
+        // string pointed.
+        const scene = BACKGROUND_SCENES.some((entry) => entry.src === raw);
+        return raw && (scene || raw.startsWith("data:image/")) ? raw : held;
     } catch {
-        return null;
+        return held;
     }
+}
+
+/**
+ * Use one of the pictures Polaris ships.
+ *
+ * The same value the upload writes, so everything downstream - the filter, the
+ * picker's tick, the preview - reads one field and never asks which kind of
+ * picture this is.
+ */
+export function setBackgroundScene(scene: BackgroundScene): void {
+    if (typeof window === "undefined") return;
+    held = scene.src;
+    try {
+        window.localStorage.setItem(IMAGE_KEY, scene.src);
+    } catch {
+        // Kept for this browser session anyway.
+    }
+    window.dispatchEvent(new Event(CHANGED));
 }
 
 /**
@@ -215,6 +293,7 @@ export function useCameraBackground(): {
     background: CameraBackground;
     image: string | null;
     choose: (next: CameraBackground) => void;
+    chooseScene: (scene: BackgroundScene) => void;
     pickImage: (file: File) => Promise<void>;
 } {
     const [background, setBackground] = useState<CameraBackground>(BACKGROUND_DEFAULT);
@@ -242,7 +321,8 @@ export function useCameraBackground(): {
     }, []);
 
     // Picking a picture is how somebody asks for it to be used: a file chosen
-    // and then a second press to turn it on is a step that means nothing.
+    // and then a second press to turn it on is a step that means nothing. The
+    // same for one of the scenes, which is the same act with less typing.
     const pickImage = useCallback(
         async (file: File) => {
             setImage(await rememberBackgroundImage(file));
@@ -251,5 +331,14 @@ export function useCameraBackground(): {
         [choose]
     );
 
-    return { background, image, choose, pickImage };
+    const chooseScene = useCallback(
+        (scene: BackgroundScene) => {
+            setBackgroundScene(scene);
+            setImage(scene.src);
+            choose("image");
+        },
+        [choose]
+    );
+
+    return { background, image, choose, chooseScene, pickImage };
 }

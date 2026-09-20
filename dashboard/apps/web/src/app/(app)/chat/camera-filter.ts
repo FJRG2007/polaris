@@ -163,6 +163,17 @@ export async function maskCamera(
         segmenter.setOptions({ modelSelection: 1, selfieMode: false });
         segmenter.onResults(draw);
         await within(START_TIMEOUT, segmenter.initialize());
+        // The first frame, before this returns, and it is not a formality.
+        //
+        // `initialize` resolves in about a tenth of a second and leaves the real
+        // work - instantiating the wasm, building the graph, compiling the
+        // shaders - to the first frame that goes through it. Measured in Chrome
+        // on this model: one task of 1.1 to 1.4 seconds that holds the main
+        // thread, and 69ms for every switch-on after it in the same tab. Held
+        // here, that second is inside the caller's `await`, where a screen has
+        // already said it is starting; left where it was, it landed on whatever
+        // the page was doing and read as the picture freezing.
+        await within(START_TIMEOUT, segmenter.send({ image: video }));
     } catch (caught) {
         await teardown();
         return refusal(background, reasonOf(caught));
@@ -361,6 +372,22 @@ function tickerScript(): string {
         );
     }
     return tickerUrl;
+}
+
+/**
+ * Resolve once the browser has painted.
+ *
+ * Exported from here because it exists for what is above: building a background
+ * takes a second of the main thread the first time in a tab, and a screen that
+ * sets "Starting..." and calls straight into it never gets that line onto the
+ * glass - the freeze arrives first and what stays on screen is the frame
+ * before. Two frames, because one only means the next paint was scheduled.
+ */
+export function afterPaint(): Promise<void> {
+    if (typeof requestAnimationFrame !== "function") return Promise.resolve();
+    return new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
 }
 
 /** Resolve once the camera has actually produced a frame: everything after this

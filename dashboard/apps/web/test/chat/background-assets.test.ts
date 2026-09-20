@@ -28,6 +28,8 @@ const APP = join(HERE, "..", "..");
 const SCRIPT = join(APP, "scripts", "copy-video-assets.mjs");
 const FILTER = join(APP, "src", "app", "(app)", "chat", "camera-filter.ts");
 const PACKAGE = join(APP, "..", "..", "node_modules", "@mediapipe", "selfie_segmentation");
+const SCENES = join(APP, "src", "app", "(app)", "chat", "camera-background.ts");
+const PUBLIC = join(APP, "public", "backgrounds");
 
 /** Every `/video/...` file the filter names for itself. */
 function asked(): string[] {
@@ -42,6 +44,36 @@ function skipped(): string[] {
     const list = /notForTheBrowser = new Set\(\[([^\]]*)\]\)/.exec(source)?.[1] ?? "";
     return [...list.matchAll(/"([^"]+)"/g)].map((match) => match[1] ?? "");
 }
+
+/** The ids of the pictures Polaris ships, read out of the module that lists
+ *  them rather than repeated here. */
+function scenes(): string[] {
+    const source = readFileSync(SCENES, "utf8");
+    const list = source.slice(source.indexOf("BACKGROUND_SCENES"));
+    return [...list.matchAll(/id: "([\w-]+)", label:/g)].map((match) => match[1] ?? "");
+}
+
+describe("the pictures the picker offers", () => {
+    it("are files that exist, at both sizes", () => {
+        const ids = scenes();
+        // A guard on the guard: a regex that stopped matching would make this
+        // pass by asserting nothing.
+        expect(ids.length).toBeGreaterThan(0);
+        for (const id of ids) {
+            // Committed rather than staged, unlike the model: they are ours and
+            // there is no package to copy them out of. A menu drawing nine
+            // broken images is what a rename here costs.
+            expect(existsSync(join(PUBLIC, `${id}.webp`))).toBe(true);
+            expect(existsSync(join(PUBLIC, `${id}-thumb.webp`))).toBe(true);
+        }
+    });
+
+    it("say where they came from", () => {
+        // Somebody else's photographs, served from this origin. The terms and
+        // the names travel with the files.
+        expect(existsSync(join(PUBLIC, "NOTICE.txt"))).toBe(true);
+    });
+});
 
 describe("the background model the call asks for", () => {
     it("is not one of the files the build leaves behind", () => {
