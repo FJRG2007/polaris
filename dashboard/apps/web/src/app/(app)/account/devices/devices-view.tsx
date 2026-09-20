@@ -12,8 +12,11 @@
  *
  * So both devices are tested here. The microphone draws its own level while
  * somebody talks into it, which is the only way a threshold can be set and the
- * only honest answer to "is it picking me up". The camera shows itself. Neither
- * test touches a call. The level is live on arrival only where the browser has
+ * only honest answer to "is it picking me up". The camera shows itself, with
+ * whatever background is switched on already drawn behind it - a background is
+ * the one call setting nobody can check from inside a call, because the only
+ * person who cannot see it there is the person it is hiding. Neither test
+ * touches a call. The level is live on arrival only where the browser has
  * already been allowed the microphone, and in a call it reads the call's own -
  * see `MicLevelMeter`; everything else waits for somebody to press it.
  *
@@ -26,6 +29,7 @@ import { refused } from "@/app/(app)/chat/call-media";
 import { filterMic, type FilteredMic } from "@/app/(app)/chat/mic-filter";
 import { Camera, Loader2, Mic, Square } from "lucide-react";
 import { useCameras } from "@/app/(app)/chat/camera-device";
+import { maskCamera, type MaskedCamera } from "@/app/(app)/chat/camera-filter";
 import { useMicrophones } from "@/app/(app)/chat/mic-device";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
@@ -33,6 +37,7 @@ import { MicLevelMeter } from "@/app/(app)/chat/mic-level-meter";
 import { Button, Card, CardBody, Select, Switch, cn } from "@polaris/ui";
 import { useMicGain, GAIN_MAX, GAIN_MIN } from "@/app/(app)/chat/mic-gain";
 import { NOISE_LEVELS, micConstraints, useMicCleanup } from "@/app/(app)/chat/mic-cleanup";
+import { BACKGROUNDS, useCameraBackground } from "@/app/(app)/chat/camera-background";
 import {
     INPUT_MODES,
     INPUT_MODE_LABELS,
@@ -272,16 +277,52 @@ function MicrophoneCard({
     );
 }
 
-/** Which camera, and what it is pointing at. */
+/** Which camera, what it is pointing at, and what is drawn behind you. */
 function CameraCard() {
     const { devices, chosenId, choose } = useCameras();
+    const { background, image, choose: chooseBackground, pickImage } = useCameraBackground();
     const [showing, setShowing] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    /** What the background did when it was actually asked to start, in the same
+     *  shape and for the same reason as the microphone's filter above: a setting
+     *  that says "blur" while nothing is running is the state somebody has to be
+     *  able to see. */
+    const [maskState, setMaskState] = useState<MaskedCamera | null>(null);
+    const [building, setBuilding] = useState(false);
+    const [pickProblem, setPickProblem] = useState("");
     const video = useRef<HTMLVideoElement>(null);
     const stream = useRef<MediaStream | null>(null);
+    const masked = useRef<MaskedCamera | null>(null);
+    const picker = useRef<HTMLInputElement>(null);
+    /**
+     * The call's own camera, when there is a call sending one.
+     *
+     * Shown instead of opening a second one, for the reason the level meter
+     * above reads the call's microphone: a camera another application already
+     * holds is a camera some machines will not open twice, and the picture the
+     * call is sending is a better answer to "what do I look like" than a second
+     * capture of the same room would be. It already has the background drawn on
+     * it, because that is what a call sends.
+     */
+    const held = useHeldCall();
+    const inCall = held?.session ? (held.call.localStream?.getVideoTracks()[0] ?? null) : null;
+
+    /** Point the preview at a track, whichever of the three it is. */
+    const show = useCallback((track: MediaStreamTrack | null) => {
+        if (!video.current || !track) return;
+        video.current.srcObject = new MediaStream([track]);
+        void video.current.play().catch(() => undefined);
+    }, []);
 
     const stop = useCallback(() => {
+        // The canvas goes before the device does, for the reason the microphone
+        // graph does: it holds a worker and a model, and a screen somebody has
+        // wandered away from should be running neither.
+        void masked.current?.stop();
+        masked.current = null;
+        setMaskState(null);
+        setBuilding(false);
         for (const track of stream.current?.getTracks() ?? []) track.stop();
         stream.current = null;
         if (video.current) video.current.srcObject = null;
@@ -290,8 +331,61 @@ function CameraCard() {
 
     useEffect(() => stop, [stop]);
 
+    // The call's camera, as it changes: turned on or off mid-call, swapped for
+    // another device, or handed a new background.
+    useEffect(() => {
+        if (!showing || !inCall) return;
+        show(inCall);
+    }, [inCall, show, showing]);
+
+    /**
+     * Draw the background that is switched on, and draw it again when it
+     * changes.
+     *
+     * This preview is the only place a background can be checked at all - in a
+     * call, the one person who cannot see it is the person it is hiding - so it
+     * is built for real rather than approximated: the same function a call uses,
+     * on the camera this screen opened.
+     */
+    useEffect(() => {
+        // Nothing to build against a call's camera: the call built it, and
+        // building a second one here would run two models on one device.
+        if (!showing || inCall) return;
+        const camera = stream.current?.getVideoTracks()[0] ?? null;
+        if (!camera) return;
+
+        let dropped = false;
+        setBuilding(background !== "off");
+        void (async () => {
+            const built = await maskCamera(camera, background, image);
+            // The setting moved again, or the preview was stopped, while the
+            // model was loading.
+            if (dropped) {
+                await built?.stop();
+                return;
+            }
+            const previous = masked.current;
+            masked.current = built?.track ? built : null;
+            setMaskState(built);
+            setBuilding(false);
+            show(masked.current?.track ?? camera);
+            await previous?.stop();
+        })();
+
+        return () => {
+            dropped = true;
+        };
+    }, [background, image, inCall, show, showing]);
+
     const start = async () => {
         setError("");
+        // A call is already holding a camera and already drawing the background
+        // on it. Nothing to open.
+        if (inCall) {
+            setShowing(true);
+            show(inCall);
+            return;
+        }
         setBusy(true);
         try {
             const opened = await navigator.mediaDevices.getUserMedia({
@@ -299,10 +393,10 @@ function CameraCard() {
             });
             stream.current = opened;
             setShowing(true);
-            if (video.current) {
-                video.current.srcObject = opened;
-                await video.current.play().catch(() => undefined);
-            }
+            // The camera itself first, so there is a picture while the model
+            // loads; the effect above swaps the composited one in when it is
+            // ready.
+            show(opened.getVideoTracks()[0] ?? null);
         } catch (caught) {
             setError(refused(caught, "camera"));
             stop();
@@ -310,6 +404,8 @@ function CameraCard() {
             setBusy(false);
         }
     };
+
+    const chosen = BACKGROUNDS.find((entry) => entry.value === background);
 
     return (
         <Card>
@@ -364,6 +460,88 @@ function CameraCard() {
                         Nothing is opened until you press it, and it closes when you leave this
                         screen.
                     </p>
+                ) : inCall ? (
+                    <p className="text-xs text-muted-foreground">
+                        This is the camera your call is sending, background and all.
+                    </p>
+                ) : null}
+
+                <label className="flex flex-col gap-1 text-sm">
+                    Background
+                    <Select
+                        value={background}
+                        onValueChange={(value) => {
+                            const next = value as typeof background;
+                            // With no picture chosen yet there is nothing for
+                            // this to turn on, so it asks for one instead.
+                            if (next === "image" && !image) {
+                                setPickProblem("");
+                                picker.current?.click();
+                                return;
+                            }
+                            chooseBackground(next);
+                        }}
+                        aria-label="Background"
+                        options={BACKGROUNDS.map((entry) => ({
+                            value: entry.value,
+                            label: entry.label
+                        }))}
+                    />
+                    <span className="text-xs text-muted-foreground">{chosen?.help ?? ""}</span>
+                </label>
+
+                <div className="flex flex-wrap items-center gap-3">
+                    {image ? (
+                        <img
+                            src={image}
+                            alt=""
+                            className="size-12 shrink-0 rounded-md object-cover"
+                        />
+                    ) : null}
+                    <Button size="sm" variant="outline" onClick={() => picker.current?.click()}>
+                        {image ? "Change picture" : "Choose a picture"}
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                        Kept in this browser and sent nowhere.
+                    </span>
+                </div>
+                <input
+                    ref={picker}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        // Cleared either way, so choosing the same file twice is
+                        // a second change event rather than silence.
+                        event.target.value = "";
+                        if (!file) return;
+                        setPickProblem("");
+                        void pickImage(file).catch((caught: unknown) =>
+                            setPickProblem(
+                                caught instanceof Error
+                                    ? caught.message
+                                    : "Polaris could not use that picture."
+                            )
+                        );
+                    }}
+                />
+
+                {/* What the model DID, once it has been asked to - the same
+                    answer the microphone gives about its filter, and given for
+                    the same reason. */}
+                {pickProblem ? <p className="text-sm text-danger">{pickProblem}</p> : null}
+                {showing && !inCall && building ? (
+                    <p className="text-xs text-muted-foreground">
+                        Starting. The first one on a machine downloads the model.
+                    </p>
+                ) : null}
+                {showing && !inCall && maskState?.problem ? (
+                    <p className="text-xs text-warning">
+                        It could not start, so there is nothing behind you: {maskState.problem}
+                    </p>
+                ) : showing && !inCall && maskState?.track ? (
+                    <p className="text-xs text-success">Running. This is what a call sends.</p>
                 ) : null}
 
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -371,7 +549,6 @@ function CameraCard() {
         </Card>
     );
 }
-
 /** How the microphone decides whether it is sending. */
 function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Change }) {
     const [listening, setListening] = useState(false);

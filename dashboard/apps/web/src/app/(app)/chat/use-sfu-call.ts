@@ -561,6 +561,15 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * reach to stop.
      */
     const maskRound = useRef(0);
+    /**
+     * The setting this hook has already acted on.
+     *
+     * The background can be changed from somewhere that is not this call - the
+     * Voice & Video screen, or another tab - and the call has to follow it
+     * rather than keep the one it joined with. Null until the first build, so
+     * joining does not build the same background twice.
+     */
+    const maskApplied = useRef<CameraBackground | null>(null);
     const licensed = useRef<{ moduleUrl: string; token: string } | null>(null);
     const me = useRef<string | null>(null);
     /**
@@ -1163,6 +1172,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // turned on instead - see `toggleCamera`.
         const usable = track?.readyState === "live" && track.enabled;
         const wanted = usable ? cameraBackground() : "off";
+        // What was asked for, which is not always what is buildable: a camera
+        // that is off gets nothing built, and the answer to "has this already
+        // been acted on" is still yes.
+        maskApplied.current = cameraBackground();
 
         /**
          * The one that is running stays running until the next one is ready.
@@ -2663,6 +2676,24 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         },
         [pickImage, swapBackground]
     );
+
+    /**
+     * Follow a background chosen somewhere that is not this call.
+     *
+     * The setting lives in the browser rather than in the call - the Voice &
+     * Video screen writes it, and so does another tab - and a call that kept
+     * drawing whatever it joined with would make that screen a preview of
+     * something that is not happening.
+     *
+     * Guarded by what the hook has already acted on rather than by what is
+     * running: a background that failed to build leaves nothing running, and
+     * comparing against that would rebuild it on every render for as long as
+     * the call lasted, downloading the model each time.
+     */
+    useEffect(() => {
+        if (maskApplied.current === null || maskApplied.current === background) return;
+        void swapBackground();
+    }, [background, swapBackground]);
 
     /**
      * Move the quality bar, mid-call.
