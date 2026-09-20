@@ -37,12 +37,8 @@ CREATE INDEX IF NOT EXISTS "MailDelivery_accountId_sentAt_idx" ON "MailDelivery"
 CREATE INDEX IF NOT EXISTS "MailDelivery_accountId_state_sentAt_idx" ON "MailDelivery"("accountId", "state", "sentAt");
 CREATE UNIQUE INDEX IF NOT EXISTS "MailDelivery_accountId_messageId_key" ON "MailDelivery"("accountId", "messageId");
 
--- Added on its own so a re-run does not fail on a constraint that is already
--- there: Postgres has no IF NOT EXISTS for one.
-DO $$
-BEGIN
-    ALTER TABLE "MailDelivery" ADD CONSTRAINT "MailDelivery_accountId_fkey"
-        FOREIGN KEY ("accountId") REFERENCES "MailAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION
-    WHEN duplicate_object THEN NULL;
-END $$;
+-- Dropped by name first, because Postgres has no conditional form of adding a
+-- constraint and a second run would otherwise fail on the one already there.
+ALTER TABLE "MailDelivery" DROP CONSTRAINT IF EXISTS "MailDelivery_accountId_fkey";
+ALTER TABLE "MailDelivery" ADD CONSTRAINT "MailDelivery_accountId_fkey"
+    FOREIGN KEY ("accountId") REFERENCES "MailAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;

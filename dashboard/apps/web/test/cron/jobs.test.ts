@@ -114,6 +114,9 @@ describe("the work Polaris runs on a schedule", () => {
             // and sending a queued message twice is the one thing the outgoing
             // queue must never do. Two passes over the backfill would decide the
             // same batch of messages twice.
+            // A message that did not arrive is said once: two passes reading
+            // the same report would each tell the person who sent it.
+            "mail-bounces",
             "mail-categories",
             "mail-send",
             // Two passes would read the same DMARC report mailbox at once.
