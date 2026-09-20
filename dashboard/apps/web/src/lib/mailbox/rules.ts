@@ -292,7 +292,7 @@ async function forwardMessage(accountId: string, messageId: string, to: string):
             message.bodyText || message.snippet || ""
         ].join("\n");
 
-        const mime = await composeMime({
+        const forwarded = await composeMime({
             from: self,
             to: [{ name: "", address: wanted }],
             cc: [],
@@ -311,7 +311,10 @@ async function forwardMessage(accountId: string, messageId: string, to: string):
         });
         // Stamped after composing, because this is the header the next hop reads
         // to know the message has been round once.
-        const stamped = Buffer.concat([Buffer.from("X-Polaris-Forwarded: 1\r\n", "utf8"), mime]);
+        const stamped = Buffer.concat([
+            Buffer.from("X-Polaris-Forwarded: 1\r\n", "utf8"),
+            forwarded.mime
+        ]);
         await sendMime(
             account,
             {

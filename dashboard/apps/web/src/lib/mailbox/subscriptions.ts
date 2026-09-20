@@ -412,5 +412,5 @@ async function sendUnsubscribeMail(
         references: [],
         requestReceipt: false
     };
-    await sendMime(account, message, await composeMime(message));
+    await sendMime(account, message, (await composeMime(message)).mime);
 }

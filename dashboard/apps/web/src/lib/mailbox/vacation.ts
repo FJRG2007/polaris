@@ -18,8 +18,8 @@
  *   so the client at the other end knows not to answer it back.
  */
 
-import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { addressesFrom } from "./json";
 import { ACCOUNT_COLUMNS } from "./access";
 import { composeMime, sendMime } from "./send";
@@ -123,12 +123,15 @@ export async function replyIfAway(accountId: string, messageId: string): Promise
             references: message.messageId ? [`<${message.messageId}>`] : [],
             requestReceipt: false
         };
-        const mime = await composeMime(outgoing);
+        const replied = await composeMime(outgoing);
         // The header that tells the client at the other end this was a machine,
         // so its own responder does not answer back. Added to the built message
         // rather than through the composer, which has no business knowing about
         // vacation replies.
-        const marked = Buffer.concat([Buffer.from("Auto-Submitted: auto-replied\r\n"), mime]);
+        const marked = Buffer.concat([
+            Buffer.from("Auto-Submitted: auto-replied\r\n"),
+            replied.mime
+        ]);
         await sendMime(account, outgoing, marked);
     } catch {
         // Not being able to send an away message is not worth a failed sync, and

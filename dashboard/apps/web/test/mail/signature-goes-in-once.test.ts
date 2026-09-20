@@ -78,9 +78,9 @@ vi.mock("@/lib/mailbox/imap", () => ({ withImap: async () => undefined }));
 vi.mock("@/lib/mailbox/send", () => ({
     composeMime: async (message: { body: string }) => {
         sent = message.body;
-        return Buffer.from("");
+        return { mime: Buffer.from(""), messageId: "sent-1@example.com" };
     },
-    sendMime: async () => undefined
+    sendMime: async () => ({ accepted: ["them@example.net"], refused: [], response: "250 ok" })
 }));
 vi.mock("@/lib/mailbox/access", () => ({
     ACCOUNT_COLUMNS: {},

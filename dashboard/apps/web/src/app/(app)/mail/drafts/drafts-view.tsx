@@ -11,16 +11,24 @@
  *
  * A draft that is waiting to go says so and is not opened: it is in the send
  * queue, and the composer's own countdown is what takes it back.
+ *
+ * A message the outgoing server would not take is the third thing on this
+ * screen, and it used to be indistinguishable from the second: it kept its hour,
+ * so it drew as "Waiting to go out" at a time in the past, for ever, greyed out,
+ * with no way to open it, throw it away or try it again. Somebody reading that
+ * has been told their message is on its way when it is not going anywhere. It
+ * now says it was not sent, says what the server said, and offers the two things
+ * there are to do about it.
  */
 
 import { refusalOf } from "../refusal";
 import { useMail } from "../mail-shell";
 import { useEffect, useState } from "react";
-import { discardDraftAction } from "../actions";
-import { Pencil, Send, Trash2 } from "lucide-react";
 import type { MailDraftView } from "@/lib/mailbox/compose";
 import { useDisplayFormat } from "@/components/display-format";
 import { Button, EmptyState, cn, useToast } from "@polaris/ui";
+import { discardDraftAction, retrySendAction } from "../actions";
+import { Pencil, RotateCcw, Send, Trash2, TriangleAlert } from "lucide-react";
 
 export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
     const toast = useToast();
@@ -35,6 +43,10 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
      * back, with the reason, if the server refuses.
      */
     const [discarded, setDiscarded] = useState<string[]>([]);
+    /** The ones whose Try again is in flight, so a second press cannot be a
+     *  second message. The server refuses one anyway - the claim is on the row -
+     *  and this is what stops the press looking like it did nothing. */
+    const [retrying, setRetrying] = useState<string[]>([]);
     // The server's own list has moved: whatever this was standing in for is
     // either in it or gone from it.
     useEffect(() => setDiscarded([]), [drafts]);
@@ -63,7 +75,11 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
 
             <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {shown.map((draft) => {
-                    const waiting = Boolean(draft.sendAt);
+                    // Refused first: a message that failed may still carry the
+                    // hour it was due at, and reading that as "waiting" is the
+                    // whole bug this screen had.
+                    const refused = draft.state === "failed";
+                    const waiting = !refused && Boolean(draft.sendAt);
                     return (
                         <li key={draft.id} className="border-b border-border/60">
                             <div className="flex items-start gap-2 px-3 py-2">
@@ -95,8 +111,19 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                                             {format.dateTime(new Date(draft.updatedAt))}
                                         </span>
                                     </span>
-                                    <span className="mt-0.5 block truncate text-[12px] text-foreground-subtle">
-                                        {waiting ? (
+                                    <span className="mt-0.5 block text-[12px] text-foreground-subtle">
+                                        {refused ? (
+                                            <span className="flex items-start gap-1.5 text-warning">
+                                                <TriangleAlert
+                                                    className="mt-0.5 size-3 shrink-0"
+                                                    aria-hidden
+                                                />
+                                                <span className="min-w-0">
+                                                    {draft.failure ||
+                                                        "It was not sent. Try it again."}
+                                                </span>
+                                            </span>
+                                        ) : waiting ? (
                                             <span className="flex items-center gap-1.5">
                                                 <Send className="size-3 shrink-0" aria-hidden />
                                                 Waiting to go out
@@ -105,10 +132,44 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                                                     : ""}
                                             </span>
                                         ) : (
-                                            `To ${draft.to.map((one) => one.address).join(", ") || "nobody yet"}`
+                                            <span className="block truncate">
+                                                {`To ${draft.to.map((one) => one.address).join(", ") || "nobody yet"}`}
+                                            </span>
                                         )}
                                     </span>
                                 </button>
+                                {refused && !draft.willRetry ? (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Send this message again"
+                                        title="Send this message again"
+                                        disabled={retrying.includes(draft.id)}
+                                        onClick={() => {
+                                            setRetrying((held) => [...held, draft.id]);
+                                            void (async () => {
+                                                const answer = await retrySendAction(draft.id);
+                                                setRetrying((held) =>
+                                                    held.filter((id) => id !== draft.id)
+                                                );
+                                                const said = refusalOf(answer);
+                                                if (said) {
+                                                    toast.show({ title: said });
+                                                    return;
+                                                }
+                                                toast.show({
+                                                    title:
+                                                        "queued" in answer && answer.queued
+                                                            ? "Sending it again."
+                                                            : "That message is no longer waiting to be sent."
+                                                });
+                                                reloadLists();
+                                            })();
+                                        }}
+                                    >
+                                        <RotateCcw className="size-4 shrink-0" aria-hidden />
+                                    </Button>
+                                ) : null}
                                 <Button
                                     variant="ghost"
                                     size="icon"

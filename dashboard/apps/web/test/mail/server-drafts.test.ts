@@ -120,6 +120,7 @@ vi.mock("@/lib/mailbox/send", async () => {
         composeMime: real.composeMime,
         sendMime: async (_account: unknown, _message: unknown, mime: Buffer) => {
             sentMime = mime.toString("utf8");
+            return { accepted: ["them@example.net"], refused: [], response: "250 ok" };
         }
     };
 });

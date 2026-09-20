@@ -37,9 +37,9 @@ import * as mailImport from "@/lib/mailbox/import";
 import * as mailExport from "@/lib/mailbox/export";
 import * as messages from "@/lib/mailbox/messages";
 import * as contacts from "@/lib/mailbox/contacts";
+import { mailShelfFor } from "@/lib/mailbox/shelf";
 import * as templates from "@/lib/mailbox/templates";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
-import { mailShelfFor } from "@/lib/mailbox/shelf";
 import * as attachFrom from "@/lib/mailbox/attach-from";
 import { MailAuthError } from "@/lib/mailbox/credentials";
 import { discoverMailbox } from "@/lib/mailbox/autoconfig";
@@ -920,6 +920,23 @@ export async function discardDraftAction(draftId: string) {
         return {};
     } catch (caught) {
         return failure(caught, "That draft could not be removed.");
+    }
+}
+
+/**
+ * Try a refused message again.
+ *
+ * Answers with whether anything moved. `false` is a message that is no longer
+ * refused - already back in the queue, or already gone - and the screen says so
+ * rather than queueing a second copy: the claim that decides it is a conditional
+ * update on the row, so two presses cannot both win it.
+ */
+export async function retrySendAction(draftId: string) {
+    const userId = await actorId();
+    try {
+        return { queued: await compose.retrySend(userId, draftId) };
+    } catch (caught) {
+        return failure(caught, "That message could not be sent again.");
     }
 }
 

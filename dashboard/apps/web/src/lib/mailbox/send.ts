@@ -22,6 +22,7 @@ import { marked } from "marked";
 import * as core from "@polaris/core";
 import { createTransport } from "nodemailer";
 import type Mail from "nodemailer/lib/mailer";
+import { MailAuthError } from "./credentials";
 import { asMailFailure, isLoopback } from "./imap";
 import MailComposer from "nodemailer/lib/mail-composer";
 import { mailCredential, type MailCredentialSource } from "./credentials";
@@ -31,6 +32,26 @@ export interface MailSendSource extends MailCredentialSource {
     readonly smtpHost: string;
     readonly smtpPort: number;
     readonly smtpSecurity: string;
+}
+
+/**
+ * The outgoing server would not take this message.
+ *
+ * Its own class because it is the one send failure that is about the message
+ * rather than about the mailbox: the credential was fine, the connection was
+ * fine, and the server said no to these bytes or to these recipients. It
+ * carries the server's reply verbatim, because "it was refused" without the
+ * reason is a sentence somebody can do nothing with, and how final that refusal
+ * was - which is what decides whether anything ever tries again.
+ */
+export class MailRejectedError extends Error {
+    public readonly failure: core.MailSendFailure;
+
+    public constructor(failure: core.MailSendFailure) {
+        super(core.sendFailureSentence(failure));
+        this.name = "MailRejectedError";
+        this.failure = failure;
+    }
 }
 
 /** Port 465 speaks TLS from the first byte; everything else opens in the clear
@@ -132,10 +153,22 @@ function textFrom(markdown: string): string {
  * client must still have its blind copies, and it is in their own mailbox, so
  * nobody else reads the header. Anything sent never keeps it.
  */
+/** The bytes, and the name they gave themselves.
+ *
+ *  The Message-Id is read back off the composed message rather than made up
+ *  here, so what is recorded as having been sent is the id the recipient's
+ *  server sees and the id a bounce will name. An id invented beside the message
+ *  is an id that is right until the day the two disagree. */
+export interface ComposedMessage {
+    readonly mime: Buffer;
+    /** Bare, with no angle brackets, the way every id is stored here. */
+    readonly messageId: string;
+}
+
 export async function composeMime(
     message: OutgoingMessage,
     extra: { messageId?: string; keepBcc?: boolean } = {}
-): Promise<Buffer> {
+): Promise<ComposedMessage> {
     const options: Mail.Options = {
         ...(extra.messageId ? { messageId: extra.messageId } : {}),
         from: core.formatAddress(message.from),
@@ -167,7 +200,10 @@ export async function composeMime(
     };
     const node = new MailComposer(options).compile();
     if (extra.keepBcc) node.keepBcc = true;
-    return node.build();
+    // Asked for before the build, because this is also what writes one into the
+    // headers when the caller named none.
+    const messageId = core.bareMessageId(node.messageId());
+    return { mime: await node.build(), messageId };
 }
 
 /**
@@ -183,20 +219,62 @@ export async function sendMime(
     account: MailSendSource,
     message: OutgoingMessage,
     mime: Buffer
-): Promise<void> {
+): Promise<MailSendOutcome> {
     const credential = await mailCredential(account);
     const transport = transportFor(account, credential);
+    const envelope = [...message.to, ...message.cc, ...message.bcc].map((entry) => entry.address);
     try {
-        await transport.sendMail({
-            envelope: {
-                from: message.from.address,
-                to: [...message.to, ...message.cc, ...message.bcc].map((entry) => entry.address)
-            },
+        const info = await transport.sendMail({
+            envelope: { from: message.from.address, to: envelope },
             raw: mime
         });
+        const accepted = addressList(info.accepted);
+        const refused = addressList(info.rejected);
+        // A server that took the message for nobody has refused it, whatever it
+        // answered with. The library resolves this rather than throwing when
+        // every recipient was rejected one at a time, and treating it as a send
+        // is how a message nobody received is filed in Sent as though it went.
+        if (accepted.length === 0) {
+            throw new MailRejectedError(
+                core.judgeSendFailure({
+                    responseCode: 550,
+                    code: "EENVELOPE",
+                    response: typeof info.response === "string" ? info.response : ""
+                })
+            );
+        }
+        return { accepted, refused, response: typeof info.response === "string" ? info.response : "" };
     } catch (caught) {
-        throw asMailFailure(caught);
+        if (caught instanceof MailRejectedError) throw caught;
+        const failure = asMailFailure(caught);
+        // A credential is the mailbox's problem and pauses it; anything the
+        // server actually answered is this message's problem and must reach the
+        // person who wrote it, in the server's own words.
+        if (failure instanceof MailAuthError) throw failure;
+        const judged = core.judgeSendFailure(caught as core.MailSendFailureInput);
+        if (judged.code > 0 || judged.verdict === "permanent") throw new MailRejectedError(judged);
+        throw failure;
     } finally {
         transport.close();
     }
+}
+
+/** What the outgoing server did with it. */
+export interface MailSendOutcome {
+    /** The recipients it took. Never empty: none is a refusal. */
+    readonly accepted: readonly string[];
+    /** The ones it would not take while taking the rest. Almost always empty,
+     *  and the one case nobody ever finds out about on their own. */
+    readonly refused: readonly string[];
+    /** Its final reply, for the record. */
+    readonly response: string;
+}
+
+/** The library hands back either bare addresses or objects, depending on the
+ *  transport. */
+function addressList(entries: readonly (string | { address?: string })[] | undefined): string[] {
+    return (entries ?? [])
+        .map((entry) => (typeof entry === "string" ? entry : (entry.address ?? "")))
+        .filter(Boolean)
+        .map((address) => address.toLowerCase());
 }

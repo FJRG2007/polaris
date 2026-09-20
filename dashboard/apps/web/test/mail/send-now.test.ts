@@ -41,7 +41,10 @@ vi.mock("@/lib/mailbox/access", () => ({
     ownedAccount: async () => ({ id: "a1" })
 }));
 vi.mock("@/lib/mailbox/imap", () => ({ withImap: async () => undefined }));
-vi.mock("@/lib/mailbox/send", () => ({ composeMime: async () => "", sendMime: async () => undefined }));
+vi.mock("@/lib/mailbox/send", () => ({
+    composeMime: async () => ({ mime: Buffer.from(""), messageId: "sent-1@example.com" }),
+    sendMime: async () => ({ accepted: ["them@example.net"], refused: [], response: "250 ok" })
+}));
 
 const DRAFT = "0198f0aa-0000-7000-8000-000000000001";
 const compose = await import("@/lib/mailbox/compose");

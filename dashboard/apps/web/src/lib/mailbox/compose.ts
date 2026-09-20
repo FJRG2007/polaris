@@ -28,8 +28,9 @@ import { recordCredentialRefusal } from "./refused";
 import { readUpload, attachUploads } from "./uploads";
 import { addressesFrom, asJson, stringsFrom } from "./json";
 import { withImap, type MailConnectionSource } from "./imap";
-import { composeMime, sendMime, type OutgoingMessage } from "./send";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount } from "./access";
+import { composeMime, sendMime, MailRejectedError, type OutgoingMessage } from "./send";
+import { announcePartial, announceUnsent, recordSend, recordSentCopy, type MailSentCopy } from "./delivery";
 
 /** What the composer sends up. */
 export interface ComposeInput {
@@ -78,7 +79,11 @@ export async function saveDraft(userId: string, input: ComposeInput): Promise<st
         forward: input.forward,
         requestReceipt: input.requestReceipt,
         state: "draft",
-        failure: ""
+        failure: "",
+        // Somebody editing a message the server refused has changed it, so the
+        // refusal is no longer about what is in front of them. Left set, it
+        // would keep the sweep off a message they went on to send.
+        permanent: false
     };
 
     const draft = input.draftId
@@ -112,7 +117,7 @@ export async function queueSend(
     const sendAt = input.sendAt ?? new Date(Date.now() + held.undoSeconds * 1_000);
     await prisma.mailDraft.update({
         where: { id: draftId },
-        data: { state: "queued", sendAt, attempts: 0, failure: "" }
+        data: { state: "queued", sendAt, attempts: 0, failure: "", permanent: false }
     });
     scheduleQueued(draftId, sendAt);
     publishMail({ accountId: input.accountId, kind: "sending", actorId: userId });
@@ -195,6 +200,12 @@ async function ancestryFor(
  *  is what makes a ten-second undo window feel like ten seconds. */
 const TIMERS = Symbol.for("polaris.mail.timers");
 
+/** How many times a server that keeps failing to take a message is asked again
+ *  before Polaris says so and stops. Past this the queue is hammering somebody's
+ *  mail server, and the writer has been watching a message "wait to go out" for
+ *  long enough to deserve being told it is not going. */
+const MAX_SEND_ATTEMPTS = 5;
+
 function timers(): Map<string, NodeJS.Timeout> {
     const holder = globalThis as { [TIMERS]?: Map<string, NodeJS.Timeout> };
     if (!holder[TIMERS]) holder[TIMERS] = new Map();
@@ -257,10 +268,31 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
     let gone = false;
     try {
         const message = await outgoingFromDraft(draft, account, { signature: true });
-        const mime = await composeMime(message);
-        await sendMime(account, message, mime);
+        const composed = await composeMime(message);
+        const outcome = await sendMime(account, message, composed.mime);
         gone = true;
-        await fileInSent(account, mime);
+        // Written before anything else that can fail, because from here on the
+        // message exists in the world and this row is the only thing that knows
+        // it - including for the report that may come back about it days later.
+        const deliveryId = await recordSend({
+            accountId: account.id,
+            messageId: composed.messageId,
+            subject: message.subject,
+            to: message.to,
+            refused: outcome.refused,
+            probe: draft.probe
+        });
+        await recordSentCopy(deliveryId, account.id, await fileInSent(account, composed.mime));
+        // The quietest way to lose mail: the server took the message for
+        // somebody, so it is in Sent and the composer closed, and the people it
+        // refused are in a list nobody read.
+        if (outcome.refused.length > 0) {
+            await announcePartial(
+                account.id,
+                draft.subject,
+                core.partialSendSentence(outcome.refused)
+            ).catch(() => undefined);
+        }
         await rememberContacts(account.id, "sent", {
             from: [message.from],
             to: message.to,
@@ -292,26 +324,75 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
         if (auth) {
             await recordCredentialRefusal(account.id, caught.message).catch(() => undefined);
         }
+
+        /**
+         * Whether anything will ever try this again, and what the writer is
+         * told.
+         *
+         * A server answering 5xx has decided. Retrying it sends the same
+         * rejection to the same people four more times, and - far worse - the
+         * screen goes on saying the message is waiting to go out while it is
+         * not going anywhere. So a final refusal clears the hour, which is what
+         * every sweep selects on, and says what the server said.
+         */
+        const rejected = caught instanceof MailRejectedError;
+        // Out of tries counts as final too. A message the sweep will not pick up
+        // again has to say so: `permanent` is what every screen reads as "this
+        // is not going anywhere by itself", and a draft sitting at five attempts
+        // with the flag clear would go on claiming it was waiting to go out.
+        const spent = draft.attempts >= MAX_SEND_ATTEMPTS;
+        const permanent = (rejected && caught.failure.verdict === "permanent") || spent;
+        const said = auth
+            ? caught.message
+            : rejected
+              ? caught.message
+              : "Not sent yet. Polaris could not reach the outgoing server, and will try again.";
+        const failure =
+            spent && !(rejected && caught.failure.verdict === "permanent")
+                ? `${said.replace(/ (Polaris will try again|and will try again)\.$/, ".")} Polaris has stopped trying after ${MAX_SEND_ATTEMPTS} attempts.`
+                : said;
         await prisma.mailDraft.update({
             where: { id: draft.id },
-            data: {
-                state: "failed",
-                // The two failures somebody can act on are said. Anything else is
-                // the server having a bad day, and the queue will try again.
-                failure: auth
-                    ? caught.message
-                    : "The outgoing server would not take this message. Polaris will try again."
-            }
+            data: { state: "failed", failure, permanent, ...(permanent ? { sendAt: null } : {}) }
         });
+        if (permanent) {
+            await announceUnsent(account.id, draft.subject, failure).catch(() => undefined);
+        }
         publishMail({ accountId: draft.accountId, kind: "sending", actorId: account.userId });
         return false;
     }
+}
+
+/**
+ * Put a message the server refused back in the queue, once.
+ *
+ * The claim is the conditional update: a message is only ever moved out of
+ * `failed`, so two presses of Try again - or a press and a sweep arriving
+ * together - find one row to move between them and the other finds none. That is
+ * the same lock `deliverQueued` uses, for the same reason: this is the button
+ * whose bug is sending somebody's message twice.
+ */
+export async function retrySend(userId: string, draftId: string): Promise<boolean> {
+    const id = await ownedDraftId(userId, draftId);
+    const now = new Date();
+    const moved = await prisma.mailDraft.updateMany({
+        where: { id, state: "failed" },
+        // The attempt count starts again: this is a person deciding, not the
+        // sweep giving up slowly, and a message refused for a reason they have
+        // now fixed deserves its tries back.
+        data: { state: "queued", sendAt: now, failure: "", permanent: false, attempts: 0 }
+    });
+    if (moved.count === 0) return false;
+    scheduleQueued(id, now);
+    return true;
 }
 
 /** What a draft is read as, for sending it or for filing its copy. */
 export const DRAFT_COLUMNS = {
     id: true,
     accountId: true,
+    attempts: true,
+    probe: true,
     subject: true,
     body: true,
     replyTo: true,
@@ -389,22 +470,31 @@ export async function outgoingFromDraft(
  * second one is how a Gmail mailbox ends up with everything sent twice. Never
  * allowed to fail the send: the message has already gone, and telling somebody
  * it failed because a copy could not be filed would be a lie.
+ *
+ * What it does not do any more is swallow the answer. The copy is a convenience
+ * to the send and the whole record to the sender: a mailbox quietly filing none
+ * of what it sends is one where the reader eventually goes looking for a message
+ * they know they wrote and concludes it was never sent. So which of the four
+ * things happened is handed back, written on the delivery, and said once.
  */
 async function fileInSent(
     account: MailConnectionSource & { id: string; appendToSent: boolean },
     mime: Buffer
-): Promise<void> {
-    if (!account.appendToSent) return;
+): Promise<MailSentCopy> {
+    if (!account.appendToSent) return "automatic";
     // Through the one place that decides which folder holds a role: with two
     // folders that both read as Sent, this is the one the provider itself uses.
     const sent = await findFolderForRole(account.id, "sent");
-    if (!sent) return;
+    if (!sent) return "none";
     try {
         await withImap(account, async (client) => {
             await client.append(sent.path, mime, ["\\Seen"]);
         });
-    } catch {
-        /* the message is sent; the copy is a convenience */
+        return "filed";
+    } catch (caught) {
+        // The server's own words name hosts and paths: logged, never shown.
+        console.warn("polaris: a sent message could not be copied to Sent:", caught);
+        return "failed";
     }
 }
 
@@ -445,13 +535,13 @@ export async function fileDraftOnServer(userId: string, draftId: string): Promis
 
     try {
         const message = await outgoingFromDraft(draft, account, { signature: false });
-        const mime = await composeMime(message, {
+        const composed = await composeMime(message, {
             messageId: `<${core.polarisDraftMessageId(draft.id)}>`,
             keepBcc: true
         });
         const uid = await withImap(account, async (client) => {
             await deleteCopies(client, folder.path, draft.id);
-            const appended = await client.append(folder.path, mime, ["\\Draft", "\\Seen"]);
+            const appended = await client.append(folder.path, composed.mime, ["\\Draft", "\\Seen"]);
             return appended && typeof appended === "object" && appended.uid ? appended.uid : null;
         });
         await prisma.mailDraft.update({
@@ -567,14 +657,18 @@ function withSignature(
  * than a timer was held for. A message that has failed several times is left
  * alone: the queue is not a place to hammer somebody's mail server from. Nor is
  * a mailbox whose server refused its credential - every retry would be another
- * failed sign-in - so its messages wait until the credential works again.
+ * failed sign-in - so its messages wait until the credential works again. Nor,
+ * now, is a message the server refused for good: `permanent` is cleared only by
+ * somebody pressing Try again, and retrying a 5xx only sends the same rejection
+ * to the same people while the screen claims the message is on its way.
  */
 export async function sweepDueSends(): Promise<number> {
     const due = await prisma.mailDraft.findMany({
         where: {
             state: { in: ["queued", "failed"] },
+            permanent: false,
             sendAt: { not: null, lte: new Date() },
-            attempts: { lt: 5 },
+            attempts: { lt: MAX_SEND_ATTEMPTS },
             account: { state: { not: "auth" } }
         },
         select: { id: true, state: true },
@@ -605,6 +699,16 @@ export interface MailDraftView {
     readonly forward: boolean;
     /** Set only while it is waiting to go, which is what the Outbox shows. */
     readonly sendAt: string | null;
+    /** "draft" | "queued" | "sending" | "failed". Carried because the screen
+     *  drew a failed message as one waiting to go out, at an hour in the past,
+     *  with no way to open it, discard it or try it again - which is the one
+     *  state a mail client must never be wrong about. */
+    readonly state: string;
+    /** Why it did not go, in words the writer reads, or "". */
+    readonly failure: string;
+    /** Whether anything will try it again on its own. False here means the only
+     *  thing that will move it is the person reading the screen. */
+    readonly willRetry: boolean;
     readonly updatedAt: string;
 }
 
@@ -619,7 +723,10 @@ export interface MailDraftView {
  */
 export async function listDrafts(userId: string): Promise<MailDraftView[]> {
     const rows = await prisma.mailDraft.findMany({
-        where: { account: { userId } },
+        // The sending check's own message is Polaris writing to itself. It is
+        // reported on its own screen and has no business appearing in somebody's
+        // drafts as a message they half wrote.
+        where: { account: { userId }, probe: false },
         orderBy: { updatedAt: "desc" },
         take: 200
     });
@@ -635,6 +742,9 @@ export async function listDrafts(userId: string): Promise<MailDraftView[]> {
         inReplyToId: row.inReplyToId,
         forward: row.forward,
         sendAt: row.sendAt?.toISOString() ?? null,
+        state: row.state,
+        failure: row.failure,
+        willRetry: row.state === "failed" && !row.permanent && row.attempts < MAX_SEND_ATTEMPTS,
         updatedAt: row.updatedAt.toISOString()
     }));
 }
