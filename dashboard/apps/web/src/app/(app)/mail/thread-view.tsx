@@ -50,6 +50,7 @@ const FileViewer = dynamic(
 );
 import { useBusy } from "./use-busy";
 import { readMessage } from "./message-store";
+import { DeliveryNote } from "./delivery-note";
 import type { MailViewContext } from "./mail-view";
 import type { MailAction } from "@/lib/mailbox/messages";
 import type { ReadableMessage } from "@/lib/mailbox/reading";
@@ -927,6 +928,13 @@ function MessageCard({
                                 "40 out of 100" is not something anybody can
                                 act on; "a link says bank.example.com and goes
                                 to evil.example.ru" is. */}
+                            {/* What became of it, for a message this Polaris
+                                sent. Above everything else on the message,
+                                because "it never arrived" changes what the
+                                reader is doing here. */}
+                            {message.delivery ? (
+                                <DeliveryNote delivery={message.delivery} />
+                            ) : null}
                             {message.spamReason ? (
                                 <div className="mb-3 flex items-start gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-3 py-1.5 text-[12px] text-foreground">
                                     <ShieldAlert

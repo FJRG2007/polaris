@@ -15,13 +15,14 @@
  */
 
 import { withLease } from "./lease";
-import { appJobs } from "@/lib/app-extensions/registry";
 import { sweepTrash } from "@/lib/mailbox/trash";
 import { wakeSnoozed } from "@/lib/mailbox/messages";
+import { sweepBounces } from "@/lib/mailbox/bounces";
 import { sweepExpiredSends } from "@/lib/vault/sends";
 import { sweepDueSends } from "@/lib/mailbox/compose";
 import { pruneTelemetry } from "@/lib/telemetry/store";
 import { runAutoscale } from "@/lib/deploy/autoscaler";
+import { appJobs } from "@/lib/app-extensions/registry";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
 import { runSleepPass } from "@/lib/deploy/sleep-service";
@@ -250,6 +251,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // Leased, because sending twice is the one thing this must not do.
         leaseMs: 5 * MINUTE,
         run: sweepDueSends
+    },
+    {
+        key: "mail-bounces",
+        // What came back about what was sent. Five minutes, because the thing
+        // being waited for took minutes to hours to arrive and nothing is
+        // watching the screen for it - and because a pass only reads mailboxes
+        // that are actually waiting to hear about a message.
+        everyMs: 5 * MINUTE,
+        // Leased: two passes would read the same reports and tell somebody
+        // twice about the same message not arriving.
+        leaseMs: 10 * MINUTE,
+        run: sweepBounces
     },
     {
         key: "mail-snooze",

@@ -517,6 +517,43 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "mail.message.bounced",
+        group: "mail",
+        label: "A message you sent did not arrive",
+        description:
+            "A delivery report came back about something you sent, saying it never reached the address it was for.",
+        level: "warning",
+        // On, and it means it. A bounce arrives as an ordinary message from a
+        // mail system, with a subject nobody reads, filed next to a newsletter -
+        // so the ordinary outcome of one is that nobody notices, and the sender
+        // goes on believing the message arrived.
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "mail.message.unsent",
+        group: "mail",
+        label: "A message could not be sent",
+        description:
+            "The outgoing server refused a message for good, or refused it for some of the people it was for.",
+        level: "warning",
+        // On. Said once, when Polaris gives up rather than on every attempt:
+        // past this point the message sits in Drafts waiting for a person.
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "mail.message.uncopied",
+        group: "mail",
+        label: "Sent messages are not being copied to Sent",
+        description:
+            "Your mail is going out, but the mail server would not keep a copy of it in your Sent folder.",
+        level: "warning",
+        // On, and said at most once a day per mailbox: what is missing is the
+        // reader's own record of what they sent, and nothing else would ever
+        // tell them - they would find out by looking for a message they know
+        // they wrote.
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "network.router",
         group: "network",
         label: "Network needs attention",

@@ -14,13 +14,14 @@
  * Reaching the end asks for the next page; it never reaches for all of them.
  */
 
-import type { MailShelf } from "@/lib/mailbox/shelf";
 import Fuse from "fuse.js";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { namesFor } from "./contacts";
 import { addressesFrom } from "./json";
+import * as delivery from "./delivery";
 import type { Prisma } from "@polaris/db";
+import type { MailShelf } from "@/lib/mailbox/shelf";
 import { onShelf, unifiedAccountIds } from "./access";
 import { mailCursorOf, mailCursorWhere, mailOrderBy } from "./list-order";
 
@@ -482,6 +483,15 @@ export interface MailMessageView {
     /** Everything else said against it, strongest first, for the message that
      *  was filed away. Empty for one that arrived without objection. */
     readonly spamReasons: readonly string[];
+    /**
+     * What became of it, for a message this Polaris sent, or null.
+     *
+     * Null for everything else, which is nearly every message: somebody else's
+     * mail, and mail this mailbox sent from another client. A message with no
+     * record is a message Polaris knows nothing about the fate of, and that is
+     * shown as nothing rather than as a state it would have to invent.
+     */
+    readonly delivery: delivery.MailDeliveryView | null;
     readonly attachments: readonly {
         id: string;
         name: string;
@@ -501,6 +511,7 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
             id: true,
             accountId: true,
             folderId: true,
+            messageId: true,
             subject: true,
             fromJson: true,
             toJson: true,
@@ -532,6 +543,17 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
         orderBy: { sentAt: "asc" }
     });
 
+    // What became of the ones Polaris sent. One query for the whole
+    // conversation, and a failure costs the states rather than the screen: a
+    // conversation that will not open because a delivery record could not be
+    // read would be a far worse bug than not knowing what happened to a message.
+    const fates = await delivery
+        .deliveriesFor(
+            messages.map((message) => message.accountId),
+            messages.map((message) => message.messageId)
+        )
+        .catch(() => new Map<string, delivery.MailDeliveryView>());
+
     const rows = messages.map((message) => ({
         id: message.id,
         accountId: message.accountId,
@@ -553,6 +575,7 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
         spamScore: message.spamScore,
         spamReason: message.spamReason,
         spamReasons: message.spamReasons,
+        delivery: (message.messageId && fates.get(message.messageId)) || null,
         attachments: message.attachments.map((file) => ({
             id: file.id,
             name: file.name,
