@@ -25,6 +25,7 @@
  */
 
 import Link from "next/link";
+import { SendCheck } from "./send-check";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useBusy } from "@/app/(app)/mail/use-busy";
@@ -456,6 +457,11 @@ function AccountRow({
                     <Trash2 className="size-4 shrink-0" aria-hidden />
                 </Button>
             </div>
+
+            {/* Not for a mailbox whose credential is already refused: it would
+                send a message that cannot be sent and report the refusal the
+                line above already states. */}
+            {refused ? null : <SendCheck accountId={account.id} />}
 
             {removing ? (
                 <ConfirmDeleteDialog
