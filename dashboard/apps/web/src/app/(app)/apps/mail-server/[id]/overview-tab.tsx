@@ -244,6 +244,36 @@ function HealthSection({ serverId }: { serverId: string }) {
                     </div>
                 </dl>
             ) : null}
+            {/* The pair the DNS tab cannot cover, because neither is a record in
+                the operator's own zone: a reverse name is set by whoever hands
+                out the address. Put beside the ports rather than under Domains
+                for that reason, and because it is about the one address the
+                whole server sends from rather than about a domain. */}
+            {health ? (
+                <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-xs text-muted-foreground">
+                            The address mail leaves from
+                        </h3>
+                        <VerdictBadge verdict={health.reverse.verdict} />
+                        {health.reverse.address ? <Mono>{health.reverse.address}</Mono> : null}
+                    </div>
+                    {[health.reverse.reverse, health.reverse.greeting].map((check, at) => (
+                        <div key={at} className="flex flex-col gap-0.5">
+                            <p className="flex items-center gap-2 text-[0.8125rem]">
+                                <VerdictBadge verdict={check.verdict} />
+                                <span className="text-muted-foreground">
+                                    {at === 0 ? "Reverse name" : "Greeting name"}
+                                </span>
+                            </p>
+                            <p className="text-xs text-muted-foreground">{check.note}</p>
+                            {check.instruction ? (
+                                <p className="text-xs text-foreground">{check.instruction}</p>
+                            ) : null}
+                        </div>
+                    ))}
+                </div>
+            ) : null}
             {ports ? (
                 <div className="flex flex-col gap-2">
                     <p className="text-xs text-muted-foreground">

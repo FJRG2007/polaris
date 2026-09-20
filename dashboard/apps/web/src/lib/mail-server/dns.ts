@@ -36,7 +36,11 @@ import {
 /** The resolvers asked, two operators so one having a bad day is not the answer. */
 const PUBLIC_RESOLVERS = ["1.1.1.1", "8.8.8.8"];
 
-function publicResolver(): Resolver {
+/** A resolver that asks them, and nobody else. Exported because every check
+ *  that has to see what the internet sees - the records here, and the reverse
+ *  name in `health` - must ask the same two rather than the machine's own,
+ *  which may answer for a name nobody outside can look up. */
+export function publicResolver(): Resolver {
     const resolver = new Resolver({ timeout: 4000, tries: 2 });
     resolver.setServers(PUBLIC_RESOLVERS);
     return resolver;

@@ -13,8 +13,8 @@
 import { z } from "zod";
 import { reached } from "./steps";
 import * as core from "@polaris/core";
+import { publicResolver } from "./dns";
 import { adminCredentials } from "./access";
-import { Resolver } from "node:dns/promises";
 import { queuedMessages } from "./operations";
 import { connect as tlsConnect } from "node:tls";
 import { call, engineAnswers } from "./stalwart";
@@ -59,10 +59,28 @@ export interface CertificateCheck {
     readonly note: string | null;
 }
 
+/**
+ * Whether the address mail leaves from is one receivers will take mail from.
+ *
+ * The two facts here are the pair every large receiver checks first and the only
+ * two on these screens the operator cannot publish themselves: a reverse name is
+ * set by whoever hands out the address, and the greeting name has to lead back
+ * to it. A server with faultless SPF, DKIM and DMARC and no reverse name has its
+ * mail refused at the door before any of that is read, and nothing on these
+ * screens said so.
+ */
+export interface ReverseReport {
+    readonly address: string | null;
+    readonly verdict: core.MailReverseVerdict;
+    readonly reverse: core.MailReverseCheck;
+    readonly greeting: core.MailReverseCheck;
+}
+
 export interface MailHealth {
     readonly engine: EngineHealth;
     readonly ports: PortReport;
     readonly certificate: CertificateCheck;
+    readonly reverse: ReverseReport;
 }
 
 const TLS_TIMEOUT_MS = 8000;
@@ -112,9 +130,9 @@ export async function engineHealth(server: MailServer): Promise<EngineHealth> {
 /** Where the world reaches the server: the mail name on a public resolver,
  *  else the machine's own address. */
 async function publicAddress(server: MailServer): Promise<string | null> {
-    const resolver = new Resolver({ timeout: 4000, tries: 2 });
-    resolver.setServers(["1.1.1.1", "8.8.8.8"]);
-    const resolved = await resolver.resolve4(server.hostname).catch(() => [] as string[]);
+    const resolved = await publicResolver()
+        .resolve4(server.hostname)
+        .catch(() => [] as string[]);
     if (resolved[0]) return resolved[0];
     if (server.placement === "local") return publicProbeHost();
     const host = await prisma.host.findUnique({ where: { id: server.placement }, select: { address: true } });
@@ -195,11 +213,56 @@ export function checkCertificate(hostname: string, address: string | null): Prom
     });
 }
 
+/**
+ * The reverse name of the sending address, and the name the server greets with.
+ *
+ * Asked of public resolvers rather than the machine's own, like every other
+ * check here: what matters is what a receiver on the internet sees, and a local
+ * resolver may have an answer for a name nobody else can look up. A lookup that
+ * fails is passed on as `null` and graded as unchecked, never as absent - the
+ * difference between "there is no reverse name" and "the question could not be
+ * asked" is the difference between sending somebody to their hosting provider
+ * and wasting their afternoon.
+ */
+export async function checkReverseName(server: MailServer): Promise<ReverseReport> {
+    const address = await publicAddress(server);
+    const resolver = publicResolver();
+    const [pointers, hostAddresses] = await Promise.all([
+        address ? resolver.reverse(address).catch(failedLookup) : Promise.resolve([]),
+        resolver.resolve4(server.hostname).catch(failedLookup)
+    ]);
+    const pointerAddresses = pointers?.[0]
+        ? await resolver.resolve4(pointers[0]).catch(failedLookup)
+        : [];
+
+    const lookup: core.MailReverseLookup = {
+        hostname: server.hostname,
+        address,
+        pointers,
+        pointerAddresses,
+        hostAddresses
+    };
+    const reverse = core.gradeReverseName(lookup);
+    const greeting = core.gradeGreetingName(lookup);
+    return { address, verdict: core.reverseOverall([reverse, greeting]), reverse, greeting };
+}
+
+/** A name that does not exist answers with an empty list, which is an answer.
+ *  Anything else is the lookup itself failing, and that is not an answer. */
+function failedLookup(caught: unknown): string[] | null {
+    const code = (caught as { code?: unknown } | null)?.code;
+    return code === "ENOTFOUND" || code === "ENODATA" ? [] : null;
+}
+
 /** Everything at once, for the Overview. */
 export async function mailHealth(server: MailServer): Promise<MailHealth> {
-    const [engine, ports] = await Promise.all([engineHealth(server), checkPorts(server)]);
+    const [engine, ports, reverse] = await Promise.all([
+        engineHealth(server),
+        checkPorts(server),
+        checkReverseName(server)
+    ]);
     const certificate = await checkCertificate(server.hostname, ports.address);
-    return { engine, ports, certificate };
+    return { engine, ports, certificate, reverse };
 }
 
 /**
