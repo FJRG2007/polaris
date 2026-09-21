@@ -29,6 +29,7 @@ import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { ClipDialog } from "./clip-dialog";
 import { MicSettings } from "./mic-settings";
 import { VideoPreview } from "@/components/video-preview";
+import { ImageViewer } from "@/components/image-viewer";
 import { ScheduleDialog } from "./schedule-dialog";
 import { PollDialog, type PollDraft } from "./poll-dialog";
 import { canRecordClip } from "./clip-recorder";
@@ -1336,6 +1337,16 @@ function StagedFile({
     onRemove: () => void;
 }) {
     const [preview, setPreview] = useState<string | null>(null);
+    /**
+     * Whether this one is open in the viewer.
+     *
+     * A thumbnail of a screenshot is enough to tell two screenshots apart and not
+     * enough to tell whether the right window is in shot, which is the actual
+     * question somebody has about a picture they are one press away from sending
+     * to other people. The conversation already opens a picture properly, and it
+     * is the same picture before and after sending, so it opens the same way.
+     */
+    const [open, setOpen] = useState(false);
     const type = file.type.split(";")[0]?.trim().toLowerCase() ?? "";
     const watchable = WATCHABLE.has(type);
 
@@ -1425,7 +1436,12 @@ function StagedFile({
                 // unclipped it throws the picture's colour past its own edges as
                 // a halo, which reads as a broken thumbnail rather than a covered
                 // one.
-                <span className="border-border block size-20 overflow-hidden rounded-md border">
+                <button
+                    type="button"
+                    onClick={() => setOpen(true)}
+                    aria-label={`Open ${file.name}`}
+                    className="border-border block size-20 cursor-zoom-in overflow-hidden rounded-md border"
+                >
                     {/* eslint-disable-next-line @next/next/no-img-element -- a local blob, no loader wanted */}
                     <img
                         src={preview}
@@ -1436,12 +1452,19 @@ function StagedFile({
                             covered && "scale-110 blur-md"
                         )}
                     />
-                </span>
+                </button>
             )}
             <span className="absolute -right-1.5 -top-1.5 flex items-center gap-0.5 rounded-full border border-border bg-elevated px-0.5 shadow-sm">
                 {cover}
                 {remove}
             </span>
+            {/* Nothing to forward and nothing to report: it is not on a message
+                yet, and the one person who could report it is the one looking at
+                it. */}
+            <ImageViewer
+                image={open && !watchable ? { url: preview, name: file.name } : null}
+                onClose={() => setOpen(false)}
+            />
         </li>
     );
 }

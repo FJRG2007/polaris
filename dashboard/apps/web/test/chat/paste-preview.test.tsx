@@ -14,7 +14,7 @@ import { DEFAULT_CHAT_RULES } from "@polaris/core";
 import userEvent from "@testing-library/user-event";
 import { Composer } from "@/app/(app)/chat/composer";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("@/app/(app)/mention-actions", () => ({
     searchMentionsAction: async () => ({ results: [] }),
@@ -82,6 +82,36 @@ describe("pasting a screenshot into the composer", () => {
         expect(preview.tagName).toBe("IMG");
         // Not also drawn as the name-and-size chip a non-previewable file gets.
         expect(screen.queryByText("screenshot.png")).toBeNull();
+    });
+
+    it("opens it properly when it is pressed, rather than only as a thumbnail", async () => {
+        // A thumbnail tells two screenshots apart and says nothing about whether
+        // the right window is in shot, which is the question somebody has about a
+        // picture one press away from other people. It used to be the one picture
+        // in Polaris that could not be opened.
+        const { container } = render(
+            <Composer
+                channelId="c1"
+                rules={DEFAULT_CHAT_RULES}
+                disabled={false}
+                placeholder="Message"
+                onSend={() => undefined}
+            />
+        );
+
+        const editable = await editableSurface(container);
+        pasteFiles(editable, [png("screenshot.png")]);
+        await screen.findByAltText("screenshot.png");
+        expect(screen.queryByRole("dialog")).toBeNull();
+
+        fireEvent.click(screen.getByRole("button", { name: "Open screenshot.png" }));
+        const viewer = screen.getByRole("dialog", { name: "screenshot.png" });
+        expect(viewer).toBeTruthy();
+
+        fireEvent.keyDown(window, { key: "Escape" });
+        expect(screen.queryByRole("dialog")).toBeNull();
+        // Still staged: looking at it is not taking it off.
+        expect(screen.getByAltText("screenshot.png")).toBeTruthy();
     });
 
     it("keeps a chip, not a picture, for a file that draws no thumbnail", async () => {

@@ -57,6 +57,20 @@ export function savable(url: string): boolean {
 }
 
 /**
+ * Whether this picture is one anybody else could reach.
+ *
+ * A file staged in the composer is drawn from a blob address, which exists in
+ * this tab and nowhere else: it is not a link to copy, it is not a page to open,
+ * and it stops working the moment the message is sent or the file taken back off.
+ * So the items that hand a picture to somebody else are not offered for one -
+ * looking closer at it, and copying the bytes, are the two that mean anything
+ * before it has been sent.
+ */
+export function sharable(url: string): boolean {
+    return !url.startsWith("blob:");
+}
+
+/**
  * The bytes on the clipboard, and the words to say about it.
  *
  * Fetched and handed over as a blob, because "copy image" means the picture and
@@ -126,25 +140,29 @@ export function imageItems({
                     Copy image
                 </Item>
             )}
-            <Item
-                onSelect={() => {
-                    void copyText(imageLink(image.url, baseUrl));
-                    announce("Link copied");
-                }}
-            >
-                <Link2 className="size-3.5" />
-                Copy media link
-            </Item>
+            {sharable(image.url) && (
+                <Item
+                    onSelect={() => {
+                        void copyText(imageLink(image.url, baseUrl));
+                        announce("Link copied");
+                    }}
+                >
+                    <Link2 className="size-3.5" />
+                    Copy media link
+                </Item>
+            )}
             {savable(image.url) && (
                 <Item onSelect={() => downloadFile(image.url, image.name)}>
                     <Download className="size-3.5" />
                     {kind === "video" ? "Download video" : "Download"}
                 </Item>
             )}
-            <Item onSelect={() => window.open(image.url, "_blank", "noopener,noreferrer")}>
-                <ExternalLink className="size-3.5" />
-                Open in the browser
-            </Item>
+            {sharable(image.url) && (
+                <Item onSelect={() => window.open(image.url, "_blank", "noopener,noreferrer")}>
+                    <ExternalLink className="size-3.5" />
+                    Open in the browser
+                </Item>
+            )}
             {onForward && image.forwardable && messageId && (
                 <Item onSelect={() => onForward(messageId)}>
                     <Forward className="size-3.5" />
