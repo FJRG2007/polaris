@@ -18,6 +18,13 @@
  * AudioContext created before that lands in `suspended`, so the context is made
  * on first use and resumed each time; a ring that cannot start returns a stop
  * function anyway, so no caller has to care.
+ *
+ * **A ring is scheduled whole, not repeated by a timer.** Every pass of it goes
+ * onto the audio clock at once and the stop function silences the ones that have
+ * not happened yet. A `setInterval` would have been simpler and was what this
+ * did: a browser throttles one to about a minute in a tab nobody is looking at,
+ * so the ring sounded once and then gave up in silence - in exactly the case it
+ * exists for.
  */
 
 import { soundGain } from "@/lib/notification-sound";
@@ -81,11 +88,23 @@ export type CallSound =
     | "ring"
     | "ringBack";
 
-/** How loud the incoming ring is. Several times everything else here, and that
- *  is the point of it: every other sound is played to somebody already looking
- *  at the screen, and this one is played to somebody who is not in the room. A
- *  single oscillator sounds at a time, so nothing here can sum into clipping. */
-const RING_GAIN = 0.26;
+/**
+ * How loud the incoming ring is.
+ *
+ * Several times everything else here, and that is the point of it: every other
+ * sound is played to somebody already looking at the screen, and this one is
+ * played to somebody who is not in the room.
+ *
+ * It is not the height of what comes out, which is the mistake the note beside
+ * it used to make - it claimed a single oscillator sounded at a time. Three of
+ * the ring's notes overlap, each of them a bell of three partials, so nine
+ * oscillators reach the output together and the sum peaks at about twice this.
+ * The ceiling that matters is TWO rings at once, which one device with two tabs
+ * can produce (see `device-once`): past full scale the output is clipped flat,
+ * and clipping is heard as distortion rather than as volume. `call-ring`
+ * computes the sum and holds this to it.
+ */
+const RING_GAIN = 0.22;
 
 /**
  * Every sound, as data.
@@ -188,6 +207,20 @@ export const SOUNDS: Record<CallSound, readonly Note[]> = {
 export const RING_EVERY_MS: Record<"ring" | "ringBack", number> = { ring: 3400, ringBack: 3000 };
 export const RING_FOR_MS = 45_000;
 
+/**
+ * How many passes cover the span a ring is allowed to ring for.
+ *
+ * Every one of them is scheduled on the audio clock the moment the ring starts,
+ * and that is the whole point rather than an optimisation: a repeat driven by
+ * `setInterval` is throttled to about once a minute in a tab nobody is looking
+ * at, which is every tab a call arrives in. The ring rang once and then stopped
+ * for the rest of its forty-five seconds, and the code looked correct - the
+ * timer was simply not being run. The audio thread is not throttled.
+ */
+export function ringPasses(name: "ring" | "ringBack"): number {
+    return Math.max(1, Math.ceil(RING_FOR_MS / RING_EVERY_MS[name]));
+}
+
 /** How loud a tone is by default. Low: these play over whatever the reader is
  *  already listening to, and over the call itself. */
 export const DEFAULT_GAIN = 0.1;
@@ -222,6 +255,23 @@ function audio(): AudioContext | null {
     return context;
 }
 
+/** One pass of a sound, scheduled to begin at `start` on the audio clock, and
+ *  the oscillators it will use - which is what lets a ring scheduled minutes
+ *  ahead be silenced the moment somebody answers. */
+function schedule(ctx: AudioContext, name: CallSound, start: number, level: number): OscillatorNode[] {
+    const made: OscillatorNode[] = [];
+    for (const note of SOUNDS[name]) {
+        // One partial, or three of them. `sound` is the whole note: the tone
+        // itself is the first call and a bell adds its octave and its twelfth
+        // over the top, each quieter and all fading together.
+        made.push(sound(ctx, note, start, 1, level));
+        if (!note.bell) continue;
+        made.push(sound(ctx, note, start, 2, OCTAVE_SHARE * level));
+        made.push(sound(ctx, note, start, 3, TWELFTH_SHARE * level));
+    }
+    return made;
+}
+
 /** Play one sound, once. Does nothing at all where audio is not available. */
 export function playCallSound(name: CallSound): void {
     // The account's volume, applied to every tone here. Zero is silence rather
@@ -230,16 +280,20 @@ export function playCallSound(name: CallSound): void {
     if (level <= 0) return;
     const ctx = audio();
     if (!ctx) return;
-    const start = ctx.currentTime;
-    for (const note of SOUNDS[name]) {
-        // One partial, or three of them. `sound` is the whole note: the tone
-        // itself is the first call and a bell adds its octave and its twelfth
-        // over the top, each quieter and all fading together.
-        sound(ctx, note, start, 1, level);
-        if (!note.bell) continue;
-        sound(ctx, note, start, 2, OCTAVE_SHARE * level);
-        sound(ctx, note, start, 3, TWELFTH_SHARE * level);
-    }
+    schedule(ctx, name, ctx.currentTime, level);
+}
+
+/**
+ * Whether a sound started here would actually be heard.
+ *
+ * No browser lets a page make a noise before it has been interacted with, and a
+ * context that is still suspended is one whose notes nobody hears. The notice
+ * drawn outside the window asks this before deciding whether to ring itself, so
+ * that one event makes one sound: the ring where the ring can be heard, the
+ * notice where it cannot.
+ */
+export function canBeHeard(): boolean {
+    return context !== null && context.state === "running" && soundGain() > 0;
 }
 
 /** One oscillator: the note at some multiple of its frequency, at some share of
@@ -250,7 +304,7 @@ function sound(
     start: number,
     multiple: number,
     share: number
-): void {
+): OscillatorNode {
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
     oscillator.type = note.wave ?? "sine";
@@ -278,6 +332,7 @@ function sound(
     oscillator.connect(gain).connect(ctx.destination);
     oscillator.start(from);
     oscillator.stop(to + 0.02);
+    return oscillator;
 }
 
 /**
@@ -287,11 +342,25 @@ function sound(
  * first sound is a ring that is missed.
  */
 export function startRinging(name: "ring" | "ringBack" = "ring"): () => void {
-    playCallSound(name);
-    const timer = setInterval(() => playCallSound(name), RING_EVERY_MS[name]);
-    const stopAt = setTimeout(() => clearInterval(timer), RING_FOR_MS);
+    const level = soundGain();
+    const ctx = level > 0 ? audio() : null;
+    if (!ctx) return () => undefined;
+
+    const every = RING_EVERY_MS[name] / 1000;
+    const made: OscillatorNode[] = [];
+    for (let pass = 0; pass < ringPasses(name); pass += 1) {
+        made.push(...schedule(ctx, name, ctx.currentTime + pass * every, level));
+    }
     return () => {
-        clearInterval(timer);
-        clearTimeout(stopAt);
+        // Answered, declined, or hushed. A node whose start is still in the
+        // future is told to stop before it - which the spec answers by never
+        // playing it at all - so the rest of the ring simply does not happen.
+        for (const oscillator of made) {
+            try {
+                oscillator.stop(ctx.currentTime);
+            } catch {
+                // Already finished. Nothing to silence.
+            }
+        }
     };
 }

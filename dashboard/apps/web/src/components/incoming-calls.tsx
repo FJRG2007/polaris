@@ -52,7 +52,7 @@ import {
 import { callElsewhereAction } from "@/app/(app)/chat/meeting-actions";
 import { BellOff, Phone, PhoneMissed, PhoneOff, X } from "lucide-react";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
-import { RING_FOR_MS, playCallSound, startRinging } from "@/lib/call-sounds";
+import { RING_FOR_MS, canBeHeard, playCallSound, startRinging } from "@/lib/call-sounds";
 import { CALLS_CHANNEL, callTabMessageSchema, type CallTabMessage } from "@/lib/chat/call-tabs";
 
 /** How often a ringing telephone checks whether it was answered somewhere else.
@@ -453,13 +453,14 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                         tag: `call:${entry.meetingId}`,
                         href: `/chat/c/${entry.channelId}`,
                         insistent: true,
-                        // The one notice in Polaris that rings. Everything else
-                        // is chimed by the tab, and a tab nobody is looking at
-                        // is one whose audio the browser may have suspended -
-                        // which is every call that arrives while somebody is in
-                        // another window, which is every call this notice is
-                        // drawn for.
-                        sound: true
+                        // The one notice in Polaris that may ring - and only
+                        // where the ring itself cannot be heard. A tab nobody is
+                        // looking at is one whose audio the browser may never
+                        // have been allowed to start, and then this is the only
+                        // sound there is; where it has been allowed, the ring is
+                        // already sounding and a chime over the top of it is two
+                        // noises for one call.
+                        sound: !canBeHeard()
                     }).then((notice) => {
                         if (notice) notices.current.set(entry.meetingId, notice);
                     });

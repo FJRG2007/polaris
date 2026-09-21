@@ -58,7 +58,10 @@ vi.mock("@/lib/desktop-notify", () => ({
 vi.mock("@/lib/call-sounds", () => ({
     RING_FOR_MS: 30_000,
     playCallSound: () => undefined,
-    startRinging: () => () => undefined
+    startRinging: () => () => undefined,
+    // Audible, so the notice these tests draw stays silent - which is not what
+    // they are about, but it has to be one or the other.
+    canBeHeard: () => true
 }));
 
 /** Where this account's seat is, as the server would answer. Null is the usual
