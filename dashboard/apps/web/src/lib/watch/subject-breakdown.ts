@@ -10,15 +10,16 @@
  * Nothing new is measured here. Every figure already exists somewhere in Polaris
  * and was only ever shown on another screen:
  *
- *   - CPU and memory are the containers the engine is running, which is exactly
- *     what the host series is the sum of. The collector samples them every minute
- *     on its way past and leaves them in the stats cache, so opening this costs a
- *     listing rather than a second per container.
+ *   - CPU and memory are the containers the engine is running. The chart above
+ *     is the whole machine, so what the containers do not account for is the
+ *     leftover row rather than a discrepancy. The collector samples them every
+ *     minute on its way past and leaves them in the stats cache, so opening this
+ *     costs a listing rather than a second per container.
  *   - Storage is what the Servers screen already lists: the volumes largest
  *     first with what each belongs to, plus the image store and the build cache.
  *     Only for the machine Polaris runs on, because it is the only disk anything
- *     here can measure - a server reached over SSH reports no disk at all, and
- *     inventing one would be worse than the empty chart it already draws.
+ *     here can walk - a server reached over SSH charts the disk its probe
+ *     reports, but nothing here can say what is on it.
  *   - Upload is the stored counters, differenced over the window on screen. A
  *     counter read once inside a window is a position rather than a distance, so
  *     a service sampled once contributes no rate and is left out instead of being
@@ -39,9 +40,9 @@ import { prisma, type Prisma } from "@polaris/db";
 import { localDisk } from "@/lib/deploy/local-disk";
 import { hostSpace } from "@/lib/deploy/host-space";
 import { cachedSamples } from "@/lib/container-stats-cache";
-import { LOCAL_SERVER_ID, serverIdSchema, type Permission } from "@polaris/core";
 import { describePart, isPolarisPart } from "@/lib/polaris-parts";
 import { baseProject, hostVolumes } from "@/lib/deploy/host-volumes";
+import { LOCAL_SERVER_ID, serverIdSchema, type Permission } from "@polaris/core";
 import { counterAdvance, hostSubject, RAW_MAX_SPAN_MS } from "@/lib/metrics-shared";
 import type { ContainerStats, ContainerSummary, DockerDriver } from "@polaris/docker";
 import {
@@ -254,7 +255,7 @@ async function machineLoad(
         return {
             rows: ranked(rest ? [...parts, rest] : parts, total),
             total,
-            note: "Measured from the containers this server is running, which is what the chart adds up.",
+            note: "Measured from the containers this server is running. The chart above is the whole machine, so anything outside a container is the last row.",
             unavailable: null,
             at
         };

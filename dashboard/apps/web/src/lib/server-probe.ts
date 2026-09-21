@@ -37,6 +37,18 @@ export interface ServerMetrics {
     readonly memoryUsedBytes: number | null;
     readonly diskTotalBytes: number | null;
     readonly diskUsedBytes: number | null;
+    /**
+     * What every real interface on the machine has moved since it booted, added
+     * up. A counter, not a rate: the reader turns it into one by differencing two
+     * readings, which is the only way a single command can answer "how much
+     * traffic" without sitting on the connection for a second.
+     *
+     * Loopback is left out - a container talking to the database beside it is not
+     * the machine's traffic, and on a busy box it dwarfs what actually crossed the
+     * network.
+     */
+    readonly netRxBytes: number | null;
+    readonly netTxBytes: number | null;
     /** Heaviest first. Containers and processes ranked together, because the
      *  question is what is eating the machine, not what kind of thing it is. */
     readonly consumers: readonly ServerConsumer[];
@@ -94,6 +106,16 @@ DISK=$(df -k / 2>/dev/null | awk 'NR == 2 { print \$2 " " \$3 }')
 emit disk_total "$(echo "\$DISK" | awk '{ print \$1 * 1024 }')"
 emit disk_used "$(echo "\$DISK" | awk '{ print \$2 * 1024 }')"
 
+# Columns are: <name>: rx_bytes ...7 more... tx_bytes. Printed as an integer
+# because awk writes a large sum in scientific notation, which parses to a
+# number nobody can difference against the next reading.
+if [ -r /proc/net/dev ]; then
+    NET=$(awk 'NR > 2 { sub(":", " "); if (\$1 != "lo") { rx += \$2; tx += \$10 } }
+        END { printf "%.0f %.0f", rx, tx }' /proc/net/dev)
+    emit net_rx "$(echo "\$NET" | awk '{ print \$1 }')"
+    emit net_tx "$(echo "\$NET" | awk '{ print \$2 }')"
+fi
+
 if command -v docker >/dev/null 2>&1; then
     docker stats --no-stream --format '{{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}' 2>/dev/null \\
         | head -${CONSUMER_LIMIT} \\
@@ -135,6 +157,8 @@ export function parseProbe(output: string): ServerMetrics {
         memoryUsedBytes: memoryTotal !== null && memoryAvailable !== null ? memoryTotal - memoryAvailable : null,
         diskTotalBytes: numberOf(fields.get("disk_total")),
         diskUsedBytes: numberOf(fields.get("disk_used")),
+        netRxBytes: numberOf(fields.get("net_rx")),
+        netTxBytes: numberOf(fields.get("net_tx")),
         consumers: rank(consumers),
         probedAt: new Date().toISOString()
     };

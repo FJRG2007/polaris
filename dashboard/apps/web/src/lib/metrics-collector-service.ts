@@ -18,6 +18,7 @@ import type { DockerDriver } from "@polaris/docker";
 import { recordMachineCores } from "./machine-cores";
 import { rememberSample } from "./container-stats-cache";
 import { getPorts, type TargetRow } from "./deploy/runtime";
+import { getServerMetrics } from "./server-metrics-service";
 import { recordHostDockerId, recordLocalDockerId } from "./local-machine";
 import { getDriverForConnection, getUnasMetrics } from "./storage-service";
 import { currentReleaseRef, servingContainerNames } from "./deploy/releases";
@@ -148,6 +149,120 @@ async function localDisk(): Promise<{ used: number; total: number } | null> {
 }
 
 /**
+ * What a machine says about itself, whichever way it was asked.
+ *
+ * Every field is best effort and independent of the others: a box that answers
+ * about its memory but not its disk is measured for its memory, the same way the
+ * probe behind a server's panel treats a missing number.
+ */
+interface MachineReading {
+    cpuPercent: number | null;
+    memUsedBytes: number | null;
+    memTotalBytes: number | null;
+    disk: { used: number; total: number } | null;
+    cores: number | null;
+    /** Interface counters since boot, where the machine could be asked for them. */
+    net: { rx: number; tx: number } | null;
+}
+
+/**
+ * How hard a machine is being worked, as a percentage of itself.
+ *
+ * The load average against the core count - the same reading the panel above the
+ * chart puts on screen ("0.11 load of 2"), so the two cannot disagree about the
+ * same machine. Clamped because the chart's ceiling is the whole machine: a load
+ * past the core count is a queue, and how long that queue is belongs on a panel
+ * that can say so rather than off the top of a chart.
+ */
+function loadPercent(load: number | null, cores: number | null): number | null {
+    if (load == null || !cores) return null;
+    return round2(Math.min(100, (load / cores) * 100));
+}
+
+/** One file of `/proc`, or null where there is no `/proc` to read (a dev run on
+ *  Windows or macOS). */
+async function readProc(path: string): Promise<string | null> {
+    try {
+        const { readFile } = await import("node:fs/promises");
+        return await readFile(path, "utf8");
+    } catch {
+        return null;
+    }
+}
+
+function numberOf(value: string | undefined): number | null {
+    if (!value) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * The machine Polaris runs on, read from `/proc`.
+ *
+ * A container gets neither its own `/proc/loadavg` nor its own `/proc/meminfo`:
+ * both are the host's, the same figures `uptime` and `free` give on the box. So
+ * the one server that has no login to probe is still measured, and measured as a
+ * whole machine rather than as the sum of what Polaris happens to have deployed
+ * on it.
+ */
+async function localMachine(): Promise<MachineReading | null> {
+    const [loadavg, meminfo, disk] = await Promise.all([
+        readProc("/proc/loadavg"),
+        readProc("/proc/meminfo"),
+        localDisk()
+    ]);
+    if (loadavg === null && meminfo === null && disk === null) return null;
+
+    // Available, not free, for the same reason the probe uses it: free counts the
+    // page cache as gone, which reports a healthy machine as nearly out of memory.
+    const total = numberOf(/^MemTotal:\s+(\d+)/m.exec(meminfo ?? "")?.[1]);
+    const available = numberOf(/^MemAvailable:\s+(\d+)/m.exec(meminfo ?? "")?.[1]);
+    const { cpus } = await import("node:os");
+    const cores = cpus().length || null;
+    return {
+        cpuPercent: loadPercent(numberOf(loadavg?.trim().split(/\s+/)[0]), cores),
+        memUsedBytes: total !== null && available !== null ? (total - available) * 1024 : null,
+        memTotalBytes: total === null ? null : total * 1024,
+        disk,
+        cores,
+        // A container's `/proc/net/dev` is its own network namespace, so what it
+        // reports is Polaris's own traffic under the heading of the whole box.
+        // The containers are counted for this one instead.
+        net: null
+    };
+}
+
+/**
+ * A registered server's own report of itself, over SSH.
+ *
+ * The same probe the server's page runs, and cached by it for half a tick, so a
+ * page open on this machine and this collector share one session's answer rather
+ * than each opening their own.
+ */
+async function probedMachine(hostId: string, ownerId: string): Promise<MachineReading | null> {
+    try {
+        const metrics = await getServerMetrics(hostId, ownerId);
+        return {
+            cpuPercent: loadPercent(metrics.loadAverage, metrics.cpuCount),
+            memUsedBytes: metrics.memoryUsedBytes,
+            memTotalBytes: metrics.memoryTotalBytes,
+            disk:
+                metrics.diskUsedBytes != null && metrics.diskTotalBytes != null
+                    ? { used: metrics.diskUsedBytes, total: metrics.diskTotalBytes }
+                    : null,
+            cores: metrics.cpuCount,
+            net:
+                metrics.netRxBytes != null && metrics.netTxBytes != null
+                    ? { rx: metrics.netRxBytes, tx: metrics.netTxBytes }
+                    : null
+        };
+    } catch {
+        // Off, unreachable, or without a login Polaris can use.
+        return null;
+    }
+}
+
+/**
  * How much the containers on one machine have moved, as a counter that only goes
  * up.
  *
@@ -190,57 +305,71 @@ function advanceTraffic(
 }
 
 /**
- * Sample each server's load: how much of it the containers running on it are
- * using, against what the machine actually has.
+ * Sample each server's load: the whole machine, and what of it the containers
+ * running on it are using.
  *
- * Measured through the Docker daemon already reachable on that server rather
- * than by shelling in for `/proc` - it needs no extra privilege, works the same
- * for the local box and a remote host, and answers the question Watch is
- * actually asked, which is how hard a server is being worked.
+ * The machine is asked about itself first - `/proc` for the box Polaris runs in,
+ * the SSH probe for a registered server - because that is the only reading that
+ * exists on a server with nothing deployed on it yet. A server carrying no
+ * containers used to chart a flat zero under a panel reporting real load, which
+ * reads as monitoring that does not work rather than as a machine at rest.
+ *
+ * The containers are still read on the same tick: they are what the Containers
+ * screen serves, they carry the traffic counters where the machine cannot be
+ * asked for its own, and they answer for a box whose `/proc` is not readable.
  *
  * The local machine is sampled first, because a registered server can turn out to
  * be that same machine reached over SSH; one that is gets no second series of its
  * own (see `lib/local-machine`).
  */
 async function collectHosts(ts: Date): Promise<SampleRow[]> {
-    const hosts = await prisma.host.findMany({ select: { id: true, ownerId: true } });
+    const hosts = await prisma.host.findMany({
+        // The daemon it answered with last time, for a server that cannot be
+        // reached this tick but was already known to be this machine.
+        select: { id: true, ownerId: true, dockerId: true }
+    });
     const rows: SampleRow[] = [];
 
     const local = await sampleHost(LOCAL_HOST_SUBJECT, null, ts);
     if (local) {
         rows.push(local.row);
-        await recordLocalDockerId(local.dockerId);
+        if (local.dockerId) await recordLocalDockerId(local.dockerId);
     }
 
     for (const host of hosts) {
         const sample = await sampleHost(host.id, host.ownerId, ts);
         if (!sample) continue;
-        await recordHostDockerId(host.id, sample.dockerId);
+        if (sample.dockerId) await recordHostDockerId(host.id, sample.dockerId);
         // The same box, reached the long way round. Its load is already in this
         // tick under the local subject, and writing it again would produce a
         // second server that disagrees with the first about the same CPU.
-        if (local && sample.dockerId && sample.dockerId === local.dockerId) continue;
+        const daemon = sample.dockerId ?? host.dockerId;
+        if (local?.dockerId && daemon && daemon === local.dockerId) continue;
         rows.push(sample.row);
     }
     return rows;
 }
 
-/** One server's load this tick, plus which daemon answered. Null when the
- *  machine is unreachable or has no daemon. Each container it reads on the way is
- *  left in the Containers cache, so that screen has a reading to open on. */
-async function sampleHost(
+/** What the containers on one machine are using, added up, plus which daemon
+ *  answered. Null when the machine has no reachable daemon. Each container it
+ *  reads on the way is left in the Containers cache, so that screen has a reading
+ *  to open on rather than a second pass over the same daemon. */
+async function containersOn(
     subjectId: string,
-    ownerId: string | null,
-    ts: Date
-): Promise<{ row: SampleRow; dockerId: string } | null> {
+    ownerId: string | null
+): Promise<{
+    dockerId: string;
+    cores: number | null;
+    memTotalBytes: number | null;
+    cpuPercent: number;
+    memUsedBytes: number;
+    net: Map<string, { rx: number; tx: number }>;
+} | null> {
     let driver: DockerDriver | null = null;
     try {
         driver =
             ownerId === null ? localDockerDriver() : await hostDockerDriver(subjectId, ownerId);
         const info = await driver.info();
-        // What turns a service's share of this machine into cores, for billing.
-        // A failed write costs the reading nothing.
-        await recordMachineCores(subjectId, info.ncpu).catch(() => undefined);
         const running = (await driver.listContainers(false)).filter(
             (entry) => entry.state === "running"
         );
@@ -259,7 +388,7 @@ async function sampleHost(
             ownerId === null ? LOCAL_DOCKER_CONNECTION_ID : `${HOST_DOCKER_PREFIX}${subjectId}`;
         let cpu = 0;
         let memory = 0;
-        const readings = new Map<string, { rx: number; tx: number }>();
+        const net = new Map<string, { rx: number; tx: number }>();
         for (const container of running) {
             const stats = samples.get(container.id);
             // A container that stopped between the list and the read.
@@ -267,31 +396,19 @@ async function sampleHost(
             rememberSample(connectionId, [container.id, container.name], stats);
             cpu += stats.cpuPercent;
             memory += stats.memUsage;
-            readings.set(container.id, { rx: stats.netRx, tx: stats.netTx });
+            net.set(container.id, { rx: stats.netRx, tx: stats.netTx });
         }
-        const moved = advanceTraffic(subjectId, readings);
-        // Only the machine Polaris is installed on: a server reached over SSH has
-        // no filesystem this process can ask about, so its storage stays unmeasured
-        // rather than being answered with this box's disk.
-        const disk = ownerId === null ? await localDisk() : null;
         return {
             dockerId: info.id,
-            row: {
-                subjectType: "host",
-                subjectId,
-                ts,
-                // Already a share of the machine per container, so this sum is one
-                // too and needs no core count. Clamped anyway: the samples are read
-                // one container at a time over a moment, and a busy box can hand
-                // back a set that adds up to a hair over the whole machine.
-                cpuPercent: round2(Math.min(100, cpu)),
-                memUsedBytes: bigBytes(memory),
-                memTotalBytes: bigBytes(info.memTotal),
-                diskUsedBytes: bigBytes(disk?.used),
-                diskTotalBytes: bigBytes(disk?.total),
-                netRxBytes: moved.rx,
-                netTxBytes: moved.tx
-            }
+            cores: info.ncpu || null,
+            memTotalBytes: info.memTotal,
+            // Already a share of the machine per container, so this sum is one
+            // too and needs no core count. Clamped anyway: the samples are read
+            // one container at a time over a moment, and a busy box can hand
+            // back a set that adds up to a hair over the whole machine.
+            cpuPercent: round2(Math.min(100, cpu)),
+            memUsedBytes: memory,
+            net
         };
     } catch {
         // Daemon absent or host unreachable this tick.
@@ -299,6 +416,59 @@ async function sampleHost(
     } finally {
         if (driver) await driver.dispose().catch(() => undefined);
     }
+}
+
+/**
+ * One server's load this tick, plus which daemon answered if one did.
+ *
+ * The machine's own reading wins every column it could fill, and the containers
+ * answer for the rest: a box whose `/proc` cannot be read or whose login does not
+ * work is still measured for what Polaris runs on it, which is what this used to
+ * be able to say and all it could say.
+ *
+ * Null only when neither could be read at all - that is a server that is off, and
+ * a gap in its chart is the truth about it.
+ */
+async function sampleHost(
+    subjectId: string,
+    ownerId: string | null,
+    ts: Date
+): Promise<{ row: SampleRow; dockerId: string | null } | null> {
+    const [machine, containers] = await Promise.all([
+        ownerId === null ? localMachine() : probedMachine(subjectId, ownerId),
+        containersOn(subjectId, ownerId)
+    ]);
+    if (!machine && !containers) return null;
+
+    // What turns a service's share of this machine into cores, for billing. A
+    // failed write costs the reading nothing.
+    const cores = containers?.cores ?? machine?.cores ?? null;
+    if (cores) await recordMachineCores(subjectId, cores).catch(() => undefined);
+
+    // One source or the other, never both added together: the machine's counters
+    // already include everything its containers moved. `advanceTraffic` keeps its
+    // own total per server, so a machine that stops answering and leaves this
+    // falling back to its containers contributes nothing that tick instead of the
+    // difference between two unrelated counters.
+    const moved = advanceTraffic(
+        subjectId,
+        machine?.net ? new Map([["machine", machine.net]]) : (containers?.net ?? new Map())
+    );
+    return {
+        dockerId: containers?.dockerId ?? null,
+        row: {
+            subjectType: "host",
+            subjectId,
+            ts,
+            cpuPercent: machine?.cpuPercent ?? containers?.cpuPercent ?? null,
+            memUsedBytes: bigBytes(machine?.memUsedBytes ?? containers?.memUsedBytes),
+            memTotalBytes: bigBytes(machine?.memTotalBytes ?? containers?.memTotalBytes),
+            diskUsedBytes: bigBytes(machine?.disk?.used),
+            diskTotalBytes: bigBytes(machine?.disk?.total),
+            netRxBytes: moved.rx,
+            netTxBytes: moved.tx
+        }
+    };
 }
 
 /**

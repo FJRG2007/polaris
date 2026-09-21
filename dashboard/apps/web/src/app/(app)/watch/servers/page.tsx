@@ -13,7 +13,7 @@ export default async function WatchServersPage() {
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <PageHeader
                 title="Servers"
-                description="Load on every server Polaris can reach, sampled from the containers running on it."
+                description="Load on every server Polaris can reach, read from the machine itself."
             />
             <WatchCardList
                 cards={servers}

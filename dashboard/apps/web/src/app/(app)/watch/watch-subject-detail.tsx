@@ -137,7 +137,7 @@ export function WatchSubjectDetail({
                     <MetricsHistory endpoint={endpoint} live={live} metrics={metrics} />
                     <p className="text-xs text-muted-foreground">
                         {kind === "server"
-                            ? "Measured from the containers running on this server, against what the machine has."
+                            ? "Read from the machine itself, not only from what Polaris runs on it."
                             : "Measured from the service's own container."}
                     </p>
                 </div>

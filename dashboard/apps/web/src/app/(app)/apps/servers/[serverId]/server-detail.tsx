@@ -242,8 +242,7 @@ export function ServerDetail({
                             metrics={CONSUMPTION_METRICS}
                         />
                         <p className="text-xs text-muted-foreground">
-                            Measured from the containers running on this server, against what the
-                            machine has.{" "}
+                            Read from the machine itself, not only from what Polaris runs on it.{" "}
                             {/* The Storage figure is the one people arrive at with a
                                 question the chart cannot answer: 89 GB of what. */}
                             {server.kind === "local" ? (

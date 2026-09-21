@@ -19,6 +19,8 @@ const LINUX = [
     "mem_available=8388608000",
     "disk_total=105086976000",
     "disk_used=59797504000",
+    "net_rx=903000000",
+    "net_tx=41000000",
     "container=polaris-web-56\t12.34%\t512MiB / 1.94GiB",
     "container=polaris-postgres-1\t3.10%\t128.5MiB / 1.94GiB",
     "process=99.0\t2048\tstress-ng",
@@ -38,6 +40,21 @@ describe("parseProbe", () => {
     // or a healthy machine reads as nearly out of memory.
     it("reports memory as total minus available", () => {
         expect(parseProbe(LINUX).memoryUsedBytes).toBe(8388608000);
+    });
+
+    // A counter, not a rate: what the chart needs is the difference between two
+    // of these, so a reading that arrives as a float in scientific notation is
+    // a reading nobody can difference.
+    it("reads the machine's traffic counters as whole numbers of bytes", () => {
+        const metrics = parseProbe(LINUX);
+        expect(metrics.netRxBytes).toBe(903000000);
+        expect(metrics.netTxBytes).toBe(41000000);
+    });
+
+    it("leaves traffic missing on a machine that did not report it", () => {
+        const metrics = parseProbe("os=Alpine Linux v3.20\n");
+        expect(metrics.netRxBytes).toBeNull();
+        expect(metrics.netTxBytes).toBeNull();
     });
 
     it("ranks whatever is heaviest first, container or process alike", () => {
