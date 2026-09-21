@@ -404,22 +404,42 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
      * a re-render deciding to ring the same call again asks nobody a second time.
      */
     const sounding = showing.find((entry) => !silenced.includes(entry.meetingId))?.meetingId ?? null;
+    /**
+     * Which tab of this device answers for a call: its sound AND its notice.
+     *
+     * One claim for both, because they are one decision. With a claim each they
+     * could fall to different tabs, and then the tab ringing and the tab drawing
+     * the notice each believed the other was making the sound: the ringing tab
+     * was one the browser had never let start its audio, the notice tab could
+     * have made a noise and stayed silent because "the ring is already
+     * sounding", and the call arrived in silence. Whoever holds this knows
+     * whether its own ring can be heard, which is the only place that question
+     * has an answer.
+     */
     const mine = useRef(new Map<string, Promise<boolean>>());
+    const alertClaim = useCallback(
+        (meetingId: string): Promise<boolean> => {
+            const held = mine.current.get(meetingId);
+            if (held) return held;
+            const claim = claimForDevice(`${scope}:ring:${meetingId}`, RING_FOR_MS);
+            mine.current.set(meetingId, claim);
+            return claim;
+        },
+        [scope]
+    );
+
     useEffect(() => {
         if (!sounding) return;
-        const claim =
-            mine.current.get(sounding) ?? claimForDevice(`${scope}:ring:${sounding}`, RING_FOR_MS);
-        mine.current.set(sounding, claim);
         let stop: (() => void) | null = null;
         let dropped = false;
-        void claim.then((ours) => {
+        void alertClaim(sounding).then((ours) => {
             if (ours && !dropped) stop = startRinging("ring");
         });
         return () => {
             dropped = true;
             stop?.();
         };
-    }, [scope, sounding]);
+    }, [alertClaim, sounding]);
 
     /**
      * Reach past the browser window.
@@ -444,7 +464,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
             // Marked before the claim and the permission prompt resolve, so a
             // second frame does not raise a second notice for the same call.
             notices.current.set(entry.meetingId, { close: () => undefined });
-            void claimForDevice(`${scope}:call-notice:${entry.meetingId}`, RING_FOR_MS).then(
+            void alertClaim(entry.meetingId).then(
                 (ours) => {
                     if (!ours) return;
                     return notifyDesktop({
@@ -482,7 +502,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
         for (const meetingId of mine.current.keys()) {
             if (!live.has(meetingId)) mine.current.delete(meetingId);
         }
-    }, [scope, showing, silenced]);
+    }, [alertClaim, showing, silenced]);
 
     // Nothing outlives the screen: a notice left behind by a page that has gone
     // is one nobody can dismiss from inside Polaris.

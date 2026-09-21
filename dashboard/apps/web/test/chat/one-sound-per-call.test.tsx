@@ -58,6 +58,16 @@ vi.mock("@/lib/call-sounds", () => ({
 
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({ callElsewhereAction: async () => null }));
 
+/** Every claim this tab asked its device for. */
+let claims: string[] = [];
+
+vi.mock("@/lib/device-once", () => ({
+    claimForDevice: async (key: string) => {
+        claims.push(key);
+        return true;
+    }
+}));
+
 const ring = {
     kind: "call",
     state: "ringing",
@@ -71,6 +81,7 @@ const ring = {
 beforeEach(() => {
     onFrame = null;
     notices = [];
+    claims = [];
     audible = true;
     // No localStorage in this environment, which is the state `device-once`
     // treats as a device of one tab: the claim resolves and the notice is drawn.
@@ -91,6 +102,21 @@ describe("a call arriving while nobody is looking at the tab", () => {
 
         await vi.waitFor(() => expect(notices).toHaveLength(1));
         expect(notices[0]?.sound).toBe(true);
+    });
+
+    it("answers for the sound and the notice with one claim", async () => {
+        // With a claim each they could fall to different tabs of one device, and
+        // then each believed the other was making the sound: the ringing tab was
+        // one whose audio the browser had never allowed, the notice tab stayed
+        // silent because "the ring is already sounding", and the call arrived in
+        // silence. Whoever holds this knows whether its own ring can be heard.
+        render(<IncomingCalls viewerId="ada" />);
+
+        await act(async () => onFrame?.(ring, { owner: true }));
+
+        await vi.waitFor(() => expect(notices).toHaveLength(1));
+        expect(new Set(claims).size).toBe(1);
+        expect(claims[0]).toContain("m1");
     });
 
     it("keeps the notice silent when the ring is already sounding", async () => {
