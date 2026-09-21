@@ -79,7 +79,16 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
             <p className="text-sm text-muted-foreground">{core.CHAT_RULE_SCOPE_NOTES[scope]}</p>
 
             <Card>
-                <CardBody className="flex flex-col gap-5 p-4">
+                {/* Keyed by scope, which is what makes the fields belong to the
+                    tab above them. A number field holds the text it is being
+                    typed into - it has to, or a half-typed "1" is read as the
+                    limit - and that text was seeded once and never taken back,
+                    so switching tab left the previous scope's numbers on screen
+                    under the new scope's name. A limit set to 100 under one tab
+                    then read as saved under another, with 25 still stored. The
+                    drafts live above these fields, so remounting them shows this
+                    scope's own draft rather than losing anything. */}
+                <CardBody key={scope} className="flex flex-col gap-5 p-4">
                     <Limit
                         label="Longest message"
                         hint="Characters. Somebody with more to say than this has a note or a snippet."
