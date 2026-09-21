@@ -11,13 +11,41 @@
 
 import type { PickedFile } from "./picked-file";
 
-export async function asFiles(picked: readonly PickedFile[]): Promise<{ files: File[]; failed: string[] }> {
+/** A file left where it is, for a screen that can send where rather than what. */
+export interface KeptPick {
+    readonly connectionId: string;
+    readonly path: string;
+    readonly name: string;
+    readonly size: number;
+}
+
+/**
+ * @param keepDrive - Leave the picks that are already on a storage alone, and
+ *   hand back where they are instead of their bytes. For a screen that can send
+ *   a reference: fetching a file out of Polaris so the browser can upload it
+ *   back into Polaris is a round trip of the whole file for nothing, and it is
+ *   what makes a big file impossible to share at all.
+ */
+export async function asFiles(
+    picked: readonly PickedFile[],
+    keepDrive = false
+): Promise<{ files: File[]; kept: KeptPick[]; failed: string[] }> {
     const files: File[] = [];
+    const kept: KeptPick[] = [];
     const failed: string[] = [];
 
     for (const one of picked) {
         if (one.kind === "upload") {
             files.push(one.file);
+            continue;
+        }
+        if (one.kind === "drive" && keepDrive) {
+            kept.push({
+                connectionId: one.connectionId,
+                path: one.path,
+                name: one.name,
+                size: one.size
+            });
             continue;
         }
         const url =
@@ -39,5 +67,5 @@ export async function asFiles(picked: readonly PickedFile[]): Promise<{ files: F
             failed.push("That file could not be fetched.");
         }
     }
-    return { files, failed };
+    return { files, kept, failed };
 }

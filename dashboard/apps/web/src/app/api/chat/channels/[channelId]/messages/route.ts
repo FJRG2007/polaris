@@ -22,12 +22,57 @@ import * as core from "@polaris/core";
 import { send } from "@/lib/chat/messages";
 
 import { rulesForChannel } from "@/lib/chat/rules";
+import { driveShare } from "@/lib/chat/drive-share";
+import {
+    AttachRefused,
+    fileFromDrive,
+    referenceFromDrive
+} from "@/lib/attachments/from-elsewhere";
 import { ChatAccessError, requirePostable } from "@/lib/chat/access";
 import {
     AttachmentStorageError,
+    borrowedAttachment,
     storeAttachment,
     type StoredAttachment
 } from "@/lib/chat/attachments";
+
+/**
+ * The Drive files a message is sharing, as the composer lists them.
+ *
+ * A JSON array of `{ c, p }` - a storage connection and a path on it - and
+ * nothing else: no name, no size, no type. Everything about the file is read from
+ * the storage itself under the sender's own authorization, because a client that
+ * could name the size of a file it is sharing could name a different one.
+ *
+ * Silent about anything malformed. This arrives from a browser, and a message
+ * with an unreadable reference on it is a message to send without that reference
+ * rather than a request to refuse - the composer shows what went on it.
+ */
+function readBorrowed(raw: FormDataEntryValue | null): { connectionId: string; path: string }[] {
+    if (typeof raw !== "string" || raw.trim().length === 0) return [];
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        return [];
+    }
+    if (!Array.isArray(parsed)) return [];
+    const out: { connectionId: string; path: string }[] = [];
+    for (const entry of parsed.slice(0, MOST_BORROWED)) {
+        if (typeof entry !== "object" || entry === null) continue;
+        const held = entry as Record<string, unknown>;
+        const connectionId = typeof held.c === "string" ? held.c.trim() : "";
+        const path = typeof held.p === "string" ? held.p.trim() : "";
+        if (connectionId.length === 0 || path.length === 0) continue;
+        out.push({ connectionId, path });
+    }
+    return out;
+}
+
+/** A ceiling on the list itself, before the rules are consulted: the rules cap
+ *  how many files a message carries, and this caps how much work a malformed
+ *  request can ask for while that is being worked out. */
+const MOST_BORROWED = 50;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -93,6 +138,12 @@ export async function POST(
         if (caught instanceof ChatAccessError) {
             return Response.json({ error: caught.message }, { status: 403 });
         }
+        // A file from Drive that is not theirs, or is a folder, or would not read.
+        // Said in the words `borrowAttachment` chose: they name nothing but the
+        // file the sender picked.
+        if (caught instanceof AttachRefused) {
+            return Response.json({ error: caught.message }, { status: 400 });
+        }
         throw caught;
     }
 
@@ -130,14 +181,25 @@ export async function POST(
             .map((entry) => Number.parseInt(entry, 10))
             .filter((entry) => Number.isInteger(entry))
     );
-    if (files.length === 0 && !fields.data.body) {
+    // Files the sender already has in Drive: what travels is where to find them,
+    // never the bytes. The browser downloading a file out of one screen of
+    // Polaris so it can upload it into another was the whole of what this
+    // replaces, and it is why the ceiling used to refuse a file the Drive was
+    // holding perfectly well.
+    //
+    // What happens to them is the instance's choice and it is made here, not in
+    // the composer: copied into the conversation's own store (the default, read
+    // from the storage by this server), or left where they are and pointed at.
+    const borrowed = readBorrowed(form.get("borrowed"));
+    const share = borrowed.length > 0 ? await driveShare() : "copy";
+    if (files.length === 0 && borrowed.length === 0 && !fields.data.body) {
         return Response.json({ error: "Write something, or attach a file" }, { status: 400 });
     }
     // Whether this account may put files in a conversation at all, which is a
     // grant rather than a rule: the rules below are the instance's ceiling for
     // everybody, and this is one account's standing. Asked before a byte is
     // read off the request.
-    if (files.length > 0 && !(await can(user.id, "chat.attach"))) {
+    if ((files.length > 0 || borrowed.length > 0) && !(await can(user.id, "chat.attach"))) {
         return Response.json(
             { error: "You are not allowed to send files here" },
             { status: 403 }
@@ -147,10 +209,10 @@ export async function POST(
     // per kind of conversation: an operator may reasonably allow a screenshot in
     // a channel and nothing at all in a direct message.
     const rules = await rulesForChannel(channelId);
-    if (files.length > 0 && rules.maxAttachments === 0) {
+    if ((files.length > 0 || borrowed.length > 0) && rules.maxAttachments === 0) {
         return Response.json({ error: "Files cannot be sent here" }, { status: 400 });
     }
-    if (files.length > rules.maxAttachments) {
+    if (files.length + borrowed.length > rules.maxAttachments) {
         return Response.json(
             { error: `That is more than ${rules.maxAttachments} files` },
             { status: 400 }
@@ -181,6 +243,38 @@ export async function POST(
                     await posterBytes(posters[at]),
                     covered.has(at)
                 )
+            );
+        }
+        // After the uploads and in the order they were listed, so the message
+        // carries them in the order the composer showed.
+        for (const [at, reference] of borrowed.entries()) {
+            const spoiler = covered.has(files.length + at);
+            stored.push(
+                share === "link"
+                    ? borrowedAttachment(
+                          await referenceFromDrive(
+                              user.id,
+                              reference.connectionId,
+                              reference.path
+                          ),
+                          spoiler
+                      )
+                    : // A copy, made where the bytes already are. The ceiling is
+                      // applied by the read itself, so a file too big to store is
+                      // refused in the words the reader needs rather than after a
+                      // download nobody watched.
+                      await storeAttachment(
+                          channelId,
+                          await fileFromDrive(
+                              user.id,
+                              reference.connectionId,
+                              reference.path,
+                              biggest
+                          ),
+                          undefined,
+                          null,
+                          spoiler
+                      )
             );
         }
 
@@ -229,6 +323,10 @@ export async function POST(
 }
 
 async function removeQuietly(file: StoredAttachment): Promise<void> {
+    // Never a borrowed one. Nothing was written for it - what was stored is where
+    // to find somebody's own file - so "clean up what this send wrote" would
+    // reach into their Drive and delete it because a message failed to send.
+    if (file.borrowed) return;
     const { driverForTarget, LOCAL_TARGET } = await import("@/lib/storage-target");
     const driver = await driverForTarget(file.connectionId ?? LOCAL_TARGET, "chat").catch(
         () => null

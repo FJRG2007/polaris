@@ -28,6 +28,62 @@ export interface FetchedFile {
     readonly bytes: Uint8Array;
 }
 
+/** Where a file is, once it is known to be a file this reader may share. */
+export interface FileReference {
+    readonly connectionId: string;
+    readonly path: string;
+    readonly name: string;
+    readonly size: number;
+}
+
+/**
+ * A file on one of this reader's storages, without its bytes.
+ *
+ * For sharing a file where it already lies rather than copying it: what the
+ * caller gets is where to find it and how big it is, and no byte is read. The
+ * authorization is the same guard and the same path as `fileFromDrive` - a
+ * reference nobody checked would be a way to publish any path on any storage by
+ * naming it - and what follows from passing it is that the file is then served to
+ * whoever can read the thing it was attached to. Attaching is publishing, which
+ * was just as true of a copy.
+ *
+ * No ceiling, deliberately. A ceiling limits what this server stores, and this
+ * stores nothing.
+ */
+export async function referenceFromDrive(
+    userId: string,
+    connectionId: string,
+    rawPath: string
+): Promise<FileReference> {
+    let path: string;
+    try {
+        path = normalizeRelPath(rawPath);
+    } catch {
+        throw new AttachRefused("That file could not be attached.");
+    }
+
+    const driver = await requireDriveDriver(userId, connectionId, path, "download").catch(
+        () => null
+    );
+    if (!driver) throw new AttachRefused("That file is not yours to share.");
+
+    try {
+        const stat = await driver.stat(path);
+        if (stat.kind !== "file") throw new AttachRefused("That is a folder, not a file.");
+        return {
+            connectionId,
+            path,
+            name: path.split("/").at(-1) || "attachment",
+            size: Number(stat.size ?? 0)
+        };
+    } catch (caught) {
+        if (caught instanceof AttachRefused) throw caught;
+        throw new AttachRefused("That file could not be read just now.");
+    } finally {
+        await driver.dispose().catch(() => undefined);
+    }
+}
+
 /**
  * A file on one of this reader's storages.
  *

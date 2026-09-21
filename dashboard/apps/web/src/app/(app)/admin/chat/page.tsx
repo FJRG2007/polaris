@@ -9,12 +9,18 @@ import { ChatRulesView } from "./chat-rules-view";
 import { CallServerView } from "./call-server-view";
 import { OrgChatView } from "./org-chat-view";
 import { orgChatOffered } from "@/lib/chat/isolation";
+import { driveShare } from "@/lib/chat/drive-share";
+import { DriveShareView } from "./drive-share-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChatRulesPage() {
     await requireAdmin();
-    const [rules, offered] = await Promise.all([allChatRules(), orgChatOffered()]);
+    const [rules, offered, share] = await Promise.all([
+        allChatRules(),
+        orgChatOffered(),
+        driveShare()
+    ]);
 
     return (
         // A column of settings and nothing wide, centred the way the rest of the
@@ -26,6 +32,12 @@ export default async function ChatRulesPage() {
                 description="How long a message may be, what it may carry, how long it stays editable, and what a deleted one leaves behind. Answered separately for spaces, group chats and direct messages."
             />
             <ChatRulesView initial={rules} />
+            {/* Beside the size limit it qualifies: the limit is about what this
+                instance stores, and this is what decides whether sending a file
+                stores anything at all. */}
+            <div className="mt-8">
+                <DriveShareView how={share} />
+            </div>
             {/* Under the rules and above the call server: it is a house rule
                 like the ones over it, and it is asked about far more often than
                 where calls run. */}

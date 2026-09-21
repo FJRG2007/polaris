@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { setChatRules } from "@/lib/chat/rules";
 import { setOrgChatOffered } from "@/lib/chat/isolation";
+import { isDriveShare, setDriveShare } from "@/lib/chat/drive-share";
 import * as calls from "@/lib/chat/call-server";
 import { recordAudit } from "@/lib/audit-service";
 import { syncCallServerRoute } from "@/lib/chat/call-edge";
@@ -38,6 +39,28 @@ export async function setChatRulesAction(
         targetType: "setting",
         targetId: `chat.rules.${chosen}`,
         metadata: { ...parsed.data }
+    });
+    revalidatePath("/admin/chat");
+    return {};
+}
+
+/**
+ * Choose what happens to a file somebody sends out of their Drive.
+ *
+ * Only what happens next. Messages already sent keep whatever they were given -
+ * a copy stays a copy and a link stays a link - because this decides how bytes
+ * are handled, not what was promised about the ones already handled.
+ */
+export async function setDriveShareAction(how: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    if (!isDriveShare(how)) return { error: "That is not a way to share a file" };
+    await setDriveShare(how);
+    await recordAudit({
+        actorId: admin.id,
+        action: "chat.driveShare.set",
+        targetType: "setting",
+        targetId: "chat.driveShare",
+        metadata: { how }
     });
     revalidatePath("/admin/chat");
     return {};

@@ -88,11 +88,16 @@ function SentFile({
                 download={file.name}
                 className={chip}
             >
-                <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                {file.borrowed ? (
+                    <HardDrive className="size-3.5 shrink-0 text-muted-foreground" />
+                ) : (
+                    <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                )}
                 <span className="max-w-[16rem] truncate" title={file.name}>
                     {file.name}
                 </span>
                 <span className="shrink-0 text-muted-foreground">{readableSize(file.size)}</span>
+                {file.borrowed && <DriveMark />}
             </a>
         );
     }
@@ -107,9 +112,14 @@ function SentFile({
                     onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at })
                 }
             >
-                <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+                {file.borrowed ? (
+                    <HardDrive className="size-3.5 shrink-0 text-muted-foreground" />
+                ) : (
+                    <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+                )}
                 <span className="max-w-[16rem] truncate">{file.name}</span>
                 <span className="shrink-0 text-muted-foreground">{readableSize(file.size)}</span>
+                {file.borrowed && <DriveMark />}
             </button>
             <a
                 href={`/api/chat/attachments/${file.id}?download=1`}
@@ -148,6 +158,7 @@ import {
     CornerUpLeft,
     Download,
     FileText,
+    HardDrive,
     MessageSquare,
     Paperclip,
     Pencil,
@@ -1872,6 +1883,26 @@ function withinWindow(left: string, right: string): boolean {
 }
 
 /** A size somebody can read at a glance. */
+/**
+ * That this file is not the conversation's own.
+ *
+ * It lives in whoever sent it's Drive, so it is one thing a copy never is:
+ * changeable. The owner can edit it and everybody then reads the new one under
+ * the old sentence, or delete it and leave the message pointing at nothing. Two
+ * words on the chip, because the alternative is a reader discovering it from a
+ * download that fails.
+ */
+function DriveMark() {
+    return (
+        <span
+            className="shrink-0 text-muted-foreground"
+            title="This file lives in the sender's Drive. They can change it or remove it."
+        >
+            in Drive
+        </span>
+    );
+}
+
 function readableSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;

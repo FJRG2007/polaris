@@ -23,7 +23,7 @@
 
 import * as core from "@polaris/core";
 import { EmojiPicker } from "./emoji-picker";
-import { asFiles } from "@/components/file-picker/as-files";
+import { asFiles, type KeptPick } from "@/components/file-picker/as-files";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { ClipDialog } from "./clip-dialog";
@@ -52,6 +52,7 @@ import {
     CornerUpLeft,
     Eye,
     EyeOff,
+    HardDrive,
     Image as ImageIcon,
     Mic,
     MicOff,
@@ -95,6 +96,7 @@ export function Composer({
     onCancelReply,
     onTyping,
     onSend,
+    canShareFromDrive = false,
     onSchedule,
     onPoll,
     onMedia,
@@ -206,9 +208,13 @@ export function Composer({
         body: string,
         files: readonly File[],
         sounds?: readonly RecordedSound[],
-        /** Which of those arrive covered, by position in `files`. Empty for
-         *  nearly every message ever sent - see the `Spoiler` component. */
-        spoilers?: readonly number[]
+        /** Which of those arrive covered, by position in `files` and then in
+         *  `fromDrive`. Empty for nearly every message ever sent - see the
+         *  `Spoiler` component. */
+        spoilers?: readonly number[],
+        /** Files that stay where they are: what travels is where to find them.
+         *  Only ever set for a caller that said it can carry them. */
+        fromDrive?: readonly KeptPick[]
     ) => void | Promise<void>;
     /**
      * The same message, at an hour that has not happened yet.
@@ -232,6 +238,17 @@ export function Composer({
      * the only place the person can read it.
      */
     onPoll?: (draft: PollDraft) => Promise<{ error?: string }>;
+    /**
+     * Whether this caller can send a file that stays where it is.
+     *
+     * A pick out of Drive is a place, not bytes. Where the caller can carry that
+     * - the conversation can - it is sent as a place: nothing is downloaded into
+     * this browser and uploaded back, which is a round trip of the whole file for
+     * nothing and what made a big one impossible to share. Where it cannot - a
+     * task's comment box, a meeting's chat - the bytes are fetched as before,
+     * because silently dropping the file would be worse than copying it.
+     */
+    canShareFromDrive?: boolean;
     /** A GIF or sticker chosen from the picker. Its own path rather than a
      *  staged file: it is already somewhere, and it is the whole message. */
     onMedia?: (address: string) => void | Promise<void>;
@@ -243,10 +260,17 @@ export function Composer({
 }) {
     const [body, setBody] = useState("");
     const [files, setFiles] = useState<readonly File[]>([]);
+    /** Picks that are staying where they are. Held apart from `files` because
+     *  there are no bytes to hold: what is sent is where to find them. */
+    const [kept, setKept] = useState<readonly KeptPick[]>([]);
     /** Which of the staged files were marked to arrive covered, by index. Kept
      *  beside the list rather than on it, because a `File` is the browser's own
      *  object and not somewhere to write a decision. */
     const [covered, setCovered] = useState<ReadonlySet<number>>(() => new Set());
+    /** The same, for the ones staying where they are. A second set rather than
+     *  one over both lists: the two are held apart, and an index into a list
+     *  that does not hold it is how a mark lands on the wrong file. */
+    const [coveredKept, setCoveredKept] = useState<ReadonlySet<number>>(() => new Set());
     const [refused, setRefused] = useState("");
     const [picking, setPicking] = useState(false);
     /** Whether the "when" dialog is open, and what the server said about the
@@ -495,18 +519,26 @@ export function Composer({
         const text = isBlankMarkdown(value) ? "" : value.trim();
         // A message that is only a file is a message. Making somebody type
         // "here" before they can send a screenshot is a tax on the common case.
-        if (disabled || tooLong || (!text && files.length === 0)) return;
+        if (disabled || tooLong || (!text && files.length === 0 && kept.length === 0)) return;
         const sending = files;
-        const hidden = [...covered].sort((one, other) => one - other);
+        const staying = kept;
+        // The marks over both lists, in the order the server reads them: the
+        // uploads first and then the ones staying where they are.
+        const hidden = [
+            ...covered,
+            ...[...coveredKept].map((at) => sending.length + at)
+        ].sort((one, other) => one - other);
         setBody("");
         setFiles([]);
+        setKept([]);
         setCovered(new Set());
+        setCoveredKept(new Set());
         setRefused("");
         emptyTheBox();
         // It is somewhere that is not a browser now.
         if (draftKey && !editing) dropDraft(draftKey);
         if (editing && onSaveEdit) await onSaveEdit(editing.id, text);
-        else await onSend(text, sending, undefined, hidden);
+        else await onSend(text, sending, undefined, hidden, staying);
     };
 
     /**
@@ -612,9 +644,36 @@ export function Composer({
      * this composer already knows how to stage.
      */
     const takePicked = async (picked: readonly PickedFile[]): Promise<void> => {
-        const { files: got, failed } = await asFiles(picked);
+        const { files: got, kept: staying, failed } = await asFiles(picked, canShareFromDrive);
         if (failed.length > 0) setRefused(failed[0] ?? "");
         if (got.length > 0) stage(got);
+        if (staying.length > 0) keep(staying);
+    };
+
+    /**
+     * Stage files that are staying where they are.
+     *
+     * The count is the message's, shared with the uploads - a message carries so
+     * many files and it does not matter where each of them lives. The size is
+     * deliberately not checked: nothing is being stored, and whether this
+     * instance copies these or points at them is its own setting, answered by
+     * the server when the message is sent.
+     */
+    const keep = (staying: readonly KeptPick[]): void => {
+        if (!attachable) {
+            setRefused("You are not allowed to send files here.");
+            return;
+        }
+        const room = Math.max(0, rules.maxAttachments - files.length - kept.length);
+        const accepted = staying.slice(0, room);
+        if (accepted.length < staying.length) {
+            setRefused(
+                rules.maxAttachments === 0
+                    ? "Files cannot be sent here."
+                    : `A message can carry ${rules.maxAttachments} files.`
+            );
+        }
+        if (accepted.length > 0) setKept((current) => [...current, ...accepted]);
     };
 
     const stage = (picked: ArrayLike<File> | null): number => {
@@ -626,7 +685,7 @@ export function Composer({
             return 0;
         }
         const chosen = Array.from(picked);
-        const room = Math.max(0, rules.maxAttachments - files.length);
+        const room = Math.max(0, rules.maxAttachments - files.length - kept.length);
         const small = chosen.filter((file) => file.size <= maxBytes);
         const accepted = small.slice(0, room);
 
@@ -763,7 +822,7 @@ export function Composer({
                 </p>
             )}
 
-            {files.length > 0 && (
+            {(files.length > 0 || kept.length > 0) && (
                 <ul className="mb-2 flex flex-wrap items-end gap-2">
                     {files.map((file, index) => (
                         <StagedFile
@@ -783,6 +842,32 @@ export function Composer({
                                 // The marks are by position, so removing one
                                 // shifts every mark after it.
                                 setCovered((current) => {
+                                    const next = new Set<number>();
+                                    for (const at of current) {
+                                        if (at < index) next.add(at);
+                                        else if (at > index) next.add(at - 1);
+                                    }
+                                    return next;
+                                });
+                            }}
+                        />
+                    ))}
+                    {kept.map((one, index) => (
+                        <StagedFromDrive
+                            key={`${one.connectionId}:${one.path}`}
+                            kept={one}
+                            covered={coveredKept.has(index)}
+                            onCover={() =>
+                                setCoveredKept((current) => {
+                                    const next = new Set(current);
+                                    if (next.has(index)) next.delete(index);
+                                    else next.add(index);
+                                    return next;
+                                })
+                            }
+                            onRemove={() => {
+                                setKept((current) => current.filter((_, at) => at !== index));
+                                setCoveredKept((current) => {
                                     const next = new Set<number>();
                                     for (const at of current) {
                                         if (at < index) next.add(at);
@@ -1374,6 +1459,59 @@ const WATCHABLE = new Set(["video/mp4", "video/webm", "video/ogg"]);
 
 /** A size somebody can read at a glance. Not the display-format helper: that one
  *  writes dates and money, and a file size is neither. */
+/**
+ * One staged file that is staying where it is.
+ *
+ * No preview and no player, because there are no bytes here to draw one from -
+ * which is the point of it. What it says instead is where the file lives, so
+ * nobody wonders why this row looks different from the one beside it: a message
+ * carrying one of these carries a way to reach somebody's file rather than a copy
+ * of it, and the conversation says the same thing again once it is sent.
+ */
+function StagedFromDrive({
+    kept,
+    covered,
+    onCover,
+    onRemove
+}: {
+    kept: KeptPick;
+    covered: boolean;
+    onCover: () => void;
+    onRemove: () => void;
+}) {
+    return (
+        <li className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
+            <HardDrive className="size-3 shrink-0 text-muted-foreground" />
+            <span className="max-w-[12rem] truncate" title={`${kept.name} - in your Drive`}>
+                {kept.name}
+            </span>
+            <span className="text-muted-foreground">{readableSize(kept.size)}</span>
+            <button
+                type="button"
+                aria-pressed={covered}
+                aria-label={covered ? `Send ${kept.name} uncovered` : `Send ${kept.name} as a spoiler`}
+                title={covered ? "Sent as a spoiler" : "Send as a spoiler"}
+                onClick={onCover}
+                className={cn(
+                    "rounded p-0.5 transition-colors",
+                    covered ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                )}
+            >
+                {covered ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+            </button>
+            <button
+                type="button"
+                aria-label={`Remove ${kept.name}`}
+                title="Remove"
+                onClick={onRemove}
+                className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+            >
+                <X className="size-3" />
+            </button>
+        </li>
+    );
+}
+
 function readableSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;

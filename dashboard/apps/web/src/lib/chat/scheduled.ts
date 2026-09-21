@@ -222,7 +222,8 @@ const rowForSending = {
             waveform: true,
             posterPath: true,
             posterConnectionId: true,
-            spoiler: true
+            spoiler: true,
+            borrowed: true
         }
     }
 } as const;
@@ -246,6 +247,7 @@ interface SendableRow {
         posterPath: string | null;
         posterConnectionId: string | null;
         spoiler: boolean;
+        borrowed: boolean;
     }[];
 }
 
@@ -266,6 +268,7 @@ async function deliver(row: SendableRow): Promise<void> {
         connectionId: file.connectionId,
         path: file.path,
         spoiler: file.spoiler,
+        borrowed: file.borrowed,
         durationMs: file.durationMs,
         waveform: file.waveform,
         posterPath: file.posterPath,

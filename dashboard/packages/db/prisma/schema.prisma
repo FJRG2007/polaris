@@ -8367,6 +8367,14 @@ model ChatAttachment {
     connectionId String?  @db.Uuid
     // Where it landed, as that storage addresses it.
     path         String
+    // Whether the bytes belong to somebody else: a file shared out of a Drive
+    // rather than copied into the conversation. Three things follow from it and
+    // none of them is cosmetic. Polaris never deletes the file when the message
+    // goes, because it was never Polaris's to delete. The size ceiling does not
+    // apply, because nothing was stored. And the file can be edited or removed
+    // by its owner under the message that points at it, which the conversation
+    // says out loud rather than showing a broken download.
+    borrowed     Boolean  @default(false)
     // How long it plays for, when it is something that plays and the browser
     // that recorded it said so. Kept rather than worked out on the way in: a
     // recording made in a browser carries no duration in its container, so the

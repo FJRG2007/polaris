@@ -49,6 +49,7 @@ import { useChatStream } from "./use-chat-stream";
 import { useVoiceSettings } from "./voice-settings";
 import { useCloseOnEscape } from "./close-on-escape";
 import type { RecordedSound } from "./voice-recorder";
+import type { KeptPick } from "@/components/file-picker/as-files";
 import type * as messagesLib from "@/lib/chat/messages";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -1327,9 +1328,10 @@ export function ChannelView({
         body: string,
         files: readonly File[] = [],
         sounds: readonly RecordedSound[] = [],
-        spoilers: readonly number[] = []
+        spoilers: readonly number[] = [],
+        fromDrive: readonly KeptPick[] = []
     ) => {
-        if (files.length > 0) {
+        if (files.length > 0 || fromDrive.length > 0) {
             following.current = true;
             const form = new FormData();
             form.set("body", body);
@@ -1353,6 +1355,18 @@ export function ChannelView({
             // it was made. Sent as one field in file order rather than one per
             // file, so a message with no recording in it sends nothing.
             if (sounds.length > 0) form.set("sounds", JSON.stringify(sounds));
+            // The files that are staying where they are: where to find each one
+            // and nothing else. What happens to them - copied into the
+            // conversation or pointed at - is the instance's setting, answered on
+            // the other side. Nothing about them is read in this browser, which
+            // is the whole point: a file in Drive is not downloaded here so it
+            // can be uploaded back.
+            if (fromDrive.length > 0) {
+                form.set(
+                    "borrowed",
+                    JSON.stringify(fromDrive.map((one) => ({ c: one.connectionId, p: one.path })))
+                );
+            }
             setReplyingTo(null);
             const response = await fetch(`/api/chat/channels/${channelId}/messages`, {
                 method: "POST",
@@ -1882,6 +1896,7 @@ export function ChannelView({
                         }}
                         onCancelEdit={() => setEditing(null)}
                         onSend={send}
+                        canShareFromDrive
                         onSchedule={scheduleMessage}
                         onPoll={createPoll}
                         onMedia={async (address) => {

@@ -167,6 +167,16 @@ export interface ChatAttachmentView {
     readonly hasPoster: boolean;
     /** Sent covered, to be uncovered by whoever wants to see it. */
     readonly spoiler: boolean;
+    /**
+     * Whether it lives in the sender's own Drive rather than in this
+     * conversation.
+     *
+     * Said out loud on the file, because it is a different promise: the owner can
+     * change it or take it away, and then the message is pointing at something
+     * else or at nothing. A copy cannot do either, and somebody reading a
+     * conversation is entitled to know which of the two they are looking at.
+     */
+    readonly borrowed: boolean;
 }
 
 /** The message a reply or a forward stands on, as the quote line draws it. */
@@ -1521,6 +1531,7 @@ export async function decorateMessages(
                 waveform: true,
                 posterPath: true,
                 spoiler: true,
+                borrowed: true,
                 messageId: true,
                 durationMs: true,
                 contentType: true
@@ -1631,7 +1642,8 @@ export async function decorateMessages(
             spoiler: file.spoiler,
             durationMs: file.durationMs,
             contentType: file.contentType,
-            inline: isInlineImage(file.contentType)
+            inline: isInlineImage(file.contentType),
+            borrowed: file.borrowed
         });
         onMessageFiles.set(file.messageId, bucket);
     }

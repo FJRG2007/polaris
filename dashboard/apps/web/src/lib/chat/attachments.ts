@@ -19,6 +19,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { mimeForName } from "@/lib/mime";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { keepChannelForReports, keepForReports } from "./report-files";
 import {
@@ -182,6 +183,9 @@ export interface StoredAttachment {
     readonly posterConnectionId: string | null;
     /** Whether it arrives covered - the sender's decision, per file. */
     readonly spoiler: boolean;
+    /** Whether the bytes are somebody else's, shared out of a Drive rather than
+     *  copied in here. See `borrowAttachment`. */
+    readonly borrowed: boolean;
 }
 
 /**
@@ -300,6 +304,7 @@ export async function storeAttachment(
         path,
         posterPath: still?.path ?? null,
         posterConnectionId: still?.connectionId ?? null,
+        borrowed: false,
         spoiler,
         ...soundOf(sound)
     };
@@ -563,10 +568,23 @@ export async function discardEvidence(reportIds: readonly string[]): Promise<voi
  * forever, in somebody's file browser.
  */
 export async function discardAttachments(messageId: string): Promise<void> {
-    const files = await prisma.chatAttachment.findMany({
+    const held = await prisma.chatAttachment.findMany({
         where: { messageId },
-        select: { id: true, connectionId: true, path: true, posterPath: true, posterConnectionId: true }
+        select: {
+            id: true,
+            connectionId: true,
+            path: true,
+            posterPath: true,
+            posterConnectionId: true,
+            borrowed: true
+        }
     });
+    // A borrowed file is somebody's own, shared out of their Drive rather than
+    // copied in here. Deleting a message must never delete it: what was sent was
+    // a way to reach the file, and taking the file away with it would be Polaris
+    // reaching into somebody's Drive to destroy something because a sentence
+    // beside it was taken back.
+    const files = held.filter((file) => !file.borrowed);
     if (files.length === 0) return;
 
     // Anything a report is holding is moved out from under this first, so that
@@ -574,7 +592,7 @@ export async function discardAttachments(messageId: string): Promise<void> {
     // objected to. Nothing is refused and nothing is copied - see
     // `report-files` - and for the overwhelming majority of messages this is one
     // indexed lookup that finds nothing.
-    await keepForReports(files.map((file) => file.id));
+    await keepForReports(held.map((file) => file.id));
 
     await removeStoredFiles([
         ...files,
@@ -584,6 +602,41 @@ export async function discardAttachments(messageId: string): Promise<void> {
             .filter((file) => file.posterPath)
             .map((file) => ({ connectionId: file.posterConnectionId, path: file.posterPath! }))
     ]);
+}
+
+/**
+ * A file somebody already has in Drive, as an attachment on a message.
+ *
+ * Pure: the authorization and the read are `attachments/from-elsewhere`'s, which
+ * is where every "a file that is not on the reader's machine" already goes. What
+ * is decided here is what the row says - `borrowed`, which is what keeps
+ * `discardAttachments` from deleting somebody's own file when a message is taken
+ * back, and what the list reads to say the file can change or vanish.
+ *
+ * No size ceiling is applied and that is the point: a ceiling is a limit on what
+ * this instance stores per file, and this stores nothing. It is the answer the
+ * ceiling's own hint points at.
+ */
+export function borrowedAttachment(
+    reference: { readonly connectionId: string; readonly path: string; readonly size: number },
+    spoiler = false
+): StoredAttachment {
+    const name = reference.path.split("/").at(-1) || "attachment";
+    return {
+        name,
+        size: reference.size,
+        // A storage read reports no content type, so it is what the name implies -
+        // the same answer a browser would have put on an upload of the same file.
+        contentType: mimeForName(name) ?? "application/octet-stream",
+        connectionId: reference.connectionId,
+        path: reference.path,
+        durationMs: null,
+        waveform: null,
+        posterPath: null,
+        posterConnectionId: null,
+        spoiler,
+        borrowed: true
+    };
 }
 
 /**
