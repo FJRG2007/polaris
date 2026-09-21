@@ -16,7 +16,7 @@
  */
 
 import { IncomingCalls } from "@/components/incoming-calls";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let onFrame: ((frame: unknown, context: { owner: boolean }) => void) | null = null;
@@ -87,20 +87,20 @@ afterEach(() => {
 describe("a missed call while the reader is on the phone", () => {
     it("goes when the second attempt is answered", async () => {
         const view = render(<IncomingCalls viewerId="ada" />);
-        onFrame?.(ring("m1"), { owner: true });
-        // Awaited between the two: the card is drawn from state, and a frame
+        // Flushed one at a time: the card is drawn from state, and a frame
         // arriving in the same tick as the one before it finds a component that
         // has not been told about the first yet.
-        expect(await screen.findByText("Grace is calling")).toBeTruthy();
-        onFrame?.(gaveUp("m1"), { owner: true });
-        expect(await screen.findByText("Missed call")).toBeTruthy();
+        await act(async () => onFrame?.(ring("m1"), { owner: true }));
+        expect(screen.queryByText("Grace is calling")).toBeTruthy();
+        await act(async () => onFrame?.(gaveUp("m1"), { owner: true }));
+        expect(screen.queryByText("Missed call")).toBeTruthy();
 
         // They rang again and this time it was picked up, in the same
         // conversation the missed one was in.
         session = { meetingId: "m2", channelId: "c1", title: "Grace" };
-        view.rerender(<IncomingCalls viewerId="ada" />);
+        await act(async () => view.rerender(<IncomingCalls viewerId="ada" />));
 
-        await vi.waitFor(() => expect(screen.queryByText("Missed call")).toBeNull());
+        expect(screen.queryByText("Missed call")).toBeNull();
     });
 
     it("is never left behind when the call was already answered", async () => {
@@ -109,21 +109,21 @@ describe("a missed call while the reader is on the phone", () => {
         // rings again before the first attempt has run out.
         session = { meetingId: "m2", channelId: "c1", title: "Grace" };
         render(<IncomingCalls viewerId="ada" />);
-        onFrame?.(ring("m1"), { owner: true });
-        expect(await screen.findByText("Grace is calling")).toBeTruthy();
-        onFrame?.(gaveUp("m1"), { owner: true });
+        await act(async () => onFrame?.(ring("m1"), { owner: true }));
+        expect(screen.queryByText("Grace is calling")).toBeTruthy();
+        await act(async () => onFrame?.(gaveUp("m1"), { owner: true }));
 
-        await vi.waitFor(() => expect(screen.queryByText("Grace is calling")).toBeNull());
+        expect(screen.queryByText("Grace is calling")).toBeNull();
         expect(screen.queryByText("Missed call")).toBeNull();
     });
 
     it("keeps one from somebody else, which is the call worth coming back to", async () => {
         session = { meetingId: "m2", channelId: "c1", title: "Grace" };
         render(<IncomingCalls viewerId="ada" />);
-        onFrame?.(ring("m9", "c2"), { owner: true });
-        expect(await screen.findByText("Grace is calling")).toBeTruthy();
-        onFrame?.(gaveUp("m9", "c2"), { owner: true });
+        await act(async () => onFrame?.(ring("m9", "c2"), { owner: true }));
+        expect(screen.queryByText("Grace is calling")).toBeTruthy();
+        await act(async () => onFrame?.(gaveUp("m9", "c2"), { owner: true }));
 
-        expect(await screen.findByText("Missed call")).toBeTruthy();
+        expect(screen.queryByText("Missed call")).toBeTruthy();
     });
 });
