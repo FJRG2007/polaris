@@ -102,6 +102,12 @@ vi.mock("@polaris/db", () => ({
                 });
             }
         },
+        /** Which spellings the server has seen. Empty here: these tests are about
+         *  who a name is tied to, and a name nobody has seen keeps the spelling
+         *  that was typed - see `asSeenSpelling`. */
+        gamePlayerSession: {
+            findMany: async () => []
+        },
         gamePlayerLink: {
             findMany: async () => links,
             create: async ({ data }: { data: Omit<Link, "id"> }) => {

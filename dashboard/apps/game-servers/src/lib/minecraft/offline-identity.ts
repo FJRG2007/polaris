@@ -67,6 +67,42 @@ export function offlineUuid(name: string): string {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+/**
+ * The spelling to use for a name somebody typed, given the ones this server has
+ * already seen.
+ *
+ * On a server that invents identities the spelling IS the player: `PICHURRINA`
+ * and `pichurrina` hash to two different people, and only one of them ever
+ * connects. So a name typed in the wrong case produces a roster entry under an
+ * identity nothing will look up - the player is listed on every screen, the file
+ * plainly names them, and the login refuses them. That is the defect this whole
+ * module exists to prevent, arrived at from an operator's keyboard instead of
+ * from Mojang's UUIDs, and it cost a real player hours: the rule said
+ * `pichurrina`, the whitelist was written for `pichurrina`, and `PICHURRINA` was
+ * told he was not on a list with his name on it.
+ *
+ * The seen spellings are the only authority on the question - a name is however
+ * the player's own client sends it - so a match among them wins over what was
+ * typed. Nothing is invented: a player nobody has seen keeps the typed spelling,
+ * which is all anybody knows about them yet.
+ */
+export function asSeenSpelling(typed: string, seen: readonly string[]): string {
+    const wanted = typed.trim();
+    // Exactly, across all of them, before any difference in case is considered -
+    // the same order `indexOfName` uses over a roster file, and for the same
+    // reason. A server that has seen both `solojose` and `Solojose` has seen two
+    // players, and answering a request about one of them with the other would
+    // put a working name on somebody else's identity.
+    if (seen.some((name) => name.trim() === wanted)) return wanted;
+    const match = seen.find((name) => name.trim().toLowerCase() === wanted.toLowerCase());
+    return match?.trim() || wanted;
+}
+
+/** Every name in `typed`, under the spelling this server has seen for it. */
+export function asSeenSpellings(typed: readonly string[], seen: readonly string[]): string[] {
+    return typed.map((name) => asSeenSpelling(name, seen));
+}
+
 /** The shape of an invented identity: version 3, and the RFC 4122 variant. */
 const OFFLINE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-3[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

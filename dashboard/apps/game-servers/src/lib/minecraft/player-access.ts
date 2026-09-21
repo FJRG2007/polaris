@@ -43,6 +43,8 @@ import {
 } from "../container-files";
 import {
     isReadableRoster,
+    asSeenSpelling,
+    asSeenSpellings,
     withOfflineIdentities,
     withOfflineNames,
     withoutInventedIdentities,
@@ -278,6 +280,26 @@ async function inventsIdentities(server: ServerContainer): Promise<boolean> {
     const properties = await readContainerFile(server, PROPERTIES_FILE);
     if (properties === null) return false;
     return parseProperties(properties)["online-mode"] === "false";
+}
+
+/**
+ * How this server has spelled the players it has seen.
+ *
+ * `GamePlayerSession.name` is written as the server reported it, which on a
+ * server that invents identities is the only spelling that can ever get in - the
+ * identity is a hash of it. Distinct and capped: this is read to correct a name
+ * somebody typed, and one server's cast of players is tens of names, not a table
+ * scan.
+ */
+async function spellingsSeen(installedAppId: string): Promise<string[]> {
+    const rows = await prisma.gamePlayerSession.findMany({
+        where: { installedAppId },
+        select: { name: true },
+        distinct: ["name"],
+        orderBy: { joinedAt: "desc" },
+        take: 200
+    });
+    return rows.map((row) => row.name);
 }
 
 /**
@@ -532,7 +554,11 @@ export async function reconcileWhitelist(
     if (rules.length === 0) return [];
     // Against nothing listed, this is every granted name once - one player who
     // plays from two places is two rules and one entry.
-    const names = missingWhitelistNames(rules, []);
+    // Under the spellings this server has seen, which repairs what is already
+    // stored: a rule typed in the wrong case before this existed is a player
+    // refused at the door, and the pass that writes the list is the one place
+    // that can put it right without anybody having to know why.
+    const names = asSeenSpellings(missingWhitelistNames(rules, []), await spellingsSeen(installedAppId));
     return withServerContainer(ownerId, installedAppId, async (server) => {
         if (await inventsIdentities(server)) {
             const current = await readRoster(server, WHITELIST_FILE);
@@ -655,7 +681,7 @@ export async function linkPlayerAccount(
     input: { username: string; userId: string }
 ): Promise<void> {
     const install = await resolve(ownerId, installedAppId);
-    const username = input.username.trim();
+    const username = asSeenSpelling(input.username, await spellingsSeen(installedAppId));
     if (install.edition !== "java") {
         throw new Error(
             "Bedrock servers do not report where a player connects from, so a player cannot be tied to their sign-ins."
@@ -754,7 +780,10 @@ export async function grantPlayerAccess(
     input: { username: string; address: string; note?: string }
 ): Promise<void> {
     const install = await resolve(ownerId, installedAppId);
-    const username = input.username.trim();
+    // The spelling the server has seen, not the one that was typed: on a server
+    // without authentication they are two different players, and only one of them
+    // ever knocks on the door. See `asSeenSpelling`.
+    const username = asSeenSpelling(input.username, await spellingsSeen(installedAppId));
     const address = input.address.trim().toLowerCase();
     if (!isPlayerName(install.edition, username))
         throw new Error("That is not a username this edition accepts");
