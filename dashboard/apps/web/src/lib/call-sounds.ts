@@ -13,6 +13,14 @@
  * a theme, and a control plane somebody sits in front of all day is the wrong
  * place to be characterful about it.
  *
+ * Plain, though, is not the same as interchangeable. **Two sounds that mean
+ * different things have to differ in shape** - in how many notes there are, how
+ * fast they come and what they are made of - because pitch alone is not something
+ * anybody can hear the difference in. Four of these were the same two-note
+ * gesture a tone or two apart, so a screen coming down was heard as somebody
+ * hanging up; the share sounds are a three-note figure on a different wave for
+ * exactly that reason, and `call-sound-shapes` holds them apart.
+ *
  * **Nothing plays until the reader has interacted with the page**, because no
  * browser will allow it and trying is how a console fills with errors. An
  * AudioContext created before that lands in `suspended`, so the context is made
@@ -136,15 +144,31 @@ export const SOUNDS: Record<CallSound, readonly Note[]> = {
         { from: 783.99, at: 0, seconds: 0.09 },
         { from: 523.25, at: 0.08, seconds: 0.14 }
     ],
-    /** A screen went up. */
+    /**
+     * A screen went up.
+     *
+     * Three notes and a brighter wave, which is the whole point of it: this was
+     * two notes rising a fifth on a sine, and so were arriving, leaving and
+     * hanging up - the same gesture at four slightly different pitches. Nobody
+     * can name an interval off a laptop speaker, so a screen going up was heard
+     * as somebody joining and a screen coming down as somebody hanging up, which
+     * is the worst of the four to be wrong about.
+     *
+     * What tells two sounds apart is their shape - how many notes, how fast, and
+     * what they are made of - not which note they start on. So a share is a quick
+     * three-note figure on a triangle wave: more notes than any of the plain
+     * events, and audibly a different instrument from all of them.
+     */
     shareOn: [
-        { from: 587.33, at: 0, seconds: 0.07 },
-        { from: 880.0, at: 0.06, seconds: 0.1 }
+        { from: 659.25, at: 0, seconds: 0.05, wave: "triangle" },
+        { from: 830.61, at: 0.045, seconds: 0.05, wave: "triangle" },
+        { from: 1108.73, at: 0.09, seconds: 0.14, wave: "triangle" }
     ],
-    /** A screen came down. */
+    /** A screen came down. The same three notes, the other way down. */
     shareOff: [
-        { from: 880.0, at: 0, seconds: 0.07 },
-        { from: 587.33, at: 0.06, seconds: 0.1 }
+        { from: 1108.73, at: 0, seconds: 0.05, wave: "triangle" },
+        { from: 830.61, at: 0.045, seconds: 0.05, wave: "triangle" },
+        { from: 659.25, at: 0.09, seconds: 0.16, wave: "triangle" }
     ],
     /**
      * Somebody put a hand up, played to whoever is chairing.
@@ -159,10 +183,19 @@ export const SOUNDS: Record<CallSound, readonly Note[]> = {
         { from: 587.33, at: 0, seconds: 0.06, gain: 0.06 },
         { from: 880.0, at: 0.055, seconds: 0.11, gain: 0.06 }
     ],
-    /** You hung up, or the call ended under you. */
+    /**
+     * You hung up, or the call ended under you.
+     *
+     * Three notes falling away rather than two, and the last one held: the same
+     * reason the share sounds are three, applied to the other end of the same
+     * collision. Two notes falling on a sine was also what somebody leaving the
+     * call sounded like, a fifth higher - and the difference between somebody
+     * stepping out and the call being over is not a difference worth guessing at.
+     */
     hangUp: [
-        { from: 466.16, at: 0, seconds: 0.11 },
-        { from: 349.23, at: 0.1, seconds: 0.22 }
+        { from: 466.16, at: 0, seconds: 0.1 },
+        { from: 349.23, at: 0.09, seconds: 0.1 },
+        { from: 261.63, at: 0.18, seconds: 0.3 }
     ],
     /**
      * One pass of an incoming ring. Repeated by `startRinging`.
