@@ -27,8 +27,7 @@ import type { DeliveryView } from "@/lib/notification-service";
 import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import type { DestinationView } from "@/lib/notifications/destinations";
 import { drawFavicon } from "@/lib/favicon";
-import { canNotify, mayNotify } from "@/lib/desktop-notify";
-import { desktopBridge } from "@/lib/desktop-bridge";
+import { mayNotify, noticeStanding, type NoticeStanding } from "@/lib/desktop-notify";
 import { AlertTriangle, Bell, Mail, Smartphone, Volume2, Webhook } from "lucide-react";
 import {
     Badge,
@@ -143,23 +142,15 @@ export function NotificationSettingsView({
  * no permission, so there it says so and offers nothing.
  */
 function BrowserNoticesCard() {
-    type Standing = "app" | "granted" | "denied" | "askable" | "unsupported";
-    const [standing, setStanding] = useState<Standing>("unsupported");
+    const [standing, setStanding] = useState<NoticeStanding>("unsupported");
     const [asking, setAsking] = useState(false);
 
     // Read on mount: none of this exists while the page is rendered on the
     // server, and a card that guessed would be wrong on every second device.
-    const settle = () => {
-        if (desktopBridge()) return setStanding("app");
-        if (!canNotify()) return setStanding("unsupported");
-        const permission = Notification.permission;
-        setStanding(
-            permission === "granted" ? "granted" : permission === "denied" ? "denied" : "askable"
-        );
-    };
+    const settle = () => setStanding(noticeStanding());
     useEffect(settle, []);
 
-    const said: Record<Standing, string> = {
+    const said: Record<NoticeStanding, string> = {
         app: "The Polaris app draws these itself. Nothing to allow.",
         granted:
             "Polaris can tell you about a call or a message while you are on another tab.",

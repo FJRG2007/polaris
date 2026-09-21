@@ -48,7 +48,11 @@ vi.mock("@/lib/shared-stream", () => ({
 
 vi.mock("@/lib/desktop-notify", () => ({
     notifyDesktop: async () => null,
-    tabIsWatched: () => true
+    tabIsWatched: () => true,
+    mayNotify: async () => false,
+    // Granted, so the card offers nothing: what is under test here is which tab
+    // rings, not what a browser has been asked.
+    noticeStanding: () => "granted"
 }));
 
 vi.mock("@/lib/call-sounds", () => ({

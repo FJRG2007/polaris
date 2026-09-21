@@ -38,11 +38,17 @@ import { Avatar } from "./avatar";
 import { Button } from "@polaris/ui";
 import { useSessionScope } from "./session-scope";
 import { claimForDevice } from "@/lib/device-once";
-import { ringDecision, roomAfter, type RingRoom } from "@/lib/chat/ring-decision";
+import { leavesMissedCall, ringDecision, roomAfter, type RingRoom } from "@/lib/chat/ring-decision";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
-import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
+import {
+    mayNotify,
+    noticeStanding,
+    notifyDesktop,
+    tabIsWatched,
+    type NoticeStanding
+} from "@/lib/desktop-notify";
 import { callElsewhereAction } from "@/app/(app)/chat/meeting-actions";
 import { BellOff, Phone, PhoneMissed, PhoneOff, X } from "lucide-react";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
@@ -92,6 +98,21 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     // being offered, and only the sound has been dealt with.
     const [silenced, setSilenced] = useState<readonly string[]>([]);
     const inCall = held?.session?.meetingId ?? null;
+    /** And which conversation that call belongs to, which is what says whether a
+     *  missed call is still missed. */
+    const inChannel = held?.session?.channelId ?? null;
+    /**
+     * Whether Polaris may reach past this window at all.
+     *
+     * A missed call is the moment this is worth saying: somebody was somewhere
+     * else and nothing reached them, and the reason is usually that this browser
+     * has never been asked. Read on mount, because none of it exists on the
+     * server, and starting at "granted" so a card that has not read it yet
+     * offers nothing rather than flashing an offer at somebody who already said
+     * yes.
+     */
+    const [standing, setStanding] = useState<NoticeStanding>("granted");
+    useEffect(() => setStanding(noticeStanding()), []);
 
     /**
      * How full each ringing room was, and whether anybody walked into it.
@@ -155,6 +176,27 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     }, [ringing]);
 
     /**
+     * A missed call from the conversation you are now in is not a missed call.
+     *
+     * Read from a ref by `missedOut`, which is memoized and must not be rebuilt
+     * every time a call is joined or left, and swept here for the other order:
+     * the card left by the first attempt is already on screen when the second
+     * one is answered, and it sat there afterwards saying "missed call" over a
+     * conversation the reader was in the middle of having. Answering IS the
+     * answer to it, whichever of the two happened first.
+     */
+    const inChannelNow = useRef<string | null>(null);
+    useEffect(() => {
+        inChannelNow.current = inChannel;
+        if (!inChannel) return;
+        setMissed((current) =>
+            current.some((one) => one.channelId === inChannel)
+                ? current.filter((one) => one.channelId !== inChannel)
+                : current
+        );
+    }, [inChannel]);
+
+    /**
      * A call that went away without being answered.
      *
      * The difference from `settle` is the whole of what a missed call is: settled
@@ -177,7 +219,17 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
             const entry = live.current.find((one) => one.meetingId === meetingId);
             const answered = seats.current.get(meetingId)?.answered ?? false;
             drop(meetingId);
-            if (!entry || answered) return;
+            if (!entry) return;
+            // Decided in one pure place, for the same reason ringing is: what is
+            // owed a card is a rule, and a rule inside a component is one
+            // nothing can ask a question of. See `leavesMissedCall`.
+            const owed = leavesMissedCall({
+                wasRinging: true,
+                answered,
+                channelId: entry.channelId,
+                inChannelId: inChannelNow.current
+            });
+            if (!owed) return;
             setMissed((current) =>
                 [
                     { ...entry, at: Date.now() },
@@ -400,7 +452,14 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                         body: "Answer in Polaris",
                         tag: `call:${entry.meetingId}`,
                         href: `/chat/c/${entry.channelId}`,
-                        insistent: true
+                        insistent: true,
+                        // The one notice in Polaris that rings. Everything else
+                        // is chimed by the tab, and a tab nobody is looking at
+                        // is one whose audio the browser may have suspended -
+                        // which is every call that arrives while somebody is in
+                        // another window, which is every call this notice is
+                        // drawn for.
+                        sound: true
                     }).then((notice) => {
                         if (notice) notices.current.set(entry.meetingId, notice);
                     });
@@ -452,7 +511,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
 
     return (
         <div className="flex flex-col gap-2">
-            {missed.map((entry) => (
+            {missed.map((entry, index) => (
                 <div
                     key={entry.meetingId}
                     role="status"
@@ -468,6 +527,30 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                         </span>
                         <PhoneMissed className="size-4 shrink-0 text-danger" aria-hidden />
                     </span>
+                    {/* Why it may not have been heard, on the one card that is
+                        evidence of it, and only on the first of them - three
+                        missed calls do not need telling three times. Offered
+                        here rather than left on a settings screen nobody visits
+                        until after the call they missed. */}
+                    {index === 0 && standing === "askable" ? (
+                        <button
+                            type="button"
+                            className="text-left text-xs text-primary hover:underline"
+                            onClick={() =>
+                                void mayNotify().finally(() => setStanding(noticeStanding()))
+                            }
+                        >
+                            Polaris can only ring this tab. Let it reach you anywhere.
+                        </button>
+                    ) : index === 0 && standing === "denied" ? (
+                        <span className="text-xs text-muted-foreground">
+                            This browser is blocking Polaris' notices, so a call can only ring in
+                            this tab.{" "}
+                            <Link className="text-primary hover:underline" href="/account/notifications">
+                                What to do about it
+                            </Link>
+                        </span>
+                    ) : null}
                     <span className="flex items-center gap-2">
                         <Button
                             asChild

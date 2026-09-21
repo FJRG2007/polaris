@@ -26,6 +26,16 @@ export interface NoticeInput {
     readonly href?: string;
     /** Stays until it is dealt with, where the system allows it. */
     readonly insistent?: boolean;
+    /**
+     * Whether the notice makes a sound of its own.
+     *
+     * Off by default: the page chimes for what it announces, and one event with
+     * two sounds is worse than either. A call asks for it, because a call is
+     * announced out here precisely when the window is not the thing in front of
+     * somebody - and a window nobody is looking at is one whose audio may be
+     * suspended, so the page's own ring is a sound nobody hears.
+     */
+    readonly sound?: boolean;
 }
 
 export type PickedFolder =

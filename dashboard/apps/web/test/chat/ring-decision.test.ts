@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ringDecision, roomAfter } from "@/lib/chat/ring-decision";
+import { leavesMissedCall, ringDecision, roomAfter } from "@/lib/chat/ring-decision";
 
 const ME = "user-me";
 const THEM = "user-them";
@@ -104,5 +104,42 @@ describe("what became of the room", () => {
         // Inviting somebody into a group rings them with a frame of its own.
         const rang = roomAfter(undefined, RANG);
         expect(roomAfter(rang, { state: "ringing", userId: THEM, count: 1 })?.answered).toBe(false);
+    });
+});
+
+/**
+ * A missed call, which is not the same thing as a call that stopped ringing.
+ *
+ * The case these were written for: somebody rings, is not picked up, and rings
+ * again. The second attempt is answered, and a moment later the first one gives
+ * up - leaving a card that said "missed call" over a conversation the reader was
+ * in the middle of having, and that only a press would remove.
+ */
+describe("what a call that stopped ringing leaves behind", () => {
+    const FROM_THEM = { wasRinging: true, answered: false, channelId: "c-them" };
+
+    it("leaves a missed call when nobody picked it up", () => {
+        expect(leavesMissedCall({ ...FROM_THEM, inChannelId: null })).toBe(true);
+    });
+
+    it("leaves nothing when this browser is already in a call with them", () => {
+        expect(leavesMissedCall({ ...FROM_THEM, inChannelId: "c-them" })).toBe(false);
+    });
+
+    // Being busy elsewhere is exactly when a missed call is worth keeping: it is
+    // the one somebody comes back to.
+    it("still leaves one for another conversation while you are on a call", () => {
+        expect(leavesMissedCall({ ...FROM_THEM, inChannelId: "c-someone-else" })).toBe(true);
+    });
+
+    it("leaves nothing when somebody else answered it", () => {
+        expect(leavesMissedCall({ ...FROM_THEM, answered: true, inChannelId: null })).toBe(false);
+    });
+
+    // The end of a call this browser answered, declined or picked up on a phone.
+    // The frame that says it is over reaches every tab, the one that dealt with
+    // it included.
+    it("leaves nothing for a call this browser had already settled", () => {
+        expect(leavesMissedCall({ ...FROM_THEM, wasRinging: false, inChannelId: null })).toBe(false);
     });
 });

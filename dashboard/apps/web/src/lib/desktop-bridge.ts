@@ -29,6 +29,9 @@ export interface PolarisDesktop {
         readonly tag: string;
         readonly href?: string;
         readonly insistent?: boolean;
+        /** Whether the notice rings. Only a call asks for it - see
+         *  `desktop-notify`. */
+        readonly sound?: boolean;
     }): Promise<boolean>;
     closeNotice(tag: string): Promise<void>;
     pickFolder(): Promise<DesktopFolder>;

@@ -49,6 +49,23 @@ export function canNotify(): boolean {
 }
 
 /**
+ * Where this browser stands on letting Polaris draw outside its own window.
+ *
+ * Read on the client and never on the server, where none of it exists. Shared
+ * rather than worked out at each screen: the settings card says so in words, and
+ * a missed call offers the one button that mends it, and the two must not
+ * disagree about what this browser has already answered.
+ */
+export type NoticeStanding = "app" | "granted" | "denied" | "askable" | "unsupported";
+
+export function noticeStanding(): NoticeStanding {
+    if (desktopBridge()) return "app";
+    if (!canNotify()) return "unsupported";
+    if (Notification.permission === "granted") return "granted";
+    return Notification.permission === "denied" ? "denied" : "askable";
+}
+
+/**
  * Whether the person is looking at this tab right now: visible AND focused. A
  * window with another program on top of it is still `visible`, and a card drawn
  * there is a card nobody sees - see `components/use-attention`.
@@ -94,6 +111,20 @@ export async function notifyDesktop(input: {
     href?: string;
     /** Whether it stays until it is dealt with. True for a call. */
     insistent?: boolean;
+    /**
+     * Whether the notice makes a sound of its own.
+     *
+     * Off by default, because the tab chimes for what it draws and one event
+     * with two sounds is worse than either of them. A call is the exception, and
+     * it is the exception for the reason this whole module exists: a notice is
+     * only ever raised when nobody is looking at the tab, and a tab nobody is
+     * looking at is one whose audio the browser is free to suspend. Polaris' own
+     * ring is then notes scheduled into a context that is not running - nothing
+     * comes out of the speakers at all - so a silent notice made a call the one
+     * thing in Polaris that could pass in complete silence, which is the one
+     * thing a call must never do.
+     */
+    sound?: boolean;
 }): Promise<{ close: () => void } | null> {
     const app = desktopBridge();
     if (app) {
@@ -112,9 +143,10 @@ export async function notifyDesktop(input: {
             icon: "/polaris-mark-128.png",
             badge: "/polaris-mark-128.png",
             requireInteraction: input.insistent ?? false,
-            // The sound is Polaris' own, played by the tab, and one notice that
-            // also chimed would be two sounds for one event.
-            silent: true
+            // Silent unless the caller says otherwise: the sound is normally
+            // Polaris' own, played by the tab, and one notice that also chimed
+            // would be two sounds for one event. See `sound`.
+            silent: !(input.sound ?? false)
         });
         notice.onclick = () => {
             window.focus();

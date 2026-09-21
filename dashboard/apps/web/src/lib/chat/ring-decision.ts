@@ -76,6 +76,35 @@ export function roomAfter(held: RingRoom | undefined, frame: CallFrameFacts): Ri
     return (frame.count ?? 0) > held.ringing ? { ...held, answered: true } : held;
 }
 
+/**
+ * Whether a call that has stopped ringing leaves a missed call behind.
+ *
+ * Three things end the ringing here and only one of them is a miss: this
+ * browser dealt with it, somebody else answered it, or nobody did anything at
+ * all. `roomAfter` answers the second; this one adds the case that no frame can
+ * carry, because it is about the reader rather than about the room.
+ *
+ * Somebody who is not picked up rings again. By the time the first attempt
+ * gives up, the second one has usually been answered - so the card it left said
+ * "missed call" above a conversation the reader was in the middle of having,
+ * and stayed there until it was pressed. Being in a call with them is the
+ * answer to their call, whichever attempt it was placed on.
+ */
+export function leavesMissedCall(input: {
+    /** Whether this browser was still showing it as ringing. A call already
+     *  settled here is one somebody dealt with. */
+    readonly wasRinging: boolean;
+    /** Whether anybody other than the caller took a seat. */
+    readonly answered: boolean;
+    /** The conversation it rang for. */
+    readonly channelId: string;
+    /** The conversation this browser is in a call in, if it is in one. */
+    readonly inChannelId: string | null;
+}): boolean {
+    if (!input.wasRinging || input.answered) return false;
+    return input.channelId !== input.inChannelId;
+}
+
 export function ringDecision(frame: CallFrameFacts, viewerId: string): RingDecision {
     if (frame.state === "ringing") {
         // Your own call. The frame is addressed to the conversation, and the

@@ -29,7 +29,8 @@ const noticeSchema = z.object({
     body: z.string().max(1000).optional(),
     tag: z.string().min(1).max(200),
     href: z.string().max(2048).optional(),
-    insistent: z.boolean().optional()
+    insistent: z.boolean().optional(),
+    sound: z.boolean().optional()
 });
 
 const windowSchema = z.object({
@@ -69,8 +70,11 @@ export function registerIpc(host: IpcHost): void {
             body: input.data.body,
             tag: input.data.tag,
             insistent: input.data.insistent,
-            // The page plays its own sound for what it announces.
-            silent: true,
+            // The page plays its own sound for what it announces - except where
+            // it has said it cannot, which is a call: the window it would ring
+            // in is behind whatever somebody is actually doing, and a browser
+            // may have suspended its audio. Then the notice rings instead.
+            silent: !(input.data.sound ?? false),
             // An alert from the dashboard's feed - a finished deploy - may already
             // have been announced by the push window that started it.
             once: input.data.tag.startsWith("notification:"),
