@@ -13,6 +13,8 @@
  * shareable and the back button works, without a server round-trip per folder.
  */
 
+import { saveFile, sendFile } from "@/components/transfers/move-file";
+import { TransfersView } from "@/components/transfers/transfers-view";
 import Fuse from "fuse.js";
 import { formatBytes } from "@polaris/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -100,14 +102,15 @@ function zipUrl(token: string, paths: string[]): string {
     return `/api/s/${token}/zip?${query.toString()}`;
 }
 
-/** Kick off a download without leaving the page (a single navigation, never blocked). */
+/**
+ * Kick off a download without leaving the page.
+ *
+ * Through the shared surface, which is what puts it in the card in the corner: a
+ * visitor asking for a folder as a zip is waiting on the server building it, and
+ * before this there was nothing on screen saying so.
+ */
 function openHref(href: string, downloadName?: string) {
-    const anchor = document.createElement("a");
-    anchor.href = href;
-    if (downloadName) anchor.download = downloadName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
+    saveFile(href, downloadName ?? "download");
 }
 
 /** Parent folder path of a relative path ("a/b/c" -> "a/b"). */
@@ -454,15 +457,22 @@ export function ShareExplorer({
             const q = new URLSearchParams({ name: relPath });
             if (path) q.set("p", path);
             try {
-                const res = await fetch(`/api/s/${token}/upload?${q.toString()}`, {
-                    method: "PUT",
-                    body: file
+                // Through the shared sender, which puts a bar on screen for it: a
+                // visitor dropping a folder of photos into somebody's share had
+                // nothing to look at but a disabled button.
+                const sent = await sendFile(`/api/s/${token}/upload?${q.toString()}`, file, {
+                    name: relPath
                 });
-                if (!res.ok) {
+                if (!sent.ok) {
                     failed++;
                     continue;
                 }
-                const body = (await res.json().catch(() => ({}))) as { name?: string };
+                let body: { name?: string } = {};
+                try {
+                    body = JSON.parse(sent.body || "{}") as typeof body;
+                } catch {
+                    body = {};
+                }
                 if (body.name && body.name !== file.name) renamed.push(body.name);
             } catch {
                 failed++;
@@ -711,6 +721,10 @@ export function ShareExplorer({
 
     return (
         <div className="flex min-w-0 flex-1 flex-col">
+            {/* The transfers card, mounted here rather than by the frame: this page
+                is outside the signed-in chrome, and a visitor uploading into
+                somebody's share needs to see it going as much as anybody. */}
+            <TransfersView />
             {/* Breadcrumb + folder-level actions */}
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">

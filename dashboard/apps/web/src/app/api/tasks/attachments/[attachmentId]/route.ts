@@ -10,12 +10,13 @@
 import { requireTask, TaskAccessError } from "@/lib/tasks/access";
 import { apiPermission } from "@/lib/api-session";
 import { attachmentTaskId, readAttachment } from "@/lib/tasks/attachment-service";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ attachmentId: string }> }
 ): Promise<Response> {
     const { attachmentId } = await params;
@@ -41,6 +42,9 @@ export async function GET(
         headers: {
             "Content-Type": file.mime,
             "Content-Length": String(file.size),
+            // Says "this download has started" to the page that asked for it -
+            // see `download-ticket`. Nothing at all when no ticket was sent.
+            ...downloadTicketHeaders(request),
             // The name is quoted and stripped of anything that could end the
             // header early; a file name is user input like any other.
             "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${file.name.replace(/["\\\r\n]/g, "")}"`,

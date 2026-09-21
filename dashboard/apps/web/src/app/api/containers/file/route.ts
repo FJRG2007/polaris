@@ -8,6 +8,7 @@
 import { basename } from "node:path";
 import { readFile } from "@/lib/container-service";
 import { authorizeConnection, filesQuerySchema, parseQuery } from "../query";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,9 @@ export async function GET(request: Request): Promise<Response> {
         return new Response(new Uint8Array(content), {
             headers: {
                 "Content-Type": "application/octet-stream",
+                // Says "this download has started" to the page that asked for it - see
+                // `download-ticket`. Nothing at all when no ticket was sent.
+                ...downloadTicketHeaders(request),
                 "Content-Disposition": `attachment; filename="${name.replace(/"/g, "")}"`,
                 "Content-Length": String(content.byteLength)
             }

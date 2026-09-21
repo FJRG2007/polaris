@@ -318,6 +318,7 @@ model User {
     mailLabels          MailLabel[]
     mailUploads         MailUpload[]
     mailTemplates       MailTemplate[]
+    chatUploads         ChatUpload[]
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -7860,6 +7861,7 @@ model ChatChannel {
     messages ChatMessage[]
     meetings Meeting[]
     scheduled ChatScheduledMessage[]
+    uploads  ChatUpload[]
 
     @@index([spaceId, order])
     @@index([categoryId, order])
@@ -8409,6 +8411,47 @@ model ChatAttachment {
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
     @@index([messageId])
+}
+
+// A file already on the storage, waiting for the message that will carry it.
+//
+// A conversation used to take its files inside the request that sent the message,
+// which meant every byte passed through this process's memory on the way in - and
+// that, not a policy, is what held the per-file limit at a hundred megabytes. A
+// file large enough to be worth sending is now streamed to the storage first,
+// under its own request, and the message that follows names what was written.
+//
+// Owned by the person and the conversation rather than by a message, because
+// there is no message yet: somebody who drops a file in and then closes the tab
+// leaves one of these, so anything nobody claimed is swept.
+model ChatUpload {
+    id        String @id @default(uuid(7)) @db.Uuid
+    userId    String @db.Uuid
+    channelId String @db.Uuid
+    // What the sender called it, and what it was sent as. Both are the client's
+    // words about its own file and neither decides anything: the stored path is
+    // Polaris's own, and what a browser is allowed to do with the bytes is
+    // decided from this type by the route that serves them.
+    name        String
+    contentType String @default("application/octet-stream")
+    // What was actually written, measured by the storage rather than declared by
+    // the client - a size the sender could name is a size the sender could
+    // understate.
+    size        BigInt @default(0)
+    // Where it went, on the same terms as an attachment's: recorded per file so
+    // pointing chat at another storage does not orphan what is already staged.
+    connectionId String? @db.Uuid
+    path         String
+    // Sent covered, chosen before the upload because that is when the sender
+    // marked it.
+    spoiler   Boolean  @default(false)
+    createdAt DateTime @default(now())
+
+    user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+    @@index([userId, createdAt])
+    @@index([channelId])
 }
 
 // A message written now and sent later.

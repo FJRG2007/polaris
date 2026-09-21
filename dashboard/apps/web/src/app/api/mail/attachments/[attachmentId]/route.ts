@@ -30,6 +30,7 @@
 import { apiPermission } from "@/lib/api-session";
 import { MailAccessError } from "@/lib/mailbox/access";
 import { readAttachment } from "@/lib/mailbox/messages";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,6 +73,9 @@ export async function GET(
             headers: {
                 "content-type": drawn ? declared : "application/octet-stream",
                 "content-length": String(file.bytes.length),
+                // Says "this download has started" to the page that asked for it - see
+                // `download-ticket`. Nothing at all when no ticket was sent.
+                ...downloadTicketHeaders(request),
                 "content-disposition": `${drawn ? "inline" : "attachment"}; filename="${name}"; filename*=UTF-8''${encodeURIComponent(file.name)}`,
                 "x-content-type-options": "nosniff",
                 // Nothing in here may reach anything, whatever a browser decides

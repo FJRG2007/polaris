@@ -15,6 +15,7 @@ import { apiPermission } from "@/lib/api-session";
 import { createZipStream } from "@/lib/zip-stream";
 import { MailAccessError } from "@/lib/mailbox/access";
 import { attachmentZipPlan, attachmentZipSources } from "@/lib/mailbox/attachment-zip";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ function asciiFallback(name: string): string {
 }
 
 export async function GET(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ messageId: string }> }
 ): Promise<Response> {
     const user = await apiPermission("mail.use");
@@ -46,6 +47,9 @@ export async function GET(
         status: 200,
         headers: {
             "content-type": "application/zip",
+            // Says "this download has started" to the page that asked for it - see
+            // `download-ticket`. Nothing at all when no ticket was sent.
+            ...downloadTicketHeaders(request),
             "content-disposition": `attachment; filename="${asciiFallback(plan.archiveName)}"; filename*=UTF-8''${encodeURIComponent(plan.archiveName)}`,
             "x-content-type-options": "nosniff",
             "content-security-policy": "default-src 'none'; sandbox",

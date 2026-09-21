@@ -17,7 +17,7 @@ import { listLocks } from "@/lib/access-lock-service";
 import { recordAudit } from "@/lib/audit-service";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
 import { baseNameOf, zipSourcesFor } from "@/lib/drive-archive";
-import { downloadTicketCookie, validDownloadTicket } from "@/lib/drive/download-ticket";
+import { downloadTicketCookie, validDownloadTicket } from "@/lib/download-ticket";
 import type { StorageDriver } from "@polaris/storage";
 
 export const runtime = "nodejs";

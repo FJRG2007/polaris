@@ -12,6 +12,11 @@
  *
  * Files first, row second, and the bytes are removed again if the row fails -
  * an orphan on a NAS is somebody's disk quietly filling up.
+ *
+ * Bytes reach it the same two ways a live message's do: small ones in this form,
+ * and anything worth streaming uploaded beforehand and named here by its id - see
+ * `lib/chat/uploads`. Scheduling a recording of a meeting for the morning is
+ * exactly the case the streamed door exists for.
  */
 
 import { z } from "zod";
@@ -24,10 +29,13 @@ import { scheduleMessage } from "@/lib/chat/scheduled";
 import { ChatAccessError, requirePostable } from "@/lib/chat/access";
 import {
     AttachmentStorageError,
+    MAX_ATTACHMENT_BYTES,
     removeStoredFiles,
     storeAttachment,
+    withStill,
     type StoredAttachment
 } from "@/lib/chat/attachments";
+import { claimUploads, UploadRefused } from "@/lib/chat/uploads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +61,25 @@ const soundsSchema = z
     )
     .max(core.CHAT_ATTACHMENT_COUNT_CEILING)
     .default([]);
+
+/** The files this message was uploaded before it, as the composer lists them: a
+ *  JSON array of ids and nothing else. Everything about each one is on the row the
+ *  upload made, under the same account. Malformed is empty rather than refused, on
+ *  the same terms as the live route. */
+function readUploads(raw: FormDataEntryValue | null): string[] {
+    if (typeof raw !== "string" || raw.trim().length === 0) return [];
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        return [];
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+        .slice(0, core.CHAT_ATTACHMENT_COUNT_CEILING)
+        .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+        .map((entry) => entry.trim());
+}
 
 function readSounds(field: FormDataEntryValue | null): unknown {
     if (typeof field !== "string" || !field) return [];
@@ -120,21 +147,29 @@ export async function POST(
     // everything that is not a video. Never required: a message whose thumbnails
     // did not arrive is a message.
     const posters = form.getAll("posters").filter((entry): entry is File => entry instanceof File);
-    if (files.length === 0 && !fields.data.body) {
+    // Files already on the storage, streamed here before this request, in the order
+    // the composer showed them. They come first in the message, exactly as they do
+    // on a live one.
+    const uploads = readUploads(form.get("uploads"));
+    const carrying = uploads.length + files.length;
+    if (carrying === 0 && !fields.data.body) {
         return Response.json({ error: "Write something, or attach a file" }, { status: 400 });
     }
-    if (files.length > 0 && !(await can(user.id, "chat.attach"))) {
+    if (carrying > 0 && !(await can(user.id, "chat.attach"))) {
         return Response.json({ error: "You are not allowed to send files here" }, { status: 403 });
     }
 
     const rules = await rulesForChannel(channelId);
-    if (files.length > 0 && rules.maxAttachments === 0) {
+    if (carrying > 0 && rules.maxAttachments === 0) {
         return Response.json({ error: "Files cannot be sent here" }, { status: 400 });
     }
-    if (files.length > rules.maxAttachments) {
+    if (carrying > rules.maxAttachments) {
         return Response.json({ error: `That is more than ${rules.maxAttachments} files` }, { status: 400 });
     }
     const biggest = rules.maxAttachmentMib * 1024 * 1024;
+    // A file that came in this request is held in memory to be read out of the
+    // form, so it has its own much lower limit - see `MAX_ATTACHMENT_BYTES`.
+    const inTheForm = Math.min(biggest, MAX_ATTACHMENT_BYTES);
     for (const file of files) {
         if (file.size > biggest) {
             return Response.json(
@@ -142,11 +177,30 @@ export async function POST(
                 { status: 400 }
             );
         }
+        if (file.size > inTheForm) {
+            return Response.json(
+                { error: `${file.name} has to be uploaded before the message it goes on` },
+                { status: 413 }
+            );
+        }
     }
 
     const stored: StoredAttachment[] = [];
     try {
+        // The streamed ones. Nothing is written here - the bytes are already on the
+        // storage - so what this does is prove they are this sender's, in this
+        // conversation, and turn them into what the message will carry.
+        const claimed = await claimUploads(
+            user.id,
+            channelId,
+            uploads,
+            uploads.map((_, at) => (sounds.success ? sounds.data[at] : undefined))
+        );
+        for (const [at, attachment] of claimed.entries()) {
+            stored.push(await withStill(attachment, await posterBytes(posters[at])));
+        }
         for (const [at, file] of files.entries()) {
+            const position = uploads.length + at;
             stored.push(
                 await storeAttachment(
                     channelId,
@@ -155,8 +209,8 @@ export async function POST(
                         type: file.type,
                         bytes: new Uint8Array(await file.arrayBuffer())
                     },
-                    sounds.success ? sounds.data[at] : undefined,
-                    await posterBytes(posters[at])
+                    sounds.success ? sounds.data[position] : undefined,
+                    await posterBytes(posters[position])
                 )
             );
         }
@@ -179,6 +233,11 @@ export async function POST(
         await removeStoredFiles(stored).catch(() => undefined);
         if (caught instanceof ChatAccessError) {
             return Response.json({ error: caught.message }, { status: 403 });
+        }
+        // A file this message named that is not there to claim: swept, already sent,
+        // or never this sender's.
+        if (caught instanceof UploadRefused) {
+            return Response.json({ error: caught.message }, { status: 409 });
         }
         if (caught instanceof AttachmentStorageError) {
             console.error(caught);

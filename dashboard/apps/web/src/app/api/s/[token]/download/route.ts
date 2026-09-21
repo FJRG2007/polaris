@@ -14,6 +14,7 @@ import { pipeThenDispose } from "@/lib/drive-stream";
 import { gateShareRequest } from "@/lib/share-access";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { logShareAccess, registerDownload, resolveWithinShare } from "@/lib/share-service";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,6 +69,9 @@ export async function GET(
             "content-type":
                 stat.mime ?? mimeForName(baseName(target)) ?? "application/octet-stream",
             "accept-ranges": "bytes",
+            // Says "this download has started" to the page that asked for it - see
+            // `download-ticket`. Nothing at all when no ticket was sent.
+            ...downloadTicketHeaders(request),
             "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(baseName(target))}`
         });
 

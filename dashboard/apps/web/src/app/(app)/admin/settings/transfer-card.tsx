@@ -9,6 +9,8 @@
  * including the one doing it.
  */
 
+import { saveFile } from "@/components/transfers/move-file";
+import { sendFile } from "@/components/transfers/move-file";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { usePasswordSafety } from "@/lib/use-password-safety";
@@ -59,7 +61,10 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
         setExported(result);
         setExportPass("");
         setExportConfirm("");
-        window.location.assign(`/api/admin/transfer/${result.id}/download`);
+        // The largest download Polaris ever answers, and it is built before it is
+        // sent: through the shared surface so the screen says so - see
+        // `components/transfers`.
+        saveFile(`/api/admin/transfer/${result.id}/download`, "polaris-export.polaris");
     }
 
     async function runPreview() {
@@ -69,13 +74,23 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
         let id = uploadId;
         if (!id) {
             setBusy("upload");
-            const response = await fetch("/api/admin/transfer/upload", {
+            // Through the shared sender: an instance's whole export is the largest
+            // file anybody puts into Polaris, and it used to be a button that said
+            // "Working" for as long as it took.
+            const response = await sendFile("/api/admin/transfer/upload", file, {
                 method: "POST",
-                headers: { "x-polaris-transfer": "1", "content-type": "application/octet-stream" },
-                body: file
-            }).catch(() => null);
-            const answer = (await response?.json().catch(() => null)) as { id?: string; error?: string } | null;
-            if (!response?.ok || !answer?.id) {
+                headers: { "x-polaris-transfer": "1" }
+            });
+            let answer: { id?: string; error?: string } = {};
+            try {
+                answer = (JSON.parse(response.body || "{}") ?? {}) as {
+                    id?: string;
+                    error?: string;
+                };
+            } catch {
+                answer = {};
+            }
+            if (!response.ok || !answer.id) {
                 setBusy(null);
                 setError(answer?.error ?? "The file could not be uploaded");
                 return;

@@ -123,7 +123,7 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
 
                     <Limit
                         label="Biggest single file"
-                        hint="Anything larger belongs in Drive, with a link to it in the conversation."
+                        hint="A file this big is streamed straight to the storage Polaris writes uploads to, so what this really sets is how much of your disks one message may take. Somebody sharing a file they already have in Drive is not bound by it at all when this instance shares by link."
                         suffix="MB"
                         value={rules.maxAttachmentMib}
                         min={1}

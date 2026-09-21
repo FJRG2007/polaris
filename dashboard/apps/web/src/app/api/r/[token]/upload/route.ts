@@ -23,35 +23,11 @@ import { getDriverForConnection } from "@/lib/storage-service";
 import { extensionOf } from "@/app/(app)/drive/file-categories";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { claimUploadPath, replaceWithStaged } from "@/lib/upload-naming";
+import { cappedStream } from "@/lib/stream-cap";
 import { baseName, checkUploadCandidate, normalizeRelPath } from "@polaris/core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** Wrap a body stream so it errors once more than `max` bytes have been read. */
-function limitSize(body: ReadableStream<Uint8Array>, max: number): ReadableStream<Uint8Array> {
-    let seen = 0;
-    const reader = body.getReader();
-    return new ReadableStream<Uint8Array>({
-        async pull(controller) {
-            const { done, value } = await reader.read();
-            if (done) {
-                controller.close();
-                return;
-            }
-            seen += value.byteLength;
-            if (seen > max) {
-                await reader.cancel();
-                controller.error(new Error("too_large"));
-                return;
-            }
-            controller.enqueue(value);
-        },
-        async cancel(reason) {
-            await reader.cancel(reason);
-        }
-    });
-}
 
 export async function PUT(
     request: Request,
@@ -158,7 +134,7 @@ export async function PUT(
     try {
         let stat;
         try {
-            stat = await driver.writeStream(staged, limitSize(request.body, maxSizeBytes), {});
+            stat = await driver.writeStream(staged, cappedStream(request.body, maxSizeBytes), {});
         } catch (error) {
             // An aborted oversize write leaves a truncated file behind, under a name
             // that reads as a complete document. Take the claim back with it.

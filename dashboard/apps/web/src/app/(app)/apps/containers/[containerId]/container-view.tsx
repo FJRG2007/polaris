@@ -18,6 +18,7 @@
  * them as fresh ones land.
  */
 
+import { saveFile } from "@/components/transfers/move-file";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
@@ -822,6 +823,13 @@ function FilesTab({ query }: { query: string }) {
                                         </span>
                                         <a
                                             href={`/api/containers/file?${query}&p=${encodeURIComponent(full)}`}
+                                            onClick={(event) => {
+                                                event.preventDefault();
+                                                saveFile(
+                                                    `/api/containers/file?${query}&p=${encodeURIComponent(full)}`,
+                                                    entry.name
+                                                );
+                                            }}
                                             aria-label={`Download ${entry.name}`}
                                             title={`Download ${entry.name}`}
                                             className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"

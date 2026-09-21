@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { readContainerFile } from "@/lib/container-files-service";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,9 @@ export async function GET(
         return new Response(Readable.toWeb(stream) as ReadableStream, {
             headers: {
                 "content-type": "application/octet-stream",
+                // Says "this download has started" to the page that asked for it - see
+                // `download-ticket`. Nothing at all when no ticket was sent.
+                ...downloadTicketHeaders(request),
                 "content-disposition": `attachment; filename="${name.replace(/"/g, "")}"`
             }
         });

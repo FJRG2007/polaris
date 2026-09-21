@@ -14,6 +14,7 @@
  * immediately instead of appearing to hang while a file is built.
  */
 
+import { sendFile } from "@/components/transfers/move-file";
 import * as core from "@polaris/core";
 import { Download, Upload } from "lucide-react";
 import { AccountPicker } from "../account-picker";
@@ -105,11 +106,18 @@ export function ArchiveView({
             // than on whichever disk happens to be under the web server.
             const form = new FormData();
             form.set("file", file);
-            const sent = await fetch("/api/mail/uploads?kind=archive", {
-                method: "POST",
-                body: form
+            // An mbox is routinely hundreds of megabytes, which makes this the one
+            // upload in Polaris most worth watching - through the shared sender it
+            // has a bar and can be stopped.
+            const sent = await sendFile("/api/mail/uploads?kind=archive", form, {
+                name: file.name
             });
-            const stored = (await sent.json()) as { upload?: { id: string }; error?: string };
+            let stored: { upload?: { id: string }; error?: string } = {};
+            try {
+                stored = JSON.parse(sent.body || "{}") as typeof stored;
+            } catch {
+                stored = {};
+            }
             if (!sent.ok || !stored.upload) {
                 toast.show({ title: stored.error ?? "That file could not be read." });
                 return;

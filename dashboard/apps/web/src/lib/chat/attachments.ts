@@ -26,6 +26,7 @@ import {
     AUTOMATIC_TARGET,
     LOCAL_TARGET,
     placeFile,
+    streamFile,
     driverForTarget,
     resolveStorageTarget,
     storageTargetOptions,
@@ -56,15 +57,20 @@ const ATTACHMENT_ROOT = "polaris/chat";
 const EVIDENCE_ROOT = "polaris/chat-reports";
 
 /**
- * The most one file may be, whatever the rules say.
+ * The most one file that travels *inside the send request* may be.
  *
- * A chat is not a file server: something bigger than this belongs in Drive, with
- * a link to it in the conversation. The admin sets the actual limit per kind of
- * conversation and can only go lower - this is the ceiling, and it is a fact
- * about the code rather than a matter of taste, because a file is held in memory
- * whole on its way in and on its way back out.
+ * Not the instance's limit - that is the operator's, it is set per kind of
+ * conversation, and it is far above this. This is the one door that still holds a
+ * whole file in memory: a screenshot sent with a sentence is simpler as one
+ * request than as two, so a small file still rides the form and is read out of it
+ * here.
+ *
+ * Anything larger is streamed to the storage before the message names it, which is
+ * what `lib/chat/uploads` is for and what the composer does for every file it
+ * sends. A client that puts a bigger one in the form is told to upload it first
+ * rather than being allowed to cost the server the whole of it.
  */
-export const MAX_ATTACHMENT_BYTES = core.CHAT_ATTACHMENT_CEILING_MIB * 1024 * 1024;
+export const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 
 /**
  * What the browser is allowed to show inline.
@@ -311,6 +317,86 @@ export async function storeAttachment(
 }
 
 /**
+ * A file written straight from another storage, without passing through here.
+ *
+ * What "copy this out of my Drive into the conversation" does now. The bytes go
+ * from the storage they are on to the storage the conversation writes to, and the
+ * only thing this process holds is the pair of open sessions - which is what lets
+ * the per-file limit be a number about disks rather than about one request's
+ * heap.
+ *
+ * The size recorded is what the destination says it kept, never what the source
+ * claimed, on the same terms as a streamed upload.
+ */
+export async function storeStreamedAttachment(
+    channelId: string,
+    file: {
+        readonly name: string;
+        readonly type: string;
+        readonly body: ReadableStream<Uint8Array>;
+        readonly size?: number;
+    },
+    spoiler = false
+): Promise<StoredAttachment> {
+    const folder = `${ATTACHMENT_ROOT}/${safe(channelId)}`;
+    const path = `${folder}/${crypto.randomUUID()}`;
+    const contentType = file.type || mimeForName(file.name) || "application/octet-stream";
+
+    let placed: { targetId: string; size: number };
+    try {
+        placed = await streamFile({
+            target: await chatTarget(),
+            localFolder: LOCAL_FOLDER,
+            folder,
+            path,
+            body: file.body,
+            mime: contentType,
+            declared: file.size,
+            what: "file"
+        });
+    } catch (error) {
+        throw new AttachmentStorageError(reason(error));
+    }
+
+    return {
+        name: file.name.slice(0, 200) || "file",
+        size: placed.size,
+        contentType,
+        connectionId: placed.targetId === LOCAL_TARGET ? null : placed.targetId,
+        path,
+        posterPath: null,
+        posterConnectionId: null,
+        borrowed: false,
+        spoiler,
+        durationMs: null,
+        waveform: null
+    };
+}
+
+/**
+ * The same still, put beside a file that was written before this request.
+ *
+ * A file streamed straight to the storage has no thumbnail: the browser takes one
+ * from the video it is about to send, and that is a few kilobytes riding the
+ * message rather than a second upload. So the attachment comes back from the
+ * staging table without one and gets it here, beside the bytes it is of.
+ *
+ * Never fatal, for the same reason `placePoster` is not: a video with no
+ * thumbnail is a message, and a message refused over a thumbnail is a bug.
+ */
+export async function withStill(
+    attachment: StoredAttachment,
+    bytes: Uint8Array | null
+): Promise<StoredAttachment> {
+    if (!bytes || bytes.length === 0) return attachment;
+    const folder = attachment.path.slice(0, attachment.path.lastIndexOf("/"));
+    if (!folder) return attachment;
+    const still = await placePoster(folder, attachment.path, bytes);
+    if (!still) return attachment;
+    return { ...attachment, posterPath: still.path, posterConnectionId: still.connectionId };
+}
+
+/**
  * The biggest a still may be.
  *
  * A JPEG of a screen at 640 pixels across is twenty kilobytes; a hundred is the
@@ -377,6 +463,26 @@ export async function readAttachmentPoster(attachmentId: string): Promise<Uint8A
 }
 
 /** Read one back, for the download route. Null when the bytes are gone. */
+/**
+ * Where one attachment's bytes are, without reading any of them.
+ *
+ * What a route needs to hand the file back as a stream: the name and type it is
+ * served under, and the storage and path to open. `readAttachment` below is the
+ * other shape - the whole file in hand - and is for the few things that genuinely
+ * need the bytes here, like attaching one to an outgoing mail.
+ */
+export async function describeAttachment(attachmentId: string): Promise<{
+    readonly name: string;
+    readonly contentType: string;
+    readonly connectionId: string | null;
+    readonly path: string;
+} | null> {
+    return prisma.chatAttachment.findUnique({
+        where: { id: attachmentId },
+        select: { name: true, contentType: true, connectionId: true, path: true }
+    });
+}
+
 export async function readAttachment(attachmentId: string): Promise<{
     readonly name: string;
     readonly contentType: string;

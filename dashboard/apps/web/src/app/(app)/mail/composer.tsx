@@ -26,6 +26,7 @@
  * and the missing attachment, which are the two mistakes everybody makes.
  */
 
+import { sendFile } from "@/components/transfers/move-file";
 import Link from "next/link";
 import { useBusy } from "./use-busy";
 import * as core from "@polaris/core";
@@ -101,6 +102,15 @@ const writeDraft: DraftWriter = async (fields, id) => {
     const outcome = await outbox.saveDraft(fields, id);
     return outbox.isRefused(outcome) ? null : outcome.draftId;
 };
+
+/** A route's answer, when there is one to read. */
+function parsed(body: string): unknown {
+    try {
+        return JSON.parse(body || "null");
+    } catch {
+        return null;
+    }
+}
 
 export function Composer() {
     const { accounts, identities, composing, openComposer, refreshMailbox, viewerName, shelf } =
@@ -260,8 +270,11 @@ export function Composer() {
                 }
                 const form = new FormData();
                 form.set("file", file);
-                const response = await fetch("/api/mail/uploads", { method: "POST", body: form });
-                const answer = (await response.json().catch(() => null)) as {
+                // Through the shared sender, so a twenty-megabyte attachment has a
+                // bar rather than a composer that looks stuck - see
+                // `components/transfers`.
+                const response = await sendFile("/api/mail/uploads", form, { name: file.name });
+                const answer = parsed(response.body) as {
                     upload?: Attached;
                     error?: string;
                 } | null;

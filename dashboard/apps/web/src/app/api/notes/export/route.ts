@@ -19,6 +19,7 @@
 import { NoteAccessError } from "@/lib/notes/access";
 import { apiPermission } from "@/lib/api-session";
 import { exportArchive, type ExportScope } from "@/lib/notes/export-service";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,6 +44,9 @@ export async function GET(request: Request): Promise<Response> {
                 "content-type": archive.contentType,
                 // The quoted form, because a notebook is allowed to be called
                 // "Q3 planning" and an unquoted header stops at the space.
+                // Says "this download has started" to the page that asked for it - see
+                // `download-ticket`. Nothing at all when no ticket was sent.
+                ...downloadTicketHeaders(request),
                 "content-disposition": `attachment; filename="${archive.name.replace(/"/g, "")}"`,
                 "cache-control": "no-store"
             }

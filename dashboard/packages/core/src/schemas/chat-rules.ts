@@ -67,11 +67,38 @@ export const CHAT_NO_LIMIT = 0;
 /**
  * The most a single file may be allowed to be, in MiB.
  *
- * Not a matter of taste: an attachment is read into memory whole on its way in
- * and on its way back out, so the ceiling is what one request may reasonably
- * cost the server. Something larger belongs in Drive with a link to it.
+ * A hundred megabytes for a long time, and that number was honest while it lasted:
+ * a file arrived inside the request that sent the message and left inside the
+ * request that read it, so both ends held the whole thing in memory and the limit
+ * was what one request could be allowed to cost the server. It was also plainly
+ * the wrong answer for somebody sending a recording of a meeting, and the screen
+ * that set it had to say "anything bigger belongs in Drive" about files the same
+ * instance was already storing in Drive perfectly well.
+ *
+ * The bytes stream now, in both directions: a file goes to the storage before the
+ * message that names it (`lib/chat/uploads`) and is handed back a chunk at a time
+ * (`lib/chat/streamed-file`), so nothing here is bounded by memory any more. What
+ * this is now is a real ceiling on a real thing - what one message may put on the
+ * operator's disks - and eight gigabytes is past any video anybody sends a
+ * colleague while still being a number somebody could see coming.
+ *
+ * The two doors that genuinely do hold a file in memory keep their own, much lower
+ * limits, and neither follows this: a file small enough to ride the send request
+ * itself (`MAX_ATTACHMENT_BYTES`) and a call recorded in a browser tab
+ * (`CALL_RECORDING_CEILING_MIB`).
  */
-export const CHAT_ATTACHMENT_CEILING_MIB = 100;
+export const CHAT_ATTACHMENT_CEILING_MIB = 8 * 1024;
+
+/**
+ * The most a call recorded in the browser may be, in MiB.
+ *
+ * Not the same question as the one above, which is why it is not the same number.
+ * A recording is made by the tab that is in the call and held in that tab's memory
+ * until it is sent, so what bounds it is a browser rather than a disk - and a tab
+ * that has just spent an hour collecting an hour of video is the last place to
+ * discover a limit.
+ */
+export const CALL_RECORDING_CEILING_MIB = 512;
 
 /** The most files one message may be allowed to carry. */
 export const CHAT_ATTACHMENT_COUNT_CEILING = 25;

@@ -19,6 +19,7 @@
  * up nothing but itself.
  */
 
+import { sendFile } from "@/components/transfers/move-file";
 import Link from "next/link";
 import { FilesView } from "./files-view";
 import * as driveActions from "./actions";
@@ -452,7 +453,13 @@ export function DriveExplorer({
         for (const { file, relPath } of items) {
             const query = new URLSearchParams({ c: connectionId, name: relPath });
             if (path) query.set("p", path);
-            await fetch(`/api/drive/upload?${query.toString()}`, { method: "PUT", body: file });
+            // Through the shared sender, so the file gets a bar in the corner and
+            // can be stopped - a folder of holiday video through `fetch` was a
+            // spinner that knew nothing for twenty minutes.
+            const sent = await sendFile(`/api/drive/upload?${query.toString()}`, file, {
+                name: relPath
+            });
+            if (!sent.ok && sent.status !== 0) setOpError(sent.body || "That file was refused.");
         }
         setUploading(false);
         if (fileInput.current) fileInput.current.value = "";

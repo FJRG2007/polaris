@@ -15,6 +15,7 @@ import { gateShareRequest } from "@/lib/share-access";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
 import { zipSourcesFor } from "@/lib/drive-archive";
 import type { StorageDriver } from "@polaris/storage";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,6 +77,9 @@ export async function GET(
         status: 200,
         headers: {
             "content-type": "application/zip",
+            // Says "this download has started" to the page that asked for it - see
+            // `download-ticket`. Nothing at all when no ticket was sent.
+            ...downloadTicketHeaders(request),
             "content-disposition": `attachment; filename="${asciiFallback(archiveName)}"; filename*=UTF-8''${encodeURIComponent(archiveName)}`,
             "cache-control": "no-store"
         }

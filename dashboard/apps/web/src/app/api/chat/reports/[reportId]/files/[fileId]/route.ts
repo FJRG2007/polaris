@@ -20,9 +20,11 @@
  * should be talked into running something found inside them.
  */
 
-import { readReportFile } from "@/lib/chat/report-files";
+import { describeReportFile } from "@/lib/chat/report-files";
 import { apiAdmin } from "@/lib/api-session";
+import { rangeHeaders, streamStored } from "@/lib/chat/streamed-file";
 import { isInlineImage, isPlayableMedia } from "@/lib/chat/attachments";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +41,7 @@ export async function GET(
     if (refused instanceof Response) return refused;
     const { reportId, fileId } = await params;
 
-    const file = await readReportFile(reportId, fileId);
+    const file = await describeReportFile(reportId, fileId);
     // The same answer for "not there" and "not that report's", so this cannot be
     // used to find out which files exist.
     if (!file) {
@@ -49,13 +51,32 @@ export async function GET(
     const asFile = new URL(request.url).searchParams.get("download") === "1";
     const shown =
         !asFile && (isInlineImage(file.contentType) || isPlayableMedia(file.contentType));
-    return new Response(file.bytes as unknown as BodyInit, {
+    // Streamed rather than read whole. A report about a message carrying an
+    // hour-long recording is a report an administrator has to be able to open, and
+    // the bytes are the same bytes the conversation serves - see `streamStored`.
+    const opened = await streamStored(
+        file,
+        asFile ? null : request.headers.get("range"),
+        `reported file ${fileId}`
+    );
+    if (!opened.ok) {
+        if (opened.why === "unsatisfiable") {
+            return new Response(null, { status: 416, headers: { "Accept-Ranges": "bytes" } });
+        }
+        return Response.json({ error: "That file is no longer there" }, { status: 410 });
+    }
+    return new Response(opened.body, {
+        status: opened.range ? 206 : 200,
         headers: {
             "Content-Type": shown ? file.contentType : "application/octet-stream",
-            "Content-Length": String(file.bytes.length),
+            "Accept-Ranges": "bytes",
+            ...rangeHeaders(opened),
             "Cache-Control": CACHE,
             "X-Content-Type-Options": "nosniff",
             "Content-Security-Policy": "default-src 'none'; sandbox",
+            // Says "this download has started" to the page that asked for it -
+            // see `download-ticket`. Nothing at all when no ticket was sent.
+            ...downloadTicketHeaders(request),
             "Content-Disposition": `${shown ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`
         }
     });

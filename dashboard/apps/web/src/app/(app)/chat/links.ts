@@ -11,6 +11,8 @@
  * and nowhere else. Same reason, and the same helper, as a task link.
  */
 
+import { saveFile } from "@/components/transfers/move-file";
+
 /** The conversation itself: a channel, a group chat or a direct message. */
 export function channelLink(baseUrl: string, channelId: string): string {
     return `${baseUrl}/chat/c/${channelId}`;
@@ -69,8 +71,8 @@ export async function copyText(value: string): Promise<void> {
  * and a second copy would be the one that forgets the query.
  */
 export function downloadFile(url: string, name: string): void {
-    const anchor = document.createElement("a");
-    anchor.href = `${url}${url.includes("?") ? "&" : "?"}download=1`;
-    anchor.download = name;
-    anchor.click();
+    // Through the shared surface, so the wait before the first byte is on screen:
+    // a file on a share behind a fresh connection can be many seconds of a menu
+    // item that looks like it did nothing - see `components/transfers`.
+    saveFile(url, name, { asFile: true });
 }

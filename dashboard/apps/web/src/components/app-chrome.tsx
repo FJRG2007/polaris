@@ -34,6 +34,7 @@ import { ScopeSwitcher } from "@/components/scope-switcher";
 import { IncomingCalls } from "@/components/incoming-calls";
 import { CallElsewhere } from "@/app/(app)/chat/call-elsewhere";
 import { MessageToasts } from "@/components/message-toasts";
+import { TransfersView } from "@/components/transfers/transfers-view";
 import { CommandPalette } from "@/components/command-palette";
 import { PresenceProvider } from "@/components/presence-store";
 import { ProfileStyleProvider } from "@/components/profile-style-store";
@@ -226,6 +227,12 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                         {apps.ids.includes("chat") ? (
                                                             <MessageToasts />
                                                         ) : null}
+                                                        {/* Files going up and coming down, from every screen
+                                    at once. Out here because a transfer outlives
+                                    the screen it was started from: somebody who
+                                    sends a recording and then goes to read their
+                                    mail has not cancelled anything. */}
+                                                        <TransfersView />
                                                         <AppShell
                                                             mark={
                                                                 <Link

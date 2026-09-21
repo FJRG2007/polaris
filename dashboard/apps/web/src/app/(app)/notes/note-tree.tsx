@@ -18,6 +18,7 @@
  * and not of the writing.
  */
 
+import { saveFile } from "@/components/transfers/move-file";
 import Fuse from "fuse.js";
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
@@ -100,7 +101,10 @@ function exportHref(scope: "note" | "folder" | "space", id: string | null): stri
 }
 
 function download(scope: "note" | "folder" | "space", id: string | null): void {
-    window.location.assign(exportHref(scope, id));
+    // An export is built before it is answered - a shelf of notes is a zip the
+    // server has to make - so it goes through the shared surface, which says so
+    // until the first byte arrives. See `components/transfers`.
+    saveFile(exportHref(scope, id), scope === "note" ? "note.md" : "notes.zip");
 }
 
 /**

@@ -12,6 +12,7 @@
  * something the machine already knows.
  */
 
+import { saveFile } from "@/components/transfers/move-file";
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
@@ -189,7 +190,10 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                                 aria-label="Export this note as Markdown"
                                 title="Export"
                                 onClick={() =>
-                                    window.location.assign(`/api/notes/export?scope=note&id=${note.id}`)
+                                    saveFile(
+                                        `/api/notes/export?scope=note&id=${note.id}`,
+                                        `${note.title || "note"}.md`
+                                    )
                                 }
                                 className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >

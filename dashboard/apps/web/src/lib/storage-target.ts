@@ -271,6 +271,92 @@ export async function placeFile(input: {
     );
 }
 
+/**
+ * The same thing for a file nobody is holding: bytes straight from a request into
+ * the storage.
+ *
+ * `placeFile` above is for a file this process has in hand, and it can afford
+ * every guarantee because it can write the same bytes twice. A stream cannot:
+ * once a request body has been read it is gone, so the storage that was chosen is
+ * the storage that gets it, and a share that fails halfway is a failed upload
+ * rather than a quiet fallback. What is kept from `placeFile` is what still
+ * holds - the choice is made *before* the body is touched, so an unplugged NAS is
+ * still skipped rather than written to, and the file is read back afterwards to
+ * prove the storage will give it up again.
+ *
+ * There is no overall timeout, deliberately. A file large enough to be streamed
+ * legitimately takes minutes, and a clock over the whole write would cut off the
+ * uploads this exists for. What bounds it is the request: if the sender goes
+ * away, the body ends and the write ends with it.
+ *
+ * `size` is what the storage says it kept, which is the only number worth
+ * recording - a size the client declared is a size the client could understate.
+ */
+export async function streamFile(input: {
+    readonly target: UploadTarget;
+    readonly localFolder: string;
+    /** Made if it is not there. */
+    readonly folder: string;
+    readonly path: string;
+    readonly body: ReadableStream<Uint8Array>;
+    readonly mime: string;
+    /** What the sender said it weighs, for drivers that need a length up front -
+     *  a chunked upload API cannot start without one. Never trusted as the
+     *  stored size. */
+    readonly declared?: number;
+    /** What to call this kind of file in a log line. */
+    readonly what: string;
+}): Promise<{ targetId: string; size: number; fellBackFrom: string | null }> {
+    const chosen = await openForWriting(input.target, input.localFolder);
+    try {
+        await chosen.driver.mkdir(input.folder).catch(() => undefined);
+        const written = await chosen.driver.writeStream(input.path, input.body, {
+            mime: input.mime || "application/octet-stream",
+            ...(input.declared !== undefined && input.declared > 0
+                ? { size: BigInt(input.declared) }
+                : {})
+        });
+
+        // It took the file. Whether it will give it back is a different question,
+        // and the one that has cost people their uploads: a share that has gone
+        // away, a mount that accepts writes into nothing and a handle still held
+        // open all stat perfectly and refuse the read.
+        const stream = await withTimeout(
+            chosen.driver.readStream(input.path),
+            PLACE_TIMEOUT_MS,
+            "it would not open the file it had just taken"
+        );
+        const reader = stream.getReader();
+        try {
+            const { done, value } = await withTimeout(
+                reader.read(),
+                PLACE_TIMEOUT_MS,
+                "it opened the file and then said nothing"
+            );
+            if (Number(written.size) > 0 && (done || !value?.length)) {
+                throw new StorageRefused(
+                    `${chosen.name} took the ${input.what} and gave back nothing.`
+                );
+            }
+        } finally {
+            await reader.cancel().catch(() => undefined);
+        }
+
+        return {
+            targetId: chosen.targetId,
+            size: Number(written.size),
+            fellBackFrom: chosen.fellBackFrom
+        };
+    } catch (error) {
+        // A write that stopped part-way leaves a truncated file under a name that
+        // reads like a whole one.
+        await chosen.driver.delete(input.path).catch(() => undefined);
+        throw error;
+    } finally {
+        await chosen.driver.dispose().catch(() => undefined);
+    }
+}
+
 /** One attempt on one open storage. Disposes of it either way; leaves nothing
  *  behind when it fails, because an orphan on a NAS is somebody's disk quietly
  *  filling up. */

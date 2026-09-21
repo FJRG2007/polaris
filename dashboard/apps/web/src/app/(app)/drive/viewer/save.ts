@@ -5,6 +5,7 @@
  * them straight to the browser as a download that never touches the server.
  */
 
+import { sendFile } from "@/components/transfers/move-file";
 import { z } from "zod";
 import { parentPath } from "@polaris/core";
 import type { ViewerTarget } from "./types";
@@ -66,13 +67,12 @@ export async function saveFileBytes(
     const parent = parentPath(target.path);
     if (parent) query.set("p", parent);
     try {
-        const response = await fetch(`/api/drive/upload?${query.toString()}`, {
-            method: "PUT",
-            body
-        });
-        if (response.ok) return null;
-        if (response.status === 403) return "Could not save - you may not have write access here.";
-        if (response.status === 423) return "This file is locked.";
+        // Through the shared sender: a slide deck with video in it is a save
+        // somebody watches, and this is the one that reports how far it has got.
+        const sent = await sendFile(`/api/drive/upload?${query.toString()}`, body, { name });
+        if (sent.ok) return null;
+        if (sent.status === 403) return "Could not save - you may not have write access here.";
+        if (sent.status === 423) return "This file is locked.";
         return "Could not save this file.";
     } catch {
         return "Could not save this file.";

@@ -110,6 +110,20 @@ export async function storeMeetingFile(
 /** One file back out, or null when the storage no longer has it - which the
  *  caller turns into a 410 rather than a 500, because from the reader's side a
  *  swept file and an unreachable share are the same thing. */
+/** Where one file in a call is, without reading it. The route serves it as a
+ *  stream, so the bytes never pass through here. */
+export async function describeMeetingFile(attachmentId: string): Promise<{
+    readonly name: string;
+    readonly contentType: string;
+    readonly connectionId: string | null;
+    readonly path: string;
+} | null> {
+    return prisma.meetingAttachment.findUnique({
+        where: { id: attachmentId },
+        select: { name: true, contentType: true, connectionId: true, path: true }
+    });
+}
+
 export async function readMeetingFile(attachmentId: string): Promise<{
     bytes: Uint8Array;
     name: string;

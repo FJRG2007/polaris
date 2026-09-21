@@ -27,6 +27,7 @@ import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
 import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
+import { sweepUploads } from "@/lib/chat/uploads";
 import { probeAllDomains } from "@/lib/watch/health-probe";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
 import { evaluateAlarms } from "@/lib/watch/alarm-evaluator";
@@ -291,6 +292,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: HOUR,
         leaseMs: null,
         run: sweepOrphanUploads
+    },
+    {
+        key: "chat-uploads",
+        // The same thing for a conversation: a file streamed to the storage by
+        // somebody who then closed the tab without sending. Hourly, and nothing is
+        // waiting on it - what it reclaims is disk.
+        everyMs: HOUR,
+        leaseMs: null,
+        run: sweepUploads
     },
     {
         key: "service-crons",

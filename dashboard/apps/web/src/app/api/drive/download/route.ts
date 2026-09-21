@@ -11,7 +11,7 @@ import { pipeThenDispose } from "@/lib/drive-stream";
 import { sessionCan } from "@/lib/session";
 import { baseName, normalizeRelPath } from "@polaris/core";
 import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
-import { downloadTicketCookie, validDownloadTicket } from "@/lib/drive/download-ticket";
+import { downloadTicketCookie, validDownloadTicket } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

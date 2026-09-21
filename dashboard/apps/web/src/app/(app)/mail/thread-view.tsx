@@ -18,6 +18,7 @@
  * what marks it, and the toolbar can always put it back.
  */
 
+import { saveFile } from "@/components/transfers/move-file";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import * as core from "@polaris/core";
@@ -1069,8 +1070,23 @@ function MessageCard({
                                                         </span>
                                                     </span>
                                                 )}
+                                                {/* The link is kept so a middle
+                                                    click and "save link as" still
+                                                    work; an ordinary press goes
+                                                    through the shared surface,
+                                                    which puts it in the corner
+                                                    with everything else that is
+                                                    moving - see
+                                                    `components/transfers`. */}
                                                 <a
                                                     href={`/api/mail/attachments/${file.id}`}
+                                                    onClick={(event) => {
+                                                        event.preventDefault();
+                                                        saveFile(
+                                                            `/api/mail/attachments/${file.id}`,
+                                                            file.name
+                                                        );
+                                                    }}
                                                     className="shrink-0 rounded p-1 text-foreground-subtle hover:text-foreground"
                                                     aria-label={`Save ${file.name}`}
                                                     title={`Save ${file.name}`}
@@ -1092,6 +1108,13 @@ function MessageCard({
                                         <li className="flex items-center">
                                             <a
                                                 href={`/api/mail/zip/${message.id}`}
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    saveFile(
+                                                        `/api/mail/zip/${message.id}`,
+                                                        "attachments.zip"
+                                                    );
+                                                }}
                                                 className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground"
                                                 download
                                             >
@@ -1115,6 +1138,13 @@ function MessageCard({
                                 <a
                                     className="inline-flex items-center gap-1 underline"
                                     href={`/api/mail/export?messageId=${encodeURIComponent(message.id)}`}
+                                    onClick={(event) => {
+                                        event.preventDefault();
+                                        saveFile(
+                                            `/api/mail/export?messageId=${encodeURIComponent(message.id)}`,
+                                            "message.eml"
+                                        );
+                                    }}
                                     download
                                 >
                                     <Download className="size-3 shrink-0" aria-hidden />

@@ -203,6 +203,24 @@ export async function reportFiles(reportIds: readonly string[]): Promise<
  *
  * Addressed by report and file together so an id on its own reaches nothing.
  */
+/** Where one reported file's bytes are, without reading them: what the route
+ *  needs to hand it back as a stream. Addressed by report and file together, on
+ *  the same terms as the read below - an id on its own reaches nothing. */
+export async function describeReportFile(
+    reportId: string,
+    fileId: string
+): Promise<{
+    readonly name: string;
+    readonly contentType: string;
+    readonly connectionId: string | null;
+    readonly path: string;
+} | null> {
+    return prisma.chatReportFile.findFirst({
+        where: { id: fileId, reportId },
+        select: { name: true, contentType: true, connectionId: true, path: true }
+    });
+}
+
 export async function readReportFile(
     reportId: string,
     fileId: string

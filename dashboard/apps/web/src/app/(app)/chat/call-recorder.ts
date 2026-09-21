@@ -55,14 +55,17 @@ export const MAX_RECORDING_SECONDS = 60 * 60;
 /**
  * The most it may grow to.
  *
- * The ceiling an attachment can be on any Polaris, because the point of a
- * recording is to end up in the conversation the call belongs to, and one that
- * cannot be sent there is a file somebody has to keep on a laptop. An instance
- * whose own limit is lower will refuse the upload with its own message, and the
- * panel offers the download instead - which is the only case where the two
- * numbers can disagree.
+ * Its own ceiling rather than the instance's, because the two are about different
+ * things. What a conversation accepts is a number about the operator's disks, and
+ * it is measured in gigabytes now; what this is about is a browser tab holding
+ * every frame it has recorded until somebody sends it, and a tab that has just
+ * spent an hour filling up is the last place to discover a limit.
+ *
+ * An instance whose own limit is lower will refuse the upload with its own
+ * message, and the panel offers the download instead - which is the only case
+ * where the two numbers can disagree.
  */
-export const MAX_RECORDING_BYTES = core.CHAT_ATTACHMENT_CEILING_MIB * 1024 * 1024;
+export const MAX_RECORDING_BYTES = core.CALL_RECORDING_CEILING_MIB * 1024 * 1024;
 
 /** What the recording is composed at. 720p: legible for a shared screen, and a
  *  size any machine can encode while also being in a call. */

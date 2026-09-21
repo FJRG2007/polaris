@@ -50,6 +50,7 @@ import { useVoiceSettings } from "./voice-settings";
 import { useCloseOnEscape } from "./close-on-escape";
 import type { RecordedSound } from "./voice-recorder";
 import type { KeptPick } from "@/components/file-picker/as-files";
+import { sendFile } from "@/components/transfers/move-file";
 import type * as messagesLib from "@/lib/chat/messages";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -161,6 +162,34 @@ function readingOlder(element: HTMLElement): boolean {
 /** How long a freshly opened conversation keeps putting itself at the bottom
  *  while everything late finishes arriving. */
 const SETTLE_MS = 1200;
+
+/**
+ * What the server said about a file it would not take.
+ *
+ * The upload route answers with a sentence for the sender - "that is bigger than
+ * 200 MB", "files cannot be sent here" - and it is the only thing worth showing:
+ * the alternative is "that could not be sent" over a refusal that said exactly
+ * what to do about it.
+ */
+function refusal(body: string): string | null {
+    if (!body) return null;
+    try {
+        const parsed: unknown = JSON.parse(body);
+        const said = (parsed as { error?: unknown }).error;
+        return typeof said === "string" && said ? said : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Take a staged file back off the storage, for a send that failed after some of
+ *  its files had already gone up. Best effort: the sweep is behind it. */
+async function discardUpload(channelId: string, id: string): Promise<void> {
+    if (!id) return;
+    await fetch(`/api/chat/channels/${channelId}/uploads?id=${encodeURIComponent(id)}`, {
+        method: "DELETE"
+    }).catch(() => undefined);
+}
 
 export function ChannelView({
     channelId,
@@ -1261,11 +1290,29 @@ export function ChannelView({
     ): Promise<{ error?: string }> => {
         const answering = replyingTo?.id ?? null;
         if (files.length > 0) {
+            // Uploaded first, exactly as a message sent now is: the bytes have to be
+            // on the storage before the hour comes, and streaming them is what lets
+            // somebody schedule a recording rather than a screenshot.
+            const uploaded: string[] = [];
+            for (const file of files) {
+                const query = new URLSearchParams({ name: file.name });
+                const sent = await sendFile(
+                    `/api/chat/channels/${channelId}/uploads?${query.toString()}`,
+                    file
+                );
+                if (!sent.ok) {
+                    await Promise.all(uploaded.map((id) => discardUpload(channelId, id)));
+                    return { error: refusal(sent.body) ?? `${file.name} could not be sent` };
+                }
+                const staged: unknown = JSON.parse(sent.body || "{}");
+                uploaded.push(String((staged as { id?: unknown }).id ?? ""));
+            }
+
             const form = new FormData();
             form.set("body", body);
             form.set("sendAt", sendAt);
             if (answering) form.set("replyToId", answering);
-            for (const file of files) form.append("files", file);
+            form.set("uploads", JSON.stringify(uploaded));
             for (const file of files) {
                 const still = await posterFor(file).catch(() => null);
                 form.append("posters", still ?? new Blob([], { type: "image/jpeg" }));
@@ -1333,6 +1380,36 @@ export function ChannelView({
     ) => {
         if (files.length > 0 || fromDrive.length > 0) {
             following.current = true;
+
+            // The files go first, one request each, streamed straight to the
+            // storage with a bar on screen for each - see
+            // `components/transfers`. The message that follows names what was
+            // written rather than carrying it, which is what lets a file be
+            // measured in gigabytes instead of in what one request may hold.
+            const uploaded: string[] = [];
+            for (const [at, file] of files.entries()) {
+                const query = new URLSearchParams({ name: file.name });
+                // Covered is chosen before the upload, because that is when the
+                // sender marked it.
+                if (spoilers.includes(at)) query.set("spoiler", "1");
+                const sent = await sendFile(
+                    `/api/chat/channels/${channelId}/uploads?${query.toString()}`,
+                    file
+                );
+                if (!sent.ok) {
+                    // Nothing was sent, so nothing is left behind: the files that
+                    // did go up are taken off the storage rather than waiting for
+                    // the sweep.
+                    await Promise.all(uploaded.map((id) => discardUpload(channelId, id)));
+                    setError(refusal(sent.body) ?? `${file.name} could not be sent`);
+                    return;
+                }
+                const staged: unknown = JSON.parse(sent.body || "{}");
+                uploaded.push(
+                    String((staged as { id?: unknown }).id ?? "")
+                );
+            }
+
             const form = new FormData();
             form.set("body", body);
             if (replyingTo) form.set("replyToId", replyingTo.id);
@@ -1340,13 +1417,14 @@ export function ChannelView({
             // are any, which is nearly never - an empty field on every message
             // in Polaris to say "none" is a field nobody needed.
             if (spoilers.length > 0) form.set("spoilers", spoilers.join(","));
-            for (const file of files) form.append("files", file);
-            // A still per video, in the same order as the files and with an
-            // empty one standing in for everything that is not a video - so the
-            // two lists line up on the other side without either of them
-            // carrying an index. Taken here rather than on the server: the
-            // bytes are already in this browser, and the alternative is a
-            // transcoder on the machine Polaris runs on.
+            if (uploaded.length > 0) form.set("uploads", JSON.stringify(uploaded));
+            // A still per video, in the same order as the files that were just
+            // uploaded, with an empty one standing in for everything that is not
+            // a video - so the two lists line up on the other side without
+            // either of them carrying an index. It rides the message because it
+            // is kilobytes. Taken here rather than on the server: the bytes are
+            // already in this browser, and the alternative is a transcoder on
+            // the machine Polaris runs on.
             for (const file of files) {
                 const still = await posterFor(file).catch(() => null);
                 form.append("posters", still ?? new Blob([], { type: "image/jpeg" }));

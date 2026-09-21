@@ -13,11 +13,12 @@ import { stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { apiAdmin } from "@/lib/api-session";
 import { dropTransferFile, transferPath } from "@/lib/instance-transfer/files";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
     const user = await apiAdmin();
     if (user instanceof Response) return user;
     const { id } = await context.params;
@@ -37,6 +38,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         headers: {
             "Content-Type": "application/octet-stream",
             "Content-Length": String(info.size),
+            // Says "this download has started" to the page that asked for it - see
+            // `download-ticket`. Nothing at all when no ticket was sent.
+            ...downloadTicketHeaders(request),
             "Content-Disposition": `attachment; filename="polaris-${day}.polaris"`,
             "Cache-Control": "no-store"
         }

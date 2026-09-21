@@ -1,21 +1,19 @@
 "use client";
 
 /**
- * Starting a download, and saying so until it starts.
+ * How many of this screen's downloads have not started yet.
  *
- * A download is a navigation rather than a fetch: the browser takes the URL,
- * asks for it, and saves what comes back, and the page that started it is told
- * nothing at all. That is fine when the answer is immediate and wrong when it is
- * not - a file on a share behind a fresh connection, or a folder the server has
- * to build into an archive first, is many seconds of a button that looks like it
- * did nothing. People press it again. Then again, and now the server is building
- * the same archive four times.
+ * The asking is `saveFile`'s, and so is the bar that every download in Polaris now
+ * gets - see `components/transfers`. What is left here is the number Drive's own
+ * toolbar spins on, which is a different question from the list in the corner:
+ * "is anything I asked for still coming", answered for one screen.
  *
- * So the request carries a ticket and the response sets a cookie naming it (see
- * `download-ticket`). The cookie can only exist once the server has answered,
- * which is the moment the browser starts saving - so a page watching for it
- * knows when to stop saying "preparing" without ever seeing a byte. After that
- * the download belongs to the browser, which has an indicator of its own.
+ * Why anything has to be said at all: a download is a navigation, not a fetch, so
+ * the page that started it is told nothing. That is fine when the answer is
+ * immediate and wrong when it is not - a file on a share behind a fresh connection,
+ * or a folder the server has to build into an archive first, is many seconds of a
+ * button that looks like it did nothing. People press it again. Then again, and now
+ * the server is building the same archive four times.
  *
  * A module store rather than a hook, because the presses are spread across a
  * context menu, a toolbar, a viewer and an editor, and the indicator is drawn in
@@ -23,21 +21,8 @@
  * the version of this that gets forgotten at one call site.
  */
 
+import { saveFile } from "@/components/transfers/move-file";
 import { useSyncExternalStore } from "react";
-import {
-    downloadStarted,
-    forgetDownloadTicket,
-    newDownloadTicket
-} from "@/lib/drive/download-ticket";
-
-/** How often the cookie is looked for. Often enough that a file which was ready
- *  anyway never reads as a wait. */
-const POLL_MS = 250;
-
-/** When a download that has not begun is given up on. Something has failed
- *  somewhere the page cannot see, and a button that never comes back is worse
- *  than one that stops. */
-const GIVE_UP_MS = 120_000;
 
 let pending = 0;
 const listeners = new Set<() => void>();
@@ -67,23 +52,16 @@ export function useDownloadsPending(): number {
  * a single file's own name. An archive is named by the endpoint building it.
  */
 export function startDownload(url: string, filename?: string): void {
-    const ticket = newDownloadTicket();
-    const anchor = document.createElement("a");
-    anchor.href = `${url}${url.includes("?") ? "&" : "?"}dl=${ticket}`;
-    if (filename) anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-
+    // The asking, the ticket and the bar belong to the shared surface now - see
+    // `components/transfers`, which does this for every download in Polaris. What
+    // stays here is the count this screen's toolbar spins on, because it answers a
+    // different question: "is anything still being fetched for me", asked by one
+    // screen rather than listed for the reader.
     pending += 1;
     publish();
-    const began = Date.now();
-    const timer = setInterval(() => {
-        const started = downloadStarted(ticket);
-        if (!started && Date.now() - began < GIVE_UP_MS) return;
-        if (started) forgetDownloadTicket(ticket);
-        clearInterval(timer);
+    const settle = () => {
         pending = Math.max(0, pending - 1);
         publish();
-    }, POLL_MS);
+    };
+    saveFile(url, filename ?? "file", { onStarted: settle, onGaveUp: settle });
 }

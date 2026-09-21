@@ -8,6 +8,9 @@
  * zip first, can be twenty seconds of a button that looks like it did nothing.
  * People press it again. Then again.
  *
+ * Every download in Polaris answers this, not only Drive's: a file on a message
+ * comes off the same shares, and a conversation had exactly the same silence.
+ *
  * So the request carries a ticket and the response sets a cookie naming it. The
  * cookie can only be set when the server has answered, which is exactly the
  * moment the browser starts saving the file - so a page watching for it knows
@@ -48,6 +51,22 @@ export function validDownloadTicket(ticket: string | null): ticket is string {
  */
 export function downloadTicketCookie(ticket: string): string {
     return `${PREFIX}${ticket}=1; Path=/; Max-Age=120; SameSite=Lax`;
+}
+
+/**
+ * The header to add to a response that is answering a download.
+ *
+ * One line per route rather than a copy of the reasoning in each: every route that
+ * hands back a file spreads this into its headers, and a request with no ticket -
+ * an image being drawn inline, a player fetching a range, anything the browser
+ * asked for itself - gets nothing added.
+ *
+ * It has to be `Set-Cookie`, which a `Headers` object will not let a caller append
+ * twice, so a route that already sets one of its own keeps doing that instead.
+ */
+export function downloadTicketHeaders(request: Request): Record<string, string> {
+    const ticket = new URL(request.url).searchParams.get("dl");
+    return validDownloadTicket(ticket) ? { "Set-Cookie": downloadTicketCookie(ticket) } : {};
 }
 
 /** Whether the browser has been handed the cookie for this ticket yet. */

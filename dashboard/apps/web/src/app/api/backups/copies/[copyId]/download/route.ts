@@ -11,12 +11,13 @@
 
 import { openCopy } from "@/lib/backups/manage";
 import { apiAdmin } from "@/lib/api-session";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-    _request: Request,
+    request: Request,
     context: { params: Promise<{ copyId: string }> }
 ): Promise<Response> {
     const user = await apiAdmin();
@@ -45,6 +46,9 @@ export async function GET(
         headers: {
             "Content-Type": "application/octet-stream",
             ...(opened.sizeBytes > 0 ? { "Content-Length": String(opened.sizeBytes) } : {}),
+            // Says "this download has started" to the page that asked for it - see
+            // `download-ticket`. Nothing at all when no ticket was sent.
+            ...downloadTicketHeaders(request),
             "Content-Disposition": `attachment; filename="${opened.fileName.replace(/"/g, "")}"`
         }
     });

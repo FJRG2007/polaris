@@ -12,6 +12,8 @@
  * showing something the operator did not ask for.
  */
 
+import { saveFile } from "@/components/transfers/move-file";
+import { sendFile } from "@/components/transfers/move-file";
 import Link from "next/link";
 import { Button } from "@polaris/ui";
 import { asDirectory, parentDirectory } from "./files-path";
@@ -73,12 +75,14 @@ export function FilesPanel({
     async function onUpload(file: File) {
         setBusy(true);
         setError(null);
-        const res = await fetch(
+        // The file itself rather than a copy of it in this tab's memory, and
+        // through the shared sender so it has a bar while it goes.
+        const sent = await sendFile(
             `/api/deploy/apps/${applicationId}/files?path=${encodeURIComponent(`${path}${file.name}`)}`,
-            { method: "PUT", body: await file.arrayBuffer() }
+            file
         );
-        if (!res.ok) {
-            const data = (await res.json()) as { error?: string };
+        if (!sent.ok) {
+            const data = JSON.parse(sent.body || "{}") as { error?: string };
             setError(data.error ?? "Upload failed");
         } else {
             await load(path);
@@ -151,6 +155,13 @@ export function FilesPanel({
                         {!entry.isDir && (
                             <a
                                 href={`/api/deploy/apps/${applicationId}/files/download?path=${encodeURIComponent(`${path}${entry.name}`)}`}
+                                onClick={(event) => {
+                                    event.preventDefault();
+                                    saveFile(
+                                        `/api/deploy/apps/${applicationId}/files/download?path=${encodeURIComponent(`${path}${entry.name}`)}`,
+                                        entry.name
+                                    );
+                                }}
                                 className="text-muted-foreground hover:text-foreground"
                                 title="Download"
                             >

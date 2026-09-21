@@ -22,6 +22,7 @@ import * as core from "@polaris/core";
 import { apiPermission } from "@/lib/api-session";
 import { MailAccessError } from "@/lib/mailbox/access";
 import { emlFilename, exportMbox, messageSource } from "@/lib/mailbox/export";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,9 +39,12 @@ function headerSafe(name: string): string {
     );
 }
 
-function download(name: string): Record<string, string> {
+function download(name: string, request: Request): Record<string, string> {
     return {
         "content-type": "application/octet-stream",
+        // Says "this download has started" to the page that asked for it - see
+        // `download-ticket`. Nothing at all when no ticket was sent.
+        ...downloadTicketHeaders(request),
         "content-disposition": `attachment; filename="${headerSafe(name)}"; filename*=UTF-8''${encodeURIComponent(name)}`,
         "x-content-type-options": "nosniff",
         "content-security-policy": "default-src 'none'; sandbox",
@@ -68,7 +72,7 @@ export async function GET(request: Request): Promise<Response> {
             if (!bytes) return new Response("Not found", { status: 404 });
             return new Response(new Uint8Array(bytes), {
                 headers: {
-                    ...download(emlFilename(row.subject, row.sentAt)),
+                    ...download(emlFilename(row.subject, row.sentAt), request),
                     "content-length": String(bytes.length)
                 }
             });
@@ -114,7 +118,7 @@ export async function GET(request: Request): Promise<Response> {
         });
 
         return new Response(stream, {
-            headers: download(core.mboxFilename(account.address, new Date()))
+            headers: download(core.mboxFilename(account.address, new Date()), request)
         });
     } catch (caught) {
         if (caught instanceof MailAccessError) return new Response("Not found", { status: 404 });

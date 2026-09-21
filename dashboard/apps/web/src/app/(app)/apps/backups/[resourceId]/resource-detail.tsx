@@ -12,6 +12,7 @@
  * not have to think about.
  */
 
+import { saveFile } from "@/components/transfers/move-file";
 import Link from "next/link";
 import { readJson } from "@/lib/read-json";
 import { formatBytes } from "@polaris/core";
@@ -237,6 +238,13 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                                                         {copy.downloadable ? (
                                                             <a
                                                                 href={`/api/backups/copies/${copy.id}/download`}
+                                                                onClick={(event) => {
+                                                                    event.preventDefault();
+                                                                    saveFile(
+                                                                        `/api/backups/copies/${copy.id}/download`,
+                                                                        `backup-${copy.id}`
+                                                                    );
+                                                                }}
                                                                 download
                                                                 className="text-primary hover:underline"
                                                                 aria-label={`Download the copy in ${copy.destinationName}`}

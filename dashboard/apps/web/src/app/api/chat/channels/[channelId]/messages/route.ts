@@ -13,6 +13,12 @@
  * Files are written first and the message second. If the write of the message
  * fails, the bytes are removed again rather than left behind - an orphan on a
  * NAS is somebody's disk quietly filling up.
+ *
+ * Bytes reach a message two ways now. Small ones ride in this form, as they always
+ * did, because one request for a screenshot is simpler than two. Anything worth
+ * streaming was uploaded before this request and is named here by its id - see
+ * `lib/chat/uploads`, which is where the reasoning for that lives. A message can
+ * carry both at once, and the order it lists them in is the order they were shown.
  */
 
 import { z } from "zod";
@@ -25,16 +31,20 @@ import { rulesForChannel } from "@/lib/chat/rules";
 import { driveShare } from "@/lib/chat/drive-share";
 import {
     AttachRefused,
-    fileFromDrive,
+    openFromDrive,
     referenceFromDrive
 } from "@/lib/attachments/from-elsewhere";
 import { ChatAccessError, requirePostable } from "@/lib/chat/access";
 import {
     AttachmentStorageError,
     borrowedAttachment,
+    MAX_ATTACHMENT_BYTES,
     storeAttachment,
+    storeStreamedAttachment,
+    withStill,
     type StoredAttachment
 } from "@/lib/chat/attachments";
+import { claimUploads, UploadRefused } from "@/lib/chat/uploads";
 
 /**
  * The Drive files a message is sharing, as the composer lists them.
@@ -73,6 +83,33 @@ function readBorrowed(raw: FormDataEntryValue | null): { connectionId: string; p
  *  how many files a message carries, and this caps how much work a malformed
  *  request can ask for while that is being worked out. */
 const MOST_BORROWED = 50;
+
+/**
+ * The files this message was uploaded before it, as the composer lists them.
+ *
+ * A JSON array of ids and nothing else. Everything about each one - its name, its
+ * size, where it was written, whether it arrives covered - is on the row the
+ * upload made, under the same account, because a client that could name those
+ * could name a file it never sent.
+ *
+ * Malformed is empty rather than refused, on the same terms as the Drive list
+ * above: what a message carries is shown in the composer, and an unreadable field
+ * is a message to send without it.
+ */
+function readUploads(raw: FormDataEntryValue | null): string[] {
+    if (typeof raw !== "string" || raw.trim().length === 0) return [];
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        return [];
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+        .slice(0, core.CHAT_ATTACHMENT_COUNT_CEILING)
+        .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+        .map((entry) => entry.trim());
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -192,14 +229,21 @@ export async function POST(
     // from the storage by this server), or left where they are and pointed at.
     const borrowed = readBorrowed(form.get("borrowed"));
     const share = borrowed.length > 0 ? await driveShare() : "copy";
-    if (files.length === 0 && borrowed.length === 0 && !fields.data.body) {
+    // Files already on the storage, streamed here before this request. They come
+    // first in the message, which is the order the composer showed them in: it
+    // uploads as they are picked and sends the ones it has.
+    const uploads = readUploads(form.get("uploads"));
+    /** Everything this message carries, however it got here. The counts, the
+     *  covered list, the stills and the sounds are all indexed over this. */
+    const carrying = uploads.length + files.length + borrowed.length;
+    if (carrying === 0 && !fields.data.body) {
         return Response.json({ error: "Write something, or attach a file" }, { status: 400 });
     }
     // Whether this account may put files in a conversation at all, which is a
     // grant rather than a rule: the rules below are the instance's ceiling for
     // everybody, and this is one account's standing. Asked before a byte is
     // read off the request.
-    if ((files.length > 0 || borrowed.length > 0) && !(await can(user.id, "chat.attach"))) {
+    if (carrying > 0 && !(await can(user.id, "chat.attach"))) {
         return Response.json(
             { error: "You are not allowed to send files here" },
             { status: 403 }
@@ -209,16 +253,20 @@ export async function POST(
     // per kind of conversation: an operator may reasonably allow a screenshot in
     // a channel and nothing at all in a direct message.
     const rules = await rulesForChannel(channelId);
-    if ((files.length > 0 || borrowed.length > 0) && rules.maxAttachments === 0) {
+    if (carrying > 0 && rules.maxAttachments === 0) {
         return Response.json({ error: "Files cannot be sent here" }, { status: 400 });
     }
-    if (files.length + borrowed.length > rules.maxAttachments) {
+    if (carrying > rules.maxAttachments) {
         return Response.json(
             { error: `That is more than ${rules.maxAttachments} files` },
             { status: 400 }
         );
     }
     const biggest = rules.maxAttachmentMib * 1024 * 1024;
+    // The instance's limit, for everything. A file that came in this request has a
+    // second, much lower one: it is being held in memory to be read out of the
+    // form, which is the whole reason the streamed door exists.
+    const inTheForm = Math.min(biggest, MAX_ATTACHMENT_BYTES);
     for (const file of files) {
         if (file.size > biggest) {
             return Response.json(
@@ -226,11 +274,37 @@ export async function POST(
                 { status: 400 }
             );
         }
+        if (file.size > inTheForm) {
+            // Not a size refusal - the instance allows it - but the wrong door for
+            // it. The composer never lands here; anything else driving this route
+            // gets told which way a file this big goes in.
+            return Response.json(
+                {
+                    error: `${file.name} has to be uploaded before the message it goes on`
+                },
+                { status: 413 }
+            );
+        }
     }
 
     const stored: StoredAttachment[] = [];
     try {
+        // The streamed ones. Nothing is written here - the bytes are already on the
+        // storage - so what this does is prove they are this sender's, in this
+        // conversation, and turn them into what the message carries.
+        const claimed = await claimUploads(
+            user.id,
+            channelId,
+            uploads,
+            uploads.map((_, at) => (sounds.success ? sounds.data[at] : undefined))
+        );
+        for (const [at, attachment] of claimed.entries()) {
+            // The still rides the message because it is kilobytes; a video streamed
+            // straight to the storage has none until it gets here.
+            stored.push(await withStill(attachment, await posterBytes(posters[at])));
+        }
         for (const [at, file] of files.entries()) {
+            const position = uploads.length + at;
             stored.push(
                 await storeAttachment(
                     channelId,
@@ -239,16 +313,16 @@ export async function POST(
                         type: file.type,
                         bytes: new Uint8Array(await file.arrayBuffer())
                     },
-                    sounds.success ? sounds.data[at] : undefined,
-                    await posterBytes(posters[at]),
-                    covered.has(at)
+                    sounds.success ? sounds.data[position] : undefined,
+                    await posterBytes(posters[position]),
+                    covered.has(position)
                 )
             );
         }
         // After the uploads and in the order they were listed, so the message
         // carries them in the order the composer showed.
         for (const [at, reference] of borrowed.entries()) {
-            const spoiler = covered.has(files.length + at);
+            const spoiler = covered.has(uploads.length + files.length + at);
             stored.push(
                 share === "link"
                     ? borrowedAttachment(
@@ -259,20 +333,17 @@ export async function POST(
                           ),
                           spoiler
                       )
-                    : // A copy, made where the bytes already are. The ceiling is
-                      // applied by the read itself, so a file too big to store is
+                    : // A copy, made where the bytes already are: from that storage
+                      // straight to the one the conversation writes to, with nothing
+                      // held here. The ceiling is applied from the size the source
+                      // reports, before a byte moves, so a file too big to store is
                       // refused in the words the reader needs rather than after a
-                      // download nobody watched.
-                      await storeAttachment(
+                      // copy nobody watched.
+                      await copiedFromDrive(
                           channelId,
-                          await fileFromDrive(
-                              user.id,
-                              reference.connectionId,
-                              reference.path,
-                              biggest
-                          ),
-                          undefined,
-                          null,
+                          user.id,
+                          reference,
+                          biggest,
                           spoiler
                       )
             );
@@ -302,6 +373,12 @@ export async function POST(
         if (caught instanceof ChatAccessError) {
             return Response.json({ error: caught.message }, { status: 403 });
         }
+        // A file this message named that is not there to claim: swept, already
+        // sent, or never this sender's. Whoever pressed send still has it in front
+        // of them, so it is their sentence rather than an internal one.
+        if (caught instanceof UploadRefused) {
+            return Response.json({ error: caught.message }, { status: 409 });
+        }
         // Said as what it is. "That could not be sent" for a storage that took
         // the file and lost it sends whoever reads it looking at the browser, at
         // the network and at the message - anywhere but at the disk.
@@ -319,6 +396,32 @@ export async function POST(
             { error: user.isAdmin ? `That could not be sent: ${detail}` : "That could not be sent" },
             { status: 500 }
         );
+    }
+}
+
+/**
+ * One Drive file copied into the conversation, storage to storage.
+ *
+ * Its own function because the two sessions have to be closed whatever happens:
+ * the source is opened here and given back the moment the write is over, failed or
+ * not.
+ */
+async function copiedFromDrive(
+    channelId: string,
+    userId: string,
+    reference: { connectionId: string; path: string },
+    biggest: number,
+    spoiler: boolean
+): Promise<StoredAttachment> {
+    const opened = await openFromDrive(userId, reference.connectionId, reference.path, biggest);
+    try {
+        return await storeStreamedAttachment(
+            channelId,
+            { name: opened.name, type: opened.type, body: opened.body, size: opened.size },
+            spoiler
+        );
+    } finally {
+        await opened.done();
     }
 }
 

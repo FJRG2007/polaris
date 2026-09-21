@@ -23,6 +23,7 @@ import { officeReader } from "@/lib/office/reader";
 import { readByLink } from "@/lib/office/documents";
 import { exportDocument } from "@/lib/office/export";
 import { resolveSession, sessionCan } from "@/lib/session";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,6 +77,9 @@ export async function GET(
         headers: {
             "content-type": file.contentType,
             "content-length": String(file.bytes.length),
+            // Says "this download has started" to the page that asked for it - see
+            // `download-ticket`. Nothing at all when no ticket was sent.
+            ...downloadTicketHeaders(request),
             "content-disposition": `attachment; filename="${name}"; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
             "x-content-type-options": "nosniff",
             "content-security-policy": "default-src 'none'; sandbox",

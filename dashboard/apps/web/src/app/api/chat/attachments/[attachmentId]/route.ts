@@ -17,19 +17,20 @@
  * a file to save. So the formats with a player get their own type.
  */
 
-import { rangeOf } from "@/lib/http-range";
 import { apiPermission } from "@/lib/api-session";
 
 import { channelAccess } from "@/lib/chat/access";
+import { rangeHeaders, streamStored } from "@/lib/chat/streamed-file";
 import {
     channelOfAttachment,
+    describeAttachment,
     diagnoseAttachment,
     isInlineDocument,
     isInlineImage,
     isPlayableMedia,
-    readAttachment,
     readAttachmentPoster
 } from "@/lib/chat/attachments";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,26 +80,10 @@ export async function GET(
         });
     }
 
-    const file = await readAttachment(attachmentId);
-    // Gone rather than missing, and said out loud. Access has already been
-    // proved by this point, so there is nothing left to withhold - and the two
-    // are not the same thing to whoever is looking at it: "there is no such
-    // attachment" sends somebody to the browser, and "the storage this instance
-    // writes to did not give it back" sends them to the disk, which is where it
-    // is.
+    const file = await describeAttachment(attachmentId);
     if (!file) {
-        // Asked at the moment somebody hits it, and answered to their face when
-        // they are the one who can act on it. An operator should not have to go
-        // and find a log to learn which disk lost their files.
-        const detail = user.isAdmin ? await diagnoseAttachment(attachmentId) : "";
-        console.error(`chat: attachment ${attachmentId} is gone - ${detail || "(not diagnosed)"}`);
-        return Response.json(
-            {
-                error: "This file is not on the storage Polaris keeps uploads on. It was written and is no longer there.",
-                detail
-            },
-            { status: 410 }
-        );
+        console.warn(`chat: attachment ${attachmentId} has no row`);
+        return new Response(null, { status: 404 });
     }
 
     // Asked for as a file rather than to be looked at or played. The menus that
@@ -111,28 +96,48 @@ export async function GET(
             isPlayableMedia(file.contentType) ||
             isInlineDocument(file.contentType));
 
-    // What a player asks for when somebody drags the bar. Answered, and said to
-    // be answerable, because a browser that is not offered ranges will not let
-    // anybody seek at all: the bar snaps back to where it was and the video
-    // reads as broken. The bytes are already in hand, so a range is a slice.
-    const range = asFile ? null : rangeOf(request.headers.get("range"), file.bytes.length);
-    if (range === "unsatisfiable") {
-        return new Response(null, {
-            status: 416,
-            headers: { "Content-Range": `bytes */${file.bytes.length}`, "Accept-Ranges": "bytes" }
-        });
+    // What a player asks for when somebody drags the bar. Answered, and said to be
+    // answerable, because a browser that is not offered ranges will not let
+    // anybody seek at all: the bar snaps back to where it was and the video reads
+    // as broken. The slice is taken by the storage - see `streamStored` - rather
+    // than out of a copy of the whole file in this process, which is what let the
+    // per-file limit rise past what one request could hold.
+    const opened = await streamStored(
+        file,
+        asFile ? null : request.headers.get("range"),
+        `attachment ${attachmentId}`
+    );
+    if (!opened.ok) {
+        if (opened.why === "unsatisfiable") {
+            return new Response(null, { status: 416, headers: { "Accept-Ranges": "bytes" } });
+        }
+        // Gone rather than missing, and said out loud. Access has already been
+        // proved by this point, so there is nothing left to withhold - and the two
+        // are not the same thing to whoever is looking at it: "there is no such
+        // attachment" sends somebody to the browser, and "the storage this instance
+        // writes to did not give it back" sends them to the disk, which is where it
+        // is.
+        //
+        // Asked at the moment somebody hits it, and answered to their face when
+        // they are the one who can act on it. An operator should not have to go and
+        // find a log to learn which disk lost their files.
+        const detail = user.isAdmin ? await diagnoseAttachment(attachmentId) : "";
+        console.error(`chat: attachment ${attachmentId} is gone - ${detail || "(not diagnosed)"}`);
+        return Response.json(
+            {
+                error: "This file is not on the storage Polaris keeps uploads on. It was written and is no longer there.",
+                detail
+            },
+            { status: 410 }
+        );
     }
-    const body = range ? file.bytes.subarray(range.from, range.to + 1) : file.bytes;
 
-    return new Response(body as unknown as BodyInit, {
-        status: range ? 206 : 200,
+    return new Response(opened.body, {
+        status: opened.range ? 206 : 200,
         headers: {
             "Content-Type": shown ? file.contentType : "application/octet-stream",
-            "Content-Length": String(body.length),
             "Accept-Ranges": "bytes",
-            ...(range
-                ? { "Content-Range": `bytes ${range.from}-${range.to}/${file.bytes.length}` }
-                : {}),
+            ...rangeHeaders(opened),
             "Cache-Control": CACHE,
             // The bytes came from a person and are served from Polaris's own
             // origin: the browser must treat them as what they were declared to
@@ -140,6 +145,9 @@ export async function GET(
             // found inside them.
             "X-Content-Type-Options": "nosniff",
             "Content-Security-Policy": "default-src 'none'; sandbox",
+            // Says "this download has started" to the page that asked for it -
+            // see `download-ticket`. Nothing at all when no ticket was sent.
+            ...downloadTicketHeaders(request),
             "Content-Disposition": `${shown ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`
         }
     });

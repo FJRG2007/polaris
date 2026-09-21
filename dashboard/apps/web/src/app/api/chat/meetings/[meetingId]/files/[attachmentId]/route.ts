@@ -13,7 +13,9 @@
  */
 
 import { resolveSeat } from "@/lib/chat/meeting-seat";
-import { isMeetingImage, meetingOfFile, readMeetingFile } from "@/lib/chat/meeting-files";
+import { rangeHeaders, streamStored } from "@/lib/chat/streamed-file";
+import { describeMeetingFile, isMeetingImage, meetingOfFile } from "@/lib/chat/meeting-files";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,22 +47,40 @@ export async function GET(
         return new Response("Not found", { status: 404 });
     }
 
-    const file = await readMeetingFile(attachmentId);
-    // The row said there was a file and the bytes did not arrive: a storage that
-    // moved, a share that is not answering, or a call whose files have already
-    // been cleared. Gone rather than broken, which is what it is.
+    const file = await describeMeetingFile(attachmentId);
     if (!file) return new Response("Gone", { status: 410 });
 
     const asFile = new URL(request.url).searchParams.get("download") === "1";
     const shown = !asFile && isMeetingImage(file.contentType);
 
-    return new Response(file.bytes as unknown as BodyInit, {
+    // The row said there was a file; whether the bytes are there is what opening
+    // it answers - a storage that moved, a share that is not answering, or a call
+    // whose files have already been cleared. Gone rather than broken, which is what
+    // it is.
+    const opened = await streamStored(
+        file,
+        asFile ? null : request.headers.get("range"),
+        "a file in a call"
+    );
+    if (!opened.ok) {
+        if (opened.why === "unsatisfiable") {
+            return new Response(null, { status: 416, headers: { "Accept-Ranges": "bytes" } });
+        }
+        return new Response("Gone", { status: 410 });
+    }
+
+    return new Response(opened.body, {
+        status: opened.range ? 206 : 200,
         headers: {
             "Content-Type": shown ? file.contentType : "application/octet-stream",
-            "Content-Length": String(file.bytes.length),
+            "Accept-Ranges": "bytes",
+            ...rangeHeaders(opened),
             "Cache-Control": CACHE,
             "X-Content-Type-Options": "nosniff",
             "Content-Security-Policy": "default-src 'none'; sandbox",
+            // Says "this download has started" to the page that asked for it -
+            // see `download-ticket`. Nothing at all when no ticket was sent.
+            ...downloadTicketHeaders(request),
             "Content-Disposition": `${shown ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`
         }
     });

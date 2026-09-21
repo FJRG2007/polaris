@@ -84,6 +84,64 @@ export async function referenceFromDrive(
     }
 }
 
+/** A file opened on its own storage, for copying somewhere else without ever
+ *  holding it. `done` gives the storage session back and has to be called - on
+ *  the way out of a failure as much as on success. */
+export interface OpenedFile {
+    readonly name: string;
+    readonly type: string;
+    readonly size: number;
+    readonly body: ReadableStream<Uint8Array>;
+    readonly done: () => Promise<void>;
+}
+
+/**
+ * The same file, opened rather than collected.
+ *
+ * For a copy that is bytes moving from one storage to another with nothing in the
+ * middle: a file somebody shares out of a Drive can be as large as their Drive
+ * allows, and reading it into this process to write it back out is the one thing
+ * that could not survive the per-file limit being raised. The ceiling is still
+ * applied - from the size the storage reports, before a byte moves - because a
+ * copy is something this instance stores.
+ */
+export async function openFromDrive(
+    userId: string,
+    connectionId: string,
+    rawPath: string,
+    maxBytes: number
+): Promise<OpenedFile> {
+    let path: string;
+    try {
+        path = normalizeRelPath(rawPath);
+    } catch {
+        throw new AttachRefused("That file could not be attached.");
+    }
+
+    const driver = await requireDriveDriver(userId, connectionId, path, "download").catch(
+        () => null
+    );
+    if (!driver) throw new AttachRefused("That file is not yours to attach.");
+    const done = () => driver.dispose().catch(() => undefined) as Promise<void>;
+
+    try {
+        const stat = await driver.stat(path);
+        if (stat.kind !== "file") throw new AttachRefused("That is a folder, not a file.");
+        if (maxBytes > 0 && Number(stat.size) > maxBytes) throw new AttachRefused(tooBig());
+        return {
+            name: path.split("/").at(-1) || "attachment",
+            type: stat.mime ?? "",
+            size: Number(stat.size ?? 0),
+            body: await driver.readStream(path),
+            done
+        };
+    } catch (caught) {
+        // Nothing was handed out, so the session is this function's to give back.
+        await done();
+        throw caught;
+    }
+}
+
 /**
  * A file on one of this reader's storages.
  *
