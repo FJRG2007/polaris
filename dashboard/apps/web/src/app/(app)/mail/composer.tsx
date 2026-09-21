@@ -124,6 +124,17 @@ export function Composer() {
     const [problem, setProblem] = useState("");
     const [picking, setPicking] = useState(false);
     const [insert, setInsert] = useState<{ token: number; text: string } | null>(null);
+    /**
+     * Putting the writer in the message, on a line of their own.
+     *
+     * A reply and a forward open holding somebody else's words, and what they
+     * open on was the attribution line of that message: the writer had to make
+     * room above it before they could start, every single time. A draft being
+     * reopened is the other way round - the text at the top is their own, and
+     * they go back to the end of it.
+     */
+    const [focusAt, setFocusAt] = useState(0);
+    const [ownLine, setOwnLine] = useState(false);
 
     // Opening the composer seeds it. Keyed on the seed object, which is replaced
     // whenever something asks for a new one, so pressing Reply on two different
@@ -171,6 +182,14 @@ export function Composer() {
         setQueued(null);
         setProblem("");
         setPosture("docked");
+        setOwnLine(!composing.draftId);
+        // The caret goes to the message only when there is nobody left to name:
+        // a reply arrives addressed, so writing is all that is left. A forward
+        // and a new message arrive with an empty To, and taking the caret out of
+        // it would be answering a question nobody asked first. Bumped rather
+        // than set - the number means nothing to the editor beyond having
+        // changed, and two replies in a row have to move the caret twice.
+        if (composing.inReplyToId && (composing.to ?? []).length > 0) setFocusAt(Date.now());
     }, [composing, accounts, identities]);
 
     /** Files being brought over from the message being forwarded, and the ones
@@ -600,6 +619,9 @@ export function Composer() {
                                     value={body}
                                     onChange={(next) => setBody(keepSignatureDelimiter(next))}
                                     insert={insert}
+                                    focusAt={focusAt}
+                                    focusWhere={ownLine ? "start" : "end"}
+                                    leadingBlankLine={ownLine}
                                     placeholder="Write your message"
                                     className="flex min-h-[14rem] flex-1 flex-col"
                                     // A screenshot pasted in is an attachment rather

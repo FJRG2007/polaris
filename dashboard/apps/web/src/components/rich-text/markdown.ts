@@ -54,6 +54,25 @@ export function markdownToDoc(markdown: string, origin: string | null = null): J
     return { type: "doc", content: content.length > 0 ? content : [{ type: "paragraph" }] };
 }
 
+/**
+ * The document with somewhere to write at the top of it.
+ *
+ * For a surface that opens holding somebody else's words - a reply, a forward -
+ * where the first line belongs to the writer rather than to the message being
+ * answered. Here rather than in the parser because a blank paragraph is not
+ * something Markdown carries: `renderBlocks` drops an empty block rather than
+ * inventing a spelling for it, so this is a decision about a document being
+ * opened and not about a value being read.
+ *
+ * A no-op when the first block is already a line to write on, which is what
+ * keeps a new message from opening two lines down.
+ */
+export function withLeadingBlankLine(doc: JSONContent): JSONContent {
+    const first = doc.content?.[0];
+    const writable = first?.type === "paragraph" && (first.content ?? []).length === 0;
+    return writable ? doc : { ...doc, content: [{ type: "paragraph" }, ...(doc.content ?? [])] };
+}
+
 function blocks(tokens: readonly Token[], origin: string | null): JSONContent[] {
     const out: JSONContent[] = [];
     for (const token of tokens) {

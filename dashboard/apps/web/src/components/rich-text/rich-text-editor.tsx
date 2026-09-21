@@ -83,7 +83,25 @@ export interface RichTextEditorProps {
      * must put the caret back where the writer left it, not at the end of a line
      * they were in the middle of.
      */
-    focusWhere?: "end" | "keep";
+    focusWhere?: "end" | "keep" | "start";
+    /**
+     * Open with an empty line at the top, whatever the value starts with.
+     *
+     * For a surface that arrives holding text somebody has to write ABOVE: a
+     * reply opens on the message it answers, and a forward on the message being
+     * forwarded. Without a line of their own the writer lands on the attribution
+     * line of somebody else's message and has to make room by hand, every time.
+     *
+     * A property of how the editor is opened rather than of the value, because
+     * it cannot be one of the value: Markdown has no blank paragraph, and the
+     * serializer drops one rather than pretending otherwise (see
+     * `docToMarkdown`). So the line is put in the document when the content is
+     * set, and what is stored is unchanged.
+     *
+     * A no-op when the first block is already a line to write on, so a new
+     * message does not open two lines down.
+     */
+    leadingBlankLine?: boolean;
     /**
      * Files arrived on the clipboard, usually a screenshot.
      *
@@ -175,6 +193,7 @@ export function RichTextEditor({
     focusAt = 0,
     insert = null,
     focusWhere = "end",
+    leadingBlankLine = false,
     onPasteFiles,
     mentionsIn = null,
     mentionSource = null,
@@ -229,6 +248,13 @@ export function RichTextEditor({
         [placeholder, search, mentionsIn]
     );
 
+    /** What goes into the editor for a value: the document, with a line to write
+     *  on at the top where the caller asked for one. */
+    const opened = useCallback(
+        (doc: JSONContent): JSONContent => (leadingBlankLine ? md.withLeadingBlankLine(doc) : doc),
+        [leadingBlankLine]
+    );
+
     const editor = useEditor({
         extensions,
         editable: !disabled,
@@ -236,7 +262,7 @@ export function RichTextEditor({
         // Rendered on the client only: the server has no DOM to build the view
         // against, and a description is inside a panel that is client-side anyway.
         immediatelyRender: false,
-        content: md.markdownToDoc(value, origin()),
+        content: opened(md.markdownToDoc(value, origin())),
         editorProps: {
             attributes: {
                 class: cn(
@@ -325,9 +351,14 @@ export function RichTextEditor({
     // loses the position and the undo history.
     useEffect(() => {
         if (!editor || editor.isFocused) return;
+        // The document, not the source: the line this may have opened with is
+        // not in the Markdown and never will be, so comparing the two strings is
+        // what keeps it from being put back on every render.
         if (md.docToMarkdown(editor.getJSON()) === value) return;
-        editor.commands.setContent(md.markdownToDoc(value, origin()), { emitUpdate: false });
-    }, [editor, value]);
+        editor.commands.setContent(opened(md.markdownToDoc(value, origin())), {
+            emitUpdate: false
+        });
+    }, [editor, value, opened]);
 
     useEffect(() => {
         editor?.setEditable(!disabled);
@@ -374,7 +405,9 @@ export function RichTextEditor({
                 // "keep" restores the selection the editor still holds from
                 // before it was blurred, which is where the writer left off.
                 if (caret.current === "keep") editor.commands.focus();
-                else editor.commands.focus("end");
+                // "start" is the line a reply opens with: the writer's own,
+                // above the message they are answering.
+                else editor.commands.focus(caret.current === "start" ? "start" : "end");
             }, wait)
         );
         return () => timers.forEach((timer) => window.clearTimeout(timer));
