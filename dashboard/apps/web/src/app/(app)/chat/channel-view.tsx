@@ -1516,7 +1516,12 @@ export function ChannelView({
      *  the column the call takes and how the people in it are drawn, and those
      *  two answers must not be able to disagree with each other. */
     const callPlace: CallPlace = voiceRoom ? "room" : directCall ? "direct" : "channel";
-    const expanded = callPlace === "direct" && inCall !== null && expandedCall === inCall;
+    /** Whether this call has been asked to take the whole column, the
+     *  conversation put away behind it. Both kinds of band, because the reason
+     *  somebody asks is a picture they are trying to read and that happens in a
+     *  channel as much as in a group - see `callBandHeight`. A voice room is the
+     *  column already. */
+    const expanded = callPlace !== "room" && inCall !== null && expandedCall === inCall;
     // Kept per place, because they are different questions: how much of a direct
     // message a call may take is not how much of a channel it may take, and
     // somebody who sized one has said nothing about the other.
@@ -2098,9 +2103,9 @@ export function ChannelView({
                             onStage={setStaged}
                             expanded={expanded}
                             onExpand={
-                                callPlace === "direct"
-                                    ? (next) => setExpandedCall(next ? inCall : null)
-                                    : undefined
+                                callPlace === "room"
+                                    ? undefined
+                                    : (next) => setExpandedCall(next ? inCall : null)
                             }
                             onLeave={() => {
                                 leaveCall();

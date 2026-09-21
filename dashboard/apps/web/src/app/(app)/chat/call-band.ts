@@ -98,12 +98,19 @@ export function directLayout(
  * The height the call is drawn at.
  *
  * `staged` is whether a shared screen - or a face somebody asked to see bigger -
- * currently has the big place in the room. `expanded` is a call in a direct
- * message somebody asked to take the whole column - the one case a direct call
- * is not capped, with the conversation put away behind it until it is shrunk.
+ * currently has the big place in the room. `expanded` is a call over a
+ * conversation that somebody asked to take the whole column - the one case a
+ * capped call is not capped, with the conversation put away behind it until it is
+ * shrunk.
+ *
+ * Both kinds of band answer to it, a channel as much as a direct message. The cap
+ * is what a call is worth before anybody says otherwise; somebody watching a
+ * shared screen has said otherwise, and in a channel that request used to have
+ * nowhere to go - the picture stopped at the cap and the only thing left was the
+ * whole display, with the call, the people in it and the rest of Polaris gone.
  */
 export function callBandHeight(place: CallPlace, staged: boolean, expanded = false): string {
-    if (expanded && place === "direct") return "flex-1";
+    if (expanded && place !== "room") return "flex-1";
     const cap = bandCap(place, staged);
     // A room has nothing above or below it to share the column with, staged or
     // not: the conversation is beside it.

@@ -157,8 +157,20 @@ describe("expanding a call in a group", () => {
         expect(messages.closest(".hidden")).toBeNull();
     });
 
-    it("is not offered in a channel, where the call is not a band over a conversation", async () => {
+    it("is offered in a channel too, where a capped call used to be the end of it", async () => {
+        // Why it is not direct messages only: the reason anybody asks is a picture
+        // they are trying to read, and that happens in a channel's call as much as
+        // in a group's. Without this the size above the cap was the whole display.
         state.kind = "text";
+        render(<ChannelView channelId="c1" />);
+        const messages = await screen.findByText("Nothing here yet.");
+        fireEvent.click(screen.getByRole("button", { name: "Expand the call" }));
+        expect(messages.isConnected).toBe(true);
+        expect(messages.closest(".hidden")).not.toBeNull();
+    });
+
+    it("is not offered in a voice room, which is the column already", async () => {
+        state.kind = "voice";
         render(<ChannelView channelId="c1" />);
         await screen.findByText("Nothing here yet.");
         expect(screen.queryByRole("button", { name: "Expand the call" })).toBeNull();

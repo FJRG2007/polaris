@@ -36,8 +36,22 @@ describe("an expanded call", () => {
         expect(callBandHeight("direct", true, true)).toBe("flex-1");
     });
 
-    it("changes nothing anywhere else", () => {
-        expect(callBandHeight("channel", false, true)).toBe(callBandHeight("channel", false));
+    it("takes it in a channel as well, which is where it used to stop at the cap", () => {
+        // The defect this pins down: a shared screen in a channel's call could be
+        // made bigger only as far as the cap, and the next size up was the whole
+        // display - so reading somebody's screen meant losing the call, the people
+        // in it and the rest of Polaris.
+        expect(callBandHeight("channel", false, true)).toBe("flex-1");
+        expect(callBandHeight("channel", true, true)).toBe("flex-1");
+    });
+
+    it("leaves a voice room as it was, being the column already", () => {
         expect(callBandHeight("room", false, true)).toBe("flex-1");
+        expect(callBandHeight("room", true, true)).toBe("flex-1");
+    });
+
+    it("changes nothing until somebody asks", () => {
+        expect(callBandHeight("channel", false)).not.toBe("flex-1");
+        expect(callBandHeight("direct", true)).not.toBe("flex-1");
     });
 });

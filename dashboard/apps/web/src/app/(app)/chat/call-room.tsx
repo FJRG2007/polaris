@@ -492,6 +492,22 @@ export function CallRoom({
      *  that already has the whole band. */
     const letGo = layout === "stream" && !expanded;
 
+    /**
+     * The middle size, on the picture itself.
+     *
+     * A picture worth watching has three sizes and only the outer two were
+     * reachable from it: the size the call gives it, and the whole display. The
+     * step between them - the call taking the column, the conversation put away
+     * behind it - existed but lived in a chevron at the top of the panel, which
+     * is not where somebody looking at a screen they cannot read is looking.
+     *
+     * So it is offered on the picture, beside the other two, wherever there is a
+     * column to take: a voice room is already the column, and has none to give.
+     */
+    const column: { grown?: boolean; onGrow?: () => void } = onExpand
+        ? { grown: expanded, onGrow: () => onExpand(!expanded) }
+        : {};
+
     /** Said out loud rather than worked out again outside, because it is decided
      *  here: what is being watched turns on what somebody in this room asked
      *  for, and that is this component's own. */
@@ -836,6 +852,7 @@ export function CallRoom({
                                     : () => focus(stage.key)
                             }
                             backLabel={letGo ? "Back to the people" : undefined}
+                            {...column}
                             // A shared screen is usually text, and the reason
                             // anybody stares at one is to read a line of it.
                             zoomable
@@ -859,6 +876,7 @@ export function CallRoom({
                             mirrored={call.mirrored}
                             focused
                             onFocus={() => focus(live)}
+                            {...column}
                             cameraOff={!call.cameraOn}
                             muted={!call.micOn}
                             deafened={call.deafened}
@@ -881,6 +899,7 @@ export function CallRoom({
                                     guest={person?.guest}
                                     focused
                                     onFocus={() => focus(live)}
+                                    {...column}
                                     muted={call.states.get(personId)?.muted}
                                     deafened={call.states.get(personId)?.deafened}
                                     speaking={call.speaking.has(personId)}
@@ -1901,6 +1920,8 @@ function Tile({
     focused = false,
     onFocus,
     backLabel = "Back to the grid",
+    grown = false,
+    onGrow,
     onCombine,
     onAskCombine,
     combineAsked = false,
@@ -1958,6 +1979,14 @@ function Tile({
     onFocus?: () => void;
     /** What pressing a focused tile goes back to, said on the button. */
     backLabel?: string;
+    /** Whether the call this picture is in has taken the whole column already. */
+    grown?: boolean;
+    /** Give the call the whole column - the conversation put away behind it - or
+     *  hand it back. The middle of the three sizes a picture has, between the
+     *  room the call gives it and the whole display. Absent where there is no
+     *  column to take: a voice room is one, and a tile with nothing in it is not
+     *  worth one. */
+    onGrow?: () => void;
     /** Go quiet and listen through this person's device, and ask them to go
      *  quiet and listen through this one. Both absent once the two are already
      *  sharing a room, and on a tile that is not somebody else's. */
@@ -2245,11 +2274,14 @@ function Tile({
                 )}
             </span>
 
-            {/* Two different things, which is why they are two buttons. Bigger
-                keeps the call around it - the other faces, the controls, the
-                conversation - and is what somebody wants while a screen is being
-                explained to them. Full screen is the whole display and nothing
-                else, which is what they want when it is a film. */}
+            {/* Three sizes, which is why they are three buttons. Bigger keeps the
+                call around it - the other faces, the controls, the conversation -
+                and is what somebody wants while a screen is being explained to
+                them. The column is the call over the conversation, which is put
+                away behind it: the size for reading somebody's screen without
+                leaving Polaris, and the one that used to be missing here. Full
+                screen is the whole display and nothing else, which is what they
+                want when it is a film. */}
             {!blank && (
                 <span className="absolute right-1 top-1 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/tile:opacity-100">
                     {onFocus && (
@@ -2264,6 +2296,26 @@ function Tile({
                                 <Shrink className="size-3.5" />
                             ) : (
                                 <Expand className="size-3.5" />
+                            )}
+                        </button>
+                    )}
+                    {onGrow && (
+                        <button
+                            type="button"
+                            onClick={onGrow}
+                            aria-pressed={grown}
+                            aria-label={grown ? "Bring the conversation back" : "Fill the column"}
+                            title={
+                                grown
+                                    ? "Shrink the call - the conversation comes back"
+                                    : "Fill the column - the conversation goes behind the call"
+                            }
+                            className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                            {grown ? (
+                                <ChevronsUp className="size-3.5" />
+                            ) : (
+                                <ChevronsDown className="size-3.5" />
                             )}
                         </button>
                     )}

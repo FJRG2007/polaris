@@ -252,6 +252,52 @@ describe("a stream in a direct message", () => {
     });
 });
 
+describe("the three sizes a watched stream has", () => {
+    it("offers the column between the call and the whole display", () => {
+        // The defect this pins down: from the picture itself there were two sizes,
+        // the room the call gave it and the whole display. Somebody trying to read
+        // a shared screen had nothing in between - the step that puts the
+        // conversation away and gives the call the column lived in a chevron at the
+        // top of the panel, which is not where they were looking.
+        const onExpand = vi.fn();
+        const { rerender } = render(
+            <CallRoom
+                meetingId="m1"
+                place="direct"
+                call={call()}
+                onExpand={onExpand}
+                onLeave={() => undefined}
+            />
+        );
+        fireEvent.click(screen.getByTitle("Watch Bo - screen"));
+        expect(screen.getByRole("button", { name: "Full screen" })).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Fill the column" }));
+        expect(onExpand).toHaveBeenLastCalledWith(true);
+
+        rerender(
+            <CallRoom
+                meetingId="m1"
+                place="direct"
+                call={call()}
+                expanded
+                onExpand={onExpand}
+                onLeave={() => undefined}
+            />
+        );
+        const back = screen.getByRole("button", { name: "Bring the conversation back" });
+        expect(back.getAttribute("aria-pressed")).toBe("true");
+        fireEvent.click(back);
+        expect(onExpand).toHaveBeenLastCalledWith(false);
+    });
+
+    it("says nothing about a column in a voice room, which is one already", () => {
+        render(<CallRoom meetingId="m1" place="room" call={call()} onLeave={() => undefined} />);
+        expect(screen.getByRole("button", { name: "Full screen" })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Fill the column" })).toBeNull();
+    });
+});
+
 describe("combining from a person's menu", () => {
     const menu = (locked: boolean) => (
         <PersonMenu
