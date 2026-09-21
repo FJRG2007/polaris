@@ -68,6 +68,18 @@ vi.mock("@/lib/device-once", () => ({
     }
 }));
 
+/**
+ * Everything the effects have started, drained.
+ *
+ * A notice is drawn from a promise chain an effect starts - a claim, then the
+ * permission, then the notice itself - and each hop is a microtask. Draining a
+ * bounded number of them happens at the same speed on any machine; waiting for a
+ * deadline does not, which is how a test passes alone and fails in a full run.
+ */
+async function settled(): Promise<void> {
+    for (let hop = 0; hop < 6; hop += 1) await act(async () => undefined);
+}
+
 const ring = {
     kind: "call",
     state: "ringing",
@@ -100,7 +112,8 @@ describe("a call arriving while nobody is looking at the tab", () => {
         await act(async () => onFrame?.(ring, { owner: true }));
         expect(screen.queryByText("Grace is calling")).toBeTruthy();
 
-        await vi.waitFor(() => expect(notices).toHaveLength(1));
+        await settled();
+        expect(notices).toHaveLength(1);
         expect(notices[0]?.sound).toBe(true);
     });
 
@@ -114,7 +127,8 @@ describe("a call arriving while nobody is looking at the tab", () => {
 
         await act(async () => onFrame?.(ring, { owner: true }));
 
-        await vi.waitFor(() => expect(notices).toHaveLength(1));
+        await settled();
+        expect(notices).toHaveLength(1);
         expect(new Set(claims).size).toBe(1);
         expect(claims[0]).toContain("m1");
     });
@@ -125,7 +139,8 @@ describe("a call arriving while nobody is looking at the tab", () => {
 
         await act(async () => onFrame?.(ring, { owner: true }));
 
-        await vi.waitFor(() => expect(notices).toHaveLength(1));
+        await settled();
+        expect(notices).toHaveLength(1);
         // The ring is the sound. A chime over the top of it is two noises for
         // one call, which is what somebody hears as distortion.
         expect(notices[0]?.sound).toBe(false);
