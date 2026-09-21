@@ -63,5 +63,12 @@ export function startDownload(url: string, filename?: string): void {
         pending = Math.max(0, pending - 1);
         publish();
     };
-    saveFile(url, filename ?? "file", { onStarted: settle, onGaveUp: settle });
+    // `as` only where the caller knows the name better than the server does: a
+    // single file's own. An archive is named by the endpoint building it, and
+    // forcing a name here is how one ends up saved as "file".
+    saveFile(url, filename ?? "the folder", {
+        ...(filename ? { as: filename } : {}),
+        onStarted: settle,
+        onGaveUp: settle
+    });
 }

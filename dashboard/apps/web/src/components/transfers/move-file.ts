@@ -138,22 +138,33 @@ function formName(form: FormData): string | undefined {
  */
 export function saveFile(
     url: string,
-    name: string,
-    /** `asFile` adds the `download=1` the chat and task routes read to mean "hand
-     *  this over rather than draw it inline". Every other route here already
-     *  answers with an attachment, and an extra parameter they do not read would
-     *  only be noise in a log.
+    /** What to call it in the list. A label for the reader, not necessarily the
+     *  name it is saved under - see `as`. */
+    label: string,
+    /**
+     * `as` is the filename to save it under, and leaving it out is deliberate
+     * rather than lazy: with no `download` attribute the browser uses the name the
+     * response gives, which for an archive the server just built is the only place
+     * the real name exists. Setting it to the label instead is how every zip ends
+     * up on somebody's disk called "file".
      *
-     *  `onStarted` and `onGaveUp` are for a screen with an indicator of its own -
-     *  a toolbar button that spins while anything it asked for is still coming -
-     *  so there is one ticket and one watcher rather than two that disagree. */
+     * `asFile` adds the `download=1` the chat and task routes read to mean "hand
+     * this over rather than draw it inline". Every other route here already answers
+     * with an attachment, and a parameter they do not read would only be noise in a
+     * log.
+     *
+     * `onStarted` and `onGaveUp` are for a screen with an indicator of its own - a
+     * toolbar button that spins while anything it asked for is still coming - so
+     * there is one ticket and one watcher rather than two that disagree.
+     */
     options: {
+        readonly as?: string;
         readonly asFile?: boolean;
         readonly onStarted?: () => void;
         readonly onGaveUp?: () => void;
     } = {}
 ): void {
-    const transfer = beginTransfer({ name, way: "down", total: null });
+    const transfer = beginTransfer({ name: label, way: "down", total: null });
     // The ticket is how a navigation reports back: the response sets a cookie
     // naming it, which can only happen once the server has answered - see
     // `download-ticket`. No second request, and nothing read here.
@@ -165,7 +176,7 @@ export function saveFile(
 
     const anchor = document.createElement("a");
     anchor.href = address;
-    anchor.download = name;
+    if (options.as) anchor.download = options.as;
     anchor.rel = "noopener";
     document.body.appendChild(anchor);
     anchor.click();

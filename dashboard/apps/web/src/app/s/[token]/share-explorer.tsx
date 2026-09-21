@@ -110,7 +110,9 @@ function zipUrl(token: string, paths: string[]): string {
  * before this there was nothing on screen saying so.
  */
 function openHref(href: string, downloadName?: string) {
-    saveFile(href, downloadName ?? "download");
+    // A file's own name where the caller has it; for a zip the server is building,
+    // the name comes back with the answer.
+    saveFile(href, downloadName ?? "the folder", downloadName ? { as: downloadName } : {});
 }
 
 /** Parent folder path of a relative path ("a/b/c" -> "a/b"). */

@@ -13,7 +13,7 @@
  * is the kind of mistake a test has to catch rather than a person.
  */
 
-import { sendFile } from "@/components/transfers/move-file";
+import { saveFile, sendFile } from "@/components/transfers/move-file";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearTransfer, transfersNow } from "@/components/transfers/transfer-store";
 
@@ -153,5 +153,32 @@ describe("sending a form", () => {
 
         request.answer(200, "{}");
         await sending;
+    });
+});
+
+describe("saving a file", () => {
+    it("lets the server name an archive it is building", () => {
+        // The trap this pins down: a name forced on the anchor wins over the one the
+        // response gives, so a zip the server had just built - the only place its
+        // real name exists - was saved as whatever the list was calling it.
+        const anchors: HTMLAnchorElement[] = [];
+        const made = document.createElement.bind(document);
+        vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+            const element = made(tag);
+            if (tag === "a") anchors.push(element as HTMLAnchorElement);
+            return element;
+        });
+
+        saveFile("/api/s/abc/zip?p=holiday", "the folder");
+        expect(anchors[0]!.hasAttribute("download")).toBe(false);
+
+        saveFile("/api/chat/attachments/9", "holiday.mp4", {
+            asFile: true,
+            as: "holiday.mp4"
+        });
+        expect(anchors[1]!.getAttribute("download")).toBe("holiday.mp4");
+        // And the route is told to hand it over rather than draw it.
+        expect(anchors[1]!.getAttribute("href")).toContain("download=1");
+        expect(anchors[1]!.getAttribute("href")).toContain("dl=");
     });
 });

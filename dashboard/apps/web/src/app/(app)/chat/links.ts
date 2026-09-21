@@ -74,5 +74,5 @@ export function downloadFile(url: string, name: string): void {
     // Through the shared surface, so the wait before the first byte is on screen:
     // a file on a share behind a fresh connection can be many seconds of a menu
     // item that looks like it did nothing - see `components/transfers`.
-    saveFile(url, name, { asFile: true });
+    saveFile(url, name, { asFile: true, as: name });
 }
