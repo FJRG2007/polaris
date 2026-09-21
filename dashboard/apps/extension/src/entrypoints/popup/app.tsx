@@ -138,12 +138,33 @@ export function App(): React.JSX.Element {
     const [status, refresh] = useStatus();
     const update = useUpdate();
     const [section, setSection] = useSection();
+    /**
+     * Asking Polaris to let this browser in, from the locked screen.
+     *
+     * The master password is one way past a locked vault and it is not always
+     * the one that works: a vault whose keys this browser is no longer holding
+     * refuses every password there is, and so does an extension too old to run
+     * the derivation the account was moved to. Both used to end at a password
+     * field with nothing else on the screen, which reads as a forgotten master
+     * password - the one thing nobody can help with. The approval is the other
+     * way in and it was already built; this only makes it reachable from the
+     * screen where somebody is stuck.
+     */
+    const [way, setWay] = useState<"either" | "approval" | "password">("either");
+    const askPolaris = useCallback(() => setWay("approval"), []);
+    const askPassword = useCallback(() => setWay("password"), []);
 
     // Nothing at all until the worker has answered: a popup that flashed the
     // sign-in screen at somebody whose vault is open would be lying for a frame.
     if (!status) return <main className="pad" />;
 
     const shown = screenFor(status);
+    // Asked for, or found waiting. The second is what a popup reopened in the
+    // middle of an approval lands on: the worker is still holding the request,
+    // and this is the screen that can show its code. Saying so explicitly is what
+    // makes the way back work - a request still in flight would otherwise send
+    // somebody straight back to it the moment they left.
+    const onApproval = way === "approval" || (way === "either" && status.awaitingApproval);
 
     // Before the account: which Polaris, then connecting this browser to it. The
     // accounts line stays under these, because adding a second account is exactly
@@ -172,18 +193,34 @@ export function App(): React.JSX.Element {
             ) : (
                 <>
                     <SectionBar title="Vault" onBack={() => setSection("home")} />
-                    {shown === "signIn" ? (
+                    {shown === "signIn" || (shown === "unlock" && onApproval) ? (
                         <SignIn
                             server={status.server}
                             connected={status.connected}
                             canVault={status.canVault}
-                            onDone={refresh}
+                            onDone={async () => {
+                                setWay("either");
+                                await refresh();
+                            }}
+                            // Only from the locked screen, where the password is
+                            // still there to go back to. On the sign-in screen
+                            // proper there is nothing behind it.
+                            onBack={shown === "unlock" ? askPassword : undefined}
                         />
                     ) : shown === "unlock" ? (
-                        <Unlock onDone={refresh} />
+                        <Unlock onDone={refresh} onApprove={askPolaris} />
                     ) : (
                         <Items status={status} onChange={refresh} />
                     )}
+                    {/* Making a password needs no vault: it is arithmetic in this
+                        popup, the same generator the item list offers. Somebody
+                        signing up for something with their vault locked is exactly
+                        who wants one, and sending them through a master password
+                        first to reach a local random number was a lock on a door
+                        with no room behind it. Over the list it is the one inside
+                        `Items`, which can also hand the value to the save form;
+                        here there is no form to hand it to. */}
+                    {shown === "signIn" || shown === "unlock" ? <Generator /> : null}
                 </>
             )}
         </div>
@@ -409,13 +446,17 @@ function SignIn({
     server,
     connected,
     canVault,
-    onDone
+    onDone,
+    onBack
 }: {
     server: string;
     connected: boolean;
     /** Whether this account may use a vault at all. */
     canVault: boolean;
     onDone: () => Promise<void>;
+    /** Where this screen was reached from, when it was reached from somewhere:
+     *  the locked vault, whose password field is still worth going back to. */
+    onBack?: () => void;
 }): React.JSX.Element {
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -564,11 +605,24 @@ function SignIn({
                     Sign out of the vault
                 </button>
             ) : null}
+            {onBack ? (
+                <button className="ghost" onClick={onBack}>
+                    Use the master password instead
+                </button>
+            ) : null}
         </main>
     );
 }
 
-function Unlock({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element {
+function Unlock({
+    onDone,
+    onApprove
+}: {
+    onDone: () => Promise<void>;
+    /** The other way past a locked vault, for when the password is not the thing
+     *  standing in the way. */
+    onApprove: () => void;
+}): React.JSX.Element {
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -600,6 +654,13 @@ function Unlock({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element 
             <button disabled={busy || password === ""} onClick={() => void unlock()}>
                 {busy ? "Opening" : "Unlock"}
             </button>
+            {/* The way out of the one screen that had none. A password field on
+                its own can only be read as "you have forgotten it", and two of
+                the three reasons this refuses have nothing to do with what was
+                typed - see `lib/unlock`. */}
+            <button className="ghost" onClick={onApprove}>
+                Let me in from Polaris instead
+            </button>
         </main>
     );
 }
@@ -615,8 +676,12 @@ function Unlock({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element 
  * a password made here and one made there are drawn the same way. This makes a
  * string and saves nothing itself: "Use it" hands it to the form above, and "Copy"
  * hands it to whatever somebody is signing up to.
+ *
+ * It needs no vault, no account and no server, which is why it is offered on
+ * every screen rather than behind the item list. Where there is no save form to
+ * hand a password to there is no "Use it" either, and copying is the whole of it.
  */
-function Generator({ onUse }: { onUse: (value: string) => void }): React.JSX.Element {
+function Generator({ onUse }: { onUse?: (value: string) => void }): React.JSX.Element {
     const [open, setOpen] = useState(false);
     const [length, setLength] = useState(20);
     const [value, setValue] = useState<string | null>(null);
@@ -701,16 +766,18 @@ function Generator({ onUse }: { onUse: (value: string) => void }): React.JSX.Ele
                         "Copy"
                     )}
                 </button>
-                <button
-                    className="ghost"
-                    title="Put it straight into a new login"
-                    disabled={!value}
-                    onClick={() => {
-                        if (value) onUse(value);
-                    }}
-                >
-                    Use it
-                </button>
+                {onUse ? (
+                    <button
+                        className="ghost"
+                        title="Put it straight into a new login"
+                        disabled={!value}
+                        onClick={() => {
+                            if (value) onUse(value);
+                        }}
+                    >
+                        Use it
+                    </button>
+                ) : null}
                 <button className="ghost" onClick={() => setOpen(false)}>
                     Hide
                 </button>

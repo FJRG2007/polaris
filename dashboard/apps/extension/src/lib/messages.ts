@@ -96,6 +96,17 @@ export interface VaultStatus {
     readonly accounts: readonly AccountRef[];
     /** Which of them is in front, or null while none is. */
     readonly activeId: string | null;
+    /**
+     * Whether a request to be let in is out there waiting on somebody.
+     *
+     * Read from the worker rather than remembered by the popup, because the
+     * popup does not outlive the press that started it: asking opens a tab, and
+     * opening a tab is what closes the popup. Without this, reopening it lands
+     * on the master password again while an approval nobody can see is still in
+     * flight - which is how somebody ends up starting a second request and
+     * orphaning the one they were in the middle of approving.
+     */
+    readonly awaitingApproval: boolean;
     /** The organizations the connected account can switch to, as the dashboard's
      *  header offers them. Empty for an account in none. */
     readonly organizations: readonly ShelfChoice[];

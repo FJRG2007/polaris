@@ -13,9 +13,9 @@ import type { SymmetricKey } from "@polaris/vault-crypto";
 import { noticeFor, type UpdateNotice } from "@/lib/update";
 import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
+import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
-import { deriveMasterKey, stretchMasterKey } from "@polaris/vault-crypto";
 import {
     decrypt,
     decryptRsa,
@@ -544,31 +544,28 @@ async function organizationKeys(key: SymmetricKey): Promise<Map<string, Symmetri
  * The password is turned into a key here and dropped; what is kept is what it
  * unwrapped. Nothing derived from it is written anywhere, which is why this has
  * to be asked again after the browser - or the worker - has been away.
+ *
+ * What it answers with is why, not whether: see `lib/unlock`. A refusal that
+ * cannot tell a wrong password from an extension that will not run the
+ * derivation is one the reader can only read as their own mistake.
  */
-async function unlock(password: string): Promise<boolean> {
+async function unlock(password: string): Promise<UnlockOutcome> {
     const [held, wrapped] = await Promise.all([EMAIL.getValue(), WRAPPED.getValue()]);
-    if (!wrapped) return false;
     // A vault this browser was let into by approval typed no address, and the master
     // password cannot be stretched without one - it is the salt. Fetched from the
     // profile rather than refused, because what a refusal looks like on screen is a
     // locked vault telling somebody their correct password is wrong, with no way
     // back but signing out.
     let email = held;
-    if (!email) {
+    if (!email && wrapped) {
         await sync(true);
         email = await EMAIL.getValue();
     }
-    if (!email) return false;
 
-    const settings = wrapped.kdf as Parameters<typeof deriveMasterKey>[2];
-    const masterKey = await deriveMasterKey(password, email, settings);
-    const stretched = await stretchMasterKey(masterKey);
-    const raw = await decryptBytes(wrapped.key, stretched);
-    if (raw === null || raw.length !== 64) return false;
-    const key = symmetricKeyFromBytes(raw);
-
-    open = { key, organizations: await organizationKeys(key) };
-    return true;
+    const outcome = await openVault(password, email, wrapped);
+    if (!outcome.ok) return outcome;
+    open = { key: outcome.key, organizations: await organizationKeys(outcome.key) };
+    return outcome;
 }
 
 /**
@@ -1308,7 +1305,8 @@ async function status(): Promise<messages.VaultStatus> {
         canVault,
         linkOrgs,
         faces,
-        shelf
+        shelf,
+        waiting
     ] = await Promise.all([
         currentOrigin(),
         EMAIL.getValue(),
@@ -1323,7 +1321,8 @@ async function status(): Promise<messages.VaultStatus> {
         LINK_VAULT.getValue(),
         LINK_ORGS.getValue(),
         LINK_FACES.getValue(),
-        LINK_SHELF.getValue()
+        LINK_SHELF.getValue(),
+        WAITING.getValue()
     ]);
     // Only worth asking for once there is a session to ask about: a browser that
     // has not been let in yet would spend a request on every poll of a screen
@@ -1367,7 +1366,11 @@ async function status(): Promise<messages.VaultStatus> {
             face: faces.orgs[org.id] ?? null
         })),
         shelf,
-        face: faces.self
+        face: faces.self,
+        // Read, never consumed: what became of a request that has ended is the
+        // sign-in screen's to report, and reading it here would take the answer
+        // away from the screen that says it out loud.
+        awaitingApproval: waiting?.state === "pending"
     };
 }
 
@@ -2022,7 +2025,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "unlock": {
                 const opened = await inTurn(() => unlock(request.password));
-                if (!opened) return { ok: false, error: "That password did not open the vault." };
+                if (!opened.ok) return { ok: false, error: unlockRefusal(opened.reason) };
                 // Deliberately not waited on - an unlock should not sit on the
                 // network - but still in a turn, or the items it brings down could
                 // land after a switch and be read as the incoming account's.

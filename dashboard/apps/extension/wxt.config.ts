@@ -81,7 +81,30 @@ export default defineConfig({
         // origin that is in no optional list is one `permissions.request` refuses,
         // which left the extension unable to reach any server at all there.
         ...(manifestVersion === 3
-            ? { optional_host_permissions: ["https://*/*", "http://*/*"] }
+            ? {
+                  optional_host_permissions: ["https://*/*", "http://*/*"],
+                  /**
+                   * WebAssembly, which a vault on Argon2id is opened through.
+                   *
+                   * Manifest v3 blocks it outright unless the manifest asks: the
+                   * default policy is `script-src 'self'`, and under it
+                   * `WebAssembly.compile` throws "Wasm code generation disallowed
+                   * by embedder" the moment a master password is typed. What that
+                   * reached the screen as was the vault refusing a password that
+                   * opens it perfectly well on the dashboard - an account locked
+                   * out of the extension with nothing to read but its own
+                   * refusal, for a setting somebody chose on another screen.
+                   *
+                   * `wasm-unsafe-eval` is the narrow form: it permits compiling
+                   * WebAssembly and nothing else. `eval` and remote script stay
+                   * refused, which is the part that matters in a password
+                   * manager. Manifest v2 (Firefox) allows WebAssembly under its
+                   * own default policy, so its build is left alone.
+                   */
+                  content_security_policy: {
+                      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+                  }
+              }
             : { optional_permissions: ["https://*/*", "http://*/*"] }),
         ...(browser === "firefox"
             ? { browser_specific_settings: { gecko: { id: "vault@polaris.local" } } }

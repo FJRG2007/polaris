@@ -83,6 +83,7 @@ src/lib/protocol.ts      the Bitwarden protocol client: be let in, sync, refresh
 src/lib/accounts.ts      more than one signed-in account, and switching between them
 src/lib/matching.ts      whether an item belongs to this page, and which comes first
 src/lib/lock.ts          when an open vault locks itself again
+src/lib/unlock.ts        the master password, and why it did not open the vault
 src/lib/save.ts          what was typed for a new login, before it is encrypted
 src/lib/item.ts          the item to send back when only its password changes
 src/lib/update.ts        whether a newer build is out, and who is going to install it
@@ -130,6 +131,20 @@ enforces it whether or not you open the popup.
 
 The longest choice is the browser session. There is no "never", because that would
 mean keeping the key somewhere a restart cannot take it.
+
+Getting back in is the master password **or** the approval again, and the locked
+screen offers both. Two of the three ways a password can be refused are nothing
+to do with what was typed - this browser may no longer be holding the wrapped
+keys, or the extension may be too old to run the key derivation the account has
+been moved to - and a password field on its own could only be read as "you have
+forgotten it", which is the one thing nobody can mend. `src/lib/unlock.ts` tells
+the three apart and the popup says which.
+
+An account on Argon2id is opened through a WebAssembly build, and manifest v3
+refuses to run one unless the manifest asks: the Chromium build declares
+`'wasm-unsafe-eval'` for that and nothing else. Without it the master password
+that opens the vault on the dashboard is refused here, so read the built
+`.output/<target>/manifest.json` rather than `wxt.config.ts` after touching it.
 
 ## Finding out it is out of date
 

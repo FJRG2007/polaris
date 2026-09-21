@@ -22,6 +22,7 @@ const STATUS: VaultStatus = {
     timeoutMs: 0,
     accounts: [],
     activeId: null,
+    awaitingApproval: false,
     organizations: [],
     shelf: null,
     face: null
