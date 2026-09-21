@@ -52,6 +52,9 @@ describe("letting the browser draw a notice", () => {
         `${SRC}app/(app)/account/notifications/notification-settings-view.tsx`,
         "utf8"
     );
+    /** Where the standing itself is worked out, for the two screens that show
+     *  it: this card, and the missed call that offers to mend it. */
+    const notify = readFile(`${SRC}lib/desktop-notify.ts`, "utf8");
 
     it("is offered deliberately rather than only mid-alert", async () => {
         const source = await settings;
@@ -65,7 +68,11 @@ describe("letting the browser draw a notice", () => {
     });
 
     it("asks nothing inside the app, which draws its own", async () => {
-        const source = await settings;
-        expect(source).toContain('if (desktopBridge()) return setStanding("app");');
+        // The card reads where this browser stands rather than working it out in
+        // place: a missed call needs the same answer, and a second copy of it is
+        // a second thing to keep in step. So the app case is asserted where it
+        // is now decided.
+        expect(await settings).toContain("noticeStanding()");
+        expect(await notify).toContain('if (desktopBridge()) return "app";');
     });
 });
