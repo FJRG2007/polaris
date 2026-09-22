@@ -1,19 +1,28 @@
 /**
- * A read-mostly StorageDriver over a running container's filesystem, so a deployed
- * service shows up in Drive as an ordinary browsable folder. It wraps the host
- * daemon's allowlisted fs endpoints (the same ones the deploy Files panel uses):
- * `ls`/`stat` for listing, `cat` for download, and the fs-write endpoint for
- * upload. Mutating operations the daemon does not permit (mkdir/move/delete) are
- * reported as unsupported, and the driver declares itself non-seekable so the
- * download route never asks for a byte range it cannot serve.
+ * A StorageDriver over a container's filesystem, so a deployed service - a game
+ * server, most of all - shows up in Drive as an ordinary folder somebody can work
+ * in. It wraps the host daemon's fs endpoints: `ls`/`stat` for listing, `cat` for
+ * download, the fs-write endpoint for upload and for saving an edited file, and
+ * the fs-mutate endpoint for a new folder, a rename and a delete.
+ *
+ * Those last three used to be refused outright, and that refusal was the whole
+ * distance between this and the file manager every game host has. Drive already
+ * draws New folder, Rename and Delete here - the authorization for a container
+ * source allows all three - so what somebody met was four buttons that existed
+ * and an error, which reads as Polaris being broken rather than as something it
+ * does not do. The daemon now names the operation rather than taking a command,
+ * and this asks for it by name.
+ *
+ * The driver declares itself non-seekable so the download route never asks for a
+ * byte range it cannot serve.
  *
  * The driver lives in the app layer (not in @polaris/storage) because it needs the
  * privileged HostdClient transport, which the pure storage package must not import.
  */
 
 import { Readable } from "node:stream";
-import type { IncomingMessage } from "node:http";
 import { baseName } from "@polaris/core";
+import type { IncomingMessage } from "node:http";
 import { HostdClient } from "@polaris/hostd-client";
 import {
     StorageError,
@@ -58,7 +67,7 @@ export class ContainerDriver implements StorageDriver {
     public readonly capabilities: StorageDriverCapabilities = {
         randomRead: false,
         randomWrite: false,
-        move: false,
+        move: true,
         usage: false,
         requiresHostd: true
     };
@@ -132,16 +141,45 @@ export class ContainerDriver implements StorageDriver {
         return this.stat(path);
     }
 
-    public async mkdir(): Promise<void> {
-        throw new StorageError("not_supported", "Creating folders inside a container is not supported");
+    public async mkdir(path: string): Promise<void> {
+        await this.mutate("mkdir", toAbsolute(path), undefined, "Creating folders inside a container");
     }
 
-    public async move(): Promise<void> {
-        throw new StorageError("not_supported", "Moving files inside a container is not supported");
+    public async move(from: string, to: string): Promise<void> {
+        await this.mutate("rename", toAbsolute(from), toAbsolute(to), "Moving files inside a container");
     }
 
-    public async delete(): Promise<void> {
-        throw new StorageError("not_supported", "Deleting files inside a container is not supported");
+    public async delete(path: string): Promise<void> {
+        await this.mutate("remove", toAbsolute(path), undefined, "Deleting files inside a container");
+    }
+
+    /**
+     * Ask the daemon for one named change, and turn what it says into the failure
+     * a screen can show.
+     *
+     * Three answers have to stay apart. A daemon that has never heard of the route
+     * is a deployment that has not been updated, and saying "not supported" is the
+     * truth about this machine rather than about the operation. A command that ran
+     * and refused says why - "Directory not empty", "Read-only file system" - and
+     * that sentence is the whole value of having waited for it. Anything else is
+     * the daemon itself failing, which is not the caller's fault to explain.
+     */
+    private async mutate(
+        op: "mkdir" | "rename" | "remove",
+        path: string,
+        to: string | undefined,
+        what: string
+    ): Promise<void> {
+        const result = await this.hostd.fsMutate(this.container, op, path, to);
+        if (!result.supported) {
+            throw new StorageError("not_supported", `${what} needs a newer Polaris on this machine`);
+        }
+        if (result.code === 0) return;
+        const said = result.output.trim().split("\n").pop()?.trim() ?? "";
+        // The command's own words, with the part that only means something to
+        // whoever wrote the command taken off the front.
+        const reason = said.replace(/^[a-z]+:\s*/i, "").slice(0, 200);
+        throw new StorageError("io_error", reason.length > 0 ? `${what} failed: ${reason}` : `${what} failed`);
     }
 
     public async usage(): Promise<StorageUsage> {

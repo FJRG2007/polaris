@@ -146,6 +146,24 @@ struct FsReadRequest {
     argv: Vec<String>,
 }
 
+/// One change to a container's files, named rather than commanded.
+///
+/// `op` is a word from a closed set and never a command: the daemon builds the
+/// argv itself, so nothing that arrives over the wire chooses what runs. That is
+/// the same shape the volume wipe has, and it is why this endpoint can exist at
+/// all beside an `fs/read` whose whole design is an allowlist.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FsMutateRequest {
+    container: String,
+    /// `mkdir`, `rename` or `remove`.
+    op: String,
+    path: String,
+    /// Where a rename lands. Absent for the other two.
+    #[serde(default)]
+    to: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ExecRunRequest {
@@ -214,6 +232,7 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/exec/resize") => deploy_exec_resize(state, req, body),
         ("POST", "/v1/deploy/fs/read") => deploy_fs_read(req, body),
         ("POST", "/v1/deploy/fs/write") => deploy_fs_write(state, req, body),
+        ("POST", "/v1/deploy/fs/mutate") => deploy_fs_mutate(req, body),
         ("POST", "/v1/deploy/volume/wipe") => deploy_volume_wipe(req, body),
         ("POST", "/v1/deploy/networks/reconcile") => deploy_networks_reconcile(state, req, body),
         _ if path.starts_with("/v1/fs/") => fs_handler(state, req, body),
@@ -984,6 +1003,87 @@ fn deploy_fs_write<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Re
     }
 }
 
+/// A path a change may be made at: absolute, sane, and never the whole filesystem.
+///
+/// The root is refused outright. Every other guard here is about what a path is
+/// allowed to contain; this one is about what it would mean - "remove /" is the
+/// container's entire filesystem, and no file manager has ever meant it.
+fn valid_fs_path(path: &str) -> bool {
+    !path.is_empty()
+        && path.len() <= 4096
+        && path.starts_with('/')
+        && path.trim_matches('/') != ""
+        && !path.bytes().any(|b| b < 0x20 || b == 0x7f)
+}
+
+/// Create a folder, rename an entry, or remove one, inside a container.
+///
+/// The second destructive primitive this daemon has, and like the first
+/// (`deploy_volume_wipe`) it is destructive only where the caller points: the
+/// operation is a word from a closed set, the argv is built here, and nothing
+/// that arrives over the wire is ever run as a command. What it grants over what
+/// was already possible is narrow - `exec/run` has entered a running container
+/// with an arbitrary argv since it existed - and what it adds is the stopped
+/// case, where the files are reached by borrowing the volumes exactly as
+/// `fs/read` and `fs/write` already do. A server switched off while its
+/// configuration is put right is the ordinary reason to be in these files.
+fn deploy_fs_mutate<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: FsMutateRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid fs mutate request"),
+    };
+    if !deploy::valid_container_ref(&request.container) {
+        return Response::bad_request("invalid container reference");
+    }
+    if !valid_fs_path(&request.path) {
+        return Response::bad_request("invalid path");
+    }
+
+    let argv: Vec<String> = match request.op.as_str() {
+        "mkdir" => vec![
+            "mkdir".into(),
+            "-p".into(),
+            "--".into(),
+            request.path.clone(),
+        ],
+        "rename" => {
+            let Some(to) = request.to.as_deref() else {
+                return Response::bad_request("rename needs a destination");
+            };
+            if !valid_fs_path(to) {
+                return Response::bad_request("invalid destination");
+            }
+            // `-n` rather than `-f`: a rename that would land on something else is
+            // a file silently destroyed, and the screen that asked has a name it
+            // can offer instead.
+            vec![
+                "mv".into(),
+                "-n".into(),
+                "--".into(),
+                request.path.clone(),
+                to.to_string(),
+            ]
+        }
+        "remove" => vec!["rm".into(), "-rf".into(), "--".into(), request.path.clone()],
+        _ => return Response::bad_request("unknown fs operation"),
+    };
+
+    match deploy::run_against_files(&request.container, &argv) {
+        Ok((code, output)) => {
+            let body = serde_json::json!({ "code": code, "output": output });
+            Response::json(200, "OK", &body)
+        }
+        Err(error) => {
+            eprintln!("fs {} in {} failed: {error}", request.op, request.container);
+            Response::text(502, "Bad Gateway", "could not change the file")
+        }
+    }
+}
+
 /// Empty a volume's mount point inside a container, leaving the directory itself
 /// in place so the service still has somewhere to write when it comes back up.
 ///
@@ -1503,6 +1603,40 @@ mod tests {
         // Missing required field is rejected.
         let missing = br#"{"id":"nas","kind":"nfs","source":"s"}"#;
         assert!(serde_json::from_slice::<MountRequest>(missing).is_err());
+    }
+
+    #[test]
+    fn fs_mutate_request_is_a_word_and_a_path_never_a_command() {
+        let ok = br#"{"container":"polaris-web-1","op":"mkdir","path":"/data/config"}"#;
+        let parsed: FsMutateRequest = serde_json::from_slice(ok).unwrap();
+        assert_eq!(parsed.op, "mkdir");
+        assert!(parsed.to.is_none());
+
+        // An argv is not a thing this endpoint takes: the daemon builds it.
+        let argv = br#"{"container":"c","op":"mkdir","path":"/x","argv":["rm","-rf","/"]}"#;
+        assert!(serde_json::from_slice::<FsMutateRequest>(argv).is_err());
+
+        let rename = br#"{"container":"c","op":"rename","path":"/a","to":"/b"}"#;
+        let parsed: FsMutateRequest = serde_json::from_slice(rename).unwrap();
+        assert_eq!(parsed.to.as_deref(), Some("/b"));
+    }
+
+    #[test]
+    fn a_path_is_absolute_printable_and_never_the_root() {
+        assert!(valid_fs_path("/data/config/corpse-server.toml"));
+        assert!(valid_fs_path("/data"));
+        // The whole filesystem of the container. "Remove everything" is not
+        // something any file manager means, so it cannot be asked for.
+        assert!(!valid_fs_path("/"));
+        assert!(!valid_fs_path("//"));
+        assert!(!valid_fs_path(""));
+        // A relative path is read against whatever directory the command happens
+        // to start in, which is not a place anybody chose.
+        assert!(!valid_fs_path("data/config"));
+        // A newline is how one command becomes two wherever a path is put through
+        // a shell, and these paths are handed to containers that have one.
+        assert!(!valid_fs_path("/data\nrm -rf /"));
+        assert!(!valid_fs_path("/data\u{7f}"));
     }
 
     #[test]

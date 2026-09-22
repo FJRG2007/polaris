@@ -775,6 +775,49 @@ pub fn exec_stopped(
     stream_command_ext(cmd, merge_stderr)
 }
 
+/// Run one command against a container's files and wait for what it did.
+///
+/// The same two worlds `exec_stopped` explains - a running container is entered,
+/// a stopped one has its volumes borrowed by a throwaway container from its own
+/// image - but waited for and answered with an exit status rather than streamed.
+/// That is the difference between reading a file and changing one: a listing that
+/// comes back empty is an answer in itself, while a folder that was not created
+/// has to say why, in words the person who pressed the button can act on.
+///
+/// The argv is built by the caller in this crate and never by whoever asked over
+/// the wire - see `deploy_fs_mutate`, which is the only caller.
+pub fn run_against_files(container: &str, argv: &[String]) -> io::Result<(i32, String)> {
+    let (program, rest) = argv
+        .split_first()
+        .ok_or_else(|| io::Error::other("empty argv"))?;
+
+    let mut cmd = Command::new("docker");
+    if container_running(container) {
+        cmd.arg("exec").arg(container).arg(program);
+    } else {
+        let image = container_image(container)?;
+        cmd.arg("run")
+            .arg("--rm")
+            .arg("--network")
+            .arg("none")
+            .arg("--volumes-from")
+            .arg(container)
+            .arg("--entrypoint")
+            .arg(program)
+            .arg(&image);
+    }
+    for arg in rest {
+        cmd.arg(arg);
+    }
+    cmd.stdin(Stdio::null());
+    let output = cmd.output()?;
+    // Both streams: the reason a rename was refused is on stderr, and it is the
+    // whole of what the answer is for.
+    let mut said = String::from_utf8_lossy(&output.stdout).into_owned();
+    said.push_str(&String::from_utf8_lossy(&output.stderr));
+    Ok((output.status.code().unwrap_or(-1), said))
+}
+
 fn pump<R: Read>(mut reader: R, tx: mpsc::Sender<Vec<u8>>) {
     let mut buf = [0u8; 8192];
     loop {

@@ -814,7 +814,13 @@ export function DriveExplorer({
                         onNewFolder={() => setNewFolderOpen(true)}
                         onNewFile={() => setNewFileOpen(true)}
                         onUpload={onUpload}
-                        onDelete={(items) => setDeleteTargets(items)}
+                        onDelete={
+                            // A container and a registered server have no recycle
+                            // bin to move anything into - see `moveManyToTrash`.
+                            isSavedConnection(connectionId)
+                                ? (items) => setDeleteTargets(items)
+                                : undefined
+                        }
                         onDeletePermanent={(items) => setPermanentTargets(items)}
                         onEmptyFolder={(entry, permanent) => setEmptyTarget({ entry, permanent })}
                         onScheduleDelete={(items) => setScheduleTargets(items)}

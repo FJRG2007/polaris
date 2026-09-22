@@ -526,6 +526,7 @@ export function MinecraftPanel({
             {tab === "mods" && (
                 <MinecraftMods
                     installedAppId={installedAppId}
+                    applicationId={applicationId}
                     settings={settings}
                     playersOnline={status?.players.online ?? 0}
                     clientMods={game?.clientMods ?? []}

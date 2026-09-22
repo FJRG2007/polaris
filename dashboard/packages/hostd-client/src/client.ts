@@ -271,6 +271,42 @@ export class HostdClient {
     }
 
     /**
+     * Create a folder, rename an entry, or remove one inside a container.
+     *
+     * The daemon takes a word and a path, never a command: `op` is one of
+     * `mkdir`, `rename` and `remove`, and it builds the argv itself. What comes
+     * back is the exit status and whatever the command said, because every caller
+     * of this is a screen that has to say why a rename did not happen.
+     *
+     * A daemon too old to know this route answers 404, and that is not an error
+     * to show anybody: it is this deployment not having been updated yet, which
+     * the caller reports as the operation not being available here.
+     */
+    public async fsMutate(
+        container: string,
+        op: "mkdir" | "rename" | "remove",
+        path: string,
+        to?: string
+    ): Promise<{ code: number; output: string; supported: boolean }> {
+        const response = await this.call(
+            "POST",
+            "/v1/deploy/fs/mutate",
+            JSON.stringify({ container, op, path, ...(to === undefined ? {} : { to }) })
+        );
+        if (response.status === 404 || response.status === 405) {
+            return { code: -1, output: "", supported: false };
+        }
+        if (response.status !== 200) throw new Error(daemonMessage("fs", response));
+        const parsed = JSON.parse(response.body) as { code?: unknown; output?: unknown };
+        if (typeof parsed.code !== "number") throw new Error("the host daemon returned no exit status");
+        return {
+            code: parsed.code,
+            output: typeof parsed.output === "string" ? parsed.output : "",
+            supported: true
+        };
+    }
+
+    /**
      * Write a file inside a container from a stream of known length.
      *
      * The same route as `fsWrite`, without the whole body held in memory first:

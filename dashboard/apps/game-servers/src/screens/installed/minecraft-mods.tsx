@@ -25,10 +25,12 @@ import { memoryChangeSentence } from "../../lib/minecraft/memory-plan";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "../../lib/minecraft/join-guard";
 import { Badge, Button, Card, CardBody, cn, Input, ScrollRow, Select, Skeleton } from "@polaris/ui";
+import Link from "next/link";
 import {
     ArrowUpCircle,
     Download,
     ExternalLink,
+    FolderCog,
     Loader2,
     Plus,
     RotateCw,
@@ -58,6 +60,7 @@ function pinnedVersion(value: string | undefined): string {
 
 export function MinecraftMods({
     installedAppId,
+    applicationId = null,
     settings,
     playersOnline,
     clientMods = [],
@@ -65,6 +68,15 @@ export function MinecraftMods({
     onSaved
 }: {
     installedAppId: string;
+    /**
+     * The container these mods run in, for the one thing this screen cannot do.
+     *
+     * A mod is installed here and then configured in its own file - and until
+     * now the answer to "where do I turn that setting on" was a shell on the
+     * machine. Null for a server that has never been deployed, which has no
+     * files yet.
+     */
+    applicationId?: string | null;
     settings: InstalledAppSetting[];
     playersOnline: number;
     /** The mods the players install and this server does not run. Kept apart from
@@ -323,6 +335,7 @@ export function MinecraftMods({
 
             <InstalledList
                 installedAppId={installedAppId}
+                applicationId={applicationId}
                 entries={projects}
                 projects={onList}
                 conflicts={conflicts}
@@ -603,6 +616,7 @@ function unreadRow(entry: string): InstalledRow {
 
 function InstalledList({
     installedAppId,
+    applicationId,
     entries,
     projects,
     conflicts,
@@ -616,6 +630,7 @@ function InstalledList({
     onRemove
 }: {
     installedAppId: string;
+    applicationId: string | null;
     entries: readonly string[];
     projects: InstalledRow[] | null;
     conflicts: readonly modrinth.ModrinthConflict[];
@@ -650,6 +665,21 @@ function InstalledList({
                             The server installs these when it boots and removes whatever is taken
                             off.
                         </p>
+                        {/* Where a mod's own settings live. Every one of these
+                            writes a file into `config/` the first time the server
+                            boots with it, and that file is the only place most of
+                            them can be changed - so the way to it belongs here,
+                            beside the list that put it there, rather than in a
+                            shell on the machine. */}
+                        {applicationId ? (
+                            <Link
+                                href={`/drive?c=container:${applicationId}&p=/data/config`}
+                                className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                                <FolderCog className="size-3.5" />
+                                Mod settings files
+                            </Link>
+                        ) : null}
                     </div>
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
                         Dependencies

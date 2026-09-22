@@ -398,7 +398,16 @@ export function FilesView({
     onNewFolder: () => void;
     onNewFile: () => void;
     onUpload: (items: { file: File; relPath: string }[]) => void;
-    onDelete: (entries: DriveEntry[]) => void;
+    /**
+     * Move these to the recycle bin.
+     *
+     * Absent on a source that has no bin - a running container, a registered
+     * server - where deleting is the only thing deleting can mean. The menu then
+     * offers one Delete rather than two, and the Delete key does that one: a
+     * source where "Move to Trash" is offered and always refused is a menu
+     * teaching somebody that the product is broken.
+     */
+    onDelete?: (entries: DriveEntry[]) => void;
     onRename: (entry: DriveEntry, nextName: string) => void;
     /** Share a link to each of these items. Absent on a source with no saved
      *  connection behind it - a server or a running container - where a link has
@@ -721,7 +730,7 @@ export function FilesView({
             openEntry(selectedEntries[0]);
         } else if (event.key === "Delete" && selectedEntries.length > 0) {
             event.preventDefault();
-            onDelete(selectedEntries);
+            (onDelete ?? onDeletePermanent)(selectedEntries);
         } else if (event.key === "ArrowDown") {
             event.preventDefault();
             moveCursor(viewMode === "grid" ? gridColumns() : 1, event.shiftKey);
@@ -1324,33 +1333,38 @@ export function FilesView({
                                 Delete
                             </ContextMenuSubTrigger>
                             <ContextMenuSubContent>
-                                <ContextMenuItem onSelect={() => onDelete(targets)}>
-                                    <Trash2 className="size-4" />
-                                    Move to Trash
-                                    <MenuShortcut>Del</MenuShortcut>
-                                </ContextMenuItem>
+                                {onDelete ? (
+                                    <ContextMenuItem onSelect={() => onDelete(targets)}>
+                                        <Trash2 className="size-4" />
+                                        Move to Trash
+                                        <MenuShortcut>Del</MenuShortcut>
+                                    </ContextMenuItem>
+                                ) : null}
                                 <ContextMenuItem
                                     variant="danger"
                                     onSelect={() => onDeletePermanent(targets)}
                                 >
                                     <Trash2 className="size-4" />
-                                    Delete permanently
+                                    {onDelete ? "Delete permanently" : "Delete"}
+                                    {onDelete ? null : <MenuShortcut>Del</MenuShortcut>}
                                 </ContextMenuItem>
                                 {!many && entry.kind === "dir" ? (
                                     <>
                                         <ContextMenuSeparator />
-                                        <ContextMenuItem
-                                            onSelect={() => onEmptyFolder(entry, false)}
-                                        >
-                                            <Eraser className="size-4" />
-                                            Empty folder to Trash
-                                        </ContextMenuItem>
+                                        {onDelete ? (
+                                            <ContextMenuItem
+                                                onSelect={() => onEmptyFolder(entry, false)}
+                                            >
+                                                <Eraser className="size-4" />
+                                                Empty folder to Trash
+                                            </ContextMenuItem>
+                                        ) : null}
                                         <ContextMenuItem
                                             variant="danger"
                                             onSelect={() => onEmptyFolder(entry, true)}
                                         >
                                             <Eraser className="size-4" />
-                                            Empty folder permanently
+                                            {onDelete ? "Empty folder permanently" : "Empty folder"}
                                         </ContextMenuItem>
                                     </>
                                 ) : null}
@@ -2209,7 +2223,7 @@ export function FilesView({
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => onDelete(selectedEntries)}
+                                    onClick={() => (onDelete ?? onDeletePermanent)(selectedEntries)}
                                     disabled={pending}
                                     title="Delete"
                                     aria-label="Delete"
