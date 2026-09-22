@@ -22,6 +22,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 let onFrame: ((frame: unknown, context: { owner: boolean }) => void) | null = null;
 /** Whether the tab's own audio would be heard, as `call-sounds` answers it. */
 let audible = true;
+/** Whether somebody is looking at this tab, as the browser reports it. */
+let watched = false;
 /** Every notice the worker was asked to draw. */
 let notices: { title: string; sound?: boolean }[] = [];
 
@@ -43,8 +45,7 @@ vi.mock("@/lib/desktop-notify", () => ({
         notices.push(input);
         return { close: () => undefined };
     },
-    // Nobody is looking at the tab, which is the only state that draws one.
-    tabIsWatched: () => false,
+    tabIsWatched: () => watched,
     mayNotify: async () => true,
     noticeStanding: () => "granted"
 }));
@@ -53,7 +54,7 @@ vi.mock("@/lib/call-sounds", () => ({
     RING_FOR_MS: 30_000,
     playCallSound: () => undefined,
     startRinging: () => () => undefined,
-    canBeHeard: () => audible
+    willBeHeard: async () => audible
 }));
 
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({ callElsewhereAction: async () => null }));
@@ -95,6 +96,7 @@ beforeEach(() => {
     notices = [];
     claims = [];
     audible = true;
+    watched = false;
     // No localStorage in this environment, which is the state `device-once`
     // treats as a device of one tab: the claim resolves and the notice is drawn.
 });
@@ -144,5 +146,40 @@ describe("a call arriving while nobody is looking at the tab", () => {
         // The ring is the sound. A chime over the top of it is two noises for
         // one call, which is what somebody hears as distortion.
         expect(notices[0]?.sound).toBe(false);
+    });
+});
+
+describe("a call arriving on a tab that is on screen", () => {
+    it("draws nothing over a tab that is being read and can ring", async () => {
+        watched = true;
+        audible = true;
+        render(<IncomingCalls viewerId="ada" />);
+
+        await act(async () => onFrame?.(ring, { owner: true }));
+        expect(screen.queryByText("Grace is calling")).toBeTruthy();
+
+        await settled();
+        // The card is in front of them and the telephone is ringing. A notice
+        // from the operating system on top of that is the same call announced
+        // twice.
+        expect(notices).toHaveLength(0);
+    });
+
+    it("still rings for a tab nobody has pressed, however visible it is", async () => {
+        // The case that made a call arrive in complete silence. "Visible" is a
+        // window being on screen and says nothing about anybody reading it: a
+        // Polaris left open on a second screen is visible and untouched, and a
+        // browser refuses audio to a page nobody has interacted with. This tab
+        // held the device's one claim, made no sound, and drew nothing because it
+        // believed somebody was looking at it.
+        watched = true;
+        audible = false;
+        render(<IncomingCalls viewerId="ada" />);
+
+        await act(async () => onFrame?.(ring, { owner: true }));
+
+        await settled();
+        expect(notices).toHaveLength(1);
+        expect(notices[0]?.sound).toBe(true);
     });
 });

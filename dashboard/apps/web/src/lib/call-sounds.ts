@@ -317,16 +317,39 @@ export function playCallSound(name: CallSound): void {
 }
 
 /**
- * Whether a sound started here would actually be heard.
+ * Whether a sound started here will actually be heard.
  *
  * No browser lets a page make a noise before it has been interacted with, and a
- * context that is still suspended is one whose notes nobody hears. The notice
- * drawn outside the window asks this before deciding whether to ring itself, so
- * that one event makes one sound: the ring where the ring can be heard, the
- * notice where it cannot.
+ * context that is still suspended is one whose notes nobody hears. A call asks
+ * this twice over: it decides whether the notice drawn outside the window rings,
+ * so that one event makes one sound - the ring where the ring can be heard, the
+ * notice where it cannot - and it decides whether a notice is drawn at all,
+ * because a tab that cannot be heard has nothing else to offer.
+ *
+ * **It waits for the browser's answer, and that is the point of it.** Reading
+ * the context's state is the wrong question at the one moment this is asked: the
+ * ring and the notice are settled in the same breath, and the context the ring
+ * has just made is `suspended` until the browser answers the request to resume
+ * it. A state read there says "cannot be heard" about a tab that is a
+ * millisecond from ringing - which is a call with two sounds over each other,
+ * and the thing the single claim exists to prevent.
  */
-export function canBeHeard(): boolean {
-    return context !== null && context.state === "running" && soundGain() > 0;
+export async function willBeHeard(): Promise<boolean> {
+    // A volume of zero is somebody saying no, not a context that has not started:
+    // nothing is resumed to find that out.
+    if (soundGain() <= 0) return false;
+    const ctx = audio();
+    if (!ctx) return false;
+    if (ctx.state !== "running") {
+        // Refused rather than thrown at, which is what a browser does with a
+        // context no gesture has unlocked.
+        try {
+            await ctx.resume();
+        } catch {
+            return false;
+        }
+    }
+    return ctx.state === "running";
 }
 
 /** One oscillator: the note at some multiple of its frequency, at some share of

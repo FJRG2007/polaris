@@ -38,10 +38,10 @@ import { Avatar } from "./avatar";
 import { Button } from "@polaris/ui";
 import { useSessionScope } from "./session-scope";
 import { claimForDevice } from "@/lib/device-once";
-import { leavesMissedCall, ringDecision, roomAfter, type RingRoom } from "@/lib/chat/ring-decision";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
+import { leavesMissedCall, ringDecision, roomAfter, type RingRoom } from "@/lib/chat/ring-decision";
 import {
     mayNotify,
     noticeStanding,
@@ -52,7 +52,7 @@ import {
 import { callElsewhereAction } from "@/app/(app)/chat/meeting-actions";
 import { BellOff, Phone, PhoneMissed, PhoneOff, X } from "lucide-react";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
-import { RING_FOR_MS, canBeHeard, playCallSound, startRinging } from "@/lib/call-sounds";
+import { RING_FOR_MS, playCallSound, startRinging, willBeHeard } from "@/lib/call-sounds";
 import { CALLS_CHANNEL, callTabMessageSchema, type CallTabMessage } from "@/lib/chat/call-tabs";
 
 /** How often a ringing telephone checks whether it was answered somewhere else.
@@ -449,43 +449,57 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
      * exists inside a page nobody is looking at is a missed call. This is the
      * one thing a browser has that the operating system draws.
      *
-     * Only while the tab is unwatched, once for the device however many tabs it
-     * has open, and taken back the moment the call is answered or gives up - a
-     * notice offering to join a room that is already over is worse than none.
+     * Once for the device however many tabs it has open, and taken back the
+     * moment the call is answered or gives up - a notice offering to join a room
+     * that is already over is worse than none.
+     *
+     * **Drawn whenever this tab cannot ring, and not only when nobody is looking
+     * at it.** "Looking at the tab" is `document.visibilityState`, which says a
+     * window is on screen and nothing about whether anybody has read a word of
+     * it: a Polaris left open on a second screen, or behind an editor, is
+     * "visible" and untouched, and a browser refuses audio to a page nobody has
+     * interacted with. That combination - on screen, never pressed - took the
+     * device's one claim and then made no sound at all, drew nothing outside the
+     * window because it believed somebody was reading it, and the call passed in
+     * silence with its card on a screen nobody was facing. So the question is not
+     * where the tab is, it is whether this tab can be heard.
      */
     const notices = useRef(new Map<string, { close: () => void }>());
     useEffect(() => {
         for (const entry of showing) {
-            if (notices.current.has(entry.meetingId) || tabIsWatched()) continue;
+            if (notices.current.has(entry.meetingId)) continue;
             // A hushed call raises nothing outside the window either. The
             // operating system's notice is the same interruption in another
             // form, and somebody who has just silenced one has said so.
             if (silenced.includes(entry.meetingId)) continue;
-            // Marked before the claim and the permission prompt resolve, so a
-            // second frame does not raise a second notice for the same call.
+            // Marked before the claim, the audio and the permission prompt
+            // resolve, so a second frame does not raise a second notice for the
+            // same call.
             notices.current.set(entry.meetingId, { close: () => undefined });
-            void alertClaim(entry.meetingId).then(
-                (ours) => {
-                    if (!ours) return;
-                    return notifyDesktop({
-                        title: `${entry.name || "Somebody"} is calling`,
-                        body: "Answer in Polaris",
-                        tag: `call:${entry.meetingId}`,
-                        href: `/chat/c/${entry.channelId}`,
-                        insistent: true,
-                        // The one notice in Polaris that may ring - and only
-                        // where the ring itself cannot be heard. A tab nobody is
-                        // looking at is one whose audio the browser may never
-                        // have been allowed to start, and then this is the only
-                        // sound there is; where it has been allowed, the ring is
-                        // already sounding and a chime over the top of it is two
-                        // noises for one call.
-                        sound: !canBeHeard()
-                    }).then((notice) => {
-                        if (notice) notices.current.set(entry.meetingId, notice);
-                    });
-                }
-            );
+            void alertClaim(entry.meetingId).then(async (ours) => {
+                if (!ours) return;
+                // Asked once, after the ring has had its chance to start, and
+                // used for both halves of the decision below - see `willBeHeard`
+                // for why the answer has to be waited for rather than read.
+                const heard = await willBeHeard();
+                // A tab being read, ringing audibly, needs nothing drawn over the
+                // top of it.
+                if (heard && tabIsWatched()) return;
+                const notice = await notifyDesktop({
+                    title: `${entry.name || "Somebody"} is calling`,
+                    body: "Answer in Polaris",
+                    tag: `call:${entry.meetingId}`,
+                    href: `/chat/c/${entry.channelId}`,
+                    insistent: true,
+                    // The one notice in Polaris that may ring - and only where
+                    // the ring itself cannot be heard, which is the whole reason
+                    // this tab is drawing one. Where the ring has been allowed,
+                    // it is already sounding and a chime over the top of it is
+                    // two noises for one call.
+                    sound: !heard
+                });
+                if (notice) notices.current.set(entry.meetingId, notice);
+            });
         }
 
         const live = new Set(
