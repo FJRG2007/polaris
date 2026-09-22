@@ -149,6 +149,25 @@ export interface AccountRef {
     readonly origin: string;
 }
 
+/**
+ * A login the worker is holding for a tab, as much of it as a page may know.
+ *
+ * Deliberately not the password, and not the item id on the save side: the bar
+ * that draws this is running inside somebody else's page, and what it needs is a
+ * sentence and two buttons. The values it is about stay in the worker, and
+ * `saveCaptured` names none of them.
+ */
+export interface OfferedCapture {
+    /** What saving it would do: add a login, replace a password, or nothing. */
+    readonly kind: "none" | "save" | "update";
+    /** The name of the item about to change, for an update, or the site's host
+     *  for a save. Null when there is nothing to offer. */
+    readonly name: string | null;
+    /** The username it would be saved under, so the bar can show whose login it
+     *  is about to become. */
+    readonly username: string | null;
+}
+
 export type Request =
     | { readonly kind: "status" }
     | { readonly kind: "connect"; readonly typed: string }
@@ -204,6 +223,36 @@ export type Request =
     /** Whether the tab in front of somebody is one they have shut this out of. */
     | { readonly kind: "blocked" }
     /**
+     * Whether a password somebody is inventing is already in a breach corpus.
+     *
+     * The password crosses to the worker and no further: what leaves the browser
+     * is five characters of its hash, to the deployment's own server. The answer
+     * is a count, or null for a question that could not be asked - see
+     * `lib/breach.ts`, which fails open on purpose.
+     */
+    | { readonly kind: "breach"; readonly password: string }
+    /**
+     * A login that has just been submitted on a page, offered to the vault.
+     *
+     * Sent by the inline script the moment a form goes, because the page it was
+     * typed on is usually gone a second later. The worker decides what it is
+     * worth - a new item, a password to replace, or nothing at all - and holds it
+     * for the tab until somebody answers the bar, so a submission that navigates
+     * is still offerable on the page that lands.
+     */
+    | { readonly kind: "captured"; readonly username: string; readonly password: string }
+    /** What is still waiting to be offered for this tab, if anything. Asked on
+     *  every load, because that is how an offer survives the navigation that
+     *  submitting the form caused. */
+    | { readonly kind: "pendingCapture" }
+    /** Save what was captured, as the worker decided it: a new login, or the new
+     *  password on the one it belongs to. The values are the worker's - nothing
+     *  crosses back into a page to do this. */
+    | { readonly kind: "saveCaptured" }
+    /** Drop it. `never` also shuts this extension out of the site, which is what
+     *  the third button on the bar is for. */
+    | { readonly kind: "dismissCapture"; readonly never: boolean }
+    /**
      * Whether a newer extension has been published, and what to do about it.
      *
      * Read-only: it answers from what the worker's own slow check last left, so
@@ -214,6 +263,16 @@ export type Request =
     | { readonly kind: "updateStatus" }
     /** Shut this extension out of the current site, or let it back in. */
     | { readonly kind: "setBlocked"; readonly blocked: boolean }
+    /**
+     * Start offering Polaris inside the page in front of somebody.
+     *
+     * Sent after the popup has asked the browser for that site - which only the
+     * popup can do, since a permission request has to come from a gesture and the
+     * worker has none. What this does is the half the popup cannot: register the
+     * inline script for the origins now granted, and run it in the tab that is
+     * already open, so the marks appear without a reload.
+     */
+    | { readonly kind: "startInline" }
     /** Change how long an unlocked vault may sit unused before it locks itself. */
     | { readonly kind: "setTimeout"; readonly timeoutMs: number }
     /**
@@ -276,6 +335,11 @@ export type Reply =
     | { readonly ok: true; readonly host: string | null; readonly blocked: boolean }
     /** Six digits and the seconds before they turn over. */
     | { readonly ok: true; readonly code: string; readonly remaining: number }
+    /** How many times a password appears in the corpus, or null for a question
+     *  that could not be asked. Null is unknown, never "none". */
+    | { readonly ok: true; readonly count: number | null }
+    /** What the worker is holding for this tab, and what to say about it. */
+    | { readonly ok: true; readonly offer: OfferedCapture }
     /**
      * A request to be let in by Polaris: where it stands, and what to show while
      * it is in flight.
@@ -296,6 +360,45 @@ export type Reply =
       }
     | { readonly ok: true }
     | { readonly ok: false; readonly error: string };
+
+/**
+ * The only things a script running inside a page may ask for.
+ *
+ * Everything else in this file is the popup's, and the popup is one of the
+ * extension's own pages: it holds a window nobody else scripts. The inline
+ * script does not. It runs in an isolated world on somebody else's site, and the
+ * right way to read this list is as what would be lost if that isolation ever
+ * failed - so it is the narrowest set the page can offer anything with.
+ *
+ * What is on it, and why each one is worth it:
+ *
+ * - `blocked`, `itemsFor` and `pendingCapture` are reads about the page in front
+ *   of the person, and the worker answers them for the SENDER's tab rather than
+ *   for whatever address the caller names. A page that could ask which logins
+ *   exist for another site would be a page reading the vault's index.
+ * - `fill` and `totpNow` put a credential into that page, which is the whole
+ *   feature - and both are checked against the sender's own address first, so
+ *   neither can be turned into a fill on a site the item was never saved for.
+ * - `breach`, `captured`, `saveCaptured` and `dismissCapture` carry values the
+ *   page already has, because somebody typed them into it.
+ *
+ * What is deliberately absent: `items` (the whole vault), `copy` (any field of
+ * any item, including a password, as a string), `status`, `unlock`, `save`,
+ * `changePassword`, and everything to do with accounts. None of them is about
+ * the page, and each of them would hand a page something it cannot get any other
+ * way.
+ */
+export const FROM_PAGE: ReadonlySet<Request["kind"]> = new Set([
+    "blocked",
+    "itemsFor",
+    "fill",
+    "totpNow",
+    "breach",
+    "captured",
+    "pendingCapture",
+    "saveCaptured",
+    "dismissCapture"
+] satisfies Request["kind"][]);
 
 /**
  * Ask the background worker something, from the popup.

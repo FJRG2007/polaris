@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { findFields, isUsername, type FieldFacts } from "../src/lib/fields";
+import { findFields, isOneTimeCode, isUsername, readForm, type FieldFacts } from "../src/lib/fields";
 
 /** An input, with the defaults of an ordinary visible text box. */
 function field(over: Partial<FieldFacts> = {}): FieldFacts {
@@ -86,6 +86,107 @@ describe("finding the pair on a page", () => {
 
     it("has nothing to say about a page with no inputs", () => {
         expect(findFields([])).toEqual({ username: null, password: null });
+    });
+});
+
+describe("what the form is for", () => {
+    it("reads one password box as somebody signing in", () => {
+        const form = readForm([field({ words: "email" }), field({ type: "password" })]);
+        expect(form.purpose).toBe("signin");
+        expect(form).toMatchObject({ username: 0, password: 1, newPassword: null });
+    });
+
+    it("reads two unlabelled password boxes as a password and its confirmation", () => {
+        // The shape most sign-up forms actually have: nothing says "new", there
+        // are simply two of them.
+        const form = readForm([
+            field({ words: "email", form: FORM }),
+            field({ type: "password", form: FORM }),
+            field({ type: "password", form: FORM })
+        ]);
+        expect(form).toMatchObject({
+            purpose: "signup",
+            password: null,
+            newPassword: 1,
+            confirmPassword: 2
+        });
+    });
+
+    it("reads three of them as a password being changed", () => {
+        const form = readForm([
+            field({ type: "password", form: FORM }),
+            field({ type: "password", form: FORM }),
+            field({ type: "password", form: FORM })
+        ]);
+        expect(form).toMatchObject({
+            purpose: "change",
+            password: 0,
+            newPassword: 1,
+            confirmPassword: 2
+        });
+    });
+
+    it("believes the page over the count when it labels its boxes", () => {
+        const form = readForm([
+            field({ type: "password", autocomplete: "current-password", form: FORM }),
+            field({ type: "password", autocomplete: "new-password", form: FORM })
+        ]);
+        expect(form).toMatchObject({ purpose: "change", password: 0, newPassword: 1 });
+    });
+
+    it("reads the words around a box when there is no autocomplete on it", () => {
+        const form = readForm([
+            field({ type: "password", words: "current password", form: FORM }),
+            field({ type: "password", words: "nueva contraseña", form: FORM }),
+            field({ type: "password", words: "repite la contraseña", form: FORM })
+        ]);
+        expect(form).toMatchObject({ purpose: "change", password: 0, newPassword: 1, confirmPassword: 2 });
+    });
+
+    it("never offers to fill a new password with the saved one", () => {
+        const form = readForm([
+            field({ words: "email", form: FORM }),
+            field({ type: "password", autocomplete: "new-password", form: FORM })
+        ]);
+        expect(form.password).toBeNull();
+        expect(form.newPassword).toBe(1);
+    });
+
+    it("does not count a sign-in and a sign-up on one page as a change form", () => {
+        // Two forms side by side, which is three password boxes on the page and
+        // nothing whatever to do with changing one.
+        const signup = { id: "signup" };
+        const form = readForm([
+            field({ type: "password", form: FORM }),
+            field({ type: "password", form: signup }),
+            field({ type: "password", form: signup })
+        ]);
+        expect(form).toMatchObject({ purpose: "signin", password: 0, newPassword: null });
+    });
+
+    it("finds the box an authenticator's code goes in", () => {
+        const form = readForm([field({ autocomplete: "one-time-code" })]);
+        expect(form.oneTimeCode).toBe(0);
+    });
+});
+
+describe("whether a box is for a one-time code", () => {
+    it("believes the page when it says so", () => {
+        expect(isOneTimeCode(field({ autocomplete: "one-time-code" }))).toBe(true);
+    });
+
+    it("reads the words a code box carries", () => {
+        expect(isOneTimeCode(field({ words: "verification code" }))).toBe(true);
+        expect(isOneTimeCode(field({ words: "authenticator app code" }))).toBe(true);
+        expect(isOneTimeCode(field({ words: "one-time password" }))).toBe(true);
+    });
+
+    it("leaves an ordinary box alone", () => {
+        // A mark offering to type an authenticator's code into a discount box is
+        // worse than no mark at all.
+        expect(isOneTimeCode(field({ words: "coupon code" }))).toBe(false);
+        expect(isOneTimeCode(field({ words: "email" }))).toBe(false);
+        expect(isOneTimeCode(field({ type: "password", words: "code" }))).toBe(false);
     });
 });
 

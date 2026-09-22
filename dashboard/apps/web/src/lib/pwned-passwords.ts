@@ -33,6 +33,27 @@ async function sha1Hex(value: string): Promise<string> {
 }
 
 /**
+ * Every hash in the corpus that begins with these five characters, as the API
+ * sends them, or null when it could not be asked.
+ *
+ * Separate from the count because the browser extension needs the range itself:
+ * its manifest declares no host permission at all, so it cannot reach this API,
+ * and it asks its own Polaris for the bucket and searches it there. That route is
+ * the only other caller - see `app/api/polaris/pwned/[prefix]`.
+ */
+export async function pwnedRange(prefix: string, signal?: AbortSignal): Promise<string | null> {
+    try {
+        const response = await fetch(`${RANGE_URL}/${prefix}`, {
+            headers: { "Add-Padding": "true" },
+            signal: signal ?? AbortSignal.timeout(TIMEOUT_MS)
+        });
+        return response.ok ? await response.text() : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
  * How many times this password appears in the corpus, or null when the question
  * could not be asked. Null is not "safe" - it is "unknown", and every caller
  * treats it as a pass on purpose.
@@ -41,13 +62,10 @@ export async function passwordBreachCount(password: string, signal?: AbortSignal
     if (!password) return null;
     try {
         const hash = await sha1Hex(password);
-        const response = await fetch(`${RANGE_URL}/${hash.slice(0, 5)}`, {
-            headers: { "Add-Padding": "true" },
-            signal: signal ?? AbortSignal.timeout(TIMEOUT_MS)
-        });
-        if (!response.ok) return null;
+        const range = await pwnedRange(hash.slice(0, 5), signal);
+        if (range === null) return null;
         const suffix = hash.slice(5);
-        for (const line of (await response.text()).split("\n")) {
+        for (const line of range.split("\n")) {
             const [candidate, count] = line.trim().split(":");
             if (candidate === suffix) return Number(count) || 0;
         }

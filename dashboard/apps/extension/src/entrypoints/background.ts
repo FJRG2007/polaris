@@ -1,19 +1,21 @@
 import { storage } from "#imports";
 import * as link from "@/lib/link";
+import { onShelf } from "@/lib/shelf";
 import * as protocol from "@/lib/protocol";
 import * as messages from "@/lib/messages";
 import * as accounts from "@/lib/accounts";
-import { onShelf } from "@/lib/shelf";
+import { breachCount } from "@/lib/breach";
 import { searchLogins } from "@/lib/search";
 import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
 import { injectableOrigins } from "@/lib/injection";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
+import { offerFor, type CaptureOffer } from "@/lib/capture";
 import { noticeFor, type UpdateNotice } from "@/lib/update";
-import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
+import { baseDomain, hostOf, readUriMatch, type UriMatch } from "@polaris/core";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
 import {
@@ -219,6 +221,25 @@ const DEVICE = storage.defineItem<string | null>("local:vault.device", { fallbac
  * reloading the extension should still be told tomorrow.
  */
 const UPDATE = storage.defineItem<UpdateNotice | null>("local:update.notice", { fallback: null });
+/**
+ * A login somebody has just submitted on a page, waiting to be offered.
+ *
+ * Session storage rather than memory, for the reason the whole feature turns on:
+ * submitting the form is usually a navigation, so the page that asked for this to
+ * be held is gone by the time there is anything to show, and a manifest v3 worker
+ * can be recycled in the gap. Both would take a plain variable with them, and the
+ * offer would be one that appears on a fast site and not on a slow one.
+ *
+ * It holds a password in the clear, which is the honest cost of offering to save
+ * one at all: it was typed into a page a moment ago and it is about to be
+ * encrypted into the vault. So it is tied to the tab that produced it, it expires
+ * on its own, and it goes when the vault locks - a locked vault cannot save it
+ * anyway, and holding somebody's password past the lock they asked for is the one
+ * thing this worker must not do.
+ */
+const CAPTURE = storage.defineItem<HeldCapture | null>("session:vault.capture", {
+    fallback: null
+});
 /** The wrapped keys, kept so unlocking does not need the network. */
 const WRAPPED = storage.defineItem<{ key: string; privateKey: string | null; kdf: unknown } | null>(
     "session:vault.wrapped",
@@ -324,6 +345,11 @@ async function vault(): Promise<OpenVault | null> {
     if ((await LINK_TOKEN.getValue()) === null) return null;
     if (hasExpired(Date.now(), await LOCK_AT.getValue())) {
         open = null;
+        // The submitted login goes with it. It is a password in the clear, held
+        // only to be offered, and a vault that has locked itself cannot save it -
+        // keeping it would be this worker holding a credential past the deadline
+        // somebody set for exactly that.
+        await CAPTURE.setValue(null);
         return null;
     }
     return open;
@@ -1042,12 +1068,186 @@ async function forUrl(url: string): Promise<Login[]> {
     return rankForPage(await logins(), url);
 }
 
-/** The site in front of somebody, and whether they have shut this out of it. */
-async function blockedHere(): Promise<{ host: string | null; blocked: boolean }> {
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    const url = tab?.url ?? "";
+/**
+ * The site in front of somebody, and whether they have shut this out of it.
+ *
+ * `where` is the page that asked, when a page is what asked. The popup has no
+ * address of its own and means the tab in front of it; the inline script means
+ * the page it is running inside, which is not always that tab - a background tab
+ * finishing a sign-in is still entitled to a true answer about itself.
+ */
+async function blockedHere(where?: string): Promise<{ host: string | null; blocked: boolean }> {
+    const url =
+        where ?? (await browser.tabs.query({ active: true, currentWindow: true }))[0]?.url ?? "";
     if (!/^https?:/i.test(url)) return { host: null, blocked: false };
     return { host: hostOf(url), blocked: isBlockedHost(await BLOCKED.getValue(), url) };
+}
+
+/**
+ * The page a request came from, when it came from one at all.
+ *
+ * Built from what the browser says about the sender rather than from anything
+ * the caller sent, which is the point: every request a page may make is answered
+ * about THIS address. A page that could name another one would be a page reading
+ * the vault's index for a site it has nothing to do with.
+ */
+interface PageContext {
+    readonly tabId: number;
+    readonly url: string;
+}
+
+/** The tab in front of somebody, as the same shape a page arrives as. Null when
+ *  there is nothing fillable there - a settings screen, a new tab, a PDF. */
+async function activeTab(): Promise<PageContext | null> {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id === undefined || !tab.url || !/^https?:/i.test(tab.url)) return null;
+    return { tabId: tab.id, url: tab.url };
+}
+
+/** A submitted login, held for the tab that produced it. */
+interface HeldCapture {
+    readonly tabId: number;
+    /** The address it was typed on, so a tab that has moved on somewhere else is
+     *  not offered somebody else's login to save. */
+    readonly url: string;
+    /** When it stops being offered, whatever happens. */
+    readonly until: number;
+    readonly offer: CaptureOffer;
+}
+
+/** Long enough to survive the sign-in and the page that lands after it, short
+ *  enough that a password is not sitting here an hour later. */
+const CAPTURE_FOR_MS = 5 * 60 * 1000;
+
+/** What crosses to a page about what is held for it: a sentence, never a value. */
+function describeOffer(offer: CaptureOffer, host: string | null): messages.OfferedCapture {
+    if (offer.kind === "none") return { kind: "none", name: null, username: null };
+    return {
+        kind: offer.kind,
+        name: offer.kind === "update" ? offer.name : host,
+        username: offer.username
+    };
+}
+
+/**
+ * Take in a login that has just been submitted, and decide what it is worth.
+ *
+ * The decision is `offerFor`'s and is tested there. What is here is everything
+ * that needs the vault: the items this page already has, and the holding of the
+ * result for the tab until somebody answers it.
+ *
+ * A locked vault produces nothing. It could not save the item anyway, and the
+ * alternative - holding the password until somebody happens to unlock - is a
+ * password kept past the lock that was asked for.
+ */
+async function capture(
+    page: PageContext,
+    submitted: Extract<messages.Request, { kind: "captured" }>
+): Promise<messages.Reply> {
+    const quiet: messages.Reply = { ok: true, offer: { kind: "none", name: null, username: null } };
+    if (!(await vault())) return quiet;
+    if (isBlockedHost(await BLOCKED.getValue(), page.url)) return quiet;
+
+    // Every vault this account can open, and deliberately not only the shelf that
+    // happens to be in front of somebody: the question here is whether this login
+    // is already saved anywhere, and a shelf-filtered answer would offer to save a
+    // second copy of an item that is sitting in an organization's vault.
+    const offer = offerFor(
+        { username: submitted.username, password: submitted.password },
+        await forUrl(page.url)
+    );
+    if (offer.kind === "none") {
+        await CAPTURE.setValue(null);
+        return quiet;
+    }
+
+    await CAPTURE.setValue({
+        tabId: page.tabId,
+        url: page.url,
+        until: Date.now() + CAPTURE_FOR_MS,
+        offer
+    });
+    return { ok: true, offer: describeOffer(offer, hostOf(page.url)) };
+}
+
+/**
+ * What is still waiting to be offered on this page, if anything.
+ *
+ * Asked by the inline script on every load, because the load is usually the
+ * navigation the submitted form caused - so this, rather than the message that
+ * created it, is what actually puts the bar on the screen.
+ *
+ * Tied to the tab and to the host it was typed on: a tab that has gone somewhere
+ * else entirely is not asked to save a login for where it has been.
+ */
+async function heldFor(page: PageContext): Promise<HeldCapture | null> {
+    const held = await CAPTURE.getValue();
+    if (!held) return null;
+    if (held.until <= Date.now()) {
+        await CAPTURE.setValue(null);
+        return null;
+    }
+    if (held.tabId !== page.tabId) return null;
+    // The domain rather than the host, because a sign-in that lands somewhere
+    // else is the ordinary shape of one: the form is on `accounts.example.com`
+    // and what comes back is `example.com`, and an exact comparison would drop
+    // the offer on exactly the sites that redirect. What is saved is still the
+    // address the form was on, so a wider comparison widens where the bar can
+    // appear and nothing else.
+    if (sameSite(held.url, page.url)) return held;
+    return null;
+}
+
+/**
+ * Save what was captured, as the worker decided it.
+ *
+ * Nothing about the item crosses from the page to do this: the page says "yes",
+ * and the values are the ones this worker has been holding since the form went.
+ * A save goes into the account's own vault for the same reason every other save
+ * here does - see `save` - and an update replaces one password and nothing else.
+ */
+async function saveCaptured(page: PageContext): Promise<messages.Reply> {
+    const held = await heldFor(page);
+    if (!held || held.offer.kind === "none") {
+        return { ok: false, error: "There is nothing waiting to be saved." };
+    }
+    const { offer } = held;
+    await CAPTURE.setValue(null);
+
+    const done =
+        offer.kind === "update"
+            ? await changePassword(offer.id, offer.password)
+            : await save({
+                  name: hostOf(held.url) ?? "Login",
+                  username: offer.username ?? "",
+                  password: offer.password,
+                  // The origin, never the address the form was submitted to: a
+                  // sign-in URL carries a query string often enough, and a token
+                  // in one would be saved into the vault and shown on every screen
+                  // that lists the item.
+                  uri: originOfPage(held.url) ?? ""
+              });
+
+    // Reduced to yes or why not, because this answer crosses into a page. Both of
+    // those functions answer with the whole vault status - which server, which
+    // account, which addresses are signed in here - and none of that is a page's.
+    return done.ok ? { ok: true } : done;
+}
+
+/** Whether two pages belong to the same site, as the vault's own matching reads
+ *  one - `@polaris/core`'s base domain, so a subdomain counts. */
+function sameSite(left: string, right: string): boolean {
+    const here = baseDomain(hostOf(left) ?? "");
+    return here !== "" && here === baseDomain(hostOf(right) ?? "");
+}
+
+/** The scheme and host of a page, as an address an item can be saved for. */
+function originOfPage(url: string): string | null {
+    try {
+        return new URL(url).origin;
+    } catch {
+        return null;
+    }
 }
 
 function summarize(login: Login, vaults: ReadonlyMap<string, string>): messages.ItemSummary {
@@ -1205,6 +1405,7 @@ async function clearActive(): Promise<void> {
     open = null;
     await abandonRequest();
     await Promise.all([
+        CAPTURE.setValue(null),
         LOCK_AT.setValue(null),
         REFRESH.setValue(null),
         ACCESS.setValue(null),
@@ -1568,10 +1769,18 @@ function typeIntoPage(
     return { user: Boolean(user), pass: Boolean(pass) };
 }
 
-/** Type the two strings into the page in front of somebody. */
-async function fill(id: string): Promise<messages.Reply> {
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id || !tab.url) return { ok: false, error: "There is no page to fill." };
+/**
+ * Type the two strings into a page.
+ *
+ * `page` is where the request came from, when it came from a page at all. The
+ * popup fills the tab in front of it; the inline script fills the page it is
+ * running inside, and being handed that rather than looking it up is what stops
+ * a fill landing in a different tab than the one somebody pressed in.
+ */
+async function fill(id: string, page: PageContext | null = null): Promise<messages.Reply> {
+    const target = page ?? (await activeTab());
+    if (!target) return { ok: false, error: "There is no page to fill." };
+    const tab = { id: target.tabId, url: target.url };
     const login = (await logins()).find((one) => one.id === id);
     if (!login) return { ok: false, error: "That item is not open." };
 
@@ -1626,7 +1835,11 @@ const USES_VAULT = new Set<messages.Request["kind"]>([
     "copy",
     "totpNow",
     "save",
-    "changePassword"
+    "changePassword",
+    // Saving what was captured is somebody deciding to; being offered it is not.
+    // `captured`, `pendingCapture` and `breach` arrive because a page did
+    // something, and a timeout that any page could push forward is not a timeout.
+    "saveCaptured"
 ]);
 
 /**
@@ -1809,12 +2022,24 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     // guessed the extension id gets nothing: anything that is not one of ours is
     // refused before it is parsed.
     if (sender.id !== browser.runtime.id) return false;
-    // And the id alone is not that boundary, because anything injected into a
-    // page carries it too - so this surface, which hands back decrypted items,
-    // would be open to script running inside whatever page somebody is on. Ours
-    // speak from no tab; anything sent from inside a page has one.
-    if (sender.tab) return false;
     const request = raw as messages.Request;
+
+    // And the id alone is not the boundary, because anything injected into a page
+    // carries it too. What separates them is where they speak from: the
+    // extension's own pages speak from no tab, and the inline script speaks from
+    // the page it is running inside - which is why that page's own address, taken
+    // from the browser rather than from the message, is what every answer below
+    // is about.
+    //
+    // A page may ask for `FROM_PAGE` and nothing else. The list is in
+    // `lib/messages.ts` with the reasoning for each entry, and everything not on
+    // it - the whole vault, any field of any item as a string, the accounts - is
+    // refused here before it is read.
+    const page: PageContext | null =
+        sender.tab?.id !== undefined && typeof sender.url === "string" && /^https?:/i.test(sender.url)
+            ? { tabId: sender.tab.id, url: sender.url }
+            : null;
+    if (sender.tab && (page === null || !messages.FROM_PAGE.has(request.kind))) return false;
 
     const answer = async (): Promise<messages.Reply> => {
         switch (request.kind) {
@@ -2042,6 +2267,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     // would answer a different question than the one the button asks:
                     // being set aside is disuse, and so is being locked.
                     parkedVaults.clear();
+                    await CAPTURE.setValue(null);
                     await LOCK_AT.setValue(null);
                 });
                 await badge();
@@ -2149,9 +2375,13 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "itemsFor": {
                 const vaults = await vaultNames();
+                // The page's own address where a page asked, never the one it
+                // named: an inline script that could ask about another site would
+                // be a site reading which logins exist for somewhere else.
+                const url = page?.url ?? request.url;
                 return {
                     ok: true,
-                    items: (await onOpenShelf(await forUrl(request.url))).map((login) =>
+                    items: (await onOpenShelf(await forUrl(url))).map((login) =>
                         summarize(login, vaults)
                     )
                 };
@@ -2178,6 +2408,12 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // left, so the secret stays in this worker and the popup holds
                 // only something that expires on its own.
                 const login = (await logins()).find((one) => one.id === request.id);
+                // Asked by a page, it is a code about to be typed into that page,
+                // so the item has to be one saved for it - the same rule a fill
+                // is held to, and for the same reason.
+                if (page && (!login || !matchesPage(login.uris, page.url))) {
+                    return { ok: false, error: "That item is not saved for this site." };
+                }
                 if (!login?.totp) return { ok: false, error: "That item has no one-time code." };
                 const code = await totpCode(login.totp);
                 if (!code) return { ok: false, error: "That authenticator value cannot be read." };
@@ -2185,7 +2421,49 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "blocked":
-                return { ok: true, ...(await blockedHere()) };
+                return { ok: true, ...(await blockedHere(page?.url)) };
+
+            case "breach": {
+                // Asked of this deployment's own server, which is the only origin
+                // this extension may reach - and what leaves the browser is five
+                // characters of a hash. Unknown answers are unknown, never safe.
+                const origin = await currentOrigin();
+                if (!origin) return { ok: true, count: null };
+                return { ok: true, count: await breachCount(origin, request.password) };
+            }
+
+            case "captured":
+                return page ? capture(page, request) : { ok: false, error: "There is no page here." };
+
+            case "pendingCapture": {
+                if (!page) return { ok: false, error: "There is no page here." };
+                const held = await heldFor(page);
+                return {
+                    ok: true,
+                    offer: held
+                        ? describeOffer(held.offer, hostOf(held.url))
+                        : { kind: "none", name: null, username: null }
+                };
+            }
+
+            case "saveCaptured":
+                return page
+                    ? inTurn(() => saveCaptured(page))
+                    : { ok: false, error: "There is no page here." };
+
+            case "dismissCapture": {
+                await CAPTURE.setValue(null);
+                // "Never here" is the same instruction the popup's switch gives,
+                // so it is kept in the same place and honoured by everything that
+                // reads it - no suggestions, no badge, nothing to fill.
+                if (request.never && page) {
+                    const host = hostOf(page.url);
+                    const held = await BLOCKED.getValue();
+                    if (host && !held.includes(host)) await BLOCKED.setValue([...held, host]);
+                    await badge();
+                }
+                return { ok: true };
+            }
 
             case "updateStatus":
                 // Read, never checked here: the popup asking is not a reason to
@@ -2213,8 +2491,28 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 return { ok: true, ...(await blockedHere()) };
             }
 
+            case "startInline": {
+                // Manifest v2 has no `scripting` namespace at all, so on Firefox
+                // this is a feature the browser does not have rather than one that
+                // failed - and the sentence says which.
+                if (!browser.scripting?.registerContentScripts) {
+                    return { ok: false, error: "This browser cannot show Polaris inside a page." };
+                }
+                await syncAutofill();
+                const target = await activeTab();
+                // And into the tab that is already open, because registering only
+                // covers the next load: without this, turning it on does nothing
+                // visible until somebody reloads the page they were looking at.
+                if (target) {
+                    await browser.scripting
+                        .executeScript({ target: { tabId: target.tabId }, files: ["/autofill.js"] })
+                        .catch(() => undefined);
+                }
+                return { ok: true };
+            }
+
             case "fill":
-                return fill(request.id);
+                return fill(request.id, page);
 
             // Both end in a sync, so both write the items of whichever account was
             // in front when they started - which has to still be the one in front

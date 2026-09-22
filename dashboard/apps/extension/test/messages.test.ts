@@ -13,7 +13,7 @@
  * is the refusal shape they all already handle.
  */
 
-import { askBackground } from "../src/lib/messages";
+import { askBackground, FROM_PAGE } from "../src/lib/messages";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /** A worker that answers however the test says it does. */
@@ -62,5 +62,58 @@ describe("asking the background worker", () => {
 
         expect(reply.ok).toBe(false);
         if (!reply.ok) expect(reply.error).toMatch(/again/i);
+    });
+});
+
+/**
+ * The list is the boundary, so it is pinned rather than read.
+ *
+ * A script running inside somebody else's page may ask for a few things about
+ * that page. What would be lost if the isolation it runs behind ever failed is
+ * exactly this list, which is why a message added to it should have to be added
+ * here too - and why the ones below, each of which hands over something no page
+ * could otherwise reach, are named one at a time instead of assumed absent.
+ */
+describe("what a page may ask the worker for", () => {
+    it("lets a page ask only about the page", () => {
+        expect([...FROM_PAGE].sort()).toEqual(
+            [
+                "blocked",
+                "breach",
+                "captured",
+                "dismissCapture",
+                "fill",
+                "itemsFor",
+                "pendingCapture",
+                "saveCaptured",
+                "totpNow"
+            ].sort()
+        );
+    });
+
+    it("keeps the vault itself out of a page's reach", () => {
+        for (const kind of [
+            "items",
+            "copy",
+            "status",
+            "unlock",
+            "lock",
+            "save",
+            "changePassword",
+            "signOut",
+            "switchAccount",
+            "addAccount",
+            "connect",
+            "authorize",
+            "setBlocked",
+            "setTimeout",
+            "forgetServer",
+            "setShelf",
+            "link",
+            "unlink",
+            "startInline"
+        ] as const) {
+            expect(FROM_PAGE.has(kind)).toBe(false);
+        }
     });
 });

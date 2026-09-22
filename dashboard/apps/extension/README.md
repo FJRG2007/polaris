@@ -86,6 +86,10 @@ src/lib/lock.ts          when an open vault locks itself again
 src/lib/unlock.ts        the master password, and why it did not open the vault
 src/lib/save.ts          what was typed for a new login, before it is encrypted
 src/lib/item.ts          the item to send back when only its password changes
+src/lib/fields.ts        which box is the username, which password is which, what the form is for
+src/lib/capture.ts       whether a submitted login is worth saving, replacing, or neither
+src/lib/breach.ts        whether a password being invented is already public
+src/lib/injection.ts     which granted sites the inline script may run on
 src/lib/update.ts        whether a newer build is out, and who is going to install it
 src/lib/messages.ts      what the popup may ask the worker for, as a closed list
 src/entrypoints/         background worker and popup
@@ -98,6 +102,47 @@ injected onto the tab in front of you at the moment you ask for it, and it is
 handed the two strings and nothing else. A declared content script would itself
 be a host permission - `<all_urls>` at install time - which is the access this
 manifest is written to avoid, and a page can read anything running inside it.
+
+## On the page itself
+
+The popup is not the only way to use this. With "Show it here" in the popup,
+Polaris also appears inside that site's own pages:
+
+- the mark beside a login box, which offers what the vault has for the page,
+- the mark beside a **new** password box, which makes one for you and fills the
+  confirmation with it,
+- the mark beside a one-time-code box, which types the code for the item you
+  pick,
+- a warning while you invent a password that is already in a breach corpus,
+- and, when a form goes, an offer to save what was typed - or to replace the
+  password on the login it belongs to.
+
+**It is per site, and it is never automatic.** The manifest declares no host
+permission, so the browser is asked for that one origin at the moment you press
+the button, and only then is the script registered for it. `src/lib/injection.ts`
+is the rule that decides which granted origins qualify, and it never registers on
+a wildcard grant: a browser that has been given the broad optional pattern is
+permission to ask, not an instruction to inject everywhere.
+
+What that script may ask the worker for is the closed list `FROM_PAGE` in
+`src/lib/messages.ts`, and the right way to read it is as what would be lost if
+the isolated world it runs in ever failed. Every entry is about the page in front
+of you, and the worker answers each one for the **sender's** own address rather
+than for one the caller named. The whole vault, any field of any item as a string,
+and everything to do with accounts are not on it.
+
+The breach warning sends five characters of a hash to `GET
+/api/polaris/pwned/<prefix>` on your own Polaris, which passes it to Have I Been
+Pwned's range API and hands back the bucket. The password stays in the extension,
+the prefix names one bucket in a million, and an unreachable corpus produces
+silence rather than a password approved by an outage. Your Polaris rather than the
+corpus directly, for the same reason the update check asks your Polaris: a second
+host would be permission every install stands on permanently.
+
+The submitted login is held in the worker's session storage until you answer,
+because submitting a form usually navigates and the page that asked is gone by the
+time there is anything to show. It expires on its own, it is tied to the tab that
+produced it, and it goes when the vault locks.
 
 ## Saving a login
 

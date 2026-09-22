@@ -1,5 +1,6 @@
 /**
- * Which box on a page is the username and which is the password.
+ * Which box on a page is the username, which is the password, and what the form
+ * around them is for.
  *
  * Pure, and taking descriptions rather than elements, so the rules can be
  * asserted against the shapes real pages have without a DOM anywhere near them -
@@ -56,6 +57,25 @@ const NOT_A_LOGIN = /search|captcha|find|query|coupon|voucher|discount|promo/i;
 const IDENTIFIER =
     /user|login|email|correo|usuario|e-?mail|account|cuenta|identifiant|benutzer|nome|phone|telefono|mobile/i;
 
+/** Words that mean "the password you already have" - the box a sign-in fills. */
+const CURRENT_WORDS = /current|old password|existing|actual|antigua|antiguo|vieja|viejo/i;
+
+/** Words that mean "type it again", which is the box beside a new password
+ *  rather than a second password of its own. */
+const CONFIRM_WORDS =
+    /confirm|confirma|repeat|repit|re-?type|re-?enter|again|otra vez|verify|verifica|match/i;
+
+/** Words that mean "invent one now". */
+const NEW_WORDS = /new|nueva|nuevo|create|crear|choose|elige|elegir|set up|registr|sign.?up/i;
+
+/** Words a one-time code box carries. Narrow on purpose: a mark offering to type
+ *  an authenticator's code into an unrelated box is worse than no mark at all. */
+const ONE_TIME_WORDS =
+    /one.?time|\botp\b|2fa|two.?factor|authenticat|verification code|verify code|codigo de verificacion|código de verificación|\bmfa\b|passcode/i;
+
+/** The types a short code is typed into. */
+const CODE_TYPES = new Set(["text", "tel", "number"]);
+
 /** Where the two boxes are, as positions in the list handed in. */
 export interface FoundFields {
     /** The username box, or null when the page has none to offer. */
@@ -66,47 +86,158 @@ export interface FoundFields {
 }
 
 /**
+ * What the form in front of somebody is for.
+ *
+ * `signin` is a password being recalled, `signup` one being invented, `change`
+ * both at once, and `none` a page with no password box at all - which is still
+ * worth naming, because the first page of a two-page sign-in looks like that and
+ * the username on it is still worth offering.
+ */
+export type FormPurpose = "signin" | "signup" | "change" | "none";
+
+/** Every box this extension has something to offer for, and what to offer. */
+export interface PageFields extends FoundFields {
+    /** The box a new password is invented in, on a sign-up or a change form. */
+    readonly newPassword: number | null;
+    /** The box that same new password is typed into again. */
+    readonly confirmPassword: number | null;
+    /** The box an authenticator's six digits go in. */
+    readonly oneTimeCode: number | null;
+    readonly purpose: FormPurpose;
+}
+
+/** What one password box on the page turned out to be. */
+type PasswordRole = "current" | "new" | "confirm" | "unknown";
+
+/** Three unlabelled password boxes, in the order they are always written in. */
+const BY_COUNT: readonly PasswordRole[] = ["current", "new", "confirm"];
+
+/**
  * Find the pair, from the whole list of a page's inputs.
  *
- * The password is looked for first, because `type="password"` is a fact rather
- * than a guess, and the username is then looked for among the fields that belong
- * with it: the same form, or - when the page uses no form at all - the fields
- * written BEFORE it. That ordering is what stops the search box at the top of a
- * page being filled with somebody's email address.
- *
- * A password marked `new-password` is skipped: that is a sign-up asking for a
- * password to be invented, and putting the existing one there is both wrong and
- * the kind of wrong somebody only notices later.
+ * Kept as the narrow question the fill path asks - which two boxes does a saved
+ * login go into - and answered out of `readForm`, so the two can never disagree
+ * about what a sign-up form is.
  */
 export function findFields(fields: readonly FieldFacts[]): FoundFields {
+    const { username, password } = readForm(fields);
+    return { username, password };
+}
+
+/**
+ * Read the whole form: which password is which, and what it is for.
+ *
+ * The password boxes are found first, because `type="password"` is a fact rather
+ * than a guess, and their roles come from what the page says about them - the
+ * `autocomplete` token first, then the words around them. What is left over is
+ * settled by how many there are, which is the rule that covers the pages that
+ * label nothing at all: two password boxes are a password and its confirmation,
+ * three are the current one followed by both.
+ *
+ * The username is then looked for among the fields that belong with the password
+ * it goes with: the same form, or - when the page uses no form at all - the
+ * fields written BEFORE it. That ordering is what stops the search box at the top
+ * of a page being filled with somebody's email address.
+ *
+ * A new password is never reported as the one to fill. Putting the existing
+ * password there is both wrong and the kind of wrong somebody only notices later,
+ * when they cannot sign in with the password they believe they chose.
+ */
+export function readForm(fields: readonly FieldFacts[]): PageFields {
     const usable: number[] = [];
     for (const [index, field] of fields.entries()) {
         if (!field.usable || NEVER.has(field.type)) continue;
         usable.push(index);
     }
 
-    const password =
-        usable.find(
-            (index) =>
-                fields[index]?.type === "password" && fields[index]?.autocomplete !== "new-password"
-        ) ?? null;
+    const passwords = usable.filter((index) => fields[index]?.type === "password");
+    // One form's worth of them. A page with a sign-in and a sign-up side by side
+    // has two sets, and counting them together reads the pair as a change form.
+    const first = passwords[0];
+    const group =
+        first === undefined
+            ? []
+            : passwords.filter((index) => fields[index]?.form === fields[first]?.form);
+    const roles = settleRoles(group.map((index) => roleOf(fields[index])));
+    const roleAt = (role: PasswordRole): number | null => {
+        const where = roles.indexOf(role);
+        return where === -1 ? null : (group[where] ?? null);
+    };
 
+    const current = roleAt("current");
+    const newPassword = roleAt("new");
+    const confirmPassword = roleAt("confirm");
+
+    // The name goes with whichever password this form is actually about: the one
+    // being recalled where there is one, the one being invented otherwise.
+    const anchor = current ?? newPassword;
     const candidates =
-        password === null
+        anchor === null
             ? usable
             : usable.filter((index) => {
                   const field = fields[index];
-                  const pass = fields[password];
+                  const pass = fields[anchor];
                   if (!field || !pass) return false;
                   // A form is the better answer where there is one; the order on
                   // the page is what is left when there is not.
                   return pass.form != null
                       ? field.form === pass.form
-                      : usable.indexOf(index) < usable.indexOf(password);
+                      : usable.indexOf(index) < usable.indexOf(anchor);
               });
 
     const username = candidates.find((index) => isUsername(fields[index])) ?? null;
-    return { username, password };
+    const oneTimeCode = usable.find((index) => isOneTimeCode(fields[index])) ?? null;
+
+    const purpose: FormPurpose =
+        current !== null && newPassword !== null
+            ? "change"
+            : newPassword !== null
+              ? "signup"
+              : current !== null
+                ? "signin"
+                : "none";
+
+    return { username, password: current, newPassword, confirmPassword, oneTimeCode, purpose };
+}
+
+/** What one password box says about itself, before its neighbours are counted. */
+function roleOf(field: FieldFacts | undefined): PasswordRole {
+    if (!field) return "unknown";
+    const token = field.autocomplete;
+    if (token === "current-password") return "current";
+    if (token === "new-password") return CONFIRM_WORDS.test(field.words) ? "confirm" : "new";
+    if (CURRENT_WORDS.test(field.words)) return "current";
+    if (CONFIRM_WORDS.test(field.words)) return "confirm";
+    if (NEW_WORDS.test(field.words)) return "new";
+    return "unknown";
+}
+
+/**
+ * Give the unlabelled boxes a role, from how many there are and where they sit.
+ *
+ * A page that labels nothing is the common case rather than the exception: one
+ * box is a sign-in, two are a password and its confirmation, three are the
+ * current one followed by both. Where the page DID label something, an
+ * unlabelled box before the new password is the current one and an unlabelled
+ * box after it is the confirmation, which is the order these are written in
+ * everywhere - and a role already filled is not filled twice.
+ */
+function settleRoles(said: readonly PasswordRole[]): PasswordRole[] {
+    if (said.length === 0) return [];
+    if (said.every((role) => role === "unknown")) {
+        if (said.length === 1) return ["current"];
+        if (said.length === 2) return ["new", "confirm"];
+        return said.map((_, index) => BY_COUNT[index] ?? "unknown");
+    }
+
+    const settled = [...said];
+    const firstNew = settled.indexOf("new");
+    for (const [index, role] of settled.entries()) {
+        if (role !== "unknown") continue;
+        const wanted: PasswordRole = firstNew !== -1 && index > firstNew ? "confirm" : "current";
+        settled[index] = settled.includes(wanted) ? "unknown" : wanted;
+    }
+    return settled;
 }
 
 /** Whether this box is the one a username goes in. */
@@ -120,4 +251,14 @@ export function isUsername(field: FieldFacts | undefined): boolean {
     if (!["text", "email", "tel", "number"].includes(field.type)) return false;
     if (NOT_A_LOGIN.test(field.words)) return false;
     return IDENTIFIER.test(field.words) || field.type === "email";
+}
+
+/** Whether this box is where an authenticator's code is typed. */
+export function isOneTimeCode(field: FieldFacts | undefined): boolean {
+    if (!field) return false;
+    if (field.autocomplete === "one-time-code") return true;
+    if (field.autocomplete !== "" && field.autocomplete !== "off") return false;
+    if (!CODE_TYPES.has(field.type)) return false;
+    if (NOT_A_LOGIN.test(field.words)) return false;
+    return ONE_TIME_WORDS.test(field.words);
 }

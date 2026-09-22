@@ -666,6 +666,121 @@ function Unlock({
 }
 
 /**
+ * Whether Polaris shows itself inside the pages of this site.
+ *
+ * The thing it turns on is the mark beside a login box, the generator on a
+ * sign-up form, and the offer to save what was just typed - none of which the
+ * popup can do, because all of them mean running a script inside somebody else's
+ * page. This extension asks for no standing access to any site, so that access
+ * arrives here, one host at a time, from the person looking at the host.
+ *
+ * The request is made here rather than sent to the worker, and it has to be: a
+ * browser refuses a permission request that did not come from a user gesture, and
+ * a worker has none. What the worker does afterwards is the half the popup
+ * cannot - registering the script and running it in the tab already open, so the
+ * marks appear without a reload.
+ *
+ * Absent entirely where it would be noise: on Polaris's own site, which fills its
+ * own forms, and on a browser whose extensions cannot inject a script at runtime
+ * at all.
+ */
+function OnThisSite({
+    url,
+    host,
+    server
+}: {
+    url: string | null;
+    host: string | null;
+    server: string | null;
+}): React.JSX.Element | null {
+    const [granted, setGranted] = useState<boolean | null>(null);
+    const [busy, setBusy] = useState(false);
+    const [note, setNote] = useState<string | null>(null);
+    const origin = url === null ? null : readOrigin(url);
+    // Manifest v2 has no `scripting` namespace, so on Firefox this is a feature
+    // the browser does not have rather than one somebody has not switched on.
+    const possible = Boolean(browser.scripting?.registerContentScripts);
+
+    useEffect(() => {
+        if (!origin || !possible) return;
+        void browser.permissions
+            .contains({ origins: [`${origin}/*`] })
+            .then(setGranted)
+            .catch(() => setGranted(false));
+    }, [origin, possible]);
+
+    if (!origin || !host || !possible || granted === null) return null;
+    // Its own site, which has the vault open in a tab of its own.
+    if (server !== null && readOrigin(server) === origin) return null;
+
+    const turnOn = async (): Promise<void> => {
+        setBusy(true);
+        setNote(null);
+        let allowed = false;
+        try {
+            allowed = await browser.permissions.request({ origins: [`${origin}/*`] });
+        } catch {
+            allowed = false;
+        }
+        if (!allowed) {
+            setBusy(false);
+            setNote("Without permission for this site, nothing can be drawn on it.");
+            return;
+        }
+        const reply = await askBackground({ kind: "startInline" });
+        setBusy(false);
+        setGranted(true);
+        if (!reply.ok) setNote(reply.error);
+    };
+
+    const turnOff = async (): Promise<void> => {
+        setBusy(true);
+        try {
+            await browser.permissions.remove({ origins: [`${origin}/*`] });
+        } catch {
+            // Refused by the browser, which the line below then reports honestly:
+            // the state is re-read rather than assumed.
+        }
+        const held = await browser.permissions
+            .contains({ origins: [`${origin}/*`] })
+            .catch(() => true);
+        setGranted(held);
+        setBusy(false);
+        // A script already running in a page cannot be taken back out of it, and
+        // somebody who still sees the mark after switching this off would read
+        // that as a switch that does nothing.
+        setNote(held ? null : "The mark goes when you reload the page.");
+    };
+
+    return (
+        <>
+            <div className="row">
+                <span className="muted small">
+                    {granted
+                        ? `Polaris appears on ${host}.`
+                        : `Polaris is not shown on ${host}.`}
+                </span>
+                <div className="acts">
+                    <button
+                        className="ghost"
+                        disabled={busy}
+                        title={
+                            granted
+                                ? "Stop drawing anything inside this site's pages"
+                                : "Show the fill mark, the generator and the save offer on this site"
+                        }
+                        onClick={() => void (granted ? turnOff() : turnOn())}
+                    >
+                        {granted ? "Not here" : "Show it here"}
+                    </button>
+                </div>
+            </div>
+            {note ? <p className="muted small">{note}</p> : null}
+        </>
+    );
+}
+
+/**
  * Making up a password, where somebody is already signing up for something.
  *
  * Closed until asked for, because most visits here are to read a password rather
@@ -1535,6 +1650,8 @@ function Items({
                     onChange={onChange}
                 />
             ) : null}
+
+            <OnThisSite url={pageUrl} host={here.host} server={status.server} />
 
             {here.host ? (
                 <div className="row">
