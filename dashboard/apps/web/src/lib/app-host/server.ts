@@ -97,6 +97,7 @@ const load = {
     footageStorage: once(() => import("@/lib/footage-storage")),
     hostService: once(() => import("@/lib/host-service")),
     integrationService: once(() => import("@/lib/integration-service")),
+    minecraftRouter: once(() => import("@/lib/minecraft-router")),
     integrationsCloudflareAccountService: once(
         () => import("@/lib/integrations/cloudflare-account-service")
     ),
@@ -277,6 +278,10 @@ export const serverHost = {
     },
     mime: {
         imageTypeOfBytes: mime.imageTypeOfBytes
+    },
+    minecraftRouter: {
+        startRouter: later(load.minecraftRouter, "startRouter"),
+        stopRouter: later(load.minecraftRouter, "stopRouter")
     },
     netPortProbe: {
         probeTcpPort: later(load.netPortProbe, "probeTcpPort"),

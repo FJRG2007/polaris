@@ -104,16 +104,22 @@ and no token between them. A routed server costs no DNS record at all.
 It is opt-in per server, from the server's Address card, for three reasons worth
 keeping in view:
 
-- The router binds 25565 on the host, so it ships behind the `mcrouter` compose profile
-  and is off unless asked for. An existing install whose first Minecraft server was
-  pinned to that port would otherwise fail to start the whole stack.
+- The router binds 25565 on the host, so it is not running until something asks for
+  it: an existing install whose first Minecraft server was pinned to that port would
+  otherwise fail to start the whole stack. Turning the shared port on for a server
+  starts it - the dashboard deploys it as its own one-service project through the
+  daemon (`lib/minecraft-router.ts`), reading the network and the routes volume off
+  its own container, because both are named after the compose project this Polaris
+  was installed as. The `mcrouter` compose profile still works and is left alone;
+  a router is only started when nothing is answering on the port.
 - Connections reach the server from the router, so the address half of the player list
   (`player-access`, which reads the address off the join line) cannot be enforced
   through it. Turning routing on is refused while that is in use rather than quietly
   weakening it.
-- Turning it on removes the SRV record, so it is also refused when nothing is listening
-  on the router's port - otherwise it would take a working address away and leave
-  nothing in its place.
+- Turning it on removes the SRV record, so the router has to be answering first -
+  otherwise it would take a working address away and leave nothing in its place. That
+  is why the table is written before the router is started: mc-router watches that
+  file and exits at startup if it does not exist.
 
 PROXY protocol is deliberately not enabled: vanilla servers do not speak it, and
 turning it on while backends keep their own published ports would let a client that

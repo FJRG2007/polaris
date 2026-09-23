@@ -611,7 +611,13 @@ services:
   # Behind a profile, and off unless the operator asks for it, because it binds
   # 25565 on the host: an existing install whose first Minecraft server was pinned
   # to that port would otherwise fail to start the whole stack on the next `up`.
-  # Turn it on by adding `mcrouter` to COMPOSE_PROFILES in .env.
+  #
+  # Nobody has to add the profile, though. Turning on the shared port for a server
+  # starts this same image as a project of its own (`lib/minecraft-router.ts`),
+  # since asking somebody to edit .env and restart Polaris for a button they just
+  # pressed is not something a screen here may do. The profile stays for an install
+  # that already runs it this way, and the dashboard leaves that one alone: it only
+  # starts a router when nothing is answering on the port.
   #
   # The table is a file the dashboard writes and this watches. No API, no token,
   # no port between them, and it survives a restart of either side - the same seam

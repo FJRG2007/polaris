@@ -17,7 +17,7 @@ import { routesByHostname } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { normalizeZoneName } from "@polaris/deploy";
 import { probeListening } from "./reach";
-import { syncMinecraftRoutes } from "./router-service";
+import { minecraftRoutes, syncMinecraftRoutes } from "./router-service";
 import { host } from "@polaris/app-host";
 
 const { getPublicIp } = host.domainService;
@@ -25,6 +25,7 @@ const { getDomainZones } = host.domainZones;
 const { provisionHostnameDns } = host.domainDns;
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { loadCloudflareToken } = host.integrationsCloudflareAccountService;
+const { startRouter, stopRouter } = host.minecraftRouter;
 const { deleteDnsRecord, findDnsRecords, resolveZoneForHostname, upsertSrvRecord } = host.integrationsCloudflareApi;
 
 /** The label game servers live under, so they never collide with a deployed
@@ -209,13 +210,25 @@ export async function setGameRouted(ownerId: string, installedAppId: string, rou
             "This server's player list is bound to addresses, which cannot be checked through the router - turn that off first, or leave this server on its own port"
         );
     }
-    // Refused rather than accepted hopefully: turning routing on drops the SRV record
-    // that carried this server's port, so doing it with no router listening would take
-    // a working address away and leave nothing in its place.
+    // Turning routing on drops the SRV record that carried this server's port, so
+    // doing it with no router listening would take a working address away and leave
+    // nothing in its place. The router is Polaris's to run, though, so the answer is
+    // to start it rather than to refuse and tell somebody to go and edit a file.
+    //
+    // The table is written first, empty or not: the router watches that file, and a
+    // watch on a file that does not exist kills it at startup.
     if (routed && !(await routerListening())) {
-        throw new Error(
-            `Nothing is listening on port ${routerPort()}, so the router is not running - add "mcrouter" to COMPOSE_PROFILES and restart Polaris, then turn this on`
-        );
+        await syncMinecraftRoutes().catch(() => undefined);
+        const failed = await startRouter(routerPort());
+        if (failed) throw new Error(failed);
+        // It binds a second or so after the container starts, and the caller is a
+        // person waiting on a switch: waiting here is the difference between this
+        // working and this asking them to press it again.
+        if (!(await waitForRouter())) {
+            throw new Error(
+                `The router was started but is not answering on port ${routerPort()} yet. Give it a moment and turn this on again.`
+            );
+        }
     }
     const hostname = typeof config.hostname === "string" ? config.hostname : "";
     const port = install.applicationId ? await publishedPort(install.applicationId) : null;
@@ -235,6 +248,25 @@ export async function setGameRouted(ownerId: string, installedAppId: string, rou
     // written - otherwise it goes back to carrying it, which is what a player needs.
     await patchInstallConfig(installedAppId, { routed: false, portless: srvWritten });
     await syncMinecraftRoutes().catch(() => undefined);
+    // The last server off the router leaves it holding a port for an empty table.
+    // Only ever the one Polaris started: an install running the router from its
+    // compose profile has a project this does not name, and keeps it.
+    if ((await minecraftRoutes().catch(() => [])).length === 0) {
+        await stopRouter().catch(() => undefined);
+    }
+}
+
+/** How long to give a router that has just been started, and how often to look. */
+const ROUTER_WAIT_TRIES = 6;
+const ROUTER_WAIT_MS = 1000;
+
+/** Whether it came up, waiting the few seconds a container takes to bind. */
+async function waitForRouter(): Promise<boolean> {
+    for (let attempt = 0; attempt < ROUTER_WAIT_TRIES; attempt += 1) {
+        if (await routerListening()) return true;
+        await new Promise((wake) => setTimeout(wake, ROUTER_WAIT_MS));
+    }
+    return false;
 }
 
 /** The port the hostname router answers on, which is the default Minecraft port
