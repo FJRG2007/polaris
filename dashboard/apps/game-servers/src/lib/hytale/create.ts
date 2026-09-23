@@ -7,7 +7,7 @@
  * block, which is the block a game port belongs in anyway.
  */
 
-import { HYTALE_PORT } from "./service";
+import { HYTALE_PORT } from "./paths";
 import { host } from "@polaris/app-host";
 
 const { getPortBlocks } = host.appsPortBlockStore;

@@ -33,7 +33,7 @@ import * as polarisLogin from "./minecraft/polaris-login";
 import { findGame, findSoftware, softwareSourceEnv, type GameDefinition } from "@polaris/core";
 import { grantPlayerAccess } from "./minecraft/player-access";
 import { arkServerEnv, expectedArkMemoryMb } from "./ark/config";
-import { HYTALE_CATALOG_ID, HYTALE_PORT } from "./hytale/service";
+import { HYTALE_CATALOG_ID, HYTALE_PORT } from "./hytale/paths";
 import { mintConsolePassword, PENDING_SETUP_KEY } from "./fivem/service";
 import {
     defaultModFor,

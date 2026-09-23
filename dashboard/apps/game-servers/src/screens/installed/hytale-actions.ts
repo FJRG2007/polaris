@@ -13,7 +13,8 @@
  */
 
 import { host } from "@polaris/app-host";
-import { readHytaleFiles, type HytaleFiles } from "../../lib/hytale/service";
+import { readHytaleFiles } from "../../lib/hytale/service";
+import type { HytaleFiles } from "../../lib/hytale/paths";
 
 const { requireGameServer } = host.appsInstallAccess;
 

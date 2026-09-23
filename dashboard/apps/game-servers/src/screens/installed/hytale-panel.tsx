@@ -20,7 +20,7 @@ import { GameConsole } from "./game-console";
 import { hytaleFilesAction } from "./hytale-actions";
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, CardBody, Skeleton } from "@polaris/ui";
-import { HYTALE_PORT, type HytaleFiles } from "../../lib/hytale/service";
+import { HYTALE_PORT, type HytaleFiles } from "../../lib/hytale/paths";
 import { CheckCircle2, FolderOpen, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 
 /** How often the files are looked for while they are missing. Often enough that

@@ -16,31 +16,14 @@
 
 import { withServerContainer } from "../minecraft/service";
 import { readContainerFileState } from "../container-files";
+import { HYTALE_ASSETS, HYTALE_JAR, type HytaleFiles } from "./paths";
 
-/** The manifest a Hytale server is created from. */
-export const HYTALE_CATALOG_ID = "hytale";
-
-/** Where the image looks for them, which is the top of the volume. */
-export const HYTALE_ROOT = "/data";
-export const HYTALE_JAR = `${HYTALE_ROOT}/HytaleServer.jar`;
-export const HYTALE_ASSETS = `${HYTALE_ROOT}/Assets.zip`;
-
-/** The port a Hytale client reaches a server on. QUIC, so UDP and nothing else. */
-export const HYTALE_PORT = 5520;
-
-export interface HytaleFiles {
-    readonly jar: boolean;
-    readonly assets: boolean;
-    /**
-     * Whether the answer is worth trusting.
-     *
-     * A container that is not up has its volumes read by borrowing them, which
-     * works - but a machine that will not answer at all is a different thing from
-     * a file that is not there, and a screen that turned one into "put your files
-     * in" would be asking somebody to fix what is already correct.
-     */
-    readonly read: boolean;
-}
+// The constants and the shape of the answer are in `paths.ts` and are NOT
+// re-exported from here. A screen needs them, and this file reaches a container -
+// so an import of one constant from here is the deploy stack, node's own crypto
+// and everything behind them in the browser half of the app bundle, which is a
+// build that fails rather than a warning. Leaving the only route through
+// `paths.ts` is what keeps that from happening twice.
 
 export async function readHytaleFiles(ownerId: string, installedAppId: string): Promise<HytaleFiles> {
     return withServerContainer(ownerId, installedAppId, async (server) => {

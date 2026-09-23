@@ -12,7 +12,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { findGame, GAMES, gameOfServer } from "@polaris/core";
 import { commandsFor } from "@polaris-app/game-servers/src/lib/console-complete";
-import { HYTALE_ASSETS, HYTALE_JAR, HYTALE_PORT } from "@polaris-app/game-servers/src/lib/hytale/service";
+import { HYTALE_ASSETS, HYTALE_JAR, HYTALE_PORT } from "@polaris-app/game-servers/src/lib/hytale/paths";
 
 describe("Hytale in the catalogue", () => {
     it("is a game a server can be created for", () => {
