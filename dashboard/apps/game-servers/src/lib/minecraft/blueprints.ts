@@ -46,6 +46,16 @@ export interface GameBlueprint {
     readonly software?: string;
     /** Modrinth projects installed on the first boot, on top of the defaults. */
     readonly projects: readonly string[];
+    /**
+     * SpigotMC resource numbers its plugins cannot run without.
+     *
+     * Modrinth installs a project's Modrinth dependencies and can do nothing
+     * about the rest, and several of the best known server libraries - Vault
+     * above all - have only ever been published on SpigotMC. A plugin whose
+     * dependency is missing is not a plugin that works badly: the server refuses
+     * to load it, comes up without it, and says so only in a log.
+     */
+    readonly spigot?: readonly number[];
     /** Server properties it sets, as the image's environment. */
     readonly env?: Readonly<Record<string, string>>;
     /**
@@ -91,6 +101,10 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         editions: ["java"],
         software: "PAPER",
         projects: ["iridiumskyblock"],
+        // Vault, which IridiumSkyblock declares as a hard dependency and which
+        // exists only on SpigotMC. Without it the server loads everything else,
+        // reaches "Done", and has no skyblock in it at all.
+        spigot: [34315],
         // The islands are worlds the plugin makes and manages itself; what the
         // server generates is only where people land before they have one.
         levelType: FLAT_LEVEL_TYPE,

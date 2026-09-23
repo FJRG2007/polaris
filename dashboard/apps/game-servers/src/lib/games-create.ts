@@ -45,6 +45,7 @@ import {
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "./ark/service";
 import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "./ark/settings";
 import { isMapResourcePack, mapFor, pinnedRelease, type WorldMap } from "./minecraft/maps";
+import { formatSpigetList, parseSpigetList, SPIGET_KEY } from "./minecraft/spiget";
 import {
     commonVersions,
     knownUnsupported,
@@ -351,6 +352,11 @@ function javaSoftwareEnv(
     // does not - and then the project guard below takes its place.
     const mod = polarisLogin.modMovedTo(env, software, env.get("VERSION") ?? "");
     for (const [key, value] of mod ?? []) env.set(key, value);
+    // What its plugins need from SpigotMC, which is where several of the
+    // libraries they depend on are published and Modrinth is not. Written every
+    // time, blank included, so a server reset onto a blueprint that needs none
+    // stops installing the last one's.
+    env.set(SPIGET_KEY, spigetList(blueprint, env.get(SPIGET_KEY)));
     env.set(
         PROJECTS_KEY,
         protectionFor(
@@ -360,6 +366,23 @@ function javaSoftwareEnv(
             polarisLogin.loginOn(env)
         )
     );
+}
+
+/**
+ * The SpigotMC resources a server ends up carrying.
+ *
+ * The blueprint's own, on top of whatever is already there: a number on that list
+ * was put there by somebody choosing a plugin from the SpigotMC browser, and a
+ * blueprint change is not them asking for it to be taken off. Every blueprint's
+ * own numbers are dropped first, so a server reset from Skyblock to Survival
+ * stops carrying Vault - the same rule the Modrinth list follows.
+ */
+function spigetList(blueprint: GameBlueprint, current: string | undefined): string {
+    const theirs = new Set(
+        GAME_BLUEPRINTS.flatMap((entry) => [...(entry.spigot ?? [])])
+    );
+    const kept = parseSpigetList(current ?? "").filter((id) => !theirs.has(id));
+    return formatSpigetList([...kept, ...(blueprint.spigot ?? [])]);
 }
 
 /** The heap a Java server of this shape is given, from the software and the
