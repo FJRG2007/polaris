@@ -8,7 +8,7 @@
  * and is recorded: banning a player is an administrative act, not a UI event.
  */
 
-import { gameOfServer, routesByHostname } from "@polaris/core";
+import { gameOfServer, isModpackReference, routesByHostname } from "@polaris/core";
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
@@ -21,6 +21,7 @@ import { isAddressRule } from "../../lib/minecraft/access";
 import { ITEM_ID_PATTERN } from "../../lib/minecraft/items";
 import { stripFormatting } from "../../lib/minecraft/parse";
 import type { SpigotPlugin } from "../../lib/minecraft/spiget";
+import type { ModrinthProject } from "../../lib/minecraft/modrinth";
 import type { PlayerStats } from "../../lib/games-activity";
 import { formatProjectList, loaderForType } from "../../lib/minecraft/modrinth";
 import { CLIENT_MODS_KEY } from "../../lib/minecraft/client-pack";
@@ -46,7 +47,7 @@ import type { InventoryItem } from "../../lib/minecraft/inventory";
 import { DIFFICULTIES, isDifficulty } from "../../lib/minecraft/rules";
 import { setGameSchedule } from "../../lib/minecraft/schedule-service";
 import { readMinecraftStats } from "../../lib/minecraft/stats-service";
-import { guardForSave, SOFTWARE_KEY } from "../../lib/minecraft/join-guard";
+import { guardForSave, PROJECTS_KEY, SOFTWARE_KEY } from "../../lib/minecraft/join-guard";
 import { setGameHostname, setGameRouted } from "../../lib/minecraft/address";
 import { liftTimeout, timeoutPlayer } from "../../lib/minecraft/timeout-service";
 import { EXPERIENCE_UNITS, MAX_EXPERIENCE } from "../../lib/minecraft/experience";
@@ -1467,6 +1468,82 @@ export async function saveWorldTrimAction(input: WorldTrimInput): Promise<{ erro
     const { WORLD_TRIM_KEY } = await import("../../lib/minecraft/world-trim");
     await patchInstallConfig(installedAppId, { [WORLD_TRIM_KEY]: settings });
     return {};
+}
+
+/** Modpacks on Modrinth, for a server that wants to become one. */
+export async function searchModpacksAction(
+    installedAppId: string,
+    query: string,
+    version?: string
+): Promise<{ packs?: ModrinthProject[]; error?: string }> {
+    await requireGameServer("games.read", installedAppId);
+    const { searchModpacks } = await import("../../lib/minecraft/modrinth");
+    return { packs: await searchModpacks(query, version ?? null).catch(() => []) };
+}
+
+const modpackSchema = z.object({
+    installedAppId: z.string().uuid(),
+    /** The pack, or blank to stop running one. */
+    modpack: z.string().trim().max(200),
+    restart: z.boolean().default(false)
+});
+
+/**
+ * Put a modpack on this server, or take the one it runs off.
+ *
+ * Not an addition to what the server has: a modpack decides the loader, the
+ * release and every mod, and the image installs it over whatever was there. So
+ * the project list is cleared with the same save rather than left behind, where
+ * it would be a handful of mods the pack never asked for competing with the ones
+ * it brought.
+ *
+ * The world is not touched. It may still be a world the pack cannot read - a
+ * modded world is the mods that made it - which is what the screen says before
+ * this is called.
+ */
+export async function setModpackAction(
+    input: z.infer<typeof modpackSchema>
+): Promise<{ error?: string }> {
+    const parsed = modpackSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the pack and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const install = await prisma.installedApp.findFirst({
+            where: { id: parsed.data.installedAppId, ownerId: access.ownerId },
+            select: { applicationId: true }
+        });
+        if (!install?.applicationId) throw new Error("This server has not been deployed yet");
+
+        const pack = parsed.data.modpack.trim();
+        if (pack.length > 0 && !isModpackReference(pack))
+            throw new Error("That is a modpack short name, or the link to its page");
+
+        const vars = pack.length > 0
+            ? [
+                  { key: SOFTWARE_KEY, value: "MODRINTH", isSecret: false },
+                  { key: "MODRINTH_MODPACK", value: pack, isSecret: false },
+                  // The pack brings its own, and what was here was chosen for a
+                  // different server.
+                  { key: PROJECTS_KEY, value: "", isSecret: false }
+              ]
+            : [
+                  { key: SOFTWARE_KEY, value: "PAPER", isSecret: false },
+                  { key: "MODRINTH_MODPACK", value: "", isSecret: false }
+              ];
+        await setEnvVars("application", install.applicationId, access.ownerId, vars);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.modpack",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { modpack: pack }
+        });
+        if (parsed.data.restart)
+            await deployApplication(install.applicationId, access.ownerId, user.id);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not change the modpack" };
+    }
 }
 
 /**

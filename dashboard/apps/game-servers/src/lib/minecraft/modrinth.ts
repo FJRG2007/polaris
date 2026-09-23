@@ -259,6 +259,37 @@ export async function searchModrinth(
     return parsed.success ? parsed.data.hits.map(hitToProject) : [];
 }
 
+/**
+ * Modpacks, which are a different kind of thing from everything else here.
+ *
+ * A mod is added to a server. A modpack IS the server: it brings its own loader,
+ * its own release and its own list of mods, and the image installs it instead of
+ * anything Polaris would have chosen. So it is searched separately and offered
+ * separately, rather than appearing among the mods as something that could be
+ * ticked alongside them.
+ *
+ * Server packs only, because a modpack whose mods are all client-side installs
+ * nothing a server can run - and finding that out afterwards means a server that
+ * comes back up as ordinary vanilla.
+ */
+export async function searchModpacks(query: string, version?: string | null): Promise<ModrinthProject[]> {
+    const facets: string[][] = [["project_type:modpack"], ["server_side:required", "server_side:optional"]];
+    const wanted = (version ?? "").trim();
+    if (isGameVersion(wanted)) facets.push([`versions:${wanted}`]);
+
+    const params = new URLSearchParams({
+        facets: JSON.stringify(facets),
+        limit: "20",
+        index: query.trim().length > 0 ? "relevance" : "downloads"
+    });
+    if (query.trim().length > 0) params.set("query", query.trim());
+
+    const parsed = searchResponseSchema.safeParse(
+        await modrinthJson(`${modrinthApi}/search?${params.toString()}`).catch(() => null)
+    );
+    return parsed.success ? parsed.data.hits.map(hitToProject) : [];
+}
+
 const projectSchema = z.object({
     /** Modrinth's own id, which is what dependencies between projects are
      *  recorded by - the slugs are only what people type. */

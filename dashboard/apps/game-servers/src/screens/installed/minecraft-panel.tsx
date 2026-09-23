@@ -23,6 +23,7 @@ import { GameConsole } from "./game-console";
 import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
 import { SpigotPluginsCard } from "./minecraft-spigot-plugins";
+import { ModpacksCard } from "./minecraft-modpacks";
 import { SPIGET_KEY } from "../../lib/minecraft/spiget";
 import { isPluginLoader, loaderForType } from "../../lib/minecraft/modrinth";
 import type { GameContext } from "./game-context";
@@ -543,6 +544,18 @@ export function MinecraftPanel({
                         only one of the two can be checked before installing. Not
                         shown on a modded server, where every one of these is a jar
                         the server cannot read. */}
+                    {/* A pack is the server rather than an addition to it, so it
+                        is offered to any Java server and warns about what it
+                        replaces before it replaces anything. */}
+                    {edition === "java" && (
+                        <ModpacksCard
+                            installedAppId={installedAppId}
+                            modpack={
+                                settings.find((entry) => entry.key === "MODRINTH_MODPACK")?.value ?? ""
+                            }
+                            onSaved={reloadSettings}
+                        />
+                    )}
                     {isPluginLoader(loaderForType(software) ?? "") && (
                         <SpigotPluginsCard
                             installedAppId={installedAppId}
