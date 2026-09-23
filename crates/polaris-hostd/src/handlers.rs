@@ -1012,7 +1012,7 @@ fn valid_fs_path(path: &str) -> bool {
     !path.is_empty()
         && path.len() <= 4096
         && path.starts_with('/')
-        && path.trim_matches('/') != ""
+        && !path.trim_matches('/').is_empty()
         && !path.bytes().any(|b| b < 0x20 || b == 0x7f)
 }
 
