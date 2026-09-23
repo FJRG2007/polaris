@@ -98,8 +98,79 @@ export interface PlayerLinkView {
 export const LINKED_REFUSAL =
     "Sign in to Polaris from the network you are playing on, then join again.";
 
+/**
+ * Somebody this server turned away, kept so the owner can see it happened.
+ *
+ * A refusal is the one thing here that happens to a person who is not looking at
+ * Polaris: they are in the game, they are thrown out, and they read a sentence
+ * that tells them to go and ask somebody. Without this the somebody has no way to
+ * know - which makes a rotating home address, which is most of them, a server
+ * that quietly ejects its own regulars.
+ */
+export interface PlayerRefusal {
+    readonly player: string;
+    /** Where they were coming from, when the log or the mod carried it. */
+    readonly address: string | null;
+    /** What they were told. */
+    readonly why: string;
+    readonly at: string;
+}
+
+/** Where the last few live on the install, beside the rest of its settings. */
+export const REFUSALS_KEY = "playerRefusals";
+
+/** How many to keep. Enough to see a pattern over an evening, few enough that
+ *  the config stays a config. */
+const REFUSALS_KEPT = 12;
+
+/** The same person refused from the same place again inside this window is the
+ *  same event: a client retries by itself, and three rows for one arrival is
+ *  noise where the point is to be read. */
+const REFUSAL_WINDOW_MS = 10 * 60 * 1000;
+
+export function readRefusals(config: Record<string, unknown>): PlayerRefusal[] {
+    const raw = config[REFUSALS_KEY];
+    if (!Array.isArray(raw)) return [];
+    return raw.flatMap((entry) => {
+        if (typeof entry !== "object" || entry === null) return [];
+        const row = entry as Record<string, unknown>;
+        if (typeof row.player !== "string" || typeof row.at !== "string") return [];
+        return [
+            {
+                player: row.player,
+                address: typeof row.address === "string" ? row.address : null,
+                why: typeof row.why === "string" ? row.why : "",
+                at: row.at
+            }
+        ];
+    });
+}
+
+/** Write one down, newest first, without repeating the retry of one arrival. */
+export async function noteRefusal(
+    installedAppId: string,
+    refusal: Omit<PlayerRefusal, "at">,
+    now: Date = new Date()
+): Promise<void> {
+    const row = await prisma.installedApp
+        .findUnique({ where: { id: installedAppId }, select: { config: true } })
+        .catch(() => null);
+    const held = readRefusals(readInstallConfig(row?.config));
+    const same = held.find(
+        (one) =>
+            one.player.toLowerCase() === refusal.player.toLowerCase() &&
+            one.address === refusal.address &&
+            now.getTime() - Date.parse(one.at) < REFUSAL_WINDOW_MS
+    );
+    if (same) return;
+    const kept = [{ ...refusal, at: now.toISOString() }, ...held].slice(0, REFUSALS_KEPT);
+    await patchInstallConfig(installedAppId, { [REFUSALS_KEY]: kept }).catch(() => undefined);
+}
+
 export interface PlayerAccessView {
     readonly rules: readonly PlayerAccessRule[];
+    /** The last few people this server turned away. */
+    readonly refusals: readonly PlayerRefusal[];
     /** Players tied to a Polaris account. */
     readonly links: readonly PlayerLinkView[];
     /** Whether the address half is enforced. Usernames always are. Linked
@@ -115,6 +186,7 @@ interface AccessInstall {
     readonly applicationId: string | null;
     readonly edition: MinecraftEdition;
     readonly bindAddresses: boolean;
+    readonly refusals: readonly PlayerRefusal[];
 }
 
 /** The install, asserting the caller owns it, with the access flag off its config. */
@@ -124,13 +196,15 @@ async function resolve(ownerId: string, installedAppId: string): Promise<AccessI
         select: { id: true, applicationId: true, catalogId: true, config: true }
     });
     if (!row) throw new Error("Installed app not found");
+    const config = readInstallConfig(row.config);
     return {
         id: row.id,
         applicationId: row.applicationId,
         edition: editionOf(row.catalogId),
         // Absent means on: a server created before this existed is closed too, and
         // a config that cannot be read is never a reason to stop enforcing.
-        bindAddresses: readInstallConfig(row.config).bindAddresses !== false
+        bindAddresses: config.bindAddresses !== false,
+        refusals: readRefusals(config)
     };
 }
 
@@ -157,6 +231,7 @@ export async function listPlayerAccess(
         people.map((person) => [person.id, person.name || person.username || ""])
     );
     return {
+        refusals: install.refusals,
         rules: rows.map((row) => ({
             id: row.id,
             username: row.username,
@@ -982,6 +1057,7 @@ export async function enforcePlayerAddresses(
         if (!refusal) continue;
         const said = isLinked ? LINKED_REFUSAL : refusal;
         await runServerCommand(ownerId, installedAppId, ["kick", player, said]).catch(() => null);
+        await noteRefusal(installedAppId, { player, address, why: said }).catch(() => undefined);
         kicked.push(player);
     }
     return { kicked, unknown, reachedFromOutside };

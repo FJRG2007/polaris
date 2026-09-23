@@ -86,8 +86,16 @@ vi.mock("@polaris/db", () => ({
 
 const rules = vi.hoisted(() => ({ value: [] as { username: string; address: string }[] }));
 const bound = vi.hoisted(() => ({ value: true }));
+/** What the door wrote down, so the owner can be told somebody was turned away. */
+const noted = vi.hoisted(
+    () => [] as { installedAppId: string; player: string; address: string | null; why: string }[]
+);
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/player-access", () => ({
-    playerAccessRules: vi.fn(async () => rules.value)
+    playerAccessRules: vi.fn(async () => rules.value),
+    noteRefusal: vi.fn(
+        async (installedAppId: string, refusal: { player: string; address: string | null; why: string }) =>
+            void noted.push({ installedAppId, ...refusal })
+    )
 }));
 
 vi.mock("@/lib/rate-limit-service", () => ({
@@ -136,6 +144,7 @@ beforeEach(() => {
     logins.clear();
     checkIns.clear();
     counters.clear();
+    noted.length = 0;
     env.list.mockReset();
     env.list.mockResolvedValue(switchedOn);
 });
@@ -319,6 +328,11 @@ describe("the player list", () => {
 
         const login = await ask("login", { player: "Steve", password: "correct horse" });
         expect((await login.json()).refused).toMatch(/player list/);
+
+        // Whoever runs the server hears about it here or nowhere: the player was
+        // told to go and ask them, and has no other way of reaching them.
+        expect(noted[0]).toMatchObject({ player: "Steve", address: "203.0.113.9" });
+        expect(noted[0]?.why).toMatch(/player list/);
     });
 
     it("lets a listed name in from its own network", async () => {
@@ -338,6 +352,8 @@ describe("the player list", () => {
             await ask("status", { player: "Steve", address: "198.51.100.7" })
         ).json();
         expect(away.refused).toMatch(/different network/);
+        expect(noted).toHaveLength(1);
+        expect(noted[0]).toMatchObject({ player: "Steve", address: "198.51.100.7" });
 
         bound.value = false;
         const unbound = await (

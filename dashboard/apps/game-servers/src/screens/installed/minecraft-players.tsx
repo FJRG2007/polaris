@@ -404,6 +404,65 @@ export function MinecraftPlayers({
                 </Card>
             )}
 
+            {/* Somebody thrown out is the one thing on this screen that happened
+                to a person who is not looking at it. They were told to ask the
+                server's owner; this is the owner being asked. Most of these are a
+                home connection that changed address on its own overnight, which is
+                why the answer offered is the address they actually arrived from
+                rather than a form to fill in. */}
+            {(access?.refusals?.length ?? 0) > 0 && (
+                <Card className="border-warning-edge bg-warning-soft">
+                    <CardBody className="flex flex-col gap-2">
+                        <p className="flex items-center gap-2 text-sm font-medium">
+                            <Users className="size-4 text-warning" />
+                            Turned away recently
+                        </p>
+                        {(access?.refusals ?? []).map((refusal) => {
+                            const from = refusal.address;
+                            return (
+                                <div
+                                    key={`${refusal.player}-${refusal.at}`}
+                                    className="flex flex-wrap items-center gap-2 text-sm"
+                                >
+                                    <span className="font-medium">{refusal.player}</span>
+                                    <span className="text-muted-foreground">
+                                        {from
+                                            ? `arrived from ${from}`
+                                            : "arrived from an address the log did not carry"}
+                                        {" - "}
+                                        {format.dateTime(refusal.at)}
+                                    </span>
+                                    {from && (
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            disabled={pending}
+                                            onClick={() =>
+                                                run(() =>
+                                                    actions.grantPlayerAccessAction({
+                                                        installedAppId,
+                                                        username: refusal.player,
+                                                        address: from,
+                                                        note: "Added from a refused join"
+                                                    })
+                                                )
+                                            }
+                                        >
+                                            Allow this address too
+                                        </Button>
+                                    )}
+                                </div>
+                            );
+                        })}
+                        <p className="text-xs text-muted-foreground">
+                            A home connection is given a new address by its provider every so often,
+                            and the player is thrown out when it happens. Allowing the new one keeps
+                            the old one as well.
+                        </p>
+                    </CardBody>
+                </Card>
+            )}
+
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">

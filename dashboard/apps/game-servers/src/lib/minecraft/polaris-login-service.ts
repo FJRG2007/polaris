@@ -103,7 +103,7 @@ export async function joinRefusal(
 ): Promise<string | null> {
     // Imported when asked: the rules live beside the code that reaches the
     // server, which this route never needs.
-    const { playerAccessRules } = await import("./player-access");
+    const { noteRefusal, playerAccessRules } = await import("./player-access");
     const [rules, install] = await Promise.all([
         playerAccessRules(server.installedAppId),
         prisma.installedApp.findUnique({
@@ -114,7 +114,19 @@ export async function joinRefusal(
     if (rules.length === 0) return null;
     const bound = readInstallConfig(install?.config).bindAddresses !== false;
     const from = bound && address && isIP(address) ? address : null;
-    return accessRefusal(player, from, rules);
+    const refusal = accessRefusal(player, from, rules);
+    // Written down before it is answered. This is the door, so it is the only
+    // place that sees somebody arrive from an address nobody has allowed yet -
+    // and the person it happens to is told to go and ask the owner, who until now
+    // had no way of hearing about it except from them.
+    if (refusal) {
+        await noteRefusal(server.installedAppId, {
+            player,
+            address: from,
+            why: refusal
+        }).catch(() => undefined);
+    }
+    return refusal;
 }
 
 export async function isRegistered(server: ModServer, player: string): Promise<boolean> {
