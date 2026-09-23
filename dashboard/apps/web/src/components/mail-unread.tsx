@@ -21,6 +21,7 @@ import { z } from "zod";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
 import { canNotify, closeDesktopNotice, notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
+import { noticeAllowed } from "@/lib/notifications/browser-notices";
 import {
     createContext,
     useCallback,
@@ -151,7 +152,9 @@ async function announceArrivals(cursor: { current: string | null }): Promise<voi
     // the one taking over would otherwise announce again everything since it
     // was opened.
     const since = laterOf(cursor.current, sharedCursor());
-    if (!since || !canNotify()) return;
+    // Switched off for this device, which is a thing to check before asking the
+    // server what has arrived: the answer would only be thrown away.
+    if (!since || !canNotify() || !noticeAllowed("mail")) return;
     const answer = await fetchArrivals(since);
     if (!answer) return;
     cursor.current = answer.cursor;

@@ -38,6 +38,7 @@ import { useSessionScope } from "@/components/session-scope";
 import { messageToastsAction } from "@/app/(app)/chat/actions";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
 import { closeDesktopNotice, notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
+import { noticeAllowed } from "@/lib/notifications/browser-notices";
 import { notificationSoundEnabled } from "@/lib/notification-sound";
 import {
     arrivalAlert,
@@ -164,7 +165,7 @@ export function MessageToasts() {
 
             // Past the window as well, when nobody is looking at it, and drawn
             // once however many tabs this browser has open on it.
-            if (alert.desktop) {
+            if (alert.desktop && noticeAllowed("messages")) {
                 void claimForDevice(`${device.current}:message-notice:${message.channelId}`).then(
                     (mine) => {
                         if (!mine) return;

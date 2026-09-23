@@ -38,6 +38,7 @@ import { Avatar } from "./avatar";
 import { Button } from "@polaris/ui";
 import { useSessionScope } from "./session-scope";
 import { claimForDevice } from "@/lib/device-once";
+import { noticeAllowed } from "@/lib/notifications/browser-notices";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
@@ -468,6 +469,9 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     useEffect(() => {
         for (const entry of showing) {
             if (notices.current.has(entry.meetingId)) continue;
+            // Switched off for this device. The card and the ring are unaffected -
+            // what is refused is the notice drawn outside the window.
+            if (!noticeAllowed("calls")) continue;
             // A hushed call raises nothing outside the window either. The
             // operating system's notice is the same interruption in another
             // form, and somebody who has just silenced one has said so.

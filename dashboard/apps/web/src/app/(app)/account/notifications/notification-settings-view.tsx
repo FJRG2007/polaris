@@ -27,7 +27,14 @@ import type { DeliveryView } from "@/lib/notification-service";
 import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import type { DestinationView } from "@/lib/notifications/destinations";
 import { drawFavicon } from "@/lib/favicon";
-import { mayNotify, noticeStanding, type NoticeStanding } from "@/lib/desktop-notify";
+import { mayNotify, noticeStanding, notifyDesktop, type NoticeStanding } from "@/lib/desktop-notify";
+import {
+    NOTICE_KINDS,
+    NOTICE_LABEL,
+    noticeSettings,
+    setNoticeAllowed,
+    type NoticeKind
+} from "@/lib/notifications/browser-notices";
 import { AlertTriangle, Bell, Mail, Smartphone, Volume2, Webhook } from "lucide-react";
 import {
     Badge,
@@ -129,7 +136,7 @@ export function NotificationSettingsView({
 }
 
 /**
- * Whether this browser may draw a notice outside the tab.
+ * What this browser may draw outside the tab, and which of it.
  *
  * The permission was only ever asked for at the moment something was about to be
  * shown, which is the right time to ask and the wrong time to find out the
@@ -138,58 +145,142 @@ export function NotificationSettingsView({
  * is said here plainly, and granting it is one press - the same prompt, asked
  * deliberately, which is the one people say yes to.
  *
- * The desktop app draws its own notices through the operating system and needs
- * no permission, so there it says so and offers nothing.
+ * Under it, the part that was missing altogether: four different interruptions
+ * were behind that one yes, and the only way to stop the one somebody did not
+ * want was to refuse the lot - which takes the call notice with it, permanently.
+ * Each kind is its own switch now, kept per device for the reason the chime is:
+ * whether being interrupted is welcome depends on the machine somebody is
+ * sitting at, not on who is signed in.
+ *
+ * The desktop app draws its own notices through the operating system and needs no
+ * permission, so there the switches stand and the prompt does not.
  */
 function BrowserNoticesCard() {
     const [standing, setStanding] = useState<NoticeStanding>("unsupported");
     const [asking, setAsking] = useState(false);
+    const [kinds, setKinds] = useState<Record<NoticeKind, boolean>>(() =>
+        Object.fromEntries(NOTICE_KINDS.map((kind) => [kind, true])) as Record<NoticeKind, boolean>
+    );
+    const [shown, setShown] = useState<string | null>(null);
 
     // Read on mount: none of this exists while the page is rendered on the
     // server, and a card that guessed would be wrong on every second device.
     const settle = () => setStanding(noticeStanding());
-    useEffect(settle, []);
+    useEffect(() => {
+        settle();
+        setKinds(noticeSettings());
+    }, []);
 
     const said: Record<NoticeStanding, string> = {
         app: "The Polaris app draws these itself. Nothing to allow.",
-        granted:
-            "Polaris can tell you about a call or a message while you are on another tab.",
+        granted: "Polaris can tell you about these while you are on another tab.",
         denied:
             "This browser is blocking them. Allow notifications for this site in its settings to turn them back on.",
-        askable:
-            "Let Polaris tell you about a call or a message while you are on another tab.",
+        askable: "Let Polaris tell you about a call or a message while you are on another tab.",
         unsupported: "This browser cannot show them."
     };
 
+    /** Whether the switches mean anything yet: refused or unsupported, nothing
+     *  below them can be drawn whatever they say. */
+    const working = standing === "granted" || standing === "app";
+
+    function choose(kind: NoticeKind, allowed: boolean) {
+        setKinds((current) => ({ ...current, [kind]: allowed }));
+        setNoticeAllowed(kind, allowed);
+        setShown(null);
+    }
+
+    /**
+     * Draw one, now.
+     *
+     * The only honest way to answer "will I actually see it": permission can be
+     * granted and the notice still go nowhere - an operating system with its own
+     * do-not-disturb, a browser whose site settings were changed in another
+     * window. Pressing it is also the gesture a browser wants before it shows
+     * anything, so nothing here is fighting a policy.
+     */
+    async function test() {
+        const notice = await notifyDesktop({
+            title: "Polaris",
+            body: "This is what a notice from Polaris looks like.",
+            tag: "polaris:test"
+        });
+        setShown(
+            notice
+                ? "Sent. If nothing appeared, the system is holding it back - check its own notification settings."
+                : "This browser would not draw it."
+        );
+    }
+
     return (
         <Card>
-            <CardBody className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                    <p className="text-sm font-medium">Browser notifications</p>
-                    <p className="text-xs text-muted-foreground">{said[standing]}</p>
+            <CardHeader>
+                <CardTitle>Browser notifications</CardTitle>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-4">
+                <div className="flex items-center justify-between gap-3">
+                    <p className="min-w-0 text-xs text-muted-foreground">{said[standing]}</p>
+                    <div className="flex shrink-0 items-center gap-2">
+                        {standing === "granted" ? (
+                            <Badge variant="success">Allowed</Badge>
+                        ) : standing === "app" ? (
+                            <Badge variant="success">On</Badge>
+                        ) : standing === "denied" ? (
+                            <Badge variant="warning">Blocked</Badge>
+                        ) : standing === "askable" ? (
+                            <Button
+                                size="sm"
+                                disabled={asking}
+                                onClick={() => {
+                                    setAsking(true);
+                                    void mayNotify().finally(() => {
+                                        setAsking(false);
+                                        settle();
+                                    });
+                                }}
+                            >
+                                <Bell className="size-4 shrink-0" aria-hidden />
+                                Allow
+                            </Button>
+                        ) : null}
+                        {working ? (
+                            <Button size="sm" variant="secondary" onClick={() => void test()}>
+                                Show me one
+                            </Button>
+                        ) : null}
+                    </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                    {standing === "granted" ? (
-                        <Badge variant="success">On</Badge>
-                    ) : standing === "denied" ? (
-                        <Badge variant="warning">Blocked</Badge>
-                    ) : standing === "askable" ? (
-                        <Button
-                            size="sm"
-                            disabled={asking}
-                            onClick={() => {
-                                setAsking(true);
-                                void mayNotify().finally(() => {
-                                    setAsking(false);
-                                    settle();
-                                });
-                            }}
-                        >
-                            <Bell className="size-4 shrink-0" aria-hidden />
-                            Allow
-                        </Button>
-                    ) : null}
+
+                {shown ? <p className="text-xs text-muted-foreground">{shown}</p> : null}
+
+                <div className="flex flex-col divide-y divide-border rounded-md border border-border">
+                    {NOTICE_KINDS.map((kind) => (
+                        <div key={kind} className="flex items-center justify-between gap-3 px-3 py-2">
+                            <div className="min-w-0">
+                                <p className={cn("text-sm", !working && "text-muted-foreground")}>
+                                    {NOTICE_LABEL[kind].title}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    {NOTICE_LABEL[kind].hint}
+                                </p>
+                            </div>
+                            <Switch
+                                checked={kinds[kind]}
+                                // Left usable while the browser is refusing, on
+                                // purpose: this is what will happen once it is
+                                // allowed, and a row of dead switches teaches
+                                // nobody which of them was on.
+                                onChange={(next) => choose(kind, next)}
+                                aria-label={`${NOTICE_LABEL[kind].title} outside the tab`}
+                            />
+                        </div>
+                    ))}
                 </div>
+
+                <p className="text-xs text-muted-foreground">
+                    These are kept for this browser, not for your account - the same as the sound
+                    below. What reaches the bell, your mail and everything else is further down.
+                </p>
             </CardBody>
         </Card>
     );
