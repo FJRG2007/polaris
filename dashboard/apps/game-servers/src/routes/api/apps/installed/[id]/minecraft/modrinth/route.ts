@@ -9,11 +9,40 @@ import {
     readRequirements,
     searchModrinth
 } from "../../../../../../../lib/minecraft/modrinth";
+import { prisma } from "@polaris/db";
 import { isBrowsableLoader } from "@polaris/core";
+import { refusedPlugins } from "../../../../../../../lib/minecraft/plugin-load";
 import { host } from "@polaris/app-host";
 import { notForPlayers, packEntries } from "../../../../../../../lib/minecraft/client-pack";
 
 const { requireGameServer } = host.appsInstallAccess;
+const { readAppRuntimeLog } = host.deployService;
+
+/**
+ * How much of the log to read for plugins the server would not load.
+ *
+ * The refusals are printed in the first seconds of a boot, before the world is
+ * opened, so what matters is whether the tail still reaches back that far. A
+ * server that has been up for a week and printed a lot since has scrolled past
+ * it - and then this says nothing, which is the right answer rather than a
+ * guess.
+ */
+const PLUGIN_LOG_TAIL = 400;
+
+/** Which plugins this server refused to load, last time it started. */
+async function refusedHere(installedAppId: string, ownerId: string) {
+    const install = await prisma.installedApp
+        .findFirst({
+            where: { id: installedAppId, ownerId },
+            select: { applicationId: true }
+        })
+        .catch(() => null);
+    if (!install?.applicationId) return [];
+    const log = await readAppRuntimeLog(install.applicationId, ownerId, PLUGIN_LOG_TAIL).catch(
+        () => ""
+    );
+    return refusedPlugins(log);
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,7 +117,7 @@ export async function GET(
     // Against the server the search is for, not against the instance: the results
     // end up in one install's mod list, so the grant that matters is the one on it.
     const { id } = await params;
-    await requireGameServer("games.manage", id);
+    const { access } = await requireGameServer("games.manage", id);
     const url = new URL(request.url);
     const asked = {
         query: url.searchParams.get("query") ?? "",
@@ -139,7 +168,7 @@ export async function GET(
         // other, and whether an entry nailed to one build has been left behind by a
         // newer one. The last costs nothing on a list where nothing is pinned,
         // which is most lists.
-        const [projects, conflicts, newest, requires] = await Promise.all([
+        const [projects, conflicts, newest, requires, refused] = await Promise.all([
             readInstalledProjects(entries, parsed.data.loader, parsed.data.version || null),
             readConflicts(entries, parsed.data.loader, parsed.data.version || null).catch(() => []),
             newestBuilds(entries, parsed.data.loader, parsed.data.version || null).catch(
@@ -150,7 +179,11 @@ export async function GET(
             // boot that ends, and a server that restarts until it is stopped.
             readRequirements(entries, parsed.data.loader, parsed.data.version || null).catch(
                 () => []
-            )
+            ),
+            // And which of them the server actually refused to load. Everything
+            // above is what Modrinth says should work; this is the only thing
+            // here that knows what happened when it was tried.
+            refusedHere(id, access.ownerId).catch(() => [])
         ]);
         return NextResponse.json({
             projects: projects.map((project) => ({
@@ -159,7 +192,8 @@ export async function GET(
                 newest: newest.get(project.entry) ?? null
             })),
             conflicts,
-            requires
+            requires,
+            refused
         });
     }
 

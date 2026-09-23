@@ -24,6 +24,7 @@ import { updateServerSettingsAction } from "./minecraft-actions";
 import { memoryChangeSentence } from "../../lib/minecraft/memory-plan";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "../../lib/minecraft/join-guard";
+import type { RefusedPlugin } from "../../lib/minecraft/plugin-load";
 import { Badge, Button, Card, CardBody, cn, Input, ScrollRow, Select, Skeleton } from "@polaris/ui";
 import Link from "next/link";
 import {
@@ -115,6 +116,16 @@ export function MinecraftMods({
      *  being skipped, so this is the difference between a warning and nine
      *  restarts - see `readRequirements`. */
     const [requires, setRequires] = useState<modrinth.ModrinthRequirement[]>([]);
+    /**
+     * What the server actually refused to load when it last started.
+     *
+     * Everything else on this screen is what Modrinth says should work. This is
+     * the only thing here that knows what happened when it was tried - and the
+     * failure it reports is the quietest one a server has: the jar is there, the
+     * list says installed, the server starts, and the thing it was installed for
+     * is not in the game.
+     */
+    const [refused, setRefused] = useState<RefusedPlugin[]>([]);
     const [error, setError] = useState<string | null>(null);
     /** What the last save did to the heap: more mods can mean more memory. */
     const [memoryNote, setMemoryNote] = useState<string | null>(null);
@@ -223,10 +234,12 @@ export function MinecraftMods({
                     projects?: InstalledRow[];
                     conflicts?: modrinth.ModrinthConflict[];
                     requires?: modrinth.ModrinthRequirement[];
+                    refused?: RefusedPlugin[];
                 };
                 setOnList(data.projects ?? []);
                 setConflicts(data.conflicts ?? []);
                 setRequires(data.requires ?? []);
+                setRefused(data.refused ?? []);
             } catch {
                 if (!signal.aborted) unread();
             }
@@ -340,6 +353,7 @@ export function MinecraftMods({
                 projects={onList}
                 conflicts={conflicts}
                 requires={requires}
+                refused={refused}
                 onAddNeeded={(slugs) =>
                     setProjects((current) => [
                         ...current,
@@ -621,6 +635,7 @@ function InstalledList({
     projects,
     conflicts,
     requires,
+    refused,
     onAddNeeded,
     onRepin,
     version,
@@ -636,6 +651,8 @@ function InstalledList({
     conflicts: readonly modrinth.ModrinthConflict[];
     /** What the things on the list cannot run without - see `readRequirements`. */
     requires: readonly modrinth.ModrinthRequirement[];
+    /** What the server would not load, in its own words - see `plugin-load`. */
+    refused: readonly RefusedPlugin[];
     /** Put the dependencies on the list too. Offered rather than done silently: a
      *  list that grew by itself is a list nobody can account for later. */
     onAddNeeded: (slugs: readonly string[]) => void;
@@ -693,6 +710,35 @@ function InstalledList({
                         </div>
                     </label>
                 </div>
+
+                {/* Above the list rather than on a row: what the server refused
+                    is the jar it named, and matching that back to an entry means
+                    guessing at how a project's name became a file name. Saying it
+                    plainly is worth more than putting it in the right place and
+                    sometimes putting it on the wrong one. */}
+                {refused.length > 0 && (
+                    <div className="flex flex-col gap-1 rounded-md border border-danger-edge bg-danger-soft px-3 py-2">
+                        <p className="text-sm font-medium">
+                            The server would not load{" "}
+                            {refused.length === 1 ? "one of these" : `${refused.length} of these`}{" "}
+                            when it last started
+                        </p>
+                        {refused.map((one) => (
+                            <p key={one.jar} className="text-xs text-muted-foreground">
+                                <span className="font-medium text-foreground">{one.name}</span>
+                                {one.needs.length > 0
+                                    ? ` needs ${one.needs.join(", ")}, which is not installed.`
+                                    : one.why
+                                      ? ` - ${one.why}`
+                                      : " - the server did not say why."}
+                            </p>
+                        ))}
+                        <p className="text-xs text-muted-foreground">
+                            It is installed and it is not running. Whatever it was installed for is
+                            not in the game until this is fixed.
+                        </p>
+                    </div>
+                )}
 
                 {entries.length === 0 ? (
                     <p className="py-2 text-sm text-muted-foreground">
