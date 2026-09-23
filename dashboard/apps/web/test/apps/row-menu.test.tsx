@@ -98,9 +98,18 @@ describe("the menu on a player row", () => {
     it("draws the same list behind the three dots", async () => {
         render(<RowMenuButton entries={ENTRIES} label="More for ErMigue04" />);
 
-        // Opened from the keyboard: the trigger listens for a pointer down, and
-        // jsdom has no pointer events to give it.
-        fireEvent.keyDown(screen.getByLabelText("More for ErMigue04"), { key: "Enter" });
+        // Opened with a pointer rather than from the keyboard, which is how the
+        // three dots are actually used. It also avoids the one thing a keyboard
+        // open does that jsdom cannot finish: the menu then walks its items
+        // looking for the first to focus, nothing in jsdom is focusable enough to
+        // be found, and the walk lands after the test is over and the menu
+        // unmounted - an uncaught TypeError that fails the whole run while every
+        // test still reads as passed.
+        fireEvent.pointerDown(screen.getByLabelText("More for ErMigue04"), {
+            button: 0,
+            ctrlKey: false,
+            pointerType: "mouse"
+        });
 
         expect(await screen.findByText("Kick them")).toBeTruthy();
         expect(screen.getByText("Kill")).toBeTruthy();
