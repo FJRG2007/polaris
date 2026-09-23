@@ -11,7 +11,7 @@ import { PassThrough } from "node:stream";
 import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
 import { DF_ROOT, PRUNE_EVERY_ENGINE, freeBytesFromDf } from "@/lib/deploy/server-space";
-import { ensurePrivateNetworksScript, forCompose, isReleaseImage, parseReclaimedBytes, quoteArg, renderComposeYaml, type BuildRequest, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
+import { ensurePrivateNetworksScript, forCompose, isReleaseImage, parseReclaimedBytes, quoteArg, renderComposeYaml, type BuildRequest, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts, type WorldTrimOptions } from "@polaris/deploy";
 
 /** Where compose files and volume data live on a managed remote server. */
 const REMOTE_DEPLOY_ROOT = "/var/lib/polaris/deploy";
@@ -585,6 +585,79 @@ export class SshPorts implements RuntimePorts {
         });
     }
 
+    /**
+     * The world optimizer, on the other machine.
+     *
+     * The container is down, so there is nothing to `docker exec` into: the work
+     * happens in a throwaway container built from the server own image, holding
+     * the same volumes and with no network at all. That is also how the file gets
+     * in - the script is piped into the same throwaway container before the run
+     * rather than kept anywhere, since nothing here has a place to keep it.
+     *
+     * Refused while the server is up, and asked of the engine rather than assumed
+     * from what Polaris last recorded: a server somebody started by hand a minute
+     * ago is exactly the case where a stale answer costs a world.
+     */
+    public async trimWorld(
+        container: string,
+        script: string,
+        options: WorldTrimOptions
+    ): Promise<ExecResult> {
+        const client = await this.connect();
+        const ask = async (format: string): Promise<string> => {
+            let said = "";
+            await execCommand(client, `docker inspect -f ${quoteArg(format)} ${quoteArg(container)}`, {
+                onStdout: (chunk: Buffer) => {
+                    said += chunk.toString("utf8");
+                }
+            });
+            return said.trim();
+        };
+
+        if ((await ask("{{.State.Running}}")) === "true")
+            throw new Error("The server has to be stopped before its world can be optimized");
+        const from = await ask("{{.Config.Image}}");
+        if (from.length === 0) throw new Error("That server image is no longer on the machine");
+
+        // The script arrives on stdin rather than in the command. A command line
+        // is readable in `ps` by everyone on the machine and is bounded in length;
+        // stdin is neither.
+        const inside = [
+            `cat > ${quoteArg(WORLD_TOOL_PATH)}`,
+            [
+                "python3",
+                quoteArg(WORLD_TOOL_PATH),
+                "--world",
+                quoteArg(options.world),
+                "--keep-ticks",
+                String(Math.max(0, Math.trunc(options.keepTicks))),
+                "--keep-radius",
+                String(Math.max(0, Math.trunc(options.keepRadius))),
+                ...(options.dryRun ? ["--dry-run"] : [])
+            ].join(" ")
+        ].join(" && ");
+
+        const command = [
+            "docker run --rm -i --network none",
+            `--volumes-from ${quoteArg(container)}`,
+            "--entrypoint sh",
+            quoteArg(from),
+            "-c",
+            quoteArg(inside)
+        ].join(" ");
+
+        let output = "";
+        const collect = (chunk: Buffer): void => {
+            output += chunk.toString("utf8");
+        };
+        const result = await execCommand(client, command, {
+            onStdout: collect,
+            onStderr: collect,
+            input: script
+        });
+        return { code: result.code, output };
+    }
+
     private async run(command: string, onOutput?: OutputSink): Promise<void> {
         const client = await this.connect();
         const result = await execCommand(client, command, {
@@ -596,6 +669,10 @@ export class SshPorts implements RuntimePorts {
         }
     }
 }
+
+/** Where the optimizer is put inside the container, which is the same path the
+ *  local daemon runs. */
+const WORLD_TOOL_PATH = "/data/.polaris-world-trim.py";
 
 /** A path that stays inside the build context: relative, no parent steps, no
  *  control characters. The same rule the local daemon applies to both values. */

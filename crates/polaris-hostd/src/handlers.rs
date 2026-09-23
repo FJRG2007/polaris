@@ -166,6 +166,24 @@ struct FsMutateRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct WorldTrimRequest {
+    container: String,
+    /// The world folder, inside the container.
+    world: String,
+    /// Keep a chunk with more than this many ticks of inhabited time. Nought
+    /// keeps everything anybody has ever stood in.
+    #[serde(default)]
+    keep_ticks: u64,
+    /// Chunks to keep around spawn and around where each player was.
+    #[serde(default)]
+    keep_radius: u32,
+    /// Measure without changing anything.
+    #[serde(default)]
+    dry_run: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ExecRunRequest {
     container: String,
     argv: Vec<String>,
@@ -233,6 +251,7 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/fs/read") => deploy_fs_read(req, body),
         ("POST", "/v1/deploy/fs/write") => deploy_fs_write(state, req, body),
         ("POST", "/v1/deploy/fs/mutate") => deploy_fs_mutate(req, body),
+        ("POST", "/v1/deploy/world/trim") => deploy_world_trim(req, body),
         ("POST", "/v1/deploy/volume/wipe") => deploy_volume_wipe(req, body),
         ("POST", "/v1/deploy/networks/reconcile") => deploy_networks_reconcile(state, req, body),
         _ if path.starts_with("/v1/fs/") => fs_handler(state, req, body),
@@ -1080,6 +1099,73 @@ fn deploy_fs_mutate<R: Read>(req: &Request, body: &mut R) -> Response {
         Err(error) => {
             eprintln!("fs {} in {} failed: {error}", request.op, request.container);
             Response::text(502, "Bad Gateway", "could not change the file")
+        }
+    }
+}
+
+/// Where the dashboard puts the script this endpoint runs.
+///
+/// Hardcoded rather than taken from the request. The script is written into the
+/// container by an ordinary file write, so what it contains is already the
+/// dashboard's to decide - but the path being fixed here means this endpoint can
+/// only ever start that one program, instead of becoming a way to run anything at
+/// all inside somebody's volumes.
+const WORLD_TRIM_SCRIPT: &str = "/data/.polaris-world-trim.py";
+
+/// Take the chunks nobody has ever been in out of a world.
+///
+/// Refused while the container is running, and that refusal is the whole reason
+/// this lives in the daemon rather than being a command the dashboard sends. A
+/// running server holds its region files open and caches where every chunk sits
+/// inside them; rewriting one underneath it is not a race that sometimes loses a
+/// chunk, it is a world the server then writes back through a stale table. The
+/// daemon is the only thing here that knows for certain whether the container is
+/// up, so it is the thing that says no.
+fn deploy_world_trim<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: WorldTrimRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid world trim request"),
+    };
+    if !deploy::valid_container_ref(&request.container) {
+        return Response::bad_request("invalid container reference");
+    }
+    if !valid_fs_path(&request.world) {
+        return Response::bad_request("invalid world path");
+    }
+    if deploy::container_running(&request.container) {
+        return Response::text(
+            409,
+            "Conflict",
+            "the server has to be stopped before its world can be optimized",
+        );
+    }
+
+    let mut argv: Vec<String> = vec![
+        "python3".into(),
+        WORLD_TRIM_SCRIPT.into(),
+        "--world".into(),
+        request.world.clone(),
+        "--keep-ticks".into(),
+        request.keep_ticks.min(u32::MAX as u64).to_string(),
+        "--keep-radius".into(),
+        request.keep_radius.min(64).to_string(),
+    ];
+    if request.dry_run {
+        argv.push("--dry-run".into());
+    }
+
+    match deploy::run_against_files(&request.container, &argv) {
+        Ok((code, output)) => {
+            let body = serde_json::json!({ "code": code, "output": output });
+            Response::json(200, "OK", &body)
+        }
+        Err(error) => {
+            eprintln!("world trim in {} failed: {error}", request.container);
+            Response::text(502, "Bad Gateway", "could not optimize the world")
         }
     }
 }

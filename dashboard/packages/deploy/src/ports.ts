@@ -57,6 +57,19 @@ export interface ExecResult {
     readonly output: string;
 }
 
+/** What the world optimizer is being asked for. */
+export interface WorldTrimOptions {
+    /** The world folder inside the container, e.g. `/data/world`. */
+    readonly world: string;
+    /** Keep a chunk with more than this many ticks of inhabited time. Nought
+     *  keeps every chunk anybody has ever stood in. */
+    readonly keepTicks: number;
+    /** Chunks to keep around spawn and around where each player was. */
+    readonly keepRadius: number;
+    /** Measure without changing anything. */
+    readonly dryRun: boolean;
+}
+
 export interface LogOptions {
     readonly tail?: number;
     readonly follow?: boolean;
@@ -180,5 +193,25 @@ export interface RuntimePorts {
      * pretending.
      */
     writeFile?(container: string, path: string, body: NodeJS.ReadableStream, size: number): Promise<void>;
+    /**
+     * Take the chunks nobody has ever been in out of a Minecraft world, with the
+     * container stopped.
+     *
+     * A port of its own rather than a use of `runIn` because of the one condition
+     * that makes it safe: the container has to be down. A running server holds
+     * its region files open and remembers where every chunk sits inside them, so
+     * rewriting one underneath it is not a race that occasionally loses a chunk -
+     * it is a world the server then writes back through a table that no longer
+     * describes it. Each implementation checks that itself, close to the engine
+     * that knows, rather than trusting its caller to have checked.
+     *
+     * `script` is the optimizer, which is put into the container first: the two
+     * machines reach their files by different routes and neither has anywhere to
+     * keep it between runs.
+     *
+     * Optional: an older host daemon has no route for it, and a caller that finds
+     * it missing leaves the world exactly as it is.
+     */
+    trimWorld?(container: string, script: string, options: WorldTrimOptions): Promise<ExecResult>;
     dispose(): Promise<void>;
 }

@@ -1403,6 +1403,71 @@ export async function backUpWorldAction(
     }
 }
 
+/**
+ * What optimizing this world would do, measured rather than estimated.
+ *
+ * The same run as the real one with nothing written, so the number on screen is
+ * the number that will happen. Needs the server stopped, like the real one: what
+ * a running server has on disk at any moment is not what it will have a second
+ * later.
+ */
+export async function previewWorldTrimAction(
+    installedAppId: string
+): Promise<{ summary?: string; removed?: number; freedBytes?: number; error?: string }> {
+    const { access } = await requireGameServer("games.manage", installedAppId);
+    const { previewWorldTrim } = await import("../../lib/minecraft/world-trim-service");
+    const { describeTrim } = await import("../../lib/minecraft/world-trim");
+    const outcome = await previewWorldTrim(access.ownerId, installedAppId);
+    if (!outcome.report) return { error: outcome.failure ?? "Could not measure the world" };
+    return {
+        summary: describeTrim(outcome.report),
+        removed: outcome.report.removed,
+        freedBytes: outcome.report.freedBytes
+    };
+}
+
+/** Do it, stopping the server for it and putting it back as it was. */
+export async function optimizeWorldAction(
+    installedAppId: string,
+    options: { backup?: boolean } = {}
+): Promise<{ summary?: string; error?: string }> {
+    const { user, access } = await requireGameServer("games.manage", installedAppId);
+    const { optimizeWorldNow } = await import("../../lib/minecraft/world-trim-service");
+    const { describeTrim } = await import("../../lib/minecraft/world-trim");
+    const outcome = await optimizeWorldNow(access.ownerId, installedAppId, options);
+    if (!outcome.report) return { error: outcome.failure ?? "Could not optimize the world" };
+    await recordAudit({
+        actorId: user.id,
+        action: "games.world-optimize",
+        targetType: "installedApp",
+        targetId: installedAppId,
+        metadata: { removed: outcome.report.removed, freedBytes: outcome.report.freedBytes }
+    });
+    return { summary: describeTrim(outcome.report) };
+}
+
+const worldTrimSchema = z.object({
+    installedAppId: z.string().uuid(),
+    enabled: z.boolean(),
+    /** Ticks of inhabited time a chunk needs to be kept. */
+    keepTicks: z.number().int().min(0).max(24_000 * 30),
+    keepRadius: z.number().int().min(0).max(64),
+    everyDays: z.number().int().min(1).max(365)
+});
+
+export type WorldTrimInput = z.infer<typeof worldTrimSchema>;
+
+/** Whether Polaris may do this on its own, and how. */
+export async function saveWorldTrimAction(input: WorldTrimInput): Promise<{ error?: string }> {
+    const parsed = worldTrimSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const { installedAppId, ...settings } = parsed.data;
+    await requireGameServer("games.manage", installedAppId);
+    const { WORLD_TRIM_KEY } = await import("../../lib/minecraft/world-trim");
+    await patchInstallConfig(installedAppId, { [WORLD_TRIM_KEY]: settings });
+    return {};
+}
+
 const backupPolicySchema = z.object({
     installedAppId: z.string().uuid(),
     every: z.enum(["off", "hourly", "six-hourly", "daily", "weekly"]),

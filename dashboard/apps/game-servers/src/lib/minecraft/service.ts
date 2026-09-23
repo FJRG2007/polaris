@@ -18,7 +18,7 @@ import * as parse from "./parse";
 import { prisma } from "@polaris/db";
 import { withTimeout } from "@polaris/core";
 import { gameServerAddress } from "./address";
-import type { ExecResult, RuntimePorts } from "@polaris/deploy";
+import type { ExecResult, RuntimePorts, WorldTrimOptions } from "@polaris/deploy";
 import { experienceCommand, type ExperienceChange } from "./experience";
 import { readCrashLoop, readRestartWatch } from "../games-health";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
@@ -319,6 +319,18 @@ export interface ServerContainer {
      * not.
      */
     readFile(path: string): Promise<ReadableStream<Uint8Array>>;
+    /**
+     * Run the world optimizer against this server's files, with the server down.
+     *
+     * Not a use of `run`: that is a command inside a container that is up, and the
+     * whole safety of this one is that the container is not. The machine checks
+     * that itself - the daemon on the local host, the engine over SSH - rather
+     * than taking this side's word for it.
+     *
+     * Null where the machine has no route for it, which is an older host daemon
+     * and nothing worse: the world is then left exactly as it is.
+     */
+    trimWorld: null | ((script: string, options: WorldTrimOptions) => Promise<ExecResult>);
 }
 
 export async function withServerContainer<T>(
@@ -340,7 +352,10 @@ export async function withServerContainer<T>(
                 return result.output;
             },
             say: (argv) => sendGameCommand(ports, install, argv),
-            readFile: (path) => ports.readFile(install.container, path)
+            readFile: (path) => ports.readFile(install.container, path),
+            trimWorld: ports.trimWorld
+                ? (script, options) => ports.trimWorld!(install.container, script, options)
+                : null
         };
         return work(server);
     });

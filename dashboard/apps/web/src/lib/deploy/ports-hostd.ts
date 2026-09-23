@@ -9,7 +9,11 @@ import { Readable } from "node:stream";
 import { HostdClient } from "@polaris/hostd-client";
 import { reclaimHostSpace } from "@/lib/deploy/host-space";
 import { forCompose, isReleaseImage } from "@polaris/deploy";
-import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
+import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts, WorldTrimOptions } from "@polaris/deploy";
+
+/** Where the optimizer is put inside the container. The daemon runs this one
+ *  path and no other, so the two have to agree on it. */
+const WORLD_TOOL_PATH = "/data/.polaris-world-trim.py";
 
 export class HostdPorts implements RuntimePorts {
     private readonly client: HostdClient;
@@ -230,6 +234,34 @@ export class HostdPorts implements RuntimePorts {
     ): Promise<void> {
         const response = await this.client.fsWriteStream(container, path, body, size);
         await drain(response);
+    }
+
+    /**
+     * The world optimizer, through the daemon.
+     *
+     * Two steps: the script is written into the volume - which the daemon allows
+     * on a stopped container, since editing a config while a server is off is the
+     * ordinary reason to be in those files - and then the daemon is asked to run
+     * it. The daemon runs one fixed path and refuses while the container is up,
+     * so neither of those is this side of the wire to get right.
+     */
+    public async trimWorld(
+        container: string,
+        script: string,
+        options: WorldTrimOptions
+    ): Promise<ExecResult> {
+        const bytes = Buffer.from(script, "utf8");
+        await drain(
+            await this.client.fsWriteStream(container, WORLD_TOOL_PATH, Readable.from(bytes), bytes.length)
+        );
+        const result = await this.client.worldTrim(container, options.world, {
+            keepTicks: options.keepTicks,
+            keepRadius: options.keepRadius,
+            dryRun: options.dryRun
+        });
+        if (!result.supported) throw new Error("This machine needs a newer Polaris to optimize a world");
+        if (result.running) throw new Error("The server has to be stopped before its world can be optimized");
+        return { code: result.code, output: result.output };
     }
 
     public async dispose(): Promise<void> {

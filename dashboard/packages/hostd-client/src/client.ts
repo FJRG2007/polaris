@@ -307,6 +307,51 @@ export class HostdClient {
     }
 
     /**
+     * Take the chunks nobody has ever been in out of a world.
+     *
+     * Runs the script the caller has already written into the container, against
+     * the volumes of a container that is stopped. The daemon refuses while it is
+     * running, which is the point: a live server holds its region files open and
+     * would write back through a table this had rewritten underneath it.
+     *
+     * `supported` is false on a daemon too old to know this route, which is an
+     * ordinary answer rather than a failure - the world is simply left as it is.
+     * `running` is the daemon saying the server is still up.
+     */
+    public async worldTrim(
+        container: string,
+        world: string,
+        options: { keepTicks?: number; keepRadius?: number; dryRun?: boolean } = {}
+    ): Promise<{ code: number; output: string; supported: boolean; running: boolean }> {
+        const response = await this.call(
+            "POST",
+            "/v1/deploy/world/trim",
+            JSON.stringify({
+                container,
+                world,
+                keep_ticks: Math.max(0, Math.trunc(options.keepTicks ?? 0)),
+                keep_radius: Math.max(0, Math.trunc(options.keepRadius ?? 8)),
+                dry_run: options.dryRun === true
+            })
+        );
+        if (response.status === 404 || response.status === 405) {
+            return { code: -1, output: "", supported: false, running: false };
+        }
+        if (response.status === 409) {
+            return { code: -1, output: "", supported: true, running: true };
+        }
+        if (response.status !== 200) throw new Error(daemonMessage("world", response));
+        const parsed = JSON.parse(response.body) as { code?: unknown; output?: unknown };
+        if (typeof parsed.code !== "number") throw new Error("the host daemon returned no exit status");
+        return {
+            code: parsed.code,
+            output: typeof parsed.output === "string" ? parsed.output : "",
+            supported: true,
+            running: false
+        };
+    }
+
+    /**
      * Write a file inside a container from a stream of known length.
      *
      * The same route as `fsWrite`, without the whole body held in memory first:

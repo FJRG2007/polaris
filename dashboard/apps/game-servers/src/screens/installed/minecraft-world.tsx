@@ -19,6 +19,8 @@ import { formatBytes } from "@polaris/core";
 import * as world from "../../lib/minecraft/world";
 import { useCallback, useEffect, useState } from "react";
 import type { WorldView } from "../../lib/minecraft/world-service";
+import { WorldOptimizeCard } from "./minecraft-optimize";
+import { WORLD_TRIM_DEFAULTS } from "../../lib/minecraft/world-trim";
 import {
     BACKUP_EVERY_OPTIONS,
     MAX_KEEP_LAST,
@@ -127,6 +129,15 @@ export function MinecraftWorld({ installedAppId, name }: { installedAppId: strin
                 onChanged={reload}
             />
             <BackupScheduleCard installedAppId={installedAppId} view={view} onChanged={reload} />
+            {/* Java only: a Bedrock world is a key-value store rather than the
+                region files this reads, so there is nothing here it could do. */}
+            {view?.edition !== "bedrock" && (
+                <WorldOptimizeCard
+                    installedAppId={installedAppId}
+                    settings={view?.trim ?? WORLD_TRIM_DEFAULTS}
+                    lastRun={view?.lastTrim ?? null}
+                />
+            )}
         </div>
     );
 }

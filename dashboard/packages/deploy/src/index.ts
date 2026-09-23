@@ -52,6 +52,7 @@ export {
 export { parseWatchPaths, shouldDeployForPaths } from "./watch-paths.js";
 export type {
     RuntimePorts,
+    WorldTrimOptions,
     OutputSink,
     BuildRequest,
     ExecResult,

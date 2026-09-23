@@ -19,6 +19,7 @@
  */
 
 import * as world from "./world";
+import { readWorldTrim, readWorldTrimRun, type WorldTrimRun, type WorldTrimSettings } from "./world-trim";
 import { prisma } from "@polaris/db";
 import * as policy from "./backup-policy";
 import { formatBytes, gameOfServer } from "@polaris/core";
@@ -97,6 +98,12 @@ export interface WorldView {
     readonly backupBytes: number;
     /** When the next scheduled copy is due, or null when none is scheduled. */
     readonly nextBackupAt: string | null;
+    /** Whether the world is optimized on its own, and what the last run did.
+     *  On this view rather than on a fetch of its own: the card sits on the same
+     *  screen, and a second round trip for two small values is a second thing to
+     *  wait for. */
+    readonly trim: WorldTrimSettings;
+    readonly lastTrim: WorldTrimRun | null;
     /** Why the lists are empty, when the container could not be read. */
     readonly message: string | null;
 }
@@ -162,12 +169,22 @@ export async function readWorldView(ownerId: string, installedAppId: string): Pr
     return withServerContainer(ownerId, installedAppId, async (server) => {
         const { level, seed } = await readWorldSettings(ownerId, server.applicationId, server.edition);
         const rules = await getBackupPolicy(installedAppId);
+        const stored = readInstallConfig(
+            (
+                await prisma.installedApp.findUnique({
+                    where: { id: installedAppId },
+                    select: { config: true }
+                })
+            )?.config
+        );
         const base = {
             edition: server.edition,
             level,
             seed,
             carriesPlayers: world.canCarryPlayers(server.edition),
-            policy: rules
+            policy: rules,
+            trim: readWorldTrim(stored),
+            lastTrim: readWorldTrimRun(stored)
         };
         try {
             // Asked before anything is read, because a command against a container

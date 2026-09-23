@@ -220,6 +220,31 @@ async function runInventories(): Promise<{ servers: number; snapshots: number; a
 }
 
 /** The jobs, with the keys their leases were always taken under. */
+/**
+ * Optimize the worlds of servers that are already stopped.
+ *
+ * Never stops one to do it - see `trimDue`. So this is a sweep that usually finds
+ * nothing, which is the intended shape: the moment worth using is a server that
+ * is off for its own reasons, and a background job does not get to create that
+ * moment by turning somebody off.
+ */
+async function runWorldTrims(): Promise<{ done: number; servers: number }> {
+    const { sweepWorldTrim } = await import("./minecraft/world-trim-service");
+    let done = 0;
+    let servers = 0;
+    for (const ownerId of await ownersWithApps()) {
+        const installs = await prisma.installedApp.findMany({
+            where: { ownerId, status: { not: "removed" }, catalogId: "minecraft", applicationId: { not: null } },
+            select: { id: true }
+        });
+        for (const install of installs) {
+            servers += 1;
+            if (await sweepWorldTrim(ownerId, install.id).catch(() => false)) done += 1;
+        }
+    }
+    return { done, servers };
+}
+
 export function gameJobTable(): readonly AppJob[] {
     return [
         {
@@ -279,6 +304,18 @@ export function gameJobTable(): readonly AppJob[] {
             // is here to prevent.
             leaseMs: 20 * MINUTE,
             run: runWorldBackups
+        },
+        {
+            key: "game-world-trim",
+            // Hourly, because what it is looking for is a server that happens to be
+            // stopped, and that is a state that lasts hours rather than seconds. A
+            // pass over a running fleet is one query and no work at all.
+            everyMs: Number(process.env.POLARIS_GAME_TRIM_SWEEP_MS) || 60 * MINUTE,
+            // Leased for the same reason the backup sweep is: this rewrites region
+            // files, and two runners rewriting the same world is the one thing the
+            // optimizer itself cannot defend against.
+            leaseMs: 30 * MINUTE,
+            run: runWorldTrims
         },
         {
             key: "game-reach",
