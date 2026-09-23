@@ -16,7 +16,7 @@ import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { setChatRulesAction } from "./actions";
-import { Button, Card, CardBody, Input, SegmentedControl, Switch, cn } from "@polaris/ui";
+import { Button, Card, CardBody, Input, SegmentedControl, SizeField, Switch, cn } from "@polaris/ui";
 
 type Rules = core.ChatRules;
 type Scope = core.ChatRuleScope;
@@ -121,16 +121,29 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                         onChange={(value) => set("maxAttachments", value)}
                     />
 
-                    <Limit
-                        label="Biggest single file"
-                        hint="A file this big is streamed straight to the storage Polaris writes uploads to, so what this really sets is how much of your disks one message may take. Somebody sharing a file they already have in Drive is not bound by it at all when this instance shares by link."
-                        suffix="MB"
-                        value={rules.maxAttachmentMib}
-                        min={1}
-                        max={core.CHAT_ATTACHMENT_CEILING_MIB}
-                        disabled={rules.maxAttachments === 0}
-                        onChange={(value) => set("maxAttachmentMib", value)}
-                    />
+                    <label
+                        className={cn(
+                            "flex flex-col gap-1.5",
+                            rules.maxAttachments === 0 && "opacity-50"
+                        )}
+                    >
+                        <span className="text-sm font-medium">Biggest single file</span>
+                        <SizeField
+                            value={rules.maxAttachmentMib}
+                            stored="MB"
+                            min={1}
+                            max={core.CHAT_ATTACHMENT_CEILING_MIB}
+                            disabled={rules.maxAttachments === 0}
+                            aria-label="Biggest single file"
+                            onChange={(value) => set("maxAttachmentMib", value)}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            A file this big is streamed straight to the storage Polaris writes uploads to, so
+                            what this really sets is how much of your disks one message may take. Somebody
+                            sharing a file they already have in Drive is not bound by it at all when this
+                            instance shares by link.
+                        </span>
+                    </label>
 
                     <Limit
                         label="How long a message stays editable"

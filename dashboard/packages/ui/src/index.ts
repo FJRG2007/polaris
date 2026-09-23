@@ -19,6 +19,7 @@ export { MenuSurfaceProvider, useMenuSurface, type MenuSurfaceState } from "./li
 export { useReopenElsewhere } from "./lib/menu-reopen";
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
 export { Input, type InputProps } from "./components/input";
+export { SizeField, type SizeFieldProps } from "./components/size-field";
 export { Textarea, type TextareaProps } from "./components/textarea";
 export { Badge, statusChipClass, type BadgeProps } from "./components/badge";
 export { CopyButton } from "./components/copy-button";

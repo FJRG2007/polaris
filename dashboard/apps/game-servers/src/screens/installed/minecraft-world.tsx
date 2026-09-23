@@ -62,6 +62,7 @@ import {
     DialogTitle,
     Input,
     Select,
+    SizeField,
     Skeleton,
     cn
 } from "@polaris/ui";
@@ -69,10 +70,6 @@ import { hostUi } from "@polaris/app-host/client";
 
 const { CopyButton } = hostUi.copyButton;
 const { useDisplayFormat } = hostUi.displayFormat;
-
-/** Gigabytes as the budget field means them, which is what a disk is sold in and
- *  what an operator types. */
-const GIB = 1024 ** 3;
 
 /** What every screen here needs: the view, and a way to ask for it again. */
 export function useWorldView(installedAppId: string): {
@@ -744,7 +741,8 @@ function BackupScheduleCard({
     const saved = view?.policy ?? null;
     const [every, setEvery] = useState<BackupEvery>("off");
     const [keepLast, setKeepLast] = useState(0);
-    const [budgetGb, setBudgetGb] = useState("");
+    /** Bytes, which is what the policy stores. Nought is no limit. */
+    const [budgetBytes, setBudgetBytes] = useState(0);
     const [notify, setNotify] = useState(true);
     const [onShutdown, setOnShutdown] = useState(true);
     const [pending, setPending] = useState(false);
@@ -756,16 +754,14 @@ function BackupScheduleCard({
         if (!saved) return;
         setEvery(saved.every);
         setKeepLast(saved.keepLast);
-        setBudgetGb(saved.maxBytes > 0 ? String(Math.round((saved.maxBytes / GIB) * 10) / 10) : "");
+        setBudgetBytes(saved.maxBytes);
         setNotify(saved.notifyOnFailure);
         setOnShutdown(saved.onShutdown);
     }, [saved]);
 
-    const maxBytes = Math.round((Number.parseFloat(budgetGb) || 0) * GIB);
-    const budgetError =
-        budgetGb.trim().length > 0 && !(Number.parseFloat(budgetGb) > 0)
-            ? "Give a size in gigabytes, or leave it blank"
-            : null;
+    // Nought means no limit rather than a limit of nothing, so there is no size
+    // somebody can put in this field that has to be refused.
+    const maxBytes = budgetBytes;
     // Dirty means the values differ from the ones loaded, not that a field was
     // touched: a number typed and put back leaves Save disabled.
     const dirty =
@@ -844,24 +840,19 @@ function BackupScheduleCard({
 
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="font-medium">Size budget</span>
-                            <Input
-                                value={budgetGb}
-                                onChange={(event) => setBudgetGb(event.target.value)}
-                                placeholder="No limit"
-                                inputMode="decimal"
+                            <SizeField
+                                value={budgetBytes}
+                                stored="B"
+                                min={0}
+                                aria-label="Size budget"
+                                onChange={setBudgetBytes}
                             />
-                            <span
-                                className={cn(
-                                    "text-xs",
-                                    budgetError ? "text-danger" : "text-muted-foreground"
-                                )}
-                            >
-                                {budgetError ??
-                                    `In gigabytes. The oldest go as the total approaches it${
-                                        view.backups.length > 0
-                                            ? ` - they take up ${formatBytes(view.backupBytes)} now`
-                                            : ""
-                                    }. The newest copy is never deleted.`}
+                            <span className="text-xs text-muted-foreground">
+                                {`Nought is no limit. The oldest go as the total approaches it${
+                                    view.backups.length > 0
+                                        ? ` - they take up ${formatBytes(view.backupBytes)} now`
+                                        : ""
+                                }. The newest copy is never deleted.`}
                             </span>
                         </label>
 
@@ -902,7 +893,7 @@ function BackupScheduleCard({
                             <Button
                                 size="sm"
                                 onClick={() => void save()}
-                                disabled={pending || !dirty || budgetError !== null}
+                                disabled={pending || !dirty}
                             >
                                 {pending && <Loader2 className="size-4 animate-spin" />}
                                 Save

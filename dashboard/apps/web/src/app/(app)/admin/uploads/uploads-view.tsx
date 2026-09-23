@@ -20,7 +20,7 @@ import type { ChatStorageSettings } from "@/lib/chat/attachments";
 import type { PersonalDriveSettings } from "@/lib/personal-drive";
 import type { OrganizationDriveSettings } from "@/lib/organization-drive";
 import type { UploadSettings } from "@/lib/tasks/attachment-service";
-import { Button, Card, CardBody, ConfirmDeleteDialog, Input, Switch, cn } from "@polaris/ui";
+import { Button, Card, CardBody, ConfirmDeleteDialog, SizeField, Switch, cn } from "@polaris/ui";
 import {
     checkStorageAction,
     setAvatarSettingsAction,
@@ -271,24 +271,18 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
 
                 <label className="flex flex-col gap-1.5">
                     <span className="text-sm font-medium">Biggest single file</span>
-                    <div className="flex items-center gap-2">
-                        <Input
-                            type="number"
-                            min={1}
-                            max={10240}
-                            value={megabytes}
-                            aria-label="Upload limit in megabytes"
-                            onChange={(event) => {
-                                setMegabytes(event.target.value);
-                                setSaved(false);
-                            }}
-                            className={cn("w-28", !limitValid && "border-danger-edge")}
-                        />
-                        <span className="text-sm text-muted-foreground">MB</span>
-                    </div>
-                    {!limitValid && (
-                        <span className="text-xs text-danger">Between 1 and 10240 MB.</span>
-                    )}
+                    <SizeField
+                        value={Number(megabytes) || 0}
+                        stored="MB"
+                        min={1}
+                        max={10240}
+                        aria-label="Biggest single file"
+                        onChange={(value) => {
+                            setMegabytes(String(value));
+                            setSaved(false);
+                        }}
+                    />
+                    {!limitValid && <span className="text-xs text-danger">Between 1 MB and 10 GB.</span>}
                 </label>
 
                 <CheckButton which="tasks" />

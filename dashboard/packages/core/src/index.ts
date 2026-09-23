@@ -22,6 +22,7 @@ export * from "./cidr.js";
 export * from "./geo.js";
 export * from "./games-catalog.js";
 export * from "./minecraft-software.js";
+export * from "./size-units.js";
 export * from "./probe-timeout.js";
 export * from "./hostnames.js";
 export * from "./local-network.js";
