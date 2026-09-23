@@ -178,12 +178,16 @@ export const FIVEM_COMMANDS: readonly CommandSpec[] = [
 export function commandsFor(game: ConsoleGame): readonly CommandSpec[] {
     if (game === "ark") return ARK_COMMANDS;
     if (game === "fivem") return FIVEM_COMMANDS;
+    // Hytale is in early access and its console vocabulary is not settled, so it
+    // is offered with nothing to complete from rather than with a list invented
+    // here: a suggestion for a command that does not exist is worse than none.
+    if (game === "hytale") return [];
     return game === "bedrock" ? BEDROCK_COMMANDS : JAVA_COMMANDS;
 }
 
 /** The consoles this knows the commands of. Not the same as a game: Minecraft has
  *  two and they take different commands. */
-export type ConsoleGame = "java" | "bedrock" | "ark" | "fivem";
+export type ConsoleGame = "java" | "bedrock" | "ark" | "fivem" | "hytale";
 
 /** What is known that could fill an argument. */
 export interface CompletionSources {

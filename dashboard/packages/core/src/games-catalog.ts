@@ -21,7 +21,7 @@
 export const GAME_SERVERS_APP_ID = "game-servers";
 
 /** The games a server can be created for. */
-export type GameId = "minecraft" | "ark" | "fivem";
+export type GameId = "minecraft" | "ark" | "fivem" | "hytale";
 
 export interface GameDefinition {
     readonly id: GameId;
@@ -36,6 +36,9 @@ export interface GameDefinition {
      * a logo is recognised.
      *
      * Each is the publisher's own artwork rather than something drawn here:
+     * Hytale's is the logo its own site serves at `/images/logo.webp`, kept whole
+     * because there is no separate emblem to crop it down to - the mark IS the
+     * word.
      * Minecraft's is the grass block out of the vendored texture set
      * (`resources/mcicons`), ARK's is the emblem from its Steam store logo with
      * the wordmark cropped off - the words under it are pale grey and vanish on a
@@ -79,6 +82,20 @@ export const GAMES: readonly GameDefinition[] = [
         legacyManagerCatalogId: "ark-manager",
         serverCatalogIds: ["ark"],
         domainLabel: "ark",
+        srv: false
+    },
+    {
+        // Early access, and the one game here whose server files Polaris cannot
+        // fetch: they are behind the operator's own Hytale account. The server is
+        // created, the volume is there, and the screen asks for the two files -
+        // which is a drag into Files rather than anything typed.
+        id: "hytale",
+        name: "Hytale",
+        summary: "A Hytale world of your own, run from the server files on your account.",
+        demands: "About 4 GB of memory, plus the server files you put in.",
+        logo: "/logos/hytale.webp",
+        serverCatalogIds: ["hytale"],
+        domainLabel: "hytale",
         srv: false
     },
     {

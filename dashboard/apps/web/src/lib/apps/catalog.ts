@@ -961,6 +961,43 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         }
     },
     {
+        // Early access, and the only server here Polaris cannot install for
+        // somebody: the files are behind their own Hytale account, so what this
+        // manifest provides is the runtime and the volume they land in. The
+        // container says which file it is waiting for and starts the moment both
+        // are there - see `services/hytale/entrypoint.sh`.
+        id: "hytale",
+        name: "Hytale",
+        internal: true,
+        ownedBy: "game-servers",
+        category: "Game servers",
+        icon: Gamepad2,
+        summary: "A Hytale world of your own, run from the server files on your account.",
+        description:
+            "Runs a Hytale server on the machine you choose, with its worlds on a server-local volume or a NAS. The server files are yours rather than ours: Hytale hands them out through your own account, so put HytaleServer.jar and Assets.zip into the server's Files and it starts by itself. Players reach it over UDP, which is the only transport Hytale speaks.",
+        docsUrl: "https://support.hytale.com/hc/en-us/articles/45326769420827-Hytale-Server-Manual",
+        installMethod: "compose-template",
+        capabilities: ["game-server"],
+        dashboard: "builtin",
+        template: {
+            image: "ghcr.io/fjrg2007/polaris-hytale:latest",
+            env: [
+                {
+                    // What the JVM may take. The server is the whole game rather
+                    // than a plugin host, so the floor is higher than Minecraft's.
+                    key: "HYTALE_MEMORY",
+                    label: "Memory",
+                    help: "How much memory the server may use, as 3G or 4096M.",
+                    default: "3G"
+                }
+            ],
+            volumes: [{ name: "data", mountPath: "/data", label: "Server files and worlds" }],
+            // QUIC, so UDP and nothing else. A deployment that published TCP here
+            // would be a server nobody can join, with nothing anywhere saying why.
+            ports: [{ container: 5520, protocol: "udp", host: 5520, label: "Game port" }]
+        }
+    },
+    {
         id: "fivem",
         name: "FiveM",
         internal: true,

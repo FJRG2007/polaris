@@ -443,6 +443,22 @@ async function readPresence(ownerId: string, server: GameServerFacts): Promise<S
     // Each game is asked in its own language - Minecraft over rcon-cli, ARK
     // through arkmanager, FiveM over the documents it publishes - and all of them
     // answer the same shape, because the row that renders it is one row.
+    // Hytale has no console or query Polaris can ask who is on, so the honest
+    // answer is the one the deployment already knows: whether the container is up.
+    // A zero here would read as "nobody is playing", which is a different claim
+    // and one nothing has checked.
+    if (server.game === "hytale") {
+        return {
+            id: server.id,
+            answering: server.running,
+            containerRunning: server.applicationId ? server.running : null,
+            online: 0,
+            max: server.slots ?? 0,
+            players: [],
+            message: null,
+            crashLoop: null
+        };
+    }
     if (server.game === "fivem") {
         const live = await getFivemPlayers(ownerId, server.id).catch((caught: unknown) => ({
             answering: false,
@@ -687,6 +703,11 @@ export async function syncFirewallBans(
         // installs into the server. This walk is what hands them over - and, on a
         // server that has just been created, what gives it everything it was
         // created with in the first place.
+        // Hytale has no ban list, no whitelist and no console of its own that
+        // Polaris can reach, so there is nothing here to hand it. Skipped rather
+        // than left to fall into the Minecraft walk below, which would ask an
+        // RCON that is not there.
+        if (gameOfServer(install.catalogId)?.id === "hytale") continue;
         if (gameOfServer(install.catalogId)?.id === "fivem") {
             servers += 1;
             await applyPendingSetup(ownerId, install.id).catch(() => false);

@@ -130,6 +130,8 @@ export async function runDueRestart(
 async function saveWorld(ownerId: string, installedAppId: string, catalogId: string): Promise<void> {
     // A FiveM server has no world of its own to write out. See `games-flush`.
     if (gameOfServer(catalogId)?.id === "fivem") return;
+    // And a Hytale one, which has no console Polaris can ask - see `games-flush`.
+    if (gameOfServer(catalogId)?.id === "hytale") return;
     if (gameOfServer(catalogId)?.id === "ark") {
         const { saveArkWorld } = await import("./ark/service");
         await saveArkWorld(ownerId, installedAppId).catch(() => undefined);

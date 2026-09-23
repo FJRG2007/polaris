@@ -109,6 +109,10 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 
     const [licenseKey, setLicenseKey] = useState("");
     const [onesync, setOnesync] = useState<"on" | "legacy" | "off">("on");
+    // The one thing a Hytale server is asked, because nothing else about it is
+    // for Polaris to decide: the files belong to whoever owns the game and the
+    // rest is defaults.
+    const [hytaleMemory, setHytaleMemory] = useState("3G");
     /** Who the creator is as the game will know them - `license:...`, `discord:...`.
      *  Optional, because it is not something anybody can copy before they have
      *  connected once. See the schema for what an empty one means. */
@@ -283,7 +287,13 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
             subdomain: subdomain.trim() || undefined
         };
         const parsed = createGameServerSchema.safeParse(
-            game === "fivem"
+            game === "hytale"
+                ? {
+                      game: "hytale" as const,
+                      ...common,
+                      memory: hytaleMemory.trim() || undefined
+                  }
+                : game === "fivem"
                 ? {
                       game: "fivem" as const,
                       ...common,
@@ -461,6 +471,32 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 value={shape}
                                 onChange={setShape}
                             />
+                        </>
+                    ) : game === "hytale" ? (
+                        <>
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="font-medium">Memory</span>
+                                <Input
+                                    value={hytaleMemory}
+                                    onChange={(event) => setHytaleMemory(event.target.value)}
+                                    placeholder="3G"
+                                    className="font-mono"
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                    How much the server may take, as 3G or 4096M.
+                                </span>
+                            </label>
+                            {/* Said before the server exists rather than after it
+                                will not start: Hytale hands its server files to
+                                the account that owns the game, so this is the one
+                                step Polaris cannot do for anybody. */}
+                            <p className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted-foreground">
+                                Hytale gives out its server files through your own account. Once
+                                this server exists, put HytaleServer.jar and Assets.zip into its
+                                Files and it starts by itself.
+                            </p>
                         </>
                     ) : game === "fivem" ? (
                         <>

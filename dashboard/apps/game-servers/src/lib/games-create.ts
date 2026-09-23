@@ -23,6 +23,8 @@ import * as fivemAccess from "./fivem/access";
 import { joinAccess } from "./minecraft/access";
 import { allocateArkPorts } from "./ark/create";
 import { allocateFivemPort } from "./fivem/create";
+import { allocateHytalePort } from "./hytale/create";
+import { HYTALE_CATALOG_ID, HYTALE_PORT } from "./hytale/service";
 import { setGameHostname } from "./minecraft/address";
 import { prisma } from "@polaris/db";
 import * as memoryPlan from "./minecraft/memory-plan";
@@ -65,6 +67,7 @@ import type {
     CreateArkServerInput,
     CreateFivemServerInput,
     CreateGameServerInput,
+    CreateHytaleServerInput,
     CreateMinecraftServerInput
 } from "./games-schema";
 import {
@@ -436,6 +439,7 @@ export async function createGameServer(
 ): Promise<CreatedGameServer> {
     if (input.game === "ark") return createArkServer(ownerId, actorId, input);
     if (input.game === "fivem") return createFivemServer(ownerId, actorId, input);
+    if (input.game === "hytale") return createHytaleServer(ownerId, actorId, input);
     return createMinecraftServer(ownerId, actorId, input);
 }
 
@@ -752,6 +756,60 @@ async function createFivemServer(
 
     const hostname = await attachHostname(ownerId, install.installedAppId, input, { srv: false });
     return { installedAppId: install.installedAppId, hostname };
+}
+
+/**
+ * A Hytale server: a machine, a volume and an address, and then it waits.
+ *
+ * Nothing is installed into it here, and that is the game rather than an omission
+ * - the server files are handed out by Hytale to the account that owns the game,
+ * so the last step belongs to whoever created this. The container says which file
+ * it is waiting for and starts by itself when both arrive, and the panel says the
+ * same thing with the folder one press away.
+ */
+async function createHytaleServer(
+    ownerId: string,
+    actorId: string,
+    input: CreateHytaleServerInput
+): Promise<CreatedGameServer> {
+    const manifest = findApp(HYTALE_CATALOG_ID);
+    if (!manifest) throw new Error("Hytale is not available");
+
+    const port = await allocateHytalePort();
+    const base = defaultInstallInput(manifest, input.serverId);
+    const env = new Map(base.env.map((entry) => [entry.key, entry.value]));
+    env.set("HYTALE_MEMORY", input.memory);
+
+    const install = await installApp(
+        ownerId,
+        actorId,
+        {
+            ...base,
+            name: input.name,
+            env: [...env.entries()].map(([key, value]) => ({ key, value }))
+        },
+        // UDP alone. A Hytale client speaks QUIC and nothing else, and a TCP
+        // publication here would be a port nobody ever connects to.
+        { primary: { host: port, container: HYTALE_PORT, protocol: "udp" } }
+    );
+
+    await patchInstallConfig(install.installedAppId, {
+        // What the machine picker bills this server at, since there is no heap
+        // setting for it to read: without this a machine running four of them
+        // looks empty to the form deciding where the fifth goes.
+        memoryMb: memoryMbOf(input.memory),
+        slots: input.maxPlayers
+    });
+
+    const hostname = await attachHostname(ownerId, install.installedAppId, input, { srv: false });
+    return { installedAppId: install.installedAppId, hostname };
+}
+
+/** `3G` and `4096M` as the number the machine picker adds up. */
+function memoryMbOf(memory: string): number {
+    const amount = Number.parseInt(memory, 10);
+    if (!Number.isFinite(amount)) return 3072;
+    return memory.trim().toUpperCase().endsWith("G") ? amount * 1024 : amount;
 }
 
 /**

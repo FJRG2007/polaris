@@ -121,6 +121,24 @@ const fivemServerSchema = z.object({
     onesync: z.enum(["on", "legacy", "off"]).default("on")
 });
 
+const hytaleServerSchema = z.object({
+    game: z.literal("hytale"),
+    ...commonFields,
+    /**
+     * How much memory the server may take.
+     *
+     * Asked rather than derived, unlike Minecraft's heap: Hytale is in early
+     * access and there is no measured curve from players to memory to derive one
+     * from. A default that somebody can change beats a number this repo would be
+     * pretending to know.
+     */
+    memory: z
+        .string()
+        .trim()
+        .regex(/^[1-9][0-9]{0,4}[MG]$/, "Memory is a number and a unit, like 3G or 4096M")
+        .default("3G")
+});
+
 export const createGameServerSchema = z
     .discriminatedUnion("game", [minecraftServerSchema, arkServerSchema, fivemServerSchema])
     .superRefine((value, ctx) => {
@@ -151,6 +169,9 @@ export const createGameServerSchema = z
             }
             return;
         }
+        // Hytale has nothing to refine here: what it needs beyond the common
+        // fields is one string, and the field itself says what a valid one is.
+        if (value.game === "hytale") return;
         if (value.game === "ark") {
             if (!isSteamId(value.ownerSteamId)) {
                 ctx.addIssue({
@@ -255,3 +276,4 @@ export type CreateGameServerInput = z.infer<typeof createGameServerSchema>;
 export type CreateMinecraftServerInput = z.infer<typeof minecraftServerSchema>;
 export type CreateArkServerInput = z.infer<typeof arkServerSchema>;
 export type CreateFivemServerInput = z.infer<typeof fivemServerSchema>;
+export type CreateHytaleServerInput = z.infer<typeof hytaleServerSchema>;

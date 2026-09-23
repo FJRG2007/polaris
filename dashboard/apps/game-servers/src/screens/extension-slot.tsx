@@ -11,6 +11,7 @@ import Link from "next/link";
 import { Button, Card, CardBody } from "@polaris/ui";
 import { ArkPanel } from "./installed/ark-panel";
 import { FivemPanel } from "./installed/fivem-panel";
+import { HytalePanel } from "./installed/hytale-panel";
 import type { GameContext } from "./installed/game-context";
 import { MinecraftPanel } from "./installed/minecraft-panel";
 import { GamesFirewallSection, type GamesFirewallSectionProps } from "./firewall-section";
@@ -63,6 +64,14 @@ function GameServersHome() {
 function ServerPanel({ host, context }: { host: InstalledSlotHost; context: GameContext | null }) {
     const { app, settings, running, held, onStatus } = host;
     switch (app.catalogId) {
+        case "hytale":
+            return (
+                <HytalePanel
+                    installedAppId={app.id}
+                    applicationId={app.applicationId}
+                    running={running}
+                />
+            );
         case "fivem":
             return (
                 <FivemPanel

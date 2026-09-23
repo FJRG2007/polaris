@@ -85,6 +85,11 @@ export async function flushGameWorld(ownerId: string, installedAppId: string): P
     // been told where that is - so there is genuinely nothing to flush, and
     // pretending otherwise would be a save that never happened.
     if (game.id === "fivem") return;
+    // Nor a Hytale one, for a different reason: it has a world and no console
+    // Polaris can ask to write it out. The server writes on its own schedule and
+    // on the way down, and inventing a command for it would be a save that never
+    // happened.
+    if (game.id === "hytale") return;
     if (game.id === "ark") {
         await saveArkWorld(ownerId, installedAppId).catch(() => undefined);
         return;
