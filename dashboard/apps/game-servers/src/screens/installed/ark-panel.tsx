@@ -453,6 +453,7 @@ export function ArkPanel({
                         installedAppId={installedAppId}
                         schedule={game?.schedule ?? NO_SCHEDULE}
                         state={game?.scheduleState ?? null}
+                        canRoute={game?.canRoute ?? false}
                     />
                     <MinecraftDomain
                         installedAppId={installedAppId}

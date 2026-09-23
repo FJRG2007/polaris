@@ -113,6 +113,18 @@ export const SCHEDULE_KEY = "schedule";
 export const EMPTY_SINCE_KEY = "emptySince";
 export const CHECKED_AT_KEY = "scheduleCheckedAt";
 
+/** Whether a player trying to join may start this server, and when one last did.
+ *  Acting on it is `wake-service.ts`; the keys live here because the screen that
+ *  offers the setting runs in the browser and this is the module it can read. */
+export const WAKE_KEY = "wakeOnJoin";
+export const WOKEN_AT_KEY = "wokenAt";
+
+/** On unless it was turned off. A server that sleeps and cannot be woken is the
+ *  state people ask about, so it is not the one saying nothing falls into. */
+export function wakesOnJoin(config: Record<string, unknown>): boolean {
+    return config[WAKE_KEY] !== false;
+}
+
 /**
  * What the last sweep saw, so a screen can say whether the schedule is being
  * followed at all.
@@ -127,11 +139,18 @@ export interface ScheduleState {
     readonly checkedAt: string | null;
     /** Since when it has had nobody on it, as the sweep last recorded. */
     readonly emptySince: string | null;
+    /** When a player last started it by trying to join, so a start nobody made
+     *  has an explanation on the screen rather than none. */
+    readonly wokenAt: string | null;
 }
 
 export function readScheduleState(config: Record<string, unknown>): ScheduleState {
     const read = (key: string): string | null => (typeof config[key] === "string" ? (config[key] as string) : null);
-    return { checkedAt: read(CHECKED_AT_KEY), emptySince: read(EMPTY_SINCE_KEY) };
+    return {
+        checkedAt: read(CHECKED_AT_KEY),
+        emptySince: read(EMPTY_SINCE_KEY),
+        wokenAt: read(WOKEN_AT_KEY)
+    };
 }
 
 /** How long a server may sit empty before a sleeping window stops it, at the

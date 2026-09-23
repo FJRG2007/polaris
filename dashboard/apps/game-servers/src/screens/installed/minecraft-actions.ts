@@ -63,6 +63,7 @@ import {
 import {
     MAX_IDLE_MINUTES,
     MIN_IDLE_MINUTES,
+    WAKE_KEY,
     type GameSchedule
 } from "../../lib/minecraft/schedule";
 import {
@@ -826,6 +827,34 @@ export async function saveGameScheduleAction(
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the schedule" };
+    }
+}
+
+/**
+ * Whether a player trying to join may start this server again.
+ *
+ * Only reaches a routed server: a stopped one has no port open, so the only thing
+ * that can see the attempt is the router that already reads the name a player
+ * dialled. Turning it off is for a server somebody wants to decide about
+ * themselves - a machine that should not come up at four in the morning because
+ * one person tried.
+ */
+export async function setWakeOnJoinAction(
+    installedAppId: string,
+    wake: boolean
+): Promise<{ error?: string }> {
+    if (!z.string().uuid().safeParse(installedAppId).success) {
+        return { error: "That server does not exist" };
+    }
+    try {
+        await requireGameServer("games.manage", installedAppId);
+        await patchInstallConfig(installedAppId, { [WAKE_KEY]: wake });
+        revalidatePath(`/apps/installed/${installedAppId}`);
+        return {};
+    } catch (caught) {
+        return {
+            error: caught instanceof Error ? caught.message : "Could not change that"
+        };
     }
 }
 

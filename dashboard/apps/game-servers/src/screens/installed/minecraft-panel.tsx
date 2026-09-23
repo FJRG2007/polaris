@@ -618,6 +618,9 @@ export function MinecraftPanel({
                         runs={game?.routineRuns ?? null}
                         installedAppId={installedAppId}
                         state={game?.scheduleState ?? null}
+                        routed={game?.routed ?? false}
+                        canRoute={game?.canRoute ?? false}
+                        wakeOnJoin={game?.wakeOnJoin ?? true}
                         schedule={game?.schedule ?? NO_SCHEDULE}
                     />
                     <MinecraftDomain

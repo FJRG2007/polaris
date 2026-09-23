@@ -637,6 +637,29 @@ services:
       # New connections per second. The upstream default is 1, which a server with
       # a queue of players rejoining after a restart would trip over immediately.
       CONNECTION_RATE_LIMIT: ${POLARIS_MC_ROUTER_RATE_LIMIT:-20}
+      # Somebody joining a server that is asleep starts it again.
+      #
+      # The router is the only thing that sees the attempt: a stopped server has no
+      # port open, and the name the player dialled is in the handshake the router
+      # already reads. It reports the knock to the dashboard and then holds the
+      # player's connection, retrying the backend until it answers - so it needs no
+      # Docker socket and no authority of its own, and the dashboard decides whether
+      # that server is one a player may start (`lib/minecraft/wake-service.ts`).
+      #
+      # Only ever up. Stopping is a statement about who is playing, which the
+      # schedule sweep knows and the router does not.
+      AUTO_SCALE_UP: "true"
+      AUTO_SCALE_WEBHOOK_URL: http://web:3000/api/minecraft/wake
+      # A cold Minecraft server takes a while to answer: chunk loading, plugins, and
+      # on the first boot the download. The player's own client gives up long before
+      # this - joining again is what gets them in - but the router must not stop
+      # waiting while the server it started is still coming up.
+      AUTO_SCALE_WEBHOOK_WAKE_TIMEOUT: ${POLARIS_MC_WAKE_TIMEOUT:-5m}
+      # What the server list says meanwhile. Without these the router answers a ping
+      # for a sleeping server with nothing, which a player reads as the server being
+      # gone rather than as something they can wake by joining.
+      AUTO_SCALE_ASLEEP_MOTD: ${POLARIS_MC_ASLEEP_MOTD:-Asleep - join to start it}
+      AUTO_SCALE_LOADING_MOTD: ${POLARIS_MC_LOADING_MOTD:-Starting up - join again in a moment}
     ports:
       - "${POLARIS_MC_ROUTER_PORT:-25565}:25565"
     volumes:

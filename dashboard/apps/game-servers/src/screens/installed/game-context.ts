@@ -31,6 +31,7 @@ import {
     readRoutineRuns,
     readSchedule,
     readScheduleState,
+    wakesOnJoin,
     type GameSchedule,
     type RoutineRun,
     type ScheduleState
@@ -71,6 +72,8 @@ export interface GameContext {
     readonly schedule: GameSchedule;
     /** What the last sweep of that schedule saw. */
     readonly scheduleState: ScheduleState;
+    /** Whether a player trying to join is allowed to start this server again. */
+    readonly wakeOnJoin: boolean;
     /** What each routine did last time it ran. */
     readonly routineRuns: Record<string, RoutineRun>;
     /**
@@ -186,6 +189,7 @@ export async function gameContextFor(app: {
                 : null,
         schedule: readSchedule(config),
         scheduleState: readScheduleState(config),
+        wakeOnJoin: wakesOnJoin(config),
         routineRuns: readRoutineRuns(config),
         arkAccess,
         playerAccess,

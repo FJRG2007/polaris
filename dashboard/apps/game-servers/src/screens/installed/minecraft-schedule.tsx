@@ -9,14 +9,17 @@
  * things - be on, be off, or sleep when empty - and everything no window covers
  * falls to a default, so that sentence is one rule and not six.
  *
- * Sleeping is deliberately one-way. A window that says sleep lets a server stop
- * once nobody has played for a while; it never starts one, because a server that
- * woke at three in the morning would only find itself empty and stop again.
- * Coming back is a window that says on, or somebody pressing start.
+ * A sleeping window never starts anything by itself: a server that woke at three
+ * in the morning on a timer would only find itself empty and stop again. What does
+ * start one is a player trying to join it, which the router sees because a Java
+ * client names the address it dialled before it logs in - so a server that shares
+ * the port can be left asleep and still be there when somebody turns up. On a
+ * server that keeps its own port there is nothing listening while it is down, and
+ * coming back is a window that says on, or somebody pressing start.
  */
 
 import { useMemo, useState, useTransition } from "react";
-import { saveGameScheduleAction } from "./minecraft-actions";
+import { saveGameScheduleAction, setWakeOnJoinAction } from "./minecraft-actions";
 import { Button, Card, CardBody, Input, Select, Switch } from "@polaris/ui";
 import { CalendarClock, Loader2, Moon, Plus, Power, Trash2 } from "lucide-react";
 import {
@@ -39,7 +42,7 @@ const MODES: { value: GameScheduleMode; label: string; hint: string }[] = [
     {
         value: "sleep",
         label: "Sleep when empty",
-        hint: "Stopped once nobody has played for a while. It gives its memory back and somebody has to start it again."
+        hint: "Stopped once nobody has played for a while. It gives its memory back, and somebody trying to join starts it again where that is possible."
     },
     { value: "off", label: "Keep stopped", hint: "Stopped even if somebody is on." }
 ];
@@ -53,10 +56,22 @@ export function MinecraftSchedule({
     installedAppId,
     schedule: saved,
     state = null,
-    runs = null
+    runs = null,
+    routed = false,
+    canRoute = false,
+    wakeOnJoin = true
 }: {
     installedAppId: string;
     schedule: GameSchedule;
+    /** Whether this server shares the router's port. Only then is there anything
+     *  listening while it is down for a player's attempt to reach. */
+    routed?: boolean;
+    /** Whether it could. ARK, FiveM and Bedrock speak UDP and name no address a
+     *  router could read, so for them being started by a join is not a setting
+     *  that is off - it is a thing that cannot happen. */
+    canRoute?: boolean;
+    /** Whether that attempt is allowed to start it. */
+    wakeOnJoin?: boolean;
     /** What each routine did last time, so one that has been failing every night
      *  says so rather than looking identical to one that has never run. */
     runs?: Record<string, RoutineRun> | null;
@@ -65,6 +80,7 @@ export function MinecraftSchedule({
     state?: ScheduleState | null;
 }) {
     const [schedule, setSchedule] = useState<GameSchedule>(saved);
+    const [wakes, setWakes] = useState(wakeOnJoin);
     const [error, setError] = useState<string | null>(null);
     const [saved_, setSavedNote] = useState(false);
     const [pending, startTransition] = useTransition();
@@ -87,6 +103,21 @@ export function MinecraftSchedule({
     function updateWindow(index: number, patch: Partial<GameScheduleWindow>): void {
         update({
             windows: schedule.windows.map((window, at) => (at === index ? { ...window, ...patch } : window))
+        });
+    }
+
+    // Saved on the spot rather than with the schedule. It is one switch, and
+    // holding it behind the same button as a form somebody is halfway through
+    // editing is how a setting gets turned on and then lost.
+    function setWake(next: boolean): void {
+        setError(null);
+        setWakes(next);
+        startTransition(async () => {
+            const result = await setWakeOnJoinAction(installedAppId, next);
+            if (result.error) {
+                setWakes(!next);
+                setError(result.error);
+            }
         });
     }
 
@@ -180,6 +211,37 @@ export function MinecraftSchedule({
                                 )}
                             </Field>
                         </div>
+
+                        {/* The other half of sleeping, and the half people ask
+                            about: who starts it again. Only a routed server has
+                            anything holding its port while it is down, so on one that
+                            keeps its own port this says what would make it possible
+                            instead of offering a switch that does nothing. */}
+                        {sleeps &&
+                            (routed ? (
+                                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+                                    <div>
+                                        <p className="text-sm font-medium">Start it when somebody joins</p>
+                                        <p className="max-w-xl text-xs text-muted-foreground">
+                                            While it is asleep the server list says so, and a player joining starts
+                                            it. That attempt of theirs ends straight away - the server is only
+                                            beginning to load - and joining again a minute later gets them in.
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={wakes}
+                                        onChange={setWake}
+                                        disabled={pending}
+                                        aria-label="Start this server when somebody tries to join it"
+                                    />
+                                </div>
+                            ) : (
+                                <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                                    {canRoute
+                                        ? "While this server is asleep its port is closed, so nobody can start it by joining. Turn on sharing the port under Address and a player arriving by name starts it again."
+                                        : "While this server is asleep its port is closed and nothing can see somebody trying to reach it, so it is started from here or by a window that says Keep running."}
+                                </p>
+                            ))}
 
                         <div className="flex flex-col gap-2">
                             {schedule.windows.length === 0 ? (
@@ -416,14 +478,19 @@ function timezoneOptions(current: string): { value: string; label: string }[] {
  * from yesterday answers no in a way a clock time does not.
  */
 function describeLastCheck(state: ScheduleState): string {
+    const woken = state.wokenAt ? Date.parse(state.wokenAt) : Number.NaN;
+    const started = Number.isNaN(woken)
+        ? ""
+        : ` Somebody joining started it ${new Date(woken).toLocaleString()}.`;
     const checked = state.checkedAt ? Date.parse(state.checkedAt) : Number.NaN;
-    if (Number.isNaN(checked)) return "Not checked yet. The first pass runs within a minute of saving.";
+    if (Number.isNaN(checked))
+        return `Not checked yet. The first pass runs within a minute of saving.${started}`;
     const ago = Math.max(0, Math.round((Date.now() - checked) / 60_000));
     const when = ago < 1 ? "just now" : ago < 60 ? `${ago} minutes ago` : new Date(checked).toLocaleString();
     const empty = state.emptySince ? Math.max(0, Math.round((Date.now() - Date.parse(state.emptySince)) / 60_000)) : null;
     return empty === null
-        ? `Last checked ${when}.`
-        : `Last checked ${when}. Nobody has been on it for ${empty} ${empty === 1 ? "minute" : "minutes"}.`;
+        ? `Last checked ${when}.${started}`
+        : `Last checked ${when}. Nobody has been on it for ${empty} ${empty === 1 ? "minute" : "minutes"}.${started}`;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
