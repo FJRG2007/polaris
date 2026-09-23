@@ -121,6 +121,9 @@ const expectedMemorySchema = z.object({
     edition: z.enum(["java", "bedrock"]),
     blueprintId: z.string().trim().min(1).max(64),
     software: z.string().trim().min(1).max(32).optional(),
+    // The modpack or the jar, which changes the figure: a modpack server is
+    // priced as a mod loader whatever the blueprint is.
+    softwareSource: z.string().trim().min(1).max(500).optional(),
     mapId: z.string().trim().min(1).max(64).optional(),
     crossplay: z.boolean(),
     concurrentPlayers: z.number().int().min(1).max(1000),

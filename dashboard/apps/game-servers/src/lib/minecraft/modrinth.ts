@@ -18,6 +18,7 @@
  */
 
 import { z } from "zod";
+import { modrinthLoaderOf } from "@polaris/core";
 
 /** Modrinth asks API clients to identify themselves. */
 const USER_AGENT = "polaris-dashboard (https://github.com/FJRG2007/polaris)";
@@ -27,16 +28,6 @@ const USER_AGENT = "polaris-dashboard (https://github.com/FJRG2007/polaris)";
 export const modrinthApi = "https://api.modrinth.com/v2";
 
 const TIMEOUT_MS = 8000;
-
-/** Server software, as the loader category Modrinth files projects under. */
-const LOADER_BY_TYPE: Record<string, string> = {
-    PAPER: "paper",
-    PURPUR: "paper",
-    SPIGOT: "spigot",
-    FABRIC: "fabric",
-    FORGE: "forge",
-    NEOFORGE: "neoforge"
-};
 
 /** Modrinth indexes a server-side addon as a plugin or as a mod depending on the
  *  loader it targets, and searching for the wrong one of the two answers with
@@ -54,9 +45,18 @@ export function isPluginLoader(loader: string): boolean {
     return PLUGIN_LOADERS.has(loader);
 }
 
-/** Whether this server software can load anything from Modrinth at all. */
+/**
+ * Whether this server software can load anything from Modrinth at all, and under
+ * which loader it is filed there.
+ *
+ * The answer lives in the software catalogue in core rather than here, because
+ * the same list is what the create dialog offers and what the app manifest
+ * offers. A second copy of it in this file is how a server ends up creatable as
+ * something whose mod browser then answers with an empty shelf - which reads as
+ * an outage rather than as "nothing on Modrinth loads into this".
+ */
 export function loaderForType(type: string): string | null {
-    return LOADER_BY_TYPE[type.toUpperCase()] ?? null;
+    return modrinthLoaderOf(type);
 }
 
 /**

@@ -9,7 +9,7 @@
  * server that is still booting is a row that says so, not a page that errors.
  */
 
-import { type GameId, gameOfServer } from "@polaris/core";
+import { type GameId, gameOfServer, softwareLabel } from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { freemem, totalmem } from "node:os";
 import { RELEASE_KEY } from "./games-create";
@@ -72,12 +72,6 @@ const SOFTWARE_VAR = SOFTWARE_KEY;
 /** The plugin list, which is where a Java server's crossplay lives: Bedrock
  *  clients get in because Geyser is installed, not because a setting says so. */
 const CROSSPLAY_VAR = PROJECTS_KEY;
-
-/** `PAPER` as somebody writes it. The setting is an option list of shouted words,
- *  and a table is not the place to shout. */
-function titleCase(value: string): string {
-    return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-}
 
 /** Whether a catalog id names a game server rather than any other installed app.
  *  The manifest's capability is the authority - a game server is not a list of
@@ -330,9 +324,10 @@ export async function listGameServerFacts(
                   ? config.slots
                   : null,
             release: releaseOf(config, env.get(RELEASE_VAR)),
-            software: (env.get(SOFTWARE_VAR) ?? "").trim()
-                ? titleCase((env.get(SOFTWARE_VAR) as string).trim())
-                : null,
+            // `PAPER` as somebody writes it, from the same catalogue the picker
+            // offers - so NeoForge is not filed under "Neoforge" and a server
+            // running something this build has never heard of is still nameable.
+            software: (env.get(SOFTWARE_VAR) ?? "").trim() ? softwareLabel(env.get(SOFTWARE_VAR)) : null,
             edition: game?.id === "minecraft" ? editionOf(install.catalogId) : null,
             crossplay: hasCrossplay(env.get(CROSSPLAY_VAR)),
             lastOnlineAt: uptime.lastOnlineAt,

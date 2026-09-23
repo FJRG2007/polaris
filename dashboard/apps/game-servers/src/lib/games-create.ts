@@ -18,23 +18,23 @@
  * which is strictly better than no server.
  */
 
-import { findGame, type GameDefinition } from "@polaris/core";
+import { prisma } from "@polaris/db";
 import * as fivemAccess from "./fivem/access";
 import { joinAccess } from "./minecraft/access";
 import { allocateArkPorts } from "./ark/create";
 import { allocateFivemPort } from "./fivem/create";
 import { allocateHytalePort } from "./hytale/create";
-import { HYTALE_CATALOG_ID, HYTALE_PORT } from "./hytale/service";
 import { setGameHostname } from "./minecraft/address";
-import { prisma } from "@polaris/db";
 import * as memoryPlan from "./minecraft/memory-plan";
 import { normalizeIdentifier } from "./fivem/players";
+import { randomBytes, randomUUID } from "node:crypto";
 import { ALLOW_LIST_KEY, withPlayer } from "./ark/access";
+import * as polarisLogin from "./minecraft/polaris-login";
+import { findGame, findSoftware, softwareSourceEnv, type GameDefinition } from "@polaris/core";
 import { grantPlayerAccess } from "./minecraft/player-access";
 import { arkServerEnv, expectedArkMemoryMb } from "./ark/config";
+import { HYTALE_CATALOG_ID, HYTALE_PORT } from "./hytale/service";
 import { mintConsolePassword, PENDING_SETUP_KEY } from "./fivem/service";
-import * as polarisLogin from "./minecraft/polaris-login";
-import { randomBytes, randomUUID } from "node:crypto";
 import {
     defaultModFor,
     enableLogin,
@@ -152,6 +152,9 @@ export interface MinecraftShape {
     readonly mapId?: string;
     /** Java only: PAPER, FABRIC, ... The blueprint may pin it. */
     readonly software?: string;
+    /** The one value that software asks for: the modpack, or the URL of the jar.
+     *  Nothing for the software that asks for nothing. */
+    readonly softwareSource?: string;
     /** A release, or LATEST for the newest the blueprint can run on. */
     readonly version?: string;
     /** Blank generates a random world. */
@@ -306,19 +309,43 @@ function resourcePackEnv(
     return isMapResourcePack(current) ? { RESOURCE_PACK: "", RESOURCE_PACK_SHA1: "" } : {};
 }
 
+/**
+ * Everything one piece of software can ask the image for, blank.
+ *
+ * Written before the chosen software writes its own, so changing what a server
+ * runs takes the previous one with it. Without this a server moved from a modpack
+ * to Paper keeps `MODRINTH_MODPACK` and installs the pack over the top of it on
+ * the next start, which reads as Paper not working.
+ */
+const SOFTWARE_EXTRA_KEYS: Readonly<Record<string, string>> = {
+    BUILD_FROM_SOURCE: "",
+    MODRINTH_MODPACK: "",
+    CUSTOM_SERVER: ""
+};
+
 /** The software a Java server runs and the projects its list carries, written
  *  onto `env`. Shared by building a server and quoting its heap, so the two agree
  *  on what the list ends up holding. */
 function javaSoftwareEnv(
     env: Map<string, string>,
     blueprint: GameBlueprint,
-    shape: Pick<MinecraftShape, "software" | "crossplay">,
+    shape: Pick<MinecraftShape, "software" | "softwareSource" | "crossplay">,
     map: WorldMap | undefined
 ): void {
     // What the operator chose, then what the blueprint insists on: a blueprint
     // that needs Paper is not a suggestion, it is what its plugins load into.
     const software = blueprint.software ?? shape.software ?? "PAPER";
     env.set(SOFTWARE_KEY, software);
+    // What this software needs set beyond its own name - Spigot has to be
+    // compiled because its downloads stopped answering machines - and the one
+    // value the operator was asked for. Both are written every time, blank
+    // included: a server moved off a modpack keeps fetching it otherwise.
+    for (const [key, value] of Object.entries(SOFTWARE_EXTRA_KEYS)) env.set(key, value);
+    for (const [key, value] of Object.entries(findSoftware(software)?.env ?? {})) env.set(key, value);
+    for (const [key, value] of Object.entries(
+        softwareSourceEnv(software, shape.softwareSource ?? "")
+    ))
+        env.set(key, value);
     // Polaris's login mod, on a server being reset that already runs it: kept
     // when it has a build for where the server is going, taken off when it
     // does not - and then the project guard below takes its place.
@@ -348,6 +375,7 @@ export function shapeHeapMb(
             concurrentPlayers,
             weight: blueprint.weight,
             loader: loaderForType(env.get(SOFTWARE_KEY) ?? "") ?? "",
+            software: env.get(SOFTWARE_KEY) ?? "",
             mods: parseProjectList(env.get(PROJECTS_KEY) ?? "").length
         }),
         { ceilingMb: memoryPlan.DEFAULT_CEILING_MB }
@@ -380,6 +408,7 @@ export async function expectedMinecraftHeapMb(
         readonly edition: "java" | "bedrock";
         readonly blueprintId: string;
         readonly software?: string;
+        readonly softwareSource?: string;
         readonly mapId?: string;
         readonly crossplay: boolean;
         readonly concurrentPlayers: number;
@@ -414,7 +443,11 @@ export async function expectedMinecraftHeapMb(
     javaSoftwareEnv(
         env,
         blueprint,
-        { ...(input.software ? { software: input.software } : {}), crossplay: input.crossplay },
+        {
+            ...(input.software ? { software: input.software } : {}),
+            ...(input.softwareSource ? { softwareSource: input.softwareSource } : {}),
+            crossplay: input.crossplay
+        },
         mapFor(blueprint, input.mapId)
     );
     const heapMb = shapeHeapMb(env, blueprint, input.concurrentPlayers);
@@ -464,6 +497,7 @@ async function createMinecraftServer(
             blueprintId: input.blueprintId,
             ...(input.mapId ? { mapId: input.mapId } : {}),
             ...(input.software ? { software: input.software } : {}),
+            ...(input.softwareSource ? { softwareSource: input.softwareSource } : {}),
             version: input.version,
             ...(input.seed ? { seed: input.seed } : {}),
             ...(input.levelType ? { levelType: input.levelType } : {}),
@@ -927,6 +961,13 @@ export function protectionFor(
 ): string {
     const loader = loaderForType(software);
     if (loader && isPluginLoader(loader)) return withJoinGuard(current, software, modOn);
+    // Software nothing on Modrinth loads into gets nothing put on its list. A
+    // modpack brings its own mods and its own versions of them, a custom jar is
+    // whatever somebody built, and a lobby server has no world to protect - so
+    // the modded protection below would be three downloads the server either
+    // ignores or refuses to boot past. What is already on the list is left alone:
+    // it is somebody else's decision, not this one.
+    if (!loader) return current;
     const seeded = seededPlugins(edition);
     const modded = new Set(MODDED_PROTECTION.map((entry) => projectSlug(entry)?.toLowerCase()));
     const kept = parseProjectList(current).filter((entry) => {

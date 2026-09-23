@@ -13,7 +13,7 @@
  */
 
 import { z } from "zod";
-import { isArkMap } from "@polaris/core";
+import { isArkMap, findSoftware, isModpackReference, isServerJarUrl, isServerSoftware } from "@polaris/core";
 import { isWorldMap } from "./minecraft/maps";
 import { isBiome, isLevelType, isSeed } from "./minecraft/world";
 import { isIdentifier } from "./fivem/players";
@@ -50,8 +50,18 @@ const minecraftServerSchema = z.object({
     /** A prebuilt map of that game to build on, fetched while the server is
      *  created. Blank generates a world instead. */
     mapId: z.string().trim().max(64).refine(isWorldMap, "That is not a map this server can be built on").optional(),
-    /** Java only: PAPER, FABRIC, ... The blueprint may pin it. */
-    software: z.string().trim().max(32).optional(),
+    /** Java only: PAPER, FABRIC, ... The blueprint may pin it. Checked against the
+     *  software catalogue, because this is written into the image environment as
+     *  it stands and the image exits on anything it does not know. */
+    software: z
+        .string()
+        .trim()
+        .max(32)
+        .refine(isServerSoftware, "That is not server software Polaris can install")
+        .optional(),
+    /** The one value the chosen software needs: the modpack for a modpack server,
+     *  the URL of the jar for a custom one. Ignored by everything else. */
+    softwareSource: z.string().trim().max(500).optional(),
     version: z.string().trim().max(32).default("LATEST"),
     /** The world to generate. Any text: a number is used as itself, anything
      *  else is hashed. Blank is a random world. */
@@ -140,7 +150,15 @@ const hytaleServerSchema = z.object({
 });
 
 export const createGameServerSchema = z
-    .discriminatedUnion("game", [minecraftServerSchema, arkServerSchema, fivemServerSchema])
+    // Hytale belongs here as much as the rest: the create action parses this and
+    // nothing else, so a game missing from the union is a game the dialog can
+    // describe and never actually create.
+    .discriminatedUnion("game", [
+        minecraftServerSchema,
+        arkServerSchema,
+        fivemServerSchema,
+        hytaleServerSchema
+    ])
     .superRefine((value, ctx) => {
         if (value.concurrentPlayers > value.maxPlayers) {
             ctx.addIssue({
@@ -216,6 +234,10 @@ export const createGameServerSchema = z
                 message: "A seed is up to 64 characters of ordinary text"
             });
         }
+        const wrongSource = softwareSourceError(value.software, value.softwareSource);
+        if (wrongSource) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["softwareSource"], message: wrongSource });
+        }
         if (value.crossplay && value.edition !== "java") {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
@@ -240,7 +262,13 @@ export const resetMinecraftServerSchema = z
         installedAppId: z.string().uuid(),
         blueprintId: z.string().trim().min(1).max(48).default("survival"),
         mapId: z.string().trim().max(64).refine(isWorldMap, "That is not a map this server can be built on").optional(),
-        software: z.string().trim().max(32).optional(),
+        software: z
+            .string()
+            .trim()
+            .max(32)
+            .refine(isServerSoftware, "That is not server software Polaris can install")
+            .optional(),
+        softwareSource: z.string().trim().max(500).optional(),
         version: z.string().trim().max(32).default("LATEST"),
         seed: z.string().trim().max(64).optional(),
         levelType: z.string().trim().max(64).refine(isLevelType, "That is not a world type").optional(),
@@ -257,7 +285,31 @@ export const resetMinecraftServerSchema = z
                 message: "A seed is up to 64 characters of ordinary text"
             });
         }
+        const wrongSource = softwareSourceError(value.software, value.softwareSource);
+        if (wrongSource) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["softwareSource"], message: wrongSource });
+        }
     });
+
+/**
+ * What is wrong with the value a piece of software asks for, or null.
+ *
+ * Two of them ask for one: a modpack server needs the pack, and a custom server
+ * needs the jar. Neither has a default worth inventing, and a server created
+ * without it is one that starts, finds nothing to install, and runs as an
+ * ordinary vanilla world - which is the failure that looks most like success.
+ */
+export function softwareSourceError(software: string | undefined, source: string | undefined): string | null {
+    const asks = findSoftware(software)?.asks;
+    if (!asks) return null;
+    const value = (source ?? "").trim();
+    if (value.length === 0)
+        return asks === "modpack" ? "Name the modpack to install" : "Give the URL of the server jar";
+    if (asks === "modpack" && !isModpackReference(value))
+        return "That is a modpack short name, or the link to its page";
+    if (asks === "jar" && !isServerJarUrl(value)) return "That is an https link ending in .jar";
+    return null;
+}
 
 export type ResetMinecraftServerInput = z.infer<typeof resetMinecraftServerSchema>;
 

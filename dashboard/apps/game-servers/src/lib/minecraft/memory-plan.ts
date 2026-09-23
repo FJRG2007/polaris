@@ -25,6 +25,7 @@
  */
 
 import { formatMemory } from "./blueprints";
+import { findSoftware } from "@polaris/core";
 import type { BlueprintWeight } from "./blueprints";
 
 /** Where the mode is kept on the install: "auto" plans it, "fixed" leaves whatever
@@ -72,6 +73,17 @@ export interface MemoryPlanInput {
     /** What it runs: "" or "vanilla" for a server that loads nothing, "paper" and
      *  the rest for plugins, "fabric" / "forge" / "neoforge" for mods. */
     readonly loader?: string;
+    /**
+     * The `TYPE` the server runs, which answers this better than the loader does
+     * wherever the two disagree.
+     *
+     * They disagree on the hybrids. Arclight loads Bukkit plugins, so what it
+     * looks for on Modrinth is `bukkit` - and it is NeoForge underneath, so it
+     * costs what a mod loader costs. Priced off the loader alone it would be
+     * given a plugin server's quarter of a gigabyte and run out of memory while
+     * merging its registries.
+     */
+    readonly software?: string;
     /** How many projects its list carries. Dependencies are not counted - they are
      *  not on the list - which is part of why the per-mod figure is as generous as
      *  it is. */
@@ -80,6 +92,17 @@ export interface MemoryPlanInput {
 
 const LOADERS_WITH_MODS = new Set(["fabric", "forge", "neoforge", "quilt"]);
 const LOADERS_WITH_PLUGINS = new Set(["paper", "spigot", "purpur", "bukkit", "folia"]);
+
+/** What this server costs before anything is installed on it: the software's own
+ *  answer where there is one, the loader's otherwise - a server stored before the
+ *  catalogue existed still has a loader to go on. */
+function costClass(input: MemoryPlanInput): "mods" | "plugins" | "vanilla" {
+    const known = findSoftware(input.software);
+    if (known) return known.weight;
+    const loader = (input.loader ?? "").trim().toLowerCase();
+    if (LOADERS_WITH_MODS.has(loader)) return "mods";
+    return LOADERS_WITH_PLUGINS.has(loader) ? "plugins" : "vanilla";
+}
 
 /**
  * The heap this server wants, before any ceiling is applied.
@@ -95,14 +118,10 @@ export function plannedHeapMb(input: MemoryPlanInput): number {
     const weight = input.weight ?? "normal";
     const base = weight === "heavy" ? 2048 : weight === "light" ? 768 : 1024;
     const perPlayer = weight === "heavy" ? 80 : weight === "light" ? 35 : 50;
-    const loader = (input.loader ?? "").trim().toLowerCase();
-    const loaderCost = LOADERS_WITH_MODS.has(loader)
-        ? 1024
-        : LOADERS_WITH_PLUGINS.has(loader)
-          ? 256
-          : 0;
+    const cost = costClass(input);
+    const loaderCost = cost === "mods" ? 1024 : cost === "plugins" ? 256 : 0;
     const mods = Math.max(0, Math.trunc(input.mods ?? 0));
-    const perMod = LOADERS_WITH_MODS.has(loader) ? 64 : 32;
+    const perMod = cost === "mods" ? 64 : 32;
     const raw =
         base + Math.max(0, input.concurrentPlayers) * perPlayer + loaderCost + mods * perMod;
     return Math.max(FLOOR_MB, Math.ceil(raw / 512) * 512);
@@ -112,11 +131,11 @@ export function plannedHeapMb(input: MemoryPlanInput): number {
  *  matters. Never a formula - an operator reading this wants to know why the
  *  number moved, not how to recompute it. */
 export function planReason(input: MemoryPlanInput): string {
-    const loader = (input.loader ?? "").trim().toLowerCase();
+    const cost = costClass(input);
     const mods = Math.max(0, Math.trunc(input.mods ?? 0));
     const parts: string[] = [];
-    if (LOADERS_WITH_MODS.has(loader)) parts.push("a mod loader");
-    else if (LOADERS_WITH_PLUGINS.has(loader)) parts.push("a plugin server");
+    if (cost === "mods") parts.push("a mod loader");
+    else if (cost === "plugins") parts.push("a plugin server");
     if (mods > 0) parts.push(`${mods} ${mods === 1 ? "mod" : "mods"}`);
     const players = Math.max(0, Math.trunc(input.concurrentPlayers));
     parts.push(players === 1 ? "one player at a time" : `${players} players at a time`);

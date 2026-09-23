@@ -21,10 +21,18 @@
  * an ordinary survival server and no explanation.
  */
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import * as world from "../lib/minecraft/world";
 import { useEffect, useMemo, useState } from "react";
 import { Input, Select, Skeleton, cn } from "@polaris/ui";
+import {
+    findSoftware,
+    isModpackReference,
+    isServerJarUrl,
+    searchSoftware,
+    SOFTWARE_GROUPS,
+    type MinecraftSoftware
+} from "@polaris/core";
 import { blueprintsFor } from "../lib/minecraft/blueprints";
 import { mapsFor, pinnedRelease } from "../lib/minecraft/maps";
 import { blueprintVersionsAction, type BlueprintVersions } from "../screens/actions";
@@ -50,6 +58,10 @@ export interface BlueprintShape {
     readonly mapId: string;
     /** Java only. Ignored when the blueprint pins its own. */
     readonly software: string;
+    /** The one value the chosen software needs and nothing else does: the modpack
+     *  for a modpack server, the URL of the jar for a custom one. Blank for the
+     *  software that asks for nothing, which is most of it. */
+    readonly source: string;
     /** A release, or LATEST for the newest the blueprint can run on. */
     readonly version: string;
     /** Blank generates a random world. */
@@ -62,25 +74,42 @@ export interface BlueprintShape {
  *  a release somebody chose. */
 export const LATEST = "LATEST";
 
+/**
+ * The lines a server can follow instead of a release.
+ *
+ * Both are what the image itself accepts in `VERSION`, and both mean "whatever is
+ * newest here, and keep moving": a snapshot server upgrades itself every time
+ * Mojang publishes one. Worth offering and worth the sentence underneath - a
+ * server on one of these is a server whose plugins will break on a Tuesday.
+ */
+const JAVA_CHANNELS = [
+    {
+        value: "SNAPSHOT",
+        label: "Snapshot - the newest, unfinished",
+        detail: "Mojang's weekly builds. Almost nothing has a plugin or mod built for one."
+    }
+] as const;
+
+const BEDROCK_CHANNELS = [
+    {
+        value: "PREVIEW",
+        label: "Preview - the newest, unfinished",
+        detail: "Mojang's preview builds. Only players on a preview client can join."
+    }
+] as const;
+
 /** The value both dialogs open on, before a blueprint has been chosen. */
 export const DEFAULT_SHAPE: BlueprintShape = {
     blueprintId: "survival",
     mapId: "",
     software: "PAPER",
+    source: "",
     version: LATEST,
     seed: "",
     levelType: world.DEFAULT_LEVEL_TYPE,
     biome: world.DEFAULT_BIOME
 };
 
-const SOFTWARE = [
-    { value: "PAPER", label: "Paper - plugins, fastest" },
-    { value: "PURPUR", label: "Purpur - Paper with more settings" },
-    { value: "FABRIC", label: "Fabric - mods" },
-    { value: "NEOFORGE", label: "NeoForge - mods" },
-    { value: "FORGE", label: "Forge - mods" },
-    { value: "VANILLA", label: "Vanilla - nothing added" }
-];
 
 export function BlueprintFields({
     edition,
@@ -155,13 +184,23 @@ export function BlueprintFields({
     }, [value.blueprintId, crossplay, value.mapId]);
 
     const isLatest = value.version.trim().length === 0 || value.version.trim().toUpperCase() === LATEST;
+    // A channel is not a release: it names whatever is newest on a line that has
+    // no release number yet. Checking one against the list of releases a plugin
+    // supports would mark every snapshot unsupported, which is true of the
+    // plugins and not what the field is being asked.
+    const channels = edition === "bedrock" ? BEDROCK_CHANNELS : JAVA_CHANNELS;
+    const channel = channels.find((entry) => entry.value === value.version.trim().toUpperCase()) ?? null;
     // A pinned map settles the release on its own, without waiting on Modrinth:
     // it is a property of the map rather than of anything that has to be asked.
     const running = pinned ?? (isLatest ? offered?.latest ?? null : value.version.trim());
     // Only ever said when the answer is known. A list that came back empty is a
     // Modrinth nobody could reach, not a release nothing supports.
     const unsupported =
-        !isLatest && offered !== null && offered.versions.length > 0 && !offered.versions.includes(value.version.trim());
+        !isLatest &&
+        !channel &&
+        offered !== null &&
+        offered.versions.length > 0 &&
+        !offered.versions.includes(value.version.trim());
 
     return (
         <>
@@ -272,22 +311,14 @@ export function BlueprintFields({
 
                 {advanced && (
                     <div className="flex flex-col gap-3 border-l border-border pl-3">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3">
                             {edition === "java" && (
-                                <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">Software</span>
-                                    <Select
-                                        value={blueprint?.software ?? value.software}
-                                        onValueChange={(software) => set({ software })}
-                                        options={SOFTWARE}
-                                        disabled={Boolean(blueprint?.software)}
-                                    />
-                                    {blueprint?.software && (
-                                        <span className="text-xs text-muted-foreground">
-                                            {blueprint.name} runs on {blueprint.software.toLowerCase()}.
-                                        </span>
-                                    )}
-                                </label>
+                                <SoftwarePicker
+                                    value={blueprint?.software ?? value.software}
+                                    source={value.source}
+                                    onChange={(software, source) => set({ software, source })}
+                                    pinnedBy={blueprint?.software ? blueprint.name : null}
+                                />
                             )}
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="font-medium">Minecraft version</span>
@@ -302,13 +333,17 @@ export function BlueprintFields({
                                     <Skeleton className="h-9 w-full" />
                                 ) : (
                                     <Select
-                                        value={isLatest ? LATEST : value.version.trim()}
+                                        value={isLatest ? LATEST : (channel?.value ?? value.version.trim())}
                                         onValueChange={(version) => set({ version })}
                                         options={[
                                             {
                                                 value: LATEST,
                                                 label: offered.latest ? `Latest (${offered.latest})` : "Latest"
                                             },
+                                            ...channels.map((entry) => ({
+                                                value: entry.value,
+                                                label: entry.label
+                                            })),
                                             ...offered.versions.map((entry) => ({ value: entry, label: entry }))
                                         ]}
                                     />
@@ -318,7 +353,9 @@ export function BlueprintFields({
                                 >
                                     {pinned
                                         ? `${map?.name} was built for this release and its game does not run on later ones.`
-                                        : unsupported
+                                        : channel
+                                          ? channel.detail
+                                          : unsupported
                                           ? `${blueprint?.name} has nothing built for ${value.version.trim()}.`
                                           : offered?.pinned
                                             ? "Only the releases this blueprint's plugins have a build for."
@@ -384,9 +421,159 @@ export function BlueprintFields({
 /** Whether what is in this shape can be submitted at all. The same rule the
  *  schema applies, so a refusal lands on the field rather than on a container. */
 export function shapeError(shape: BlueprintShape): string | null {
-    return shape.seed.trim().length === 0 || world.isSeed(shape.seed.trim())
-        ? null
-        : "A seed is up to 64 characters of ordinary text";
+    if (shape.seed.trim().length > 0 && !world.isSeed(shape.seed.trim()))
+        return "A seed is up to 64 characters of ordinary text";
+    return sourceError(shape.software, shape.source);
+}
+
+/** What is wrong with the value the chosen software asks for, or null. Null for
+ *  the software that asks for nothing, whatever is left in the field. */
+export function sourceError(software: string, source: string): string | null {
+    const asks = findSoftware(software)?.asks;
+    if (!asks) return null;
+    const value = source.trim();
+    if (value.length === 0)
+        return asks === "modpack" ? "Name the modpack to install" : "Give the URL of the server jar";
+    if (asks === "modpack" && !isModpackReference(value))
+        return "That is a modpack short name, or the link to its page";
+    if (asks === "jar" && !isServerJarUrl(value)) return "That is an https link ending in .jar";
+    return null;
+}
+
+/**
+ * Which server software this runs, out of everything the image knows how to
+ * install.
+ *
+ * A list rather than a dropdown, and searchable, because it is twenty entries
+ * long and the difference between two of them is a sentence: Paper and Pufferfish
+ * in a dropdown is a choice made by guessing. Grouped the way people already
+ * think about it - what most servers run, what is established, what is
+ * experimental, and the hybrids that take plugins and mods at once.
+ *
+ * Collapsed to the chosen one until somebody opens it, so the ordinary case - the
+ * default is right - is one line rather than a wall of cards.
+ */
+function SoftwarePicker({
+    value,
+    source,
+    onChange,
+    pinnedBy
+}: {
+    value: string;
+    source: string;
+    onChange: (software: string, source: string) => void;
+    /** The blueprint that settles this, when one does. Its plugins load into one
+     *  thing, and choosing another is a server that boots without them. */
+    pinnedBy: string | null;
+}) {
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState("");
+    const chosen = findSoftware(value);
+    const found = useMemo(() => searchSoftware(query), [query]);
+    const shelves = useMemo(
+        () =>
+            SOFTWARE_GROUPS.map((group) => ({
+                ...group,
+                entries: found.filter((entry: MinecraftSoftware) => entry.group === group.id)
+            })).filter((shelf) => shelf.entries.length > 0),
+        [found]
+    );
+    const wrong = sourceError(value, source);
+
+    return (
+        <div className="flex flex-col gap-2 text-sm">
+            <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">Server software</span>
+                {!pinnedBy && (
+                    <button
+                        type="button"
+                        onClick={() => setOpen((shown) => !shown)}
+                        className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                        {open ? "Done" : "Change"}
+                    </button>
+                )}
+            </div>
+
+            <div className="rounded-md border border-border p-3">
+                <p className="text-sm font-medium">{chosen?.name ?? value}</p>
+                <p className="text-xs text-muted-foreground">
+                    {pinnedBy
+                        ? `${pinnedBy} loads its plugins into this, so it is what the server runs.`
+                        : (chosen?.summary ?? "Installed exactly as it is written here.")}
+                </p>
+                {chosen?.caveat && !pinnedBy && <p className="mt-1 text-xs text-warning">{chosen.caveat}</p>}
+            </div>
+
+            {chosen?.asks && !pinnedBy && (
+                <label className="flex flex-col gap-1">
+                    <span className="font-medium">{chosen.asks === "modpack" ? "Modpack" : "Server jar"}</span>
+                    <Input
+                        value={source}
+                        onChange={(event) => onChange(value, event.target.value)}
+                        placeholder={
+                            chosen.asks === "modpack"
+                                ? "cobblemon-fabric, or the link to its page"
+                                : "https://example.com/server.jar"
+                        }
+                    />
+                    <span className={cn("text-xs", wrong ? "text-danger" : "text-muted-foreground")}>
+                        {wrong ??
+                            (chosen.asks === "modpack"
+                                ? "The pack brings its own mod loader and its own mods."
+                                : "Fetched once, the first time the server starts.")}
+                    </span>
+                </label>
+            )}
+
+            {open && !pinnedBy && (
+                <div className="flex flex-col gap-2">
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-2 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder="Search software"
+                            className="pl-8"
+                        />
+                    </div>
+                    <div className="flex max-h-72 flex-col gap-3 overflow-y-auto pr-1">
+                        {shelves.map((shelf) => (
+                            <div key={shelf.id} className="flex flex-col gap-2">
+                                <span className="text-xs font-medium text-muted-foreground">{shelf.label}</span>
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    {shelf.entries.map((entry: MinecraftSoftware) => (
+                                        <Choice
+                                            key={entry.id}
+                                            selected={entry.id === value}
+                                            onSelect={() => {
+                                                // What the last software asked for
+                                                // means nothing to this one, and a
+                                                // modpack left in the box is a
+                                                // create refused over a field
+                                                // nobody can see any more.
+                                                onChange(entry.id, entry.id === value ? source : "");
+                                                setOpen(false);
+                                            }}
+                                            title={entry.name}
+                                            detail={entry.summary}
+                                            {...(entry.caveat ? { note: entry.caveat } : {})}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                        {shelves.length === 0 && (
+                            <p className="text-xs text-muted-foreground">
+                                Nothing here is called that. Anything this list is missing can be run as a custom
+                                server jar.
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }
 
 /** One of a small set of answers, as a card rather than a row in a list: these

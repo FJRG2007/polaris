@@ -25,13 +25,13 @@
  */
 
 import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
 import * as plan from "./minecraft/memory-plan";
 import { isGameServerApp } from "./games-service";
 import { formatMemory } from "./minecraft/blueprints";
 import { PROJECTS_KEY, SOFTWARE_KEY } from "./minecraft/join-guard";
 import { loaderForType, parseProjectList } from "./minecraft/modrinth";
 import { listGameMachines, parseMemoryMb, type GameMachine } from "./games-service";
-import { host } from "@polaris/app-host";
 
 const { readAppRuntimeLog } = host.deployService;
 const { createNotification } = host.notificationService;
@@ -175,7 +175,7 @@ export async function plannedMemoryFor(
         Number.isFinite(maxPlayers) ? maxPlayers : 0
     );
 
-    const input = { concurrentPlayers: players, loader, mods };
+    const input = { concurrentPlayers: players, loader, software: value(SOFTWARE_KEY), mods };
     const config = readInstallConfig(context.config);
     const listed = machines ?? (await listGameMachines(context.ownerId, false).catch(() => []));
     const bounds: plan.HeapBounds = {

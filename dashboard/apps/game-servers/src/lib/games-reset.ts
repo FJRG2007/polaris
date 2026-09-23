@@ -119,6 +119,7 @@ export async function resetMinecraftServer(
             blueprintId: blueprint.id,
             ...(input.mapId ? { mapId: input.mapId } : {}),
             ...(input.software ? { software: input.software } : {}),
+            ...(input.softwareSource ? { softwareSource: input.softwareSource } : {}),
             version: input.version,
             ...(input.seed ? { seed: input.seed } : {}),
             levelType,

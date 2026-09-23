@@ -11,7 +11,7 @@
  * runtime.
  */
 
-import { ARK_MAPS, DEFAULT_ARK_MAP } from "@polaris/core";
+import { ARK_MAPS, DEFAULT_ARK_MAP, MINECRAFT_SOFTWARE } from "@polaris/core";
 import {
     Bot,
     Gamepad2,
@@ -355,15 +355,11 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     label: "Server software",
                     help: "Paper runs plugins and is faster than vanilla. Fabric, Forge and NeoForge run mods.",
                     default: "PAPER",
-                    options: [
-                        { value: "PAPER", label: "Paper" },
-                        { value: "PURPUR", label: "Purpur" },
-                        { value: "SPIGOT", label: "Spigot" },
-                        { value: "FABRIC", label: "Fabric" },
-                        { value: "FORGE", label: "Forge" },
-                        { value: "NEOFORGE", label: "NeoForge" },
-                        { value: "VANILLA", label: "Vanilla" }
-                    ],
+                    // The same list the create dialog offers, so a server can be
+                    // moved to anything it could have been created as. Two lists
+                    // meant a server running Purpur that this picker could not
+                    // even select.
+                    options: MINECRAFT_SOFTWARE.map((entry) => ({ value: entry.id, label: entry.name })),
                     tunable: true,
                     group: "Server"
                 },
