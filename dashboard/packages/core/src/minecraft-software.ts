@@ -279,6 +279,28 @@ export function modrinthLoaderOf(type: string | undefined | null): string | null
     return findSoftware(type)?.loader ?? null;
 }
 
+/**
+ * Every loader something in this catalogue is filed under on Modrinth.
+ *
+ * What a mods browser may be asked for, derived rather than written out: a list
+ * of loaders kept by hand beside a list of software is a server that can be
+ * created and whose mods screen then refuses to open.
+ */
+export function modrinthLoaders(): string[] {
+    return [
+        ...new Set(
+            MINECRAFT_SOFTWARE.map((entry) => entry.loader).filter(
+                (loader): loader is string => loader !== null
+            )
+        )
+    ].sort();
+}
+
+/** Whether a mods browser can be opened against this loader at all. */
+export function isBrowsableLoader(loader: string): boolean {
+    return modrinthLoaders().includes(loader);
+}
+
 /** The software in the order the picker shows it, by group. */
 export function softwareByGroup(): { group: SoftwareGroup; label: string; entries: MinecraftSoftware[] }[] {
     return SOFTWARE_GROUPS.map((group) => ({

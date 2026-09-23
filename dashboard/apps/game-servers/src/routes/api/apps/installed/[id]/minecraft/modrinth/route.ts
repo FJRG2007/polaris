@@ -9,6 +9,7 @@ import {
     readRequirements,
     searchModrinth
 } from "../../../../../../../lib/minecraft/modrinth";
+import { isBrowsableLoader } from "@polaris/core";
 import { host } from "@polaris/app-host";
 import { notForPlayers, packEntries } from "../../../../../../../lib/minecraft/client-pack";
 
@@ -28,9 +29,15 @@ export const dynamic = "force-dynamic";
  */
 const searchSchema = z.object({
     query: z.string().trim().max(80).default(""),
-    /** The loaders a server can be running; anything else is not a search we can
-     *  make sense of, and is refused rather than passed on to Modrinth. */
-    loader: z.enum(["paper", "spigot", "fabric", "forge", "neoforge"]),
+    /**
+     * The loader the server is filed under on Modrinth.
+     *
+     * Checked against the software catalogue rather than a list written out here:
+     * five literals kept beside a catalogue that grows is a server somebody can
+     * create and whose mods screen then refuses to open, which is what happened
+     * to every Quilt, Folia and hybrid server the day the catalogue grew.
+     */
+    loader: z.string().trim().max(32).refine(isBrowsableLoader, "That is not a loader with mods"),
     /** The release the server is on, so nothing without a build for it is
      *  offered. Blank for a server on LATEST, whose release nobody here knows. */
     version: z
