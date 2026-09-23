@@ -19,10 +19,25 @@ const { recordAudit } = await import("@/lib/audit-service");
 
 beforeEach(() => create.mockClear());
 
+// A real one, because the column it lands in is a uuid: a fixture id like
+// "app-1" is recorded in the entry's metadata instead, which is a different
+// path and has its own test (`audit-prefixed-source`).
+const APPLICATION = "3f1d2c4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f";
+
 it("records what background work did, with no address to hash", async () => {
-    await recordAudit({ actorId: "owner-1", action: "deploy.app.deploy", targetType: "application", targetId: "app-1" });
+    await recordAudit({
+        actorId: "owner-1",
+        action: "deploy.app.deploy",
+        targetType: "application",
+        targetId: APPLICATION
+    });
     expect(create).toHaveBeenCalledTimes(1);
     expect(create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ action: "deploy.app.deploy", targetId: "app-1", ipHash: undefined, sessionId: undefined })
+        data: expect.objectContaining({
+            action: "deploy.app.deploy",
+            targetId: APPLICATION,
+            ipHash: undefined,
+            sessionId: undefined
+        })
     });
 });

@@ -311,10 +311,12 @@ export function gameJobTable(): readonly AppJob[] {
             // stopped, and that is a state that lasts hours rather than seconds. A
             // pass over a running fleet is one query and no work at all.
             everyMs: Number(process.env.POLARIS_GAME_TRIM_SWEEP_MS) || 60 * MINUTE,
-            // Leased for the same reason the backup sweep is: this rewrites region
-            // files, and two runners rewriting the same world is the one thing the
-            // optimizer itself cannot defend against.
-            leaseMs: 30 * MINUTE,
+            // Leased for the same reason the backup sweep is, and for longer than
+            // the gap between passes: this rewrites region files, two runners
+            // rewriting the same world is the one thing the optimizer itself
+            // cannot defend against, and a lease shorter than the interval is a
+            // second runner starting while the first is still going.
+            leaseMs: 90 * MINUTE,
             run: runWorldTrims
         },
         {
