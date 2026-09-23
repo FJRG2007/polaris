@@ -26,20 +26,15 @@ const transfers = readFileSync(
     join(process.cwd(), "src/components/transfers/transfers-view.tsx"),
     "utf8"
 );
+const corner = readFileSync(join(process.cwd(), "src/components/docked-corner.ts"), "utf8");
 
 /** The length a docked panel publishes, and the only thing the two share. */
 const HEIGHT = "--docked-panel-height";
 
 describe("the corner the composer and the transfer card share", () => {
-    it("has whatever is docked there say how much of it it takes", () => {
-        expect(composer).toContain(`const DOCKED_HEIGHT = "${HEIGHT}"`);
-        expect(composer).toContain("setProperty(");
-    });
-
-    it("has it give the corner back", () => {
-        // Twice: when it stops being docked, and when it unmounts. A length left
-        // behind is every later upload floating in the middle of the screen.
-        expect(composer.split("removeProperty(DOCKED_HEIGHT)")).toHaveLength(3);
+    it("has one place that says what is docked there", () => {
+        expect(corner).toContain(`export const DOCKED_HEIGHT = "${HEIGHT}"`);
+        expect(composer).toContain('useDockedCorner } from "@/components/docked-corner"');
     });
 
     it("counts the countdown as docked too", () => {

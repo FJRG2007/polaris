@@ -27,6 +27,7 @@
  */
 
 import { sendFile } from "@/components/transfers/move-file";
+import { useDockedCorner } from "@/components/docked-corner";
 import Link from "next/link";
 import { useBusy } from "./use-busy";
 import * as core from "@polaris/core";
@@ -37,7 +38,7 @@ import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
 import type { MailTemplateView } from "@/lib/mailbox/templates";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { useRef, useMemo, useState, useEffect, useCallback, type RefObject } from "react";
+import { useRef, useMemo, useState, useEffect, useCallback } from "react";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { keepSignatureDelimiter, signatureBlock, withSignature } from "./signature";
 import { draftSaves, type DraftFields, type DraftSaves, type DraftWriter } from "./draft-saves";
@@ -104,47 +105,6 @@ const writeDraft: DraftWriter = async (fields, id) => {
 };
 
 /** A route's answer, when there is one to read. */
-/**
- * Say how much of the bottom right corner this panel is taking.
- *
- * That corner is shared. The composer docks into it, the countdown that replaces
- * the composer after Send sits in it, and the card that reports a file being
- * uploaded is fixed to it too - and they were all on the same layer, so
- * attaching anything drew the progress card into the composer, over the
- * attachments it was reporting on and over the Send button.
- *
- * A length rather than a flag, because what is docked there is three different
- * heights and on a phone it is whatever its contents come to. Whoever else wants
- * the corner reads it (`transfers-view`) and sits above it.
- */
-function useDockedCorner(node: RefObject<HTMLElement | null>, docked: boolean): void {
-    useEffect(() => {
-        const element = node.current;
-        if (!element || !docked) {
-            document.body.style.removeProperty(DOCKED_HEIGHT);
-            return;
-        }
-        const publish = (): void => {
-            document.body.style.setProperty(
-                DOCKED_HEIGHT,
-                `${Math.round(element.getBoundingClientRect().height)}px`
-            );
-        };
-        publish();
-        // It changes size as recipients wrap, as files are attached, and when it
-        // is minimized - and a stale height is a card floating in mid air.
-        const watch = new ResizeObserver(publish);
-        watch.observe(element);
-        return () => {
-            watch.disconnect();
-            document.body.style.removeProperty(DOCKED_HEIGHT);
-        };
-    }, [node, docked]);
-}
-
-/** The length both sides of that arrangement name. */
-const DOCKED_HEIGHT = "--docked-panel-height";
-
 function parsed(body: string): unknown {
     try {
         return JSON.parse(body || "null");
