@@ -83,7 +83,12 @@ export async function routerPlacement(): Promise<RouterPlacement | null> {
             NetworkSettings?: { Networks?: Record<string, unknown>; };
             Mounts?: { Destination?: string; Name?: string; Type?: string; }[];
         };
-        const network = Object.keys(body.NetworkSettings?.Networks ?? {})[0];
+        // The dashboard is on more than one network - the control plane's own, and
+        // the dedicated one a locally installed messaging bridge joins - and the
+        // order they come back in is not ours to rely on. The control plane's is the
+        // compose project's default network, which is the one whose name ends there.
+        const joined = Object.keys(body.NetworkSettings?.Networks ?? {});
+        const network = joined.find((name) => name.endsWith("_default")) ?? joined[0];
         const routes = (body.Mounts ?? []).find(
             (mount) => mount.Destination === ROUTES_DIR && mount.Type === "volume" && mount.Name
         );
