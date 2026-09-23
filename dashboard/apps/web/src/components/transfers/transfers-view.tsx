@@ -53,7 +53,20 @@ export function TransfersView() {
     return (
         <div
             aria-label="Transfers"
-            className="pointer-events-auto fixed bottom-4 right-4 z-40 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-lg border border-border bg-elevated p-3 shadow-popover"
+            /**
+             * Above whatever is docked in this corner, not on top of it.
+             *
+             * The mail composer is fixed to the same corner with the same
+             * stacking order, so attaching a file put this card over the
+             * attachments it was reporting on and over the Send button - two
+             * panels drawn into each other, with only the document order
+             * deciding which. A docked panel publishes the height it occupies
+             * and this sits above it; when there is none the variable is absent
+             * and the corner is this card's own. The layer above it too, so a
+             * composer taking the whole screen does not bury the progress of the
+             * file it is uploading.
+             */
+            className="pointer-events-auto fixed bottom-[calc(1rem_+_var(--docked-panel-height,0px))] right-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-lg border border-border bg-elevated p-3 shadow-popover"
         >
             <div className="flex items-center gap-2">
                 <p className="flex-1 text-xs font-medium text-muted-foreground">

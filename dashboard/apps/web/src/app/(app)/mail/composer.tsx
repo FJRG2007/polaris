@@ -133,6 +133,8 @@ export function Composer() {
     const [queued, setQueued] = useState<{ draftId: string; until: number } | null>(null);
     const [problem, setProblem] = useState("");
     const [picking, setPicking] = useState(false);
+    /** The docked panel itself, so it can say how much of the corner it takes. */
+    const shell = useRef<HTMLDivElement | null>(null);
     const [insert, setInsert] = useState<{ token: number; text: string } | null>(null);
     /**
      * Putting the writer in the message, on a line of their own.
@@ -482,7 +484,40 @@ export function Composer() {
           })
         : "";
 
-    const shell =
+    /**
+     * How much of the corner this is taking, for whatever else lives in it.
+     *
+     * The transfer card that appears while a file uploads is fixed to the same
+     * corner, so without this it lands on top of the attachment strip and the
+     * Send button the moment somebody attaches anything. Published as a length
+     * rather than a flag because the composer is three different heights, and on
+     * a phone it is whatever its contents come to.
+     *
+     * Nothing is published when it is taking the whole screen: there is no room
+     * left to sit above, so the card stays where it is and is drawn over it.
+     */
+    useEffect(() => {
+        const node = shell.current;
+        if (!node || posture === "full" || queued) {
+            document.body.style.removeProperty("--docked-panel-height");
+            return;
+        }
+        const publish = (): void => {
+            document.body.style.setProperty(
+                "--docked-panel-height",
+                `${Math.round(node.getBoundingClientRect().height)}px`
+            );
+        };
+        publish();
+        const watch = new ResizeObserver(publish);
+        watch.observe(node);
+        return () => {
+            watch.disconnect();
+            document.body.style.removeProperty("--docked-panel-height");
+        };
+    }, [posture, queued]);
+
+    const shellClass =
         posture === "full"
             ? "inset-4 md:inset-10 rounded-lg border-b"
             : posture === "minimized"
@@ -503,8 +538,9 @@ export function Composer() {
                     // message, recipients, cursor and all.
                     "origin-bottom transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none md:origin-bottom-right",
                     queued && "pointer-events-none translate-y-6 scale-[0.2] opacity-0",
-                    shell
+                    shellClass
                 )}
+                ref={shell}
                 role="dialog"
                 aria-label="New message"
                 aria-hidden={queued ? true : undefined}
