@@ -28,6 +28,7 @@ import { PlayerTimeoutDialog } from "../../components/player-timeout-dialog";
 import type { PlayerAccessView } from "../../lib/minecraft/player-access";
 import type { RememberedLevel } from "../../lib/minecraft/level-memory";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
+import { RowContextMenu, RowMenuButton, type RowMenuEntry } from "../../components/row-menu";
 import { foldPlayers, GAME_MODES, type PlayerEntry } from "../../lib/minecraft/players";
 import { describeQueued, waitingOn, type QueuedAction } from "../../lib/minecraft/queue";
 import { timeoutFor, timeoutRemaining, type PlayerTimeout } from "../../lib/player-timeout";
@@ -58,12 +59,6 @@ import {
     Button,
     Card,
     CardBody,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
     Skeleton,
     Switch,
     cn
@@ -79,7 +74,6 @@ import {
     KeyRound,
     LocateFixed,
     MapPin,
-    MoreHorizontal,
     Pencil,
     RotateCcw,
     ShieldBan,
@@ -808,7 +802,14 @@ function PlayerRow({
     const live = answering && !pending;
     const format = useDisplayFormat();
 
+    // Everything this row can do, in one list: the icons at its end, and the
+    // longer set behind the `...`. The right button gets both, which is what
+    // anybody who has used a file manager tries first on a table of names.
+    const quick = quickEntries({ player, bedrock, live, pending, onModerate, onModerateWithConfirm, onRevoke });
+    const more = moreEntries({ player, bedrock, live, onOpen, onModerateWithConfirm, onGamemode, onResetPassword });
+
     return (
+        <RowContextMenu entries={[...quick, { kind: "separator" } as const, ...more]}>
         <tr
             className={cn(
                 "border-t border-border hover:bg-card-hover",
@@ -945,114 +946,25 @@ function PlayerRow({
             </td>
             <td className="px-3 py-2">
                 <div className="flex justify-end gap-1">
-                    {!bedrock && (
-                        <PlayerIconAction
-                            label={
-                                player.operator
-                                    ? `Remove ${name} as operator`
-                                    : `Make ${name} an operator`
-                            }
-                            icon={
-                                player.operator ? (
-                                    <ShieldMinus className="size-4" />
-                                ) : (
-                                    <ShieldPlus className="size-4" />
-                                )
-                            }
-                            disabled={!live}
-                            onClick={() =>
-                                onModerate({
-                                    action: player.operator ? "deop" : "op",
-                                    player: name
-                                })
-                            }
-                        />
-                    )}
-                    {!bedrock && (
-                        <PlayerIconAction
-                            label={
-                                player.whitelisted
-                                    ? `Take ${name} off the whitelist`
-                                    : `Put ${name} on the whitelist`
-                            }
-                            icon={
-                                player.whitelisted ? (
-                                    <UserMinus className="size-4" />
-                                ) : (
-                                    <UserPlus className="size-4" />
-                                )
-                            }
-                            disabled={!live}
-                            onClick={() =>
-                                onModerate({
-                                    action: player.whitelisted
-                                        ? "whitelist-remove"
-                                        : "whitelist-add",
-                                    player: name
-                                })
-                            }
-                        />
-                    )}
-                    {player.online && (
-                        <PlayerIconAction
-                            label={playerAction.kick(name)}
-                            icon={<DoorOpen className="size-4" />}
-                            disabled={!live}
-                            onClick={() => {
-                                const { title, description } = playerConfirm.kick(name);
-                                void onModerateWithConfirm(
-                                    { action: "kick", player: name },
-                                    title,
-                                    description
-                                );
-                            }}
-                        />
-                    )}
-                    {!bedrock &&
-                        (player.banned ? (
+                    {/* The same verbs the right button offers, as icons. Both are
+                        drawn from `quick` so a verb added to one is in the other. */}
+                    {quick.map((entry, index) =>
+                        entry.kind === "item" ? (
                             <PlayerIconAction
-                                label={playerAction.pardon(name)}
-                                icon={<UserPlus className="size-4" />}
-                                disabled={!live}
-                                onClick={() => onModerate({ action: "pardon", player: name })}
+                                key={index}
+                                label={entry.text}
+                                icon={entry.icon}
+                                danger={entry.danger}
+                                disabled={entry.disabled}
+                                onClick={entry.onSelect}
                             />
-                        ) : (
-                            <PlayerIconAction
-                                label={playerAction.ban(name)}
-                                icon={<Ban className="size-4" />}
-                                danger
-                                disabled={!live}
-                                onClick={() => {
-                                    const { title, description } = playerConfirm.ban(name);
-                                    void onModerateWithConfirm(
-                                        { action: "ban", player: name },
-                                        title,
-                                        description
-                                    );
-                                }}
-                            />
-                        ))}
-                    {player.addresses.length > 0 && (
-                        <PlayerIconAction
-                            label={playerAction.remove(name)}
-                            icon={<UserMinus className="size-4" />}
-                            danger
-                            disabled={pending}
-                            onClick={onRevoke}
-                        />
+                        ) : null
                     )}
-                    <MoreActions
-                        player={player}
-                        bedrock={bedrock}
-                        live={live}
-                        onOpen={onOpen}
-                        onModerateWithConfirm={onModerateWithConfirm}
-                        onGamemode={onGamemode}
-                        onResetPassword={onResetPassword}
-                    />
+                    <RowMenuButton entries={more} label={playerAction.more(name)} />
                 </div>
             </td>
         </tr>
+        </RowContextMenu>
     );
 }
 
@@ -1102,9 +1014,128 @@ function StatusCell({
     );
 }
 
+/**
+ * The verbs at the end of a row: the three or four anybody presses, as icons.
+ *
+ * A list rather than the buttons themselves, because the right button offers the
+ * same verbs and neither copy may be the one that gets a new one. Which of them
+ * exist at all is a per-player question - Bedrock has no operator list, an
+ * address can only be forgotten by somebody who has one - so the list is built
+ * rather than filtered on the way out.
+ */
+function quickEntries({
+    player,
+    bedrock,
+    live,
+    pending,
+    onModerate,
+    onModerateWithConfirm,
+    onRevoke
+}: {
+    player: PlayerEntry;
+    bedrock: boolean;
+    live: boolean;
+    pending: boolean;
+    onModerate: (input: Omit<MinecraftModeration, "installedAppId">) => void;
+    onModerateWithConfirm: (
+        input: Omit<MinecraftModeration, "installedAppId">,
+        title: string,
+        description: string
+    ) => Promise<void>;
+    onRevoke: () => void;
+}): RowMenuEntry[] {
+    const { name } = player;
+    const entries: RowMenuEntry[] = [];
+
+    if (!bedrock) {
+        entries.push({
+            kind: "item",
+            text: player.operator ? `Remove ${name} as operator` : `Make ${name} an operator`,
+            icon: player.operator ? (
+                <ShieldMinus className="size-4" />
+            ) : (
+                <ShieldPlus className="size-4" />
+            ),
+            disabled: !live,
+            onSelect: () => onModerate({ action: player.operator ? "deop" : "op", player: name })
+        });
+        entries.push({
+            kind: "item",
+            text: player.whitelisted
+                ? `Take ${name} off the whitelist`
+                : `Put ${name} on the whitelist`,
+            icon: player.whitelisted ? (
+                <UserMinus className="size-4" />
+            ) : (
+                <UserPlus className="size-4" />
+            ),
+            disabled: !live,
+            onSelect: () =>
+                onModerate({
+                    action: player.whitelisted ? "whitelist-remove" : "whitelist-add",
+                    player: name
+                })
+        });
+    }
+
+    if (player.online) {
+        entries.push({
+            kind: "item",
+            text: playerAction.kick(name),
+            icon: <DoorOpen className="size-4" />,
+            disabled: !live,
+            onSelect: () => {
+                const { title, description } = playerConfirm.kick(name);
+                void onModerateWithConfirm({ action: "kick", player: name }, title, description);
+            }
+        });
+    }
+
+    if (!bedrock) {
+        entries.push(
+            player.banned
+                ? {
+                      kind: "item",
+                      text: playerAction.pardon(name),
+                      icon: <UserPlus className="size-4" />,
+                      disabled: !live,
+                      onSelect: () => onModerate({ action: "pardon", player: name })
+                  }
+                : {
+                      kind: "item",
+                      text: playerAction.ban(name),
+                      icon: <Ban className="size-4" />,
+                      danger: true,
+                      disabled: !live,
+                      onSelect: () => {
+                          const { title, description } = playerConfirm.ban(name);
+                          void onModerateWithConfirm(
+                              { action: "ban", player: name },
+                              title,
+                              description
+                          );
+                      }
+                  }
+        );
+    }
+
+    if (player.addresses.length > 0) {
+        entries.push({
+            kind: "item",
+            text: playerAction.remove(name),
+            icon: <UserMinus className="size-4" />,
+            danger: true,
+            disabled: pending,
+            onSelect: onRevoke
+        });
+    }
+
+    return entries;
+}
+
 /** The verbs that are not one press: the ones that need a value, and the ones
  *  rare enough that a row of icons for them would bury the three that are not. */
-function MoreActions({
+function moreEntries({
     player,
     bedrock,
     live,
@@ -1124,115 +1155,116 @@ function MoreActions({
     ) => Promise<void>;
     onGamemode: (players: readonly string[], mode: string) => Promise<void>;
     onResetPassword?: () => void;
-}) {
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label={playerAction.more(player.name)}
-                    title="More"
-                >
-                    <MoreHorizontal className="size-4" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuLabel>{player.name}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {/* Polaris' own record of them - the addresses they may arrive from
-                    and the note beside the name - so it does not need the server to
-                    be answering, and Bedrock reaches it too. */}
-                <DropdownMenuItem onSelect={() => onOpen("access")}>
-                    <Pencil className="size-4" /> {playerMenuItem.edit}
-                </DropdownMenuItem>
-                {/* One door for looking at the bag and for changing what is in it:
-                    somebody who opens it to see what is missing is the same person
-                    who then hands it over, and they were two forms drawing the
-                    same grid twice.
-
-                    Not gated on being online either. The question - what were they
-                    carrying - is nearly always asked about somebody who logged
-                    off, which is what the snapshots are for, and what cannot happen
-                    now is written down and happens when they next join. */}
-                <DropdownMenuItem disabled={!live || bedrock} onSelect={() => onOpen("inventory")}>
-                    <Backpack className="size-4" /> Inventory and items
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                    disabled={!live || bedrock || !player.online}
-                    onSelect={() => onOpen("location")}
-                >
-                    <LocateFixed className="size-4" /> Where they are
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                    disabled={!live || bedrock || !player.online}
-                    onSelect={() => onOpen("teleport")}
-                >
-                    <MapPin className="size-4" /> Teleport
-                </DropdownMenuItem>
-                {/* Only while they are on: the game changes a bar on a player who
-                    is standing there, and there is nothing to write down for
-                    somebody who is not. */}
-                <DropdownMenuItem
-                    disabled={!live || bedrock || !player.online}
-                    onSelect={() => onOpen("experience")}
-                >
-                    <Sparkles className="size-4" /> Experience
-                </DropdownMenuItem>
-                {/* Never disabled any more: the record of who played is kept by
-                    Polaris now rather than read out of a log that may not reach
-                    back far enough, so there is something to show for somebody who
-                    has not been on since last month. */}
-                <DropdownMenuItem onSelect={() => onOpen("history")}>
-                    <History className="size-4" /> {playerMenuItem.history}
-                </DropdownMenuItem>
-                {/* Polaris keeps the password, so this works whether or not the
-                    server is answering. */}
-                {onResetPassword && (
-                    <DropdownMenuItem onSelect={onResetPassword}>
-                        <RotateCcw className="size-4" /> Reset password
-                    </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                {/* Flat rather than a submenu. Four items is not enough to be worth
-                    a second layer somebody has to hover exactly onto. */}
-                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                    Game mode
-                </DropdownMenuLabel>
-                {GAME_MODES.map((mode) => (
-                    <DropdownMenuItem
-                        key={mode}
-                        disabled={!live || !player.online}
-                        onSelect={() => void onGamemode([player.name], mode)}
-                    >
-                        <Gamepad2 className="size-4" />
-                        <span className="capitalize">{mode}</span>
-                    </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                    className="text-danger"
-                    disabled={!live || bedrock || !player.online}
-                    onSelect={() =>
-                        void onModerateWithConfirm(
-                            { action: "kill", player: player.name },
-                            `Kill ${player.name}?`,
-                            "They die where they stand and drop what they were carrying. Nothing stops them respawning."
-                        )
-                    }
-                >
-                    <Skull className="size-4" /> Kill
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                    className="text-danger"
-                    disabled={!live || bedrock || player.banned}
-                    onSelect={() => onOpen("timeout")}
-                >
-                    <Timer className="size-4" /> {playerMenuItem.timeout}
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
+}): RowMenuEntry[] {
+    return [
+        { kind: "label", text: player.name },
+        { kind: "separator" },
+        // The record Polaris keeps of them - the addresses they may arrive from
+        // and the note beside the name - so it does not need the server to be
+        // answering, and Bedrock reaches it too.
+        {
+            kind: "item",
+            text: playerMenuItem.edit,
+            icon: <Pencil className="size-4" />,
+            onSelect: () => onOpen("access")
+        },
+        // One door for looking at the bag and for changing what is in it: somebody
+        // who opens it to see what is missing is the same person who then hands it
+        // over, and they were two forms drawing the same grid twice.
+        //
+        // Not gated on being online either. The question - what were they carrying
+        // - is nearly always asked about somebody who logged off, which is what
+        // the snapshots are for, and what cannot happen now is written down and
+        // happens when they next join.
+        {
+            kind: "item",
+            text: "Inventory and items",
+            icon: <Backpack className="size-4" />,
+            disabled: !live || bedrock,
+            onSelect: () => onOpen("inventory")
+        },
+        {
+            kind: "item",
+            text: "Where they are",
+            icon: <LocateFixed className="size-4" />,
+            disabled: !live || bedrock || !player.online,
+            onSelect: () => onOpen("location")
+        },
+        {
+            kind: "item",
+            text: "Teleport",
+            icon: <MapPin className="size-4" />,
+            disabled: !live || bedrock || !player.online,
+            onSelect: () => onOpen("teleport")
+        },
+        // Only while they are on: the game changes a bar on a player who is
+        // standing there, and there is nothing to write down for somebody who is
+        // not.
+        {
+            kind: "item",
+            text: "Experience",
+            icon: <Sparkles className="size-4" />,
+            disabled: !live || bedrock || !player.online,
+            onSelect: () => onOpen("experience")
+        },
+        // Never disabled any more: the record of who played is kept by Polaris
+        // now rather than read out of a log that may not reach back far enough,
+        // so there is something to show for somebody who has not been on since
+        // last month.
+        {
+            kind: "item",
+            text: playerMenuItem.history,
+            icon: <History className="size-4" />,
+            onSelect: () => onOpen("history")
+        },
+        // The password is kept by Polaris, so this works whether or not the
+        // server is answering.
+        ...(onResetPassword
+            ? ([
+                  {
+                      kind: "item",
+                      text: "Reset password",
+                      icon: <RotateCcw className="size-4" />,
+                      onSelect: onResetPassword
+                  }
+              ] as RowMenuEntry[])
+            : []),
+        { kind: "separator" },
+        // Flat rather than a submenu. Four items is not enough to be worth a
+        // second layer somebody has to hover exactly onto.
+        { kind: "label", text: "Game mode", muted: true },
+        ...GAME_MODES.map(
+            (mode): RowMenuEntry => ({
+                kind: "item",
+                text: mode.charAt(0).toUpperCase() + mode.slice(1),
+                icon: <Gamepad2 className="size-4" />,
+                disabled: !live || !player.online,
+                onSelect: () => void onGamemode([player.name], mode)
+            })
+        ),
+        { kind: "separator" },
+        {
+            kind: "item",
+            text: "Kill",
+            icon: <Skull className="size-4" />,
+            danger: true,
+            disabled: !live || bedrock || !player.online,
+            onSelect: () =>
+                void onModerateWithConfirm(
+                    { action: "kill", player: player.name },
+                    `Kill ${player.name}?`,
+                    "They die where they stand and drop what they were carrying. Nothing stops them respawning."
+                )
+        },
+        {
+            kind: "item",
+            text: playerMenuItem.timeout,
+            icon: <Timer className="size-4" />,
+            danger: true,
+            disabled: !live || bedrock || player.banned,
+            onSelect: () => onOpen("timeout")
+        }
+    ];
 }
 
 /** Whether the game's own whitelist is enforced at all - a list nobody is checked

@@ -40,6 +40,7 @@ import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { ArkAccessView, ArkStatus } from "../../lib/ark/service";
 import { PlayerTimeoutDialog } from "../../components/player-timeout-dialog";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
+import { RowContextMenu, RowMenuButton, type RowMenuEntry } from "../../components/row-menu";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { timeoutFor, timeoutRemaining, type PlayerTimeout } from "../../lib/player-timeout";
 import { foldArkPlayers, matchesArkPlayer, type ArkPlayerEntry } from "../../lib/ark/players";
@@ -65,12 +66,6 @@ import {
     Card,
     CardBody,
     cn,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
     Input,
     ScrollRow,
     Skeleton,
@@ -87,7 +82,6 @@ import {
     Loader2,
     Megaphone,
     MessageSquare,
-    MoreHorizontal,
     PackageMinus,
     PackagePlus,
     Pencil,
@@ -1624,7 +1618,182 @@ function ArkPlayerRow({
     // three cases are settled and tested.
     const line = presenceLine({ online: entry.online, seen, addedAt: entry.addedAt });
 
+    // Everything this row can do, once: the icons at its end and the longer set
+    // behind the three dots. The right button gets both.
+    const quick: RowMenuEntry[] = canModerate
+        ? [
+              entry.standing === "not-allowed"
+                  ? {
+                        kind: "item",
+                        text: playerAction.allow(entry.name),
+                        icon: <UserPlus className="size-4" />,
+                        disabled: pending,
+                        onSelect: onAllow
+                    }
+                  : {
+                        kind: "item",
+                        text: playerAction.remove(entry.name),
+                        icon: <UserMinus className="size-4" />,
+                        disabled: pending,
+                        onSelect: onRemove
+                    },
+              ...(entry.online
+                  ? ([
+                        {
+                            kind: "item",
+                            text: playerAction.kick(entry.name),
+                            icon: <DoorOpen className="size-4" />,
+                            disabled: !live,
+                            onSelect: onKick
+                        }
+                    ] as RowMenuEntry[])
+                  : []),
+              // Whichever of the two applies: somebody serving a timeout is already
+              // banned, and the verb they need is the one that ends it - the same
+              // swap the Minecraft row makes.
+              timeout
+                  ? {
+                        kind: "item",
+                        text: playerAction.pardon(entry.name),
+                        icon: <UserPlus className="size-4" />,
+                        disabled: !live,
+                        onSelect: onUnban
+                    }
+                  : {
+                        kind: "item",
+                        text: playerAction.ban(entry.name),
+                        icon: <Ban className="size-4" />,
+                        danger: true,
+                        disabled: !live,
+                        onSelect: onBan
+                    }
+          ]
+        : [];
+
+    const more: RowMenuEntry[] = canModerate
+        ? [
+              { kind: "label", text: entry.name },
+              { kind: "separator" },
+              {
+                  kind: "item",
+                  text: playerMenuItem.edit,
+                  icon: <Pencil className="size-4" />,
+                  disabled: pending,
+                  onSelect: onEdit
+              },
+              // The nearest thing ARK has to an operator. Listing somebody here
+              // lets them run admin commands without being told the password -
+              // which is the only way to take it back from one person without
+              // changing it for everybody. Offered to whoever may manage the
+              // server, not to every moderator, and it is the file that is
+              // written: the game reads it when it starts.
+              ...(canManage
+                  ? ([
+                        {
+                            kind: "item",
+                            text: admin
+                                ? "Stop them administering it"
+                                : "Let them administer it",
+                            icon: admin ? (
+                                <ShieldMinus className="size-4" />
+                            ) : (
+                                <ShieldPlus className="size-4" />
+                            ),
+                            disabled: pending,
+                            onSelect: () => onAdmin(!admin)
+                        }
+                    ] as RowMenuEntry[])
+                  : []),
+              // The id is a number, and the question behind it is always "who is
+              // this" - which only Steam can answer. Opening it here is the
+              // difference between a moderator deciding and guessing.
+              {
+                  kind: "link",
+                  text: "Open their Steam profile",
+                  icon: <Eye className="size-4" />,
+                  href: `https://steamcommunity.com/profiles/${entry.steamId}`
+              },
+              // Kept whether or not they are on: how much somebody has played is
+              // exactly the question asked about a name that is not there.
+              {
+                  kind: "item",
+                  text: "Their history",
+                  icon: <Clock className="size-4" />,
+                  onSelect: onHistory
+              },
+              {
+                  kind: "item",
+                  text: playerMenuItem.message,
+                  icon: <MessageSquare className="size-4" />,
+                  disabled: !live || !entry.online,
+                  onSelect: onMessage
+              },
+              // Only while they are on. Unlike Minecraft, where a give to somebody
+              // asleep is written down and handed over when they join, ARK puts
+              // the item into a character that has to be loaded in the world - so
+              // an offline give would be a command the server takes and drops.
+              {
+                  kind: "item",
+                  text: "Give them something",
+                  icon: <PackagePlus className="size-4" />,
+                  disabled: !live || !entry.online,
+                  onSelect: onGive
+              },
+              {
+                  kind: "item",
+                  text: "Give them experience",
+                  icon: <Sparkles className="size-4" />,
+                  disabled: !live || !entry.online,
+                  onSelect: onExperience
+              },
+              { kind: "separator" },
+              // The two that act on the survivor rather than on the account. Both
+              // need the number the game knows them by, which is read out of their
+              // own file - so both refuse, with a reason, for somebody who has
+              // never played here.
+              {
+                  kind: "item",
+                  text: "Kill their survivor",
+                  icon: <Skull className="size-4" />,
+                  danger: true,
+                  disabled: !live || !entry.online,
+                  onSelect: onKill
+              },
+              {
+                  kind: "item",
+                  text: "Empty their inventory",
+                  icon: <PackageMinus className="size-4" />,
+                  danger: true,
+                  disabled: !live || !entry.online,
+                  onSelect: onStrip
+              },
+              // Offered to anybody, because ARK does not say who is banned: the
+              // ban list is the server's own and nothing reads it back, so the
+              // only honest thing is to let it be lifted for whoever it was.
+              {
+                  kind: "item",
+                  text: playerMenuItem.pardon,
+                  icon: <UserPlus className="size-4" />,
+                  disabled: !live,
+                  onSelect: onUnban
+              },
+              { kind: "separator" },
+              // A ban with an end. ARK has no such command - this is its own ban
+              // plus a note Polaris comes back to lift - which is why it is
+              // offered here and not against somebody already serving one.
+              {
+                  kind: "item",
+                  text: playerMenuItem.timeout,
+                  icon: <Timer className="size-4" />,
+                  danger: true,
+                  disabled: !live || timeout !== null,
+                  onSelect: onTimeout
+              }
+          ]
+        : [];
+
     return (
+        <RowContextMenu entries={[...quick, { kind: "separator" } as const, ...more]}>
         <tr
             className={cn(
                 "border-t border-border hover:bg-card-hover",
@@ -1766,179 +1935,27 @@ function ArkPlayerRow({
             </td>
             <td className="px-3 py-2">
                 <div className="flex justify-end gap-1">
-                    {canModerate &&
-                        (entry.standing === "not-allowed" ? (
+                    {/* The same verbs the right button offers, as icons - one list
+                        so a verb added to either is in both. */}
+                    {quick.map((item, index) =>
+                        item.kind === "item" ? (
                             <PlayerIconAction
-                                label={playerAction.allow(entry.name)}
-                                icon={<UserPlus className="size-4" />}
-                                disabled={pending}
-                                onClick={onAllow}
+                                key={index}
+                                label={item.text}
+                                icon={item.icon}
+                                danger={item.danger}
+                                disabled={item.disabled}
+                                onClick={item.onSelect}
                             />
-                        ) : (
-                            <PlayerIconAction
-                                label={playerAction.remove(entry.name)}
-                                icon={<UserMinus className="size-4" />}
-                                disabled={pending}
-                                onClick={onRemove}
-                            />
-                        ))}
-                    {canModerate && entry.online && (
-                        <PlayerIconAction
-                            label={playerAction.kick(entry.name)}
-                            icon={<DoorOpen className="size-4" />}
-                            disabled={!live}
-                            onClick={onKick}
-                        />
+                        ) : null
                     )}
-                    {/* Whichever of the two applies: somebody serving a timeout is
-                        already banned, and the verb they need is the one that ends
-                        it - the same swap the Minecraft row makes. */}
-                    {canModerate &&
-                        (timeout ? (
-                            <PlayerIconAction
-                                label={playerAction.pardon(entry.name)}
-                                icon={<UserPlus className="size-4" />}
-                                disabled={!live}
-                                onClick={onUnban}
-                            />
-                        ) : (
-                            <PlayerIconAction
-                                label={playerAction.ban(entry.name)}
-                                icon={<Ban className="size-4" />}
-                                disabled={!live}
-                                danger
-                                onClick={onBan}
-                            />
-                        ))}
                     {canModerate && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    aria-label={playerAction.more(entry.name)}
-                                    title="More"
-                                >
-                                    <MoreHorizontal className="size-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>{entry.name}</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem disabled={pending} onSelect={onEdit}>
-                                    <Pencil className="size-4" /> {playerMenuItem.edit}
-                                </DropdownMenuItem>
-                                {/* ARK's nearest thing to an operator. Listing
-                                    somebody here lets them run admin commands
-                                    without being told the password - which is the
-                                    only way to take it back from one person
-                                    without changing it for everybody. Offered to
-                                    whoever may manage the server, not to every
-                                    moderator, and it is the file that is written:
-                                    the game reads it when it starts. */}
-                                {canManage && (
-                                    <DropdownMenuItem
-                                        disabled={pending}
-                                        onSelect={() => onAdmin(!admin)}
-                                    >
-                                        {admin ? (
-                                            <ShieldMinus className="size-4" />
-                                        ) : (
-                                            <ShieldPlus className="size-4" />
-                                        )}
-                                        {admin
-                                            ? "Stop them administering it"
-                                            : "Let them administer it"}
-                                    </DropdownMenuItem>
-                                )}
-                                {/* The id is a number, and the question behind it
-                                    is always "who is this" - which only Steam can
-                                    answer. Opening it here is the difference
-                                    between a moderator deciding and guessing. */}
-                                <DropdownMenuItem asChild>
-                                    <a
-                                        href={`https://steamcommunity.com/profiles/${entry.steamId}`}
-                                        target="_blank"
-                                        rel="noreferrer noopener"
-                                    >
-                                        <Eye className="size-4" /> Open their Steam profile
-                                    </a>
-                                </DropdownMenuItem>
-                                {/* Kept whether or not they are on: how much
-                                    somebody has played is exactly the question
-                                    asked about a name that is not there. */}
-                                <DropdownMenuItem onSelect={onHistory}>
-                                    <Clock className="size-4" /> Their history
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    disabled={!live || !entry.online}
-                                    onSelect={onMessage}
-                                >
-                                    <MessageSquare className="size-4" /> {playerMenuItem.message}
-                                </DropdownMenuItem>
-                                {/* Only while they are on. Unlike Minecraft, where
-                                    a give to somebody asleep is written down and
-                                    handed over when they join, ARK puts the item
-                                    into a character that has to be loaded in the
-                                    world - so an offline give would be a command
-                                    the server takes and drops. */}
-                                <DropdownMenuItem
-                                    disabled={!live || !entry.online}
-                                    onSelect={onGive}
-                                >
-                                    <PackagePlus className="size-4" /> Give them something
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    disabled={!live || !entry.online}
-                                    onSelect={onExperience}
-                                >
-                                    <Sparkles className="size-4" /> Give them experience
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                {/* The two that act on the survivor rather than on
-                                    the account. Both need the number the game knows
-                                    them by, which is read out of their own file -
-                                    so both refuse, with a reason, for somebody who
-                                    has never played here. */}
-                                <DropdownMenuItem
-                                    className="text-danger"
-                                    disabled={!live || !entry.online}
-                                    onSelect={onKill}
-                                >
-                                    <Skull className="size-4" /> Kill their survivor
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    className="text-danger"
-                                    disabled={!live || !entry.online}
-                                    onSelect={onStrip}
-                                >
-                                    <PackageMinus className="size-4" /> Empty their inventory
-                                </DropdownMenuItem>
-                                {/* Offered to anybody, because ARK does not say who
-                                    is banned: the ban list is the server's own and
-                                    nothing reads it back, so the only honest thing
-                                    is to let it be lifted for whoever it was. */}
-                                <DropdownMenuItem disabled={!live} onSelect={onUnban}>
-                                    <UserPlus className="size-4" /> {playerMenuItem.pardon}
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                {/* A ban with an end. ARK has no such command - this
-                                    is its own ban plus a note Polaris comes back to
-                                    lift - which is why it is offered here and not
-                                    against somebody already serving one. */}
-                                <DropdownMenuItem
-                                    className="text-danger"
-                                    disabled={!live || timeout !== null}
-                                    onSelect={onTimeout}
-                                >
-                                    <Timer className="size-4" /> {playerMenuItem.timeout}
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <RowMenuButton entries={more} label={playerAction.more(entry.name)} />
                     )}
                 </div>
             </td>
         </tr>
+        </RowContextMenu>
     );
 }
 

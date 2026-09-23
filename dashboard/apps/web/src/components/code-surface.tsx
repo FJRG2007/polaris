@@ -11,10 +11,19 @@
  *
  * The grammar loads once for the language it is given, which is what lets the
  * paint keep up with typing.
+ *
+ * A find paints a third layer UNDER both, never into the painted code: what
+ * highlight.js hands back is HTML, and wrapping a match inside it means cutting
+ * up tags it wrote. The layer below carries the same text with the hits boxed
+ * and everything else invisible, so the colours above it are the ones the
+ * grammar chose and the boxes line up because all three layers share one set of
+ * metrics.
  */
 
 import { cn } from "@polaris/ui";
+import { useEffect, useRef } from "react";
 import { useHighlighter } from "@/lib/code-highlight";
+import { markedParts, type Match } from "@/app/(app)/drive/viewer/find-in-file";
 
 /** Metrics both layers must agree on, to the pixel. */
 const CODE_LAYER = "col-start-1 row-start-1 whitespace-pre p-4 font-mono text-xs leading-relaxed";
@@ -24,7 +33,9 @@ export function CodeSurface({
     language,
     onChange,
     ariaLabel,
-    className
+    className,
+    matches = [],
+    currentMatch = 0
 }: {
     code: string;
     /** A highlight.js token, or null to leave the text unpainted. */
@@ -33,16 +44,49 @@ export function CodeSurface({
     onChange?: (value: string) => void;
     ariaLabel?: string;
     className?: string;
+    /** What a find turned up, painted under the code. */
+    matches?: readonly Match[];
+    /** Which of them somebody is on. It is scrolled to as it changes. */
+    currentMatch?: number;
 }) {
     const highlight = useHighlighter(language);
     const painted = language && highlight ? highlight(code, language) : null;
     const editing = onChange !== undefined;
+    const here = useRef<HTMLElement>(null);
+
+    // The match being stepped through is brought into view rather than left for
+    // somebody to find: a count that says "8 of 40" and does not move the file is
+    // a count about a line nobody can see.
+    useEffect(() => {
+        here.current?.scrollIntoView({ block: "center", inline: "nearest" });
+    }, [currentMatch, matches]);
 
     return (
         <div className={cn("min-h-0 flex-1 overflow-auto overscroll-contain", className)}>
             <div className="flex min-h-full w-fit min-w-full">
                 <LineNumbers count={code.split("\n").length} />
                 <div className="grid flex-1">
+                    {matches.length > 0 ? (
+                        <pre className={cn(CODE_LAYER, "text-transparent")} aria-hidden>
+                            {markedParts(code, matches, currentMatch).map((part, index) =>
+                                part.hit ? (
+                                    <mark
+                                        key={index}
+                                        ref={part.current ? here : undefined}
+                                        className={cn(
+                                            "rounded-sm text-transparent",
+                                            part.current ? "bg-primary/60" : "bg-primary/25"
+                                        )}
+                                    >
+                                        {part.text}
+                                    </mark>
+                                ) : (
+                                    <span key={index}>{part.text}</span>
+                                )
+                            )}
+                            {"\n"}
+                        </pre>
+                    ) : null}
                     {/* The trailing newline gives the last line a box of its own,
                         so the caret at the end of the file stays visible. */}
                     <pre className={CODE_LAYER} aria-hidden={editing}>

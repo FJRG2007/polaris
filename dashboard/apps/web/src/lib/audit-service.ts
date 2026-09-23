@@ -14,6 +14,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
 import { headers } from "next/headers";
 import { createHash } from "node:crypto";
+import { isUuid } from "@/lib/uuid";
 import { clientIp } from "@/lib/request-context";
 import { notifySecurityChange } from "@/lib/notifications/security-events";
 
@@ -87,15 +88,38 @@ const requestSessionId = cache(async (): Promise<string | undefined> => {
  * but never tells is exactly the one somebody taking an account over would use.
  * Which actions those are is decided in notifications/security-events.
  */
+/**
+ * Where a target goes when it is not a uuid.
+ *
+ * `targetId` is a uuid column, and two of Drive's sources have an id that is not
+ * one: `container:<id>` for a deployed service's filesystem and `host:<id>` for a
+ * registered server. Handing either to Prisma throws, and the write below is
+ * swallowed on purpose - so every action anybody took inside those sources was
+ * quietly unrecorded, which is the one outcome an audit log must never have. The
+ * id moves into the metadata instead, under `target`, and the column is left
+ * empty rather than the row being lost.
+ */
+function targetFor(event: AuditEvent): { targetId: string | null; metadata: string | null } {
+    const target = event.targetId ?? null;
+    if (target === null || isUuid(target)) {
+        return {
+            targetId: target,
+            metadata: event.metadata ? JSON.stringify(event.metadata) : null
+        };
+    }
+    return { targetId: null, metadata: JSON.stringify({ ...(event.metadata ?? {}), target }) };
+}
+
 export async function recordAudit(event: AuditEvent): Promise<void> {
+    const aimed = targetFor(event);
     try {
         await prisma.auditLog.create({
             data: {
                 actorId: event.actorId,
                 action: event.action,
                 targetType: event.targetType,
-                targetId: event.targetId,
-                metadata: event.metadata ? JSON.stringify(event.metadata) : null,
+                targetId: aimed.targetId,
+                metadata: aimed.metadata,
                 ipHash: await clientIpHash(),
                 sessionId: event.sessionId ?? (await requestSessionId()),
                 orgId: event.orgId ?? null

@@ -11,6 +11,7 @@
 import { normalizeRelPath } from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
 import { prisma } from "@polaris/db";
+import { isUuid } from "@/lib/uuid";
 import { sessionCan } from "@/lib/session";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { resolveUserNames } from "@/lib/drive-meta-service";
@@ -22,6 +23,18 @@ export const dynamic = "force-dynamic";
 const SCAN_WINDOW = 400;
 /** Events returned for the panel. */
 const MAX_RESULTS = 25;
+
+/** The source an audit row was about, for the rows whose id is not a uuid and so
+ *  lives in the metadata rather than in the column - see `recordAudit`. */
+function targetOf(metadataJson: string | null): string | null {
+    if (!metadataJson) return null;
+    try {
+        const meta = JSON.parse(metadataJson) as { target?: unknown };
+        return typeof meta.target === "string" ? meta.target : null;
+    } catch {
+        return null;
+    }
+}
 
 /** Whether an audit row's metadata references the given path. */
 function touchesPath(metadataJson: string | null, path: string): boolean {
@@ -61,14 +74,25 @@ export async function GET(request: Request): Promise<Response> {
         throw caught;
     }
 
+    // A container or a registered server is browsed under an id that is not a
+    // uuid, and that column is one - asking Prisma for it throws rather than
+    // answering with nothing, which is what took this panel down over a server's
+    // own files. Those rows carry the source in their metadata instead, so they
+    // are narrowed to drive events and matched here.
+    const keyed = isUuid(connectionId);
     const rows = await prisma.auditLog.findMany({
-        where: { targetId: connectionId, action: { startsWith: "drive." } },
+        where: keyed
+            ? { targetId: connectionId, action: { startsWith: "drive." } }
+            : { targetType: "connection", action: { startsWith: "drive." } },
         orderBy: { at: "desc" },
         take: SCAN_WINDOW,
         select: { id: true, action: true, actorId: true, metadata: true, at: true }
     });
 
-    const matched = rows.filter((row) => touchesPath(row.metadata, path)).slice(0, MAX_RESULTS);
+    const matched = rows
+        .filter((row) => keyed || targetOf(row.metadata) === connectionId)
+        .filter((row) => touchesPath(row.metadata, path))
+        .slice(0, MAX_RESULTS);
     const names = await resolveUserNames(
         matched.map((row) => row.actorId).filter((id): id is string => Boolean(id))
     );
