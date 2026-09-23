@@ -22,6 +22,9 @@ import Link from "next/link";
 import { GameConsole } from "./game-console";
 import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
+import { SpigotPluginsCard } from "./minecraft-spigot-plugins";
+import { SPIGET_KEY } from "../../lib/minecraft/spiget";
+import { isPluginLoader, loaderForType } from "../../lib/minecraft/modrinth";
 import type { GameContext } from "./game-context";
 import { MinecraftRules } from "./minecraft-rules";
 import { MinecraftReset } from "./minecraft-reset";
@@ -524,15 +527,30 @@ export function MinecraftPanel({
                 ))}
 
             {tab === "mods" && (
-                <MinecraftMods
-                    installedAppId={installedAppId}
-                    applicationId={applicationId}
-                    settings={settings}
-                    playersOnline={status?.players.online ?? 0}
-                    clientMods={game?.clientMods ?? []}
-                    packCommands={game?.packCommands ?? null}
-                    onSaved={reloadSettings}
-                />
+                <div className="flex flex-col gap-4">
+                    <MinecraftMods
+                        installedAppId={installedAppId}
+                        applicationId={applicationId}
+                        settings={settings}
+                        playersOnline={status?.players.online ?? 0}
+                        clientMods={game?.clientMods ?? []}
+                        packCommands={game?.packCommands ?? null}
+                        onSaved={reloadSettings}
+                    />
+                    {/* A second catalogue rather than a second source in the one
+                        above: SpigotMC publishes a page and a claim about which
+                        releases were tested, where Modrinth publishes builds, and
+                        only one of the two can be checked before installing. Not
+                        shown on a modded server, where every one of these is a jar
+                        the server cannot read. */}
+                    {isPluginLoader(loaderForType(software) ?? "") && (
+                        <SpigotPluginsCard
+                            installedAppId={installedAppId}
+                            value={settings.find((entry) => entry.key === SPIGET_KEY)?.value ?? ""}
+                            onSaved={reloadSettings}
+                        />
+                    )}
+                </div>
             )}
             {tab === "security" && (
                 <div className="flex flex-col gap-4">

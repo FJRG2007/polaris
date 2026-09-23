@@ -480,6 +480,20 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     group: "Mods"
                 },
                 {
+                    // SpigotMC is where most plugins actually are, and the image
+                    // installs them by resource number. Managed from the Mods tab
+                    // like the list above; a number here is a plugin fetched on
+                    // every start, so a resource that is taken down is a plugin
+                    // that stops appearing rather than one that breaks the boot.
+                    key: "SPIGET_RESOURCES",
+                    label: "SpigotMC plugins",
+                    help: "SpigotMC resource numbers to install, comma separated. Managed from the Mods tab.",
+                    default: "",
+                    pluginServersOnly: true,
+                    tunable: true,
+                    group: "Mods"
+                },
+                {
                     key: "MODRINTH_DOWNLOAD_DEPENDENCIES",
                     label: "Dependencies",
                     help: "Whether a mod's own dependencies are installed with it.",

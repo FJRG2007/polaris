@@ -20,6 +20,7 @@ import { findGameIdentity } from "../../lib/game-identity";
 import { isAddressRule } from "../../lib/minecraft/access";
 import { ITEM_ID_PATTERN } from "../../lib/minecraft/items";
 import { stripFormatting } from "../../lib/minecraft/parse";
+import type { SpigotPlugin } from "../../lib/minecraft/spiget";
 import type { PlayerStats } from "../../lib/games-activity";
 import { formatProjectList, loaderForType } from "../../lib/minecraft/modrinth";
 import { CLIENT_MODS_KEY } from "../../lib/minecraft/client-pack";
@@ -1466,6 +1467,70 @@ export async function saveWorldTrimAction(input: WorldTrimInput): Promise<{ erro
     const { WORLD_TRIM_KEY } = await import("../../lib/minecraft/world-trim");
     await patchInstallConfig(installedAppId, { [WORLD_TRIM_KEY]: settings });
     return {};
+}
+
+/**
+ * Search SpigotMC for a plugin.
+ *
+ * On the server rather than in the browser, like the Modrinth browser and for the
+ * same two reasons: the dashboard should not make somebody's machine talk to a
+ * third party to render a page, and what comes back is other people's text, which
+ * is validated into a known shape before anything renders it.
+ */
+export async function searchSpigotAction(
+    installedAppId: string,
+    query: string
+): Promise<{ plugins?: SpigotPlugin[]; error?: string }> {
+    await requireGameServer("games.read", installedAppId);
+    const { searchSpigot } = await import("../../lib/minecraft/spiget");
+    return { plugins: await searchSpigot(query).catch(() => []) };
+}
+
+/** The plugins already on a server's list, as what they are rather than as
+ *  numbers - a list of five-digit ids is not something anybody can read. */
+export async function readSpigotPluginsAction(
+    installedAppId: string,
+    ids: readonly number[]
+): Promise<{ plugins?: SpigotPlugin[]; error?: string }> {
+    await requireGameServer("games.read", installedAppId);
+    const { readSpigotPlugins } = await import("../../lib/minecraft/spiget");
+    return { plugins: await readSpigotPlugins(ids).catch(() => []) };
+}
+
+const spigotListSchema = z.object({
+    installedAppId: z.string().uuid(),
+    ids: z.array(z.number().int().positive().max(9_999_999)).max(100)
+});
+
+/** Write the list. Takes effect on the next restart, which is when the image
+ *  fetches what is on it. */
+export async function saveSpigotPluginsAction(
+    input: z.infer<typeof spigotListSchema>
+): Promise<{ error?: string }> {
+    const parsed = spigotListSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the list and try again" };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const install = await prisma.installedApp.findFirst({
+            where: { id: parsed.data.installedAppId, ownerId: access.ownerId },
+            select: { applicationId: true }
+        });
+        if (!install?.applicationId) throw new Error("This server has not been deployed yet");
+        const { formatSpigetList, SPIGET_KEY } = await import("../../lib/minecraft/spiget");
+        await setEnvVars("application", install.applicationId, access.ownerId, [
+            { key: SPIGET_KEY, value: formatSpigetList(parsed.data.ids), isSecret: false }
+        ]);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.plugins.spigot",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { count: parsed.data.ids.length }
+        });
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not save the list" };
+    }
 }
 
 const backupPolicySchema = z.object({
