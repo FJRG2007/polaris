@@ -36,7 +36,11 @@ import {
 /** What each mode does, in the words the operator has to choose between. */
 const MODES: { value: GameScheduleMode; label: string; hint: string }[] = [
     { value: "on", label: "Keep running", hint: "Started if it is down." },
-    { value: "sleep", label: "Sleep when empty", hint: "Stopped once nobody has played for a while." },
+    {
+        value: "sleep",
+        label: "Sleep when empty",
+        hint: "Stopped once nobody has played for a while. It gives its memory back and somebody has to start it again."
+    },
     { value: "off", label: "Keep stopped", hint: "Stopped even if somebody is on." }
 ];
 
@@ -109,6 +113,18 @@ export function MinecraftSchedule({
                         <p className="max-w-xl text-xs text-muted-foreground">
                             Hours the server is kept up, and hours it may stop once nobody is playing. Times are read
                             where you say, not where the machine is. Nothing here restarts the server to take effect.
+                        </p>
+                        {/* The distinction people arrive here looking for and do
+                            not find: stopping a server frees its memory and needs
+                            somebody to start it again, while the server's own
+                            pause costs nothing and ends by itself. Most of what
+                            somebody wants from "stop it when nobody is playing" is
+                            the second one. */}
+                        <p className="max-w-xl text-xs text-muted-foreground">
+                            To have it go quiet without anybody starting it again, leave the schedule off and set{" "}
+                            <span className="font-medium text-foreground">Pause when nobody is playing</span> under
+                            Settings. The server keeps its address, stops using the processor, and comes back the
+                            moment somebody joins.
                         </p>
                     </div>
                     <Switch

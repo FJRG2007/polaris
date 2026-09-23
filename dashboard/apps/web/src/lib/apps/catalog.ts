@@ -63,7 +63,7 @@ export interface TemplateEnvOption {
  * dies on `8GB`, and the death is a container restart loop with the reason buried
  * in a log nobody opens. A server sat down for ten days on exactly that.
  */
-export type EnvValueFormat = "jvm-heap";
+export type EnvValueFormat = "jvm-heap" | "seconds";
 
 /** A single environment variable the install wizard collects or defaults. */
 export interface TemplateEnvVar {
@@ -368,6 +368,23 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     label: "Minecraft version",
                     help: "LATEST tracks the newest release. Pin one (1.21.4) to keep clients and mods matched.",
                     default: "LATEST",
+                    tunable: true,
+                    group: "Server"
+                },
+                {
+                    // The server's own pause, not Polaris stopping anything. Since
+                    // 1.21.2 a Java server stops ticking when the last player
+                    // leaves and resumes the instant somebody connects, keeping
+                    // its port open the whole time - so it costs nothing, needs
+                    // nobody to press start, and is the thing people actually mean
+                    // by "stop it when nobody is playing". It frees processor
+                    // rather than memory; a server that must give its memory back
+                    // is a schedule that stops the container.
+                    key: "PAUSE_WHEN_EMPTY_SECONDS",
+                    label: "Pause when nobody is playing",
+                    help: "Seconds with nobody on before the server stops ticking. It keeps its address and comes back the moment somebody joins, so nobody has to start it again. Zero never pauses. Minecraft 1.21.2 and later.",
+                    default: "60",
+                    format: "seconds",
                     tunable: true,
                     group: "Server"
                 },
@@ -1283,6 +1300,7 @@ export function normalizeEnvValue(field: TemplateEnvVar, value: string): string 
  *  refusal names the shape the same way wherever the value was typed. */
 export function envFormatHint(field: TemplateEnvVar): string {
     if (field.format === "jvm-heap") return "give a size with a unit, like 2G or 2048M";
+    if (field.format === "seconds") return "give a whole number of seconds";
     return "that is not a value this setting accepts";
 }
 
@@ -1293,6 +1311,7 @@ export function isAllowedEnvValue(field: TemplateEnvVar, value: string): boolean
     if (field.required && value.trim().length === 0) return false;
     if (field.options) return field.options.some((option) => option.value === value);
     if (field.format === "jvm-heap") return /^\d{1,6}[GMK]$/.test(value);
+    if (field.format === "seconds") return /^\d{1,7}$/.test(value);
     return value.length <= 4096;
 }
 
