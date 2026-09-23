@@ -37,7 +37,7 @@ import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
 import type { MailTemplateView } from "@/lib/mailbox/templates";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { useRef, useMemo, useState, useEffect, useCallback } from "react";
+import { useRef, useMemo, useState, useEffect, useCallback, type RefObject } from "react";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { keepSignatureDelimiter, signatureBlock, withSignature } from "./signature";
 import { draftSaves, type DraftFields, type DraftSaves, type DraftWriter } from "./draft-saves";
@@ -104,6 +104,47 @@ const writeDraft: DraftWriter = async (fields, id) => {
 };
 
 /** A route's answer, when there is one to read. */
+/**
+ * Say how much of the bottom right corner this panel is taking.
+ *
+ * That corner is shared. The composer docks into it, the countdown that replaces
+ * the composer after Send sits in it, and the card that reports a file being
+ * uploaded is fixed to it too - and they were all on the same layer, so
+ * attaching anything drew the progress card into the composer, over the
+ * attachments it was reporting on and over the Send button.
+ *
+ * A length rather than a flag, because what is docked there is three different
+ * heights and on a phone it is whatever its contents come to. Whoever else wants
+ * the corner reads it (`transfers-view`) and sits above it.
+ */
+function useDockedCorner(node: RefObject<HTMLElement | null>, docked: boolean): void {
+    useEffect(() => {
+        const element = node.current;
+        if (!element || !docked) {
+            document.body.style.removeProperty(DOCKED_HEIGHT);
+            return;
+        }
+        const publish = (): void => {
+            document.body.style.setProperty(
+                DOCKED_HEIGHT,
+                `${Math.round(element.getBoundingClientRect().height)}px`
+            );
+        };
+        publish();
+        // It changes size as recipients wrap, as files are attached, and when it
+        // is minimized - and a stale height is a card floating in mid air.
+        const watch = new ResizeObserver(publish);
+        watch.observe(element);
+        return () => {
+            watch.disconnect();
+            document.body.style.removeProperty(DOCKED_HEIGHT);
+        };
+    }, [node, docked]);
+}
+
+/** The length both sides of that arrangement name. */
+const DOCKED_HEIGHT = "--docked-panel-height";
+
 function parsed(body: string): unknown {
     try {
         return JSON.parse(body || "null");
@@ -484,38 +525,9 @@ export function Composer() {
           })
         : "";
 
-    /**
-     * How much of the corner this is taking, for whatever else lives in it.
-     *
-     * The transfer card that appears while a file uploads is fixed to the same
-     * corner, so without this it lands on top of the attachment strip and the
-     * Send button the moment somebody attaches anything. Published as a length
-     * rather than a flag because the composer is three different heights, and on
-     * a phone it is whatever its contents come to.
-     *
-     * Nothing is published when it is taking the whole screen: there is no room
-     * left to sit above, so the card stays where it is and is drawn over it.
-     */
-    useEffect(() => {
-        const node = shell.current;
-        if (!node || posture === "full" || queued) {
-            document.body.style.removeProperty("--docked-panel-height");
-            return;
-        }
-        const publish = (): void => {
-            document.body.style.setProperty(
-                "--docked-panel-height",
-                `${Math.round(node.getBoundingClientRect().height)}px`
-            );
-        };
-        publish();
-        const watch = new ResizeObserver(publish);
-        watch.observe(node);
-        return () => {
-            watch.disconnect();
-            document.body.style.removeProperty("--docked-panel-height");
-        };
-    }, [posture, queued]);
+    // Nothing is published while the composer takes the whole screen: there is no
+    // room left to sit above, so the card floats over it instead.
+    useDockedCorner(shell, posture !== "full" && !queued);
 
     const shellClass =
         posture === "full"
@@ -1040,8 +1052,15 @@ function QueuedPill({
 
     const waiting = scheduled || left > 0;
 
+    // The corner is this pill's while it is counting down, and what it holds -
+    // Undo - stops existing when the countdown does. A card drawn over that is
+    // worse than one drawn over a message somebody can still edit.
+    const pill = useRef<HTMLDivElement | null>(null);
+    useDockedCorner(pill, true);
+
     return (
         <div
+            ref={pill}
             className={cn(
                 "fixed inset-x-4 bottom-4 z-40 flex items-center gap-1 rounded-full border border-border bg-elevated py-1 pl-4 pr-1 shadow-modal md:inset-x-auto md:right-6",
                 "animate-in fade-in slide-in-from-bottom-2 zoom-in-95 duration-300 motion-reduce:animate-none"

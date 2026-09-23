@@ -31,14 +31,22 @@ const transfers = readFileSync(
 const HEIGHT = "--docked-panel-height";
 
 describe("the corner the composer and the transfer card share", () => {
-    it("has the composer say how much of it it takes", () => {
-        expect(composer).toContain(`setProperty(\n                "${HEIGHT}"`);
+    it("has whatever is docked there say how much of it it takes", () => {
+        expect(composer).toContain(`const DOCKED_HEIGHT = "${HEIGHT}"`);
+        expect(composer).toContain("setProperty(");
     });
 
-    it("has the composer give it back", () => {
+    it("has it give the corner back", () => {
         // Twice: when it stops being docked, and when it unmounts. A length left
         // behind is every later upload floating in the middle of the screen.
-        expect(composer.split(`removeProperty("${HEIGHT}")`)).toHaveLength(3);
+        expect(composer.split("removeProperty(DOCKED_HEIGHT)")).toHaveLength(3);
+    });
+
+    it("counts the countdown as docked too", () => {
+        // Undo is the one thing on this screen that expires, so a progress card
+        // drawn over it is worse than one drawn over a message that can still be
+        // edited.
+        expect(composer).toContain("useDockedCorner(pill, true)");
     });
 
     it("stops publishing when the composer takes the whole screen", () => {
