@@ -349,33 +349,67 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
         }
     }
 
-    it.runIf(HAS_SH)("move aside a hand-installed copy of a pack mod, from a shell", async () => {
-        await setsAside("sh");
-    });
+    /**
+     * These six are not unit tests and cannot be timed like them.
+     *
+     * Each one writes a real installer to a temporary folder and runs it several
+     * times through a real shell, which is the whole point - what is being
+     * checked is what the script does to somebody's mods folder, and a mocked
+     * shell would check nothing. That costs tens of seconds, against a suite
+     * whose other nine thousand tests cost milliseconds; on a busy machine the
+     * suite-wide thirty seconds times the machine rather than the test, and this
+     * file fails in a full run while passing on its own.
+     *
+     * Four minutes each. A script that genuinely hangs still fails, it just
+     * fails on evidence.
+     */
+    const SHELL_RUN_MS = 240_000;
+
+    it.runIf(HAS_SH)(
+        "move aside a hand-installed copy of a pack mod, from a shell",
+        async () => {
+            await setsAside("sh");
+        },
+        SHELL_RUN_MS
+    );
 
     it.runIf(POWERSHELL)(
         "move aside a hand-installed copy of a pack mod, from PowerShell",
         async () => {
             await setsAside("ps1");
-        }
+        },
+        SHELL_RUN_MS
     );
 
-    it.runIf(HAS_SH)("install, keep and update a mods folder, from a shell", async () => {
-        await exercise("sh");
-    });
+    it.runIf(HAS_SH)(
+        "install, keep and update a mods folder, from a shell",
+        async () => {
+            await exercise("sh");
+        },
+        SHELL_RUN_MS
+    );
 
-    it.runIf(POWERSHELL)("install, keep and update a mods folder, from PowerShell", async () => {
-        await exercise("ps1");
-    });
+    it.runIf(POWERSHELL)(
+        "install, keep and update a mods folder, from PowerShell",
+        async () => {
+            await exercise("ps1");
+        },
+        SHELL_RUN_MS
+    );
 
-    it.runIf(HAS_SH)("take nothing away on a partial or empty list, from a shell", async () => {
-        await refuses("sh");
-    });
+    it.runIf(HAS_SH)(
+        "take nothing away on a partial or empty list, from a shell",
+        async () => {
+            await refuses("sh");
+        },
+        SHELL_RUN_MS
+    );
 
     it.runIf(POWERSHELL)(
         "take nothing away on a partial or empty list, from PowerShell",
         async () => {
             await refuses("ps1");
-        }
+        },
+        SHELL_RUN_MS
     );
 });
