@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
+import { connectionSections, type ConnectionCategory } from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ExternalLink, KeyRound, Loader2, Plus, RefreshCw, Unlink } from "lucide-react";
@@ -54,6 +55,8 @@ export interface LinkedAccount {
 export interface ConnectionProviderCard {
     slug: string;
     name: string;
+    /** Which section it is listed under, from the provider catalogue. */
+    category: ConnectionCategory;
     summary: string;
     description: string;
     acceptsToken: boolean;
@@ -111,14 +114,32 @@ export function ConnectionsView({ providers }: { providers: ConnectionProviderCa
         window.history.replaceState(null, "", url.toString());
     }, []);
 
+    // The accounts most people link come first; the ones for building and
+    // shipping sit under a heading of their own below them. Which is which is
+    // the catalogue's to say, so a provider added later lands in its section
+    // without this screen being touched.
     return (
-        <div className="flex flex-col gap-3">
-            {providers.map((provider) => (
-                <ProviderCard
-                    key={provider.slug}
-                    provider={provider}
-                    notice={notice?.provider === provider.slug ? notice : null}
-                />
+        <div className="flex flex-col gap-6">
+            {connectionSections(providers).map((section) => (
+                <section
+                    key={section.id}
+                    aria-labelledby={`connections-${section.id}`}
+                    className="flex flex-col gap-3"
+                >
+                    <h2
+                        id={`connections-${section.id}`}
+                        className="text-sm font-medium text-muted-foreground"
+                    >
+                        {section.label}
+                    </h2>
+                    {section.providers.map((provider) => (
+                        <ProviderCard
+                            key={provider.slug}
+                            provider={provider}
+                            notice={notice?.provider === provider.slug ? notice : null}
+                        />
+                    ))}
+                </section>
             ))}
         </div>
     );
@@ -175,7 +196,7 @@ function ProviderCard({
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                            <h2 className="truncate text-sm font-medium">{provider.name}</h2>
+                            <h3 className="truncate text-sm font-medium">{provider.name}</h3>
                             {provider.limit > 1 ? (
                                 <Badge variant="neutral">
                                     {accounts.length} of {provider.limit}

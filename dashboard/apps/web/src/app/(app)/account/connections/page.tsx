@@ -24,6 +24,7 @@ export default async function ConnectionsPage() {
         CONNECTION_PROVIDERS.map(async (provider) => ({
             slug: provider.slug,
             name: provider.name,
+            category: provider.category,
             summary: provider.summary,
             description: provider.description,
             acceptsToken: provider.acceptsToken,

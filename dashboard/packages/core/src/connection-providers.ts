@@ -55,9 +55,41 @@ export type ConnectionProviderSlug =
     | "railway"
     | "aws";
 
+/**
+ * Which section of Connected accounts a service is listed under.
+ *
+ * "general" is the accounts a person has anyway - their mail, their games, their
+ * files. "developer" is the ones somebody links to build and ship with, which
+ * most people will never touch and which would otherwise sit between the ones
+ * they came for.
+ */
+export type ConnectionCategory = "general" | "developer";
+
+/** The sections, in the order the screen lists them, with their headings. */
+export const CONNECTION_CATEGORIES: readonly { id: ConnectionCategory; label: string }[] = [
+    { id: "general", label: "General" },
+    { id: "developer", label: "Developers" }
+];
+
+/**
+ * A list of providers split into the sections above, in section order and with
+ * each provider keeping its place within its own. A section with nothing in it
+ * is left out rather than drawn as a heading over nothing.
+ */
+export function connectionSections<T extends { category: ConnectionCategory }>(
+    providers: readonly T[]
+): { id: ConnectionCategory; label: string; providers: T[] }[] {
+    return CONNECTION_CATEGORIES.map((section) => ({
+        ...section,
+        providers: providers.filter((provider) => provider.category === section.id)
+    })).filter((section) => section.providers.length > 0);
+}
+
 export interface ConnectionProvider {
     slug: ConnectionProviderSlug;
     name: string;
+    /** Which section of the screen it is listed under. */
+    category: ConnectionCategory;
     /** One line on the card, in the second person: this is somebody's own account. */
     summary: string;
     /** What the link is used for, shown under the accounts. */
@@ -109,6 +141,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
     {
         slug: "github",
         name: "GitHub",
+        category: "developer",
         summary: "Deploy your repositories and let a runner pool serve them.",
         description:
             "Polaris lists the repositories your account reaches, builds the private ones, and can point a runner pool at them. Unlinking stops all three.",
@@ -127,6 +160,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
     {
         slug: "vercel",
         name: "Vercel",
+        category: "developer",
         summary: "Run some of your services on Vercel and keep watching them from here.",
         description:
             "Polaris lists the projects your token reaches, shows what each one has deployed and can redeploy it. Vercel still does the building and the serving; unlinking stops Polaris seeing any of it.",
@@ -146,6 +180,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
     {
         slug: "railway",
         name: "Railway",
+        category: "developer",
         summary: "Run some of your services on Railway and keep watching them from here.",
         description:
             "Polaris lists the projects your token reaches, shows what each service has deployed and can redeploy it. Railway still does the building and the serving; unlinking stops Polaris seeing any of it.",
@@ -163,6 +198,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
     {
         slug: "aws",
         name: "AWS",
+        category: "developer",
         summary: "Watch what you run on ECS or Amplify, and release it again from here.",
         description:
             "Polaris lists the ECS services and Amplify branches your key can see in one region, shows what each last released and can ask for another. AWS still does the building and the serving; unlinking stops Polaris seeing any of it. App Runner is not offered - AWS closed it to new customers in March 2026.",
@@ -182,6 +218,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
     {
         slug: "google",
         name: "Google",
+        category: "general",
         summary: "Show your calendar next to your work, and keep backups in your Drive.",
         description:
             "Read-only access to your calendar, so the schedule views can put your meetings beside your tasks. Polaris never writes to it. Connecting Drive as a backup destination asks separately, and only for the folder it creates.",
@@ -196,6 +233,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
     {
         slug: "microsoft",
         name: "Microsoft",
+        category: "general",
         summary: "Keep backups in your OneDrive.",
         description:
             "Access to the files Polaris creates in your OneDrive, so a backup can be copied somewhere that survives this machine. Unlinking stops the copies; the ones already there stay where they are.",
@@ -216,6 +254,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
     {
         slug: "steam",
         name: "Steam",
+        category: "general",
         summary: "Be let onto a game server without anybody asking for your Steam id.",
         description:
             "ARK closes its door by Steam id, not by name. Linking your account is what lets whoever runs a server add you by your Polaris name and have the right id arrive with it. Polaris reads nothing else from Steam and can do nothing with your account.",
@@ -235,6 +274,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
     {
         slug: "epic",
         name: "Epic Games",
+        category: "general",
         summary: "Be recognised on a game server you own the game on through Epic.",
         description:
             "Games bought on the Epic Store identify a player by an Epic account id rather than a Steam one. Linking yours is what lets whoever runs a server know which of those you are. Polaris reads your account id and display name and nothing else.",
@@ -250,6 +290,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
     {
         slug: "minecraft",
         name: "Minecraft",
+        category: "general",
         summary: "Be added to a Minecraft server by name, spelled the way Mojang spells it.",
         description:
             "A Minecraft server lets people in by username, and one wrong letter is a player who cannot join with nothing saying why. Linking your account hands over the name and the account id it belongs to, so whoever runs a server can add you by your Polaris name instead. Polaris reads your profile once and keeps nothing it could act with.",
@@ -265,6 +306,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
     {
         slug: "discord",
         name: "Discord",
+        category: "general",
         summary: "Be recognised by the servers and screens that know you by your Discord account.",
         description:
             "A FiveM server identifies a player by their Discord account and nothing else. Linking yours records that account id and the name you go by against your Polaris account, so it is held here in a form that cannot be mistyped rather than copied out of Discord and sent over chat. It also hands over your address and the list of servers you are in - their names, and nothing inside them. Polaris never posts as you and never reads your messages.",
@@ -289,6 +331,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
     {
         slug: "dropbox",
         name: "Dropbox",
+        category: "general",
         summary: "Keep backups in your Dropbox.",
         description:
             "Access to the folder Polaris creates in your Dropbox, so a backup can be copied off this machine. Unlinking stops the copies; the ones already there stay where they are.",

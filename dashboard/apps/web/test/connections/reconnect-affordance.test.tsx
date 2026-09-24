@@ -33,6 +33,7 @@ function card(overrides: Partial<Card> = {}, account: Record<string, unknown> = 
     return {
         slug: "discord",
         name: "Discord",
+        category: "general",
         summary: "Be recognised by the servers that know you by your Discord account.",
         description: "A FiveM server identifies a player by their Discord account.",
         acceptsToken: false,
