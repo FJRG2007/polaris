@@ -23,7 +23,7 @@ import { experienceCommand, type ExperienceChange } from "./experience";
 import { readCrashLoop, readRestartWatch } from "../games-health";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
-import { broadcastArgv, sayArgv } from "./broadcast";
+import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -265,10 +265,21 @@ export async function broadcastToMinecraft(
 }
 
 /** A console line the operator typed. Split on whitespace, because that is what
- *  the in-game console does with it too. */
+ *  the in-game console does with it too - except a line that talks to players,
+ *  which is written as Polaris rather than as `Rcon` (`consoleBroadcastArgv`). */
 export async function runConsoleLine(ownerId: string, installedAppId: string, line: string): Promise<string> {
     const trimmed = line.trim().replace(/^\//, "");
     assertSafeArgument(trimmed);
+    const install = await resolveInstall(ownerId, installedAppId);
+    const written = consoleBroadcastArgv(install.edition, trimmed);
+    if (written) {
+        try {
+            return await execCommand(install, ownerId, written);
+        } catch {
+            // A server that will not take the written form still gets the line
+            // as typed: arriving as `[Rcon]` beats not arriving.
+        }
+    }
     return runServerCommand(ownerId, installedAppId, trimmed.split(/\s+/));
 }
 

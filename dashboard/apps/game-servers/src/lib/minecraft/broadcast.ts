@@ -46,3 +46,49 @@ export function broadcastArgv(edition: MinecraftEdition, message: string): strin
         ])
     ];
 }
+
+/** The verbs that whisper to one player: `tell`, and the two names it also goes by. */
+const WHISPERS = new Set(["tell", "msg", "w"]);
+
+/**
+ * The same, for a line somebody typed into the console or scheduled as a command.
+ *
+ * The first version of this left typed lines alone, on the reasoning that the
+ * sender "really is" the operator there - but over RCON the server names nobody
+ * of the kind: `say hello` from the console reached everybody as `[Rcon] hello`,
+ * exactly the plumbing this exists to hide. So `say` is written as a Polaris
+ * line, and a whisper (`tell`, `msg`, `w`) reaches its one player the same way.
+ *
+ * Null for every other line, which is sent as typed. Also null for a whisper with
+ * no message, which the server should answer with its own usage line.
+ */
+export function consoleBroadcastArgv(edition: MinecraftEdition, line: string): string[] | null {
+    const typed = line.trim().replace(/^\//, "");
+    const [verb = "", ...rest] = typed.split(/\s+/);
+    const command = verb.toLowerCase();
+    if (command === "say") {
+        const message = typed.slice(verb.length).trim();
+        return message ? broadcastArgv(edition, message) : null;
+    }
+    if (WHISPERS.has(command) && rest.length >= 2) {
+        const target = rest[0] as string;
+        const message = typed.slice(typed.indexOf(target, verb.length) + target.length).trim();
+        if (!message) return null;
+        if (edition === "bedrock") {
+            return [
+                "tellraw",
+                target,
+                JSON.stringify({ rawtext: [{ text: `[${BROADCAST_TAG}] ${message}` }] })
+            ];
+        }
+        return [
+            "tellraw",
+            target,
+            JSON.stringify([
+                { text: `[${BROADCAST_TAG}] `, color: "gray" },
+                { text: message, color: "gray", italic: true }
+            ])
+        ];
+    }
+    return null;
+}

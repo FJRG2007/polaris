@@ -72,3 +72,40 @@ describe("the fallback", () => {
         expect(sayArgv(WARNING)).toEqual(["say", `[${BROADCAST_TAG}] ${WARNING}`]);
     });
 });
+
+describe("a line typed into the console", () => {
+    it("says a `say` as Polaris, not as Rcon", async () => {
+        const { consoleBroadcastArgv, broadcastArgv } = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/broadcast"
+        );
+        expect(consoleBroadcastArgv("java", "say hola a todos")).toEqual(
+            broadcastArgv("java", "hola a todos")
+        );
+        expect(consoleBroadcastArgv("java", "/SAY  hola")).toEqual(broadcastArgv("java", "hola"));
+        expect(consoleBroadcastArgv("bedrock", "say hola")).toEqual(broadcastArgv("bedrock", "hola"));
+    });
+
+    it("whispers to the one player as Polaris", async () => {
+        const { consoleBroadcastArgv } = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/broadcast"
+        );
+        for (const verb of ["tell", "msg", "w"]) {
+            const argv = consoleBroadcastArgv("java", `${verb} ErMigue04 ven al spawn`);
+            expect(argv?.slice(0, 2)).toEqual(["tellraw", "ErMigue04"]);
+            expect(JSON.parse(argv?.[2] ?? "[]")).toEqual([
+                { text: "[Polaris] ", color: "gray" },
+                { text: "ven al spawn", color: "gray", italic: true }
+            ]);
+        }
+    });
+
+    it("leaves every other line, and an empty message, as typed", async () => {
+        const { consoleBroadcastArgv } = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/broadcast"
+        );
+        expect(consoleBroadcastArgv("java", "op ErMigue04")).toBeNull();
+        expect(consoleBroadcastArgv("java", "say")).toBeNull();
+        expect(consoleBroadcastArgv("java", "tell ErMigue04")).toBeNull();
+        expect(consoleBroadcastArgv("java", "sayhello")).toBeNull();
+    });
+});
