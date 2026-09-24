@@ -2442,6 +2442,12 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     : { ok: false, error: "Nothing came back from that server." };
 
             case "itemsFor": {
+                // Said, rather than answered with an empty list: a locked vault
+                // under the box read as "nothing saved for this site", which is
+                // wrong and sends somebody off to save a login they already have.
+                if (!(await vault())) {
+                    return { ok: false, error: "Unlock Polaris from the toolbar to fill this." };
+                }
                 const vaults = await vaultNames();
                 // The page's own address where a page asked, never the one it
                 // named: an inline script that could ask about another site would
@@ -2672,7 +2678,7 @@ browser.tabs.onUpdated.addListener((_id, change) => {
  * grant; this only reads it. See `injectableOrigins` for why it is an answer of
  * its own rather than read off the grant.
  */
-const EVERYWHERE = storage.defineItem<boolean>("local:inline.everywhere", { fallback: false });
+const EVERYWHERE = storage.defineItem<boolean>("local:inline.everywhere", { fallback: true });
 
 /** The id the inline script is registered under, so the old registration can be
  *  found and replaced rather than piling up. */

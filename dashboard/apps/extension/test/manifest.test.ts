@@ -41,10 +41,12 @@ describe("the Chromium manifest", () => {
         expect(found).toContain("object-src 'self'");
     });
 
-    it("still asks for the address permission at runtime rather than up front", () => {
+    it("holds every web page, and nothing that is not one", () => {
+        // What puts the list of logins under a login box on every site, the way
+        // a password manager's is. Web pages only: no file://, no browser pages.
         const manifest = manifestFor({ browser: "chrome", manifestVersion: 3 });
-        expect(manifest["host_permissions"]).toBeUndefined();
-        expect(manifest["optional_host_permissions"]).toEqual(["https://*/*", "http://*/*"]);
+        expect(manifest["host_permissions"]).toEqual(["https://*/*", "http://*/*"]);
+        expect(manifest["optional_host_permissions"]).toBeUndefined();
     });
 });
 

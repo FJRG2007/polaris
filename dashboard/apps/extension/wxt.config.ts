@@ -3,13 +3,19 @@ import { defineConfig } from "wxt";
 /**
  * What the extension asks the browser for, and deliberately does not.
  *
- * **No host permission is declared up front.** Every Polaris is on somebody
- * else's domain, so there is no origin to name at build time - and an extension
- * that shipped `*://*//*` in `host_permissions` would be asking to read every
- * page on the web before it has been told which server it belongs to. The origin
- * is requested at runtime, once, for the address the person typed
- * (`src/lib/server.ts`), which is also what makes the vault calls exempt from
- * CORS: nothing on the Polaris side answers a preflight.
+ * **Every web page, on Chromium.** The list of logins and codes under a login
+ * box has to be there on whatever site somebody opens, the way a password
+ * manager's is - and a script can only be put inside a page the extension has
+ * access to. Asked for one site at a time, from a switch in the popup, it was a
+ * feature nobody found: installed, it showed up nowhere. So Chromium's build
+ * declares every https and http page like every password manager does, the
+ * browser says so once at install, and the popup's "Only some sites" narrows it
+ * back for anybody who wants that. The Polaris server's own origin is covered by
+ * the same grant, which is also what makes the vault calls exempt from CORS.
+ *
+ * Firefox's build keeps asking at runtime (`src/lib/server.ts`): manifest v2
+ * cannot register a script at runtime at all, so a standing grant would buy
+ * nothing there.
  *
  * `activeTab` and `scripting` are what filling a form needs: the tab in front of
  * somebody, at the moment they ask for it, rather than a standing hold on every
@@ -75,14 +81,14 @@ export default defineConfig({
                 description: "Fill the login for this page"
             }
         },
-        // The same request, under the name each manifest version has for it.
-        // `optional_host_permissions` does not exist in version 2 and WXT does not
-        // translate it, so it was simply absent from the Firefox build - and an
-        // origin that is in no optional list is one `permissions.request` refuses,
-        // which left the extension unable to reach any server at all there.
+        // Every web page on version 3 (see the top of this file), and the
+        // runtime request on version 2, under the name version 2 has for it:
+        // `optional_host_permissions` does not exist there and WXT does not
+        // translate it, and an origin in no optional list is one
+        // `permissions.request` refuses - no server could be reached at all.
         ...(manifestVersion === 3
             ? {
-                  optional_host_permissions: ["https://*/*", "http://*/*"],
+                  host_permissions: ["https://*/*", "http://*/*"],
                   /**
                    * WebAssembly, which a vault on Argon2id is opened through.
                    *

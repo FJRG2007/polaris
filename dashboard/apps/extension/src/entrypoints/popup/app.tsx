@@ -669,15 +669,15 @@ function Unlock({
 
 /** The answer the worker reads when it registers the inline script. Written
  *  here and nowhere else, from the press that asked the browser for the grant. */
-const EVERYWHERE = storage.defineItem<boolean>("local:inline.everywhere", { fallback: false });
+const EVERYWHERE = storage.defineItem<boolean>("local:inline.everywhere", { fallback: true });
 
 /**
  * "Show Polaris on every site": the list under a login box on every page, the
  * way a password manager usually works, rather than one site at a time.
  *
- * Off until somebody turns it on, because what it asks the browser for is to
- * run inside every page they open - and that is theirs to agree to, in a prompt
- * the browser draws, not something this extension takes at install.
+ * On from the start on Chromium, whose build holds every web page (see
+ * `wxt.config.ts`); where the grant is missing - a browser that let somebody
+ * withhold it - turning it on asks for it again in the browser's own prompt.
  *
  * Turning it off stops the registration but keeps the grant: the broad grant
  * covers the Polaris server too, and giving it back could cut the vault off from

@@ -15,11 +15,11 @@
  * extension exists not to take. A grant that broad is permission to ask, not an
  * instruction to inject everywhere: the sites still arrive one at a time.
  *
- * **Unless somebody asked for exactly that.** "Show Polaris on every site" in
- * the popup is the one switch that does, and it is a separate, stored answer
- * (`everywhere`) rather than something read off the grant: the grant alone can
- * come from the browser's own site-access menu or from connecting a server, and
- * neither of those is somebody saying "on every page".
+ * **Unless it is meant to be everywhere,** which is the default: `everywhere`
+ * is the stored answer to the popup's "Every site" / "Only some sites" switch,
+ * on until somebody turns it off. It is an answer of its own rather than read
+ * off the grant, so turning it off takes the script out of every page without
+ * giving back the grant the vault reaches its own server through.
  *
  * Pure, so the rule can be asserted without a browser - which matters here more
  * than usual, because being wrong in the generous direction is not visible from

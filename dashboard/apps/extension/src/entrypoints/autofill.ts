@@ -183,7 +183,14 @@ async function start(): Promise<void> {
                 return;
             }
             const reply = await askBackground({ kind: "itemsFor", url: location.href });
-            const items = reply.ok && "items" in reply ? reply.items : [];
+            if (!reply.ok) {
+                // Locked, most often. Not offered by itself - a panel that drops
+                // down only to say "locked" on every click is one people learn to
+                // swat - but the mark answers with why it has nothing.
+                if (!offered) menu(field, [], reply.error, async () => undefined);
+                return;
+            }
+            const items = "items" in reply ? reply.items : [];
             if (role === "code") {
                 const withCode = items.filter((item) => item.totp);
                 if (offered && withCode.length === 0) return;
