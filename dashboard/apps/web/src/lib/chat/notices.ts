@@ -14,10 +14,13 @@
  * happened, by whoever opens the room, in the order it happened in. Nothing is
  * pushed to anybody's bell.
  *
- * **It does not move the conversation or light the badge.** `lastMessageAt` is
- * left alone and the unread count skips system messages, so a room does not
- * jump to the top of everybody's list because somebody walked in. A badge that
- * counts events nobody said is a badge people stop trusting.
+ * **In a DM or a group it moves the conversation, and never lights the
+ * badge.** Somebody added, somebody gone, a call started or hung up is, to the
+ * person scanning their list, something that happened in that conversation -
+ * the same as a message - so `lastMessageAt` moves with it and it rises to the
+ * top. A space's channels are ordered by the space, not by activity, and are
+ * left alone. The unread count still skips system messages: a badge that counts
+ * events nobody said is a badge people stop trusting.
  *
  * **It never fails the thing it is about.** Joining, leaving and being added
  * are membership writes that have already happened by the time this runs; a
@@ -33,7 +36,7 @@
 
 import { prisma } from "@polaris/db";
 import { publishChatChange } from "./live";
-import { noticeBody, type ChatNoticeKind, type NoticePerson } from "./notice-text";
+import { announcesCalls, noticeBody, type ChatNoticeKind, type NoticePerson } from "./notice-text";
 
 /** Who a notice is about and, when somebody else did it, who that was. */
 interface NoticeCast {
@@ -91,9 +94,19 @@ export async function postNoticeBody(
 }
 
 async function writeNotice(channelId: string, body: string, actorId: string): Promise<void> {
-    await prisma.chatMessage.create({
-        data: { channelId, kind: "system", authorId: null, body }
+    const notice = await prisma.chatMessage.create({
+        data: { channelId, kind: "system", authorId: null, body },
+        select: { createdAt: true, channel: { select: { kind: true } } }
     });
+    // Right after the line, the way a message moves it - see the top of this
+    // file for why only a DM or a group. Not in one transaction with it: the line
+    // is the record, and a list that failed to re-sort must not take it back.
+    if (notice && announcesCalls(notice.channel?.kind ?? "")) {
+        await prisma.chatChannel
+            .update({ where: { id: channelId }, data: { lastMessageAt: notice.createdAt } })
+            .catch(() => undefined);
+    }
+    // The rail refetches on this and re-sorts by the moved `lastMessageAt`.
     publishChatChange({ channelId, kind: "posted", actorId });
 }
 

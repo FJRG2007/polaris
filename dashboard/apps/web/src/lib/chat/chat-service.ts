@@ -1538,8 +1538,8 @@ export async function openDirect(
             // and the one thing everybody does next is look for it.
             //
             // Nothing reads this as "somebody has spoken here": its readers are the
-            // two rails that order by it and the send that moves it. A notice
-            // deliberately leaves it alone, which is the distinction being kept.
+            // two rails that order by it, the send that moves it, and a notice in
+            // a DM or a group, which moves it too - see `notices.ts`.
             lastMessageAt: new Date(),
             createdById: actor.id,
             // Whoever starts a group runs it. Left unset, a group had no owner at

@@ -9,9 +9,10 @@
  * requests per navigation and two answers that disagree for a moment.
  *
  * `refresh` is what a screen calls after a write that changes the shape of the
- * list - a channel made, somebody added, a conversation left. Messages arriving
- * do not go through it: those move `lastMessageAt` and the unread count, which
- * the live frame already brings.
+ * list - a channel made, somebody added, a conversation left. Messages and the
+ * notices of a DM or group arriving do not go through it: those move
+ * `lastMessageAt` (and a message the unread count), which the live frame
+ * already brings.
  */
 
 import * as core from "@polaris/core";
