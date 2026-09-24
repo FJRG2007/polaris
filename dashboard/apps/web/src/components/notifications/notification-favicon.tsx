@@ -20,7 +20,9 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { totalWaiting, useAppUnread } from "@/components/app-unread";
+import { useAppUnread } from "@/components/app-unread";
+import { useAdminWaiting } from "@/components/admin-waiting";
+import { tabWaiting } from "@/lib/waiting-counts";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { applyFavicon, currentFavicon, drawFavicon, type FaviconLink } from "@/lib/favicon";
 import {
@@ -33,11 +35,14 @@ import {
 } from "@/lib/favicon-style";
 
 export function NotificationFavicon() {
-    const { unread } = useNotificationFeed();
+    const { items } = useNotificationFeed();
+    const apps = useAppUnread();
+    const admin = useAdminWaiting();
     // One number, because the icon has room for one. What it means is "there is
     // something here for you", and which app it came from is a question the page
-    // itself answers.
-    const waiting = unread + totalWaiting(useAppUnread());
+    // itself answers. Each thing once: an update waiting is in the bell and in
+    // Management, and used to count as two - see `tabWaiting`.
+    const waiting = tabWaiting({ bell: items, apps, admin });
     // Storage is not readable while the page is rendered on the server, so the
     // default holds until the first paint has happened.
     const [style, setStyle] = useState<FaviconStyle>(DEFAULT_FAVICON_STYLE);

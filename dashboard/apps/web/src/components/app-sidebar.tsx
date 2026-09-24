@@ -28,6 +28,8 @@ import { usePathname } from "next/navigation";
 import { hasOrgPermission } from "@polaris/core";
 import { useOrgNav } from "@/components/use-org-nav";
 import { useAppUnread } from "@/components/app-unread";
+import { useAdminWaiting } from "@/components/admin-waiting";
+import { railCount } from "@/lib/waiting-counts";
 import { useInstalledNav } from "@/components/use-installed-nav";
 import { badgeLabel, waitingSays } from "@/lib/notification-badge";
 
@@ -141,6 +143,7 @@ export function AppSidebar({
                             item={item}
                             pathname={pathname}
                             sections={sections}
+                            inApp={subapp !== null || app.id !== nav.OVERVIEW_APP_ID}
                         />
                     ))}
                 </div>
@@ -181,20 +184,25 @@ function waitingLabel(appId: string, count: number): string {
 function RailLink({
     item,
     pathname,
-    sections
+    sections,
+    inApp
 }: {
     item: nav.AppSection;
     pathname: string;
     sections: readonly nav.AppSection[];
+    /** Whether this rail is one app's screens rather than the list of apps. */
+    inApp: boolean;
 }) {
     const active = nav.isSectionActive(pathname, item.href, sections);
     const Icon = item.icon;
     const waiting = useAppUnread();
-    // Only where there is something, and only on an entry that IS an app rather
-    // than a screen inside one. A count beside every entry would be a rail of
-    // numbers; what this answers is "is anybody waiting for me".
+    const admin = useAdminWaiting();
+    // Only where there is something, and on the entry the count is about: an app
+    // in the list of apps, or the one screen inside an app that holds it - see
+    // `railCount`. A count beside every entry would be a rail of numbers; what
+    // this answers is "is anybody waiting for me".
     const appId = APP_BY_HREF[item.href] ?? "";
-    const unread = waiting[appId] ?? 0;
+    const unread = railCount({ href: item.href, appId, inApp, waiting, admin });
     // The active row is the one place the rail spends colour: a faint accent fill
     // and an accent icon. Everything else is a hover away and stays neutral, so
     // where you are is readable at a glance rather than hunted for.

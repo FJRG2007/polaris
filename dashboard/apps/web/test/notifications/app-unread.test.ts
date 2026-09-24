@@ -62,7 +62,9 @@ describe("the places a badge is drawn", () => {
 
     it("adds every app up for the tab icon rather than two of them", async () => {
         const source = await readFile(new URL("notifications/notification-favicon.tsx", COMPONENTS), "utf8");
-        expect(source).toContain("totalWaiting(useAppUnread())");
+        // Every app's count goes in, each thing once - see `waiting-counts`.
+        expect(source).toContain("const apps = useAppUnread();");
+        expect(source).toContain("tabWaiting({ bell: items, apps, admin })");
         expect(source).not.toContain("chat.messages");
         expect(source).not.toContain("mail.messages");
     });
