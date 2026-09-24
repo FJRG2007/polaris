@@ -35,7 +35,14 @@
  * decision nobody made.
  */
 
+import { storage } from "#imports";
 import { generatePassword } from "@polaris/core/password-generator";
+import {
+    GENERATOR_DEFAULTS,
+    GENERATOR_KEY,
+    readGeneratorOptions,
+    type GeneratorOptions
+} from "@/lib/generator";
 import { readForm, type FieldFacts, type PageFields } from "@/lib/fields";
 import { askBackground, type ItemSummary, type OfferedCapture } from "@/lib/messages";
 
@@ -173,7 +180,7 @@ async function start(): Promise<void> {
         open = true;
         try {
             if (role === "generate") {
-                offerGenerated(field, (value) => {
+                offerGenerated(field, await savedOptions(), (value) => {
                     put(field, value);
                     // And the box beside it, which is the one somebody would
                     // otherwise have to paste into from a password they cannot see.
@@ -578,21 +585,42 @@ function menu(
 }
 
 /**
+ * What the popup's generator was last told to make, so a password made on the
+ * page honours the same choices - a site that refuses symbols is told once.
+ *
+ * Read straight from extension storage, which a script inside a page can do
+ * without asking the worker for anything: these are choices, not a secret, and a
+ * new message a page could send would be one more thing to reason about. The
+ * defaults when there is nothing saved or storage will not answer.
+ */
+async function savedOptions(): Promise<GeneratorOptions> {
+    try {
+        return readGeneratorOptions(await storage.getItem<unknown>(GENERATOR_KEY));
+    } catch {
+        return GENERATOR_DEFAULTS;
+    }
+}
+
+/**
  * A password to use, on the box one is being invented in.
  *
  * Made here rather than in the worker: the generator is pure, it needs no key and
  * no network, and a password that never leaves this page is one fewer thing
  * crossing a boundary. It is `@polaris/core`'s, so a password made here and one
- * made in the popup are drawn the same way - see that module for why the obvious
- * way of picking characters is biased.
+ * made in the popup are drawn the same way, from the same saved choices - see that
+ * module for why the obvious way of picking characters is biased.
  *
  * Nothing is saved by this. What makes it into the vault is the offer that
  * follows the form being submitted, which is the same path a password somebody
  * typed themselves takes.
  */
-function offerGenerated(field: HTMLInputElement, use: (value: string) => void): void {
+function offerGenerated(
+    field: HTMLInputElement,
+    options: GeneratorOptions,
+    use: (value: string) => void
+): void {
     const { panel, close } = floating(field);
-    let value = generatePassword();
+    let value = generatePassword(options);
 
     const shown = document.createElement("code");
     shown.style.cssText = `
@@ -621,7 +649,7 @@ function offerGenerated(field: HTMLInputElement, use: (value: string) => void): 
             true
         ),
         action("Again", () => {
-            value = generatePassword();
+            value = generatePassword(options);
             draw();
         })
     );

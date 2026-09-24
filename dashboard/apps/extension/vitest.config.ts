@@ -24,13 +24,13 @@ export default defineConfig({
                 test: {
                     name: "unit",
                     include: ["test/**/*.test.{ts,tsx}"],
-                    exclude: ["test/worker-*.test.ts"]
+                    exclude: ["test/worker-*.test.{ts,tsx}"]
                 }
             },
             {
                 plugins: [WxtVitest()],
                 resolve: { alias },
-                test: { name: "worker", include: ["test/worker-*.test.ts"] }
+                test: { name: "worker", include: ["test/worker-*.test.{ts,tsx}"] }
             }
         ]
     }

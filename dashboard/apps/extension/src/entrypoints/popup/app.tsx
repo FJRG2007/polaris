@@ -6,6 +6,8 @@ import { readIntendedLogin } from "@/lib/save";
 import type { UpdateNotice } from "@/lib/update";
 import { looksLikeAddress, readOrigin } from "@/lib/address";
 import { accountHost, describeAccount } from "@/lib/accounts";
+import { GeneratorPanel } from "./generator";
+import { CheckMark, CopyMark } from "./marks";
 import { Home, SectionBar, TopBar, useSection } from "./shell";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askBackground, type ItemSummary, type Request, type VaultStatus } from "@/lib/messages";
@@ -13,11 +15,14 @@ import { askBackground, type ItemSummary, type Request, type VaultStatus } from 
 // product's domain logic, and pulling it in for one function put a quarter of a
 // megabyte of zod schemas, CIDR arithmetic and camera geometry into a popup that
 // draws six buttons.
+import { generatePassword } from "@polaris/core/password-generator";
 import {
-    generatePassword,
-    PASSWORD_MAX_LENGTH,
-    PASSWORD_MIN_LENGTH
-} from "@polaris/core/password-generator";
+    GENERATOR_DEFAULTS,
+    GENERATOR_KEY,
+    readGeneratorOptions,
+    sameOptions,
+    type GeneratorOptions
+} from "@/lib/generator";
 
 /**
  * The popup, which is four screens and knows nothing.
@@ -879,16 +884,57 @@ function OnThisSite({
 }
 
 /**
+ * The generator's choices, read from storage and written back when they change.
+ *
+ * The defaults until storage answers, which is a frame or two: a generator opened
+ * in that gap makes one password with the defaults and a second the moment the
+ * saved choices land, rather than waiting on a read to draw anything. Written
+ * only when a choice actually differs, and a browser that refuses the write keeps
+ * the choice for as long as the popup is open - remembering is a convenience, not
+ * something a password depends on.
+ */
+function useGeneratorOptions(): [GeneratorOptions, (next: GeneratorOptions) => void] {
+    const [options, setOptions] = useState<GeneratorOptions>(GENERATOR_DEFAULTS);
+    // Somebody who changed a choice before the saved ones arrived keeps theirs:
+    // the read landing late must not put back what they just moved away from.
+    const chosen = useRef(false);
+    useEffect(() => {
+        let alive = true;
+        void storage
+            .getItem<unknown>(GENERATOR_KEY)
+            .then((held) => {
+                if (alive && !chosen.current) setOptions(readGeneratorOptions(held));
+            })
+            .catch(() => undefined);
+        return () => {
+            alive = false;
+        };
+    }, []);
+    const choose = useCallback(
+        (next: GeneratorOptions) => {
+            if (sameOptions(options, next)) return;
+            chosen.current = true;
+            setOptions(next);
+            void storage.setItem(GENERATOR_KEY, next).catch(() => undefined);
+        },
+        [options]
+    );
+    return [options, choose];
+}
+
+/**
  * Making up a password, where somebody is already signing up for something.
  *
  * Closed until asked for, because most visits here are to read a password rather
  * than to invent one, and a panel of options above the list would be in the way
  * of the common case every time to serve the rare one.
  *
- * The generating is `@polaris/core`'s, the same module the web vault will use, so
+ * The generating is `@polaris/core`'s, the same module the web vault uses, so
  * a password made here and one made there are drawn the same way. This makes a
- * string and saves nothing itself: "Use it" hands it to the form above, and "Copy"
- * hands it to whatever somebody is signing up to.
+ * string and saves nothing itself: "Use it" hands it to the form above, and the
+ * copy button hands it to whatever somebody is signing up to. What it is made of
+ * is remembered for this browser, and the generator inside a page reads the same
+ * choices - see `lib/generator`.
  *
  * It needs no vault, no account and no server, which is why it is offered on
  * every screen rather than behind the item list. Where there is no save form to
@@ -896,9 +942,12 @@ function OnThisSite({
  */
 function Generator({ onUse }: { onUse?: (value: string) => void }): React.JSX.Element {
     const [open, setOpen] = useState(false);
-    const [length, setLength] = useState(20);
+    const [options, setOptions] = useGeneratorOptions();
     const [value, setValue] = useState<string | null>(null);
+    const [shown, setShown] = useState(true);
     const [note, setNote] = useState<string | null>(null);
+    // Bumped by "make another", so the same choices can ask for a new password.
+    const [draw, setDraw] = useState(0);
     const clearing = useRef<number | null>(null);
 
     useEffect(
@@ -908,15 +957,14 @@ function Generator({ onUse }: { onUse?: (value: string) => void }): React.JSX.El
         []
     );
 
-    const make = (at: number): void => {
-        setValue(generatePassword({ length: at }));
+    // A new password whenever the panel opens, a choice changes, or somebody
+    // asks for another - made in an effect because it is random, and a render
+    // has to draw the same thing every time it runs.
+    useEffect(() => {
+        if (!open) return;
+        setValue(generatePassword(options));
         setNote(null);
-    };
-
-    const show = (): void => {
-        setOpen(true);
-        make(length);
-    };
+    }, [open, options, draw]);
 
     const [copied, markCopied] = useCopied();
 
@@ -939,7 +987,7 @@ function Generator({ onUse }: { onUse?: (value: string) => void }): React.JSX.El
     if (!open) {
         return (
             <div className="row">
-                <button className="ghost" onClick={show}>
+                <button className="ghost" onClick={() => setOpen(true)}>
                     Generate a password
                 </button>
             </div>
@@ -947,56 +995,25 @@ function Generator({ onUse }: { onUse?: (value: string) => void }): React.JSX.El
     }
 
     return (
-        <div className="row wrap">
-            <code className="value">{value ?? "Nothing can be made of that."}</code>
-            <div className="acts">
-                <input
-                    className="tiny"
-                    type="number"
-                    min={PASSWORD_MIN_LENGTH}
-                    max={PASSWORD_MAX_LENGTH}
-                    value={length}
-                    aria-label="How many characters"
-                    onChange={(event) => {
-                        const at = Number.parseInt(event.target.value, 10);
-                        setLength(at);
-                        if (Number.isFinite(at)) make(at);
-                    }}
-                />
-                <button className="ghost" title="Make another" onClick={() => make(length)}>
-                    Again
-                </button>
-                <button
-                    className={copied === "generated" ? "ghost copied" : "ghost"}
-                    disabled={!value}
-                    onClick={() => void copy()}
-                >
-                    {copied === "generated" ? (
-                        <>
-                            <CheckMark /> Copied
-                        </>
-                    ) : (
-                        "Copy"
-                    )}
-                </button>
-                {onUse ? (
-                    <button
-                        className="ghost"
-                        title="Put it straight into a new login"
-                        disabled={!value}
-                        onClick={() => {
-                            if (value) onUse(value);
-                        }}
-                    >
-                        Use it
-                    </button>
-                ) : null}
-                <button className="ghost" onClick={() => setOpen(false)}>
-                    Hide
-                </button>
-            </div>
-            {note ? <p className="muted small">{note}</p> : null}
-        </div>
+        <GeneratorPanel
+            value={value}
+            options={options}
+            onOptions={setOptions}
+            shown={shown}
+            onShown={setShown}
+            copied={copied === "generated"}
+            note={note}
+            onAgain={() => setDraw((was) => was + 1)}
+            onCopy={() => void copy()}
+            onClose={() => setOpen(false)}
+            onUse={
+                onUse
+                    ? () => {
+                          if (value) onUse(value);
+                      }
+                    : undefined
+            }
+        />
     );
 }
 
@@ -1113,34 +1130,6 @@ function TotpCell({
 }
 
 /**
- * The mark on a line that can be copied.
- *
- * Hidden until the row is hovered or something in it has focus, which is what
- * lets a login be three readable lines instead of a name and a row of buttons
- * named after the thing they copy. `aria-hidden`, because the line it sits in is
- * already a button with a name of its own - announcing it again would read the
- * same action twice.
- */
-function CopyMark(): React.JSX.Element {
-    return (
-        <svg className="copy-mark" viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="9" y="9" width="11" height="11" rx="2" />
-            <path d="M5 15V5a2 2 0 0 1 2-2h10" />
-        </svg>
-    );
-}
-
-/** What the copy mark turns into once the value is on the clipboard: a green
- *  check that pops in, as Polaris's copy buttons do. */
-function CheckMark(): React.JSX.Element {
-    return (
-        <svg className="copy-mark done" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 6 9 17l-5-5" />
-        </svg>
-    );
-}
-
-/**
  * One value on a login, as a line that copies itself when pressed.
  *
  * The whole line is the button rather than an icon at the end of it: at 360
@@ -1208,6 +1197,8 @@ function ChangePassword({
     const [password, setPassword] = useState("");
     const [refused, setRefused] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    // The generator's choices, so "make one up" here makes what it makes there.
+    const [options] = useGeneratorOptions();
 
     const submit = async (): Promise<void> => {
         setBusy(true);
@@ -1237,7 +1228,7 @@ function ChangePassword({
                 <button
                     className="ghost"
                     title="Make one up"
-                    onClick={() => setPassword(generatePassword({ length: 20 }) ?? "")}
+                    onClick={() => setPassword(generatePassword(options) ?? "")}
                 >
                     Make one up
                 </button>

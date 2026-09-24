@@ -111,6 +111,41 @@ function shuffle(characters: string[]): void {
     }
 }
 
+/** The pools a request draws from, each as the characters it may use. Shared by
+ *  the generator and the estimate below, so the two can never disagree about
+ *  what a setting allows. */
+function poolsFor(want: PasswordWanted): { characters: string; least: number }[] {
+    const avoid = want.avoidAmbiguous === true;
+    return [
+        { on: want.lowercase, characters: alphabet(LOWER, avoid), least: 0 },
+        { on: want.uppercase, characters: alphabet(UPPER, avoid), least: 0 },
+        { on: want.digits, characters: alphabet(DIGITS, avoid), least: want.minDigits ?? 0 },
+        { on: want.symbols, characters: SYMBOLS, least: want.minSymbols ?? 0 }
+    ].filter((pool) => pool.on && pool.characters !== "");
+}
+
+/**
+ * Roughly how many bits of randomness a password made this way carries, or 0
+ * when nothing can be made of the request.
+ *
+ * Length times the log of the alphabet, which is what a uniform draw from that
+ * alphabet is worth. The placed minimums take a fraction of a bit off that and
+ * are ignored: this is a hint beside a generator, and a figure that is honest to
+ * the nearest few bits answers the only question it is asked - "is this long
+ * enough" - as well as an exact one would. It measures how the password was
+ * made, never a password somebody typed; for that, a figure like this is wrong.
+ */
+export function passwordEntropyBits(wanted: Partial<PasswordWanted> = {}): number {
+    const want = { ...PASSWORD_DEFAULTS, ...wanted };
+    const pools = poolsFor(want);
+    const length = Math.trunc(want.length);
+    if (pools.length === 0) return 0;
+    if (length < PASSWORD_MIN_LENGTH || length > PASSWORD_MAX_LENGTH) return 0;
+    if (pools.reduce((total, pool) => total + pool.least, 0) > length) return 0;
+    const size = pools.reduce((total, pool) => total + pool.characters.length, 0);
+    return length * Math.log2(size);
+}
+
 /**
  * A password, or null when what was asked for cannot be made.
  *
@@ -121,14 +156,7 @@ function shuffle(characters: string[]): void {
  */
 export function generatePassword(wanted: Partial<PasswordWanted> = {}): string | null {
     const want = { ...PASSWORD_DEFAULTS, ...wanted };
-    const avoid = want.avoidAmbiguous === true;
-
-    const pools = [
-        { on: want.lowercase, characters: alphabet(LOWER, avoid), least: 0 },
-        { on: want.uppercase, characters: alphabet(UPPER, avoid), least: 0 },
-        { on: want.digits, characters: alphabet(DIGITS, avoid), least: want.minDigits ?? 0 },
-        { on: want.symbols, characters: SYMBOLS, least: want.minSymbols ?? 0 }
-    ].filter((pool) => pool.on && pool.characters !== "");
+    const pools = poolsFor(want);
 
     const length = Math.trunc(want.length);
     if (pools.length === 0) return null;

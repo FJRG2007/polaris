@@ -12,6 +12,7 @@
 import { describe, expect, it } from "vitest";
 import {
     generatePassword,
+    passwordEntropyBits,
     PASSWORD_MAX_LENGTH,
     PASSWORD_MIN_LENGTH
 } from "../src/password-generator";
@@ -77,5 +78,31 @@ describe("making up a password", () => {
     it("does not hand back the same password twice", () => {
         const made = runs(200, () => generatePassword({ length: 20 }));
         expect(new Set(made).size).toBe(made.length);
+    });
+});
+
+describe("how strong a password made this way is", () => {
+    const none = { uppercase: false, digits: false, symbols: false, minDigits: 0, minSymbols: 0 };
+
+    it("is the length times the log of the alphabet", () => {
+        expect(passwordEntropyBits({ length: 10, ...none })).toBeCloseTo(10 * Math.log2(26), 6);
+        // 26 + 26 + 10 digits + 13 symbols.
+        expect(passwordEntropyBits({ length: 20 })).toBeCloseTo(20 * Math.log2(75), 6);
+    });
+
+    it("counts the look-alikes it leaves out", () => {
+        // l and o, I and O, 0 and 1 gone; the symbols have none to lose.
+        expect(passwordEntropyBits({ length: 20, avoidAmbiguous: true })).toBeCloseTo(
+            20 * Math.log2(69),
+            6
+        );
+    });
+
+    it("says nothing for what the generator would refuse", () => {
+        expect(passwordEntropyBits({ length: PASSWORD_MIN_LENGTH - 1 })).toBe(0);
+        expect(passwordEntropyBits({ length: 8, minDigits: 5, minSymbols: 5 })).toBe(0);
+        expect(
+            passwordEntropyBits({ lowercase: false, uppercase: false, digits: false, symbols: false })
+        ).toBe(0);
     });
 });

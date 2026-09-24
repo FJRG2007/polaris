@@ -460,6 +460,166 @@ footer {
     font-size: 12px;
 }
 
+/*
+ * The generator, open: the password with its three actions, a strength line,
+ * the length, and the kinds of character - each on a line of its own so nothing
+ * wraps into anything else at 360 pixels.
+ */
+.row.generator {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.generated {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.generated .value {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    background: hsl(var(--field));
+}
+
+/* An action that is only a mark, with its name in the label and the tooltip. */
+button.icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid hsl(var(--border));
+    background: transparent;
+    color: hsl(var(--muted-foreground));
+}
+
+button.icon:hover:not(:disabled) {
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border-strong));
+}
+
+button.icon.copied {
+    color: hsl(var(--success));
+    border-color: hsl(var(--success) / 0.5);
+}
+
+.mark,
+button.icon .copy-mark {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    opacity: 1;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* How much guessing the password would take, as a bar and a figure. */
+.strength {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 12px;
+    color: hsl(var(--muted-foreground));
+}
+
+.meter {
+    flex: 1 1 auto;
+    height: 4px;
+    border-radius: 2px;
+    background: hsl(var(--border));
+    overflow: hidden;
+}
+
+.meter > span {
+    display: block;
+    height: 100%;
+    border-radius: 2px;
+    background: currentColor;
+}
+
+.strength.weak .meter {
+    color: hsl(var(--danger));
+}
+
+.strength.fair .meter {
+    color: hsl(var(--warning));
+}
+
+.strength.strong .meter {
+    color: hsl(var(--success));
+}
+
+.length {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.length input[type="range"] {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    accent-color: hsl(var(--primary));
+}
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+/* A kind of character, on or off. On is the brand colour, so the set in use
+   reads at a glance rather than by checking each box. */
+button.chip {
+    padding: 3px 9px;
+    border: 1px solid hsl(var(--border));
+    border-radius: 999px;
+    background: transparent;
+    color: hsl(var(--muted-foreground));
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+button.chip:hover {
+    border-color: hsl(var(--border-strong));
+    color: hsl(var(--foreground));
+}
+
+button.chip[aria-pressed="true"] {
+    border-color: hsl(var(--primary) / 0.6);
+    background: hsl(var(--primary) / 0.16);
+    color: hsl(var(--foreground));
+}
+
+/* The last kind still on: it says why it will not switch off, on hover. */
+button.chip[aria-disabled="true"] {
+    cursor: default;
+}
+
+.generator-foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.generator-foot .fold {
+    margin-left: auto;
+}
+
 /* Whose account this is. The name carries the weight; the words around it are
    the label, so they stay muted and it does not. */
 .who-name {
