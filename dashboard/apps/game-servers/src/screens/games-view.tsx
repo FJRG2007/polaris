@@ -31,6 +31,7 @@ import { type GameId, GAMES } from "@polaris/core";
 import Link from "next/link";
 import * as list from "./list";
 import { useRouter } from "next/navigation";
+import { rowClickIntent } from "../lib/row-open";
 import { GameLogo } from "../components/game-picker";
 import { NewServerDialog } from "./new-server-dialog";
 import { useGamePresence } from "../components/use-game-presence";
@@ -654,11 +655,31 @@ function ServerRow({
     // the containers to be asked who is playing.
     const known = facts !== null;
     const browsable = list.canBrowseFiles(server);
+    const router = useRouter();
+
+    function openFromRow(event: MouseEvent): void {
+        const intent = rowClickIntent({
+            target: event.target instanceof Element ? event.target : null,
+            button: event.button,
+            metaKey: event.metaKey,
+            ctrlKey: event.ctrlKey,
+            shiftKey: event.shiftKey,
+            selection: window.getSelection()?.toString() ?? ""
+        });
+        if (intent === "open") router.push(href);
+        else if (intent === "new-tab") window.open(href, "_blank", "noopener");
+    }
 
     return (
         <ContextMenu>
             <ContextMenuTrigger asChild>
-                <tr className="border-t border-border hover:bg-card-hover">
+                <tr
+                    className="cursor-pointer border-t border-border hover:bg-card-hover"
+                    // The whole row opens the server, not only its name - see
+                    // `row-open`. The name is still the link a keyboard reaches.
+                    onClick={(event) => openFromRow(event.nativeEvent)}
+                    onAuxClick={(event) => openFromRow(event.nativeEvent)}
+                >
                     <td className="px-3 py-2">
                         {/* The game's own mark beside the name, because a table of
                             servers of several games is scanned for "the ARK one"
