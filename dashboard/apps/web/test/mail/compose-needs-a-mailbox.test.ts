@@ -39,6 +39,17 @@ describe("writing with no mailbox", () => {
         const composer = await readFile(new URL("composer.tsx", SCREENS), "utf8");
         expect(composer).toContain("if (!composing || accounts.length === 0) return null;");
     });
+
+    it("runs every hook before it draws nothing", async () => {
+        // The composer is mounted with no draft open. A hook after that return
+        // runs only once a draft opens, which is one more hook than the render
+        // before - and React takes the whole mail screen down on the Reply press.
+        const composer = await readFile(new URL("composer.tsx", SCREENS), "utf8");
+        const quiet = composer.indexOf("if (!composing || accounts.length === 0) return null;");
+        const tail = composer.slice(quiet, composer.indexOf("\nfunction ", quiet));
+        expect(quiet).toBeGreaterThan(0);
+        expect(tail).not.toMatch(/\buse[A-Z]\w*\(/);
+    });
 });
 
 describe("a composer being typed in", () => {
