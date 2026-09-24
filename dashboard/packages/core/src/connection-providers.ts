@@ -100,6 +100,12 @@ export interface ConnectionProvider {
     tokenHelp?: string;
     /** Where to get one, for the token form. */
     tokenUrl?: string;
+    /**
+     * Whether somebody may type their name on this service instead of proving
+     * it. Such a link is held as not verified: it says what its owner claims to
+     * be called and nothing more, and a verified link replaces it.
+     */
+    acceptsTypedName?: boolean;
     /** How many accounts one person may link when the operator has set no limit. */
     defaultLimit: number;
     /** What the operator has to connect first, named so the empty state can say it. */
@@ -295,6 +301,11 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         description:
             "A Minecraft server lets people in by username, and one wrong letter is a player who cannot join with nothing saying why. Linking your account hands over the name and the account id it belongs to, so whoever runs a server can add you by your Polaris name instead. Polaris reads your profile once and keeps nothing it could act with.",
         acceptsToken: false,
+        // Most deployments have no Microsoft application approved for the
+        // Minecraft API, and plenty of players have no account it could prove
+        // anyway. A typed name is what lets them be added by their Polaris name
+        // regardless - marked as unverified wherever it is shown.
+        acceptsTypedName: true,
         defaultLimit: 1,
         requires: "a Microsoft application approved for the Minecraft API",
         // The account behind it is a Microsoft one, with everything that reaches -

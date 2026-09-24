@@ -36,6 +36,11 @@ let nextId = 1;
 
 const key = (provider: string, accountId: string): string => `${provider}:${accountId}`;
 
+/** The method filters the store asks for: one method, or every method but one. */
+type MethodFilter = string | { not: string } | undefined;
+const methodMatches = (method: string, filter: MethodFilter): boolean =>
+    filter === undefined || (typeof filter === "string" ? method === filter : method !== filter.not);
+
 vi.mock("@polaris/db", () => ({
     prisma: {
         userConnection: {
@@ -60,8 +65,25 @@ vi.mock("@polaris/db", () => ({
                 // The sign-in lookup reads the owner's standing alongside the row.
                 return found ? { ...found, user: { bannedAt: banned.has(found.userId) ? new Date() : null } } : null;
             },
-            count: async ({ where }: { where: { userId: string; provider: string } }) =>
-                rows.filter((row) => row.userId === where.userId && row.provider === where.provider).length,
+            count: async ({ where }: { where: { userId: string; provider: string; method?: MethodFilter } }) =>
+                rows.filter(
+                    (row) =>
+                        row.userId === where.userId &&
+                        row.provider === where.provider &&
+                        methodMatches(row.method, where.method)
+                ).length,
+            deleteMany: async ({ where }: { where: { userId: string; provider: string; method?: MethodFilter } }) => {
+                const before = rows.length;
+                rows = rows.filter(
+                    (row) =>
+                        !(
+                            row.userId === where.userId &&
+                            row.provider === where.provider &&
+                            methodMatches(row.method, where.method)
+                        )
+                );
+                return { count: before - rows.length };
+            },
             upsert: async ({
                 where,
                 create,
@@ -138,6 +160,7 @@ vi.mock("@/lib/setting-store", () => ({
 const {
     ConnectionClaimedError,
     ConnectionLimitError,
+    ConnectionVerifiedError,
     connectionEmailTrusted,
     connectionLimit,
     connectionSignInAllowed,
@@ -145,6 +168,7 @@ const {
     listConnections,
     readCredential,
     saveConnection,
+    saveTypedConnection,
     setConnectionSignIn,
     signInConnection
 } = await import("@/lib/connections/store");
@@ -339,5 +363,87 @@ describe("the credential behind a link", () => {
     it("is never returned for a link that has none", async () => {
         const linked = await saveConnection("ana", account("1", "ana"));
         expect(await readCredential(linked.id)).toBeNull();
+    });
+});
+
+describe("a Minecraft name typed rather than proved", () => {
+    /** The link a Microsoft round trip writes for the same person. */
+    const proved = (accountId = "069a79f4-44e9-4726-a5be-fca90e38aaf5") => ({
+        provider: "minecraft",
+        accountId,
+        label: "Notch",
+        method: "oauth" as const
+    });
+
+    it("is stored where a proved link is, marked as typed", async () => {
+        const saved = await saveTypedConnection("ana", "minecraft", "Ana_MC");
+        expect(saved).toMatchObject({ provider: "minecraft", label: "Ana_MC", method: "manual" });
+        expect(await listConnections("ana", "minecraft")).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ method: "manual", signInEnabled: false, encryptedToken: null });
+    });
+
+    it("is changed in place rather than added again", async () => {
+        await saveTypedConnection("ana", "minecraft", "Ana_MC");
+        await saveTypedConnection("ana", "minecraft", "Ana_Real");
+        const held = await listConnections("ana", "minecraft");
+        expect(held).toHaveLength(1);
+        expect(held[0]?.label).toBe("Ana_Real");
+    });
+
+    it("claims nothing, so two people may type the same name", async () => {
+        await saveTypedConnection("ana", "minecraft", "Steve");
+        await saveTypedConnection("bruno", "minecraft", "Steve");
+        expect(await listConnections("ana", "minecraft")).toHaveLength(1);
+        expect(await listConnections("bruno", "minecraft")).toHaveLength(1);
+    });
+
+    it("is refused for a service that does not take a typed name", async () => {
+        await expect(saveTypedConnection("ana", "github", "ana")).rejects.toThrow();
+        expect(rows).toHaveLength(0);
+    });
+
+    it("is refused while a proved account is connected", async () => {
+        await saveConnection("ana", proved());
+        await expect(saveTypedConnection("ana", "minecraft", "Ana_MC")).rejects.toBeInstanceOf(
+            ConnectionVerifiedError
+        );
+        const held = await listConnections("ana", "minecraft");
+        expect(held.map((row) => row.method)).toEqual(["oauth"]);
+    });
+
+    it("is refused where the operator has turned linking off", async () => {
+        settings.set("connections.minecraft.limit", "0");
+        await expect(saveTypedConnection("ana", "minecraft", "Ana_MC")).rejects.toBeInstanceOf(ConnectionLimitError);
+    });
+
+    it("gives way to a proved account, which does not count it against the limit", async () => {
+        await saveTypedConnection("ana", "minecraft", "Ana_MC");
+        await saveConnection("ana", proved());
+        const held = await listConnections("ana", "minecraft");
+        expect(held).toHaveLength(1);
+        expect(held[0]).toMatchObject({ method: "oauth", label: "Notch" });
+    });
+
+    it("stays where it was when the proved link is refused", async () => {
+        await saveConnection("bruno", proved());
+        await saveTypedConnection("ana", "minecraft", "Ana_MC");
+        await expect(saveConnection("ana", proved())).rejects.toBeInstanceOf(ConnectionClaimedError);
+        const held = await listConnections("ana", "minecraft");
+        expect(held.map((row) => row.label)).toEqual(["Ana_MC"]);
+    });
+
+    it("is never a way in", async () => {
+        const saved = await saveTypedConnection("ana", "minecraft", "Ana_MC");
+        const after = await setConnectionSignIn("ana", saved.id, true);
+        expect(after?.signInEnabled).toBe(false);
+        // Even a row somebody forced open is not honoured.
+        rows[0]!.signInEnabled = true;
+        expect(await signInConnection("minecraft", rows[0]!.accountId)).toBeNull();
+    });
+
+    it("can be removed like any other link", async () => {
+        const saved = await saveTypedConnection("ana", "minecraft", "Ana_MC");
+        expect(await deleteConnection("ana", saved.id)).not.toBeNull();
+        expect(await listConnections("ana", "minecraft")).toHaveLength(0);
     });
 });

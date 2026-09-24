@@ -11,8 +11,8 @@
 import { requireUser } from "@/lib/session";
 import { ConnectionsView } from "./connections-view";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
-import { connectionLinkAvailable, linkScopesSatisfied, missingLinkScopes } from "@/lib/connections/oauth";
 import { connectionLimit, connectionSignInAllowed, listConnections } from "@/lib/connections/store";
+import { connectionLinkAvailable, linkScopesSatisfied, missingLinkScopes } from "@/lib/connections/oauth";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +31,9 @@ export default async function ConnectionsPage() {
             tokenLabel: provider.tokenLabel,
             tokenHelp: provider.tokenHelp,
             tokenUrl: provider.tokenUrl,
+            // Offered whether or not the operator has connected the application
+            // behind the verified link: typing a name needs nothing from them.
+            acceptsTypedName: provider.acceptsTypedName ?? false,
             requires: provider.requires,
             limit: await connectionLimit(provider.slug),
             // Whether the operator has connected the application this authorizes

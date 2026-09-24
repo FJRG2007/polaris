@@ -50,6 +50,8 @@ export async function githubCredentialsForUser(userId: string): Promise<GithubCr
     const links = await listConnections(userId, PROVIDER);
     const usable: GithubCredential[] = [];
     for (const link of links) {
+        // A typed name carries no credential to act with.
+        if (link.method === "manual") continue;
         const token = await usableToken(link.id).catch(() => null);
         if (token) usable.push({ connectionId: link.id, login: link.label, method: link.method, token });
     }

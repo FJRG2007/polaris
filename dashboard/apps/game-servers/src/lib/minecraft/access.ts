@@ -19,9 +19,12 @@
  */
 
 import type { MinecraftEdition } from "./service";
+import { MINECRAFT_JAVA_NAME_PATTERN } from "@polaris/core";
 
-/** A Java username: what Mojang allows, which is what the image resolves. */
-export const JAVA_NAME_PATTERN = /^[A-Za-z0-9_]{3,16}$/;
+/** A Java username: what Mojang allows, which is what the image resolves. The
+ *  same pattern a person's own typed name is checked against under Connected
+ *  accounts, so a name that screen accepts is one this list accepts too. */
+export const JAVA_NAME_PATTERN = MINECRAFT_JAVA_NAME_PATTERN;
 
 /** An Xbox gamertag, as far as it can be checked without asking Xbox: letters and
  *  digits in single-spaced words, up to Microsoft's limit. */

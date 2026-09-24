@@ -12,12 +12,20 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { minecraftNameSchema } from "@polaris/core";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { readGithubAccount } from "@/lib/github-service";
 import { awsIdentity } from "@/lib/integrations/aws-api";
 import { vercelUser } from "@/lib/integrations/vercel-api";
 import { railwayAccount } from "@/lib/integrations/railway-api";
-import { ConnectionClaimedError, ConnectionLimitError, deleteConnection, saveConnection } from "@/lib/connections/store";
+import {
+    ConnectionClaimedError,
+    ConnectionLimitError,
+    ConnectionVerifiedError,
+    deleteConnection,
+    saveConnection,
+    saveTypedConnection
+} from "@/lib/connections/store";
 
 const CONNECTIONS_PATH = "/account/connections";
 
@@ -164,6 +172,36 @@ export async function connectAwsAction(input: unknown): Promise<{ error?: string
             return { error: caught.message };
         }
         return { error: caught instanceof Error ? caught.message : "Could not connect the account" };
+    }
+}
+
+/**
+ * Say what one's Minecraft username is, without proving it.
+ *
+ * The way in for everybody the Microsoft round trip cannot serve: a deployment
+ * with no application approved for the Minecraft API, or a player with no
+ * account it could prove. Checked against the same schema the form checks as it
+ * is typed, and stored as not verified, so a server screen that fills the name in
+ * from it says so. Typing it again changes it; a proved account replaces it.
+ */
+export async function saveMinecraftNameAction(rawName: unknown): Promise<{ error?: string; name?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+
+    const parsed = minecraftNameSchema.safeParse(rawName);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the username and try again" };
+
+    try {
+        const saved = await saveTypedConnection(user.id, "minecraft", parsed.data);
+        revalidatePath(CONNECTIONS_PATH);
+        return { name: saved.label };
+    } catch (caught) {
+        if (caught instanceof ConnectionVerifiedError || caught instanceof ConnectionLimitError) {
+            return { error: caught.message };
+        }
+        console.error("typed Minecraft name not saved:", caught);
+        return { error: "Could not save the username. Try again." };
     }
 }
 

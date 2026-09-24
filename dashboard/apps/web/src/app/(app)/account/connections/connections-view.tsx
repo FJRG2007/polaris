@@ -13,11 +13,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
-import { connectionSections, type ConnectionCategory } from "@polaris/core";
+import { connectionSections, minecraftNameSchema, type ConnectionCategory } from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { ExternalLink, KeyRound, Loader2, Plus, RefreshCw, Unlink } from "lucide-react";
-import { connectAwsAction, connectTokenAction, disconnectAccountAction } from "./actions";
+import { ExternalLink, KeyRound, Loader2, Pencil, Plus, RefreshCw, Unlink } from "lucide-react";
+import { connectAwsAction, connectTokenAction, disconnectAccountAction, saveMinecraftNameAction } from "./actions";
 import {
     Badge,
     Button,
@@ -37,7 +37,8 @@ export interface LinkedAccount {
     provider: string;
     label: string;
     avatarUrl: string | null;
-    method: "oauth" | "token";
+    /** "manual" is a name its owner typed, which nothing has confirmed. */
+    method: "oauth" | "token" | "manual";
     /** Whether this account is also a way into Polaris. Decided under Security,
      *  and shown here because this is the screen where somebody has just added
      *  one and is wondering what it now does. */
@@ -63,6 +64,9 @@ export interface ConnectionProviderCard {
     tokenLabel?: string;
     tokenHelp?: string;
     tokenUrl?: string;
+    /** Whether a name may be typed instead of proved. Such a link is shown as not
+     *  verified, and a proved account replaces it. */
+    acceptsTypedName?: boolean;
     /** What the operator has to connect first, for the card that cannot offer one. */
     requires: string;
     /** How many accounts of this service the person may link. */
@@ -157,13 +161,21 @@ function ProviderCard({
     const [removed, setRemoved] = useState<string[]>([]);
     const [confirming, setConfirming] = useState<LinkedAccount | null>(null);
     const [tokenOpen, setTokenOpen] = useState(false);
+    const [typing, setTyping] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const accounts = useMemo(
         () => provider.accounts.filter((account) => !removed.includes(account.id)),
         [provider.accounts, removed]
     );
-    const slotsLeft = Math.max(0, provider.limit - accounts.length);
+    // A typed name holds no slot: connecting the real account replaces it, so it
+    // must not be what stands in the way of connecting the real account.
+    const typed = accounts.find((account) => account.method === "manual") ?? null;
+    const proved = accounts.filter((account) => account.method !== "manual");
+    const slotsLeft = Math.max(0, provider.limit - proved.length);
+    // Offered only while nothing is proved: a verified account is the better
+    // answer, and typing over it would trade it for a claim.
+    const canType = Boolean(provider.acceptsTypedName) && proved.length === 0 && provider.limit > 0;
     // Whether any of them is short of what this deployment now asks for, which
     // changes what the line under a full list should be telling somebody to do.
     const needsApproval = accounts.some((account) => account.needsReauthorization);
@@ -255,6 +267,23 @@ function ProviderCard({
                                         Token
                                     </Badge>
                                 ) : null}
+                                {provider.acceptsTypedName ? (
+                                    account.method === "manual" ? (
+                                        <Badge
+                                            variant="warning"
+                                            title="You typed this name. Nothing has confirmed the account is yours."
+                                        >
+                                            Not verified
+                                        </Badge>
+                                    ) : (
+                                        <Badge
+                                            variant="success"
+                                            title={`Confirmed by signing in to ${provider.name}`}
+                                        >
+                                            Verified
+                                        </Badge>
+                                    )
+                                ) : null}
                                 <span className="hidden text-xs text-muted-foreground sm:inline">
                                     <RelativeTime iso={account.linkedAt} />
                                 </span>
@@ -296,6 +325,18 @@ function ProviderCard({
                                         <RefreshCw className="size-4" />
                                     </Button>
                                 ) : null}
+                                {account.method === "manual" ? (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        aria-label={`Change ${account.label}`}
+                                        title={`Change ${account.label}`}
+                                        disabled={pending}
+                                        onClick={() => setTyping(true)}
+                                    >
+                                        <Pencil className="size-4" />
+                                    </Button>
+                                ) : null}
                                 <Button
                                     size="sm"
                                     variant="ghost"
@@ -332,7 +373,7 @@ function ProviderCard({
                     ) : null}
                 </p>
 
-                {provider.canAuthorize || provider.acceptsToken ? (
+                {provider.canAuthorize || provider.acceptsToken || canType ? (
                     <div className="flex flex-wrap items-center gap-2">
                         {provider.canAuthorize ? (
                             <Button
@@ -358,7 +399,19 @@ function ProviderCard({
                                 Use a token
                             </Button>
                         ) : null}
-                        {!canAdd ? (
+                        {/* Once a name is typed, changing it is the pencil on its row. */}
+                        {canType && !typed ? (
+                            <Button
+                                size="sm"
+                                variant={provider.canAuthorize ? "ghost" : "secondary"}
+                                disabled={pending}
+                                onClick={() => setTyping(true)}
+                            >
+                                <Pencil className="size-4" />
+                                Type your username
+                            </Button>
+                        ) : null}
+                        {!canAdd && (provider.canAuthorize || provider.acceptsToken) ? (
                             <span className="text-xs text-muted-foreground">
                                 {needsApproval
                                     ? // The literal advice - disconnect one first - is true of
@@ -373,7 +426,7 @@ function ProviderCard({
                     </div>
                 ) : null}
 
-                {!provider.canAuthorize && !provider.acceptsToken ? (
+                {!provider.canAuthorize && !provider.acceptsToken && !canType ? (
                     <p className="text-sm text-muted-foreground">
                         Available once whoever administers this Polaris connects {provider.requires}{" "}
                         under Integrations.
@@ -404,6 +457,17 @@ function ProviderCard({
                     onClose={() => setTokenOpen(false)}
                     onDone={() => {
                         setTokenOpen(false);
+                        router.refresh();
+                    }}
+                />
+            ) : null}
+
+            {typing && provider.slug === "minecraft" ? (
+                <MinecraftNameDialog
+                    current={typed?.label ?? null}
+                    onClose={() => setTyping(false)}
+                    onDone={() => {
+                        setTyping(false);
                         router.refresh();
                     }}
                 />
@@ -551,6 +615,106 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
                     <Button onClick={submit} disabled={pending || !ready}>
                         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                         Connect
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
+ * A Minecraft username, typed rather than proved.
+ *
+ * Checked as it is typed against the same schema the action checks, so what the
+ * form accepts is what gets saved. An empty field is unfinished rather than
+ * wrong, so it says nothing until there is something to judge, and saving the
+ * name that is already there is not offered.
+ */
+function MinecraftNameDialog({
+    current,
+    onClose,
+    onDone
+}: {
+    /** The name typed before, when this is a change. */
+    current: string | null;
+    onClose: () => void;
+    onDone: () => void;
+}) {
+    const [name, setName] = useState(current ?? "");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    const checked = minecraftNameSchema.safeParse(name);
+    const problem =
+        name.trim().length > 0 && !checked.success ? (checked.error.issues[0]?.message ?? null) : null;
+    const unchanged = checked.success && checked.data === current;
+
+    function submit() {
+        if (!checked.success || unchanged) return;
+        setError(null);
+        startTransition(async () => {
+            const result = await runAction(
+                () => saveMinecraftNameAction(checked.data),
+                (message) => setError(message)
+            );
+            if (!result) return;
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            onDone();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>
+                        {current ? "Change your Minecraft username" : "Type your Minecraft username"}
+                    </DialogTitle>
+                    <DialogDescription>
+                        Exactly as it appears in the game, with the same upper and lower case. A
+                        typed name is shown as not verified.
+                    </DialogDescription>
+                </DialogHeader>
+                <form
+                    className="flex flex-col gap-2"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        submit();
+                    }}
+                >
+                    <label className="text-sm font-medium" htmlFor="minecraft-name">
+                        Username
+                    </label>
+                    <Input
+                        id="minecraft-name"
+                        autoFocus
+                        autoComplete="off"
+                        spellCheck={false}
+                        maxLength={32}
+                        value={name}
+                        placeholder="Steve"
+                        aria-invalid={problem ? true : undefined}
+                        aria-describedby="minecraft-name-hint"
+                        onChange={(event) => setName(event.target.value)}
+                    />
+                    <p
+                        id="minecraft-name-hint"
+                        className={`text-xs ${problem ? "text-danger" : "text-muted-foreground"}`}
+                    >
+                        {problem ?? "Java Edition: 3 to 16 letters, numbers or underscores."}
+                    </p>
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                </form>
+                <DialogFooter>
+                    <Button variant="ghost" onClick={onClose} disabled={pending}>
+                        Cancel
+                    </Button>
+                    <Button onClick={submit} disabled={pending || !checked.success || unchanged}>
+                        {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+                        Save
                     </Button>
                 </DialogFooter>
             </DialogContent>

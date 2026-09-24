@@ -38,6 +38,13 @@ export interface GameIdentity {
     readonly accountId: string;
     /** What the provider calls the account, when it said. Falls back to the id. */
     readonly label: string;
+    /**
+     * Whether the provider vouched for it. False for a Minecraft name its owner
+     * typed under Connected accounts without proving it: still their word for
+     * what they are called, and still the name to add, but a screen showing it
+     * says it was not confirmed.
+     */
+    readonly verified: boolean;
 }
 
 /**
@@ -65,7 +72,7 @@ export async function findGameIdentity(
     const name = person.name || person.username || identifier;
     const link = await prisma.userConnection.findFirst({
         where: { userId: person.id, provider },
-        select: { accountId: true, label: true },
+        select: { accountId: true, label: true, method: true },
         // The one they linked most recently, for the rare account with two.
         orderBy: { linkedAt: "desc" }
     });
@@ -78,7 +85,8 @@ export async function findGameIdentity(
                   name,
                   provider,
                   accountId: link.accountId,
-                  label: link.label || link.accountId
+                  label: link.label || link.accountId,
+                  verified: link.method !== "manual"
               }
             : null
     };

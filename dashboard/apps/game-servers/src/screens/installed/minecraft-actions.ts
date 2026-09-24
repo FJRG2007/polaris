@@ -947,6 +947,8 @@ export async function findMinecraftPlayerByUserAction(
 ): Promise<{
     userId?: string;
     username?: string;
+    /** True when that username was typed by its owner rather than proved. */
+    unverified?: boolean;
     name?: string;
     addresses?: string[];
     error?: string;
@@ -967,7 +969,12 @@ export async function findMinecraftPlayerByUserAction(
             userId: found.userId,
             name: found.name,
             addresses,
-            ...(found.identity ? { username: found.identity.label } : {})
+            ...(found.identity
+                ? {
+                      username: found.identity.label,
+                      ...(found.identity.verified ? {} : { unverified: true })
+                  }
+                : {})
         };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not look that up" };

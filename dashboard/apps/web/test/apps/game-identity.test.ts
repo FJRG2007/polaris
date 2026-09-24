@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const PAU = "11111111-1111-4111-8111-111111111111";
 
 let people: { id: string; name: string; username: string; email: string }[] = [];
-let links: { userId: string; provider: string; accountId: string; label: string }[] = [];
+let links: { userId: string; provider: string; accountId: string; label: string; method?: string }[] = [];
 let asked: unknown = null;
 
 vi.mock("@polaris/db", () => ({
@@ -83,6 +83,28 @@ describe("findGameIdentity", () => {
         expect((await findGameIdentity("pau", "epic"))?.identity?.accountId).toBe(
             "0123456789abcdef0123456789abcdef"
         );
+    });
+
+    it("marks a Minecraft name its owner proved as verified", async () => {
+        links = [
+            {
+                userId: PAU,
+                provider: "minecraft",
+                accountId: "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+                label: "Notch",
+                method: "oauth"
+            }
+        ];
+        expect((await findGameIdentity("pau", "minecraft"))?.identity?.verified).toBe(true);
+    });
+
+    it("still answers with a name its owner only typed, marked as not verified", async () => {
+        // The name is still the one to add - it is their word for what they are
+        // called - but a screen filling it in has to be able to say nobody checked.
+        links = [{ userId: PAU, provider: "minecraft", accountId: `manual:${PAU}`, label: "Pau_MC", method: "manual" }];
+        const found = await findGameIdentity("pau", "minecraft");
+        expect(found?.identity?.label).toBe("Pau_MC");
+        expect(found?.identity?.verified).toBe(false);
     });
 
     it("is nobody for a name that is not here", async () => {

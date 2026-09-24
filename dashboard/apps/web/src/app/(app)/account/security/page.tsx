@@ -12,8 +12,8 @@
  * never going to be accepted.
  */
 
-import { prisma } from "@polaris/db";
 import { auth } from "@/lib/auth";
+import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
 import { SecurityView } from "./security-view";
 import { listPasskeys } from "./passkey-actions";
@@ -21,8 +21,8 @@ import { getAuthMailStatus } from "@/lib/auth-mail";
 import { getSuccessor } from "@/lib/successor-service";
 import { currentDeviceStanding } from "@/lib/device-grace";
 import { listUserSessions } from "@/lib/session-directory";
-import { getInstanceSecurity } from "@/lib/instance-security";
 import { accountLifecycle } from "@/lib/account-lifecycle";
+import { getInstanceSecurity } from "@/lib/instance-security";
 import type { ConnectedSignIn } from "./connected-sign-in-card";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import { CONNECTION_PROVIDERS, findConnectionProvider } from "@polaris/core";
@@ -54,7 +54,9 @@ async function connectedSignIns(userId: string): Promise<ConnectedSignIn[]> {
             )
         )
     );
-    return linked.map((account) => {
+    // A typed name is not an account anybody signed in to, so it is not offered
+    // as a way in - a switch beside it would be one that can never turn on.
+    return linked.filter((account) => account.method !== "manual").map((account) => {
         const provider = findConnectionProvider(account.provider);
         return {
             id: account.id,

@@ -641,6 +641,8 @@ export function PlayerAccessDialog({
     onLookUp?: (query: string) => Promise<{
         userId?: string;
         username?: string;
+        /** The username was typed by its owner rather than proved. */
+        unverified?: boolean;
         name?: string;
         addresses?: string[];
         error?: string;
@@ -676,6 +678,8 @@ export function PlayerAccessDialog({
      *  addresses. Bedrock reports no address, so it can only keep them. */
     const [follow, setFollow] = useState(edition === "java");
     const [noMinecraft, setNoMinecraft] = useState(false);
+    /** The name that filled itself in was typed by its owner, not proved. */
+    const [typedName, setTypedName] = useState<string | null>(null);
     const [username, setUsername] = useState(player?.username ?? "");
     const [address, setAddress] = useState("");
     const [note, setNote] = useState(player?.note ?? "");
@@ -711,6 +715,7 @@ export function PlayerAccessDialog({
             }
             setAccount({ userId: found.userId, name: found.name ?? identifier });
             setNoMinecraft(!found.username);
+            setTypedName(found.username && found.unverified ? found.username : null);
             // The name of somebody already on the list is who the server checks,
             // and an account can be tied to it whatever that account calls itself.
             if (found.username && !editing) setUsername(found.username);
@@ -966,7 +971,9 @@ export function PlayerAccessDialog({
                 hint={
                     !editing && account && noMinecraft
                         ? `${account.name} has not linked Minecraft, so type their username.`
-                        : undefined
+                        : !editing && account && typedName !== null && username.trim() === typedName
+                          ? `Typed by ${account.name} (not verified).`
+                          : undefined
                 }
             >
                 <Input

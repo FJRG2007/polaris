@@ -38,6 +38,13 @@ async function audit(entry: {
     await recordAudit(entry);
 }
 
+/**
+ * How a link came to be: the provider's own screen, a token its owner pasted, or
+ * a name its owner typed. Only the first two were proved by the provider; a
+ * typed one is a claim, and every screen that shows it says so.
+ */
+export type ConnectionMethod = "oauth" | "token" | "manual";
+
 /** What a screen may know about a linked account: never the credential. */
 export interface ConnectionView {
     readonly id: string;
@@ -47,7 +54,9 @@ export interface ConnectionView {
     /** The GitHub login, the Google address. */
     readonly label: string;
     readonly avatarUrl: string | null;
-    readonly method: "oauth" | "token";
+    /** "manual" is a name its owner typed rather than proved - see
+     *  `saveTypedConnection`. */
+    readonly method: ConnectionMethod;
     readonly scope: string;
     /** Whether the owner lets this account sign them in. The operator's own
      *  switch is separate, and both have to allow it. */
@@ -122,7 +131,7 @@ function view(row: ConnectionRow): ConnectionView {
         accountId: row.accountId,
         label: row.label,
         avatarUrl: row.avatarUrl,
-        method: row.method === "token" ? "token" : "oauth",
+        method: row.method === "token" || row.method === "manual" ? row.method : "oauth",
         scope: row.scope,
         signInEnabled: row.signInEnabled,
         linkedAt: row.linkedAt.toISOString()
@@ -245,7 +254,12 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
 
     if (!claimed) {
         const limit = await connectionLimit(input.provider);
-        const held = await prisma.userConnection.count({ where: { userId, provider: input.provider } });
+        // A typed name is not counted: the proved account is about to replace it,
+        // and refusing that because the claim was there first would keep the
+        // unverified one over the verified.
+        const held = await prisma.userConnection.count({
+            where: { userId, provider: input.provider, method: { not: "manual" } }
+        });
         if (held >= limit) throw new ConnectionLimitError(input.provider, limit);
     }
 
@@ -272,6 +286,12 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
         select: VIEW_COLUMNS
     });
 
+    // The provider has now vouched for an account, so whatever name its owner
+    // typed for this service stops standing in for it. Removed only once the
+    // proved one is stored, so a link that fails leaves the typed name where it
+    // was rather than leaving nothing.
+    await prisma.userConnection.deleteMany({ where: { userId, provider: input.provider, method: "manual" } });
+
     await reserveEmail(userId, input.provider, input.email);
     await audit({
         actorId: userId,
@@ -279,6 +299,79 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
         targetType: "user",
         targetId: userId,
         metadata: { provider: input.provider, account: input.label, method: input.method }
+    });
+    return view(row);
+}
+
+/** Raised when somebody types a name for a service they have already proved an
+ *  account on. The proved one is the better answer and is not replaced by a claim. */
+export class ConnectionVerifiedError extends Error {
+    constructor(provider: string) {
+        super(`Your ${provider} account is already connected and verified. Disconnect it first to type a name instead.`);
+        this.name = "ConnectionVerifiedError";
+    }
+}
+
+/**
+ * The account id a typed name is held under: one per person and service.
+ *
+ * Keyed by the person rather than the name, deliberately. Nothing proved the
+ * name, so it cannot claim it: two people typing the same one both keep theirs,
+ * and neither can lock the other - or the real owner - out of it. Changing the
+ * name rewrites the one row instead of adding a second.
+ */
+export function typedAccountId(userId: string): string {
+    return `manual:${userId}`;
+}
+
+/**
+ * Record a name somebody typed for themselves on a service that allows it.
+ *
+ * Held in the same place as a proved link, so everything that reads who
+ * somebody is on that service reads it without knowing the difference - and
+ * marked `manual`, so everything that shows it can. It carries no credential,
+ * never signs anybody in, and gives way to a proved account the moment one is
+ * linked. The caller validates the name; this only stores it.
+ */
+export async function saveTypedConnection(
+    userId: string,
+    provider: string,
+    label: string
+): Promise<ConnectionView> {
+    const entry = findConnectionProvider(provider);
+    if (!entry?.acceptsTypedName) throw new Error("That service cannot be connected by typing a name");
+
+    const limit = await connectionLimit(provider);
+    if (limit === 0) throw new ConnectionLimitError(provider, limit);
+    const proved = await prisma.userConnection.count({ where: { userId, provider, method: { not: "manual" } } });
+    if (proved > 0) throw new ConnectionVerifiedError(entry.name);
+
+    const accountId = typedAccountId(userId);
+    const existing = await prisma.userConnection.findUnique({
+        where: { provider_accountId: { provider, accountId } },
+        select: { id: true }
+    });
+    const row = await prisma.userConnection.upsert({
+        where: { provider_accountId: { provider, accountId } },
+        create: {
+            userId,
+            provider,
+            accountId,
+            label,
+            avatarUrl: null,
+            method: "manual",
+            scope: "",
+            signInEnabled: false
+        },
+        update: { label },
+        select: VIEW_COLUMNS
+    });
+    await audit({
+        actorId: userId,
+        action: existing ? "connection.typed.change" : "connection.typed",
+        targetType: "user",
+        targetId: userId,
+        metadata: { provider, account: label, method: "manual" }
     });
     return view(row);
 }
@@ -363,6 +456,8 @@ export async function setConnectionSignIn(
     const existing = await getConnection(userId, id);
     if (!existing) return null;
     if (existing.signInEnabled === enabled) return existing;
+    // A typed name proves nothing about who is signing in, so it is never a way in.
+    if (enabled && existing.method === "manual") return existing;
 
     const row = await prisma.userConnection.update({
         where: { id },
@@ -393,9 +488,16 @@ export async function signInConnection(
 ): Promise<{ userId: string; connectionId: string; label: string; banned: boolean } | null> {
     const row = await prisma.userConnection.findUnique({
         where: { provider_accountId: { provider, accountId } },
-        select: { id: true, userId: true, label: true, signInEnabled: true, user: { select: { bannedAt: true } } }
+        select: {
+            id: true,
+            userId: true,
+            label: true,
+            method: true,
+            signInEnabled: true,
+            user: { select: { bannedAt: true } }
+        }
     });
-    if (!row?.signInEnabled) return null;
+    if (!row?.signInEnabled || row.method === "manual") return null;
     // A suspended account is reported rather than hidden, so the caller can say
     // what a password sign-in would have said. Nothing is issued either way, and
     // whoever is holding the linked account is its owner.
