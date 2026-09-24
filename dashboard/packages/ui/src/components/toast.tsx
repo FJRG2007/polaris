@@ -18,6 +18,10 @@
  *   rather than a column down the whole screen.
  * - **Hover holds it.** A note that vanished while it was being read would have
  *   to be gone looking for, which is the opposite of the point.
+ * - **Its time runs only while somebody can see it.** A note raised while the
+ *   tab is behind another window, or the window is minimised, waits for them to
+ *   come back. It used to spend its six seconds unseen: a chime, somebody turning
+ *   round to look, and nothing on the screen and nothing in the bell.
  * - **One per key.** A second note with the same `key` replaces the first
  *   instead of stacking, so ten messages in one conversation are one note that
  *   keeps changing rather than ten.
@@ -144,16 +148,43 @@ function ToastStack({
     );
 }
 
+/** Whether somebody can see this tab: shown, and the window in front. The same
+ *  two questions the app's own attention check asks. */
+function seenNow(): boolean {
+    if (typeof document === "undefined") return true;
+    return document.visibilityState === "visible" && document.hasFocus();
+}
+
+/** Whether the tab is being looked at, kept current. */
+function useSeen(): boolean {
+    const [seen, setSeen] = useState(seenNow);
+    useEffect(() => {
+        const update = () => setSeen(seenNow());
+        update();
+        document.addEventListener("visibilitychange", update);
+        window.addEventListener("focus", update);
+        window.addEventListener("blur", update);
+        return () => {
+            document.removeEventListener("visibilitychange", update);
+            window.removeEventListener("focus", update);
+            window.removeEventListener("blur", update);
+        };
+    }, []);
+    return seen;
+}
+
 function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }) {
     const [held, setHeld] = useState(false);
+    const seen = useSeen();
     const life = toast.life ?? LIFE_MS;
 
     useEffect(() => {
-        if (held || life <= 0) return;
+        if (held || !seen || life <= 0) return;
         const timer = setTimeout(onDismiss, life);
         return () => clearTimeout(timer);
-        // Re-armed when the pointer leaves, which is what "hover holds it" is.
-    }, [held, life, onDismiss]);
+        // Re-armed when the pointer leaves, which is what "hover holds it" is,
+        // and when somebody comes back to the tab, which is when they can read it.
+    }, [held, seen, life, onDismiss]);
 
     const pressable = Boolean(toast.onPress);
 
