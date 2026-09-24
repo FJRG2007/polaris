@@ -834,6 +834,7 @@ function VoicePerson({
         <PersonRow
             as="li"
             personId={person.userId}
+            plate="never"
             className="flex items-center gap-1.5 rounded px-1 text-xs text-muted-foreground data-[state=open]:bg-card-hover"
             title={person.name}
         >

@@ -86,6 +86,7 @@ export function CallRoster({ people }: { people: readonly VoicePresence[] }) {
                     as="li"
                     key={person.id}
                     personId={person.userId}
+                    plate="never"
                     className="flex min-w-0 items-center gap-1.5 text-xs"
                     title={person.name}
                 >
@@ -132,6 +133,7 @@ export function CallRosterList({
                     as="li"
                     key={person.id}
                     personId={person.userId}
+                    plate="never"
                     className="flex min-w-0 items-center gap-2 rounded px-1 py-0.5 text-sm"
                     title={person.name}
                 >

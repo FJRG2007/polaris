@@ -89,6 +89,7 @@ export function CallPreview({
                         as="li"
                         key={person.id}
                         personId={person.userId}
+                        plate="never"
                         className="flex w-20 shrink-0 flex-col items-center gap-1"
                         title={person.name}
                     >

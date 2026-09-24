@@ -245,10 +245,13 @@ export function PersonRow<T extends ElementType = "div">({
     as?: T;
     /** When to actually paint it. `always` for a list about who people are;
      *  `active` for a long navigation list, where the plate becomes the hover
-     *  instead of covering it - see `PLATE_ON_ACTIVE`. */
-    plate?: "always" | "active";
+     *  instead of covering it - see `PLATE_ON_ACTIVE`; `never` for a row that
+     *  shows who is somewhere rather than introducing them - the people in a
+     *  call somebody is looking at from outside it. */
+    plate?: "always" | "active" | "never";
 } & Omit<ComponentPropsWithoutRef<T>, "as" | "personId" | "plate">) {
-    const plate = usePersonNameplate(personId);
+    const worn = usePersonNameplate(personId);
+    const plate = when === "never" ? null : worn;
     const Tag = (as ?? "div") as ElementType;
     const held = plate && when === "active";
     return (
