@@ -68,6 +68,26 @@ describe("which sites the inline script runs on", () => {
         expect(injectableOrigins([], "https://polaris.example.com")).toEqual([]);
     });
 
+    it("registers on every site only when somebody switched that on", () => {
+        const held = ["https://*/*", "http://*/*", "https://example.com/*"];
+        expect(injectableOrigins(held, null, true)).toEqual([
+            "https://*/*",
+            "http://*/*",
+            "https://example.com/*"
+        ]);
+        // The same grant without the switch is still one site at a time.
+        expect(injectableOrigins(held, null, false)).toEqual(["https://example.com/*"]);
+    });
+
+    it("does not register on every site the browser never granted", () => {
+        // Switched on, then refused by the browser's prompt.
+        expect(injectableOrigins(["https://example.com/*"], null, true)).toEqual([
+            "https://example.com/*"
+        ]);
+        // And never on a pattern broader than web pages, switch or not.
+        expect(injectableOrigins(["<all_urls>", "*://*/*"], null, true)).toEqual([]);
+    });
+
     it("hands each site over once", () => {
         expect(injectableOrigins(["https://example.com/*", "https://example.com/*"], null)).toEqual(
             ["https://example.com/*"]

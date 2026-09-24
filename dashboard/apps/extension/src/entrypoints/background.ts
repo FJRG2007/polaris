@@ -1682,13 +1682,20 @@ async function badge(): Promise<void> {
  * strings arrive as arguments. By the time it runs, which item to use has already
  * been decided, and the page is handed nothing it was not about to be typed.
  *
+ * The one-time code is the third string, and only the code - never the secret
+ * behind it. A second-factor step is its own page on most sites, so the same Fill
+ * that typed the password on the first page types the code on the second. The
+ * rules for finding its box are `isOneTimeCode` and `splitCode` in `lib/fields`,
+ * copied for the reason above.
+ *
  * It does not submit the form. Filling is the help somebody asked for; pressing
  * the button for them is a decision nobody made.
  */
 function typeIntoPage(
     username: string | null,
-    password: string | null
-): { user: boolean; pass: boolean } {
+    password: string | null,
+    code: string | null
+): { user: boolean; pass: boolean; code: boolean } {
     const never = new Set([
         "hidden",
         "file",
@@ -1704,6 +1711,12 @@ function typeIntoPage(
     const notALogin = /search|captcha|find|query|coupon|voucher|discount|promo/i;
     const identifier =
         /user|login|email|correo|usuario|e-?mail|account|cuenta|identifiant|benutzer|nome|phone|telefono|mobile/i;
+    const oneTimeWords =
+        /one.?time|\b[th]?otp|2fa|two.?factor|two.?step|2.?step|authenticat|verification code|verify code|security code|login code|sign.?in code|c[oó]digo de verificaci[oó]n|c[oó]digo de seguridad|verificaci[oó]n en dos|dos pasos|\bmfa\b|passcode/i;
+    const codeWord = /\bcode\b|c[oó]digo|\btoken\b/i;
+    const notACode =
+        /zip|postal|post.?code|country|area code|phone|tel[eé]fono|referr|invit|gift|card|cvc|cvv|tracking|coupon|promo/i;
+    const codeTypes = ["text", "tel", "number"];
 
     const describe = (field: HTMLInputElement): string =>
         [
@@ -1715,6 +1728,10 @@ function typeIntoPage(
             field.labels?.[0]?.textContent ?? ""
         ]
             .join(" ")
+            // `login_code` and `loginCode` are two words, and the rules below
+            // match words: `\bcode\b` never matches either as written.
+            .replace(/([a-z])([A-Z])/g, "$1 $2")
+            .replace(/_/g, " ")
             .toLowerCase();
 
     const usable = (field: HTMLInputElement): boolean => {
@@ -1749,7 +1766,48 @@ function typeIntoPage(
         if (notALogin.test(words)) return false;
         return identifier.test(words) || field.type === "email";
     };
-    const user = candidates.find(named) ?? null;
+
+    // The code box, found before the name so "login code" is not read as a
+    // username for saying "login".
+    const isCode = (field: HTMLInputElement): boolean => {
+        const token = field.autocomplete?.toLowerCase() ?? "";
+        if (token === "one-time-code") return true;
+        if (token !== "" && token !== "off") return false;
+        if (!codeTypes.includes(field.type)) return false;
+        const words = describe(field);
+        if (notALogin.test(words) || notACode.test(words)) return false;
+        if (oneTimeWords.test(words)) return true;
+        if (!codeWord.test(words)) return false;
+        const length = field.maxLength > 0 ? field.maxLength : null;
+        const short = length !== null && length >= 4 && length <= 8;
+        const digits = field.inputMode === "numeric" || field.type !== "text";
+        return length !== 1 && (short || digits);
+    };
+    const single = inputs.find(isCode) ?? null;
+    const user = candidates.find((field) => field !== single && named(field)) ?? null;
+
+    // Or a row of one-character boxes, one per digit, in one form.
+    let codeBoxes: HTMLInputElement[] = single ? [single] : [];
+    if (!single) {
+        let run: HTMLInputElement[] = [];
+        const settle = (): boolean => run.length >= 4 && run.length <= 8;
+        for (const field of inputs) {
+            const digit =
+                field !== user &&
+                field !== pass &&
+                field.maxLength === 1 &&
+                codeTypes.includes(field.type) &&
+                !notALogin.test(describe(field));
+            const last = run[run.length - 1];
+            if (digit && (!last || last.form === field.form)) {
+                run.push(field);
+                continue;
+            }
+            if (settle()) break;
+            run = digit ? [field] : [];
+        }
+        if (settle()) codeBoxes = run;
+    }
 
     // Written through the property descriptor and then announced: a form built
     // with a framework holds its own copy of what it believes the field says, so
@@ -1766,7 +1824,10 @@ function typeIntoPage(
 
     if (username && user) put(user, username);
     if (password && pass) put(pass, password);
-    return { user: Boolean(user), pass: Boolean(pass) };
+    const typed = Boolean(code) && codeBoxes.length > 0;
+    if (code && codeBoxes.length === 1) put(codeBoxes[0]!, code);
+    else if (code) for (const [index, box] of codeBoxes.entries()) put(box, code.charAt(index));
+    return { user: Boolean(user), pass: Boolean(pass), code: typed };
 }
 
 /**
@@ -1803,13 +1864,20 @@ async function fill(id: string, page: PageContext | null = null): Promise<messag
         // been typed into it - and somebody then submits an empty form, or
         // pastes a password into whatever is focused, looking for the one they
         // were told had already been filled in.
+        // The code as of now, computed here so the secret it comes from never
+        // reaches the page. Worked out even on a page with no code box: which
+        // boxes a page has is only known inside it, and a code nobody used is
+        // thirty seconds from meaning nothing.
+        const code = login.totp ? await totpCode(login.totp).catch(() => null) : null;
         const [outcome] = await browser.scripting.executeScript({
             target: { tabId: tab.id },
             func: typeIntoPage,
-            args: [login.username, login.password]
+            args: [login.username, login.password, code]
         });
-        const filled = outcome?.result as { user?: boolean; pass?: boolean } | undefined;
-        if (!filled?.user && !filled?.pass) {
+        const filled = outcome?.result as
+            | { user?: boolean; pass?: boolean; code?: boolean }
+            | undefined;
+        if (!filled?.user && !filled?.pass && !filled?.code) {
             return { ok: false, error: "No login form was found on this page." };
         }
         return { ok: true };
@@ -2598,6 +2666,14 @@ browser.tabs.onUpdated.addListener((_id, change) => {
     if (change.url || change.status === "complete") void badge();
 });
 
+/**
+ * Whether somebody switched on "Show Polaris on every site" in the popup. The
+ * popup writes it, under the same key, from the gesture that requested the
+ * grant; this only reads it. See `injectableOrigins` for why it is an answer of
+ * its own rather than read off the grant.
+ */
+const EVERYWHERE = storage.defineItem<boolean>("local:inline.everywhere", { fallback: false });
+
 /** The id the inline script is registered under, so the old registration can be
  *  found and replaced rather than piling up. */
 const AUTOFILL_ID = "polaris-autofill";
@@ -2626,7 +2702,10 @@ async function syncAutofill(): Promise<void> {
         browser.permissions.getAll().catch(() => ({ origins: [] as string[] })),
         currentOrigin()
     ]);
-    const matches = injectableOrigins(held.origins ?? [], home);
+    const matches = injectableOrigins(held.origins ?? [], home, await EVERYWHERE.getValue());
+    // Polaris's own pages stay out of a broad registration too, for the reason
+    // `injectableOrigins` leaves them out of a narrow one.
+    const homeOrigin = home ? readOrigin(home) : null;
 
     await browser.scripting.unregisterContentScripts({ ids: [AUTOFILL_ID] }).catch(() => undefined);
     if (matches.length === 0) return;
@@ -2636,6 +2715,7 @@ async function syncAutofill(): Promise<void> {
                 id: AUTOFILL_ID,
                 js: ["autofill.js"],
                 matches,
+                ...(homeOrigin ? { excludeMatches: [`${homeOrigin}/*`] } : {}),
                 runAt: "document_idle",
                 persistAcrossSessions: true
             }

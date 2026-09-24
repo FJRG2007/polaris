@@ -167,6 +167,30 @@ describe("what the form is for", () => {
     it("finds the box an authenticator's code goes in", () => {
         const form = readForm([field({ autocomplete: "one-time-code" })]);
         expect(form.oneTimeCode).toBe(0);
+        expect(form.oneTimeCodeBoxes).toEqual([0]);
+    });
+
+    it("does not read a box labelled 'login code' as the username", () => {
+        // It says "login", which is an identifier word; it is the code box.
+        const form = readForm([field({ words: "login code", maxLength: 6 })]);
+        expect(form).toMatchObject({ username: null, oneTimeCode: 0 });
+    });
+
+    it("finds a code split into one box per digit", () => {
+        const digit = { maxLength: 1, inputMode: "numeric", form: FORM };
+        const form = readForm([
+            field({ words: "search" }),
+            ...Array.from({ length: 6 }, () => field(digit)),
+            field({ type: "submit" })
+        ]);
+        expect(form.oneTimeCodeBoxes).toEqual([1, 2, 3, 4, 5, 6]);
+        expect(form.oneTimeCode).toBe(1);
+    });
+
+    it("does not take two one-character boxes for a code", () => {
+        const form = readForm([field({ maxLength: 1 }), field({ maxLength: 1 })]);
+        expect(form.oneTimeCodeBoxes).toEqual([]);
+        expect(form.oneTimeCode).toBeNull();
     });
 });
 
@@ -179,6 +203,28 @@ describe("whether a box is for a one-time code", () => {
         expect(isOneTimeCode(field({ words: "verification code" }))).toBe(true);
         expect(isOneTimeCode(field({ words: "authenticator app code" }))).toBe(true);
         expect(isOneTimeCode(field({ words: "one-time password" }))).toBe(true);
+        expect(isOneTimeCode(field({ words: "totp" }))).toBe(true);
+        expect(isOneTimeCode(field({ words: "otp_code" }))).toBe(true);
+        expect(isOneTimeCode(field({ words: "two-step verification" }))).toBe(true);
+        expect(isOneTimeCode(field({ words: "código de seguridad" }))).toBe(true);
+    });
+
+    it("takes a bare 'code' only on a box shaped like one", () => {
+        // What most sign-in second steps actually say.
+        expect(isOneTimeCode(field({ words: "code", maxLength: 6 }))).toBe(true);
+        expect(isOneTimeCode(field({ words: "enter the code", inputMode: "numeric" }))).toBe(true);
+        expect(isOneTimeCode(field({ type: "tel", words: "code" }))).toBe(true);
+        // A long free-text box that says "code" is something else.
+        expect(isOneTimeCode(field({ words: "code" }))).toBe(false);
+        expect(isOneTimeCode(field({ words: "code", maxLength: 40 }))).toBe(false);
+    });
+
+    it("never takes a postal, phone or card code", () => {
+        expect(isOneTimeCode(field({ words: "postal code", maxLength: 5 }))).toBe(false);
+        expect(isOneTimeCode(field({ words: "zip code", inputMode: "numeric" }))).toBe(false);
+        expect(isOneTimeCode(field({ words: "area code", maxLength: 4 }))).toBe(false);
+        expect(isOneTimeCode(field({ words: "card security code", maxLength: 4 }))).toBe(false);
+        expect(isOneTimeCode(field({ words: "gift card code", maxLength: 8 }))).toBe(false);
     });
 
     it("leaves an ordinary box alone", () => {

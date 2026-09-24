@@ -102,6 +102,7 @@ async function start(): Promise<void> {
             newPassword: null,
             confirmPassword: null,
             oneTimeCode: null,
+            oneTimeCodeBoxes: [],
             purpose: "none"
         },
         inputs: []
@@ -158,7 +159,16 @@ async function start(): Promise<void> {
         watchForBreaches(at(fields.newPassword));
     };
 
-    const show = async (role: Role, field: HTMLInputElement): Promise<void> => {
+    /**
+     * Open what a mark offers.
+     *
+     * `offered` is the menu opening by itself because somebody put the cursor in
+     * the box, the way a password manager's list drops down under a login field.
+     * That one only appears when there is something in it: a panel that says
+     * "nothing saved here" every time somebody clicks into a field is one they
+     * learn to swat away, and the mark is still there for the question.
+     */
+    const show = async (role: Role, field: HTMLInputElement, offered = false): Promise<void> => {
         if (open) return;
         open = true;
         try {
@@ -176,12 +186,14 @@ async function start(): Promise<void> {
             const items = reply.ok && "items" in reply ? reply.items : [];
             if (role === "code") {
                 const withCode = items.filter((item) => item.totp);
+                if (offered && withCode.length === 0) return;
                 menu(field, withCode, "Nothing here carries a one-time code.", async (item) => {
                     const answer = await askBackground({ kind: "totpNow", id: item.id });
-                    if (answer.ok && "code" in answer) put(field, answer.code);
+                    if (answer.ok && "code" in answer) putCode(codeBoxes(field), answer.code);
                 });
                 return;
             }
+            if (offered && items.length === 0) return;
             menu(field, items, "Nothing saved for this site.", async (item) => {
                 await askBackground({ kind: "fill", id: item.id });
             });
@@ -189,6 +201,40 @@ async function start(): Promise<void> {
             open = false;
         }
     };
+
+    /** The boxes a code goes in, starting from the one it was asked for on: the
+     *  whole row when the page splits the code one digit per box. */
+    const codeBoxes = (field: HTMLInputElement): HTMLInputElement[] => {
+        const boxes = seen.fields.oneTimeCodeBoxes
+            .map((index) => at(index))
+            .filter((box): box is HTMLInputElement => box !== null);
+        return boxes.includes(field) ? boxes : [field];
+    };
+
+    // Dropped down under the box as somebody clicks or tabs into it, once per box
+    // per page: closing it is an answer, and reopening it on every focus would be
+    // arguing with that answer. The mark is still there for a second look.
+    const offeredOn = new WeakSet<HTMLInputElement>();
+    document.addEventListener(
+        "focusin",
+        (event) => {
+            const field = event.target;
+            if (!(field instanceof HTMLInputElement) || offeredOn.has(field)) return;
+            for (const role of ["login", "code"] as const) {
+                const held = marks.get(role);
+                // The login is offered on the password box as well as the one the
+                // mark sits on, because either is where somebody starts.
+                const own =
+                    held?.field === field ||
+                    (role === "login" && field === at(seen.fields.password));
+                if (!own) continue;
+                offeredOn.add(field);
+                void show(role, field, true);
+                return;
+            }
+        },
+        true
+    );
 
     refresh();
     // The page keeps moving: a field can be replaced, revealed, or scrolled.
@@ -318,7 +364,14 @@ function describe(field: HTMLInputElement): FieldFacts {
             field.labels?.[0]?.textContent ?? ""
         ]
             .join(" ")
+            // `login_code` and `loginCode` are two words, and the rules match
+            // words: `\bcode\b` never matches either as written.
+            .replace(/([a-z])([A-Z])/g, "$1 $2")
+            .replace(/_/g, " ")
             .toLowerCase(),
+        // The DOM answers -1 for a box with no limit.
+        maxLength: field.maxLength > 0 ? field.maxLength : null,
+        inputMode: (field.inputMode || "").toLowerCase(),
         usable:
             !field.disabled &&
             !field.readOnly &&
@@ -343,6 +396,22 @@ function put(field: HTMLInputElement, value: string): void {
     descriptor?.set?.call(field, value);
     field.dispatchEvent(new Event("input", { bubbles: true }));
     field.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+/**
+ * Type a code into its box, or one digit into each box of a split one.
+ *
+ * Per box because a split code's boxes each listen for their own character and
+ * move the cursor on by themselves; the whole code written into the first one is
+ * cut to its first digit and leaves the rest empty.
+ */
+function putCode(boxes: readonly HTMLInputElement[], code: string): void {
+    if (boxes.length <= 1) {
+        const [only] = boxes;
+        if (only) put(only, code);
+        return;
+    }
+    for (const [index, box] of boxes.entries()) put(box, code.charAt(index));
 }
 
 /** The mark that sits in the corner of a box Polaris has something for. */
@@ -408,6 +477,7 @@ function floating(field: HTMLInputElement): {
         host.remove();
         document.removeEventListener("mousedown", away, true);
         document.removeEventListener("keydown", onKey, true);
+        field.removeEventListener("blur", close);
     };
     const away = (event: Event): void => {
         if (!host.contains(event.target as Node)) close();
@@ -420,6 +490,9 @@ function floating(field: HTMLInputElement): {
     document.body.append(host);
     document.addEventListener("mousedown", away, true);
     document.addEventListener("keydown", onKey, true);
+    // Tabbing on to the next box leaves the list behind: pressing inside the
+    // panel never blurs the field, because every button in it cancels mousedown.
+    field.addEventListener("blur", close);
     return { host, panel, close };
 }
 

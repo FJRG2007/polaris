@@ -33,6 +33,12 @@ export interface FieldFacts {
      *  field written outside any form, which is common enough to be the reason
      *  the ordering rule below exists. */
     readonly form: unknown;
+    /** The `maxlength` attribute, or null where the page set none. A code box is
+     *  short, and a box that takes one character is one digit of a code split
+     *  across several. */
+    readonly maxLength?: number | null;
+    /** The `inputmode` attribute, lowercased, or an empty string. */
+    readonly inputMode?: string;
 }
 
 /** The types a login is never typed into. */
@@ -71,7 +77,22 @@ const NEW_WORDS = /new|nueva|nuevo|create|crear|choose|elige|elegir|set up|regis
 /** Words a one-time code box carries. Narrow on purpose: a mark offering to type
  *  an authenticator's code into an unrelated box is worse than no mark at all. */
 const ONE_TIME_WORDS =
-    /one.?time|\botp\b|2fa|two.?factor|authenticat|verification code|verify code|codigo de verificacion|código de verificación|\bmfa\b|passcode/i;
+    /one.?time|\b[th]?otp|2fa|two.?factor|two.?step|2.?step|authenticat|verification code|verify code|security code|login code|sign.?in code|c[oó]digo de verificaci[oó]n|c[oó]digo de seguridad|verificaci[oó]n en dos|dos pasos|\bmfa\b|passcode/i;
+
+/** The bare word "code", which is a one-time code only on a box shaped like one:
+ *  short, or asking for digits. On a long free-text box it is a gift card. */
+const CODE_WORD = /\bcode\b|c[oó]digo|\btoken\b/i;
+
+/** Codes that are not a second factor, whatever shape their box has. */
+const NOT_A_ONE_TIME_CODE =
+    /zip|postal|post.?code|country|area code|phone|tel[eé]fono|referr|invit|gift|card|cvc|cvv|tracking|coupon|promo/i;
+
+/** The longest box a code goes in. Authenticators give six digits, some sites
+ *  eight, and a box sized for more is asking for something else. */
+const CODE_MOST = 8;
+
+/** How many single-character boxes a split code comes in. */
+const SPLIT_CODE = { least: 4, most: 8 } as const;
 
 /** The types a short code is typed into. */
 const CODE_TYPES = new Set(["text", "tel", "number"]);
@@ -101,8 +122,12 @@ export interface PageFields extends FoundFields {
     readonly newPassword: number | null;
     /** The box that same new password is typed into again. */
     readonly confirmPassword: number | null;
-    /** The box an authenticator's six digits go in. */
+    /** The box an authenticator's six digits go in - the first of them, where
+     *  the page splits the code into one box per digit. */
     readonly oneTimeCode: number | null;
+    /** Every box the code goes in, in order: one for an ordinary code box,
+     *  one per digit for a split one, none when the page asks for no code. */
+    readonly oneTimeCodeBoxes: readonly number[];
     readonly purpose: FormPurpose;
 }
 
@@ -185,8 +210,14 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
                       : usable.indexOf(index) < usable.indexOf(anchor);
               });
 
-    const username = candidates.find((index) => isUsername(fields[index])) ?? null;
-    const oneTimeCode = usable.find((index) => isOneTimeCode(fields[index])) ?? null;
+    // The code box first, so a box labelled "login code" is not then read as the
+    // username because it says "login".
+    const single = usable.find((index) => isOneTimeCode(fields[index]));
+    const username =
+        candidates.find((index) => index !== single && isUsername(fields[index])) ?? null;
+    const oneTimeCodeBoxes =
+        single !== undefined ? [single] : splitCode(fields, usable, [username, current, newPassword]);
+    const oneTimeCode = oneTimeCodeBoxes[0] ?? null;
 
     const purpose: FormPurpose =
         current !== null && newPassword !== null
@@ -197,7 +228,52 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
                 ? "signin"
                 : "none";
 
-    return { username, password: current, newPassword, confirmPassword, oneTimeCode, purpose };
+    return {
+        username,
+        password: current,
+        newPassword,
+        confirmPassword,
+        oneTimeCode,
+        oneTimeCodeBoxes,
+        purpose
+    };
+}
+
+/**
+ * A code split into one box per digit, which is how a good share of sites ask
+ * for it now: a row of four to eight boxes that each take one character, side by
+ * side in the same form. None of them says "code" on its own - most say nothing
+ * at all - so the row is the evidence, and a row is required: two one-character
+ * boxes are an initial and a suffix, not a code.
+ *
+ * Boxes already taken as the username or a password are never part of it.
+ */
+function splitCode(
+    fields: readonly FieldFacts[],
+    usable: readonly number[],
+    taken: readonly (number | null)[]
+): number[] {
+    let run: number[] = [];
+    const settle = (): number[] | null =>
+        run.length >= SPLIT_CODE.least && run.length <= SPLIT_CODE.most ? run : null;
+    for (const index of usable) {
+        const field = fields[index];
+        const digit =
+            field !== undefined &&
+            !taken.includes(index) &&
+            field.maxLength === 1 &&
+            CODE_TYPES.has(field.type) &&
+            !NOT_A_LOGIN.test(field.words);
+        const last = run[run.length - 1];
+        if (digit && (last === undefined || fields[last]?.form === field.form)) {
+            run.push(index);
+            continue;
+        }
+        const found = settle();
+        if (found) return found;
+        run = digit ? [index] : [];
+    }
+    return settle() ?? [];
 }
 
 /** What one password box says about itself, before its neighbours are counted. */
@@ -259,6 +335,14 @@ export function isOneTimeCode(field: FieldFacts | undefined): boolean {
     if (field.autocomplete === "one-time-code") return true;
     if (field.autocomplete !== "" && field.autocomplete !== "off") return false;
     if (!CODE_TYPES.has(field.type)) return false;
-    if (NOT_A_LOGIN.test(field.words)) return false;
-    return ONE_TIME_WORDS.test(field.words);
+    if (NOT_A_LOGIN.test(field.words) || NOT_A_ONE_TIME_CODE.test(field.words)) return false;
+    if (ONE_TIME_WORDS.test(field.words)) return true;
+    // "Code" alone, on a box shaped like one: short enough for a code, or
+    // asking for digits. Never a one-character box, which is a digit of a split
+    // code and is found as a row instead.
+    if (!CODE_WORD.test(field.words)) return false;
+    const length = field.maxLength ?? null;
+    const short = length !== null && length >= 4 && length <= CODE_MOST;
+    const digits = field.inputMode === "numeric" || field.type === "tel" || field.type === "number";
+    return length !== 1 && (short || digits);
 }

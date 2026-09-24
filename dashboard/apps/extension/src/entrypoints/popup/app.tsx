@@ -1,10 +1,12 @@
-import { TIMEOUT_CHOICES } from "@/lib/lock";
+import { storage } from "#imports";
 import { screenFor } from "@/lib/screen";
-import { Home, SectionBar, TopBar, useSection } from "./shell";
+import { TIMEOUT_CHOICES } from "@/lib/lock";
+import { EVERY_SITE } from "@/lib/injection";
 import { readIntendedLogin } from "@/lib/save";
 import type { UpdateNotice } from "@/lib/update";
 import { looksLikeAddress, readOrigin } from "@/lib/address";
 import { accountHost, describeAccount } from "@/lib/accounts";
+import { Home, SectionBar, TopBar, useSection } from "./shell";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askBackground, type ItemSummary, type Request, type VaultStatus } from "@/lib/messages";
 // The subpath rather than the package: `@polaris/core` is a barrel over the whole
@@ -662,6 +664,102 @@ function Unlock({
                 Let me in from Polaris instead
             </button>
         </main>
+    );
+}
+
+/** The answer the worker reads when it registers the inline script. Written
+ *  here and nowhere else, from the press that asked the browser for the grant. */
+const EVERYWHERE = storage.defineItem<boolean>("local:inline.everywhere", { fallback: false });
+
+/**
+ * "Show Polaris on every site": the list under a login box on every page, the
+ * way a password manager usually works, rather than one site at a time.
+ *
+ * Off until somebody turns it on, because what it asks the browser for is to
+ * run inside every page they open - and that is theirs to agree to, in a prompt
+ * the browser draws, not something this extension takes at install.
+ *
+ * Turning it off stops the registration but keeps the grant: the broad grant
+ * covers the Polaris server too, and giving it back could cut the vault off from
+ * its own server. The browser's extension settings remove it for anybody who
+ * wants it gone.
+ */
+function useEverywhere(): {
+    everywhere: boolean | null;
+    possible: boolean;
+    turn: (on: boolean) => Promise<string | null>;
+} {
+    const [everywhere, setEverywhere] = useState<boolean | null>(null);
+    const possible = Boolean(browser.scripting?.registerContentScripts);
+
+    useEffect(() => {
+        if (!possible) return;
+        void Promise.all([
+            EVERYWHERE.getValue(),
+            browser.permissions.contains({ origins: [...EVERY_SITE] }).catch(() => false)
+        ]).then(([chosen, held]) => setEverywhere(chosen && held));
+    }, [possible]);
+
+    const turn = async (on: boolean): Promise<string | null> => {
+        if (on) {
+            let allowed = false;
+            try {
+                allowed = await browser.permissions.request({ origins: [...EVERY_SITE] });
+            } catch {
+                allowed = false;
+            }
+            if (!allowed) return "Without permission for every site, Polaris stays where you turned it on.";
+        }
+        await EVERYWHERE.setValue(on);
+        const reply = await askBackground({ kind: "startInline" });
+        setEverywhere(on);
+        return reply.ok ? null : reply.error;
+    };
+
+    return { everywhere, possible, turn };
+}
+
+function OnEverySite({
+    everywhere,
+    turn
+}: {
+    everywhere: boolean;
+    turn: (on: boolean) => Promise<string | null>;
+}): React.JSX.Element {
+    const [busy, setBusy] = useState(false);
+    const [note, setNote] = useState<string | null>(null);
+
+    const press = async (): Promise<void> => {
+        setBusy(true);
+        setNote(null);
+        const problem = await turn(!everywhere);
+        setBusy(false);
+        setNote(problem ?? (everywhere ? "Pages already open keep it until you reload them." : null));
+    };
+
+    return (
+        <>
+            <div className="row">
+                <span className="muted small">
+                    {everywhere ? "Polaris appears on every site." : "Show Polaris under login boxes on every site."}
+                </span>
+                <div className="acts">
+                    <button
+                        className="ghost"
+                        disabled={busy}
+                        title={
+                            everywhere
+                                ? "Only show Polaris on the sites you turn it on for"
+                                : "Offer your logins and codes under the box on every site, like a password manager"
+                        }
+                        onClick={() => void press()}
+                    >
+                        {everywhere ? "Only some sites" : "Every site"}
+                    </button>
+                </div>
+            </div>
+            {note ? <p className="muted small">{note}</p> : null}
+        </>
     );
 }
 
@@ -1471,6 +1569,7 @@ function Items({
         host: null,
         blocked: false
     });
+    const inline = useEverywhere();
 
     useEffect(() => {
         void (async () => {
@@ -1651,7 +1750,12 @@ function Items({
                 />
             ) : null}
 
-            <OnThisSite url={pageUrl} host={here.host} server={status.server} />
+            {inline.possible && inline.everywhere !== null ? (
+                <OnEverySite everywhere={inline.everywhere} turn={inline.turn} />
+            ) : null}
+            {inline.everywhere ? null : (
+                <OnThisSite url={pageUrl} host={here.host} server={status.server} />
+            )}
 
             {here.host ? (
                 <div className="row">
