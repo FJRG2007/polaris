@@ -349,7 +349,12 @@ async function vault(): Promise<OpenVault | null> {
         // only to be offered, and a vault that has locked itself cannot save it -
         // keeping it would be this worker holding a credential past the deadline
         // somebody set for exactly that.
-        await CAPTURE.setValue(null);
+        //
+        // And the deadline goes too. It has done its job, and one left behind is
+        // a lock waiting for the next key to arrive: it stays in session storage,
+        // already past, and whatever opens the vault next is locked again by the
+        // first question anybody asks.
+        await Promise.all([CAPTURE.setValue(null), LOCK_AT.setValue(null)]);
         return null;
     }
     return open;
@@ -590,8 +595,25 @@ async function unlock(password: string): Promise<UnlockOutcome> {
 
     const outcome = await openVault(password, email, wrapped);
     if (!outcome.ok) return outcome;
-    open = { key: outcome.key, organizations: await organizationKeys(outcome.key) };
+    await hold(outcome.key);
     return outcome;
+}
+
+/**
+ * Hold an opened vault, with a deadline of its own.
+ *
+ * The one way a key becomes the open vault, for the password and the approval
+ * alike. There were two, and only the approval's armed a deadline: the password's
+ * set the key and kept whatever `LOCK_AT` held - which, for a vault that had locked
+ * itself, was the deadline that locked it, already past. The same answer then
+ * asked `vault()` whether it was open, and `vault()` found that deadline and locked
+ * it again. The popup was told the unlock worked and drew the locked screen, with
+ * no error: a correct master password, taken and silently thrown away, while
+ * "Let me in from Polaris" worked every time.
+ */
+async function hold(key: SymmetricKey): Promise<void> {
+    open = { key, organizations: await organizationKeys(key) };
+    await LOCK_AT.setValue(deadlineFrom(Date.now(), await TIMEOUT.getValue()));
 }
 
 /**
@@ -600,14 +622,12 @@ async function unlock(password: string): Promise<UnlockOutcome> {
  * For the approval flow: a browser that is already inside the vault sealed the key
  * to this extension's public half, so what arrives here is the 64 bytes rather than
  * something to derive them from. Nothing else differs - the same key, the same
- * other-vault keys read off the same sync - which is why this is the same three
- * lines `unlock` ends with rather than a second way of being open.
+ * other-vault keys read off the same sync, the same deadline - which is why this
+ * ends in `hold`, as `unlock` does, rather than being a second way of being open.
  */
 async function openWithKey(raw: Uint8Array): Promise<boolean> {
     if (raw.length !== 64) return false;
-    const key = symmetricKeyFromBytes(raw);
-    open = { key, organizations: await organizationKeys(key) };
-    await LOCK_AT.setValue(deadlineFrom(Date.now(), await TIMEOUT.getValue()));
+    await hold(symmetricKeyFromBytes(raw));
     return true;
 }
 
