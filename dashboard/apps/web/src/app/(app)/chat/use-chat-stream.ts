@@ -59,7 +59,11 @@ const frameSchema = z.discriminatedUnion("kind", [
         // take a third person. The browser in the old room follows it.
         movedTo: z.object({ meetingId: z.string(), channelId: z.string() }).optional(),
         // Only somebody's mute or deafen changed; who is in the call did not.
-        voice: z.literal(true).optional()
+        voice: z.literal(true).optional(),
+        // The group it rings in, for the card that says where as well as who.
+        group: z
+            .object({ name: z.string().max(200).nullable(), size: z.number().int().min(0) })
+            .optional()
     })
 ]);
 

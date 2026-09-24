@@ -108,7 +108,17 @@ export interface ChatChange {
         /** Only somebody's mute or deafen changed: a roster redraws, nothing
          *  about who is in the call does. */
         readonly voice?: true;
+        /** The group a call is ringing in, so the card can say where as well
+         *  as who. Absent for a one-to-one, which is only ever the caller. */
+        readonly group?: CallGroup;
     };
+}
+
+/** Which group a call is in, as the ringing card names it: its own name, or how
+ *  many are in it when nobody gave it one. */
+export interface CallGroup {
+    readonly name: string | null;
+    readonly size: number;
 }
 
 type Listener = (change: ChatChange) => void;

@@ -27,7 +27,7 @@ import { discardMeetingChat } from "./meeting-files";
 import { notify } from "@/lib/notifications/dispatch";
 import { postNotice, postNoticeBody } from "./notices";
 import { publishMeetingEvent } from "./meeting-events";
-import { publishChatChange, type CallState } from "./live";
+import { publishChatChange, type CallState, type CallGroup } from "./live";
 import { announcesCalls, callEndedBody } from "./notice-text";
 import { UNRESTRICTED, type SeatRestriction } from "./voice-moderation";
 import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
@@ -318,14 +318,42 @@ async function ring(
     const heard = audience.filter((userId) => !shut.has(userId));
     if (heard.length === 0) return;
 
+    const group = await callGroupOf(channelId);
     publishChatChange({
         channelId,
         kind: "call",
         actorId: actor.id,
         actorName: actor.name,
         audience: heard,
-        call: { meetingId, state: "ringing", count: await admittedCount(meetingId) }
+        call: {
+            meetingId,
+            state: "ringing",
+            count: await admittedCount(meetingId),
+            ...(group ? { group } : {})
+        }
     });
+}
+
+/**
+ * The group a call rings in, for the card that says who is calling.
+ *
+ * "Ana is calling" is a complete sentence for a one-to-one and half of one for a
+ * group: answering puts you in front of everybody in it, and which everybody is
+ * the other thing somebody decides on. Null for anything that is not a group.
+ */
+async function callGroupOf(channelId: string): Promise<CallGroup | null> {
+    let channel: { kind: string; name: string | null; _count: { members: number } } | null;
+    try {
+        channel = await prisma.chatChannel.findUnique({
+            where: { id: channelId },
+            select: { kind: true, name: true, _count: { select: { members: true } } }
+        });
+    } catch {
+        // A ring without a place is still a ring; never lose it over this.
+        return null;
+    }
+    if (channel?.kind !== "group") return null;
+    return { name: channel.name?.trim() || null, size: channel._count?.members ?? 0 };
 }
 
 /** Join a call by id, as an account. The conversation it is in decides. */
@@ -1092,6 +1120,8 @@ async function announceCall(
         select: { channelId: true }
     });
     if (!meeting?.channelId) return;
+    // Only a ring is drawn as a card, so only a ring needs to say where.
+    const group = state === "ringing" ? await callGroupOf(meeting.channelId) : null;
     publishChatChange({
         channelId: meeting.channelId,
         kind: "call",
@@ -1101,7 +1131,8 @@ async function announceCall(
             meetingId,
             state,
             count: state === "ended" ? 0 : await admittedCount(meetingId),
-            ...(voice ? { voice } : {})
+            ...(voice ? { voice } : {}),
+            ...(group ? { group } : {})
         }
     });
 }
@@ -1367,6 +1398,7 @@ async function noteCallOutcome(meetingId: string): Promise<void> {
                 channel: {
                     select: {
                         kind: true,
+                        name: true,
                         orgId: true,
                         space: { select: { orgId: true } },
                         members: { select: { userId: true } }
@@ -1435,7 +1467,7 @@ async function noteCallOutcome(meetingId: string): Promise<void> {
                     userId,
                     event: "chat.callMissed",
                     title: `Missed call from ${caller?.name || "somebody"}`,
-                    body: "Nobody picked it up.",
+                    body: missedCallBody(meeting.channel),
                     href: `/chat/c/${channelId}`,
                     shelf
                 }).catch(() => undefined)
@@ -1824,4 +1856,16 @@ async function requireHost(
         throw new ChatAccessError("Only whoever is hosting the meeting can do that");
     }
     return { title: meeting.title, hostId: meeting.hostId };
+}
+
+/** What the missed-call alert says under its title: which group, for a group,
+ *  since "missed call from Ana" alone does not say where to call back. */
+function missedCallBody(
+    channel: { kind: string; name: string | null; members: readonly unknown[] } | null | undefined
+): string {
+    if (channel?.kind !== "group") return "Nobody picked it up.";
+    const name = channel.name?.trim();
+    return name
+        ? `In ${name}. Nobody picked it up.`
+        : `In a group of ${channel.members.length}. Nobody picked it up.`;
 }

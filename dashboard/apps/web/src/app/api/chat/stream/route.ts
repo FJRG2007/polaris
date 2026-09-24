@@ -209,7 +209,8 @@ export async function GET(request: Request): Promise<Response> {
                                 userId: change.actorId,
                                 name: change.actorName ?? "",
                                 ...(change.movedTo ? { movedTo: change.movedTo } : {}),
-                                ...(change.call.voice ? { voice: true } : {})
+                                ...(change.call.voice ? { voice: true } : {}),
+                                ...(change.call.group ? { group: change.call.group } : {})
                             });
                         }
                         return;

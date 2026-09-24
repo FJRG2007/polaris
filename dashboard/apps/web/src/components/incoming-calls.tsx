@@ -33,6 +33,7 @@
  * tomorrow.
  */
 
+import { whereLine } from "@/lib/chat/call-place";
 import Link from "next/link";
 import { Avatar } from "./avatar";
 import { Button } from "@polaris/ui";
@@ -68,6 +69,7 @@ interface Missed {
     readonly meetingId: string;
     readonly name: string;
     readonly userId: string;
+    readonly group?: { name: string | null; size: number };
     /** When it stopped ringing, for the line under the name. */
     readonly at: number;
 }
@@ -86,6 +88,8 @@ interface Ringing {
      *  face is recognised, which is the whole of what somebody deciding whether
      *  to answer is doing. */
     readonly userId: string;
+    /** The group it rings in; absent for a one-to-one. */
+    readonly group?: { name: string | null; size: number };
     readonly at: number;
 }
 
@@ -344,6 +348,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                                           meetingId: frame.meetingId,
                                           name: frame.name,
                                           userId: frame.userId,
+                                          ...(frame.group ? { group: frame.group } : {}),
                                           at: Date.now()
                                       }
                                   ]
@@ -491,7 +496,9 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                 if (heard && tabIsWatched()) return;
                 const notice = await notifyDesktop({
                     title: `${entry.name || "Somebody"} is calling`,
-                    body: "Answer in Polaris",
+                    body: whereLine(entry.group)
+                        ? `Group call ${whereLine(entry.group)}. Answer in Polaris`
+                        : "Answer in Polaris",
                     tag: `call:${entry.meetingId}`,
                     href: `/chat/c/${entry.channelId}`,
                     insistent: true,
@@ -562,7 +569,11 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                             <span className="block truncate text-sm font-medium">
                                 {entry.name || "Somebody"}
                             </span>
-                            <span className="block text-xs text-muted-foreground">Missed call</span>
+                            <span className="block truncate text-xs text-muted-foreground">
+                                {whereLine(entry.group)
+                                    ? `Missed group call ${whereLine(entry.group)}`
+                                    : "Missed call"}
+                            </span>
                         </span>
                         <PhoneMissed className="size-4 shrink-0 text-danger" aria-hidden />
                     </span>
@@ -631,8 +642,15 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                             size={36}
                             person={{ id: entry.userId, name: entry.name || "Somebody" }}
                         />
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                            {entry.name || "Somebody"} is calling
+                        <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium">
+                                {entry.name || "Somebody"} is calling
+                            </span>
+                            {whereLine(entry.group) ? (
+                                <span className="block truncate text-xs text-muted-foreground">
+                                    Group call {whereLine(entry.group)}
+                                </span>
+                            ) : null}
                         </span>
                         <Phone className="size-4 shrink-0 animate-pulse text-success" />
                     </span>
