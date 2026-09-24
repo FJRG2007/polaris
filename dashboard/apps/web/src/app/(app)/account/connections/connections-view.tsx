@@ -17,7 +17,12 @@ import { connectionSections, minecraftNameSchema, type ConnectionCategory } from
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ExternalLink, KeyRound, Loader2, Pencil, Plus, RefreshCw, Unlink } from "lucide-react";
-import { connectAwsAction, connectTokenAction, disconnectAccountAction, saveMinecraftNameAction } from "./actions";
+import {
+    connectAwsAction,
+    connectTokenAction,
+    disconnectAccountAction,
+    saveMinecraftNameAction
+} from "./actions";
 import {
     Badge,
     Button,
@@ -306,7 +311,9 @@ function ProviderCard({
                                      */
                                     <Button
                                         size="sm"
-                                        variant={account.needsReauthorization ? "secondary" : "ghost"}
+                                        variant={
+                                            account.needsReauthorization ? "secondary" : "ghost"
+                                        }
                                         aria-label={
                                             account.needsReauthorization
                                                 ? `Reconnect ${account.label} to approve what Polaris now asks for`
@@ -491,6 +498,22 @@ function ProviderCard({
     );
 }
 
+/**
+ * What disconnecting this one account actually stops, said for that account.
+ *
+ * One sentence served every service and spoke of repositories and runner pools
+ * - true of GitHub and nonsense on a Minecraft name somebody typed.
+ */
+function disconnectSays(account: LinkedAccount, providerName: string): string {
+    if (account.method === "manual") {
+        return "Servers stop being able to add you by this name until you type it again or connect your account.";
+    }
+    if (account.provider === "github") {
+        return `Polaris stops reaching anything in this ${providerName} account. Services that build from its repositories stop deploying, and any runner pool serving you stops serving them.`;
+    }
+    return `Polaris stops reaching anything in this ${providerName} account.${account.signsIn ? " It also stops being a way to sign in to Polaris." : ""}`;
+}
+
 function DisconnectDialog({
     account,
     providerName,
@@ -506,12 +529,12 @@ function DisconnectDialog({
         <Dialog open onOpenChange={(open) => (open ? undefined : onCancel())}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Disconnect {account.label}?</DialogTitle>
-                    <DialogDescription>
-                        Polaris stops reaching anything in this {providerName} account. Services
-                        that build from its repositories stop deploying, and any runner pool serving
-                        you stops serving them.
-                    </DialogDescription>
+                    <DialogTitle>
+                        {account.method === "manual"
+                            ? `Remove ${account.label}?`
+                            : `Disconnect ${account.label}?`}
+                    </DialogTitle>
+                    <DialogDescription>{disconnectSays(account, providerName)}</DialogDescription>
                 </DialogHeader>
                 <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={onCancel}>
@@ -646,7 +669,9 @@ function MinecraftNameDialog({
 
     const checked = minecraftNameSchema.safeParse(name);
     const problem =
-        name.trim().length > 0 && !checked.success ? (checked.error.issues[0]?.message ?? null) : null;
+        name.trim().length > 0 && !checked.success
+            ? (checked.error.issues[0]?.message ?? null)
+            : null;
     const unchanged = checked.success && checked.data === current;
 
     function submit() {
@@ -671,7 +696,9 @@ function MinecraftNameDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {current ? "Change your Minecraft username" : "Type your Minecraft username"}
+                        {current
+                            ? "Change your Minecraft username"
+                            : "Type your Minecraft username"}
                     </DialogTitle>
                     <DialogDescription>
                         Exactly as it appears in the game, with the same upper and lower case. A
