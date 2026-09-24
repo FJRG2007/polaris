@@ -85,7 +85,8 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     dymo: DymoMark,
     nuki: brand.NukiMark,
     vercel: brand.VercelMark,
-    railway: brand.RailwayMark
+    railway: brand.RailwayMark,
+    aws: brand.AwsMark
 };
 
 /**
