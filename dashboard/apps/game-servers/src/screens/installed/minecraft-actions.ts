@@ -8,6 +8,7 @@
  * and is recorded: banning a player is an administrative act, not a UI event.
  */
 
+import { MAX_CONSOLE_LINE } from "../../lib/console-queue";
 import { gameOfServer, isModpackReference, routesByHostname } from "@polaris/core";
 import { z } from "zod";
 import { prisma } from "@polaris/db";
@@ -165,7 +166,7 @@ const gamemodeSchema = z.object({
 
 const consoleSchema = z.object({
     installedAppId: z.string().uuid(),
-    line: z.string().trim().min(1).max(400)
+    line: z.string().trim().min(1).max(MAX_CONSOLE_LINE)
 });
 
 const settingsSchema = z.object({

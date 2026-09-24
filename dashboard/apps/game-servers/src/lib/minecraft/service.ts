@@ -264,9 +264,15 @@ export async function broadcastToMinecraft(
     }
 }
 
-/** A console line the operator typed. Split on whitespace, because that is what
- *  the in-game console does with it too - except a line that talks to players,
- *  which is written as Polaris rather than as `Rcon` (`consoleBroadcastArgv`). */
+/**
+ * A console line the operator typed - except a line that talks to players, which
+ * is written as Polaris rather than as `Rcon` (`consoleBroadcastArgv`).
+ *
+ * Sent as ONE argument, not split on whitespace. Both ways into the game join
+ * their arguments with a space anyway, so splitting bought nothing - and it cost
+ * every long `tellraw`: its JSON is dozens of words, and past the argument cap
+ * the guard refused the whole line as "not valid" before it left.
+ */
 export async function runConsoleLine(ownerId: string, installedAppId: string, line: string): Promise<string> {
     const trimmed = line.trim().replace(/^\//, "");
     assertSafeArgument(trimmed);
@@ -280,7 +286,7 @@ export async function runConsoleLine(ownerId: string, installedAppId: string, li
             // as typed: arriving as `[Rcon]` beats not arriving.
         }
     }
-    return runServerCommand(ownerId, installedAppId, trimmed.split(/\s+/));
+    return runServerCommand(ownerId, installedAppId, [trimmed]);
 }
 
 /**

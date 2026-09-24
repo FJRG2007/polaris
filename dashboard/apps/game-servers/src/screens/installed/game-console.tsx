@@ -13,12 +13,31 @@
  * browser and a second operator. The history is one person's typing at one
  * keyboard, so it stays in that browser - but it is on screen now rather than
  * only reachable by pressing the up arrow, which is a feature nobody finds.
+ *
+ * Several lines can be run as one sequence ("Run several", or pasting more than
+ * one line into the box): sent one after another, each waiting for the last,
+ * with `wait 10` lines for the pauses between them - see `console-queue`.
  */
 
 import { GAME_RULES } from "../../lib/minecraft/rules";
 import { applyCompletion, completeConsole, type ConsoleGame } from "../../lib/console-complete";
 import { recentItemsAction, sendConsoleCommandAction } from "./minecraft-actions";
-import { CornerDownLeft, History, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+    CornerDownLeft,
+    History,
+    ListOrdered,
+    MoreHorizontal,
+    Plus,
+    RefreshCw,
+    Square,
+    Trash2
+} from "lucide-react";
+import {
+    MAX_CONSOLE_LINE,
+    commandCount,
+    parseQueue,
+    type QueueStep
+} from "../../lib/console-queue";
 import {
     deleteConsoleCommandAction,
     listConsoleCommandsAction,
@@ -56,6 +75,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     Input,
+    Textarea,
     cn
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
@@ -149,6 +169,17 @@ export function GameConsole({
         null
     );
     const [keepError, setKeepError] = useState("");
+    /** The block being written in "Run several", or null while it is shut. */
+    const [batch, setBatch] = useState<string | null>(null);
+    /** Where a running sequence is, or null when none is. */
+    const [queue, setQueue] = useState<{ done: number; total: number; waiting: number } | null>(
+        null
+    );
+    const stopQueue = useRef(false);
+    const parsedBatch = useMemo(
+        () => (batch === null ? null : parseQueue(batch, MAX_CONSOLE_LINE)),
+        [batch]
+    );
 
     useEffect(() => {
         history.current = readHistory(installedAppId);
@@ -243,6 +274,85 @@ export function GameConsole({
             });
         },
         [installedAppId, refresh]
+    );
+
+    /** Put a command where the arrows and the history menu find it again. */
+    const remember = useCallback(
+        (command: string) => {
+            history.current = [
+                ...history.current.filter((item) => item !== command),
+                command
+            ].slice(-KEPT_HISTORY);
+            setPast(history.current);
+            writeHistory(installedAppId, history.current);
+        },
+        [installedAppId]
+    );
+
+    /**
+     * Run a sequence: each command waits for the one before it to be answered,
+     * and a `wait` step holds the next one back. A command the server refuses is
+     * shown and the rest still run - a title that failed is no reason not to
+     * unfreeze the players - and Stop ends it between two steps.
+     */
+    const runQueue = useCallback(
+        async (steps: readonly QueueStep[]) => {
+            const total = commandCount(steps);
+            stopQueue.current = false;
+            setQueue({ done: 0, total, waiting: 0 });
+            let done = 0;
+            for (const step of steps) {
+                if (stopQueue.current) break;
+                if (step.kind === "wait") {
+                    setQueue({ done, total, waiting: step.ms });
+                    const until = Date.now() + step.ms;
+                    // In slices, so Stop is answered within a moment rather than
+                    // at the end of a ten-second pause.
+                    while (!stopQueue.current && Date.now() < until) {
+                        await new Promise((resolve) =>
+                            setTimeout(resolve, Math.min(250, until - Date.now()))
+                        );
+                    }
+                    setQueue({ done, total, waiting: 0 });
+                    continue;
+                }
+                remember(step.line);
+                const result = await sendConsoleCommandAction(installedAppId, step.line).catch(
+                    () =>
+                        ({ error: "The server did not answer" }) as {
+                            output?: string;
+                            error?: string;
+                        }
+                );
+                done += 1;
+                setQueue({ done, total, waiting: 0 });
+                setReplies((current) =>
+                    [
+                        ...current,
+                        {
+                            command: step.line,
+                            output: result.error ?? (result.output || "Done"),
+                            failed: Boolean(result.error)
+                        }
+                    ].slice(-KEPT_REPLIES)
+                );
+            }
+            if (stopQueue.current && done < total) {
+                setReplies((current) =>
+                    [
+                        ...current,
+                        {
+                            command: "Run several",
+                            output: `Stopped after ${done} of ${total}.`,
+                            failed: true
+                        }
+                    ].slice(-KEPT_REPLIES)
+                );
+            }
+            setQueue(null);
+            void refresh();
+        },
+        [installedAppId, refresh, remember]
     );
 
     /** Pressing a kept command. One that is complete runs; one with a blank in it
@@ -481,6 +591,16 @@ export function GameConsole({
                     <Input
                         ref={input}
                         value={line}
+                        // More than one line pasted is a sequence, not a command
+                        // with newlines in it: opened in "Run several" to be
+                        // looked at and sent, rather than squashed into one line.
+                        onPaste={(event) => {
+                            const pasted = event.clipboardData.getData("text");
+                            const lines = pasted.split(/\r?\n/).filter((one) => one.trim());
+                            if (lines.length < 2) return;
+                            event.preventDefault();
+                            setBatch(pasted.trim());
+                        }}
                         onChange={(event) => {
                             setLine(event.target.value);
                             setCaret(event.target.selectionStart ?? event.target.value.length);
@@ -490,7 +610,7 @@ export function GameConsole({
                         onBlur={() => setChoice(null)}
                         onKeyDown={onKeyDown}
                         placeholder={running ? hint : "Start the server to send commands"}
-                        disabled={!running || pending}
+                        disabled={!running || pending || queue !== null}
                         aria-label="Server command"
                         className="font-mono"
                     />
@@ -543,12 +663,100 @@ export function GameConsole({
                         </DropdownMenuContent>
                     </DropdownMenu>
                     <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Run several commands"
+                        title="Run several commands, one after another"
+                        disabled={!running || queue !== null}
+                        onClick={() => setBatch(line.trim())}
+                    >
+                        <ListOrdered className="size-4" />
+                    </Button>
+                    <Button
                         onClick={() => submit(line)}
-                        disabled={!running || pending || line.trim().length === 0}
+                        disabled={!running || pending || queue !== null || line.trim().length === 0}
                     >
                         <CornerDownLeft className="size-4" /> Send
                     </Button>
                 </div>
+
+                {queue && (
+                    <div
+                        role="status"
+                        className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                    >
+                        <span className="text-muted-foreground">
+                            {queue.waiting > 0
+                                ? `Waiting ${Math.round(queue.waiting / 100) / 10}s - ${queue.done} of ${queue.total} sent`
+                                : `Sending ${Math.min(queue.done + 1, queue.total)} of ${queue.total}...`}
+                        </span>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                                stopQueue.current = true;
+                            }}
+                        >
+                            <Square className="size-3.5" /> Stop
+                        </Button>
+                    </div>
+                )}
+
+                {batch !== null && (
+                    <Dialog open onOpenChange={(open: boolean) => !open && setBatch(null)}>
+                        <DialogContent className="sm:max-w-2xl">
+                            <DialogHeader>
+                                <DialogTitle>Run several commands</DialogTitle>
+                                <DialogDescription>
+                                    One per line, sent in order, each after the last is answered.
+                                    Put <code>wait 10</code> on a line of its own to pause for ten
+                                    seconds; lines starting with <code>#</code> are skipped.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <Textarea
+                                autoFocus
+                                value={batch}
+                                rows={12}
+                                spellCheck={false}
+                                className="font-mono text-xs"
+                                placeholder={`title @a title {"text":"Reloading..."}\neffect give @a minecraft:slowness 10 255 true\nwait 10\ntitle @a title {"text":"Done!"}`}
+                                onChange={(event) => setBatch(event.target.value)}
+                                aria-label="Commands, one per line"
+                            />
+                            {parsedBatch?.problem && batch.trim().length > 0 ? (
+                                <p role="alert" className="text-sm text-danger">
+                                    {parsedBatch.problem}
+                                </p>
+                            ) : parsedBatch && !parsedBatch.problem ? (
+                                <p className="text-sm text-muted-foreground">
+                                    {queueSummary(parsedBatch.steps)}
+                                </p>
+                            ) : null}
+                            <DialogFooter>
+                                <Button variant="ghost" onClick={() => setBatch(null)}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    disabled={
+                                        !running || !parsedBatch || parsedBatch.problem !== null
+                                    }
+                                    onClick={() => {
+                                        if (!parsedBatch || parsedBatch.problem) return;
+                                        const steps = parsedBatch.steps;
+                                        setBatch(null);
+                                        setLine("");
+                                        void runQueue(steps);
+                                    }}
+                                >
+                                    <ListOrdered className="size-4" />
+                                    {parsedBatch && !parsedBatch.problem
+                                        ? `Run ${commandCount(parsedBatch.steps)} ${commandCount(parsedBatch.steps) === 1 ? "command" : "commands"}`
+                                        : "Run"}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
 
                 {keeping && (
                     <Dialog open onOpenChange={(open: boolean) => !open && setKeeping(null)}>
@@ -612,4 +820,12 @@ export function GameConsole({
             </CardBody>
         </Card>
     );
+}
+
+/** What a sequence will do, in one line under the box it is written in. */
+function queueSummary(steps: readonly QueueStep[]): string {
+    const commands = commandCount(steps);
+    const waited = steps.reduce((total, step) => total + (step.kind === "wait" ? step.ms : 0), 0);
+    const said = `${commands} ${commands === 1 ? "command" : "commands"}`;
+    return waited > 0 ? `${said}, with ${Math.round(waited / 100) / 10}s of waiting.` : `${said}.`;
 }
