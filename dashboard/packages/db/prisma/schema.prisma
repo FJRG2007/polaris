@@ -4993,6 +4993,38 @@ model WafIpFeed {
     updatedAt DateTime @updatedAt
 }
 
+/// What Polaris knows about one Docker volume on a machine, kept after the thing
+/// that made it is gone - so a leftover `polaris-36e74d11_data` can still say it
+/// was the data of an app deleted a month ago, and when anything last used it.
+/// No foreign keys on purpose: every one of these outlives its owner.
+model HostResourceRecord {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    /// "local" for the machine Polaris runs on.
+    serverId       String
+    /// "volume" today; the same shape fits a container or an image.
+    kind           String
+    /// The exact Docker name.
+    name           String
+    /// app-data | database | other - what kind of thing is kept in it.
+    purpose        String    @default("other")
+    /// One line for a person: "Data of Billing (Acme / production)".
+    description    String
+    sourceKind     String?
+    sourceId       String?
+    createdAt      DateTime  @default(now())
+    /// The last time a look at the machine found it there.
+    lastSeenAt     DateTime?
+    /// The last time a running container had it mounted.
+    lastUsedAt     DateTime?
+    /// When the app, database or whatever made it was deleted.
+    ownerDeletedAt DateTime?
+    /// When it stopped being on the machine.
+    removedAt      DateTime?
+
+    @@unique([serverId, kind, name])
+    @@index([sourceKind, sourceId])
+}
+
 model Volume {
     id            String   @id @default(uuid(7)) @db.Uuid
     targetId      String   @db.Uuid

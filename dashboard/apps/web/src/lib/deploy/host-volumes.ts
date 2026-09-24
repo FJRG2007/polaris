@@ -34,6 +34,14 @@
 import { prisma } from "@polaris/db";
 import { shortHash } from "@polaris/deploy";
 import { HostdClient } from "@polaris/hostd-client";
+import {
+    appVolumeDescription,
+    noteVolumes,
+    volumeNotes,
+    volumeVerdict,
+    type SeenVolume,
+    type VolumeVerdict
+} from "./host-resources";
 
 /** How new is too new to be called spare. A deploy that is still building has
  *  created its volumes and attached none of them. */
@@ -81,6 +89,19 @@ export interface HostVolume {
     /** Whether it may be offered for removal: nothing references it, Polaris has
      *  no record of it, and it is old enough to have settled. */
     readonly spare: boolean;
+    /** What it was, from Polaris's own notes - kept after its owner is gone, so
+     *  a leftover can say it was an app's data rather than a hash. */
+    readonly description: string | null;
+    /** The last time a running container was seen using it, ISO; null when it
+     *  has not been seen in use since Polaris began keeping notes. */
+    readonly lastUsedAt: string | null;
+    /** When Polaris first noted it, ISO - what "unused for" counts from when it
+     *  was never seen in use. */
+    readonly notedSince: string | null;
+    /** Whether it looks safe to delete, and why. Advice: removal still refuses
+     *  anything in use or owned. */
+    readonly verdict: VolumeVerdict;
+    readonly reason: string;
 }
 
 interface DockerVolume {
@@ -144,11 +165,32 @@ async function claimed(): Promise<Map<string, string>> {
  * way, so this goes the other way round: every application it holds, hashed, and
  * the answer looked up by project.
  */
-async function projectOwners(): Promise<Map<string, { id: string; name: string }>> {
+async function projectOwners(): Promise<
+    Map<string, { id: string; name: string; description: string }>
+> {
     const apps = await prisma.application
-        .findMany({ select: { id: true, name: true } })
+        .findMany({
+            select: {
+                id: true,
+                name: true,
+                environment: { select: { name: true, project: { select: { name: true } } } }
+            }
+        })
         .catch(() => []);
-    return new Map(apps.map((app) => [`polaris-${shortHash(app.id, 8)}`, app]));
+    return new Map(
+        apps.map((app) => [
+            `polaris-${shortHash(app.id, 8)}`,
+            { id: app.id, name: app.name, description: appVolumeDescription(app) }
+        ])
+    );
+}
+
+/** The volumes Polaris's own databases keep their data in, by volume name. */
+async function databaseVolumes(): Promise<Map<string, { id: string; name: string; engine: string }>> {
+    const rows = await prisma.managedDatabase
+        .findMany({ select: { id: true, name: true, engine: true, volumeName: true } })
+        .catch(() => []);
+    return new Map(rows.filter((row) => row.volumeName).map((row) => [row.volumeName, row]));
 }
 
 /** The project a compose object belongs to, with the release marker taken off:
@@ -183,12 +225,14 @@ function containerName(entry: DockerContainer): string {
  */
 export async function hostVolumes(): Promise<HostVolume[] | null> {
     const daemon = new HostdClient();
-    const [listing, df, records, owners, running] = await Promise.all([
+    const [listing, df, records, owners, running, databases, notes] = await Promise.all([
         read(daemon, "/volumes"),
         read(daemon, "/system/df"),
         claimed(),
         projectOwners(),
-        containers(daemon)
+        containers(daemon),
+        databaseVolumes(),
+        volumeNotes()
     ]);
     if (!listing) return null;
 
@@ -224,6 +268,7 @@ export async function hostVolumes(): Promise<HostVolume[] | null> {
     }
 
     const now = Date.now();
+    const seen: SeenVolume[] = [];
     const volumes = [...new Set([...meta.keys(), ...usage.keys()])].map<HostVolume>((name) => {
         const entry = meta.get(name);
         const measured = usage.get(name);
@@ -243,7 +288,34 @@ export async function hostVolumes(): Promise<HostVolume[] | null> {
         // row called `polaris-dad2fc8a_data` can say the app's name instead of
         // "Polaris has no record of this one".
         const app = owners.get(baseProject(project) ?? "") ?? null;
-        const belongsTo = owner ?? app?.name ?? null;
+        const database = databases.get(name) ?? null;
+        const belongsTo =
+            owner ?? app?.name ?? (database ? `the ${database.name} database` : null);
+        // Noted as it is now, so that when its owner goes, what it was stays.
+        const used = holders.some((holder) => holder.running);
+        seen.push({
+            name,
+            used,
+            owner: app
+                ? { kind: "application", id: app.id, description: app.description, purpose: "app-data" }
+                : database
+                  ? {
+                        kind: "managedDatabase",
+                        id: database.id,
+                        description: `Data of the ${database.name} database (${database.engine})`,
+                        purpose: "database"
+                    }
+                  : null
+        });
+        const note = notes.get(name) ?? null;
+        const judged = volumeVerdict({
+            inUse,
+            owner: belongsTo,
+            note,
+            madeByPolaris: /^polaris-[0-9a-f]{8}$/.test(baseProject(project) ?? ""),
+            createdAt: createdAt ? new Date(createdAt) : null,
+            now: new Date(now)
+        });
         const way = mounted.get(name);
         const through = way ? (owners.get(way.project ?? "") ?? app) : null;
         return {
@@ -258,8 +330,19 @@ export async function hostVolumes(): Promise<HostVolume[] | null> {
                 through && way
                     ? `/drive?c=container:${through.id}&p=${encodeURIComponent(way.destination.replace(/^\/+|\/+$/g, ""))}`
                     : null,
-            spare: !inUse && belongsTo === null && Number.isFinite(age) && age > SETTLING_MS
+            spare: !inUse && belongsTo === null && Number.isFinite(age) && age > SETTLING_MS,
+            description: app?.description ?? note?.description ?? null,
+            lastUsedAt: used ? new Date(now).toISOString() : (note?.lastUsedAt?.toISOString() ?? null),
+            notedSince: note?.firstSeenAt.toISOString() ?? null,
+            verdict: judged.verdict,
+            reason: judged.reason
         };
+    });
+
+    // Every look is also a note - see `host-resources`. Never at the cost of the
+    // answer: a list that could not be written down is still the right list.
+    await noteVolumes(seen).catch((caught: unknown) => {
+        console.error("polaris: could not note the volumes on this machine:", caught);
     });
 
     return volumes.sort((left, right) => (right.bytes ?? 0) - (left.bytes ?? 0));

@@ -6,6 +6,7 @@
  * in-memory queue - no external broker - so two deploys of one app never race.
  */
 
+import { noteAppDeleted } from "@/lib/deploy/host-resources";
 import { hostPortForApp } from "@/lib/deploy/host-port";
 import { prisma } from "@polaris/db";
 import * as follow from "./follow/follow";
@@ -2176,6 +2177,9 @@ export async function deleteApplication(applicationId: string, ownerId: string):
         }
     }
 
+    // Before its rows go: what its volumes were, so a data volume left on the
+    // machine still says whose it was - see `host-resources`.
+    await noteAppDeleted(applicationId).catch(() => undefined);
     await removeApplicationDeployment(applicationId, ownerId).catch(() => undefined);
     await prisma.deployment.deleteMany({
         where: { deployableType: "application", deployableId: applicationId }

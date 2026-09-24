@@ -67,6 +67,20 @@ function age(iso: string | null): string | null {
     return months <= 1 ? "a month ago" : `${months} months ago`;
 }
 
+/**
+ * How long a volume nothing has used has sat that way, or null when it is in
+ * use. Counted from its last use, or - never seen in use since Polaris began
+ * keeping notes - from when the notes began, which is said so.
+ */
+function unusedFor(volume: HostVolume): string | null {
+    if (volume.inUse) return null;
+    const since = volume.lastUsedAt ?? volume.notedSince;
+    const when = age(since);
+    if (!when) return null;
+    if (volume.lastUsedAt) return `Last used ${when}`;
+    return when === "today" ? "Not seen in use yet" : `Not seen in use since ${when}`;
+}
+
 export function ServerStorage() {
     const [confirm, confirmElement] = useConfirm();
     const [removing, setRemoving] = useState<string | null>(null);
@@ -163,12 +177,31 @@ export function ServerStorage() {
                                                 <span className="min-w-0 truncate font-medium" title={volume.name}>
                                                     {volume.name}
                                                 </span>
-                                                {volume.spare ? (
-                                                    <Badge variant="warning" className="shrink-0">
-                                                        Nothing uses it
+                                                {/* The verdict first, because it is the
+                                                    question: can this go. The reason is
+                                                    in the title for anybody who wants it. */}
+                                                {volume.verdict === "safe" ? (
+                                                    <Badge
+                                                        variant="success"
+                                                        className="shrink-0"
+                                                        title={volume.reason}
+                                                    >
+                                                        Safe to delete
+                                                    </Badge>
+                                                ) : volume.spare ? (
+                                                    <Badge
+                                                        variant="warning"
+                                                        className="shrink-0"
+                                                        title={volume.reason}
+                                                    >
+                                                        Check first
                                                     </Badge>
                                                 ) : volume.inUse ? null : (
-                                                    <Badge variant="neutral" className="shrink-0">
+                                                    <Badge
+                                                        variant="neutral"
+                                                        className="shrink-0"
+                                                        title={volume.reason}
+                                                    >
                                                         Idle
                                                     </Badge>
                                                 )}
@@ -176,11 +209,19 @@ export function ServerStorage() {
                                             <span className="text-muted-foreground block truncate text-xs">
                                                 {volume.owner
                                                     ? `Belongs to ${volume.owner}`
-                                                    : volume.project
-                                                      ? `Created by ${volume.project}`
-                                                      : "Polaris has no record of this one"}
+                                                    : volume.description
+                                                      ? `${volume.description} - no longer exists`
+                                                      : volume.project
+                                                        ? `Created by ${volume.project}`
+                                                        : "Polaris has no record of this one"}
                                                 {volume.heldBy.length > 0 ? ` - ${holders(volume)}` : ""}
+                                                {unusedFor(volume) ? ` - ${unusedFor(volume)}` : ""}
                                             </span>
+                                            {!volume.inUse && !volume.owner ? (
+                                                <span className="text-muted-foreground block text-xs">
+                                                    {volume.reason}
+                                                </span>
+                                            ) : null}
                                         </td>
                                         <td className="whitespace-nowrap px-3 py-2 tabular-nums">
                                             {size(volume.bytes)}

@@ -28,6 +28,7 @@
  * Server-only. Safe to re-run.
  */
 
+import { hostVolumes } from "./host-volumes";
 import { prisma, VISIBLE_USER } from "@polaris/db";
 
 import { notify } from "@/lib/notifications/dispatch";
@@ -100,6 +101,9 @@ export function shouldReclaim(
  * one the filesystem reports once it has.
  */
 export async function sweepHostSpace(): Promise<HousekeepingSweep> {
+    // A look at the volumes on every sweep, so "unused for" keeps counting with
+    // nobody on the storage screen: reading them is what notes them.
+    await hostVolumes().catch(() => null);
     const disk = await localDisk();
     const before = disk ? diskFullness(disk) : null;
 

@@ -435,11 +435,15 @@ async function machineStorage(): Promise<Breakdown> {
             key: `volume:${volume.name}`,
             label: volume.name,
             kind: "volume",
+            // The same words the storage screen uses, from the same notes: what it
+            // was is still known after whatever made it is gone.
             detail: volume.owner
                 ? `Belongs to ${volume.owner}`
-                : volume.spare
-                  ? "Nothing on this machine uses it"
-                  : "Polaris has no record of this one",
+                : volume.description
+                  ? `${volume.description} - no longer exists${volume.verdict === "safe" ? ", safe to delete" : ""}`
+                  : volume.spare
+                    ? "Nothing on this machine uses it"
+                    : "Polaris has no record of this one",
             value: volume.bytes,
             // Its files where there is a way in, and otherwise the screen where
             // this volume can be looked at and removed - a row naming a large
