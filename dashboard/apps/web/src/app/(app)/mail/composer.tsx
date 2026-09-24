@@ -476,7 +476,17 @@ export function Composer() {
     // A message with nowhere to leave from is not a message: the shell sends a
     // Write with no mailbox to connecting one, and a mailbox removed while a
     // draft was open takes the composer with it.
-    if (!composing || accounts.length === 0) return null;
+    const showing = Boolean(composing) && accounts.length > 0;
+
+    // Nothing is published while the composer takes the whole screen: there is no
+    // room left to sit above, so the card floats over it instead. Called before
+    // the return below, never after it: the composer is mounted with nothing
+    // open, and a hook that only runs once a draft opens is a different number
+    // of hooks between two renders - which React refuses by taking the whole
+    // mail screen down the moment somebody presses Reply.
+    useDockedCorner(shell, showing && posture !== "full" && !queued);
+
+    if (!composing || !showing) return null;
 
     const from = account
         ? core.formatAddress({
@@ -484,10 +494,6 @@ export function Composer() {
               address: identity?.address || account.address
           })
         : "";
-
-    // Nothing is published while the composer takes the whole screen: there is no
-    // room left to sit above, so the card floats over it instead.
-    useDockedCorner(shell, posture !== "full" && !queued);
 
     const shellClass =
         posture === "full"

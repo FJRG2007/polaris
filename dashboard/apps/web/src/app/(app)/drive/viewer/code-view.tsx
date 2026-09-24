@@ -46,16 +46,19 @@ export function CodeView({
     const [query, setQuery] = useState("");
     const [at, setAt] = useState(0);
     const language = languageForFile(target.name);
+    const code = editing ? draft : (file?.text ?? "");
+    // Recomputed as the text changes, so a find stays true while somebody edits
+    // rather than boxing where the words used to be. Above the returns below:
+    // the first render has no file yet, and a hook that only runs once one
+    // arrives is a different number of hooks between two renders, which React
+    // answers by taking the viewer down as the file finishes loading.
+    const matches = useMemo(() => findMatches(code, query), [code, query]);
 
     if (error) return <ViewerError>This file could not be read.</ViewerError>;
     if (!file) return <Loading />;
 
     const blocked = readOnlyReason(file);
     const editable = !readOnly && !blocked;
-    const code = editing ? draft : file.text;
-    // Recomputed as the text changes, so a find stays true while somebody edits
-    // rather than boxing where the words used to be.
-    const matches = useMemo(() => findMatches(code, query), [code, query]);
     const on = matches.length === 0 ? 0 : Math.min(at, matches.length - 1);
 
     function find(open: boolean) {
