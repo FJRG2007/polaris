@@ -20,6 +20,7 @@
 
 import Link from "next/link";
 import { GameConsole } from "./game-console";
+import { CardBoundary } from "../../components/card-boundary";
 import { MinecraftAnnounce } from "./minecraft-announce";
 import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
@@ -615,55 +616,65 @@ export function MinecraftPanel({
 
             {tab === "settings" && (
                 <div className="flex flex-col gap-4">
-                    <MinecraftAppearance
-                        installedAppId={installedAppId}
-                        name={name}
-                        motd={settings.find((setting) => setting.key === MOTD_KEY)?.value ?? ""}
-                        iconSetAt={game?.iconSetAt ?? null}
-                        playersOnline={status?.players.online ?? 0}
-                        onSaved={reloadSettings}
-                    />
-                    <MinecraftSchedule
-                        runs={game?.routineRuns ?? null}
-                        installedAppId={installedAppId}
-                        state={game?.scheduleState ?? null}
-                        routed={game?.routed ?? false}
-                        canRoute={game?.canRoute ?? false}
-                        wakeOnJoin={game?.wakeOnJoin ?? true}
-                        schedule={game?.schedule ?? NO_SCHEDULE}
-                    />
-                    <MinecraftDomain
-                        installedAppId={installedAppId}
-                        hostname={game?.hostname ?? null}
-                        suffix={game?.suffix ?? null}
-                        address={status?.address ?? game?.address ?? null}
-                        routed={game?.routed ?? false}
-                        canRoute={game?.canRoute ?? false}
-                    />
-                    <MinecraftSettings
-                        installedAppId={installedAppId}
-                        settings={settings.filter(
-                            (setting) =>
-                                setting.group !== MODS_GROUP &&
-                                setting.group !== SECURITY_GROUP &&
-                                setting.key !== MOTD_KEY
-                        )}
-                        playersOnline={status?.players.online ?? 0}
-                        running={isRunning}
-                        withMemory
-                        onSaved={reloadSettings}
-                    />
-                    <MinecraftReset
-                        installedAppId={installedAppId}
-                        edition={game?.edition ?? "java"}
-                        blueprintId={game?.blueprintId ?? null}
-                        mapId={game?.mapId ?? null}
-                        crossplay={hasCrossplay(
-                            settings.find((setting) => setting.key === PROJECTS_KEY)?.value
-                        )}
-                        playersOnline={status?.players.online ?? 0}
-                        onDone={reloadSettings}
-                    />
+                    <CardBoundary name="Appearance">
+                        <MinecraftAppearance
+                            installedAppId={installedAppId}
+                            name={name}
+                            motd={settings.find((setting) => setting.key === MOTD_KEY)?.value ?? ""}
+                            iconSetAt={game?.iconSetAt ?? null}
+                            playersOnline={status?.players.online ?? 0}
+                            onSaved={reloadSettings}
+                        />
+                    </CardBoundary>
+                    <CardBoundary name="Schedule">
+                        <MinecraftSchedule
+                            runs={game?.routineRuns ?? null}
+                            installedAppId={installedAppId}
+                            state={game?.scheduleState ?? null}
+                            routed={game?.routed ?? false}
+                            canRoute={game?.canRoute ?? false}
+                            wakeOnJoin={game?.wakeOnJoin ?? true}
+                            schedule={game?.schedule ?? NO_SCHEDULE}
+                        />
+                    </CardBoundary>
+                    <CardBoundary name="Domain">
+                        <MinecraftDomain
+                            installedAppId={installedAppId}
+                            hostname={game?.hostname ?? null}
+                            suffix={game?.suffix ?? null}
+                            address={status?.address ?? game?.address ?? null}
+                            routed={game?.routed ?? false}
+                            canRoute={game?.canRoute ?? false}
+                        />
+                    </CardBoundary>
+                    <CardBoundary name="Settings">
+                        <MinecraftSettings
+                            installedAppId={installedAppId}
+                            settings={settings.filter(
+                                (setting) =>
+                                    setting.group !== MODS_GROUP &&
+                                    setting.group !== SECURITY_GROUP &&
+                                    setting.key !== MOTD_KEY
+                            )}
+                            playersOnline={status?.players.online ?? 0}
+                            running={isRunning}
+                            withMemory
+                            onSaved={reloadSettings}
+                        />
+                    </CardBoundary>
+                    <CardBoundary name="Reset">
+                        <MinecraftReset
+                            installedAppId={installedAppId}
+                            edition={game?.edition ?? "java"}
+                            blueprintId={game?.blueprintId ?? null}
+                            mapId={game?.mapId ?? null}
+                            crossplay={hasCrossplay(
+                                settings.find((setting) => setting.key === PROJECTS_KEY)?.value
+                            )}
+                            playersOnline={status?.players.online ?? 0}
+                            onDone={reloadSettings}
+                        />
+                    </CardBoundary>
                 </div>
             )}
         </div>
