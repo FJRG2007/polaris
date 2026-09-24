@@ -628,12 +628,12 @@ export function PlayerAccessDialog({
         username: string;
         addresses: readonly string[];
         note: string | null;
-        linkedTo?: { userId: string; name: string; followSignIns?: boolean; } | null;
+        linkedTo?: { userId: string; name: string; followSignIns?: boolean } | null;
     } | null;
     pending: boolean;
     error: string | null;
     onClose: () => void;
-    onSave: (input: { username: string; address: string; note: string; }) => void;
+    onSave: (input: { username: string; address: string; note: string }) => void;
     onRemoveAddress?: (address: string) => void;
     /** Find somebody by their Polaris name and hand back the Minecraft username
      *  they linked, plus the addresses their account is signed in from. Absent on
@@ -658,9 +658,9 @@ export function PlayerAccessDialog({
     onUnlink?: (username: string) => void;
     /** Invite somebody with no Polaris account, so the one they make is tied to
      *  this player. */
-    onInvite?: (input: { username: string; email: string; followSignIns: boolean; }) => Promise<{
+    onInvite?: (input: { username: string; email: string; followSignIns: boolean }) => Promise<{
         linked?: true;
-        invite?: { url?: string; sendError?: string; };
+        invite?: { url?: string; sendError?: string };
         error?: string;
     }>;
 }) {
@@ -671,7 +671,7 @@ export function PlayerAccessDialog({
      *  leaves the addresses and the note as editable as before. */
     const following = linkedTo !== null && linkedTo.followSignIns !== false;
     /** The Polaris account a look-up found, which the player can be tied to. */
-    const [account, setAccount] = useState<{ userId: string; name: string; } | null>(null);
+    const [account, setAccount] = useState<{ userId: string; name: string } | null>(null);
     /** Whether the player follows that account's sign-ins or keeps typed
      *  addresses. Bedrock reports no address, so it can only keep them. */
     const [follow, setFollow] = useState(edition === "java");
@@ -687,9 +687,11 @@ export function PlayerAccessDialog({
     /** Where that account signs in from, offered under the address field. */
     const [suggested, setSuggested] = useState<readonly string[]>([]);
     const [inviting, startInviting] = useTransition();
-    const [invited, setInvited] = useState<{ email: string; url?: string; sendError?: string; } | null>(
-        null
-    );
+    const [invited, setInvited] = useState<{
+        email: string;
+        url?: string;
+        sendError?: string;
+    } | null>(null);
     const [inviteError, setInviteError] = useState<string | null>(null);
 
     /** Fill the name in from a Polaris account, spelled the way Mojang spells it. */
@@ -741,8 +743,7 @@ export function PlayerAccessDialog({
     const linking = account !== null && Boolean(onLink) && !linkedTo;
     // What the addresses have to be for the form to be complete: nothing when
     // they will follow sign-ins, otherwise a new one or one already registered.
-    const addressesReady =
-        isAddressRule(rule) || (rule.length === 0 && editing && hasAddresses);
+    const addressesReady = isAddressRule(rule) || (rule.length === 0 && editing && hasAddresses);
     const ready = following
         ? true
         : linking
@@ -805,7 +806,9 @@ export function PlayerAccessDialog({
                         ? "Add another address they play from, change the note, or tie them to a Polaris account. The name itself is what the server checks."
                         : "A player is let in when the name is on this list and they arrive from an address registered to it."
             }
-            confirmLabel={following || invited ? "Done" : linking ? "Link" : editing ? "Save" : "Add player"}
+            confirmLabel={
+                following || invited ? "Done" : linking ? "Link" : editing ? "Save" : "Add player"
+            }
             ready={ready || invited !== null}
             pending={pending || inviting}
             error={error}
