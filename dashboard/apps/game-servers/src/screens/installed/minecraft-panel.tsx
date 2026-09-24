@@ -20,6 +20,7 @@
 
 import Link from "next/link";
 import { GameConsole } from "./game-console";
+import { MinecraftAnnounce } from "./minecraft-announce";
 import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
 import { SpigotPluginsCard } from "./minecraft-spigot-plugins";
@@ -468,6 +469,14 @@ export function MinecraftPanel({
                     applicationId={applicationId}
                     running={isRunning}
                     game={status?.edition === "bedrock" ? "bedrock" : "java"}
+                    players={[...(status?.players.players ?? [])]}
+                />
+            )}
+            {tab === "announce" && (
+                <MinecraftAnnounce
+                    installedAppId={installedAppId}
+                    running={isRunning}
+                    edition={status?.edition === "bedrock" ? "bedrock" : "java"}
                     players={[...(status?.players.players ?? [])]}
                 />
             )}

@@ -24,6 +24,7 @@ import { readCrashLoop, readRestartWatch } from "../games-health";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
 import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
+import { announcementCommands, type Announcement } from "./announcement";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -262,6 +263,34 @@ export async function broadcastToMinecraft(
     } catch {
         await execCommand(install, ownerId, sayArgv(message));
     }
+}
+
+/**
+ * Send an announcement: its title, subtitle, action bar, chat line and sound, as
+ * the commands `announcement.ts` builds for this server's edition, in order.
+ *
+ * Built here from what was asked for rather than taken as commands from the
+ * browser, so the only thing a screen can send through this is an announcement.
+ * Each command is one argument, like a console line, and a command the server
+ * refuses stops the rest: a subtitle with no title after it is a subtitle
+ * nobody sees.
+ */
+export async function sendAnnouncement(
+    ownerId: string,
+    installedAppId: string,
+    announcement: Announcement
+): Promise<number> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    const lines = announcementCommands(install.edition, announcement);
+    if (lines.length === 0) throw new Error("There is nothing to send yet");
+    for (const line of lines) {
+        if (line.length > MAX_COMMAND_LENGTH) {
+            throw new Error("That is too much formatting for one line. Use fewer colours or styles.");
+        }
+        assertSafeArgument(line);
+        await execCommand(install, ownerId, [line]);
+    }
+    return lines.length;
 }
 
 /**

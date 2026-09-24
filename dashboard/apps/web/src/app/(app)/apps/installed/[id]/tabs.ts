@@ -44,6 +44,10 @@ const EVERY_GAME: readonly GameId[] = ["minecraft", "ark", "fivem"];
 export const GAME_TABS: readonly GameTab[] = [
     { slug: "", label: "Overview", permission: "games.read", games: EVERY_GAME },
     { slug: "console", label: "Console", permission: "games.console", games: EVERY_GAME },
+    // Titles, a line in the chat and a sound, written with colours rather than
+    // typed as JSON into the console. The same grant, since it is the server
+    // talking to everybody on it; Minecraft only, the one game with titles.
+    { slug: "announce", label: "Announce", permission: "games.console", games: ["minecraft"] },
     { slug: "players", label: "Players", permission: "games.read", games: EVERY_GAME },
     { slug: "world", label: "World", permission: "games.manage", games: ["minecraft"] },
     { slug: "rules", label: "Rules", permission: "games.read", games: EVERY_GAME },
