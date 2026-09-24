@@ -13,13 +13,42 @@
  */
 
 import { prisma } from "@polaris/db";
-import type { MessageShape } from "./structure";
+import type { MessagePart, MessageShape } from "./structure";
 
-/** Whether anything had to change. */
+/**
+ * The parts, with every picture the HTML actually draws marked as part of it.
+ *
+ * The shape alone cannot always tell: a newsletter's icons can sit beside the
+ * HTML in a `multipart/mixed` with a Content-Id each, exactly the way an iPhone
+ * attaches a photo. The body settles it - a picture its HTML asks for by
+ * `cid:` is one it draws, and listing it as a file is a paperclip on every
+ * newsletter. Only ever narrows: nothing the shape called inline is made a file.
+ */
+export function drawnByBody(parts: readonly MessagePart[], html: string): MessagePart[] {
+    if (!html) return [...parts];
+    const body = html.toLowerCase();
+    return parts.map((part) =>
+        !part.inline &&
+        part.contentId &&
+        part.contentType.startsWith("image/") &&
+        body.includes(`cid:${part.contentId.toLowerCase()}`)
+            ? { ...part, inline: true }
+            : part
+    );
+}
+
+/** Whether anything had to change. `html` is the body when it is known, which
+ *  decides the pictures it draws - see `drawnByBody`. */
 export async function reconcileAttachments(
     messageId: string,
-    shape: MessageShape
+    read: MessageShape,
+    html = ""
 ): Promise<boolean> {
+    const attachments = drawnByBody(read.attachments, html);
+    const shape = {
+        attachments,
+        hasAttachments: attachments.some((part) => !part.inline)
+    };
     const stored = await prisma.mailAttachment.findMany({
         where: { messageId },
         select: { id: true, part: true, inline: true }

@@ -806,7 +806,7 @@ export async function loadBody(userId: string, messageId: string): Promise<MailB
     });
     // The shape was fetched anyway: a message stored by an older reading of it
     // gets its files put right now, rather than never.
-    if (shape) await reconcileAttachments(message.id, shape).catch(() => false);
+    if (shape) await reconcileAttachments(message.id, shape, body.html).catch(() => false);
 
     // The one moment a message's footer can be read. Plenty of mail that is
     // unmistakably a mailing list publishes no `List-Unsubscribe` header at all,

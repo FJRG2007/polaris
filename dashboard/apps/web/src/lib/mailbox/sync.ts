@@ -916,12 +916,14 @@ async function warmBodies(
 
     for (const message of waiting) {
         const uid = Number(message.uid);
+        const body = { text: text.get(uid) ?? "", html: html.get(uid) ?? "" };
         // Its files, from the shape just fetched for the body - see
         // `reconcileAttachments`. Before the check below, because a message that
         // is only a file has no body to come back and still has a file to list.
         const owner = owners.find((one) => one.uid === uid);
-        if (owner) await reconcileAttachments(message.id, owner.structure).catch(() => false);
-        const body = { text: text.get(uid) ?? "", html: html.get(uid) ?? "" };
+        if (owner) {
+            await reconcileAttachments(message.id, owner.structure, body.html).catch(() => false);
+        }
         // Nothing came back for it: left alone rather than written as empty,
         // which would be a message that opens blank for ever.
         if (!body.text && !body.html) continue;

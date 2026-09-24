@@ -31,7 +31,12 @@ import { UnsubscribeButton } from "./unsubscribe-button";
 import { isViewable } from "@/app/(app)/drive/viewer/kind";
 import { saveFile } from "@/components/transfers/move-file";
 import type { ViewerTarget } from "@/app/(app)/drive/viewer/types";
-import { openableAttachments, positionOf, stepFrom } from "./attachment-steps";
+import {
+    conversationFiles,
+    openableAttachments,
+    positionOf,
+    stepFrom
+} from "./attachment-steps";
 
 /**
  * The viewer, fetched when a file is actually opened.
@@ -441,6 +446,7 @@ export function ThreadView({
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+                <ConversationFiles messages={messages} />
                 <ul className="space-y-1.5">
                     {shown.map((entry) =>
                         entry.kind === "gap" ? (
@@ -1204,6 +1210,120 @@ function MessageCard({
                 }
             />
         </li>
+    );
+}
+
+/** How many of a conversation's files are shown before "Show all". Enough for
+ *  the usual handful; a thread of forty scans does not push the messages off
+ *  the screen. */
+const FILES_SHOWN = 6;
+
+/**
+ * Every file in the conversation, above the messages.
+ *
+ * The files somebody sent - and the ones this person sent - live on the message
+ * they came with, and in a long thread that message is folded, or behind the
+ * "earlier messages" line, with its list under a body that is not even loaded.
+ * So they are gathered here, newest first and each once, and each one opens in
+ * the same viewer and saves the same way as it does under its own message.
+ */
+function ConversationFiles({ messages }: { messages: readonly MailMessageView[] }) {
+    const format = useDisplayFormat();
+    const files = useMemo(() => conversationFiles(messages), [messages]);
+    const openable = useMemo(() => openableAttachments(files), [files]);
+    const [all, setAll] = useState(false);
+    const [viewing, setViewing] = useState<ViewerTarget | null>(null);
+    const viewingAt = viewing ? positionOf(openable, viewing.path) : -1;
+
+    if (files.length === 0) return null;
+    const shown = all ? files : files.slice(0, FILES_SHOWN);
+
+    return (
+        <section aria-label="Files in this conversation" className="mb-3">
+            <h3 className="mb-1.5 flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground">
+                <Paperclip className="size-3.5 shrink-0" aria-hidden />
+                {files.length === 1 ? "1 file" : `${files.length} files`} in this conversation
+            </h3>
+            <ul className="flex flex-wrap gap-2">
+                {shown.map((file) => {
+                    const detail = `${file.from ? `${file.from}, ` : ""}${format.dateTime(new Date(file.sentAt))}`;
+                    const label = (
+                        <>
+                            <Paperclip className="size-3.5 shrink-0" aria-hidden />
+                            <span className="max-w-[16rem] truncate">{file.name}</span>
+                            <span className="shrink-0 text-foreground-subtle">
+                                {readableSize(file.size)}
+                            </span>
+                        </>
+                    );
+                    return (
+                        <li
+                            key={file.id}
+                            className="flex items-center gap-1 rounded-md border border-border pr-1 text-[12px]"
+                            title={`${file.name} - ${detail}`}
+                        >
+                            {isViewable(file.name) ? (
+                                <button
+                                    type="button"
+                                    className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-muted-foreground hover:text-foreground"
+                                    onClick={() => setViewing(viewerTargetOf(file))}
+                                >
+                                    {label}
+                                </button>
+                            ) : (
+                                <span className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-muted-foreground">
+                                    {label}
+                                </span>
+                            )}
+                            <a
+                                href={`/api/mail/attachments/${file.id}`}
+                                onClick={(event) => {
+                                    event.preventDefault();
+                                    saveFile(`/api/mail/attachments/${file.id}`, file.name);
+                                }}
+                                className="shrink-0 rounded p-1 text-foreground-subtle hover:text-foreground"
+                                aria-label={`Save ${file.name}`}
+                                title={`Save ${file.name}`}
+                                download
+                            >
+                                <Download className="size-3.5 shrink-0" aria-hidden />
+                            </a>
+                        </li>
+                    );
+                })}
+                {files.length > FILES_SHOWN ? (
+                    <li className="flex items-center">
+                        <button
+                            type="button"
+                            className="rounded-md px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-card hover:text-foreground"
+                            onClick={() => setAll((open) => !open)}
+                        >
+                            {all ? "Show fewer" : `Show all ${files.length}`}
+                        </button>
+                    </li>
+                ) : null}
+            </ul>
+            <FileViewer
+                target={viewing}
+                readOnly
+                urlFor={(target, inline) =>
+                    `/api/mail/attachments/${target.path}${inline ? "?inline=1" : ""}`
+                }
+                onOpenChange={(open) => (open ? undefined : setViewing(null))}
+                steps={
+                    viewing && viewingAt !== -1
+                        ? {
+                              index: viewingAt,
+                              count: openable.length,
+                              onStep: (by) => {
+                                  const next = stepFrom(openable, viewing.path, by);
+                                  if (next) setViewing(viewerTargetOf(next));
+                              }
+                          }
+                        : undefined
+                }
+            />
+        </section>
     );
 }
 

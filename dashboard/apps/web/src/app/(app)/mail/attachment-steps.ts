@@ -40,3 +40,65 @@ export function stepFrom<T extends AttachmentLike>(
     if (at === -1) return null;
     return files[at + by] ?? null;
 }
+
+/** A file as the conversation's own list shows it: which message it came on. */
+export interface ConversationFile {
+    readonly id: string;
+    readonly name: string;
+    readonly size: number;
+    readonly inline: boolean;
+    readonly messageId: string;
+    readonly sentAt: string;
+    readonly from: string;
+}
+
+/**
+ * Every file attached anywhere in a conversation, newest first, each once.
+ *
+ * A long thread folds its middle away and opens only the newest message, so a
+ * contract sent twenty messages ago is three clicks deep - which reads as the
+ * file being gone. This is the list that goes above the messages instead.
+ *
+ * Once, because the same file turns up twice for nearly everything somebody
+ * sends: the copy in Sent, and the copy that comes back in the other person's
+ * reply or on a second mailbox. Two files with the same name and the same size
+ * are taken for one, and the newest is kept, since that is the one the
+ * conversation is about now.
+ */
+export function conversationFiles(
+    messages: readonly {
+        readonly id: string;
+        readonly sentAt: string;
+        readonly from: readonly { readonly name?: string | null; readonly address: string }[];
+        readonly attachments: readonly {
+            readonly id: string;
+            readonly name: string;
+            readonly size: number;
+            readonly inline: boolean;
+        }[];
+    }[]
+): ConversationFile[] {
+    const seen = new Set<string>();
+    const out: ConversationFile[] = [];
+    const newestFirst = [...messages].sort((a, b) => b.sentAt.localeCompare(a.sentAt));
+    for (const message of newestFirst) {
+        const sender = message.from[0];
+        const from = sender ? sender.name || sender.address : "";
+        for (const file of message.attachments) {
+            if (file.inline) continue;
+            const key = `${file.name.toLowerCase()}\u0000${file.size}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push({
+                id: file.id,
+                name: file.name,
+                size: file.size,
+                inline: false,
+                messageId: message.id,
+                sentAt: message.sentAt,
+                from
+            });
+        }
+    }
+    return out;
+}
