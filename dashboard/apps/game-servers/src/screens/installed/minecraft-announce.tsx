@@ -403,14 +403,12 @@ export function MinecraftAnnounce({
                                 <span className="min-w-0 flex-1">
                                     <Select
                                         value={draft.sound || NO_SOUND}
-                                        onValueChange={(value) => {
-                                            const sound = value === NO_SOUND ? "" : value;
-                                            set({ sound });
-                                            // Heard as it is picked, the way a
-                                            // ringtone list works - choosing a sound
-                                            // by name alone is choosing blind.
-                                            if (sound) hear(sound);
-                                        }}
+                                        // Picking one does not play it: a sound
+                                        // nobody asked to hear is a surprise, and
+                                        // the speaker beside it is one press away.
+                                        onValueChange={(value) =>
+                                            set({ sound: value === NO_SOUND ? "" : value })
+                                        }
                                         options={ANNOUNCE_SOUNDS.map((sound) => ({
                                             value: sound.id || NO_SOUND,
                                             label: sound.label
