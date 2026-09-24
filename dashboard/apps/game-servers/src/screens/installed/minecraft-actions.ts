@@ -123,6 +123,7 @@ const { requirePermissionAny } = host.session;
 const { applyWorldSchedule } = host.backupsManage;
 const { requireGameServer } = host.appsInstallAccess;
 const { userSessionAddresses } = host.sessionDirectory;
+const { invitePlayer } = host.appsInstallSharing;
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { listEnvVars, setEnvVars } = host.envVarService;
 const { writeContainerFile } = host.containerFilesService;
@@ -975,7 +976,10 @@ export async function findMinecraftPlayerByUserAction(
 const linkSchema = z.object({
     installedAppId: z.string().uuid(),
     username: z.string().trim().min(1).max(16),
-    userId: z.string().uuid()
+    userId: z.string().uuid(),
+    /** False to tie the account to the player only as who they are, keeping the
+     *  addresses typed for them. */
+    followSignIns: z.boolean().default(true)
 });
 
 /**
@@ -983,7 +987,7 @@ const linkSchema = z.object({
  * account is signed in to Polaris.
  */
 export async function linkPlayerAccountAction(
-    input: z.infer<typeof linkSchema>
+    input: z.input<typeof linkSchema>
 ): Promise<{ error?: string }> {
     const parsed = linkSchema.safeParse(input);
     if (!parsed.success)
@@ -995,19 +999,66 @@ export async function linkPlayerAccountAction(
         );
         await playerAccess.linkPlayerAccount(access.ownerId, parsed.data.installedAppId, user.id, {
             username: parsed.data.username,
-            userId: parsed.data.userId
+            userId: parsed.data.userId,
+            followSignIns: parsed.data.followSignIns
         });
         await recordAudit({
             actorId: user.id,
             action: "minecraft.player-link",
             targetType: "installedApp",
             targetId: parsed.data.installedAppId,
-            metadata: { player: parsed.data.username, userId: parsed.data.userId }
+            metadata: {
+                player: parsed.data.username,
+                userId: parsed.data.userId,
+                followSignIns: parsed.data.followSignIns
+            }
         });
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not link that player" };
+    }
+}
+
+const inviteSchema = z.object({
+    installedAppId: z.string().uuid(),
+    username: z.string().trim().min(1).max(16),
+    email: z.string().trim().toLowerCase().email("Enter their email address").max(254),
+    followSignIns: z.boolean().default(true)
+});
+
+/**
+ * Invite a player who has no Polaris account yet, so the account they make is
+ * tied to this name. Somebody who turns out to have one already is linked on
+ * the spot instead - the operator asked for the same thing either way.
+ */
+export async function invitePlayerAccountAction(
+    input: z.input<typeof inviteSchema>
+): Promise<{ linked?: true; invite?: { url?: string; sendError?: string }; error?: string }> {
+    const parsed = inviteSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    try {
+        const result = await invitePlayer({
+            installedAppId: parsed.data.installedAppId,
+            email: parsed.data.email,
+            player: parsed.data.username,
+            followSignIns: parsed.data.followSignIns
+        });
+        if (result.error) return { error: result.error };
+        if (result.userId) {
+            const linked = await linkPlayerAccountAction({
+                installedAppId: parsed.data.installedAppId,
+                username: parsed.data.username,
+                userId: result.userId,
+                followSignIns: parsed.data.followSignIns
+            });
+            return linked.error ? { error: linked.error } : { linked: true };
+        }
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
+        return { invite: result.invite ?? {} };
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not invite them" };
     }
 }
 

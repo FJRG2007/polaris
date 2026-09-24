@@ -72,16 +72,37 @@ export function mayShareAtAll(policy: SharingPolicy): boolean {
  * nobody chose. What it says is still only an intention - the claim resolves it
  * again against what the inviter holds at that moment.
  */
-export const pendingGrantSchema = z.object({
-    resourceKind: z.enum(RESOURCE_KINDS),
-    resourceId: z.string().trim().min(1).max(200),
-    actions: z.array(z.enum(PERMISSIONS)).min(1).max(PERMISSIONS.length),
-    canShare: z.boolean().default(false),
-    /** ISO 8601, or null for no end date. */
-    expiresAt: z.string().datetime().nullable().default(null),
-    /** Whose reach this was carved out of, and whose it is re-checked against. */
-    grantedById: z.string().uuid()
+/**
+ * Something an app ties the new account to once it exists, carried beside the
+ * access an invite promises. Today one kind: a game server's player, so somebody
+ * invited because they play there arrives already linked to their name.
+ */
+export const pendingAppLinkSchema = z.object({
+    kind: z.literal("gamePlayer"),
+    player: z.string().trim().min(1).max(40),
+    followSignIns: z.boolean().default(true)
 });
+
+export type PendingAppLink = z.infer<typeof pendingAppLinkSchema>;
+
+export const pendingGrantSchema = z
+    .object({
+        resourceKind: z.enum(RESOURCE_KINDS),
+        resourceId: z.string().trim().min(1).max(200),
+        actions: z.array(z.enum(PERMISSIONS)).max(PERMISSIONS.length),
+        canShare: z.boolean().default(false),
+        /** ISO 8601, or null for no end date. */
+        expiresAt: z.string().datetime().nullable().default(null),
+        /** Whose reach this was carved out of, and whose it is re-checked against. */
+        grantedById: z.string().uuid(),
+        appLink: pendingAppLinkSchema.optional()
+    })
+    // Promising nothing is only a promise when it carries a link: a player
+    // invited to a server needs an account, not access to its console.
+    .refine((grant) => grant.actions.length > 0 || grant.appLink !== undefined, {
+        message: "Choose at least one thing they may do",
+        path: ["actions"]
+    });
 
 export type PendingGrant = z.infer<typeof pendingGrantSchema>;
 

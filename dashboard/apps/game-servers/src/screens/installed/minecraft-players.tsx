@@ -346,14 +346,41 @@ export function MinecraftPlayers({
         return true;
     }
 
-    /** Tie somebody to a Polaris account, so they connect from its sign-ins. */
-    function linkPlayer(input: { username: string; userId: string }): void {
+    /**
+     * Tie somebody to a Polaris account - following its sign-ins, or only as who
+     * they are, in which case the address and note typed with it are saved too.
+     */
+    function linkPlayer(input: {
+        username: string;
+        userId: string;
+        followSignIns: boolean;
+        address?: string;
+        note?: string;
+    }): void {
         setFormError(null);
         startTransition(async () => {
-            const result = await actions.linkPlayerAccountAction({ installedAppId, ...input });
+            const result = await actions.linkPlayerAccountAction({
+                installedAppId,
+                username: input.username,
+                userId: input.userId,
+                followSignIns: input.followSignIns
+            });
             if (result.error) {
                 setFormError(result.error);
                 return;
+            }
+            if (!input.followSignIns && input.address) {
+                const saved = await actions.grantPlayerAccessAction({
+                    installedAppId,
+                    username: input.username,
+                    address: input.address,
+                    ...(input.note ? { note: input.note } : {})
+                });
+                if (saved.error) {
+                    setFormError(saved.error);
+                    onChanged();
+                    return;
+                }
             }
             setActing(null);
             onChanged();
@@ -674,6 +701,14 @@ export function MinecraftPlayers({
                             : null
                     }
                     onLink={linkPlayer}
+                    onInvite={async (input) => {
+                        const result = await actions.invitePlayerAccountAction({
+                            installedAppId,
+                            ...input
+                        });
+                        if (!result.error) onChanged();
+                        return result;
+                    }}
                     onUnlink={(username) => {
                         void confirm({
                             title: `Unlink ${username}?`,

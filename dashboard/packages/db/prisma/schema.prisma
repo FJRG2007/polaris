@@ -3584,6 +3584,9 @@ model GamePlayerLink {
     // SteamID64.
     player         String
     userId         String   @db.Uuid
+    // Whether the player's addresses are the account's sign-ins (true), or the
+    // account is only who they are and the addresses typed for them still hold.
+    followSignIns  Boolean  @default(true)
     createdById    String?  @db.Uuid
     createdAt      DateTime @default(now())
 

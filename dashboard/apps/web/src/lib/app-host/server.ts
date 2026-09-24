@@ -79,6 +79,7 @@ const load = {
     appsInstallPresence: once(() => import("@/lib/apps/install-presence")),
     appsInstallSecret: once(() => import("@/lib/apps/install-secret")),
     appsInstallService: once(() => import("@/lib/apps/install-service")),
+    appsInstallSharing: once(() => import("@/lib/apps/install-sharing")),
     appsPortBlockStore: once(() => import("@/lib/apps/port-block-store")),
     appsPortRegistry: once(() => import("@/lib/apps/port-registry")),
     auditService: once(() => import("@/lib/audit-service")),
@@ -151,6 +152,9 @@ export const serverHost = {
         reachableInstallIds: later(load.appsInstallAccess, "reachableInstallIds"),
         requireGameServer: later(load.appsInstallAccess, "requireGameServer"),
         requireGameServerOwner: later(load.appsInstallAccess, "requireGameServerOwner")
+    },
+    appsInstallSharing: {
+        invitePlayer: later(load.appsInstallSharing, "invitePlayer")
     },
     appsInstallConfig: {
         patchInstallConfig: later(load.appsInstallConfig, "patchInstallConfig"),

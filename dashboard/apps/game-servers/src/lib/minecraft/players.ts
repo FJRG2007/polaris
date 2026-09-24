@@ -35,7 +35,12 @@ export interface PlayerEntry {
      *  person plays from more than one place, so this is a list. */
     readonly addresses: readonly string[];
     /** The Polaris account their addresses follow, when they are tied to one. */
-    readonly linkedTo: { readonly userId: string; readonly name: string } | null;
+    readonly linkedTo: {
+        readonly userId: string;
+        readonly name: string;
+        /** False when the account is only who they are and typed addresses hold. */
+        readonly followSignIns: boolean;
+    } | null;
     readonly note: string | null;
     readonly banReason: string | null;
     readonly banned: boolean;
@@ -117,7 +122,9 @@ export function foldPlayers(
         });
     }
     for (const link of access?.links ?? []) {
-        upsert(link.username, { linkedTo: { userId: link.userId, name: link.name } });
+        upsert(link.username, {
+            linkedTo: { userId: link.userId, name: link.name, followSignIns: link.followSignIns }
+        });
     }
     for (const player of roster?.ops ?? []) upsert(player, { operator: true });
     for (const player of roster?.whitelist ?? []) upsert(player, { whitelisted: true });

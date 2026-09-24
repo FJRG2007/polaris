@@ -101,6 +101,16 @@ export async function afterInstallStarts(installedAppId: string): Promise<void> 
     for (const extension of extensions()) await extension.afterStart?.(installedAppId);
 }
 
+/** Hand a claimed invite's link to the app it belongs to. One app failing does
+ *  not stop another, and none of them can fail the account being created. */
+export async function claimAppLink(claim: Parameters<NonNullable<AppExtension["claimLink"]>>[0]): Promise<void> {
+    for (const extension of extensions()) {
+        await extension.claimLink?.(claim).catch((caught: unknown) => {
+            console.error("polaris: an invite's link could not be applied:", caught);
+        });
+    }
+}
+
 /** Let every app fold its older install rows into its own. */
 export async function adoptAppInstalls(ownerId: string): Promise<void> {
     await Promise.all(extensions().map((extension) => extension.adopt?.(ownerId)));

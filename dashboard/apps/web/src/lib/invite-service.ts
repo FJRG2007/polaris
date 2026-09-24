@@ -370,6 +370,7 @@ async function applyPendingGrant(invite: InviteRow, userId: string): Promise<voi
             select: { id: true, isAdmin: true }
         });
         if (!inviter) return;
+        await applyPendingLink(promised, inviter, userId);
         const still = inviter.isAdmin
             ? [...promised.actions]
             : (
@@ -400,6 +401,37 @@ async function applyPendingGrant(invite: InviteRow, userId: string): Promise<voi
     } catch {
         // The account is made and its role assigned either way.
     }
+}
+
+/**
+ * What the invite promised to tie the new account to, handed to the app it
+ * belongs to - once the inviter is checked to still manage that thing. The same
+ * narrowing the access above gets: an invite is not a way to act with a
+ * permission its sender has since lost.
+ */
+async function applyPendingLink(
+    promised: core.PendingGrant,
+    inviter: { id: string; isAdmin: boolean },
+    userId: string
+): Promise<void> {
+    const link = promised.appLink;
+    if (!link || promised.resourceKind !== "install") return;
+    const ref = core.resourceRef(promised.resourceKind, promised.resourceId);
+    if (!inviter.isAdmin && !(await canOn(inviter.id, "games.manage", ref))) return;
+    const { claimAppLink } = await import("@/lib/app-extensions/registry");
+    await claimAppLink({
+        userId,
+        installedAppId: promised.resourceId,
+        grantedById: inviter.id,
+        link
+    });
+    await recordAudit({
+        actorId: inviter.id,
+        action: "invite.link",
+        targetType: "installedApp",
+        targetId: promised.resourceId,
+        metadata: { to: userId, link, via: "invite" }
+    });
 }
 
 export interface ClaimInput {

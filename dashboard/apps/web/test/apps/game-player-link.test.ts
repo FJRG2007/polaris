@@ -22,7 +22,13 @@ type Access = {
     source: string;
     createdAt: Date;
 };
-type Link = { id: string; installedAppId: string; player: string; userId: string };
+type Link = {
+    id: string;
+    installedAppId: string;
+    player: string;
+    userId: string;
+    followSignIns?: boolean;
+};
 
 let access: Access[] = [];
 let links: Link[] = [];
@@ -270,7 +276,83 @@ describe("the list as the screen reads it", () => {
         signedInFrom[ADA] = ["1.1.1.1"];
         await service.linkPlayerAccount(OWNER, SERVER, OWNER, { username: "AdaMC", userId: ADA });
         const view = await service.listPlayerAccess(OWNER, SERVER);
-        expect(view.links).toEqual([{ username: "AdaMC", userId: ADA, name: "Ada" }]);
+        expect(view.links).toEqual([
+            { username: "AdaMC", userId: ADA, name: "Ada", followSignIns: true }
+        ]);
         expect(view.rules.map((rule) => rule.source)).toEqual(["session"]);
+    });
+});
+
+describe("an account tied to a player only as who they are", () => {
+    // The operator knows ErMigue04 is Miguel's account, but Miguel plays from a
+    // fixed address and his account is called nothing like it.
+    it("keeps the addresses typed for them and takes none from sign-ins", async () => {
+        await service.grantPlayerAccess(OWNER, SERVER, OWNER, {
+            username: "ErMigue04",
+            address: "84.121.150.175"
+        });
+        signedInFrom[ADA] = ["1.1.1.1"];
+        await service.linkPlayerAccount(OWNER, SERVER, OWNER, {
+            username: "ErMigue04",
+            userId: ADA,
+            followSignIns: false
+        });
+        expect(links.map((link) => [link.player, link.userId, link.followSignIns])).toEqual([
+            ["ErMigue04", ADA, false]
+        ]);
+        expect(access.map((row) => [row.address, row.source])).toEqual([
+            ["84.121.150.175", "manual"]
+        ]);
+        await service.syncLinkedAddresses(SERVER);
+        expect(access.map((row) => row.address)).toEqual(["84.121.150.175"]);
+    });
+
+    it("still takes another typed address", async () => {
+        await service.linkPlayerAccount(OWNER, SERVER, OWNER, {
+            username: "ErMigue04",
+            userId: ADA,
+            followSignIns: false
+        });
+        await service.grantPlayerAccess(OWNER, SERVER, OWNER, {
+            username: "ErMigue04",
+            address: "90.1.2.3"
+        });
+        expect(access.map((row) => row.address)).toEqual(["90.1.2.3"]);
+    });
+
+    it("is judged by those addresses, not held to the account's sign-ins", async () => {
+        config = { bindAddresses: false };
+        await service.grantPlayerAccess(OWNER, SERVER, OWNER, {
+            username: "ErMigue04",
+            address: "84.121.150.175"
+        });
+        await service.linkPlayerAccount(OWNER, SERVER, OWNER, {
+            username: "ErMigue04",
+            userId: ADA,
+            followSignIns: false
+        });
+        online = ["ErMigue04"];
+        joinLog = joined("ErMigue04", "7.7.7.7");
+        // With the address check off, only a player following sign-ins is held
+        // to an address - this one is treated like anybody on the list.
+        expect((await service.enforcePlayerAddresses(OWNER, SERVER)).kicked).toEqual([]);
+    });
+
+    it("can be switched to follow sign-ins later, which replaces the typed ones", async () => {
+        await service.grantPlayerAccess(OWNER, SERVER, OWNER, {
+            username: "ErMigue04",
+            address: "84.121.150.175"
+        });
+        await service.linkPlayerAccount(OWNER, SERVER, OWNER, {
+            username: "ErMigue04",
+            userId: ADA,
+            followSignIns: false
+        });
+        signedInFrom[ADA] = ["1.1.1.1"];
+        await service.linkPlayerAccount(OWNER, SERVER, OWNER, {
+            username: "ErMigue04",
+            userId: ADA
+        });
+        expect(access.map((row) => [row.address, row.source])).toEqual([["1.1.1.1", "session"]]);
     });
 });

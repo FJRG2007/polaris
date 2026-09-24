@@ -92,6 +92,9 @@ export interface PlayerLinkView {
     readonly userId: string;
     /** What Polaris calls that account. */
     readonly name: string;
+    /** Whether their addresses are the account's sign-ins, or the ones typed for
+     *  them - see `linkPlayerAccount`. */
+    readonly followSignIns: boolean;
 }
 
 /** What a linked player is told when they are not signed in from where they are. */
@@ -243,7 +246,8 @@ export async function listPlayerAccess(
         links: links.map((link) => ({
             username: link.player,
             userId: link.userId,
-            name: names.get(link.userId) || "A Polaris account"
+            name: names.get(link.userId) || "A Polaris account",
+            followSignIns: follows(link)
         })),
         bindAddresses: install.bindAddresses,
         addressesAvailable: install.edition === "java",
@@ -663,13 +667,19 @@ export async function reconcileWhitelist(
     });
 }
 
+/** Whether a link hands the player's addresses to the account's sign-ins. A
+ *  row from before the choice existed says nothing, and every link then did. */
+function follows(link: { followSignIns?: boolean | null }): boolean {
+    return link.followSignIns !== false;
+}
+
 /** The players on this server tied to a Polaris account. */
 async function linkedPlayers(
     installedAppId: string
-): Promise<{ player: string; userId: string }[]> {
+): Promise<{ player: string; userId: string; followSignIns: boolean }[]> {
     return prisma.gamePlayerLink.findMany({
         where: { installedAppId },
-        select: { player: true, userId: true },
+        select: { player: true, userId: true, followSignIns: true },
         orderBy: { createdAt: "asc" }
     });
 }
@@ -678,10 +688,10 @@ async function linkedPlayers(
 async function linkFor(
     installedAppId: string,
     username: string
-): Promise<{ id: string; player: string; userId: string } | null> {
+): Promise<{ id: string; player: string; userId: string; followSignIns?: boolean } | null> {
     const links = await prisma.gamePlayerLink.findMany({
         where: { installedAppId },
-        select: { id: true, player: true, userId: true }
+        select: { id: true, player: true, userId: true, followSignIns: true }
     });
     const wanted = username.trim().toLowerCase();
     return links.find((link) => link.player.toLowerCase() === wanted) ?? null;
@@ -693,10 +703,11 @@ async function linkFor(
  *
  * Only the rows this keeps ("session") are touched; nothing somebody typed is.
  * An account signed in nowhere ends with no address, which is a player the next
- * pass refuses - signing out of Polaris is signing out of the server.
+ * pass refuses - signing out of Polaris is signing out of the server. A link
+ * that only says who the player is follows nothing, so it keeps none of these.
  */
 export async function syncLinkedAddresses(installedAppId: string): Promise<void> {
-    const links = await linkedPlayers(installedAppId);
+    const links = (await linkedPlayers(installedAppId)).filter(follows);
     const kept = await prisma.gamePlayerAccess.findMany({
         where: { installedAppId, source: "session" },
         select: { id: true, username: true, address: true }
@@ -742,22 +753,30 @@ export async function syncLinkedAddresses(installedAppId: string): Promise<void>
 }
 
 /**
- * Tie a player to a Polaris account: from now on they may connect only from
- * where that account is signed in to Polaris.
+ * Tie a player to a Polaris account.
  *
- * Any address typed for this name before is dropped, because it would let them
- * in from somewhere their account is not. The game's own list is updated in the
- * same breath, like adding a player by address.
+ * Two ways, because an account is two things to a server. Following sign-ins
+ * (the default) means they may connect only from where that account is signed
+ * in to Polaris, so any address typed for this name before is dropped - it
+ * would let them in from somewhere their account is not. Not following makes
+ * the account only who they are: the addresses typed for them still decide
+ * where they connect from, and nothing about them changes but the name beside
+ * them on the list.
+ *
+ * The account need not have linked Minecraft, nor be called anything like the
+ * player: the operator is the one saying these are the same person. The game's
+ * own list is updated in the same breath, like adding a player by address.
  */
 export async function linkPlayerAccount(
     ownerId: string,
     installedAppId: string,
     actorId: string,
-    input: { username: string; userId: string }
+    input: { username: string; userId: string; followSignIns?: boolean }
 ): Promise<void> {
     const install = await resolve(ownerId, installedAppId);
     const username = asSeenSpelling(input.username, await spellingsSeen(installedAppId));
-    if (install.edition !== "java") {
+    const followSignIns = input.followSignIns !== false;
+    if (install.edition !== "java" && followSignIns) {
         throw new Error(
             "Bedrock servers do not report where a player connects from, so a player cannot be tied to their sign-ins."
         );
@@ -774,22 +793,30 @@ export async function linkPlayerAccount(
     if (existing) {
         await prisma.gamePlayerLink.update({
             where: { id: existing.id },
-            data: { userId: input.userId, createdById: actorId }
+            data: { userId: input.userId, followSignIns, createdById: actorId }
         });
     } else {
         await prisma.gamePlayerLink.create({
-            data: { installedAppId, player: username, userId: input.userId, createdById: actorId }
+            data: {
+                installedAppId,
+                player: username,
+                userId: input.userId,
+                followSignIns,
+                createdById: actorId
+            }
         });
     }
-    const typed = await prisma.gamePlayerAccess.findMany({
-        where: { installedAppId, source: "manual" },
-        select: { id: true, username: true }
-    });
-    const drop = typed.filter((row) => row.username.toLowerCase() === username.toLowerCase());
-    if (drop.length) {
-        await prisma.gamePlayerAccess.deleteMany({
-            where: { id: { in: drop.map((row) => row.id) } }
+    if (followSignIns) {
+        const typed = await prisma.gamePlayerAccess.findMany({
+            where: { installedAppId, source: "manual" },
+            select: { id: true, username: true }
         });
+        const drop = typed.filter((row) => row.username.toLowerCase() === username.toLowerCase());
+        if (drop.length) {
+            await prisma.gamePlayerAccess.deleteMany({
+                where: { id: { in: drop.map((row) => row.id) } }
+            });
+        }
     }
     await syncLinkedAddresses(installedAppId);
     await whitelistPlayer(ownerId, installedAppId, username).catch((caught: unknown) => {
@@ -864,7 +891,10 @@ export async function grantPlayerAccess(
         throw new Error("That is not a username this edition accepts");
     if (!isAddressRule(address))
         throw new Error('Give one address, a range like 203.0.113.0/24, or "any"');
-    if (await linkFor(installedAppId, username)) {
+    // Only a link that follows sign-ins owns where they connect from. One that
+    // only says who they are leaves their addresses to be typed, like anybody's.
+    const link = await linkFor(installedAppId, username);
+    if (link && follows(link)) {
         throw new Error(
             `${username} is tied to a Polaris account, so where they connect from follows its sign-ins.`
         );
@@ -1000,11 +1030,14 @@ export async function enforcePlayerAddresses(
 
     // Where each linked player is signed in from, before the rules are read.
     await syncLinkedAddresses(installedAppId).catch(() => undefined);
-    const [status, rules, links] = await Promise.all([
+    const [status, rules, allLinks] = await Promise.all([
         getServerPlayers(ownerId, installedAppId),
         playerAccessRules(installedAppId),
         linkedPlayers(installedAppId)
     ]);
+    // Only a link that follows sign-ins changes how a player is judged. One that
+    // only says who they are leaves them to their typed addresses, like anybody.
+    const links = allLinks.filter(follows);
     if (!status.answering) return nothing;
     const linked = new Set(links.map((link) => link.player.toLowerCase()));
 

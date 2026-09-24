@@ -95,6 +95,18 @@ export const gameServersExtension: AppExtension = {
     adopt: async (ownerId) =>
         (await import("./game-install")).adoptGameServersApp(ownerId),
 
+    // Somebody invited because they play here has just made their account.
+    claimLink: async ({ userId, installedAppId, grantedById, link }) => {
+        if (link.kind !== "gamePlayer") return;
+        await (await import("./minecraft/player-invite")).claimPlayerInvite({
+            userId,
+            installedAppId,
+            grantedById,
+            player: link.player,
+            followSignIns: link.followSignIns
+        });
+    },
+
     gameServerSummaries: async (userId) =>
         (await (await games()).listGameServerFacts(userId)).map((server) => ({
             id: server.id,

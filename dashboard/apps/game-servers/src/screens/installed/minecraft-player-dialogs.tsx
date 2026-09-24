@@ -619,7 +619,8 @@ export function PlayerAccessDialog({
     onRemoveAddress,
     onLookUp,
     onLink,
-    onUnlink
+    onUnlink,
+    onInvite
 }: {
     edition: MinecraftEdition;
     /** The player being edited, or null to register somebody new. */
@@ -627,12 +628,12 @@ export function PlayerAccessDialog({
         username: string;
         addresses: readonly string[];
         note: string | null;
-        linkedTo?: { userId: string; name: string } | null;
+        linkedTo?: { userId: string; name: string; followSignIns?: boolean; } | null;
     } | null;
     pending: boolean;
     error: string | null;
     onClose: () => void;
-    onSave: (input: { username: string; address: string; note: string }) => void;
+    onSave: (input: { username: string; address: string; note: string; }) => void;
     onRemoveAddress?: (address: string) => void;
     /** Find somebody by their Polaris name and hand back the Minecraft username
      *  they linked, plus the addresses their account is signed in from. Absent on
@@ -644,17 +645,36 @@ export function PlayerAccessDialog({
         addresses?: string[];
         error?: string;
     }>;
-    /** Tie the player to a Polaris account instead of a typed address. */
-    onLink?: (input: { username: string; userId: string }) => void;
+    /** Tie the player to a Polaris account. `followSignIns` false keeps the
+     *  addresses typed for them; `address` and `note` are then saved with it. */
+    onLink?: (input: {
+        username: string;
+        userId: string;
+        followSignIns: boolean;
+        address?: string;
+        note?: string;
+    }) => void;
     /** Untie a linked player. */
     onUnlink?: (username: string) => void;
+    /** Invite somebody with no Polaris account, so the one they make is tied to
+     *  this player. */
+    onInvite?: (input: { username: string; email: string; followSignIns: boolean; }) => Promise<{
+        linked?: true;
+        invite?: { url?: string; sendError?: string; };
+        error?: string;
+    }>;
 }) {
     const editing = player !== null;
     const linkedTo = player?.linkedTo ?? null;
+    /** Linked, and their addresses are the account's sign-ins - which is the one
+     *  case where nothing here is typed. A link that only says who they are
+     *  leaves the addresses and the note as editable as before. */
+    const following = linkedTo !== null && linkedTo.followSignIns !== false;
     /** The Polaris account a look-up found, which the player can be tied to. */
-    const [account, setAccount] = useState<{ userId: string; name: string } | null>(null);
-    /** Whether a new player follows that account's sign-ins or a typed address. */
-    const [follow, setFollow] = useState(true);
+    const [account, setAccount] = useState<{ userId: string; name: string; } | null>(null);
+    /** Whether the player follows that account's sign-ins or keeps typed
+     *  addresses. Bedrock reports no address, so it can only keep them. */
+    const [follow, setFollow] = useState(edition === "java");
     const [noMinecraft, setNoMinecraft] = useState(false);
     const [username, setUsername] = useState(player?.username ?? "");
     const [address, setAddress] = useState("");
@@ -666,12 +686,19 @@ export function PlayerAccessDialog({
     const [looking, startLooking] = useTransition();
     /** Where that account signs in from, offered under the address field. */
     const [suggested, setSuggested] = useState<readonly string[]>([]);
+    const [inviting, startInviting] = useTransition();
+    const [invited, setInvited] = useState<{ email: string; url?: string; sendError?: string; } | null>(
+        null
+    );
+    const [inviteError, setInviteError] = useState<string | null>(null);
 
     /** Fill the name in from a Polaris account, spelled the way Mojang spells it. */
     function lookUp(query: string): void {
         const identifier = query.trim();
         if (!onLookUp || identifier.length === 0) return;
         setLookUpError(null);
+        setInviteError(null);
+        setInvited(null);
         startLooking(async () => {
             const found = await onLookUp(identifier);
             if (found.error || !found.userId) {
@@ -682,7 +709,9 @@ export function PlayerAccessDialog({
             }
             setAccount({ userId: found.userId, name: found.name ?? identifier });
             setNoMinecraft(!found.username);
-            if (found.username) setUsername(found.username);
+            // The name of somebody already on the list is who the server checks,
+            // and an account can be tied to it whatever that account calls itself.
+            if (found.username && !editing) setUsername(found.username);
             if (found.name && note.trim().length === 0) setNote(found.name);
             setSuggested(found.addresses ?? []);
             // The common case is one address, and making somebody click it when
@@ -694,28 +723,42 @@ export function PlayerAccessDialog({
         });
     }
 
-    const name = username.trim();
+    const name = editing ? player.username : username.trim();
     const rule = address.trim();
     // Only the addresses that would change something: one already in the field,
     // or already registered to this player, is not an offer.
     const offer = suggested.filter(
         (known) => known !== rule && !(player?.addresses ?? []).includes(known)
     );
-    const nameInvalid = name.length > 0 && !isPlayerName(edition, name);
+    const nameInvalid = !editing && name.length > 0 && !isPlayerName(edition, name);
     const addressInvalid = rule.length > 0 && !isAddressRule(rule);
     // Editing without touching the address is how a note is changed; the note is
     // stored against a rule, so the one they already have carries it.
     const noteChanged = editing && note.trim() !== (player.note ?? "");
-    // Tying a new player to an account needs a name and no address: where they
-    // connect from is whatever that account is signed in from.
-    const linking = !editing && account !== null && follow && Boolean(onLink) && edition === "java";
-    const ready = linkedTo
+    const hasAddresses = (player?.addresses.length ?? 0) > 0;
+    const followsNow = follow && edition === "java";
+    // Tying the player to an account that was just found.
+    const linking = account !== null && Boolean(onLink) && !linkedTo;
+    // What the addresses have to be for the form to be complete: nothing when
+    // they will follow sign-ins, otherwise a new one or one already registered.
+    const addressesReady =
+        isAddressRule(rule) || (rule.length === 0 && editing && hasAddresses);
+    const ready = following
         ? true
-        : editing
-          ? isAddressRule(rule) || (rule.length === 0 && noteChanged && player.addresses.length > 0)
-          : linking
-            ? isPlayerName(edition, name)
+        : linking
+          ? isPlayerName(edition, name) && (followsNow || addressesReady)
+          : editing
+            ? isAddressRule(rule) || (rule.length === 0 && noteChanged && hasAddresses)
             : isPlayerName(edition, name) && isAddressRule(rule);
+    // An email that matched nobody: offer to invite them instead.
+    const inviteEmail = person.trim().includes("@") ? person.trim().toLowerCase() : null;
+    const canInvite =
+        Boolean(onInvite) &&
+        !linkedTo &&
+        account === null &&
+        lookUpError !== null &&
+        inviteEmail !== null &&
+        isPlayerName(edition, name);
 
     function detect(): void {
         setDetectFailed(false);
@@ -729,52 +772,92 @@ export function PlayerAccessDialog({
         });
     }
 
+    function invite(): void {
+        if (!onInvite || !inviteEmail) return;
+        setInviteError(null);
+        startInviting(async () => {
+            const result = await onInvite({
+                username: name,
+                email: inviteEmail,
+                followSignIns: followsNow
+            });
+            if (result.error) {
+                setInviteError(result.error);
+                return;
+            }
+            if (result.linked) {
+                onClose();
+                return;
+            }
+            setInvited({ email: inviteEmail, ...result.invite });
+        });
+    }
+
     return (
         <PlayerFormDialog
             title={editing ? `Edit ${player.username}` : "Add a player"}
             description={
-                linkedTo
-                    ? `${player?.username} joins from wherever ${linkedTo.name} is signed in to Polaris.`
-                    : editing
-                      ? "Add another address they play from, or change the note. The name itself is what the server checks."
-                      : "A player is let in when the name is on this list and they arrive from an address registered to it."
+                following
+                    ? `${player?.username} joins from wherever ${linkedTo?.name} is signed in to Polaris.`
+                    : linkedTo
+                      ? `${player?.username} is ${linkedTo.name} on Polaris. Where they join from is the addresses below.`
+                      : editing
+                        ? "Add another address they play from, change the note, or tie them to a Polaris account. The name itself is what the server checks."
+                        : "A player is let in when the name is on this list and they arrive from an address registered to it."
             }
-            confirmLabel={linkedTo ? "Done" : editing ? "Save" : "Add player"}
-            ready={ready}
-            pending={pending}
+            confirmLabel={following || invited ? "Done" : linking ? "Link" : editing ? "Save" : "Add player"}
+            ready={ready || invited !== null}
+            pending={pending || inviting}
             error={error}
             onClose={onClose}
             onConfirm={() => {
-                if (linkedTo) {
+                if (following || invited) {
                     onClose();
                     return;
                 }
                 if (linking && account && onLink) {
-                    onLink({ username: name, userId: account.userId });
+                    onLink({
+                        username: name,
+                        userId: account.userId,
+                        followSignIns: followsNow,
+                        ...(followsNow
+                            ? {}
+                            : {
+                                  address: rule.length > 0 ? rule : (player?.addresses[0] ?? ""),
+                                  note: note.trim()
+                              })
+                    });
                     return;
                 }
                 onSave({
-                    username: editing ? player.username : name,
+                    username: name,
                     address: rule.length > 0 ? rule : (player?.addresses[0] ?? ""),
                     note: note.trim()
                 });
             }}
         >
-            {!editing && onLookUp && (
+            {!linkedTo && onLookUp && (
                 <PlayerFormField
-                    label="Somebody with a Polaris account"
+                    label={editing ? "Their Polaris account" : "Somebody with a Polaris account"}
                     error={lookUpError}
-                    hint="If they have linked Minecraft, their name and the addresses they connect from fill themselves in."
+                    hint={
+                        editing
+                            ? "Any account, whatever it is called and whether or not it has linked Minecraft. An email that is nobody yet can be invited."
+                            : "If they have linked Minecraft, their name and the addresses they connect from fill themselves in."
+                    }
                 >
                     <div className="flex items-center gap-1">
                         <AccountInput
-                            autoFocus
+                            autoFocus={!editing}
                             value={person}
-                            onValueChange={setPerson}
+                            onValueChange={(value) => {
+                                setPerson(value);
+                                setInvited(null);
+                            }}
                             // Choosing somebody off the list is the errand, so it
                             // is not also worth a button press. A name that was
                             // typed rather than picked still is.
-                            onPick={(account) => lookUp(account.username || account.email)}
+                            onPick={(picked) => lookUp(picked.username || picked.email)}
                             onEnter={() => lookUp(person)}
                             placeholder="pau, or pau@example.com"
                             aria-label="Polaris username or email address"
@@ -785,8 +868,8 @@ export function PlayerAccessDialog({
                             variant="ghost"
                             onClick={() => lookUp(person)}
                             disabled={looking || person.trim().length === 0}
-                            aria-label="Find their Minecraft account"
-                            title="Find their Minecraft account"
+                            aria-label="Find their Polaris account"
+                            title="Find their Polaris account"
                         >
                             {looking ? (
                                 <Loader2 className="size-4 animate-spin" />
@@ -795,10 +878,47 @@ export function PlayerAccessDialog({
                             )}
                         </Button>
                     </div>
+                    {canInvite && !invited && (
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                disabled={inviting}
+                                onClick={invite}
+                            >
+                                {inviting && <Loader2 className="size-3.5 animate-spin" />}
+                                Invite {inviteEmail}
+                            </Button>
+                            <span className="text-xs text-muted-foreground">
+                                The account they make is tied to {name}.
+                            </span>
+                        </div>
+                    )}
+                    {inviteError && <p className="pt-1 text-xs text-danger">{inviteError}</p>}
+                    {invited && (
+                        <div className="flex flex-col gap-1 pt-1 text-xs text-muted-foreground">
+                            <span>
+                                {invited.sendError
+                                    ? `The email to ${invited.email} could not be sent (${invited.sendError}). Send them this link instead.`
+                                    : invited.url
+                                      ? `Send ${invited.email} this link. When they make their account, it is tied to ${name}.`
+                                      : `Invited ${invited.email}. When they make their account, it is tied to ${name}.`}
+                            </span>
+                            {invited.url && (
+                                <span className="flex items-center gap-1">
+                                    <code className="min-w-0 truncate rounded bg-muted px-1.5 py-0.5">
+                                        {invited.url}
+                                    </code>
+                                    <CopyButton value={invited.url} label="the invite link" />
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </PlayerFormField>
             )}
 
-            {!editing && account && onLink && edition === "java" && (
+            {linking && account && edition === "java" && (
                 <div className="flex flex-col gap-1.5">
                     <span className="text-xs text-muted-foreground">
                         Where {account.name} can join from
@@ -826,15 +946,14 @@ export function PlayerAccessDialog({
                             variant={follow ? "ghost" : "secondary"}
                             onClick={() => setFollow(false)}
                         >
-                            A fixed address
+                            {editing && hasAddresses ? "Keep these addresses" : "A fixed address"}
                         </Button>
                     </div>
-                    {follow && (
-                        <p className="text-xs text-muted-foreground">
-                            They are let in only from an address where {account.name} is signed in
-                            to Polaris, and removed when they sign out.
-                        </p>
-                    )}
+                    <p className="text-xs text-muted-foreground">
+                        {follow
+                            ? `They are let in only from an address where ${account.name} is signed in to Polaris, and removed when they sign out.${editing && hasAddresses ? " The addresses typed for them go." : ""}`
+                            : `Linked to ${account.name} for who they are. The addresses typed here still decide where they join from.`}
+                    </p>
                 </div>
             )}
 
@@ -848,7 +967,7 @@ export function PlayerAccessDialog({
                 }
             >
                 <Input
-                    value={username}
+                    value={editing ? player.username : username}
                     onChange={(event) => setUsername(event.target.value)}
                     placeholder={edition === "bedrock" ? "Gamertag" : "Username"}
                     disabled={editing}
@@ -859,9 +978,11 @@ export function PlayerAccessDialog({
             {linkedTo && (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
                     <span className="text-xs text-muted-foreground">
-                        {player?.addresses.length
-                            ? `Follows ${linkedTo.name}'s Polaris sign-ins.`
-                            : `${linkedTo.name} is not signed in to Polaris anywhere, so ${player?.username} cannot join right now.`}
+                        {!following
+                            ? `Linked to ${linkedTo.name}.`
+                            : player?.addresses.length
+                              ? `Follows ${linkedTo.name}'s Polaris sign-ins.`
+                              : `${linkedTo.name} is not signed in to Polaris anywhere, so ${player?.username} cannot join right now.`}
                     </span>
                     {onUnlink && player && (
                         <Button
@@ -878,10 +999,10 @@ export function PlayerAccessDialog({
                 </div>
             )}
 
-            {editing && player.addresses.length > 0 && (
+            {editing && player.addresses.length > 0 && !(linking && followsNow) && (
                 <div className="flex flex-col gap-1.5">
                     <span className="text-xs text-muted-foreground">
-                        {linkedTo ? "Signed in from" : "Addresses they play from"}
+                        {following ? "Signed in from" : "Addresses they play from"}
                     </span>
                     <div className="flex flex-wrap gap-1">
                         {player.addresses.map((held) => (
@@ -890,7 +1011,7 @@ export function PlayerAccessDialog({
                                 className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs"
                             >
                                 {held}
-                                {onRemoveAddress && !linkedTo && (
+                                {onRemoveAddress && !following && (
                                     <button
                                         type="button"
                                         disabled={pending}
@@ -908,7 +1029,7 @@ export function PlayerAccessDialog({
                 </div>
             )}
 
-            {!linkedTo && !linking && (
+            {!following && !(linking && followsNow) && (
                 <PlayerFormField
                     label={editing ? "Another address" : "Address they connect from"}
                     error={addressInvalid ? "That is not an address or a range" : null}
@@ -922,7 +1043,7 @@ export function PlayerAccessDialog({
                 >
                     <div className="flex items-center gap-1">
                         <Input
-                            autoFocus={editing}
+                            autoFocus={editing && Boolean(linkedTo)}
                             value={address}
                             onChange={(event) => setAddress(event.target.value)}
                             placeholder="203.0.113.9, 203.0.113.0/24 or any"
@@ -965,7 +1086,7 @@ export function PlayerAccessDialog({
                 </PlayerFormField>
             )}
 
-            {!linkedTo && !linking && (
+            {!following && !(linking && followsNow) && (
                 <PlayerFormField
                     label="Note"
                     hint="Who this is, for whoever reads the list next. Only Polaris sees it."

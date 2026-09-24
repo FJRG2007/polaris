@@ -288,6 +288,96 @@ export async function shareInstall(input: ShareInstallInput): Promise<ShareInsta
     };
 }
 
+export interface InvitePlayerInput {
+    readonly installedAppId: string;
+    readonly email: string;
+    /** The name the server knows them by, which the new account is tied to. */
+    readonly player: string;
+    readonly followSignIns: boolean;
+}
+
+export interface InvitePlayerResult {
+    /** They already have an account; link that one instead. */
+    readonly userId?: string;
+    readonly invite?: { readonly url?: string; readonly sendError?: string };
+    readonly error?: string;
+}
+
+/**
+ * Invite somebody who plays on a server but has no Polaris account yet.
+ *
+ * The invite promises no access to the server itself - a player needs an
+ * account, not its console - only that the account, once made, is tied to the
+ * player's name. The rules that decide who may invite a stranger at all are the
+ * same ones sharing the server goes through.
+ */
+export async function invitePlayer(input: InvitePlayerInput): Promise<InvitePlayerResult> {
+    const { user, access } = await requireGameServer("games.manage", input.installedAppId);
+    const email = input.email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "Enter their email address" };
+
+    const existing = await prisma.user.findFirst({ where: { email }, select: { id: true } });
+    if (existing) return { userId: existing.id };
+
+    const [rights, policy] = await Promise.all([
+        sharingRightsFor(user, input.installedAppId, access.ownerId),
+        sharingPolicy()
+    ]);
+    const verdict = await canDelegateShare({
+        isAdmin: user.isAdmin,
+        mayPassOn: rights.mayPassOn,
+        toStranger: true
+    });
+    if (!verdict.ok) return { error: verdict.reason };
+
+    const attempt = await rateLimit(`share:install:${user.id}`, SHARE_LIMIT, SHARE_WINDOW_MS);
+    if (!attempt.ok)
+        return { error: "That is a lot of invites at once. Try again in a little while." };
+
+    const created = await createInvite(user.id, {
+        email,
+        role: policy.inviteRole,
+        method: "link",
+        allowedCidrs: [],
+        allowedCountries: [],
+        allowedContinents: [],
+        groupIds: [],
+        delegated: true,
+        pendingGrant: {
+            resourceKind: "install",
+            resourceId: input.installedAppId,
+            actions: [],
+            canShare: false,
+            expiresAt: null,
+            grantedById: user.id,
+            appLink: {
+                kind: "gamePlayer",
+                player: input.player,
+                followSignIns: input.followSignIns
+            }
+        }
+    });
+    if (created.error) return { error: created.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "invite.delegate",
+        targetType: "invite",
+        targetId: created.id,
+        metadata: {
+            email,
+            resourceKind: "install",
+            resourceId: input.installedAppId,
+            player: input.player
+        }
+    });
+    return {
+        invite: {
+            ...(created.url ? { url: created.url } : {}),
+            ...(created.sendError ? { sendError: created.sendError } : {})
+        }
+    };
+}
+
 /** Take somebody's access away. */
 export async function revokeInstallAccess(
     installedAppId: string,

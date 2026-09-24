@@ -11,6 +11,7 @@
  * about. Everything here is a type, so this module is shared by core and apps.
  */
 
+import type { PendingAppLink } from "@polaris/core";
 import type { BackupSource } from "@/lib/backups/sources/types";
 import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
 
@@ -111,4 +112,14 @@ export interface AppExtension {
     /** Whether this account reaches the app without holding its permission -
      *  somebody lent one item of it. */
     readonly reaches?: (userId: string) => Promise<boolean>;
+
+    /** An invite that carried a link to one of its things was claimed. The
+     *  inviter has already been re-checked; an app that does not know the kind
+     *  leaves it. */
+    readonly claimLink?: (claim: {
+        readonly userId: string;
+        readonly installedAppId: string;
+        readonly grantedById: string;
+        readonly link: PendingAppLink;
+    }) => Promise<void>;
 }
