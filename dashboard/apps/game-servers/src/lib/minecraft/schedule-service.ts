@@ -19,7 +19,7 @@ import { runArkCommand } from "../ark/service";
 import { getArkPlayers } from "../ark/service";
 import { broadcastToFivem, getFivemPlayers, runFivemCommand } from "../fivem/service";
 import { flushGameWorld } from "../games-flush";
-import { getServerPlayers, runConsoleLine } from "./service";
+import { broadcastToMinecraft, getServerPlayers, runConsoleLine } from "./service";
 import { readPendingRestart } from "../games-restart";
 import { runDueRestart } from "../games-restart-service";
 import {
@@ -307,7 +307,7 @@ async function runRoutine(
                     // a message nobody in the game ever sees.
                     if (game === "ark") await runArkCommand(ownerId, installedAppId, `Broadcast ${action.value}`);
                     else if (game === "fivem") await broadcastToFivem(ownerId, installedAppId, action.value);
-                    else await runConsoleLine(ownerId, installedAppId, `say ${action.value}`);
+                    else await broadcastToMinecraft(ownerId, installedAppId, action.value);
                     break;
                 case "command":
                     if (game === "ark") await runArkCommand(ownerId, installedAppId, action.value);

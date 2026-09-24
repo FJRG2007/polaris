@@ -23,6 +23,7 @@ import { experienceCommand, type ExperienceChange } from "./experience";
 import { readCrashLoop, readRestartWatch } from "../games-health";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
+import { broadcastArgv, sayArgv } from "./broadcast";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -236,6 +237,31 @@ export async function runServerCommand(
     assertSafeCommand(argv);
     const install = await resolveInstall(ownerId, installedAppId);
     return execCommand(install, ownerId, argv);
+}
+
+/**
+ * Say something to everybody on the server, from Polaris.
+ *
+ * Written rather than said (`broadcast.ts`): `say` quotes whoever sent it, and
+ * over RCON that is a source the server calls `Rcon`, so a scheduled warning
+ * reached players as `[Rcon] ...`.
+ *
+ * Falls back to `say` if the server will not take the written form - a server old
+ * enough or odd enough to refuse `tellraw` still has to be able to warn the people
+ * on it that it is going down, and an announcement that did not arrive is worse
+ * than one that arrives with the wrong name on it.
+ */
+export async function broadcastToMinecraft(
+    ownerId: string,
+    installedAppId: string,
+    message: string
+): Promise<void> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    try {
+        await execCommand(install, ownerId, broadcastArgv(install.edition, message));
+    } catch {
+        await execCommand(install, ownerId, sayArgv(message));
+    }
 }
 
 /** A console line the operator typed. Split on whitespace, because that is what

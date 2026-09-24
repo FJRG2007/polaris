@@ -589,6 +589,11 @@ function RoutineRow({
                                     className="w-64 font-mono"
                                 />
                             )}
+                            {action.kind === "broadcast" && (
+                                <span className="text-xs text-muted-foreground">
+                                    reaches the game as [Polaris] {action.value || spec?.placeholder}
+                                </span>
+                            )}
                             <Button
                                 size="sm"
                                 variant="ghost"
