@@ -21,10 +21,11 @@
 
 import { Button, cn } from "@polaris/ui";
 import { useCallback, useState } from "react";
-import { HardDrive, Loader2 } from "lucide-react";
+import { HardDrive, Loader2, Trash2 } from "lucide-react";
 import type { HostSpace } from "@/lib/deploy/host-space";
+import { useConfirm } from "@/components/confirm-dialog";
 import { useLiveRead } from "@/components/use-live-resource";
-import { hostSpaceAction, reclaimHostSpaceAction } from "./actions";
+import { hostSpaceAction, reclaimBuildCacheAction, reclaimHostSpaceAction } from "./actions";
 
 /** Slow: this is a picture of a disk, and a disk does not change between two
  *  glances at it. Re-read straight after a reclaim, which is when it does. */
@@ -43,6 +44,7 @@ export function ContainerStorage() {
     const [freeing, setFreeing] = useState(false);
     const [freed, setFreed] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [confirm, confirmElement] = useConfirm();
 
     const load = useCallback(async (): Promise<HostSpace> => {
         const space = await hostSpaceAction();
@@ -69,10 +71,11 @@ export function ContainerStorage() {
     ];
     const worth = space.reclaimable >= WORTH_RECLAIMING;
 
-    const free = async () => {
+    const free = async (what: "everything" | "build-cache" = "everything") => {
         setFreeing(true);
         setError(null);
-        const result = await reclaimHostSpaceAction();
+        const result =
+            what === "build-cache" ? await reclaimBuildCacheAction() : await reclaimHostSpaceAction();
         setFreeing(false);
         if (result.error) {
             setError(result.error);
@@ -91,9 +94,39 @@ export function ContainerStorage() {
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {rows.map((row) => (
-                    <div key={row.label} className="rounded-lg border border-border bg-surface px-3 py-2">
-                        <p className="text-[0.9375rem] font-medium leading-none">{size(row.value)}</p>
-                        <p className="mt-1 text-[0.6875rem] text-muted-foreground">{row.label}</p>
+                    <div
+                        key={row.label}
+                        className="flex items-start justify-between gap-1 rounded-lg border border-border bg-surface px-3 py-2"
+                    >
+                        <div className="min-w-0">
+                            <p className="text-[0.9375rem] font-medium leading-none">{size(row.value)}</p>
+                            <p className="mt-1 text-[0.6875rem] text-muted-foreground">{row.label}</p>
+                        </div>
+                        {/* The build cache on its own, for somebody who looked at
+                            the number and wants exactly that gone. Nothing in it is
+                            data: the next build makes it again, more slowly. */}
+                        {row.label === "Build cache" && row.value > 0 ? (
+                            <button
+                                type="button"
+                                disabled={freeing}
+                                aria-label="Delete the build cache"
+                                title="Delete the build cache"
+                                className="-mr-1 -mt-0.5 shrink-0 rounded p-1 text-foreground-subtle hover:text-danger disabled:opacity-50"
+                                onClick={() =>
+                                    void confirm({
+                                        title: `Delete ${size(row.value)} of build cache?`,
+                                        description:
+                                            "It is only what past builds left to speed up the next ones. Nothing running is affected; the next build of each app takes longer while it is made again.",
+                                        confirmLabel: "Delete build cache",
+                                        danger: true
+                                    }).then((agreed) => {
+                                        if (agreed) void free("build-cache");
+                                    })
+                                }
+                            >
+                                <Trash2 className="size-3.5 shrink-0" />
+                            </button>
+                        ) : null}
                     </div>
                 ))}
             </div>
@@ -120,6 +153,7 @@ export function ContainerStorage() {
                 </p>
             ) : null}
             {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {confirmElement}
         </section>
     );
 }

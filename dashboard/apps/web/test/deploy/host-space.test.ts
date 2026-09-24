@@ -30,7 +30,7 @@ vi.mock("@polaris/hostd-client", () => ({
     }
 }));
 
-const { hostSpace, reclaimHostSpace, unusedImagesPrunePath } = await import(
+const { hostSpace, reclaimBuildCache, reclaimHostSpace, unusedImagesPrunePath } = await import(
     "@/lib/deploy/host-space"
 );
 
@@ -90,7 +90,11 @@ describe("what the container store is holding", () => {
         // promise the button cannot keep.
         df({
             Images: [
-                { Size: 2 * GB, Containers: 0, RepoTags: ["polaris-release/orphion-e6ba:cf94f613"] },
+                {
+                    Size: 2 * GB,
+                    Containers: 0,
+                    RepoTags: ["polaris-release/orphion-e6ba:cf94f613"]
+                },
                 { Size: 1 * GB, Containers: 0, RepoTags: ["mongo:7"] }
             ]
         });
@@ -121,14 +125,17 @@ describe("what the container store is holding", () => {
 
 describe("giving room back", () => {
     it("asks for both kinds and reports what was actually removed", async () => {
-        replies["/build/prune"] = { status: 200, body: JSON.stringify({ SpaceReclaimed: 8 * GB }) };
+        replies["/build/prune?all=true"] = {
+            status: 200,
+            body: JSON.stringify({ SpaceReclaimed: 8 * GB })
+        };
         replies[unusedImagesPrunePath()] = {
             status: 200,
             body: JSON.stringify({ SpaceReclaimed: 2 * GB })
         };
         expect(await reclaimHostSpace()).toBe(10 * GB);
         expect(asked.map((call) => call.path)).toEqual([
-            "/build/prune",
+            "/build/prune?all=true",
             unusedImagesPrunePath()
         ]);
     });
@@ -150,7 +157,7 @@ describe("giving room back", () => {
     });
 
     it("never asks for a volume to be pruned", async () => {
-        replies["/build/prune"] = { status: 200, body: "{}" };
+        replies["/build/prune?all=true"] = { status: 200, body: "{}" };
         replies[unusedImagesPrunePath()] = { status: 200, body: "{}" };
         await reclaimHostSpace();
         expect(asked.some((call) => call.path.includes("volume"))).toBe(false);
@@ -158,7 +165,10 @@ describe("giving room back", () => {
 
     it("does the second even when the first frees nothing", async () => {
         // They hold different things, and somebody pressing this once means both.
-        replies["/build/prune"] = { status: 200, body: JSON.stringify({ SpaceReclaimed: 0 }) };
+        replies["/build/prune?all=true"] = {
+            status: 200,
+            body: JSON.stringify({ SpaceReclaimed: 0 })
+        };
         replies[unusedImagesPrunePath()] = {
             status: 200,
             body: JSON.stringify({ SpaceReclaimed: 3 * GB })
@@ -170,5 +180,24 @@ describe("giving room back", () => {
         // Distinct from freeing zero bytes: one is a machine that had nothing to
         // give back, the other is a machine that was never asked.
         expect(await reclaimHostSpace()).toBeNull();
+    });
+});
+
+describe("emptying the build cache on its own", () => {
+    it("asks for all of it no build is using, not only the dangling part", async () => {
+        // Without all=true the daemon removes only dangling cache, while the
+        // estimate counts every entry no build holds - the button promised
+        // gigabytes and gave back a fraction of them.
+        replies["/build/prune?all=true"] = {
+            status: 200,
+            body: JSON.stringify({ SpaceReclaimed: 9 * GB })
+        };
+        expect(await reclaimBuildCache()).toBe(9 * GB);
+        expect(asked.map((one) => one.path)).toEqual(["/build/prune?all=true"]);
+    });
+
+    it("says nothing happened when the daemon would not take it", async () => {
+        replies["/build/prune?all=true"] = { status: 500, body: "" };
+        expect(await reclaimBuildCache()).toBeNull();
     });
 });

@@ -17,7 +17,12 @@ import type { ActivityLine } from "@/lib/activity/activity";
 import type { ServerMetrics } from "@/lib/server-probe";
 import { setLocalEnvironment } from "@/lib/network-service";
 import { getServerMetrics } from "@/lib/server-metrics-service";
-import { hostSpace, reclaimHostSpace, type HostSpace } from "@/lib/deploy/host-space";
+import {
+    hostSpace,
+    reclaimBuildCache,
+    reclaimHostSpace,
+    type HostSpace
+} from "@/lib/deploy/host-space";
 import { hostVolumes, removeHostVolume, type HostVolume } from "@/lib/deploy/host-volumes";
 import {
     removeStrayContainer,
@@ -533,6 +538,27 @@ export async function reclaimHostSpaceAction(): Promise<{ freed?: number; error?
     await recordAudit({
         actorId: user.id,
         action: "server.space.reclaimed",
+        targetType: "host",
+        targetId: "local",
+        metadata: { freed }
+    });
+    revalidatePath("/apps/servers");
+    return { freed };
+}
+
+/**
+ * Empty the build cache and nothing else - for somebody who looked at the number
+ * and wants it gone, without also dropping the images.
+ */
+export async function reclaimBuildCacheAction(): Promise<{ freed?: number; error?: string }> {
+    const user = await requirePermission("system.manage");
+    const freed = await reclaimBuildCache().catch(() => null);
+    if (freed === null) {
+        return { error: "This machine would not say. Nothing was removed." };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "server.buildcache.reclaimed",
         targetType: "host",
         targetId: "local",
         metadata: { freed }

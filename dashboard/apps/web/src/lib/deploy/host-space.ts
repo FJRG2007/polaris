@@ -163,6 +163,38 @@ export function unusedImagesPrunePath(): string {
 }
 
 /**
+ * The build cache, all of it that no build is using right now.
+ *
+ * `all=true` is the difference between this and what the button used to send.
+ * Without it the daemon removes only the dangling part - the API's
+ * `docker builder prune` without `-a` - while the estimate above counts every
+ * entry no build holds, so the button promised gigabytes and gave back a
+ * fraction of them. Nothing it removes is data: the next build makes it again,
+ * more slowly.
+ */
+export const BUILD_CACHE_PRUNE_PATH = "/build/prune?all=true";
+
+/** What one prune removed, read from the daemon's own answer; null when the
+ *  daemon did not answer at all. */
+async function prune(daemon: HostdClient, path: string): Promise<number | null> {
+    const reply = await daemon.dockerRequest("POST", path).catch(() => null);
+    if (!reply || reply.status < 200 || reply.status >= 300) return null;
+    try {
+        const body = JSON.parse(reply.body) as { SpaceReclaimed?: number };
+        return bytes(body.SpaceReclaimed);
+    } catch {
+        // It removed something and would not say how much. The caller reads
+        // the space again afterwards, which is the honest number anyway.
+        return 0;
+    }
+}
+
+/** Empty the build cache on its own, for somebody who wants exactly that. */
+export async function reclaimBuildCache(): Promise<number | null> {
+    return prune(new HostdClient(), BUILD_CACHE_PRUNE_PATH);
+}
+
+/**
  * Hand back the room that holds nothing anybody wrote.
  *
  * Both prunes run even if the first frees nothing, because they hold different
@@ -179,17 +211,11 @@ export async function reclaimHostSpace(): Promise<number | null> {
     let freed = 0;
     let answered = false;
 
-    for (const path of ["/build/prune", unusedImagesPrunePath()]) {
-        const reply = await daemon.dockerRequest("POST", path).catch(() => null);
-        if (!reply || reply.status < 200 || reply.status >= 300) continue;
+    for (const path of [BUILD_CACHE_PRUNE_PATH, unusedImagesPrunePath()]) {
+        const removed = await prune(daemon, path);
+        if (removed === null) continue;
         answered = true;
-        try {
-            const body = JSON.parse(reply.body) as { SpaceReclaimed?: number };
-            freed += bytes(body.SpaceReclaimed);
-        } catch {
-            // It removed something and would not say how much. The caller reads
-            // the space again afterwards, which is the honest number anyway.
-        }
+        freed += removed;
     }
     return answered ? freed : null;
 }
