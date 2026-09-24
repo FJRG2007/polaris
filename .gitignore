@@ -109,3 +109,18 @@ secrets.*
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Agent worktrees
+#
+# Claude Code checks out one full worktree per subagent under `.claude/worktrees/`
+# and does not add them here itself - its own documentation says to. Each is a
+# complete copy of the tree: twenty-three of them held 2.6 million files. Left
+# unignored, every one of those paths reaches any filesystem watcher on this repo,
+# and on Windows each distinct path also costs a kernel name-cache allocation that
+# is never reclaimed until the machine reboots.
+#
+# `.git/info/exclude` already carries `.claude/`, but that file lives in one clone
+# and not every tool reads it - a terminal keeping its file tree live reads this
+# one and the global ignore, and nothing else. Only `worktrees/` is listed, so
+# anything else under `.claude/` (agents, commands, settings) can still be shared.
+.claude/worktrees/
