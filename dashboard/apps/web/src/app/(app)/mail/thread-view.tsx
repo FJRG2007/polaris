@@ -18,7 +18,6 @@
  * what marks it, and the toolbar can always put it back.
  */
 
-import { saveFile } from "@/components/transfers/move-file";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import * as core from "@polaris/core";
@@ -30,6 +29,7 @@ import { leavesTheView, scopeOf } from "./mail-actions";
 import { missingFolderRole, refusalOf } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
 import { isViewable } from "@/app/(app)/drive/viewer/kind";
+import { saveFile } from "@/components/transfers/move-file";
 import type { ViewerTarget } from "@/app/(app)/drive/viewer/types";
 import { openableAttachments, positionOf, stepFrom } from "./attachment-steps";
 
@@ -758,6 +758,11 @@ function MessageCard({
     const [viewing, setViewing] = useState<ViewerTarget | null>(null);
     /** The files the viewer steps through, and where the open one is among them. */
     const openable = useMemo(() => openableAttachments(message.attachments), [message.attachments]);
+    /** What somebody attached, as against the pictures the message draws itself. */
+    const files = useMemo(
+        () => message.attachments.filter((file) => !file.inline),
+        [message.attachments]
+    );
     const viewingAt = viewing ? positionOf(openable, viewing.path) : -1;
     const [readable, setReadable] = useState<ReadableMessage | null>(null);
     const [failed, setFailed] = useState("");
@@ -900,6 +905,24 @@ function MessageCard({
                         <span className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle">
                             {message.snippet}
                         </span>
+                        {/* The files are inside the message, which is folded
+                            here - and a thread whose list row has a paperclip
+                            and whose messages show none reads as the files
+                            having gone missing. */}
+                        {files.length > 0 ? (
+                            <span
+                                className="flex shrink-0 items-center gap-0.5 pl-2 text-[11px] text-foreground-subtle"
+                                title={files.map((file) => file.name).join(", ")}
+                                aria-label={
+                                    files.length === 1
+                                        ? `1 attachment: ${files[0]!.name}`
+                                        : `${files.length} attachments`
+                                }
+                            >
+                                <Paperclip className="size-3.5 shrink-0" aria-hidden />
+                                {files.length > 1 ? files.length : null}
+                            </span>
+                        ) : null}
                     </>
                 )}
                 <span className="ml-auto shrink-0 pl-2 text-[11px] text-foreground-subtle">
@@ -1015,96 +1038,91 @@ function MessageCard({
                                 remoteAllowed={readable.remoteAllowed}
                                 trackerVendors={readable.trackerVendors}
                             />
-                            {message.attachments.filter((file) => !file.inline).length > 0 ? (
+                            {files.length > 0 ? (
                                 <ul className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
-                                    {message.attachments
-                                        .filter((file) => !file.inline)
-                                        .map((file) => (
-                                            <li
-                                                key={file.id}
-                                                className="flex items-center gap-1 rounded-md border border-border pr-1 text-[12px]"
-                                            >
-                                                {/* Openable ones open. A receipt,
-                                                    a spreadsheet, a scan - the
-                                                    reason to attach one is for
-                                                    somebody to look at it, and
-                                                    making them save it to a
-                                                    Downloads folder first is a
-                                                    step nobody wanted. */}
-                                                {isViewable(file.name) ? (
-                                                    <button
-                                                        type="button"
-                                                        className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-muted-foreground hover:text-foreground"
-                                                        onClick={() =>
-                                                            setViewing(viewerTargetOf(file))
-                                                        }
-                                                    >
-                                                        <Paperclip
-                                                            className="size-3.5 shrink-0"
-                                                            aria-hidden
-                                                        />
-                                                        <span
-                                                            className="max-w-[16rem] truncate"
-                                                            title={file.name}
-                                                        >
-                                                            {file.name}
-                                                        </span>
-                                                        <span className="shrink-0 text-foreground-subtle">
-                                                            {readableSize(file.size)}
-                                                        </span>
-                                                    </button>
-                                                ) : (
-                                                    <span className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-muted-foreground">
-                                                        <Paperclip
-                                                            className="size-3.5 shrink-0"
-                                                            aria-hidden
-                                                        />
-                                                        <span
-                                                            className="max-w-[16rem] truncate"
-                                                            title={file.name}
-                                                        >
-                                                            {file.name}
-                                                        </span>
-                                                        <span className="shrink-0 text-foreground-subtle">
-                                                            {readableSize(file.size)}
-                                                        </span>
-                                                    </span>
-                                                )}
-                                                {/* The link is kept so a middle
-                                                    click and "save link as" still
-                                                    work; an ordinary press goes
-                                                    through the shared surface,
-                                                    which puts it in the corner
-                                                    with everything else that is
-                                                    moving - see
-                                                    `components/transfers`. */}
-                                                <a
-                                                    href={`/api/mail/attachments/${file.id}`}
-                                                    onClick={(event) => {
-                                                        event.preventDefault();
-                                                        saveFile(
-                                                            `/api/mail/attachments/${file.id}`,
-                                                            file.name
-                                                        );
-                                                    }}
-                                                    className="shrink-0 rounded p-1 text-foreground-subtle hover:text-foreground"
-                                                    aria-label={`Save ${file.name}`}
-                                                    title={`Save ${file.name}`}
-                                                    download
+                                    {files.map((file) => (
+                                        <li
+                                            key={file.id}
+                                            className="flex items-center gap-1 rounded-md border border-border pr-1 text-[12px]"
+                                        >
+                                            {/* Openable ones open. A receipt,
+                                                a spreadsheet, a scan - the
+                                                reason to attach one is for
+                                                somebody to look at it, and
+                                                making them save it to a
+                                                Downloads folder first is a
+                                                step nobody wanted. */}
+                                            {isViewable(file.name) ? (
+                                                <button
+                                                    type="button"
+                                                    className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-muted-foreground hover:text-foreground"
+                                                    onClick={() => setViewing(viewerTargetOf(file))}
                                                 >
-                                                    <Download
+                                                    <Paperclip
                                                         className="size-3.5 shrink-0"
                                                         aria-hidden
                                                     />
-                                                </a>
-                                            </li>
-                                        ))}
+                                                    <span
+                                                        className="max-w-[16rem] truncate"
+                                                        title={file.name}
+                                                    >
+                                                        {file.name}
+                                                    </span>
+                                                    <span className="shrink-0 text-foreground-subtle">
+                                                        {readableSize(file.size)}
+                                                    </span>
+                                                </button>
+                                            ) : (
+                                                <span className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-muted-foreground">
+                                                    <Paperclip
+                                                        className="size-3.5 shrink-0"
+                                                        aria-hidden
+                                                    />
+                                                    <span
+                                                        className="max-w-[16rem] truncate"
+                                                        title={file.name}
+                                                    >
+                                                        {file.name}
+                                                    </span>
+                                                    <span className="shrink-0 text-foreground-subtle">
+                                                        {readableSize(file.size)}
+                                                    </span>
+                                                </span>
+                                            )}
+                                            {/* The link is kept so a middle
+                                                click and "save link as" still
+                                                work; an ordinary press goes
+                                                through the shared surface,
+                                                which puts it in the corner
+                                                with everything else that is
+                                                moving - see
+                                                `components/transfers`. */}
+                                            <a
+                                                href={`/api/mail/attachments/${file.id}`}
+                                                onClick={(event) => {
+                                                    event.preventDefault();
+                                                    saveFile(
+                                                        `/api/mail/attachments/${file.id}`,
+                                                        file.name
+                                                    );
+                                                }}
+                                                className="shrink-0 rounded p-1 text-foreground-subtle hover:text-foreground"
+                                                aria-label={`Save ${file.name}`}
+                                                title={`Save ${file.name}`}
+                                                download
+                                            >
+                                                <Download
+                                                    className="size-3.5 shrink-0"
+                                                    aria-hidden
+                                                />
+                                            </a>
+                                        </li>
+                                    ))}
                                     {/* All of them at once, for the message with
                                         eleven scans on it. Only offered when there
                                         is more than one: an archive of one file is
                                         a file with an extra step. */}
-                                    {message.attachments.filter((file) => !file.inline).length >
-                                    1 ? (
+                                    {files.length > 1 ? (
                                         <li className="flex items-center">
                                             <a
                                                 href={`/api/mail/zip/${message.id}`}

@@ -92,22 +92,39 @@ export function readShape(structure: MessageStructureObject | undefined): Messag
     let textCoding = NO_CODING;
     let htmlCoding = NO_CODING;
 
-    const walk = (node: MessageStructureObject, depth: number): void => {
-        // A message inside a message is a forward. Its parts are addressable and
-        // are worth listing as attachments, but its text is not this message's
-        // text - taking it would show the forwarded message's first line as the
-        // snippet of the forward.
+    const walk = (node: MessageStructureObject, parent: string): void => {
         const type = (node.type ?? "").toLowerCase();
-        const part = node.part ?? "";
-
-        if (node.childNodes && node.childNodes.length > 0) {
-            for (const child of node.childNodes) walk(child, depth + 1);
-            return;
-        }
-
+        // IMAP numbers the parts of a multipart message from 1 and gives the
+        // message itself no number. A message that is not multipart is one part,
+        // and that part is "1" - which is how a scanner's PDF, sent as the whole
+        // message with nothing around it, is downloaded.
+        const part = node.part ?? (node === structure ? "1" : "");
         const disposition = (node.disposition ?? "").toLowerCase();
         const filename = node.dispositionParameters?.filename ?? node.parameters?.name ?? "";
         const contentId = (node.id ?? "").replace(/^<+/, "").replace(/>+$/, "");
+
+        // A message inside a message is a forward, and it is ONE file: the .eml
+        // somebody attached. imapflow hands it over with the forwarded message's
+        // own parts as children, and walking into them listed its pieces instead
+        // of it - and took its text for this message's body when this one only
+        // had HTML.
+        if (type === "message/rfc822" && part) {
+            attachments.push({
+                part,
+                name: filename || forwardedName(node),
+                contentType: type,
+                size: node.size ?? 0,
+                contentId,
+                inline: false
+            });
+            return;
+        }
+
+        if (node.childNodes && node.childNodes.length > 0) {
+            for (const child of node.childNodes) walk(child, type);
+            return;
+        }
+
         // Attached rather than part of the body: said so explicitly, or it has a
         // filename and is not one of the two body types.
         const isFile =
@@ -116,34 +133,38 @@ export function readShape(structure: MessageStructureObject | undefined): Messag
             (disposition === "inline" && Boolean(filename) && !contentId);
 
         if (!isFile && type === "text/plain" && !textPart) {
-            textPart = part || WHOLE_BODY;
+            textPart = node.part ?? WHOLE_BODY;
             textCoding = codingOf(node);
             return;
         }
         if (!isFile && type === "text/html" && !htmlPart) {
-            htmlPart = part || WHOLE_BODY;
+            htmlPart = node.part ?? WHOLE_BODY;
             htmlCoding = codingOf(node);
             return;
         }
+        // A text part that is not the body: a second one with a name is a file
+        // somebody attached (notes.txt, page.html), not something to drop.
+        const namedText = Boolean(filename) && (type === "text/plain" || type === "text/html");
+        // The whole message being one picture or one document, with no name.
+        const wholeFile = node === structure && !type.startsWith("text/");
         if (!part) return;
-        if (isFile || contentId) {
+        if (isFile || contentId || namedText || wholeFile) {
             attachments.push({
                 part,
                 name: filename || fallbackName(type, part),
                 contentType: type || "application/octet-stream",
                 size: node.size ?? 0,
                 contentId,
-                // A part the body refers to is drawn by the message; one with no
-                // Content-Id and an inline disposition is still a file as far as
-                // a reader is concerned.
-                inline: Boolean(contentId) && disposition !== "attachment"
+                inline: isDrawnInline({ type, contentId, disposition, parent })
             });
         }
     };
 
-    walk(structure, 0);
+    walk(structure, "");
     // A message with no multipart structure at all: one node, no part number.
-    if (!textPart && !htmlPart && !structure.childNodes) {
+    // Unless that one node is a file, in which case it has no text to read and
+    // reading its bytes as the body would show a PDF as a page of noise.
+    if (!textPart && !htmlPart && !structure.childNodes && attachments.length === 0) {
         const type = (structure.type ?? "").toLowerCase();
         if (type === "text/html") {
             htmlPart = WHOLE_BODY;
@@ -161,6 +182,37 @@ export function readShape(structure: MessageStructureObject | undefined): Messag
         attachments,
         hasAttachments: attachments.some((entry) => !entry.inline)
     };
+}
+
+/**
+ * Whether a part is a picture the message draws itself with, rather than a file.
+ *
+ * A Content-Id alone is not the answer, and it was: Apple Mail and the phone
+ * apps give every attachment a Content-Id and an `inline` disposition, so a PDF
+ * or a photo somebody attached from an iPhone was filed as part of the body,
+ * kept off the list of files, and - since the reader never draws `cid:` pictures
+ * - shown nowhere at all. What a message actually draws is a picture inside a
+ * `multipart/related`, the one container that means "these parts belong to the
+ * HTML beside them".
+ */
+export function isDrawnInline(part: {
+    readonly type: string;
+    readonly contentId: string;
+    readonly disposition: string;
+    readonly parent: string;
+}): boolean {
+    return (
+        Boolean(part.contentId) &&
+        part.disposition !== "attachment" &&
+        part.type.startsWith("image/") &&
+        part.parent === "multipart/related"
+    );
+}
+
+/** A name for an attached message that came with none: its subject, as a file. */
+function forwardedName(node: MessageStructureObject): string {
+    const subject = (node.envelope?.subject ?? "").replace(/[\\/:*?"<>|\r\n]+/g, " ").trim();
+    return `${subject.slice(0, 80) || "Forwarded message"}.eml`;
 }
 
 /** Something to call a part that arrived without a filename. Better than the

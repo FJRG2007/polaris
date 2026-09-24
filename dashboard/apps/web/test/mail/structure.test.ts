@@ -125,4 +125,123 @@ describe("finding the files", () => {
         expect(shape.textPart).toBe("1");
         expect(shape.attachments.map((one) => one.part)).toEqual(["2"]);
     });
+
+    it("lists an attached message once, as imapflow really describes it", () => {
+        // imapflow gives a message/rfc822 part the forwarded message's own tree as
+        // children, at the same part number. Walking into it listed its pieces
+        // and read its text as this message's body.
+        const shape = readShape(
+            node({
+                type: "multipart/mixed",
+                childNodes: [
+                    node({ part: "1", type: "text/html" }),
+                    node({
+                        part: "2",
+                        type: "message/rfc822",
+                        size: 9000,
+                        envelope: { subject: "Quarterly numbers" } as never,
+                        childNodes: [
+                            node({
+                                part: "2",
+                                type: "multipart/mixed",
+                                childNodes: [
+                                    node({ part: "2.1", type: "text/plain" }),
+                                    node({
+                                        part: "2.2",
+                                        type: "application/pdf",
+                                        disposition: "attachment",
+                                        dispositionParameters: { filename: "q3.pdf" }
+                                    })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            })
+        );
+        expect(shape.htmlPart).toBe("1");
+        expect(shape.textPart).toBe("");
+        expect(shape.attachments).toEqual([
+            expect.objectContaining({ part: "2", name: "Quarterly numbers.eml", inline: false })
+        ]);
+        expect(shape.hasAttachments).toBe(true);
+    });
+
+    it("lists what an iPhone attached, Content-Id and all", () => {
+        // Apple Mail marks every attachment inline with a Content-Id, beside the
+        // text in a multipart/mixed. Filed as part of the body, they were shown
+        // nowhere at all.
+        const shape = readShape(
+            node({
+                type: "multipart/mixed",
+                childNodes: [
+                    node({ part: "1", type: "text/plain" }),
+                    node({
+                        part: "2",
+                        type: "application/pdf",
+                        id: "<A1B2@apple>",
+                        disposition: "inline",
+                        dispositionParameters: { filename: "contract.pdf" }
+                    }),
+                    node({
+                        part: "3",
+                        type: "image/jpeg",
+                        id: "<C3D4@apple>",
+                        disposition: "inline",
+                        dispositionParameters: { filename: "IMG_0001.jpeg" }
+                    })
+                ]
+            })
+        );
+        expect(shape.attachments.map((one) => [one.name, one.inline])).toEqual([
+            ["contract.pdf", false],
+            ["IMG_0001.jpeg", false]
+        ]);
+        expect(shape.hasAttachments).toBe(true);
+    });
+
+    it("keeps a picture the HTML draws out of the files, even without a filename", () => {
+        const shape = readShape(
+            node({
+                type: "multipart/related",
+                childNodes: [
+                    node({ part: "1", type: "text/html" }),
+                    node({ part: "2", type: "image/gif", id: "<spacer>" })
+                ]
+            })
+        );
+        expect(shape.attachments[0]?.inline).toBe(true);
+        expect(shape.hasAttachments).toBe(false);
+    });
+
+    it("takes a message that is only a file as that file, not as text", () => {
+        // A scanner's "send by mail": the whole message is the PDF.
+        const shape = readShape(
+            node({
+                type: "application/pdf",
+                size: 120_000,
+                parameters: { name: "scan.pdf" }
+            })
+        );
+        expect(shape.textPart).toBe("");
+        expect(shape.htmlPart).toBe("");
+        expect(shape.attachments).toEqual([
+            expect.objectContaining({ part: "1", name: "scan.pdf", inline: false })
+        ]);
+        expect(shape.hasAttachments).toBe(true);
+    });
+
+    it("lists a named text file that comes after the body", () => {
+        const shape = readShape(
+            node({
+                type: "multipart/mixed",
+                childNodes: [
+                    node({ part: "1", type: "text/plain" }),
+                    node({ part: "2", type: "text/plain", parameters: { name: "notes.txt" } })
+                ]
+            })
+        );
+        expect(shape.textPart).toBe("1");
+        expect(shape.attachments.map((one) => one.name)).toEqual(["notes.txt"]);
+    });
 });

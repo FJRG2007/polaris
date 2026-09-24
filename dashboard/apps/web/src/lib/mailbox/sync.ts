@@ -43,6 +43,7 @@ import { recordSubscription } from "./subscriptions";
 import { fileJudgedJunk, judgeArrival } from "./spam";
 import { MailUnreachableError, withImap } from "./imap";
 import { readShape, type MessageShape } from "./structure";
+import { reconcileAttachments } from "./attachment-rows";
 import { WATCHED_POLL_SECONDS, watchedReaders } from "./watch";
 import { mayTryMailbox, REFUSED_RETRY_MIN_MS } from "./refusals";
 import type { ImapFlow, MessageAddressObject, MessageEnvelopeObject } from "imapflow";
@@ -915,6 +916,11 @@ async function warmBodies(
 
     for (const message of waiting) {
         const uid = Number(message.uid);
+        // Its files, from the shape just fetched for the body - see
+        // `reconcileAttachments`. Before the check below, because a message that
+        // is only a file has no body to come back and still has a file to list.
+        const owner = owners.find((one) => one.uid === uid);
+        if (owner) await reconcileAttachments(message.id, owner.structure).catch(() => false);
         const body = { text: text.get(uid) ?? "", html: html.get(uid) ?? "" };
         // Nothing came back for it: left alone rather than written as empty,
         // which would be a message that opens blank for ever.

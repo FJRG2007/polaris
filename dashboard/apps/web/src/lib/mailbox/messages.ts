@@ -23,7 +23,8 @@ import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
 import * as core from "@polaris/core";
 import { addressesFrom } from "./json";
-import { readShape } from "./structure";
+import { readShape, type MessageShape } from "./structure";
+import { reconcileAttachments } from "./attachment-rows";
 import type { ImapFlow } from "imapflow";
 import { decodePart, unflow } from "./decode";
 import { folderForRole } from "./folder-roles";
@@ -773,6 +774,7 @@ export async function loadBody(userId: string, messageId: string): Promise<MailB
     });
     if (!account) throw new MailAccessError();
 
+    let shape: MessageShape | null = null;
     const body = await withImap(account, async (client) => {
         const lock = await client.getMailboxLock(message.folder.path, { readOnly: true });
         try {
@@ -782,13 +784,14 @@ export async function loadBody(userId: string, messageId: string): Promise<MailB
                 { uid: true }
             );
             if (!one) return { text: "", html: "" };
-            const shape = readShape(one.bodyStructure);
+            const read = readShape(one.bodyStructure);
+            shape = read;
             const [text, html] = await Promise.all([
-                shape.textPart
-                    ? downloadPart(client, Number(message.uid), shape.textPart)
+                read.textPart
+                    ? downloadPart(client, Number(message.uid), read.textPart)
                     : Promise.resolve(""),
-                shape.htmlPart
-                    ? downloadPart(client, Number(message.uid), shape.htmlPart)
+                read.htmlPart
+                    ? downloadPart(client, Number(message.uid), read.htmlPart)
                     : Promise.resolve("")
             ]);
             return { text, html };
@@ -801,6 +804,9 @@ export async function loadBody(userId: string, messageId: string): Promise<MailB
         where: { id: message.id },
         data: { bodyText: body.text, bodyHtml: body.html }
     });
+    // The shape was fetched anyway: a message stored by an older reading of it
+    // gets its files put right now, rather than never.
+    if (shape) await reconcileAttachments(message.id, shape).catch(() => false);
 
     // The one moment a message's footer can be read. Plenty of mail that is
     // unmistakably a mailing list publishes no `List-Unsubscribe` header at all,
