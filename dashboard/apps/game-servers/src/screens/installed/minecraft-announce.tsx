@@ -57,7 +57,16 @@ import {
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ChevronDown, Loader2, MoreHorizontal, Play, Save, Send, Trash2 } from "lucide-react";
+import {
+    ChevronDown,
+    Loader2,
+    MoreHorizontal,
+    Play,
+    Save,
+    Send,
+    Trash2,
+    Volume2
+} from "lucide-react";
 
 const { useConfirm } = hostUi.confirmDialog;
 const { CopyButton } = hostUi.copyButton;
@@ -90,6 +99,37 @@ export function MinecraftAnnounce({
     const [note, setNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
+    const [hearing, setHearing] = useState(false);
+    const [heardError, setHeardError] = useState<string | null>(null);
+    const playing = useRef<HTMLAudioElement | null>(null);
+
+    /**
+     * Play a sound here, in the browser, before anybody on the server hears it.
+     * Fetched by Polaris from Mojang the first time - see `sound-preview` - so
+     * the first press can take a moment and the next ones do not.
+     */
+    function hear(sound: string): void {
+        playing.current?.pause();
+        setHeardError(null);
+        setHearing(true);
+        const audio = new Audio(
+            `/api/apps/installed/${installedAppId}/minecraft/sound?id=${encodeURIComponent(sound)}`
+        );
+        playing.current = audio;
+        audio.addEventListener("playing", () => setHearing(false), { once: true });
+        audio.addEventListener(
+            "error",
+            () => {
+                setHearing(false);
+                setHeardError("That sound could not be played here.");
+            },
+            { once: true }
+        );
+        void audio.play().catch(() => {
+            setHearing(false);
+            setHeardError("That sound could not be played here.");
+        });
+    }
 
     useEffect(() => {
         void listAnnouncementTemplatesAction(installedAppId).then((answer) =>
@@ -357,19 +397,47 @@ export function MinecraftAnnounce({
                     </div>
 
                     {java && (
-                        <label className="flex flex-col gap-1 text-sm">
+                        <div className="flex flex-col gap-1 text-sm">
                             <span className="font-medium">Sound</span>
-                            <Select
-                                value={draft.sound || NO_SOUND}
-                                onValueChange={(value) =>
-                                    set({ sound: value === NO_SOUND ? "" : value })
-                                }
-                                options={ANNOUNCE_SOUNDS.map((sound) => ({
-                                    value: sound.id || NO_SOUND,
-                                    label: sound.label
-                                }))}
-                            />
-                        </label>
+                            <span className="flex items-center gap-1">
+                                <span className="min-w-0 flex-1">
+                                    <Select
+                                        value={draft.sound || NO_SOUND}
+                                        onValueChange={(value) => {
+                                            const sound = value === NO_SOUND ? "" : value;
+                                            set({ sound });
+                                            // Heard as it is picked, the way a
+                                            // ringtone list works - choosing a sound
+                                            // by name alone is choosing blind.
+                                            if (sound) hear(sound);
+                                        }}
+                                        options={ANNOUNCE_SOUNDS.map((sound) => ({
+                                            value: sound.id || NO_SOUND,
+                                            label: sound.label
+                                        }))}
+                                        aria-label="Sound"
+                                    />
+                                </span>
+                                <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    disabled={!draft.sound || hearing}
+                                    onClick={() => hear(draft.sound)}
+                                    aria-label="Hear this sound"
+                                    title="Hear this sound"
+                                >
+                                    {hearing ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        <Volume2 className="size-4" />
+                                    )}
+                                </Button>
+                            </span>
+                            {heardError && (
+                                <span className="text-xs text-danger">{heardError}</span>
+                            )}
+                        </div>
                     )}
 
                     {error && (
