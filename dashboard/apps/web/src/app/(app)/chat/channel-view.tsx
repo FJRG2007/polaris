@@ -1958,6 +1958,7 @@ export function ChannelView({
                         // tomorrow, whether it is a channel, a group or one
                         // person - see `drafts`.
                         draftKey={channelDraftKey(channelId)}
+                        roomMentions={channel.mayMentionRoom}
                         rules={rules}
                         disabled={!canPost}
                         attachable={may.attach}
@@ -2295,6 +2296,7 @@ export function ChannelView({
                     viewerId={viewerId}
                     canPost={canPost}
                     canModerate={canModerate}
+                    roomMentions={channel.mayMentionRoom}
                     highlightId={threadHighlight}
                     onClose={() => setThread(null)}
                     onChanged={() => void catchUp()}

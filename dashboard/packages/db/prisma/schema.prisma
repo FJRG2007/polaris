@@ -7871,6 +7871,10 @@ model ChatChannel {
     // by default, which is how every group behaved before the owner could
     // decide.
     membersMayInvite Boolean @default(true)
+    // Whether anybody in the group may use `@everyone` and `@here`, or only the
+    // owner. On by default, which is how every group behaved before the owner
+    // could decide.
+    membersMayMention Boolean @default(true)
     // How long somebody waits between messages here, in seconds. Zero is off,
     // which is every channel until whoever runs it decides otherwise. Whoever
     // may moderate the room is not held by it - a moderator who cannot answer

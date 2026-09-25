@@ -26,6 +26,9 @@
  * Nor is somebody who has blocked whoever wrote it. `@everyone` is the one place
  * a blocked account can still reach a whole room's notifications without
  * addressing anybody, which is exactly what a block is for.
+ *
+ * A group's owner can keep both to themselves. Then a message from anybody else
+ * that carries one is refused rather than sent - see `refuseRoomMention`.
  */
 
 import { prisma } from "@polaris/db";
@@ -38,6 +41,41 @@ import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { channelMentions } from "@/components/rich-text/markdown";
 import { chatAlertShelf } from "./isolation";
 import { recipientShelf } from "@/lib/workspace-scope";
+import { ChatAccessError, roomMentionsAllowed, type ChannelAccess, type ChatActor } from "./access";
+
+/** What somebody is told when the owner of a group has kept these to themselves. */
+const ROOM_MENTION_REFUSED = "Only the owner of this group can use @everyone and @here";
+
+/**
+ * Refuse a message that names the room from somebody the room does not let.
+ *
+ * Refused rather than sent as plain text, because every place that reads a
+ * message - the notification, the toast for somebody following only mentions,
+ * the mark in the list - decides "this names me" from the text alone. Sending it
+ * quietly would have to teach all three who was allowed to say it at the time,
+ * and the day one of them forgot, the whole group would be pinged anyway. The
+ * composer does not offer the words to whoever this refuses, so this is met
+ * only by somebody who typed them out.
+ *
+ * Asked of the row on every call rather than of the screen: a switch hidden from
+ * somebody is not a rule. Only a group can say no, and only a message that
+ * names the room is read for it, which is nearly none of them.
+ */
+export async function refuseRoomMention(
+    actor: ChatActor,
+    access: ChannelAccess,
+    body: string
+): Promise<void> {
+    if (access.kind !== "group") return;
+    if (!body.includes("@") || channelMentions(body).size === 0) return;
+    const group = await prisma.chatChannel.findUnique({
+        where: { id: access.channelId },
+        select: { kind: true, ownerId: true, createdById: true, membersMayMention: true }
+    });
+    if (group && !roomMentionsAllowed(group, actor.id)) {
+        throw new ChatAccessError(ROOM_MENTION_REFUSED);
+    }
+}
 
 /**
  * Tell the room, if the message named it.

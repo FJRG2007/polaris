@@ -121,6 +121,13 @@ export interface RichTextEditorProps {
      */
     mentionsIn?: string | null;
     /**
+     * Whether @ offers `@everyone` and `@here` in that conversation.
+     *
+     * False where whoever runs it has kept them to themselves: offering words
+     * the send will refuse is worse than not offering them.
+     */
+    roomMentions?: boolean;
+    /**
      * Where @ looks, when the usual place is the wrong one.
      *
      * The default asks which people this account shares work with, scoped to the
@@ -196,6 +203,7 @@ export function RichTextEditor({
     leadingBlankLine = false,
     onPasteFiles,
     mentionsIn = null,
+    roomMentions = true,
     mentionSource = null,
     listAction,
     bordered = false,
@@ -243,9 +251,9 @@ export function RichTextEditor({
         () => [
             ...baseExtensions(placeholder),
             BlockMenu,
-            mentionExtension(search, mentionsIn !== null)
+            mentionExtension(search, mentionsIn !== null && roomMentions)
         ],
-        [placeholder, search, mentionsIn]
+        [placeholder, search, mentionsIn, roomMentions]
     );
 
     /** What goes into the editor for a value: the document, with a line to write

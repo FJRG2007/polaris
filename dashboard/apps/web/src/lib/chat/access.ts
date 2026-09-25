@@ -32,8 +32,8 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { groupOwnerId } from "./ownership";
 import { memberOrgIds } from "@/lib/orgs/org-service";
-import { findPeople, type FoundPeople } from "@/lib/people-search";
 import { currentChatOrgId, orgChatPeople } from "./isolation";
+import { findPeople, type FoundPeople } from "@/lib/people-search";
 import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
 
 /** The caller, as the action layer resolved them. */
@@ -493,6 +493,30 @@ export function invitesAllowed(
     if (channel.spaceId) return channel.mayAdminister;
     if (channel.kind !== "group") return false;
     return groupOwnerId(channel) === actorId || channel.membersMayInvite;
+}
+
+/**
+ * Whether this reader may use `@everyone` and `@here` in a conversation.
+ *
+ * Only a group has a say in it: its owner always, and everybody else unless the
+ * owner has closed it - one person in a group of forty pinging all of them is
+ * the thing an owner wants to be able to stop. Everywhere else it is allowed,
+ * which is how it has always been.
+ *
+ * Same shape as `invitesAllowed`, so the composer that offers the words and the
+ * send that refuses them ask one question.
+ */
+export function roomMentionsAllowed(
+    channel: {
+        readonly kind: string;
+        readonly ownerId: string | null;
+        readonly createdById?: string | null;
+        readonly membersMayMention: boolean;
+    },
+    actorId: string
+): boolean {
+    if (channel.kind !== "group") return true;
+    return groupOwnerId(channel) === actorId || channel.membersMayMention;
 }
 
 export async function messageable(userIds: readonly string[]): Promise<Set<string>> {
