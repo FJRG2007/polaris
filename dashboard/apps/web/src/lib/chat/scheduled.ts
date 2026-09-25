@@ -110,7 +110,12 @@ export async function scheduleMessage(
                     durationMs: file.durationMs,
                     waveform: file.waveform,
                     posterPath: file.posterPath,
-                    posterConnectionId: file.posterConnectionId
+                    posterConnectionId: file.posterConnectionId,
+                    // Both were read back when it was sent and never written, so
+                    // a covered file arrived uncovered and a Drive file arrived
+                    // as a copy the cancel path would delete.
+                    spoiler: file.spoiler,
+                    borrowed: file.borrowed
                 }))
             }
         },
@@ -169,7 +174,8 @@ export async function cancelScheduled(actor: ChatActor, id: string): Promise<voi
                     connectionId: true,
                     path: true,
                     posterPath: true,
-                    posterConnectionId: true
+                    posterConnectionId: true,
+                    borrowed: true
                 }
             }
         }
@@ -180,10 +186,13 @@ export async function cancelScheduled(actor: ChatActor, id: string): Promise<voi
     if (!row) return;
 
     await prisma.chatScheduledMessage.delete({ where: { id: row.id } });
+    // A borrowed file is somebody's own Drive file: cancelling the message does
+    // not delete it.
+    const ours = row.files.filter((file) => !file.borrowed);
     await removeStoredFiles([
-        ...row.files,
+        ...ours,
         // The still goes with the file it is of.
-        ...row.files
+        ...ours
             .filter((file) => file.posterPath)
             .map((file) => ({ connectionId: file.posterConnectionId, path: file.posterPath! }))
     ]);

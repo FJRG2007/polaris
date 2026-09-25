@@ -17,6 +17,7 @@
  * retried - a refusal retried every minute for a year is not a feature.
  */
 
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface Row {
@@ -38,10 +39,14 @@ interface Row {
         path: string;
         durationMs: number | null;
         waveform: string | null;
+        spoiler?: boolean;
+        borrowed?: boolean;
     }[];
 }
 
 let rows: Row[] = [];
+/** What the sending pass asked the database for, to hold it to the schema. */
+let lastSelect: Record<string, unknown> | undefined;
 /** What `send` did, and what it was told to refuse. */
 let sent: { channelId: string; body: string; attachments: number }[] = [];
 let refuse: string | null = null;
@@ -67,7 +72,11 @@ vi.mock("@/lib/chat/messages", () => ({
         attachments: readonly unknown[]
     ) => {
         if (refuse) throw new FakeAccessError(refuse);
-        sent.push({ channelId: input.channelId, body: input.body, attachments: attachments.length });
+        sent.push({
+            channelId: input.channelId,
+            body: input.body,
+            attachments: attachments.length
+        });
         return "m1";
     }
 }));
@@ -100,7 +109,14 @@ vi.mock("@polaris/db", () => ({
                 rows.push(row);
                 return { id: row.id };
             },
-            findMany: async ({ where }: { where?: Record<string, unknown> }) => {
+            findMany: async ({
+                where,
+                select
+            }: {
+                where?: Record<string, unknown>;
+                select?: Record<string, unknown>;
+            }) => {
+                lastSelect = select;
                 const due = (where?.sendAt as { lte?: Date } | undefined)?.lte;
                 return rows.filter((row) => {
                     if (where && "failedAt" in where && where.failedAt === null && row.failedAt) {
@@ -118,7 +134,13 @@ vi.mock("@polaris/db", () => ({
                 rows = rows.filter((row) => row.id !== where.id);
                 return {};
             },
-            update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+            update: async ({
+                where,
+                data
+            }: {
+                where: { id: string };
+                data: Record<string, unknown>;
+            }) => {
                 const row = rows.find((entry) => entry.id === where.id);
                 if (row) {
                     row.failure = (data.failure as string | null) ?? null;
@@ -205,7 +227,12 @@ describe("writing one down", () => {
 
     it("refuses one that is neither words nor files", async () => {
         await expect(
-            scheduleMessage(ME, { channelId: "c1", body: "   ", forwarded: false, sendAt: IN_AN_HOUR() })
+            scheduleMessage(ME, {
+                channelId: "c1",
+                body: "   ",
+                forwarded: false,
+                sendAt: IN_AN_HOUR()
+            })
         ).rejects.toThrow(/Write something/);
     });
 });
@@ -271,6 +298,50 @@ describe("the hour coming round", () => {
         refuse = null;
         expect(await sweepDueScheduledMessages()).toEqual({ sent: 0, failed: 0 });
         expect(sent).toEqual([]);
+    });
+});
+
+describe("files a Drive share or a spoiler carried", () => {
+    it("keeps whether each file is covered, and whether it was borrowed", async () => {
+        await scheduleMessage(
+            ME,
+            { channelId: "c1", body: "", forwarded: false, sendAt: IN_AN_HOUR() },
+            [{ ...file("chat/c1/one.webm"), spoiler: true, borrowed: true }]
+        );
+        expect(rows[0]?.files[0]).toMatchObject({ spoiler: true, borrowed: true });
+    });
+
+    it("never deletes a borrowed Drive file when the message is taken back", async () => {
+        await scheduleMessage(
+            ME,
+            { channelId: "c1", body: "", forwarded: false, sendAt: IN_AN_HOUR() },
+            [{ ...file("drive/ada/report.pdf"), borrowed: true }, file("chat/c1/one.webm")]
+        );
+        await cancelScheduled(ME, "s1");
+        expect(removed).toEqual(["chat/c1/one.webm"]);
+    });
+
+    /**
+     * The sending pass selected a column the table did not have, and the fake
+     * above answered anyway - so every real pass failed and no scheduled message
+     * was ever sent. Every file column it reads has to be in the schema.
+     */
+    it("reads only columns the scheduled file table has", async () => {
+        await sweepDueScheduledMessages();
+        const schema = readFileSync(
+            new URL("../../../../packages/db/prisma/schema.prisma", import.meta.url),
+            "utf8"
+        );
+        const model = /model ChatScheduledFile \{([\s\S]*?)\n\}/.exec(schema)?.[1] ?? "";
+        const columns = new Set(
+            model
+                .split("\n")
+                .map((line) => /^\s+(\w+)\s/.exec(line)?.[1])
+                .filter((name): name is string => Boolean(name))
+        );
+        const files = (lastSelect?.files as { select: Record<string, true> } | undefined)?.select;
+        expect(files).toBeDefined();
+        for (const column of Object.keys(files ?? {})) expect(columns).toContain(column);
     });
 });
 

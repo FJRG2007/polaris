@@ -8562,6 +8562,9 @@ model ChatScheduledFile {
     // Carried across with everything else, so a message scheduled with something
     // covered arrives covered rather than quietly uncovering itself on the way.
     spoiler      Boolean  @default(false)
+    // Somebody's own Drive file, shared rather than copied: sent the same way,
+    // and never deleted when the message is cancelled - it was never ours.
+    borrowed     Boolean  @default(false)
     createdAt    DateTime @default(now())
 
     scheduled ChatScheduledMessage @relation(fields: [scheduledId], references: [id], onDelete: Cascade)
