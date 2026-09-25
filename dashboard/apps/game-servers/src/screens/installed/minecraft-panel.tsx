@@ -565,7 +565,8 @@ export function MinecraftPanel({
                         <ModpacksCard
                             installedAppId={installedAppId}
                             modpack={
-                                settings.find((entry) => entry.key === "MODRINTH_MODPACK")?.value ?? ""
+                                settings.find((entry) => entry.key === "MODRINTH_MODPACK")?.value ??
+                                ""
                             }
                             onSaved={reloadSettings}
                         />

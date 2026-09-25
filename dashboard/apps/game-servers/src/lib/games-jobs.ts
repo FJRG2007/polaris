@@ -234,7 +234,12 @@ async function runWorldTrims(): Promise<{ done: number; servers: number }> {
     let servers = 0;
     for (const ownerId of await ownersWithApps()) {
         const installs = await prisma.installedApp.findMany({
-            where: { ownerId, status: { not: "removed" }, catalogId: "minecraft", applicationId: { not: null } },
+            where: {
+                ownerId,
+                status: { not: "removed" },
+                catalogId: "minecraft",
+                applicationId: { not: null }
+            },
             select: { id: true }
         });
         for (const install of installs) {
@@ -340,8 +345,7 @@ export function gameJobTable(): readonly AppJob[] {
             everyMs: Number(process.env.POLARIS_GAME_LIVE_DISPLAY_MS) || MINUTE,
             // Unleased: starting a loop that is already running does nothing.
             leaseMs: null,
-            run: async () =>
-                (await import("./minecraft/live-display-service")).sweepLiveDisplays()
+            run: async () => (await import("./minecraft/live-display-service")).sweepLiveDisplays()
         }
     ];
 }

@@ -180,7 +180,6 @@ describe("each player's own name", () => {
             `execute as Alex run titleraw @s actionbar ${bedrockComponent("{player}", false)}`
         ]);
     });
-
 });
 
 describe("templates a server keeps", () => {
