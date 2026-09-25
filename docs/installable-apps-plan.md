@@ -187,6 +187,9 @@ load those into a core path that never uses them.
      when the app reads it, because Next compiles the dashboard once per layer
      and the layer that draws server components (React without hooks, client
      components as references) may register its copies after an app has loaded.
+     In the browser each module is handed over as CommonJS marked `__esModule`
+     with its real default on `default` (`asCommonJs`), so `import Image from
+     "next/image"` in an app is the component, not the module namespace.
    - **Screens.** An app page is a server component drawn by a catch-all route
      per surface (`/places/[[...path]]`, `/apps/games/[[...path]]`; API routes
      under `/api/home`, `/api/minecraft`, `/api/apps/games`,
