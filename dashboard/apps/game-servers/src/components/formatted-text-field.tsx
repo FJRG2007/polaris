@@ -13,7 +13,7 @@
  * generator on the web.
  */
 
-import { Code2 } from "lucide-react";
+import { Code2, Plus } from "lucide-react";
 import { Button, cn } from "@polaris/ui";
 import * as mc from "../lib/minecraft/motd";
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
@@ -26,7 +26,8 @@ export function FormattedTextField({
     placeholder,
     singleLine = false,
     actions,
-    footnote
+    footnote,
+    inserts = []
 }: {
     /** The text, with its `&` codes. */
     value: string;
@@ -42,6 +43,9 @@ export function FormattedTextField({
     actions?: ReactNode;
     /** A line of help under the field, left of the buttons. */
     footnote?: ReactNode;
+    /** Words the screen fills in when it sends the text, such as each player's
+     *  name, offered as buttons that put them where the caret is. */
+    inserts?: readonly { readonly label: string; readonly text: string; readonly title: string }[];
 }) {
     // Whether the field holds the text or the codes.
     const [raw, setRaw] = useState(false);
@@ -118,6 +122,25 @@ export function FormattedTextField({
             });
         },
         [map, raw, shown.length, value, onChange]
+    );
+
+    /** Put a word the screen fills in where the caret is, over any selection. */
+    const insert = useCallback(
+        (word: string) => {
+            const field = area.current;
+            const from = field?.selectionStart ?? shown.length;
+            const to = field?.selectionEnd ?? from;
+            const next = raw
+                ? `${value.slice(0, from)}${word}${value.slice(to)}`
+                : mc.replaceMotdPlain(value, `${shown.slice(0, from)}${word}${shown.slice(to)}`);
+            onChange(next);
+            requestAnimationFrame(() => {
+                if (!field) return;
+                field.focus();
+                field.setSelectionRange(from + word.length, from + word.length);
+            });
+        },
+        [raw, shown, value, onChange]
     );
 
     /** What the person typed, folded back into the string with its codes. */
@@ -234,6 +257,18 @@ export function FormattedTextField({
                     >
                         <Code2 className="size-3.5" /> {raw ? "Formatted" : "Codes"}
                     </Button>
+                    {inserts.map((one) => (
+                        <Button
+                            key={one.text}
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => insert(one.text)}
+                            title={one.title}
+                        >
+                            <Plus className="size-3.5" /> {one.label}
+                        </Button>
+                    ))}
                     {actions}
                 </span>
             </div>

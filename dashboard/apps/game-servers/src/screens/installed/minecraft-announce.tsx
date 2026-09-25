@@ -25,9 +25,11 @@ import {
     BLANK_ANNOUNCEMENT,
     CHAT_MAX_LINES,
     EVERYBODY,
+    PLAYER_TOKEN,
     SECONDS_MAX,
     announcementCommands,
     hasText,
+    withPlayerName,
     type Announcement
 } from "../../lib/minecraft/announcement";
 import {
@@ -67,6 +69,15 @@ import {
     Trash2,
     Volume2
 } from "lucide-react";
+
+/** The word each field can carry for the recipient's own name. */
+const PLAYER_INSERT = [
+    {
+        label: "Player name",
+        text: PLAYER_TOKEN,
+        title: "Each player sees their own name here"
+    }
+] as const;
 
 const { useConfirm } = hostUi.confirmDialog;
 const { CopyButton } = hostUi.copyButton;
@@ -321,6 +332,7 @@ export function MinecraftAnnounce({
                             rows={1}
                             singleLine
                             label="Title"
+                            inserts={PLAYER_INSERT}
                             placeholder="Server restart"
                         />
                     </Section>
@@ -331,6 +343,7 @@ export function MinecraftAnnounce({
                             rows={1}
                             singleLine
                             label="Subtitle"
+                            inserts={PLAYER_INSERT}
                             placeholder="Back in a minute, don't leave"
                         />
                     </Section>
@@ -341,6 +354,7 @@ export function MinecraftAnnounce({
                             rows={1}
                             singleLine
                             label="Action bar"
+                            inserts={PLAYER_INSERT}
                             placeholder="Check your inventory for a gift"
                         />
                     </Section>
@@ -350,6 +364,7 @@ export function MinecraftAnnounce({
                             onChange={(chat) => set({ chat })}
                             rows={3}
                             label="Chat message"
+                            inserts={PLAYER_INSERT}
                             placeholder="Thanks for your patience!"
                             actions={
                                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -620,16 +635,24 @@ function AnnouncementPreview({
 }) {
     const [phase, setPhase] = useState<Phase>("still");
     const timers = useRef<number[]>([]);
-    const title = useMemo(() => mc.motdSpans(announcement.title)[0] ?? [], [announcement.title]);
+    // A name where {player} is, as one of the recipients would read it.
+    const reader = announcement.target === EVERYBODY ? "Steve" : announcement.target;
+    const title = useMemo(
+        () => mc.motdSpans(withPlayerName(announcement.title, reader))[0] ?? [],
+        [announcement.title, reader]
+    );
     const subtitle = useMemo(
-        () => mc.motdSpans(announcement.subtitle)[0] ?? [],
-        [announcement.subtitle]
+        () => mc.motdSpans(withPlayerName(announcement.subtitle, reader))[0] ?? [],
+        [announcement.subtitle, reader]
     );
     const actionbar = useMemo(
-        () => mc.motdSpans(announcement.actionbar)[0] ?? [],
-        [announcement.actionbar]
+        () => mc.motdSpans(withPlayerName(announcement.actionbar, reader))[0] ?? [],
+        [announcement.actionbar, reader]
     );
-    const chat = useMemo(() => mc.motdSpans(announcement.chat), [announcement.chat]);
+    const chat = useMemo(
+        () => mc.motdSpans(withPlayerName(announcement.chat, reader)),
+        [announcement.chat, reader]
+    );
 
     const clear = () => {
         for (const timer of timers.current) window.clearTimeout(timer);
