@@ -52,7 +52,10 @@ export interface SessionUser {
  */
 export async function getSession() {
     try {
-        return await auth.api.getSession({ headers: await headers(), query: { disableRefresh: true } });
+        return await auth.api.getSession({
+            headers: await headers(),
+            query: { disableRefresh: true }
+        });
     } catch {
         return null;
     }
