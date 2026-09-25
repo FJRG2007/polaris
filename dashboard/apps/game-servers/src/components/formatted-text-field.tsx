@@ -14,7 +14,14 @@
  */
 
 import { Code2, Plus } from "lucide-react";
-import { Button, cn } from "@polaris/ui";
+import {
+    Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    cn
+} from "@polaris/ui";
 import * as mc from "../lib/minecraft/motd";
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -257,18 +264,41 @@ export function FormattedTextField({
                     >
                         <Code2 className="size-3.5" /> {raw ? "Formatted" : "Codes"}
                     </Button>
-                    {inserts.map((one) => (
-                        <Button
-                            key={one.text}
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 px-2 text-xs"
-                            onClick={() => insert(one.text)}
-                            title={one.title}
-                        >
-                            <Plus className="size-3.5" /> {one.label}
-                        </Button>
-                    ))}
+                    {inserts.length > 0 && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 px-2 text-xs"
+                                    title="Put a word Polaris fills in where the cursor is"
+                                >
+                                    <Plus className="size-3.5" /> Variable
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                                {inserts.map((one) => (
+                                    <DropdownMenuItem
+                                        key={one.text}
+                                        onSelect={() => insert(one.text)}
+                                        title={one.title}
+                                    >
+                                        <span className="flex min-w-0 flex-col">
+                                            <span>{one.label}</span>
+                                            <code className="text-[11px] text-muted-foreground">
+                                                {one.text}
+                                            </code>
+                                        </span>
+                                    </DropdownMenuItem>
+                                ))}
+                                <p className="max-w-64 px-2 py-1.5 text-[11px] text-muted-foreground">
+                                    {
+                                        'For a value that may be missing, write what to show instead: {polaris.name | "Player"}'
+                                    }
+                                </p>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                     {actions}
                 </span>
             </div>

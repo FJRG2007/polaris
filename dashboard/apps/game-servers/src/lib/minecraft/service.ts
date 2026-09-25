@@ -24,7 +24,9 @@ import { readCrashLoop, readRestartWatch } from "../games-health";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
 import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
-import { announcementCommands, type Announcement } from "./announcement";
+import { liveContext } from "./live-values";
+import { readsPlayerList } from "./text-vars";
+import { announcementCommands, announcementProblems, type Announcement } from "./announcement";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -281,7 +283,17 @@ export async function sendAnnouncement(
     announcement: Announcement
 ): Promise<number> {
     const install = await resolveInstall(ownerId, installedAppId);
-    const lines = announcementCommands(install.edition, announcement);
+    // The editor runs the same check as it is typed; this is the one that
+    // decides, with the edition the editor may not have been told.
+    const problem = Object.values(announcementProblems(announcement, install.edition))[0];
+    if (problem) throw new Error(problem);
+
+    const texts = [announcement.title, announcement.subtitle, announcement.actionbar, announcement.chat];
+    const players = texts.some((text) => readsPlayerList(text))
+        ? await readPlayerList(install, ownerId).catch(() => null)
+        : null;
+    const context = await liveContext(installedAppId, texts, players);
+    const lines = announcementCommands(install.edition, announcement, context);
     if (lines.length === 0) throw new Error("There is nothing to send yet");
     for (const line of lines) {
         if (line.length > MAX_COMMAND_LENGTH) {
@@ -681,6 +693,20 @@ export async function applyFirewallBans(ownerId: string, installedAppId: string)
         banned += 1;
     }
     return banned;
+}
+
+/**
+ * Who is online right now, for the words an announcement fills in. Null for a
+ * server that is not meant to be up or did not answer: the caller then writes
+ * the fallbacks rather than failing the announcement over a count.
+ */
+export async function onlinePlayers(
+    ownerId: string,
+    installedAppId: string
+): Promise<parse.PlayerList | null> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    if (!install.running) return null;
+    return readPlayerList(install, ownerId).catch(() => null);
 }
 
 /**

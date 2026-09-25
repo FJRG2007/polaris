@@ -25,13 +25,22 @@ import {
     BLANK_ANNOUNCEMENT,
     CHAT_MAX_LINES,
     EVERYBODY,
-    PLAYER_TOKEN,
+    LINE_MAX,
+    CHAT_MAX,
     SECONDS_MAX,
     announcementCommands,
+    announcementProblems,
     hasText,
-    withPlayerName,
-    type Announcement
+    needsRepeating,
+    type Announcement,
+    type Hold
 } from "../../lib/minecraft/announcement";
+import { VARIABLES, previewText, visibleLength } from "../../lib/minecraft/text-vars";
+import {
+    readLiveDisplayAction,
+    stopPinnedAction,
+    type LiveDisplayState
+} from "./live-display-actions";
 import {
     deleteAnnouncementTemplateAction,
     listAnnouncementTemplatesAction,
@@ -70,14 +79,57 @@ import {
     Volume2
 } from "lucide-react";
 
-/** The word each field can carry for the recipient's own name. */
-const PLAYER_INSERT = [
-    {
-        label: "Player name",
-        text: PLAYER_TOKEN,
-        title: "Each player sees their own name here"
-    }
-] as const;
+/**
+ * The words a field can fill in, for its Variable menu. `server` is the side
+ * panel's list: it is the same for everybody, so nothing of one player's.
+ */
+export function insertsFor(edition: MinecraftEdition, scope: "all" | "server" = "all") {
+    return VARIABLES.filter(
+        (spec) =>
+            (edition !== "bedrock" || spec.bedrock) && (scope === "all" || spec.kind === "server")
+    ).map((spec) => ({
+        label: spec.label,
+        text: `{${spec.name}}`,
+        title:
+            spec.kind === "game"
+                ? "Each player sees their own"
+                : spec.kind === "account"
+                  ? 'Each player sees their Polaris account\'s. Add a fallback for players with none: {polaris.name | "Player"}'
+                  : "The same for everybody, read when it is sent"
+    }));
+}
+
+/** The counter and the problem under a field, as it is typed. */
+export function FieldNote({ text, max, problem }: { text: string; max: number; problem?: string }) {
+    const used = visibleLength(mc.stripMotd(text));
+    return (
+        <span
+            className={cn("flex flex-wrap gap-x-2", problem ? "text-danger" : "")}
+            role={problem ? "alert" : undefined}
+        >
+            <span className={cn("tabular-nums", used > max && "text-danger")}>
+                {used}/{max}
+            </span>
+            {problem && <span>{problem}</span>}
+        </span>
+    );
+}
+
+/** What "Stays on screen" offers. */
+const HOLDS: readonly { readonly value: Hold; readonly label: string }[] = [
+    { value: "timed", label: "For the time below" },
+    { value: "until", label: "Until a moment" },
+    { value: "manual", label: "Until it is taken down" }
+];
+
+/** An ISO moment as a `datetime-local` input reads it, in this browser's time. */
+function toLocalInput(iso: string): string {
+    const moment = Date.parse(iso);
+    if (!Number.isFinite(moment)) return "";
+    const date = new Date(moment);
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 const { useConfirm } = hostUi.confirmDialog;
 const { CopyButton } = hostUi.copyButton;
@@ -111,6 +163,7 @@ export function MinecraftAnnounce({
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
     const [hearing, setHearing] = useState(false);
+    const [live, setLive] = useState<LiveDisplayState | null>(null);
     const [heardError, setHeardError] = useState<string | null>(null);
     const playing = useRef<HTMLAudioElement | null>(null);
 
@@ -148,6 +201,26 @@ export function MinecraftAnnounce({
         );
     }, [installedAppId]);
 
+    const readLive = useCallback(() => {
+        void readLiveDisplayAction(installedAppId).then((answer) => {
+            if (answer.state) setLive(answer.state);
+        });
+    }, [installedAppId]);
+    useEffect(readLive, [readLive]);
+
+    function stopPinned(): void {
+        setError(null);
+        startTransition(async () => {
+            const result = await stopPinnedAction(installedAppId);
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            setNote("Taken off the screen.");
+            readLive();
+        });
+    }
+
     const set = useCallback((patch: Partial<Announcement>) => {
         setDraft((current) => ({ ...current, ...patch }));
         setNote(null);
@@ -166,6 +239,11 @@ export function MinecraftAnnounce({
         }
     }, [edition, draft]);
     const tooLong = built.lines.some((line) => line.length > COMMAND_MAX);
+    // The same check the server runs, on every keystroke: the button is never
+    // live for something that is then refused.
+    const problems = useMemo(() => announcementProblems(draft, edition), [draft, edition]);
+    const blocked = Object.keys(problems).length > 0;
+    const inserts = useMemo(() => insertsFor(edition), [edition]);
     const empty = !(
         hasText(draft.title) ||
         hasText(draft.subtitle) ||
@@ -188,8 +266,11 @@ export function MinecraftAnnounce({
                 return;
             }
             setNote(
-                target === EVERYBODY ? "Sent to everybody on the server." : `Sent to ${target}.`
+                `${target === EVERYBODY ? "Sent to everybody on the server." : `Sent to ${target}.`}${
+                    result.kept ? " Polaris keeps it on screen." : ""
+                }`
             );
+            if (result.kept) readLive();
         });
     }
 
@@ -242,6 +323,35 @@ export function MinecraftAnnounce({
                             to skip it.
                         </p>
                     </div>
+
+                    {live?.pinned && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
+                            <span className="min-w-0 text-xs">
+                                <span className="font-medium">On screen now: </span>
+                                <span className="text-muted-foreground">
+                                    {mc
+                                        .stripMotd(
+                                            live.pinned.announcement.title ||
+                                                live.pinned.announcement.actionbar ||
+                                                live.pinned.announcement.subtitle
+                                        )
+                                        .slice(0, 60)}
+                                    {" - "}
+                                    {live.pinned.endsAt === null
+                                        ? "until it is taken down"
+                                        : `until ${new Date(live.pinned.endsAt).toLocaleString()}`}
+                                </span>
+                            </span>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={pending}
+                                onClick={stopPinned}
+                            >
+                                Take it down
+                            </Button>
+                        </div>
+                    )}
 
                     <div className="flex flex-col gap-1.5">
                         <span className="text-xs font-medium text-muted-foreground">Templates</span>
@@ -332,7 +442,14 @@ export function MinecraftAnnounce({
                             rows={1}
                             singleLine
                             label="Title"
-                            inserts={PLAYER_INSERT}
+                            inserts={inserts}
+                            footnote={
+                                <FieldNote
+                                    text={draft.title}
+                                    max={LINE_MAX}
+                                    problem={problems.title}
+                                />
+                            }
                             placeholder="Server restart"
                         />
                     </Section>
@@ -343,7 +460,14 @@ export function MinecraftAnnounce({
                             rows={1}
                             singleLine
                             label="Subtitle"
-                            inserts={PLAYER_INSERT}
+                            inserts={inserts}
+                            footnote={
+                                <FieldNote
+                                    text={draft.subtitle}
+                                    max={LINE_MAX}
+                                    problem={problems.subtitle}
+                                />
+                            }
                             placeholder="Back in a minute, don't leave"
                         />
                     </Section>
@@ -354,7 +478,14 @@ export function MinecraftAnnounce({
                             rows={1}
                             singleLine
                             label="Action bar"
-                            inserts={PLAYER_INSERT}
+                            inserts={inserts}
+                            footnote={
+                                <FieldNote
+                                    text={draft.actionbar}
+                                    max={LINE_MAX}
+                                    problem={problems.actionbar}
+                                />
+                            }
                             placeholder="Check your inventory for a gift"
                         />
                     </Section>
@@ -364,7 +495,14 @@ export function MinecraftAnnounce({
                             onChange={(chat) => set({ chat })}
                             rows={3}
                             label="Chat message"
-                            inserts={PLAYER_INSERT}
+                            inserts={inserts}
+                            footnote={
+                                <FieldNote
+                                    text={draft.chat}
+                                    max={CHAT_MAX}
+                                    problem={problems.chat}
+                                />
+                            }
                             placeholder="Thanks for your patience!"
                             actions={
                                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -409,6 +547,53 @@ export function MinecraftAnnounce({
                                 </span>
                             </label>
                         ))}
+                    </div>
+
+                    <div className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">Stays on screen</span>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                            <Select
+                                value={draft.hold}
+                                onValueChange={(value) =>
+                                    set({
+                                        hold: value as Hold,
+                                        until: value === "until" ? draft.until : ""
+                                    })
+                                }
+                                options={HOLDS.map((hold) => ({
+                                    value: hold.value,
+                                    label: hold.label
+                                }))}
+                                aria-label="How long it stays on screen"
+                            />
+                            {draft.hold === "until" && (
+                                <Input
+                                    type="datetime-local"
+                                    value={toLocalInput(draft.until)}
+                                    onChange={(event) => {
+                                        const moment = Date.parse(event.target.value);
+                                        set({
+                                            until: Number.isFinite(moment)
+                                                ? new Date(moment).toISOString()
+                                                : ""
+                                        });
+                                    }}
+                                    aria-label="Until when"
+                                />
+                            )}
+                        </div>
+                        {(problems.hold || problems.until) && (
+                            <span role="alert" className="text-xs text-danger">
+                                {problems.hold ?? problems.until}
+                            </span>
+                        )}
+                        {!problems.hold && !problems.until && needsRepeating(draft) && (
+                            <span className="text-xs text-muted-foreground">
+                                {draft.hold === "timed"
+                                    ? "The game shows an action bar for about three seconds, so Polaris sends it again until the time is up."
+                                    : "Polaris keeps sending it until then. You can take it down from here at any time."}
+                            </span>
+                        )}
                     </div>
 
                     {java && (
@@ -495,6 +680,7 @@ export function MinecraftAnnounce({
                                     pending ||
                                     empty ||
                                     tooLong ||
+                                    blocked ||
                                     built.problem !== null
                                 }
                                 onClick={send}
@@ -638,19 +824,19 @@ function AnnouncementPreview({
     // A name where {player} is, as one of the recipients would read it.
     const reader = announcement.target === EVERYBODY ? "Steve" : announcement.target;
     const title = useMemo(
-        () => mc.motdSpans(withPlayerName(announcement.title, reader))[0] ?? [],
+        () => mc.motdSpans(previewText(announcement.title, { player: reader }))[0] ?? [],
         [announcement.title, reader]
     );
     const subtitle = useMemo(
-        () => mc.motdSpans(withPlayerName(announcement.subtitle, reader))[0] ?? [],
+        () => mc.motdSpans(previewText(announcement.subtitle, { player: reader }))[0] ?? [],
         [announcement.subtitle, reader]
     );
     const actionbar = useMemo(
-        () => mc.motdSpans(withPlayerName(announcement.actionbar, reader))[0] ?? [],
+        () => mc.motdSpans(previewText(announcement.actionbar, { player: reader }))[0] ?? [],
         [announcement.actionbar, reader]
     );
     const chat = useMemo(
-        () => mc.motdSpans(withPlayerName(announcement.chat, reader)),
+        () => mc.motdSpans(previewText(announcement.chat, { player: reader })),
         [announcement.chat, reader]
     );
 

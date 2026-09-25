@@ -12,6 +12,8 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { sendAnnouncement } from "../../lib/minecraft/service";
+import { needsRepeating } from "../../lib/minecraft/announcement";
+import { pinAnnouncement } from "../../lib/minecraft/live-display-service";
 import {
     announcementSchema,
     MAX_TEMPLATE_NAME,
@@ -35,7 +37,7 @@ const sendSchema = z.object({
 /** Put an announcement on the players' screens. */
 export async function sendAnnouncementAction(
     input: z.input<typeof sendSchema>
-): Promise<{ sent?: number; error?: string }> {
+): Promise<{ sent?: number; kept?: boolean; error?: string }> {
     const parsed = sendSchema.safeParse(input);
     if (!parsed.success)
         return { error: parsed.error.issues[0]?.message ?? "Check the announcement" };
@@ -44,11 +46,23 @@ export async function sendAnnouncementAction(
             "games.console",
             parsed.data.installedAppId
         );
+        const sentAt = Date.now();
         const sent = await sendAnnouncement(
             access.ownerId,
             parsed.data.installedAppId,
             parsed.data.announcement
         );
+        // The game keeps an action bar up for about three seconds and has no
+        // "until": anything meant to stay longer is sent again from here on.
+        const kept = needsRepeating(parsed.data.announcement);
+        if (kept) {
+            await pinAnnouncement(
+                access.ownerId,
+                parsed.data.installedAppId,
+                parsed.data.announcement,
+                sentAt
+            );
+        }
         await recordAudit({
             actorId: user.id,
             action: "games.announce",
@@ -57,10 +71,11 @@ export async function sendAnnouncementAction(
             metadata: {
                 target: parsed.data.announcement.target,
                 title: parsed.data.announcement.title,
-                chat: parsed.data.announcement.chat
+                chat: parsed.data.announcement.chat,
+                hold: parsed.data.announcement.hold
             }
         });
-        return { sent };
+        return { sent, kept };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The server did not take that" };
     }

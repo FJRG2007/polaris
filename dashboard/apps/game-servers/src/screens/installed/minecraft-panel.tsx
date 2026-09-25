@@ -22,6 +22,7 @@ import Link from "next/link";
 import { GameConsole } from "./game-console";
 import { CardBoundary } from "../../components/card-boundary";
 import { MinecraftAnnounce } from "./minecraft-announce";
+import { MinecraftSidebar } from "./minecraft-sidebar";
 import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
 import { SpigotPluginsCard } from "./minecraft-spigot-plugins";
@@ -474,12 +475,15 @@ export function MinecraftPanel({
                 />
             )}
             {tab === "announce" && (
-                <MinecraftAnnounce
-                    installedAppId={installedAppId}
-                    running={isRunning}
-                    edition={status?.edition === "bedrock" ? "bedrock" : "java"}
-                    players={[...(status?.players.players ?? [])]}
-                />
+                <div className="flex flex-col gap-4">
+                    <MinecraftAnnounce
+                        installedAppId={installedAppId}
+                        running={isRunning}
+                        edition={status?.edition === "bedrock" ? "bedrock" : "java"}
+                        players={[...(status?.players.players ?? [])]}
+                    />
+                    <MinecraftSidebar installedAppId={installedAppId} canManage={canManage} />
+                </div>
             )}
             {tab === "players" && (
                 <MinecraftPlayers

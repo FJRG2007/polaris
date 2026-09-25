@@ -12,7 +12,6 @@ import {
     bedrockComponent,
     isAnnouncementTarget,
     javaComponent,
-    withPlayerName,
     type Announcement
 } from "@polaris-app/game-servers/src/lib/minecraft/announcement";
 import {
@@ -182,9 +181,6 @@ describe("each player's own name", () => {
         ]);
     });
 
-    it("reads as one player would in the preview", () => {
-        expect(withPlayerName("Hi {player}, bye {Player}", "Steve")).toBe("Hi Steve, bye Steve");
-    });
 });
 
 describe("templates a server keeps", () => {
