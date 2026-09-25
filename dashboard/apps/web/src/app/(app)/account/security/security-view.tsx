@@ -368,7 +368,7 @@ export function SecurityView({
                                         }
                                         options={SESSION_MAX_CHOICES.map((minutes) => ({
                                             value: String(minutes),
-                                            label: describeMinutes(minutes, "Instance default (7 days)")
+                                            label: describeMinutes(minutes, "After 30 days unused")
                                         }))}
                                     />
                                 </label>

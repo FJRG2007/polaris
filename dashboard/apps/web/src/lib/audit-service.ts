@@ -71,7 +71,8 @@ async function clientIpHash(): Promise<string | undefined> {
  */
 const requestSessionId = cache(async (): Promise<string | undefined> => {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
+        // Never renewing: see `getSession` in lib/session.ts.
+        const session = await auth.api.getSession({ headers: await headers(), query: { disableRefresh: true } });
         return session?.session?.id;
     } catch {
         return undefined;
