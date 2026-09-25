@@ -189,7 +189,8 @@ async function start(): Promise<void> {
         if (!first || claimed.has(first) || boxes.some((box) => box.value !== "")) return;
         claimed.add(first);
         void askBackground({ kind: "secondStepCode" }).then((reply) => {
-            if (reply.ok && "code" in reply && first.isConnected) putCode(boxes, reply.code);
+            if (!reply.ok || !("code" in reply) || !first.isConnected) return;
+            if (boxes.every((box) => box.value === "")) putCode(boxes, reply.code);
         });
     };
 
@@ -313,7 +314,8 @@ async function start(): Promise<void> {
             offered.push(choice("Use my name", name, () => fillName(name)));
         }
 
-        const passwordBox = at(fields.newPassword) ?? at(fields.password);
+        const passwordBox =
+            at(fields.newPassword) ?? (fields.purpose === "signup" ? at(fields.password) : null);
         if (passwordBox) {
             const options = await savedOptions();
             offered.push(

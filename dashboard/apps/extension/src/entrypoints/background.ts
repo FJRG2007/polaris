@@ -1187,10 +1187,6 @@ async function capture(
     if (!(await vault())) return quiet;
     if (isBlockedHost(await BLOCKED.getValue(), page.url)) return quiet;
 
-    // Every vault this account can open, and deliberately not only the shelf that
-    // happens to be in front of somebody: the question here is whether this login
-    // is already saved anywhere, and a shelf-filtered answer would offer to save a
-    // second copy of an item that is sitting in an organization's vault.
     // A username with no password is the first page of a two-page sign-in: kept
     // for the page that asks for the password, and nothing offered yet.
     if (submitted.password === "") {
@@ -1211,6 +1207,10 @@ async function capture(
             ? first.username
             : "";
 
+    // Every vault this account can open, and deliberately not only the shelf that
+    // happens to be in front of somebody: the question here is whether this login
+    // is already saved anywhere, and a shelf-filtered answer would offer to save a
+    // second copy of an item that is sitting in an organization's vault.
     const offer = offerFor(
         { username: submitted.username.trim() || earlier, password: submitted.password },
         await forUrl(page.url)

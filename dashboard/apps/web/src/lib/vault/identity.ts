@@ -292,20 +292,22 @@ export async function vaultRefresh(
         return { ok: false, kind: "invalid" };
     }
 
-    await prisma.vaultRefreshToken.update({
-        where: { id: row.id },
-        data: { revokedAt: new Date() }
-    });
     // A client may restate its own name as it refreshes, so a name it got wrong
     // at sign-in - the extension called Brave "Chrome" - corrects itself on the
     // next refresh rather than only on the next approval. Only the device this
     // token belongs to, and only its label.
     if (deviceName && row.deviceId) {
-        await prisma.vaultDevice.update({
-            where: { id: row.deviceId },
-            data: { name: deviceName }
-        });
+        await prisma.vaultDevice
+            .updateMany({
+                where: { id: row.deviceId, NOT: { name: deviceName } },
+                data: { name: deviceName }
+            })
+            .catch((error: unknown) => console.error("[vault] device relabel failed", error));
     }
+    await prisma.vaultRefreshToken.update({
+        where: { id: row.id },
+        data: { revokedAt: new Date() }
+    });
     return {
         ok: true,
         body: await tokenBody(row.userId, row.deviceId, row.device?.identifier ?? null)

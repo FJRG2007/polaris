@@ -26,13 +26,13 @@ const findAccount = vi.fn(async () => ({
     user: { name: "Someone", email: "someone@polaris.test", emailVerified: true }
 }));
 const hasPermission = vi.fn(async () => true);
-const updateDevice = vi.fn(async () => ({ id: "device-1" }));
+const updateDevice = vi.fn(async () => ({ count: 1 }));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         vaultAccount: { findFirst: vi.fn(), findUniqueOrThrow: findAccount },
         vaultOrgUser: { findMany: vi.fn(async () => []) },
-        vaultDevice: { upsert: vi.fn(), update: updateDevice },
+        vaultDevice: { upsert: vi.fn(), updateMany: updateDevice },
         vaultRefreshToken: { findUnique: findToken, update: updateToken, create: createToken }
     }
 }));
@@ -84,9 +84,17 @@ describe("vaultRefresh", () => {
         const result = await identity.vaultRefresh("token", "Brave on Windows");
         expect(result.ok).toBe(true);
         expect(updateDevice).toHaveBeenCalledWith({
-            where: { id: "device-1" },
+            where: { id: "device-1", NOT: { name: "Brave on Windows" } },
             data: { name: "Brave on Windows" }
         });
+    });
+
+    it("still rotates the token when the relabel fails", async () => {
+        updateDevice.mockRejectedValueOnce(new Error("gone"));
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        const result = await identity.vaultRefresh("token", "Brave on Windows");
+        expect(result.ok).toBe(true);
+        expect(updateToken).toHaveBeenCalled();
     });
 
     it("leaves the device alone when no name is given", async () => {
