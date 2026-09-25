@@ -67,7 +67,6 @@ const CONSOLE_ANSWER_MS = 700;
  */
 const COMMAND_TIMEOUT_MS = 15_000;
 
-
 /** More words than any command the panel builds, and far fewer than a list
  *  somebody assembled. */
 const MAX_COMMAND_ARGUMENTS = 24;

@@ -135,7 +135,6 @@ function toLocalInput(iso: string): string {
 const { useConfirm } = hostUi.confirmDialog;
 const { CopyButton } = hostUi.copyButton;
 
-
 /** "No sound" as a select value. An empty value is what a select reads as
  *  "nothing chosen", so the empty sound id rides under a name of its own. */
 const NO_SOUND = "none";
@@ -700,7 +699,8 @@ export function MinecraftAnnounce({
                                         <code
                                             className={cn(
                                                 "min-w-0 flex-1 break-all rounded bg-muted px-1.5 py-1 text-[11px]",
-                                                commandBytes(line) > COMMAND_BYTES_MAX && "text-danger"
+                                                commandBytes(line) > COMMAND_BYTES_MAX &&
+                                                    "text-danger"
                                             )}
                                         >
                                             {line}
