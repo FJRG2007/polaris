@@ -10,6 +10,9 @@ import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
 import { injectableOrigins } from "@/lib/injection";
 import { chromiumBrowser } from "@/lib/browser-name";
+import { generatePassword } from "@polaris/core/password-generator";
+import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
+import { MENU, MENU_ENTRIES, visibleEntries, type MenuTarget } from "@/lib/context-menu";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
 import { offerFor, type CaptureOffer } from "@/lib/capture";
@@ -2587,6 +2590,10 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 return { ok: true, details: { name: account?.name ?? null, email: email ?? null } };
             }
 
+            case "menuTarget":
+                await fitMenu(request.password ? "password" : "text");
+                return { ok: true };
+
             case "blocked":
                 return { ok: true, ...(await blockedHere(page?.url)) };
 
@@ -2759,6 +2766,180 @@ async function fillFromKeyboard(command: string): Promise<void> {
     if (best) await fill(best.id);
 }
 
+/**
+ * Type a value into the box somebody right-clicked.
+ *
+ * Self-contained for the same reason as `typeIntoPage`: the browser serializes
+ * it and runs it in the frame the click was in, where it can see nothing of this
+ * file. The right-click has already put the focus on that box, so the box is
+ * the focused one. A new password also goes into the password box after it when
+ * that one is empty and in the same form - the confirmation. A code split into
+ * one box per digit is spread across the row.
+ *
+ * Like every fill here, it does not submit anything.
+ */
+function typeIntoFocused(value: string, mode: "password" | "code" | "text"): boolean {
+    const active = document.activeElement;
+    const put = (field: HTMLInputElement | HTMLTextAreaElement, text: string): void => {
+        const proto =
+            field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(field, text);
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        field.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+
+    if (active instanceof HTMLElement && active.isContentEditable) {
+        return document.execCommand("insertText", false, value);
+    }
+    if (!(active instanceof HTMLInputElement) && !(active instanceof HTMLTextAreaElement)) return false;
+    if (active.disabled || active.readOnly) return false;
+
+    if (mode === "code" && active instanceof HTMLInputElement && active.maxLength === 1) {
+        const single = (root: ParentNode): HTMLInputElement[] =>
+            [...root.querySelectorAll("input")].filter((one) => one.maxLength === 1);
+        let row: HTMLInputElement[] = [];
+        for (let node = active.parentElement; node; node = node.parentElement) {
+            const near = single(node);
+            if (near.length - near.indexOf(active) >= value.length || node === active.form) {
+                row = near;
+                break;
+            }
+        }
+        const from = row.indexOf(active);
+        const digits = row.slice(from, from + value.length);
+        if (digits.length === value.length) {
+            digits.forEach((box, index) => put(box, value.charAt(index)));
+            return true;
+        }
+    }
+
+    put(active, value);
+    if (mode === "password" && active instanceof HTMLInputElement && active.type === "password") {
+        const boxes = [...document.querySelectorAll<HTMLInputElement>("input[type=password]")];
+        const next = boxes[boxes.indexOf(active) + 1];
+        if (next && next.value === "" && next.form === active.form) put(next, value);
+    }
+    return true;
+}
+
+/**
+ * Open the popup, for an entry that needs the vault while it is locked.
+ *
+ * The toolbar popup is where the vault is unlocked, and a right-click is a
+ * gesture the browser accepts for opening it. A browser without the call just
+ * does nothing, which is what the entry did before.
+ */
+async function askToUnlock(): Promise<void> {
+    const api = browser as unknown as Record<"action" | "browserAction", { openPopup?: () => Promise<void> } | undefined>;
+    const action = api.action ?? api.browserAction;
+    await action?.openPopup?.().catch(() => undefined);
+}
+
+/** Run the typing function in the frame that was clicked. */
+async function typeInFrame(
+    tabId: number,
+    frameId: number | undefined,
+    value: string,
+    mode: "password" | "code" | "text"
+): Promise<void> {
+    await browser.scripting
+        .executeScript({
+            target: { tabId, frameIds: [frameId ?? 0] },
+            func: typeIntoFocused,
+            args: [value, mode]
+        })
+        .catch(() => undefined);
+}
+
+/**
+ * Do what a right-click entry says.
+ *
+ * Every entry is held to the rules the page's own list is: nothing on a site
+ * that was switched off, a login or a code only from an item saved for the site
+ * in front of you, and the vault's contents only while it is open.
+ */
+async function fromMenu(
+    entry: string | number,
+    tab: { id?: number; url?: string } | undefined,
+    frameId: number | undefined,
+    frameUrl: string | undefined
+): Promise<void> {
+    const here = frameId ? frameUrl : tab?.url;
+    if (tab?.id === undefined || !tab.url || !here) return;
+    if (![tab.url, here].every((url) => /^https?:/i.test(url))) return;
+    const blocked = await BLOCKED.getValue();
+    if (isBlockedHost(blocked, tab.url) || isBlockedHost(blocked, here)) return;
+    const page = { tabId: tab.id, url: tab.url };
+
+    if (entry === MENU.generate) {
+        // Needs no vault: the generator is pure, and a password made for a form
+        // is offered for saving when the form goes, like one typed by hand.
+        const options = readGeneratorOptions(await storage.getItem<unknown>(GENERATOR_KEY).catch(() => null));
+        const value = generatePassword(options);
+        if (value) await typeInFrame(tab.id, frameId, value, "password");
+        return;
+    }
+
+    if (!(await vault())) {
+        await askToUnlock();
+        return;
+    }
+
+    if (entry === MENU.fill) {
+        const best = (await forUrl(page.url))[0];
+        if (best) await fill(best.id, page);
+        else await askToUnlock();
+        return;
+    }
+
+    if (entry === MENU.code) {
+        const login = (await forUrl(here)).find((one) => one.totp);
+        const code = login?.totp ? await totpCode(login.totp) : null;
+        if (code) await typeInFrame(tab.id, frameId, code, "code");
+        return;
+    }
+
+    if (entry === MENU.email) {
+        const account = await readAccount();
+        const email = account?.email ?? (await EMAIL.getValue());
+        if (email) await typeInFrame(tab.id, frameId, email, "text");
+    }
+}
+
+/**
+ * Put Polaris's entries in the browser's right-click menu on editable boxes.
+ *
+ * Removed and made again on every start, because creating an id that already
+ * exists is an error and the entries outlive the worker. A browser with no menu
+ * API - none ships without one, but the build's stand-in has none - gets none.
+ */
+async function setupMenus(): Promise<void> {
+    const menus = browser.contextMenus;
+    if (!menus) return;
+    await menus.removeAll();
+    fitted = null;
+    menus.create({ id: MENU.root, title: "Polaris", contexts: ["editable"] });
+    for (const entry of MENU_ENTRIES) {
+        menus.create({ id: entry.id, parentId: MENU.root, title: entry.title, contexts: ["editable"] });
+    }
+}
+
+/** What the entries were last fitted to, so a hover over a box of the same kind costs nothing. */
+let fitted: MenuTarget | null = null;
+
+/** Show the entries that fit the box the pointer is over. */
+async function fitMenu(target: MenuTarget): Promise<void> {
+    const menus = browser.contextMenus;
+    if (!menus || target === fitted) return;
+    fitted = target;
+    const shown = visibleEntries(target);
+    await Promise.all(
+        MENU_ENTRIES.map((entry) =>
+            Promise.resolve(menus.update(entry.id, { visible: shown[entry.id] })).catch(() => undefined)
+        )
+    );
+}
+
 /** Keep the badge honest as somebody moves around. */
 browser.tabs.onActivated.addListener(() => void badge());
 browser.tabs.onUpdated.addListener((_id, change) => {
@@ -2844,6 +3025,13 @@ export default defineBackground(() => {
     // which is still synchronous registration - what manifest v3 requires of a
     // listener that has to survive the worker being recycled.
     browser.commands.onCommand.addListener((command) => void fillFromKeyboard(command));
+
+    // The right-click entries, registered here for the same reason as the
+    // command above: the build's stand-in browser has no menu API.
+    void setupMenus();
+    browser.contextMenus?.onClicked.addListener(
+        (info, tab) => void fromMenu(info.menuItemId, tab, info.frameId, info.frameUrl)
+    );
 
     // The deadline is enforced on a period, not only when something asks. On
     // Firefox nothing else would: a persistent background page goes on holding the

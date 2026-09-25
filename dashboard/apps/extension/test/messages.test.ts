@@ -87,6 +87,7 @@ describe("what a page may ask the worker for", () => {
                 "pendingCapture",
                 "secondStepCode",
                 "myDetails",
+                "menuTarget",
                 "saveCaptured",
                 "totpNow"
             ].sort()
