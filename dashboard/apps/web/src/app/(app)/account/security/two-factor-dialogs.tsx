@@ -25,6 +25,7 @@ import { authClient } from "@/lib/auth-client";
 import { useState, type FormEvent } from "react";
 import { beginSessionRotationAction } from "./actions";
 import { BackupCodesPanel } from "./backup-codes-panel";
+import { CodeInput, isWholeCode } from "@/components/code-input";
 import { noteAuthenticatorArmedAction } from "@/app/oauth/enroll/actions";
 import {
     Button,
@@ -65,6 +66,7 @@ export function EnableTwoFactorDialog({
     const [step, setStep] = useState<"password" | "verify">("password");
     const [totpUri, setTotpUri] = useState("");
     const [backupCodes, setBackupCodes] = useState<string[]>([]);
+    const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -72,6 +74,7 @@ export function EnableTwoFactorDialog({
         setStep("password");
         setTotpUri("");
         setBackupCodes([]);
+        setCode("");
         setError(null);
         setBusy(false);
     }
@@ -94,7 +97,7 @@ export function EnableTwoFactorDialog({
 
     async function onVerify(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        const code = String(new FormData(event.currentTarget).get("code") ?? "");
+        if (!isWholeCode(code)) return;
         setBusy(true);
         setError(null);
         // Arming the factor replaces this session; claim the continuation first.
@@ -188,21 +191,14 @@ export function EnableTwoFactorDialog({
 
                         <label className="flex flex-col gap-1 text-sm">
                             Code from your app
-                            <Input
-                                name="code"
-                                inputMode="numeric"
-                                maxLength={6}
-                                placeholder="000000"
-                                autoComplete="one-time-code"
-                                required
-                            />
+                            <CodeInput name="code" value={code} onValueChange={setCode} required />
                         </label>
                         <Feedback error={error} />
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={busy}>
+                            <Button type="submit" disabled={busy || !isWholeCode(code)}>
                                 {busy ? "Verifying..." : "Turn on"}
                             </Button>
                         </div>

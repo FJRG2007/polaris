@@ -24,6 +24,7 @@ import {
     TWO_FACTOR_METHOD_INFO,
     type TwoFactorMethod
 } from "@polaris/core";
+import { CodeInput, isWholeCode } from "@/components/code-input";
 
 /** Post-verification destination: a safe same-origin redirect, else the drive. */
 function target(): string {
@@ -45,6 +46,7 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
     const router = useRouter();
     const [method, setMethod] = useState<TwoFactorMethod>(options.preferred ?? "totp");
     const [backup, setBackup] = useState(false);
+    const [code, setCode] = useState("");
     const [trustDevice, setTrustDevice] = useState(false);
     const [sent, setSent] = useState<string | null>(null);
     const [cooldown, setCooldown] = useState(0);
@@ -78,11 +80,10 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        const code = String(new FormData(event.currentTarget).get("code") ?? "").trim();
         setPending(true);
         setError(null);
         const { error: verifyError } = backup
-            ? await authClient.twoFactor.verifyBackupCode({ code })
+            ? await authClient.twoFactor.verifyBackupCode({ code: code.trim() })
             : method === "totp"
               ? await authClient.twoFactor.verifyTotp({ code, trustDevice })
               : await authClient.twoFactor.verifyOtp({ code, trustDevice });
@@ -98,6 +99,7 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
     function choose(next: TwoFactorMethod) {
         setMethod(next);
         setBackup(false);
+        setCode("");
         setSent(null);
         setError(null);
     }
@@ -154,14 +156,19 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                                 : method === "totp"
                                   ? "Code from your authenticator"
                                   : "Code we sent you"}
-                            <Input
-                                name="code"
-                                autoFocus
-                                autoComplete="one-time-code"
-                                inputMode={backup ? "text" : "numeric"}
-                                placeholder={backup ? "XXXXXXXX" : "000000"}
-                                required
-                            />
+                            {backup ? (
+                                <Input
+                                    name="code"
+                                    autoFocus
+                                    autoComplete="one-time-code"
+                                    placeholder="XXXXXXXX"
+                                    value={code}
+                                    onChange={(event) => setCode(event.target.value)}
+                                    required
+                                />
+                            ) : (
+                                <CodeInput name="code" autoFocus value={code} onValueChange={setCode} required />
+                            )}
                         </label>
                         {backup ? null : (
                             <label className="flex items-center gap-2 text-sm">
@@ -173,7 +180,10 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                             </label>
                         )}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <Button type="submit" disabled={pending}>
+                        <Button
+                            type="submit"
+                            disabled={pending || (backup ? code.trim() === "" : !isWholeCode(code))}
+                        >
                             {pending ? "Verifying..." : "Verify"}
                         </Button>
                     </form>
@@ -183,6 +193,7 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                         className="mt-4 flex w-full items-center justify-center gap-1 text-center text-xs text-muted-foreground underline-offset-2 hover:underline"
                         onClick={() => {
                             setBackup(!backup);
+                            setCode("");
                             setSent(null);
                             setError(null);
                         }}

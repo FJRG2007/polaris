@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
 import { useState, type FormEvent } from "react";
+import { codeDigits } from "@/components/code-input";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Check, LogOut, ScanLine, X } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
@@ -382,7 +383,7 @@ function ApproveSignInDialog({
                             maxLength={6}
                             autoComplete="off"
                             value={pin}
-                            onChange={(event) => setPin(event.target.value)}
+                            onChange={(event) => setPin(codeDigits(event.target.value))}
                             required
                         />
                     </label>
