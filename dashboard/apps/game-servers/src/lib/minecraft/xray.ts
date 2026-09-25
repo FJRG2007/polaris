@@ -28,6 +28,7 @@
  */
 
 import { z } from "zod";
+import { stripFormatting } from "./parse";
 
 /** Where the settings and the traps are kept on the install. */
 export const XRAY_KEY = "xrayTraps";
@@ -175,22 +176,43 @@ const point = z.object({
     y: z.number().int(),
     z: z.number().int()
 });
+const trapSchema = point.extend({ placedAt: z.number() });
+const evidenceSchema = z.object({
+    name: z.string().max(40),
+    hits: z.array(point.extend({ at: z.number() })),
+    reportedHits: z.number().int().min(0),
+    warnedAt: z.number().nullable(),
+    bannedAt: z.number().nullable()
+});
+
+/** A list where one unreadable entry is dropped on its own, never the rest with it. */
+function eachOf<T extends z.ZodTypeAny>(entry: T) {
+    return z
+        .array(z.unknown())
+        .catch([])
+        .transform((entries) =>
+            entries.flatMap((one) => {
+                const parsed = entry.safeParse(one);
+                return parsed.success ? [parsed.data as z.output<T>] : [];
+            })
+        );
+}
+
 const storedSchema = z.object({
     settings: xraySettingsSchema.catch(DEFAULT_XRAY_SETTINGS),
-    honeypots: z.array(point.extend({ placedAt: z.number() })).catch([]),
+    honeypots: eachOf(trapSchema),
     evidence: z
-        .record(
-            z.string(),
-            z.object({
-                name: z.string().max(40),
-                hits: z.array(point.extend({ at: z.number() })),
-                reportedHits: z.number().int().min(0),
-                warnedAt: z.number().nullable(),
-                bannedAt: z.number().nullable()
-            })
-        )
-        .catch({}),
-    cleanup: z.array(point.extend({ placedAt: z.number() })).catch([])
+        .record(z.string(), z.unknown())
+        .catch({})
+        .transform((entries) => {
+            const kept: Record<string, PlayerEvidence> = {};
+            for (const [key, one] of Object.entries(entries)) {
+                const parsed = evidenceSchema.safeParse(one);
+                if (parsed.success) kept[key] = parsed.data;
+            }
+            return kept;
+        }),
+    cleanup: eachOf(trapSchema)
 });
 
 /** The stored state, or an empty one for a server that never had it. */
@@ -217,8 +239,11 @@ export function minedSinceCommand(dim: Dimension): string {
     return `execute as @a[scores={${TRAP_KINDS[dim].objective}=1..}] run data get entity @s Pos`;
 }
 
-export function resetCounterCommand(dim: Dimension, name: string): string {
-    return `scoreboard players reset ${name} ${TRAP_KINDS[dim].objective}`;
+/** Back to nothing for everybody who mined it: by selector, so a name the game
+ *  prints differently from how a command takes it is reset all the same. */
+export function resetCounterCommand(dim: Dimension): string {
+    const { objective } = TRAP_KINDS[dim];
+    return `scoreboard players reset @a[scores={${objective}=1..}] ${objective}`;
 }
 
 /** Where every player is and which dimension they are in, for placing traps. */
@@ -258,21 +283,40 @@ export function removeCommand(trap: Honeypot): string {
     return `execute in ${trap.dimension} if block ${trap.x} ${trap.y} ${trap.z} ${kind.ore} run setblock ${trap.x} ${trap.y} ${trap.z} ${kind.rock}`;
 }
 
-/** The game's answer to a test: passed, failed, or a place it has not loaded. */
-export type TestAnswer = "passed" | "failed" | "unloaded";
+/**
+ * The game's answer to a test: passed, failed, a place it has not loaded, or
+ * something else. Only the game's own "Test failed" is failed: an empty,
+ * cut-short or unfamiliar answer is unknown, and nothing is concluded from it.
+ * A conditional `run` whose condition does not hold answers nothing at all, so
+ * for placing and removing that is unknown too.
+ */
+export type TestAnswer = "passed" | "failed" | "unloaded" | "unknown";
 
 export function readTest(output: string): TestAnswer {
     if (/not loaded|unloaded/i.test(output)) return "unloaded";
     if (/test passed|changed the block/i.test(output)) return "passed";
-    return "failed";
+    if (/test failed/i.test(output)) return "failed";
+    return "unknown";
+}
+
+/** Whether a message to a player reached them: they were online and the game took it. */
+export function reachedPlayer(online: string, sent: string): boolean {
+    return (
+        readTest(online) === "passed" && !/no player|not found|unknown|incorrect|error/i.test(sent)
+    );
+}
+
+/** A player online right now, by exact name. */
+export function onlineCommand(name: string): string {
+    return `execute if entity ${name}`;
 }
 
 /** `Steve has the following entity data: [1.5d, -58.0d, 30.2d]`, once per player. */
 export function readPositions(output: string): { name: string; x: number; y: number; z: number }[] {
     const found: { name: string; x: number; y: number; z: number }[] = [];
     const pattern =
-        /([A-Za-z0-9_]{1,16}) has the following entity data: \[(-?[\d.]+)d, (-?[\d.]+)d, (-?[\d.]+)d\]/g;
-    for (const match of output.matchAll(pattern)) {
+        /^(\S{1,40}) has the following entity data: \[(-?[\d.]+)d, (-?[\d.]+)d, (-?[\d.]+)d\]/gm;
+    for (const match of stripFormatting(output).matchAll(pattern)) {
         const [x, y, z] = [match[2], match[3], match[4]].map(Number) as [number, number, number];
         if ([x, y, z].every(Number.isFinite)) found.push({ name: match[1] as string, x, y, z });
     }
@@ -282,8 +326,10 @@ export function readPositions(output: string): { name: string; x: number; y: num
 /** `Steve has the following entity data: "minecraft:the_nether"`, once per player. */
 export function readDimensions(output: string): Map<string, string> {
     const found = new Map<string, string>();
-    const pattern = /([A-Za-z0-9_]{1,16}) has the following entity data: "([a-z0-9_:./-]+)"/g;
-    for (const match of output.matchAll(pattern)) found.set(match[1] as string, match[2] as string);
+    const pattern = /^(\S{1,40}) has the following entity data: "([a-z0-9_:./-]+)"/gm;
+    for (const match of stripFormatting(output).matchAll(pattern)) {
+        found.set(match[1] as string, match[2] as string);
+    }
     return found;
 }
 
@@ -295,9 +341,10 @@ function distance(a: { x: number; y: number; z: number }, b: { x: number; y: num
 export function trapsNear(
     traps: readonly Honeypot[],
     dim: Dimension,
-    at: { x: number; y: number; z: number }
+    at: { x: number; y: number; z: number },
+    range: number = HIT_RANGE
 ): Honeypot[] {
-    return traps.filter((trap) => trap.dimension === dim && distance(at, trap) <= HIT_RANGE);
+    return traps.filter((trap) => trap.dimension === dim && distance(at, trap) <= range);
 }
 
 /**

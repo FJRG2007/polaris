@@ -16,6 +16,7 @@ const fake = vi.hoisted(() => ({
     answer: (_command: string): string => "",
     notified: [] as string[],
     banned: [] as string[],
+    warned: [] as string[],
     /** How many times the loop asked who mined: proof that it looked at all. */
     looks: 0
 }));
@@ -29,7 +30,12 @@ vi.mock("@polaris/db", () => ({
                 status: "running",
                 catalogId: "minecraft"
             }),
-            findMany: async () => []
+            findMany: async () => [],
+            updateMany: async (input: { where: { config: string }; data: { config: string } }) => {
+                if (input.where.config !== JSON.stringify(fake.config)) return { count: 0 };
+                fake.config = JSON.parse(input.data.config) as Record<string, unknown>;
+                return { count: 1 };
+            }
         }
     }
 }));
@@ -77,6 +83,8 @@ import {
     readDimensions,
     readPositions,
     readTest,
+    readXray,
+    resetCounterCommand,
     trapsNear,
     verdictOf,
     type Honeypot,
@@ -127,6 +135,39 @@ describe("reading the game's answers", () => {
         expect(readTest("Test passed")).toBe("passed");
         expect(readTest("Changed the block at 1, -50, 2")).toBe("passed");
         expect(readTest("Test failed")).toBe("failed");
+    });
+
+    it("concludes nothing from an answer that is not the game's", () => {
+        expect(readTest("")).toBe("unknown");
+        expect(readTest("Connection reset")).toBe("unknown");
+    });
+
+    it("reads a name the game prints whole, and skips a line it cannot be sure of", () => {
+        const answer = [
+            ".Steve has the following entity data: [1.0d, -50.0d, 2.0d]",
+            "[Admin] Alex has the following entity data: [3.0d, -50.0d, 4.0d]"
+        ].join("\n");
+        expect(readPositions(answer)).toEqual([{ name: ".Steve", x: 1, y: -50, z: 2 }]);
+    });
+
+    it("resets the counters of everybody who mined, whatever their name", () => {
+        expect(resetCounterCommand("minecraft:overworld")).toBe(
+            "scoreboard players reset @a[scores={polaris_xray_d=1..}] polaris_xray_d"
+        );
+    });
+
+    it("drops one unreadable honeypot on its own, never the rest with it", () => {
+        const state = readXray({
+            xrayTraps: {
+                settings: DEFAULT_XRAY_SETTINGS,
+                honeypots: [trap(1, -50, 1), { dimension: "minecraft:overworld", x: "?" }],
+                evidence: { steve: evidence(1), broken: { name: 4 } },
+                cleanup: [trap(2, -50, 2), null]
+            }
+        });
+        expect(state.honeypots).toEqual([trap(1, -50, 1)]);
+        expect(state.cleanup).toEqual([trap(2, -50, 2)]);
+        expect(Object.keys(state.evidence)).toEqual(["steve"]);
     });
 });
 
@@ -251,7 +292,14 @@ describe("the game's own figures", () => {
 describe("watching a server", () => {
     const INSTALL = "018f2b7a-0000-7000-8000-0000000000e1";
     let world = new Map<string, string>();
-    let players: { name: string; x: number; y: number; z: number; mined: number }[] = [];
+    let players: {
+        name: string;
+        x: number;
+        y: number;
+        z: number;
+        mined: number;
+        online?: boolean;
+    }[] = [];
 
     const key = (x: number, y: number, z: number) => `${x},${y},${z}`;
 
@@ -268,10 +316,27 @@ describe("watching a server", () => {
                 )
                 .join("\n");
         }
-        const reset = /^scoreboard players reset (\w+) polaris_xray_d$/.exec(command);
-        if (reset) {
-            const player = players.find((one) => one.name === reset[1]);
-            if (player) player.mined = 0;
+        if (command === "scoreboard players reset @a[scores={polaris_xray_d=1..}] polaris_xray_d") {
+            for (const one of players) one.mined = 0;
+            return "";
+        }
+        if (command === "execute as @a run data get entity @s Pos") {
+            return players
+                .map(
+                    (one) =>
+                        `${one.name} has the following entity data: [${one.x}d, ${one.y}d, ${one.z}d]`
+                )
+                .join("\n");
+        }
+        const online = /^execute if entity (\S+)$/.exec(command);
+        if (online) {
+            return players.some((one) => one.name === online[1] && one.online !== false)
+                ? "Test passed, count: 1"
+                : "Test failed";
+        }
+        const told = /^tellraw (\S+) /.exec(command);
+        if (told) {
+            fake.warned.push(told[1] as string);
             return "";
         }
         const test =
@@ -292,6 +357,7 @@ describe("watching a server", () => {
         players = [];
         fake.notified.length = 0;
         fake.banned.length = 0;
+        fake.warned.length = 0;
         fake.looks = 0;
         fake.answer = answer;
         // A fresh loop for every test: one left running from the test before
@@ -328,8 +394,20 @@ describe("watching a server", () => {
         return stored.evidence[name.toLowerCase()]?.hits.length ?? 0;
     }
 
+    /** A player walking up to a honeypot, so the loop sees it in place first. */
+    async function approach(name: string, x: number, y: number, z: number) {
+        players = [{ name, x, y, z, mined: 0 }];
+        await look();
+    }
+
+    function mine(name: string, x: number, y: number, z: number, over = {}) {
+        world.set(key(x, y, z), "air");
+        players = [{ name, x, y, z: z + 1, mined: 1, ...over }];
+    }
+
     it("counts a honeypot mined by the player beside it", async () => {
         await withTraps([trap(10, -50, 10)]);
+        await approach("Steve", 10.5, -50, 14.5);
         world.set(key(10, -50, 10), "air");
         players = [{ name: "Steve", x: 10.5, y: -50, z: 12.5, mined: 1 }];
         await look();
@@ -338,10 +416,40 @@ describe("watching a server", () => {
 
     it("does not count one taken by an explosion: nobody's counter moved", async () => {
         await withTraps([trap(20, -50, 20)]);
+        await approach("Alex", 21, -50, 20);
         world.set(key(20, -50, 20), "air");
         players = [{ name: "Alex", x: 21, y: -50, z: 20, mined: 0 }];
         await look();
         expect(hitsOf("Alex")).toBe(0);
+    });
+
+    it("does not pin one gone for a while on the next person to mine a diamond there", async () => {
+        await withTraps([trap(25, -50, 25)]);
+        await approach("Alex", 26, -50, 25);
+        world.set(key(25, -50, 25), "air");
+        for (let index = 0; index < 3; index += 1) await look();
+        players = [{ name: "Alex", x: 26, y: -50, z: 25, mined: 1 }];
+        await look();
+        expect(hitsOf("Alex")).toBe(0);
+    });
+
+    it("does not count one it never saw in place", async () => {
+        await withTraps([trap(28, -50, 28)]);
+        mine("Alex", 28, -50, 28);
+        await look();
+        expect(hitsOf("Alex")).toBe(0);
+    });
+
+    it("pins one honeypot on one player, not on everybody who mined beside it", async () => {
+        await withTraps([trap(35, -50, 35)]);
+        await approach("Steve", 35, -50, 36);
+        world.set(key(35, -50, 35), "air");
+        players = [
+            { name: "Steve", x: 35, y: -50, z: 36, mined: 1 },
+            { name: "Alex", x: 36, y: -50, z: 35, mined: 1 }
+        ];
+        await look();
+        expect(hitsOf("Steve") + hitsOf("Alex")).toBe(1);
     });
 
     it("does not count one gone near somebody who mined a diamond far from it", async () => {
@@ -354,6 +462,7 @@ describe("watching a server", () => {
 
     it("does not count one in a place the game has not loaded", async () => {
         await withTraps([trap(40, -50, 40)]);
+        await approach("Steve", 40, -50, 42);
         world.delete(key(40, -50, 40));
         players = [{ name: "Steve", x: 40, y: -50, z: 41, mined: 1 }];
         await look();
@@ -362,14 +471,55 @@ describe("watching a server", () => {
 
     it("tells the owner at the second honeypot, and bans nobody by default", async () => {
         await withTraps([trap(50, -50, 50), trap(70, -50, 70)]);
-        world.set(key(50, -50, 50), "air");
-        players = [{ name: "Steve", x: 50, y: -50, z: 51, mined: 1 }];
+        await approach("Steve", 50, -50, 52);
+        mine("Steve", 50, -50, 50);
         await look();
         expect(fake.notified).toEqual([]);
-        world.set(key(70, -50, 70), "air");
-        players = [{ name: "Steve", x: 70, y: -50, z: 71, mined: 1 }];
+        await approach("Steve", 70, -50, 72);
+        mine("Steve", 70, -50, 70);
         await look();
         expect(fake.notified).toEqual(["Steve dug to 2 hidden ores on Offgrid"]);
         expect(fake.banned).toEqual([]);
+    });
+
+    it("only counts a warning that reached the player, and tries again when it can", async () => {
+        const warn = { ...DEFAULT_XRAY_SETTINGS, action: "warn" as const };
+        await withTraps([trap(50, -50, 50), trap(70, -50, 70)], warn);
+        await approach("Steve", 50, -50, 52);
+        mine("Steve", 50, -50, 50);
+        await look();
+        await approach("Steve", 70, -50, 72);
+        mine("Steve", 70, -50, 70, { online: false });
+        await look();
+        const stored = () =>
+            (fake.config.xrayTraps as { evidence: Record<string, PlayerEvidence> }).evidence.steve!;
+        expect(fake.warned).toEqual([]);
+        expect(stored().warnedAt).toBeNull();
+
+        players = [{ name: "Steve", x: 0, y: 64, z: 0, mined: 0 }];
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(fake.warned).toEqual(["Steve"]);
+        expect(stored().warnedAt).not.toBeNull();
+    });
+
+    it("keeps both of two writes that land at the same moment", async () => {
+        await withTraps([trap(80, -50, 80)]);
+        const service = await import("@polaris-app/game-servers/src/lib/minecraft/xray-service");
+        await Promise.all([
+            service.updateXray(INSTALL, (state) => ({
+                ...state,
+                honeypots: [...state.honeypots, trap(90, -50, 90)]
+            })),
+            service.updateXray(INSTALL, (state) => ({
+                ...state,
+                settings: { ...state.settings, perDimension: 20 }
+            }))
+        ]);
+        const stored = fake.config.xrayTraps as {
+            honeypots: Honeypot[];
+            settings: { perDimension: number };
+        };
+        expect(stored.honeypots).toHaveLength(2);
+        expect(stored.settings.perDimension).toBe(20);
     });
 });

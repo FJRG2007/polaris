@@ -86,6 +86,11 @@ vi.mock("@polaris/db", () => ({
                 stored = args.data.config;
                 writes += 1;
                 return {};
+            },
+            updateMany: async (args: { data: { config: string } }) => {
+                stored = args.data.config;
+                writes += 1;
+                return { count: 1 };
             }
         }
     }

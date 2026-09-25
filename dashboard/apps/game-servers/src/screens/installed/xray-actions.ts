@@ -12,10 +12,9 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { editionOf } from "../../lib/minecraft/service";
-import { startXrayTraps } from "../../lib/minecraft/xray-service";
+import { startXrayTraps, updateXray } from "../../lib/minecraft/xray-service";
 import { readAllMining, type PlayerMining } from "../../lib/minecraft/stats-service";
 import {
-    XRAY_KEY,
     countingHits,
     readXray,
     verdictOf,
@@ -27,7 +26,7 @@ import {
 
 const { recordAudit } = host.auditService;
 const { requireGameServer } = host.appsInstallAccess;
-const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
+const { readInstallConfig } = host.appsInstallConfig;
 
 export interface XrayPlayer {
     readonly name: string;
@@ -114,8 +113,8 @@ export async function saveXraySettingsAction(
         if (editionOf(row?.catalogId ?? "minecraft") === "bedrock") {
             return { error: "Bedrock keeps no per-player mining counters Polaris can watch" };
         }
-        const state = readXray(readInstallConfig(row?.config));
-        await patchInstallConfig(installedAppId, { [XRAY_KEY]: { ...state, settings } });
+        const saved = await updateXray(installedAppId, (state) => ({ ...state, settings }));
+        if (!saved) return { error: "That server is not here" };
         // On or off, the loop does the work: placing honeypots, or putting the
         // rock back where they were.
         startXrayTraps(access.ownerId, installedAppId);
@@ -146,14 +145,12 @@ export async function clearXrayPlayerAction(
     const { installedAppId, player } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
-        const row = await prisma.installedApp.findUnique({
-            where: { id: installedAppId },
-            select: { config: true }
-        });
-        const state = readXray(readInstallConfig(row?.config));
         const key = player.toLowerCase();
-        const { [key]: _, ...evidence } = state.evidence;
-        await patchInstallConfig(installedAppId, { [XRAY_KEY]: { ...state, evidence } });
+        const cleared = await updateXray(installedAppId, (state) => {
+            const { [key]: _, ...evidence } = state.evidence;
+            return { ...state, evidence };
+        });
+        if (!cleared) return { error: "That server is not here" };
         await recordAudit({
             actorId: user.id,
             action: "games.xray.clear",

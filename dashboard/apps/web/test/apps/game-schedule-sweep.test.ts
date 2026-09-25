@@ -34,6 +34,10 @@ vi.mock("@polaris/db", () => ({
             update: async ({ data }: { data: { config: string } }) => {
                 install = { ...install, config: data.config };
                 return install;
+            },
+            updateMany: async ({ data }: { data: { config: string } }) => {
+                install = { ...install, config: data.config };
+                return { count: 1 };
             }
         },
         application: {
