@@ -86,6 +86,8 @@ describe("what a page may ask the worker for", () => {
                 "itemsFor",
                 "pendingCapture",
                 "secondStepCode",
+                "continueSignIn",
+                "openUnlock",
                 "myDetails",
                 "menuTarget",
                 "saveCaptured",

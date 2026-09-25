@@ -227,6 +227,20 @@ export type Request =
      */
     | { readonly kind: "secondStepCode" }
     /**
+     * Finish a sign-in that asks for the name on one page and the password on
+     * the next, with the login picked on the first - see `lib/second-step.ts`.
+     * Sent by the page when a password box appears. Names no item: the worker
+     * fills the login it remembered for the sender's tab and site, once, through
+     * the same checks as any fill.
+     */
+    | { readonly kind: "continueSignIn" }
+    /**
+     * Open the toolbar popup so a locked vault can be unlocked, from the row a
+     * page's list shows instead of logins while it is locked. Carries nothing
+     * and answers nothing about the vault.
+     */
+    | { readonly kind: "openUnlock" }
+    /**
      * What kind of box the pointer is over, so the right-click menu that opens
      * next offers what fits it - see `lib/context-menu.ts`. A yes or no, about
      * the page the sender is on.
@@ -379,7 +393,9 @@ export type Reply =
           readonly pollMs: number;
       }
     | { readonly ok: true }
-    | { readonly ok: false; readonly error: string };
+    /** `locked` when the refusal is only the vault being locked, so a page's list
+     *  can offer the way to unlock instead of a sentence alone. */
+    | { readonly ok: false; readonly error: string; readonly locked?: true };
 
 /**
  * The only things a script running inside a page may ask for.
@@ -399,6 +415,12 @@ export type Reply =
  * - `fill` and `totpNow` put a credential into that page, which is the whole
  *   feature - and both are checked against the sender's own address first, so
  *   neither can be turned into a fill on a site the item was never saved for.
+ * - `secondStepCode` and `continueSignIn` finish a sign-in somebody already
+ *   picked a login for, on the same tab and site, once each - and go through
+ *   the same check.
+ * - `openUnlock` opens the toolbar popup, which is where the vault is unlocked.
+ *   It is the one thing a page can make happen outside itself, and all it does
+ *   is show somebody the lock screen they would have had to find.
  * - `menuTarget` says only whether the pointer is over a password box, so the
  *   right-click menu can fit the box; it reads nothing and answers nothing.
  * - `breach`, `captured`, `saveCaptured` and `dismissCapture` carry values the
@@ -416,6 +438,8 @@ export const FROM_PAGE: ReadonlySet<Request["kind"]> = new Set([
     "fill",
     "totpNow",
     "secondStepCode",
+    "continueSignIn",
+    "openUnlock",
     "myDetails",
     "menuTarget",
     "breach",

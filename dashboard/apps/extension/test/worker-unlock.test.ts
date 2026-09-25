@@ -127,3 +127,55 @@ describe("unlocking with the master password, through the worker", () => {
         expect(unlocked(await ask({ kind: "status" }))).toBe(false);
     });
 });
+
+describe("unlocking from the popup opened in a tab", () => {
+    /** The page somebody was on, and the popup's tab opened in front of it. */
+    async function popupTab(): Promise<{ page: number; popup: number; url: string }> {
+        const page = await fakeBrowser.tabs.create({ url: "https://site.example/login" });
+        const url = fakeBrowser.runtime.getURL("/popup.html");
+        const popup = await fakeBrowser.tabs.create({ url, active: true });
+        await fakeBrowser.storage.session.set({
+            "vault.unlockTab": { tabId: popup.id, returnTo: page.id }
+        });
+        return { page: page.id!, popup: popup.id!, url };
+    }
+
+    async function askFromTab(request: Request, tabId: number, url: string): Promise<Reply> {
+        let answer: (reply: Reply) => void = () => {};
+        const replied = new Promise<Reply>((resolve) => (answer = resolve));
+        const tab = await fakeBrowser.tabs.get(tabId);
+        await fakeBrowser.runtime.onMessage.trigger(
+            request,
+            { id: fakeBrowser.runtime.id, tab, url },
+            answer
+        );
+        return replied;
+    }
+
+    it("closes that tab and goes back to the page it came from", async () => {
+        await lockedByItself(null);
+        const { page, popup, url } = await popupTab();
+
+        expect(unlocked(await askFromTab({ kind: "unlock", password: PASSWORD }, popup, url))).toBe(
+            true
+        );
+
+        await vi.waitFor(async () => {
+            expect(await fakeBrowser.tabs.get(popup).catch(() => undefined)).toBeUndefined();
+        });
+        expect((await fakeBrowser.tabs.get(page)).active).toBe(true);
+        const { "vault.unlockTab": held } =
+            await fakeBrowser.storage.session.get("vault.unlockTab");
+        expect(held ?? null).toBeNull();
+    });
+
+    it("leaves the tab open when the password was wrong", async () => {
+        await lockedByItself(null);
+        const { popup, url } = await popupTab();
+
+        const reply = await askFromTab({ kind: "unlock", password: "nope" }, popup, url);
+
+        expect(reply.ok).toBe(false);
+        expect((await fakeBrowser.tabs.get(popup)).id).toBe(popup);
+    });
+});

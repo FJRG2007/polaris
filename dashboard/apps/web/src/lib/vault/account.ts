@@ -222,6 +222,38 @@ export async function bumpRevision(userId: string | null | undefined): Promise<v
         .catch(() => undefined);
 }
 
+/**
+ * Move the revision date for everybody who sees a changed item, not only for
+ * whoever changed it.
+ *
+ * The revision date is how every client knows to sync, and an item in a shared
+ * vault is in every member's sync. Moved for the author alone, a login added to
+ * a shared vault reached nobody else until something of their own happened to
+ * change. Members still at the invitation have no account to move yet, and
+ * moving one that did not need it costs a sync that finds nothing new.
+ */
+export async function bumpRevisionFor(
+    userId: string,
+    organizationIds: readonly (string | null | undefined)[]
+): Promise<void> {
+    const vaults = [...new Set(organizationIds.filter((id): id is string => Boolean(id)))];
+    if (vaults.length === 0) return bumpRevision(userId);
+    const members = await prisma.vaultOrgUser
+        .findMany({
+            where: { orgId: { in: vaults }, userId: { not: null } },
+            select: { userId: true }
+        })
+        .catch(() => [] as { userId: string | null }[]);
+    const everyone = new Set([userId]);
+    for (const member of members) if (member.userId) everyone.add(member.userId);
+    await prisma.vaultAccount
+        .updateMany({
+            where: { userId: { in: [...everyone] } },
+            data: { revisionDate: new Date() }
+        })
+        .catch(() => undefined);
+}
+
 /** When this vault last changed, as clients ask for before pulling. */
 export async function revisionDate(userId: string): Promise<Date | null> {
     const account = await prisma.vaultAccount.findUnique({
@@ -281,7 +313,10 @@ export async function deleteVault(userId: string): Promise<void> {
         prisma.vaultAttachment.findMany({
             where: {
                 cipher: {
-                    OR: [{ userId }, ...(orphanedIds.length > 0 ? [{ organizationId: { in: orphanedIds } }] : [])]
+                    OR: [
+                        { userId },
+                        ...(orphanedIds.length > 0 ? [{ organizationId: { in: orphanedIds } }] : [])
+                    ]
                 }
             },
             select: { storedPath: true }

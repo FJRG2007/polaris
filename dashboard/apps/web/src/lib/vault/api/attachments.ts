@@ -15,8 +15,8 @@ import { prisma } from "@polaris/db";
 import * as blobs from "@/lib/vault/blobs";
 import { isEncString } from "@polaris/core";
 import { vaultError } from "@/lib/vault/auth";
-import { getCipher } from "@/lib/vault/ciphers";
-import { bumpRevision } from "@/lib/vault/account";
+import { getCipher, organizationsOf } from "@/lib/vault/ciphers";
+import { bumpRevisionFor } from "@/lib/vault/account";
 import { pipeThenDispose } from "@/lib/drive-stream";
 import { readJsonBody, requirePrincipal, type VaultContext } from "@/lib/vault/api/router";
 
@@ -115,7 +115,7 @@ export async function receiveUpload(context: VaultContext): Promise<Response> {
         where: { id: attachmentId },
         data: { size: stored.size }
     });
-    await bumpRevision(principal.userId);
+    await bumpRevisionFor(principal.userId, await organizationsOf([cipherId]));
     return new Response(null, { status: 201 });
 }
 
@@ -164,6 +164,6 @@ export async function remove(context: VaultContext): Promise<Response> {
     if (!attachment) return vaultError("Not found", 404);
     await prisma.vaultAttachment.delete({ where: { id: attachment.id } });
     await blobs.deleteVaultBlob(attachment.storedPath);
-    await bumpRevision(principal.userId);
+    await bumpRevisionFor(principal.userId, await organizationsOf([cipherId]));
     return new Response(null, { status: 200 });
 }

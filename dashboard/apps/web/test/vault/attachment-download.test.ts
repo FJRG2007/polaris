@@ -34,8 +34,11 @@ vi.mock("@/lib/vault/blobs", () => ({
     writeVaultBlob: vi.fn(),
     deleteVaultBlob: vi.fn()
 }));
-vi.mock("@/lib/vault/ciphers", () => ({ getCipher: vi.fn(async () => ({ id: CIPHER })) }));
-vi.mock("@/lib/vault/account", () => ({ bumpRevision: vi.fn(async () => undefined) }));
+vi.mock("@/lib/vault/ciphers", () => ({
+    getCipher: vi.fn(async () => ({ id: CIPHER })),
+    organizationsOf: vi.fn(async () => [null])
+}));
+vi.mock("@/lib/vault/account", () => ({ bumpRevisionFor: vi.fn(async () => undefined) }));
 vi.mock("@/lib/vault/auth", () => ({
     vaultError: (message: string, status: number) =>
         Response.json({ message, object: "error" }, { status })

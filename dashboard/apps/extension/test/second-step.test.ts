@@ -12,6 +12,7 @@ import { sameSite, stepFor, type SecondStep } from "../src/lib/second-step";
 const NOW = 1_000_000;
 
 const held: SecondStep = {
+    stage: "code",
     tabId: 7,
     itemId: "item-1",
     url: "https://login.example.com/signin",
@@ -20,27 +21,40 @@ const held: SecondStep = {
 
 describe("the code step waiting for a page", () => {
     it("is handed to the same tab on the same site", () => {
-        expect(stepFor(held, { tabId: 7, url: "https://login.example.com/2fa" }, NOW)).toBe(held);
+        expect(stepFor(held, { tabId: 7, url: "https://login.example.com/2fa" }, NOW, "code")).toBe(
+            held
+        );
     });
 
     it("follows a sign-in that hands over to another host of the site", () => {
-        expect(stepFor(held, { tabId: 7, url: "https://auth.example.com/otp" }, NOW)).toBe(held);
+        expect(stepFor(held, { tabId: 7, url: "https://auth.example.com/otp" }, NOW, "code")).toBe(
+            held
+        );
     });
 
     it("is not handed to another tab", () => {
-        expect(stepFor(held, { tabId: 8, url: "https://login.example.com/2fa" }, NOW)).toBeNull();
+        expect(
+            stepFor(held, { tabId: 8, url: "https://login.example.com/2fa" }, NOW, "code")
+        ).toBeNull();
     });
 
     it("is not handed to a tab that has gone to another site", () => {
-        expect(stepFor(held, { tabId: 7, url: "https://example.org/2fa" }, NOW)).toBeNull();
+        expect(stepFor(held, { tabId: 7, url: "https://example.org/2fa" }, NOW, "code")).toBeNull();
     });
 
     it("runs out", () => {
-        expect(stepFor(held, { tabId: 7, url: held.url }, held.until)).toBeNull();
+        expect(stepFor(held, { tabId: 7, url: held.url }, held.until, "code")).toBeNull();
+    });
+
+    it("is not handed to a box of the other kind", () => {
+        const page = { tabId: 7, url: "https://login.example.com/2fa" };
+        expect(stepFor(held, page, NOW, "password")).toBeNull();
+        expect(stepFor({ ...held, stage: "password" }, page, NOW, "code")).toBeNull();
+        expect(stepFor({ ...held, stage: "password" }, page, NOW, "password")).not.toBeNull();
     });
 
     it("is nothing when nothing was filled", () => {
-        expect(stepFor(null, { tabId: 7, url: held.url }, NOW)).toBeNull();
+        expect(stepFor(null, { tabId: 7, url: held.url }, NOW, "code")).toBeNull();
     });
 });
 

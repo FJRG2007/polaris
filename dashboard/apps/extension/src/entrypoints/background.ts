@@ -10,19 +10,19 @@ import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
 import { injectableOrigins } from "@/lib/injection";
 import { chromiumBrowser } from "@/lib/browser-name";
-import { generatePassword } from "@polaris/core/password-generator";
-import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
-import { MENU, MENU_ENTRIES, visibleEntries, type MenuTarget } from "@/lib/context-menu";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
 import { offerFor, type CaptureOffer } from "@/lib/capture";
-import { SECOND_STEP_FOR_MS, sameSite, stepFor, type SecondStep } from "@/lib/second-step";
 import { noticeFor, type UpdateNotice } from "@/lib/update";
-import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
-import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
+import { generatePassword } from "@polaris/core/password-generator";
 import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
+import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
+import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
+import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
+import { MENU, MENU_ENTRIES, visibleEntries, type MenuTarget } from "@/lib/context-menu";
+import { SECOND_STEP_FOR_MS, sameSite, stepFor, type SecondStep } from "@/lib/second-step";
 import {
     decrypt,
     decryptRsa,
@@ -311,6 +311,20 @@ type AuthorizationState =
      *  picking one. */
     | "accountless";
 
+/**
+ * The tab an approval was opened in, and the one somebody was on before it.
+ *
+ * Kept with the request so the worker can close it once the answer is in: the
+ * approval is a detour, and leaving somebody on a "you can close this page"
+ * screen with the page they were signing in to one tab over is a step that
+ * exists for nobody. Optional on the requests because one opened by an older
+ * build of this worker carries neither.
+ */
+interface ApprovalTab {
+    readonly tabId: number | null;
+    readonly returnTo: number | null;
+}
+
 /** A request in flight, and what has become of it. */
 interface WaitingRequest {
     readonly deviceCode: string;
@@ -321,6 +335,7 @@ interface WaitingRequest {
     /** When the server stops answering for this code, as a moment. */
     readonly until: number;
     readonly state: AuthorizationState;
+    readonly tab?: ApprovalTab;
 }
 
 /** The pair this extension generated for a request in flight. Memory only. */
@@ -342,9 +357,15 @@ interface LinkWaiting {
     readonly pollMs: number;
     readonly until: number;
     readonly state: "pending" | "approved" | "denied" | "expired";
+    readonly tab?: ApprovalTab;
 }
 
 const LINK_WAITING = storage.defineItem<LinkWaiting | null>("session:link.waiting", {
+    fallback: null
+});
+
+/** The popup opened in a tab to unlock, and the tab somebody was on when it opened. */
+const UNLOCK_TAB = storage.defineItem<ApprovalTab | null>("session:vault.unlockTab", {
     fallback: null
 });
 
@@ -691,6 +712,50 @@ function startCollecting(): void {
 /** Leave the request where the popup will find out what happened to it. */
 async function settle(waiting: WaitingRequest, state: AuthorizationState): Promise<void> {
     await WAITING.setValue({ ...waiting, state });
+    // Yes and no were both said in that tab, so it has nothing left to show. The
+    // other endings are this browser's to explain, and the tab stays for them.
+    if (state === "approved" || state === "denied") await closeApproval(waiting.tab);
+}
+
+/**
+ * Open the page that decides on a request, remembering where somebody was.
+ *
+ * `reuse` is a tab already showing an approval - the connection's, which goes
+ * straight on to the vault's - so one detour is one tab rather than two.
+ */
+async function openApproval(url: string, reuse: ApprovalTab | null = null): Promise<ApprovalTab> {
+    if (reuse?.tabId != null) {
+        const moved = await browser.tabs.update(reuse.tabId, { url }).catch(() => null);
+        if (moved) return reuse;
+    }
+    // Where somebody was is a nicety: not knowing it must not stop the approval.
+    const [from] = await browser.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+    const opened = await browser.tabs.create({
+        url,
+        ...(from?.id !== undefined ? { openerTabId: from.id } : {})
+    });
+    return { tabId: opened.id ?? null, returnTo: from?.id ?? null };
+}
+
+/**
+ * Close an approval's tab and put somebody back where they were.
+ *
+ * Only while that tab is still on this Polaris: one somebody has since taken
+ * somewhere else is theirs now, and closing it would lose whatever they went to.
+ * The tab they came from is brought back only when the closed one was in front,
+ * so an approval answered in the background does not pull focus.
+ */
+async function closeApproval(held: ApprovalTab | undefined): Promise<void> {
+    if (held?.tabId == null) return;
+    const [tab, origin] = await Promise.all([
+        browser.tabs.get(held.tabId).catch(() => null),
+        currentOrigin()
+    ]);
+    if (!tab?.url || !origin || originOfPage(tab.url) !== origin) return;
+    await browser.tabs.remove(held.tabId).catch(() => undefined);
+    if (tab.active && held.returnTo !== null) {
+        await browser.tabs.update(held.returnTo, { active: true }).catch(() => undefined);
+    }
 }
 
 /**
@@ -973,6 +1038,7 @@ async function collectLink(): Promise<void> {
         if (!claim || claim.status === "pending") continue;
         if (claim.status !== "approved") {
             await LINK_WAITING.setValue({ ...still, state: claim.status });
+            if (claim.status === "denied") await closeApproval(still.tab);
             return;
         }
 
@@ -994,9 +1060,72 @@ async function collectLink(): Promise<void> {
         // is spent, and the first check after the switch would read the refusal as
         // a disconnection and close its vault.
         await inTurn(() => dropParked(accounts.accountId(origin, claim.account.email)));
+        // Connecting is the first half of what somebody came for, and the vault
+        // is the second. Where the account may use one and this browser is not
+        // in it yet, its approval opens in the same tab straight away - one
+        // detour, rather than a tab, a trip back to the popup and a second tab.
+        // Otherwise the tab has done its job.
+        const [canVault, inVault] = await Promise.all([LINK_VAULT.getValue(), REFRESH.getValue()]);
+        const chained =
+            canVault && inVault === null && still.tab?.tabId != null
+                ? await requestVault(origin, claim.token, still.tab).catch(() => null)
+                : null;
         await LINK_WAITING.setValue({ ...still, state: "approved" });
+        if (!chained?.ok) await closeApproval(still.tab);
         return;
     }
+}
+
+/**
+ * Ask Polaris to let this browser into the vault, and open the page that decides.
+ *
+ * `reuse` is the connection's approval tab when this follows straight on from
+ * it, so the vault's page opens there rather than in a second tab.
+ */
+async function requestVault(
+    origin: string,
+    connection: string,
+    reuse: ApprovalTab | null = null
+): Promise<messages.Reply> {
+    // A pair for this one exchange. The public half goes to the server; the
+    // private half stays here and is the only thing that can open what comes
+    // back.
+    const pair = await generateRsaKeyPair();
+    const opened = await protocol.openAuthorization(vaultBase(origin), {
+        publicKey: pair.publicKey,
+        device: await device(),
+        extensionToken: connection
+    });
+    if (!opened) return { ok: false, error: "That server did not answer." };
+
+    // Whatever pair this replaces is unreachable the moment it is overwritten, so
+    // its private half is zeroed first rather than left in memory with nothing
+    // referring to it - which is the care the collecting takes on both of its own
+    // paths.
+    asking?.privateKey.fill(0);
+    asking = { publicKey: pair.publicKey, privateKey: pair.privateKey };
+    await WAITING.setValue({
+        deviceCode: opened.deviceCode,
+        userCode: opened.userCode,
+        pollMs: opened.pollMs,
+        until: readExpiry(opened.expiresAt),
+        state: "pending"
+    });
+    // Waited on here, before the tab exists. Opening it is what closes the popup,
+    // so this worker is the only thing that can still be listening by the time
+    // somebody presses yes.
+    startCollecting();
+    // Opened here rather than left to the popup: a popup is torn down the moment
+    // it loses focus, which is exactly what opening a tab does to it.
+    const tab = await openApproval(
+        `${origin}/vault/authorize?code=${encodeURIComponent(opened.userCode)}`,
+        reuse
+    );
+    // Written back only onto the same request: somebody cancelling in the
+    // meantime has already moved it on.
+    const held = await WAITING.getValue();
+    if (held?.deviceCode === opened.deviceCode) await WAITING.setValue({ ...held, tab });
+    return { ok: true, waiting: "pending", userCode: opened.userCode, pollMs: opened.pollMs };
 }
 
 /** Which key opens this item: its vault's, or the account's own. */
@@ -1206,7 +1335,10 @@ async function capture(
     }
     const first = await FIRST_STEP.getValue();
     const earlier =
-        first && first.tabId === page.tabId && first.until > Date.now() && sameSite(first.url, page.url)
+        first &&
+        first.tabId === page.tabId &&
+        first.until > Date.now() &&
+        sameSite(first.url, page.url)
             ? first.username
             : "";
 
@@ -1659,6 +1791,26 @@ async function rememberEmail(profile: Record<string, unknown>): Promise<void> {
 }
 
 /**
+ * How long one look at the server's revision is trusted.
+ *
+ * The look is one row, so it can be asked often; this is only so that a burst
+ * of reasons to ask - a tab switch, the page finishing, the list opening - is
+ * one request rather than three.
+ */
+const FRESH_FOR_MS = 10_000;
+
+/** The longest a list waits on that look before drawing what is already held:
+ *  a slow server should cost a stale list, never a list that does not open. */
+const FRESH_WAIT_MS = 1_500;
+
+/** When the server was last asked, in this worker's life. A recycled worker
+ *  starts at zero, which is a look on the first reason to take one. */
+let lookedAt = 0;
+
+/** The look in flight, so every reason that arrives during it shares it. */
+let looking: Promise<void> | null = null;
+
+/**
  * Bring the vault down, if there is anything new.
  *
  * The revision date is one row rather than every item, so it is what a poll asks
@@ -1697,8 +1849,45 @@ async function sync(force: boolean): Promise<boolean> {
     // from - so an open vault that started without them has them now.
     const opened = await vault();
     if (opened) open = { key: opened.key, organizations: await organizationKeys(opened.key) };
+    lookedAt = Date.now();
     await badge();
     return true;
+}
+
+/**
+ * Bring down whatever changed elsewhere, if anything did.
+ *
+ * Polaris pushes nothing, so a login saved in the dashboard reaches this
+ * browser only when it asks - and it used to ask only when it was unlocked or
+ * somebody pressed Sync, so the login they had just saved was missing from the
+ * page they went straight back to. Now it asks at the moments that matter: the
+ * tab in front changing, a page finishing loading, a list about to be drawn,
+ * and once a minute while the vault is open. Each is the revision date alone,
+ * and the items come down only when it moved.
+ *
+ * Only while the vault is open: a locked vault could not read what came down,
+ * and unlocking syncs anyway.
+ */
+function freshen(): Promise<void> {
+    if (looking) return looking;
+    if (!open || Date.now() - lookedAt < FRESH_FOR_MS) return Promise.resolve();
+    lookedAt = Date.now();
+    looking = inTurn(async () => {
+        if (await vault()) await sync(false);
+    })
+        .then(
+            () => undefined,
+            () => undefined
+        )
+        .finally(() => {
+            looking = null;
+        });
+    return looking;
+}
+
+/** Freshen before answering with a list, for as long as it is worth waiting. */
+async function freshBeforeListing(): Promise<void> {
+    await Promise.race([freshen(), sleep(FRESH_WAIT_MS)]);
 }
 
 /**
@@ -1899,6 +2088,20 @@ function typeIntoPage(
 async function fill(id: string, page: PageContext | null = null): Promise<messages.Reply> {
     const target = page ?? (await activeTab());
     if (!target) return { ok: false, error: "There is no page to fill." };
+    const running = fillTab(id, target);
+    filling.set(target.tabId, running);
+    try {
+        return await running;
+    } finally {
+        if (filling.get(target.tabId) === running) filling.delete(target.tabId);
+    }
+}
+
+/** The fill still typing into each tab, so a page asking for the next step waits
+ *  for the step it is asking about to have been written. */
+const filling = new Map<number, Promise<messages.Reply>>();
+
+async function fillTab(id: string, target: PageContext): Promise<messages.Reply> {
     const tab = { id: target.tabId, url: target.url };
     const login = (await logins()).find((one) => one.id === id);
     if (!login) return { ok: false, error: "That item is not open." };
@@ -1942,13 +2145,26 @@ async function fill(id: string, page: PageContext | null = null): Promise<messag
         // next - on the page the sign-in lands on, or on this one a moment later.
         // Remembered for the tab; the page's own script asks for it when the code
         // box appears.
-        if (filled.pass && !filled.code && login.totp) {
+        //
+        // And a name that went in with no password box beside it is the first
+        // page of a sign-in that asks for the password on the next: the login
+        // somebody picked is remembered for that one too, so they pick once.
+        const next =
+            filled.pass && !filled.code && login.totp
+                ? "code"
+                : filled.user && !filled.pass && login.password
+                  ? "password"
+                  : null;
+        if (next !== null) {
             await SECOND_STEP.setValue({
+                stage: next,
                 tabId: tab.id,
                 itemId: login.id,
                 url: tab.url,
                 until: Date.now() + SECOND_STEP_FOR_MS
             });
+        } else if ((await SECOND_STEP.getValue())?.tabId === tab.id) {
+            await SECOND_STEP.setValue(null);
         }
         return { ok: true };
     } catch {
@@ -2174,10 +2390,19 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     // it - the whole vault, any field of any item as a string, the accounts - is
     // refused here before it is read.
     const page: PageContext | null =
-        sender.tab?.id !== undefined && typeof sender.url === "string" && /^https?:/i.test(sender.url)
+        sender.tab?.id !== undefined &&
+        typeof sender.url === "string" &&
+        /^https?:/i.test(sender.url)
             ? { tabId: sender.tab.id, url: sender.url }
             : null;
-    if (sender.tab && (page === null || !messages.FROM_PAGE.has(request.kind))) return false;
+    // The popup opened in a tab - where the browser would not open it over the
+    // toolbar - is still one of the extension's own pages. Its address is this
+    // extension's own origin, which no web page and no content script can have.
+    const ours =
+        typeof sender.url === "string" && sender.url.startsWith(browser.runtime.getURL("/"));
+    if (sender.tab && !ours && (page === null || !messages.FROM_PAGE.has(request.kind))) {
+        return false;
+    }
 
     const answer = async (): Promise<messages.Reply> => {
         switch (request.kind) {
@@ -2234,7 +2459,11 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // Opened here rather than in the popup: opening a tab is what
                 // closes the popup, so this worker is the only thing that can
                 // still be listening when somebody presses yes.
-                await browser.tabs.create({ url: `${origin}${opened.approveUrl}` });
+                const tab = await openApproval(`${origin}${opened.approveUrl}`);
+                const held = await LINK_WAITING.getValue();
+                if (held?.deviceCode === opened.deviceCode) {
+                    await LINK_WAITING.setValue({ ...held, tab });
+                }
                 return {
                     ok: true,
                     waiting: "pending",
@@ -2293,46 +2522,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 if (!connection) {
                     return { ok: false, error: "Connect this browser to Polaris first." };
                 }
-                // A pair for this one exchange. The public half goes to the server;
-                // the private half stays here and is the only thing that can open
-                // what comes back.
-                const pair = await generateRsaKeyPair();
-                const opened = await protocol.openAuthorization(vaultBase(origin), {
-                    publicKey: pair.publicKey,
-                    device: await device(),
-                    extensionToken: connection
-                });
-                if (!opened) return { ok: false, error: "That server did not answer." };
-
-                // Whatever pair this replaces is unreachable the moment it is
-                // overwritten, so its private half is zeroed first rather than left
-                // in memory with nothing referring to it - which is the care the
-                // collecting takes on both of its own paths.
-                asking?.privateKey.fill(0);
-                asking = { publicKey: pair.publicKey, privateKey: pair.privateKey };
-                await WAITING.setValue({
-                    deviceCode: opened.deviceCode,
-                    userCode: opened.userCode,
-                    pollMs: opened.pollMs,
-                    until: readExpiry(opened.expiresAt),
-                    state: "pending"
-                });
-                // Waited on here, before the tab exists. Opening it is what closes
-                // the popup, so this worker is the only thing that can still be
-                // listening by the time somebody presses yes.
-                startCollecting();
-                // Opened here rather than left to the popup: a popup is torn down
-                // the moment it loses focus, which is exactly what opening a tab
-                // does to it.
-                await browser.tabs.create({
-                    url: `${origin}/vault/authorize?code=${encodeURIComponent(opened.userCode)}`
-                });
-                return {
-                    ok: true,
-                    waiting: "pending",
-                    userCode: opened.userCode,
-                    pollMs: opened.pollMs
-                };
+                return requestVault(origin, connection);
             }
 
             case "authorizeCheck": {
@@ -2394,6 +2584,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // land after a switch and be read as the incoming account's.
                 void inTurn(() => sync(false));
                 await badge();
+                if (ours) void leaveUnlockTab(sender.tab?.id);
                 return { ok: true, status: await status() };
             }
 
@@ -2516,8 +2707,11 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // under the box read as "nothing saved for this site", which is
                 // wrong and sends somebody off to save a login they already have.
                 if (!(await vault())) {
-                    return { ok: false, error: "Unlock Polaris from the toolbar to fill this." };
+                    return { ok: false, error: "Your vault is locked.", locked: true };
                 }
+                // Anything saved elsewhere since the last look - a login added in
+                // Polaris a moment ago - is in this list rather than the next one.
+                await freshBeforeListing();
                 const vaults = await vaultNames();
                 // The page's own address where a page asked, never the one it
                 // named: an inline script that could ask about another site would
@@ -2532,6 +2726,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "items": {
+                await freshBeforeListing();
                 const all = await onOpenShelf(await logins());
                 // Matched the way somebody actually remembers a login rather than
                 // by a run of characters, and ranked as well as filtered. Both
@@ -2566,7 +2761,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "secondStepCode": {
                 if (!page) return { ok: false, error: "There is no page here." };
-                const held = stepFor(await SECOND_STEP.getValue(), page, Date.now());
+                const held = stepFor(await SECOND_STEP.getValue(), page, Date.now(), "code");
                 if (!held) return { ok: false, error: "There is no code waiting for this page." };
                 // Once: the box that asked gets it, and a second code box on the
                 // same page is somebody's own to fill.
@@ -2579,6 +2774,25 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 if (!code) return { ok: false, error: "That authenticator value cannot be read." };
                 return { ok: true, code, remaining: totpRemaining(login.totp) };
             }
+
+            case "continueSignIn": {
+                if (!page) return { ok: false, error: "There is no page here." };
+                await filling.get(page.tabId);
+                const held = stepFor(await SECOND_STEP.getValue(), page, Date.now(), "password");
+                if (!held) return { ok: false, error: "There is nothing waiting for this page." };
+                // Once, like the code: a second password box on the same page is
+                // somebody's own. The fill itself is held to every rule any fill
+                // is - the site switched off, the item saved for this page - and
+                // it is what remembers the code step, when the login has one.
+                await SECOND_STEP.setValue(null);
+                return fill(held.itemId, page);
+            }
+
+            case "openUnlock":
+                // Only while there is something to unlock: an open vault has
+                // nothing to show behind the popup that the page's list lacks.
+                if (!(await vault())) await askToUnlock();
+                return { ok: true };
 
             case "myDetails": {
                 if (!(await vault())) return { ok: false, error: "Unlock Polaris first." };
@@ -2607,7 +2821,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "captured":
-                return page ? capture(page, request) : { ok: false, error: "There is no page here." };
+                return page
+                    ? capture(page, request)
+                    : { ok: false, error: "There is no page here." };
 
             case "pendingCapture": {
                 if (!page) return { ok: false, error: "There is no page here." };
@@ -2782,7 +2998,9 @@ function typeIntoFocused(value: string, mode: "password" | "code" | "text"): boo
     const active = document.activeElement;
     const put = (field: HTMLInputElement | HTMLTextAreaElement, text: string): void => {
         const proto =
-            field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+            field instanceof HTMLTextAreaElement
+                ? HTMLTextAreaElement.prototype
+                : HTMLInputElement.prototype;
         Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(field, text);
         field.dispatchEvent(new Event("input", { bubbles: true }));
         field.dispatchEvent(new Event("change", { bubbles: true }));
@@ -2791,7 +3009,8 @@ function typeIntoFocused(value: string, mode: "password" | "code" | "text"): boo
     if (active instanceof HTMLElement && active.isContentEditable) {
         return document.execCommand("insertText", false, value);
     }
-    if (!(active instanceof HTMLInputElement) && !(active instanceof HTMLTextAreaElement)) return false;
+    if (!(active instanceof HTMLInputElement) && !(active instanceof HTMLTextAreaElement))
+        return false;
     if (active.disabled || active.readOnly) return false;
 
     if (mode === "code" && active instanceof HTMLInputElement && active.maxLength === 1) {
@@ -2826,13 +3045,45 @@ function typeIntoFocused(value: string, mode: "password" | "code" | "text"): boo
  * Open the popup, for an entry that needs the vault while it is locked.
  *
  * The toolbar popup is where the vault is unlocked, and a right-click is a
- * gesture the browser accepts for opening it. A browser without the call just
- * does nothing, which is what the entry did before.
+ * gesture the browser accepts for opening it. A browser without the call, or one
+ * that refuses it (Firefox, asked from a page's list rather than a gesture), gets
+ * the same popup in a tab instead.
  */
 async function askToUnlock(): Promise<void> {
-    const api = browser as unknown as Record<"action" | "browserAction", { openPopup?: () => Promise<void> } | undefined>;
+    const api = browser as unknown as Record<
+        "action" | "browserAction",
+        { openPopup?: () => Promise<void> } | undefined
+    >;
     const action = api.action ?? api.browserAction;
-    await action?.openPopup?.().catch(() => undefined);
+    const opened = await Promise.resolve()
+        .then(() => action?.openPopup?.())
+        .then(
+            () => action?.openPopup !== undefined,
+            () => false
+        );
+    if (opened) return;
+    const url = browser.runtime.getURL("/popup.html");
+    const [from] = await browser.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+    const tab = await browser.tabs
+        .create({ url, ...(from?.id !== undefined ? { openerTabId: from.id } : {}) })
+        .catch(() => null);
+    if (tab?.id !== undefined)
+        await UNLOCK_TAB.setValue({ tabId: tab.id, returnTo: from?.id ?? null });
+}
+
+/**
+ * Close the popup's tab once it has unlocked, and put somebody back on the page
+ * they came from - which is where the logins it just opened are for.
+ */
+async function leaveUnlockTab(tabId: number | undefined): Promise<void> {
+    const held = await UNLOCK_TAB.getValue();
+    if (tabId === undefined || held?.tabId !== tabId) return;
+    await UNLOCK_TAB.setValue(null);
+    const tab = await browser.tabs.get(tabId).catch(() => null);
+    await browser.tabs.remove(tabId).catch(() => undefined);
+    if (tab?.active && held.returnTo !== null) {
+        await browser.tabs.update(held.returnTo, { active: true }).catch(() => undefined);
+    }
 }
 
 /** Run the typing function in the frame that was clicked. */
@@ -2874,7 +3125,9 @@ async function fromMenu(
     if (entry === MENU.generate) {
         // Needs no vault: the generator is pure, and a password made for a form
         // is offered for saving when the form goes, like one typed by hand.
-        const options = readGeneratorOptions(await storage.getItem<unknown>(GENERATOR_KEY).catch(() => null));
+        const options = readGeneratorOptions(
+            await storage.getItem<unknown>(GENERATOR_KEY).catch(() => null)
+        );
         const value = generatePassword(options);
         if (value) await typeInFrame(tab.id, frameId, value, "password");
         return;
@@ -2920,7 +3173,12 @@ async function setupMenus(): Promise<void> {
     fitted = null;
     menus.create({ id: MENU.root, title: "Polaris", contexts: ["editable"] });
     for (const entry of MENU_ENTRIES) {
-        menus.create({ id: entry.id, parentId: MENU.root, title: entry.title, contexts: ["editable"] });
+        menus.create({
+            id: entry.id,
+            parentId: MENU.root,
+            title: entry.title,
+            contexts: ["editable"]
+        });
     }
 }
 
@@ -2935,15 +3193,23 @@ async function fitMenu(target: MenuTarget): Promise<void> {
     const shown = visibleEntries(target);
     await Promise.all(
         MENU_ENTRIES.map((entry) =>
-            Promise.resolve(menus.update(entry.id, { visible: shown[entry.id] })).catch(() => undefined)
+            Promise.resolve(menus.update(entry.id, { visible: shown[entry.id] })).catch(
+                () => undefined
+            )
         )
     );
 }
 
-/** Keep the badge honest as somebody moves around. */
-browser.tabs.onActivated.addListener(() => void badge());
+/** Keep the badge honest as somebody moves around, and the items with it: coming
+ *  back from saving a login in Polaris is a tab switch, and so is the moment
+ *  somebody is about to use it. */
+browser.tabs.onActivated.addListener(() => {
+    void badge();
+    void freshen();
+});
 browser.tabs.onUpdated.addListener((_id, change) => {
     if (change.url || change.status === "complete") void badge();
+    if (change.status === "complete") void freshen();
 });
 /** A closed tab's waiting code step goes with it. */
 browser.tabs.onRemoved.addListener((id) => {
@@ -3062,6 +3328,9 @@ export default defineBackground(() => {
             // `vault()` is what locks it; this only has to notice that it did, so
             // the badge stops offering counts for a vault nobody can read.
             if (!(await vault()) && wasOpen) await badge();
+            // And, while it is open, whatever changed elsewhere: a browser left on
+            // one page all afternoon still has today's logins when it is used.
+            void freshen();
             // The accounts set aside keep their own deadlines, and nothing else
             // ever looks at them: a switch that never comes refuses an expired
             // vault it is not holding, which is not the same as not holding it.
