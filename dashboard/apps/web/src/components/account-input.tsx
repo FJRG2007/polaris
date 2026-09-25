@@ -309,9 +309,14 @@ export function AccountInput({
                     <ul
                         id={listId}
                         role="listbox"
+                        // Pointer events back on: a modal dialog turns them off on
+                        // the body while it is open, and this list is drawn there,
+                        // so inside a dialog it could be seen and not hovered or
+                        // chosen from. React still counts it as the dialog's own,
+                        // so choosing from it does not close the dialog.
                         // Above the dialog it is usually inside, which sits at z-50.
                         style={{ left: anchor.left, top: anchor.top, width: anchor.width }}
-                        className={cn(POPUP_CLASS, "fixed z-[60]")}
+                        className={cn(POPUP_CLASS, "pointer-events-auto fixed z-[60]")}
                     >
                         {results.map((account, index) => {
                             const identity = identityOf(account);
