@@ -26,12 +26,13 @@ const findAccount = vi.fn(async () => ({
     user: { name: "Someone", email: "someone@polaris.test", emailVerified: true }
 }));
 const hasPermission = vi.fn(async () => true);
+const updateDevice = vi.fn(async () => ({ count: 1 }));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         vaultAccount: { findFirst: vi.fn(), findUniqueOrThrow: findAccount },
         vaultOrgUser: { findMany: vi.fn(async () => []) },
-        vaultDevice: { upsert: vi.fn() },
+        vaultDevice: { upsert: vi.fn(), updateMany: updateDevice },
         vaultRefreshToken: { findUnique: findToken, update: updateToken, create: createToken }
     }
 }));
@@ -77,6 +78,35 @@ describe("vaultRefresh", () => {
         const result = await identity.vaultRefresh("token");
         expect(result.ok).toBe(true);
         expect(updateToken).toHaveBeenCalled();
+    });
+
+    it("renames the token's own device when the client restates its name", async () => {
+        const result = await identity.vaultRefresh("token", "Brave on Windows");
+        expect(result.ok).toBe(true);
+        expect(updateDevice).toHaveBeenCalledWith({
+            where: { id: "device-1", NOT: { name: "Brave on Windows" } },
+            data: { name: "Brave on Windows" }
+        });
+    });
+
+    it("still rotates the token when the relabel fails", async () => {
+        updateDevice.mockRejectedValueOnce(new Error("gone"));
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        const result = await identity.vaultRefresh("token", "Brave on Windows");
+        expect(result.ok).toBe(true);
+        expect(updateToken).toHaveBeenCalled();
+    });
+
+    it("leaves the device alone when no name is given", async () => {
+        await identity.vaultRefresh("token");
+        expect(updateDevice).not.toHaveBeenCalled();
+    });
+
+    it("renames nothing on a refused refresh", async () => {
+        findToken.mockResolvedValue(tokenRow({ revokedAt: new Date() }));
+        const result = await identity.vaultRefresh("token", "Brave on Windows");
+        expect(result.ok).toBe(false);
+        expect(updateDevice).not.toHaveBeenCalled();
     });
 
     it("refuses a banned account and mints nothing", async () => {

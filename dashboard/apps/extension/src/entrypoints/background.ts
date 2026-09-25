@@ -9,13 +9,15 @@ import { searchLogins } from "@/lib/search";
 import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
 import { injectableOrigins } from "@/lib/injection";
+import { chromiumBrowser } from "@/lib/browser-name";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
 import { offerFor, type CaptureOffer } from "@/lib/capture";
+import { SECOND_STEP_FOR_MS, sameSite, stepFor, type SecondStep } from "@/lib/second-step";
 import { noticeFor, type UpdateNotice } from "@/lib/update";
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
-import { baseDomain, hostOf, readUriMatch, type UriMatch } from "@polaris/core";
+import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
 import {
@@ -240,6 +242,27 @@ const UPDATE = storage.defineItem<UpdateNotice | null>("local:update.notice", { 
 const CAPTURE = storage.defineItem<HeldCapture | null>("session:vault.capture", {
     fallback: null
 });
+/**
+ * The login just filled into a tab whose code the next step will ask for - see
+ * `lib/second-step.ts`. Session storage for the same reason as the capture: the
+ * worker is recycled between the sign-in and the page that asks for the code.
+ * An item id, never a secret.
+ */
+const SECOND_STEP = storage.defineItem<SecondStep | null>("session:vault.secondStep", {
+    fallback: null
+});
+/**
+ * The username typed on the first page of a sign-in that asks for it alone and
+ * the password on the next. Without it, the login offered for saving on the
+ * second page has no name. A username, never a password; tied to the tab and
+ * the site, and gone after the same few minutes as a capture.
+ */
+const FIRST_STEP = storage.defineItem<{
+    tabId: number;
+    url: string;
+    username: string;
+    until: number;
+} | null>("session:vault.firstStep", { fallback: null });
 /** The wrapped keys, kept so unlocking does not need the network. */
 const WRAPPED = storage.defineItem<{ key: string; privateKey: string | null; kdf: unknown } | null>(
     "session:vault.wrapped",
@@ -354,7 +377,12 @@ async function vault(): Promise<OpenVault | null> {
         // a lock waiting for the next key to arrive: it stays in session storage,
         // already past, and whatever opens the vault next is locked again by the
         // first question anybody asks.
-        await Promise.all([CAPTURE.setValue(null), LOCK_AT.setValue(null)]);
+        await Promise.all([
+            CAPTURE.setValue(null),
+            SECOND_STEP.setValue(null),
+            FIRST_STEP.setValue(null),
+            LOCK_AT.setValue(null)
+        ]);
         return null;
     }
     return open;
@@ -457,16 +485,7 @@ async function browserName(): Promise<string> {
         // Brave's own check refusing to answer is not worth failing a sign-in for.
     }
 
-    const brands = hints.userAgentData?.brands ?? [];
-    const claims = (word: string): boolean =>
-        brands.some((entry) => entry.brand.toLowerCase().includes(word)) ||
-        navigator.userAgent.toLowerCase().includes(word);
-    // Order matters only in that Chrome is last: every one of these reports a
-    // Chrome-shaped user agent as well as its own name.
-    if (claims("edg")) return "Edge";
-    if (claims("opr") || claims("opera")) return "Opera";
-    if (claims("vivaldi")) return "Vivaldi";
-    return "Chrome";
+    return chromiumBrowser(hints.userAgentData?.brands ?? [], navigator.userAgent);
 }
 
 /** Which system this is on, in the spelling the dashboard's marks match. */
@@ -519,7 +538,7 @@ async function token(base: string): Promise<string | null> {
 
     const refreshToken = await REFRESH.getValue();
     if (!refreshToken) return null;
-    const fresh = await protocol.refresh(base, refreshToken);
+    const fresh = await protocol.refresh(base, refreshToken, (await device()).name);
     if (!fresh) {
         // The server rotates refresh tokens, so a refusal is the end of this
         // session rather than something to retry: whatever we hold is spent.
@@ -1168,14 +1187,35 @@ async function capture(
     if (!(await vault())) return quiet;
     if (isBlockedHost(await BLOCKED.getValue(), page.url)) return quiet;
 
+    // A username with no password is the first page of a two-page sign-in: kept
+    // for the page that asks for the password, and nothing offered yet.
+    if (submitted.password === "") {
+        const typed = submitted.username.trim();
+        if (typed !== "") {
+            await FIRST_STEP.setValue({
+                tabId: page.tabId,
+                url: page.url,
+                username: typed,
+                until: Date.now() + CAPTURE_FOR_MS
+            });
+        }
+        return quiet;
+    }
+    const first = await FIRST_STEP.getValue();
+    const earlier =
+        first && first.tabId === page.tabId && first.until > Date.now() && sameSite(first.url, page.url)
+            ? first.username
+            : "";
+
     // Every vault this account can open, and deliberately not only the shelf that
     // happens to be in front of somebody: the question here is whether this login
     // is already saved anywhere, and a shelf-filtered answer would offer to save a
     // second copy of an item that is sitting in an organization's vault.
     const offer = offerFor(
-        { username: submitted.username, password: submitted.password },
+        { username: submitted.username.trim() || earlier, password: submitted.password },
         await forUrl(page.url)
     );
+    if (earlier !== "") await FIRST_STEP.setValue(null);
     if (offer.kind === "none") {
         await CAPTURE.setValue(null);
         return quiet;
@@ -1252,13 +1292,6 @@ async function saveCaptured(page: PageContext): Promise<messages.Reply> {
     // those functions answer with the whole vault status - which server, which
     // account, which addresses are signed in here - and none of that is a page's.
     return done.ok ? { ok: true } : done;
-}
-
-/** Whether two pages belong to the same site, as the vault's own matching reads
- *  one - `@polaris/core`'s base domain, so a subdomain counts. */
-function sameSite(left: string, right: string): boolean {
-    const here = baseDomain(hostOf(left) ?? "");
-    return here !== "" && here === baseDomain(hostOf(right) ?? "");
 }
 
 /** The scheme and host of a page, as an address an item can be saved for. */
@@ -1426,6 +1459,8 @@ async function clearActive(): Promise<void> {
     await abandonRequest();
     await Promise.all([
         CAPTURE.setValue(null),
+        SECOND_STEP.setValue(null),
+        FIRST_STEP.setValue(null),
         LOCK_AT.setValue(null),
         REFRESH.setValue(null),
         ACCESS.setValue(null),
@@ -1899,6 +1934,18 @@ async function fill(id: string, page: PageContext | null = null): Promise<messag
             | undefined;
         if (!filled?.user && !filled?.pass && !filled?.code) {
             return { ok: false, error: "No login form was found on this page." };
+        }
+        // A password went in and the code did not, so the site will ask for it
+        // next - on the page the sign-in lands on, or on this one a moment later.
+        // Remembered for the tab; the page's own script asks for it when the code
+        // box appears.
+        if (filled.pass && !filled.code && login.totp) {
+            await SECOND_STEP.setValue({
+                tabId: tab.id,
+                itemId: login.id,
+                url: tab.url,
+                until: Date.now() + SECOND_STEP_FOR_MS
+            });
         }
         return { ok: true };
     } catch {
@@ -2514,6 +2561,32 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 return { ok: true, code, remaining: totpRemaining(login.totp) };
             }
 
+            case "secondStepCode": {
+                if (!page) return { ok: false, error: "There is no page here." };
+                const held = stepFor(await SECOND_STEP.getValue(), page, Date.now());
+                if (!held) return { ok: false, error: "There is no code waiting for this page." };
+                // Once: the box that asked gets it, and a second code box on the
+                // same page is somebody's own to fill.
+                await SECOND_STEP.setValue(null);
+                const login = (await logins()).find((one) => one.id === held.itemId);
+                if (!login?.totp || !matchesPage(login.uris, page.url)) {
+                    return { ok: false, error: "That item is not saved for this site." };
+                }
+                const code = await totpCode(login.totp);
+                if (!code) return { ok: false, error: "That authenticator value cannot be read." };
+                return { ok: true, code, remaining: totpRemaining(login.totp) };
+            }
+
+            case "myDetails": {
+                if (!(await vault())) return { ok: false, error: "Unlock Polaris first." };
+                if (page && (await blockedHere(page.url)).blocked) {
+                    return { ok: false, error: "This extension is switched off for this site." };
+                }
+                const account = await readAccount();
+                const email = account?.email ?? (await EMAIL.getValue());
+                return { ok: true, details: { name: account?.name ?? null, email: email ?? null } };
+            }
+
             case "blocked":
                 return { ok: true, ...(await blockedHere(page?.url)) };
 
@@ -2690,6 +2763,12 @@ async function fillFromKeyboard(command: string): Promise<void> {
 browser.tabs.onActivated.addListener(() => void badge());
 browser.tabs.onUpdated.addListener((_id, change) => {
     if (change.url || change.status === "complete") void badge();
+});
+/** A closed tab's waiting code step goes with it. */
+browser.tabs.onRemoved.addListener((id) => {
+    void SECOND_STEP.getValue().then((held) => {
+        if (held?.tabId === id) void SECOND_STEP.setValue(null);
+    });
 });
 
 /**

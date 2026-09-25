@@ -18,6 +18,7 @@
  */
 
 import { useState, type FormEvent } from "react";
+import { CodeInput, isWholeCode } from "@/components/code-input";
 import { SECURITY_QUESTION_COUNT } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { changePasswordAction, recoverPasswordAction } from "./actions";
@@ -126,6 +127,7 @@ export function RecoverPasswordDialog({
     const hasQuestions = questions.length === SECURITY_QUESTION_COUNT;
     const [method, setMethod] = useState<"questions" | "totp">(hasQuestions ? "questions" : "totp");
     const [answers, setAnswers] = useState<string[]>(() => questions.map(() => ""));
+    const [totpCode, setTotpCode] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
@@ -148,7 +150,7 @@ export function RecoverPasswordDialog({
         const result = await recoverPasswordAction({
             newPassword: next,
             answers: method === "questions" ? answers : [],
-            totpCode: method === "totp" ? String(form.get("totpCode") ?? "") : undefined
+            totpCode: method === "totp" ? totpCode : undefined
         });
         setBusy(false);
         if (result.error) {
@@ -234,12 +236,10 @@ export function RecoverPasswordDialog({
                         {method === "totp" && canUseAuthenticator ? (
                             <label className="flex flex-col gap-1 text-sm">
                                 Authenticator code
-                                <Input
+                                <CodeInput
                                     name="totpCode"
-                                    inputMode="numeric"
-                                    maxLength={6}
-                                    placeholder="000000"
-                                    autoComplete="one-time-code"
+                                    value={totpCode}
+                                    onValueChange={setTotpCode}
                                     required
                                 />
                             </label>
@@ -258,7 +258,10 @@ export function RecoverPasswordDialog({
                             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={busy}>
+                            <Button
+                                type="submit"
+                                disabled={busy || (method === "totp" && !isWholeCode(totpCode))}
+                            >
                                 {busy ? "Saving..." : "Set password"}
                             </Button>
                         </div>

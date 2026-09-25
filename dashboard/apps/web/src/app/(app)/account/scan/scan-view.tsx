@@ -18,6 +18,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { decideQrSignInAction } from "./actions";
+import { codeDigits } from "@/components/code-input";
 import { RelativeTime } from "@/components/relative-time";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { Camera, Check, ShieldQuestion, X } from "lucide-react";
@@ -302,7 +303,7 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
                             maxLength={6}
                             autoComplete="off"
                             value={pin}
-                            onChange={(event) => setPin(event.target.value)}
+                            onChange={(event) => setPin(codeDigits(event.target.value))}
                         />
                     </label>
                 ) : (

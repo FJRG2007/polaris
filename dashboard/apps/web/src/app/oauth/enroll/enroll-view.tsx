@@ -43,6 +43,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Button, Card, CardBody, Input, PolarisMark } from "@polaris/ui";
 import { SECOND_FACTOR_ENROLLMENT_INFO, type SecondFactorEnrollment } from "@polaris/core";
 import { armByEmailAction, noteAuthenticatorArmedAction, sendEnrollmentCodeAction } from "./actions";
+import { CodeInput, isWholeCode } from "@/components/code-input";
 
 /** One way in, as the server decided this deployment can offer it. */
 export interface EnrollmentChoice {
@@ -181,6 +182,7 @@ function EmailFactor({
     onBack: (() => void) | null;
 }) {
     const [sent, setSent] = useState(false);
+    const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -198,12 +200,13 @@ function EmailFactor({
 
     async function arm(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if (!isWholeCode(code)) return;
         const form = new FormData(event.currentTarget);
         setBusy(true);
         setError(null);
         const result = await armByEmailAction(
             password ?? String(form.get("password") ?? ""),
-            String(form.get("code") ?? "")
+            code
         );
         setBusy(false);
         if (result.error) {
@@ -231,7 +234,7 @@ function EmailFactor({
                     <form className="flex flex-col gap-3" onSubmit={(event) => void arm(event)}>
                         <label className="flex flex-col gap-1 text-sm">
                             Code from the email
-                            <Input name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required />
+                            <CodeInput name="code" value={code} onValueChange={setCode} required />
                         </label>
                         {password === undefined ? (
                             <>
@@ -243,7 +246,7 @@ function EmailFactor({
                             </>
                         ) : null}
                         <div className="flex items-center gap-2">
-                            <Button type="submit" disabled={busy}>
+                            <Button type="submit" disabled={busy || !isWholeCode(code)}>
                                 {busy ? "Turning on..." : "Turn on"}
                             </Button>
                             <Button type="button" variant="ghost" onClick={() => void send()} disabled={busy}>
@@ -279,6 +282,7 @@ function AuthenticatorFactor({
 }) {
     const [totpUri, setTotpUri] = useState("");
     const [codes, setCodes] = useState<string[]>([]);
+    const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -309,7 +313,7 @@ function AuthenticatorFactor({
 
     async function verify(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        const code = String(new FormData(event.currentTarget).get("code") ?? "");
+        if (!isWholeCode(code)) return;
         setBusy(true);
         setError(null);
         const { error: verifyError } = await authClient.twoFactor.verifyTotp({ code });
@@ -370,9 +374,9 @@ function AuthenticatorFactor({
                         </p>
                         <label className="flex flex-col gap-1 text-sm">
                             Code from the app
-                            <Input name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required />
+                            <CodeInput name="code" value={code} onValueChange={setCode} required />
                         </label>
-                        <Button type="submit" disabled={busy}>
+                        <Button type="submit" disabled={busy || !isWholeCode(code)}>
                             {busy ? "Turning on..." : "Turn on"}
                         </Button>
                     </form>

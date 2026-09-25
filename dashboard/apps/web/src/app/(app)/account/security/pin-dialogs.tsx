@@ -8,7 +8,8 @@
  * downgraded from a session someone else is holding.
  */
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { codeDigits } from "@/components/code-input";
 import { setPinSchema } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { clearPinAction, setPinAction } from "./actions";
@@ -25,15 +26,25 @@ export function SetPinDialog({
 }) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [pin, setPin] = useState("");
+    const [confirmPin, setConfirmPin] = useState("");
+    const [password, setPassword] = useState("");
+    const input = { pin, confirmPin, password };
+
+    // A reopened dialog starts empty rather than holding the last PIN typed.
+    useEffect(() => {
+        if (!open) return;
+        setPin("");
+        setConfirmPin("");
+        setPassword("");
+        setError(null);
+    }, [open]);
+    // Save stays off until the form would pass, so a letter or a short PIN is
+    // never something to press and be refused for.
+    const ready = setPinSchema.safeParse(input).success;
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        const input = {
-            pin: String(form.get("pin") ?? ""),
-            confirmPin: String(form.get("confirmPin") ?? ""),
-            password: String(form.get("password") ?? "")
-        };
         const parsed = setPinSchema.safeParse(input);
         if (!parsed.success) {
             setError(parsed.error.issues[0]?.message ?? "Check the form.");
@@ -64,8 +75,9 @@ export function SetPinDialog({
                             name="pin"
                             type="password"
                             inputMode="numeric"
-                            maxLength={6}
                             autoComplete="new-password"
+                            value={pin}
+                            onChange={(event) => setPin(codeDigits(event.target.value))}
                             required
                         />
                     </label>
@@ -75,21 +87,32 @@ export function SetPinDialog({
                             name="confirmPin"
                             type="password"
                             inputMode="numeric"
-                            maxLength={6}
                             autoComplete="new-password"
+                            value={confirmPin}
+                            onChange={(event) => setConfirmPin(codeDigits(event.target.value))}
                             required
                         />
+                        {confirmPin.length >= pin.length && confirmPin !== "" && confirmPin !== pin ? (
+                            <span className="text-xs text-danger">The PINs do not match</span>
+                        ) : null}
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         Account password
-                        <Input name="password" type="password" required autoComplete="current-password" />
+                        <Input
+                            name="password"
+                            type="password"
+                            required
+                            autoComplete="current-password"
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                        />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={busy}>
+                        <Button type="submit" disabled={busy || !ready}>
                             {busy ? "Saving..." : "Save PIN"}
                         </Button>
                     </div>

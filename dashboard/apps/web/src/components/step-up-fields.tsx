@@ -21,6 +21,7 @@ import { Button, Input, Select } from "@polaris/ui";
 import type { StepUpProofInput } from "@polaris/core";
 import { useEffect, useId, useRef, useState } from "react";
 import { sendStepUpCodeAction, stepUpOptionsAction } from "@/app/(app)/account/step-up-actions";
+import { codeDigits } from "@/components/code-input";
 
 export function StepUpFields({
     open,
@@ -131,10 +132,11 @@ export function StepUpFields({
                         autoComplete={proof?.proof === "password" ? "current-password" : "one-time-code"}
                         type={proof?.proof === "password" ? "password" : "text"}
                         inputMode={proof?.proof === "password" ? undefined : "numeric"}
-                        maxLength={proof?.proof === "password" ? undefined : 6}
                         placeholder={proof?.proof === "password" ? "Your password" : "6-digit code"}
                         disabled={Boolean(proof?.sends) && !sent}
-                        onChange={(event) => setValue(event.target.value)}
+                        onChange={(event) =>
+                            setValue(proof?.proof === "password" ? event.target.value : codeDigits(event.target.value))
+                        }
                     />
                     {proof?.sends && (
                         <Button type="button" size="sm" variant="secondary" disabled={sending} onClick={() => void send()}>

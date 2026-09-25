@@ -99,11 +99,16 @@ export type TwoFactorPreferencesInput = z.infer<typeof twoFactorPreferencesSchem
  * A phone number in international form. Stored and sent exactly as written: the
  * messaging bridge addresses WhatsApp by digits, and guessing at a country code
  * for a bare local number would send someone else's code to a stranger.
+ *
+ * The spaces, dashes and brackets a number is usually copied with are dropped
+ * first, so "+34 600 11 12 22" is the same number rather than a refused one. The
+ * prefix is never added: a number without one is still refused.
  */
 export const phoneField = z
     .string()
     .trim()
-    .regex(/^\+[1-9]\d{6,14}$/, "Use the international form, for example +34600111222");
+    .transform((value) => value.replace(/[\s().-]/g, ""))
+    .pipe(z.string().regex(/^\+[1-9]\d{6,14}$/, "Use the international form, for example +34600111222"));
 
 /** A code Polaris sent, whether to an address or a phone. */
 export const otpCodeField = z

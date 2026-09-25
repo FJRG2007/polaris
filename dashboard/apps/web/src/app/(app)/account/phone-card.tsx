@@ -11,11 +11,11 @@
  * can be reached, not just one that looks right.
  */
 
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { Phone } from "lucide-react";
-import { otpCodeField, phoneField } from "@polaris/core";
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
 import type { UserPhoneView } from "@polaris/auth";
+import { otpCodeField, phoneField } from "@polaris/core";
 import {
     Badge,
     Button,
@@ -35,6 +35,7 @@ import {
     verifyPhoneAction
 } from "./security/two-factor-actions";
 import { Feedback } from "./security/setting-card";
+import { CodeInput, isWholeCode } from "@/components/code-input";
 
 export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; canSend: boolean }) {
     const router = useRouter();
@@ -105,16 +106,12 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                 {phone && !phone.verified ? (
                     <form onSubmit={verify} className="flex flex-col gap-2">
                         <div className="flex items-start gap-2">
-                            <Input
+                            <CodeInput
                                 value={code}
-                                inputMode="numeric"
-                                maxLength={6}
-                                placeholder="000000"
-                                autoComplete="one-time-code"
                                 aria-label="Confirmation code"
-                                onChange={(event) => setCode(event.target.value)}
+                                onValueChange={setCode}
                             />
-                            <Button type="submit" disabled={busy || code.length === 0}>
+                            <Button type="submit" disabled={busy || !isWholeCode(code)}>
                                 Confirm
                             </Button>
                             <Button
