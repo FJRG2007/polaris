@@ -15,7 +15,7 @@
         "services/*"
     ],
     "scripts": {
-        "postinstall": "patch-package && npm run build:packages",
+        "postinstall": "patch-package",
         "build": "npm run build:packages && npm run build -w @polaris/web",
         "build:packages": "node scripts/build-packages.mjs",
         "typecheck": "npm run typecheck --workspaces --if-present",
@@ -32,7 +32,6 @@
         "@types/node": "22.10.7",
         "patch-package": "8.0.1",
         "prettier": "3.4.2",
-        "prisma": "^6.19.3",
         "react": "19.0.0",
         "react-dom": "19.0.0",
         "tsup": "8.3.5",
@@ -44,9 +43,5 @@
         "postcss": ">=8.5.10",
         "react": "19.0.0",
         "react-dom": "19.0.0"
-    },
-    "dependencies": {
-        "@prisma/client": "6.19.3",
-        "jszip": "3.10.2"
     }
 }
