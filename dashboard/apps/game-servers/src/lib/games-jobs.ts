@@ -234,7 +234,12 @@ async function runWorldTrims(): Promise<{ done: number; servers: number }> {
     let servers = 0;
     for (const ownerId of await ownersWithApps()) {
         const installs = await prisma.installedApp.findMany({
-            where: { ownerId, status: { not: "removed" }, catalogId: "minecraft", applicationId: { not: null } },
+            where: {
+                ownerId,
+                status: { not: "removed" },
+                catalogId: "minecraft",
+                applicationId: { not: null }
+            },
             select: { id: true }
         });
         for (const install of installs) {
@@ -330,6 +335,17 @@ export function gameJobTable(): readonly AppJob[] {
             // port and write the same timestamp, which is the same outcome.
             leaseMs: null,
             run: async () => (await games()).sweepGameReach()
+        },
+        {
+            key: "game-live-display",
+            // Every minute, and all it does is start the loop that keeps a pinned
+            // announcement and the side panel on screen for a server that has lost
+            // it - after Polaris restarted or updated. The loop itself runs every
+            // two seconds in this process and stops when there is nothing to keep.
+            everyMs: Number(process.env.POLARIS_GAME_LIVE_DISPLAY_MS) || MINUTE,
+            // Unleased: starting a loop that is already running does nothing.
+            leaseMs: null,
+            run: async () => (await import("./minecraft/live-display-service")).sweepLiveDisplays()
         }
     ];
 }

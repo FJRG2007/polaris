@@ -24,7 +24,9 @@ import { readCrashLoop, readRestartWatch } from "../games-health";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
 import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
-import { announcementCommands, type Announcement } from "./announcement";
+import { liveContext } from "./live-values";
+import { readsPlayerList } from "./text-vars";
+import { announcementCommands, announcementProblems, type Announcement } from "./announcement";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -204,7 +206,8 @@ async function withPorts<T>(
  *  this is belt and braces - but a moderation screen is exactly where a crafted
  *  player name would arrive. */
 function assertSafeArgument(value: string): void {
-    if (value.length === 0 || value.length > MAX_COMMAND_LENGTH) throw new Error("That command is not valid");
+    if (value.length === 0 || value.length > MAX_COMMAND_LENGTH)
+        throw new Error("That command is not valid");
     if (/[\0\r\n]/.test(value)) throw new Error("That command is not valid");
 }
 
@@ -221,7 +224,8 @@ function assertSafeArgument(value: string): void {
  * are two separate permissions, and this is what keeps them that way.
  */
 function assertSafeCommand(argv: readonly string[]): void {
-    if (argv.length === 0 || argv.length > MAX_COMMAND_ARGUMENTS) throw new Error("That command is not valid");
+    if (argv.length === 0 || argv.length > MAX_COMMAND_ARGUMENTS)
+        throw new Error("That command is not valid");
     for (const argument of argv) assertSafeArgument(argument);
 }
 
@@ -281,11 +285,28 @@ export async function sendAnnouncement(
     announcement: Announcement
 ): Promise<number> {
     const install = await resolveInstall(ownerId, installedAppId);
-    const lines = announcementCommands(install.edition, announcement);
+    // The editor runs the same check as it is typed; this is the one that
+    // decides, with the edition the editor may not have been told.
+    const problem = Object.values(announcementProblems(announcement, install.edition))[0];
+    if (problem) throw new Error(problem);
+
+    const texts = [
+        announcement.title,
+        announcement.subtitle,
+        announcement.actionbar,
+        announcement.chat
+    ];
+    const players = texts.some((text) => readsPlayerList(text))
+        ? await readPlayerList(install, ownerId).catch(() => null)
+        : null;
+    const context = await liveContext(installedAppId, texts, players);
+    const lines = announcementCommands(install.edition, announcement, context);
     if (lines.length === 0) throw new Error("There is nothing to send yet");
     for (const line of lines) {
         if (line.length > MAX_COMMAND_LENGTH) {
-            throw new Error("That is too much formatting for one line. Use fewer colours or styles.");
+            throw new Error(
+                "That is too much formatting for one line. Use fewer colours or styles."
+            );
         }
         assertSafeArgument(line);
         await execCommand(install, ownerId, [line]);
@@ -302,7 +323,11 @@ export async function sendAnnouncement(
  * every long `tellraw`: its JSON is dozens of words, and past the argument cap
  * the guard refused the whole line as "not valid" before it left.
  */
-export async function runConsoleLine(ownerId: string, installedAppId: string, line: string): Promise<string> {
+export async function runConsoleLine(
+    ownerId: string,
+    installedAppId: string,
+    line: string
+): Promise<string> {
     const trimmed = line.trim().replace(/^\//, "");
     assertSafeArgument(trimmed);
     const install = await resolveInstall(ownerId, installedAppId);
@@ -326,7 +351,11 @@ export async function runConsoleLine(ownerId: string, installedAppId: string, li
  * to its log, so there is nothing to return - which is why anything that needs an
  * answer (the player list) reads the log on Bedrock instead of this.
  */
-async function execCommand(install: MinecraftInstall, ownerId: string, argv: readonly string[]): Promise<string> {
+async function execCommand(
+    install: MinecraftInstall,
+    ownerId: string,
+    argv: readonly string[]
+): Promise<string> {
     return withPorts(install, ownerId, (ports) => sendGameCommand(ports, install, argv));
 }
 
@@ -337,7 +366,8 @@ async function sendGameCommand(
     argv: readonly string[]
 ): Promise<string> {
     assertSafeCommand(argv);
-    const command = install.edition === "bedrock" ? ["send-command", ...argv] : ["rcon-cli", ...argv];
+    const command =
+        install.edition === "bedrock" ? ["send-command", ...argv] : ["rcon-cli", ...argv];
     const result = await withTimeout(
         ports.runIn(install.container, command),
         COMMAND_TIMEOUT_MS,
@@ -451,7 +481,11 @@ function containerFailure(output: string, failure: string): string {
 
 /** Read one of the server's own files out of the container. Empty when it does
  *  not exist yet - a server that has never had an op has no ops.json. */
-async function readServerFile(install: MinecraftInstall, ownerId: string, name: string): Promise<string> {
+async function readServerFile(
+    install: MinecraftInstall,
+    ownerId: string,
+    name: string
+): Promise<string> {
     const result = await withPorts(install, ownerId, (ports) =>
         ports.runIn(install.container, ["cat", `${DATA_DIR}/${name}`])
     );
@@ -472,7 +506,10 @@ export interface MinecraftPlayers {
 }
 
 /** Who is on, where to reach the server, and whether it is answering at all. */
-export async function getServerStatus(ownerId: string, installedAppId: string): Promise<MinecraftStatus> {
+export async function getServerStatus(
+    ownerId: string,
+    installedAppId: string
+): Promise<MinecraftStatus> {
     const install = await resolveInstall(ownerId, installedAppId);
     const [address, usage, live] = await Promise.all([
         serverAddress(install, ownerId),
@@ -502,7 +539,10 @@ export async function getServerStatus(ownerId: string, installedAppId: string): 
  * container costs about a second each, which on a page listing servers is the
  * whole wait.
  */
-export async function getServerPlayers(ownerId: string, installedAppId: string): Promise<MinecraftPlayers> {
+export async function getServerPlayers(
+    ownerId: string,
+    installedAppId: string
+): Promise<MinecraftPlayers> {
     return readLivePlayers(await resolveInstall(ownerId, installedAppId), ownerId);
 }
 
@@ -517,7 +557,10 @@ export async function getServerPlayers(ownerId: string, installedAppId: string):
  * "Error response from daemon: container 1ef6df9... is not running", which names
  * a container nobody has ever seen and says nothing about what to do.
  */
-async function readLivePlayers(install: MinecraftInstall, ownerId: string): Promise<MinecraftPlayers> {
+async function readLivePlayers(
+    install: MinecraftInstall,
+    ownerId: string
+): Promise<MinecraftPlayers> {
     const empty: parse.PlayerList = { online: 0, max: 0, players: [] };
     if (!install.running) {
         // A server Polaris stopped because it could not start is stopped for a
@@ -543,7 +586,10 @@ async function readLivePlayers(install: MinecraftInstall, ownerId: string): Prom
     // took a minute ago comes with it: without something to compare against, a
     // server that has just recovered reads exactly like one still going round.
     if (runtime && isCrashLooping(runtime, readRestartWatch(install.config ?? null), new Date())) {
-        const loop = crashLoopOf(runtime, await tail(install.applicationId, ownerId, CRASH_LOG_TAIL));
+        const loop = crashLoopOf(
+            runtime,
+            await tail(install.applicationId, ownerId, CRASH_LOG_TAIL)
+        );
         return {
             answering: false,
             players: empty,
@@ -577,7 +623,11 @@ async function readLivePlayers(install: MinecraftInstall, ownerId: string): Prom
             return {
                 answering: false,
                 players: empty,
-                message: await withReason(install.applicationId, ownerId, "The server is starting."),
+                message: await withReason(
+                    install.applicationId,
+                    ownerId,
+                    "The server is starting."
+                ),
                 containerRunning,
                 crashLoop: null
             };
@@ -631,7 +681,11 @@ function crashLoopMessage(loop: CrashLoop): string {
  * it was, because a sentence about the server's state is still better than an error
  * about fetching a log.
  */
-async function withReason(applicationId: string, ownerId: string, message: string): Promise<string> {
+async function withReason(
+    applicationId: string,
+    ownerId: string,
+    message: string
+): Promise<string> {
     try {
         const log = await readAppRuntimeLog(applicationId, ownerId, LOG_TAIL);
         const phase = parse.startupPhase(log);
@@ -650,7 +704,10 @@ async function withReason(applicationId: string, ownerId: string, message: strin
  * handed to the server's own ban list, which is the only thing a game client is
  * refused by.
  */
-export async function getServerFirewall(ownerId: string, installedAppId: string): Promise<MinecraftFirewall> {
+export async function getServerFirewall(
+    ownerId: string,
+    installedAppId: string
+): Promise<MinecraftFirewall> {
     const install = await resolveInstall(ownerId, installedAppId);
     const [waf, banned] = await Promise.all([
         resolveWaf(install.applicationId),
@@ -684,15 +741,35 @@ export async function applyFirewallBans(ownerId: string, installedAppId: string)
 }
 
 /**
+ * Who is online right now, for the words an announcement fills in. Null for a
+ * server that is not meant to be up or did not answer: the caller then writes
+ * the fallbacks rather than failing the announcement over a count.
+ */
+export async function onlinePlayers(
+    ownerId: string,
+    installedAppId: string
+): Promise<parse.PlayerList | null> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    if (!install.running) return null;
+    return readPlayerList(install, ownerId).catch(() => null);
+}
+
+/**
  * Who is online. Java asks and is answered; Bedrock is asked and answers into its
  * own console, so there the command is sent and the log is read back a moment
  * later for the newest answer it printed.
  */
-async function readPlayerList(install: MinecraftInstall, ownerId: string): Promise<parse.PlayerList | null> {
-    if (install.edition !== "bedrock") return parse.parsePlayerList(await execCommand(install, ownerId, ["list"]));
+async function readPlayerList(
+    install: MinecraftInstall,
+    ownerId: string
+): Promise<parse.PlayerList | null> {
+    if (install.edition !== "bedrock")
+        return parse.parsePlayerList(await execCommand(install, ownerId, ["list"]));
     await execCommand(install, ownerId, ["list"]);
     await new Promise((resolve) => setTimeout(resolve, CONSOLE_ANSWER_MS));
-    return parse.parsePlayerListFromLog(await readAppRuntimeLog(install.applicationId, ownerId, 80));
+    return parse.parsePlayerListFromLog(
+        await readAppRuntimeLog(install.applicationId, ownerId, 80)
+    );
 }
 
 /** How far back to read for the arrivals and departures. Enough to cover an
@@ -729,7 +806,9 @@ export async function getPlayerLevels(
     installedAppId: string,
     names: readonly string[]
 ): Promise<Record<string, number>> {
-    const wanted = [...new Set(names)].filter((name) => PLAYER_NAME.test(name)).slice(0, MAX_LEVEL_READS);
+    const wanted = [...new Set(names)]
+        .filter((name) => PLAYER_NAME.test(name))
+        .slice(0, MAX_LEVEL_READS);
     if (wanted.length === 0) return {};
     return withServerContainer(ownerId, installedAppId, async (server) => {
         if (server.edition !== "java") return {};
@@ -769,11 +848,16 @@ export async function getPlayerSessions(
     installedAppId: string
 ): Promise<readonly PlayerSessionEvent[]> {
     const install = await resolveInstall(ownerId, installedAppId);
-    return parsePlayerSessions(await readAppRuntimeLog(install.applicationId, ownerId, SESSION_LOG_TAIL));
+    return parsePlayerSessions(
+        await readAppRuntimeLog(install.applicationId, ownerId, SESSION_LOG_TAIL)
+    );
 }
 
 /** Operators, whitelisted players and bans, as the server has them on disk. */
-export async function getServerRoster(ownerId: string, installedAppId: string): Promise<MinecraftRoster> {
+export async function getServerRoster(
+    ownerId: string,
+    installedAppId: string
+): Promise<MinecraftRoster> {
     const install = await resolveInstall(ownerId, installedAppId);
     // Bedrock keeps an allow list instead of a whitelist, has no ban list at all,
     // and records operators by xuid rather than by name - so it reports the one
@@ -830,6 +914,9 @@ async function serverAddress(install: MinecraftInstall, ownerId: string): Promis
 
 /** A registered server's address, as it was enrolled. */
 async function hostIp(hostId: string, ownerId: string): Promise<string | null> {
-    const host = await prisma.host.findFirst({ where: { id: hostId, ownerId }, select: { address: true } });
+    const host = await prisma.host.findFirst({
+        where: { id: hostId, ownerId },
+        select: { address: true }
+    });
     return host?.address ?? null;
 }

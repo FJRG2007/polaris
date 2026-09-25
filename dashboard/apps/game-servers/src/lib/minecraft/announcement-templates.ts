@@ -52,7 +52,11 @@ export const announcementSchema = z.object({
     fadeIn: seconds.default(DEFAULT_TIMING.fadeIn),
     stay: seconds.default(DEFAULT_TIMING.stay),
     fadeOut: seconds.default(DEFAULT_TIMING.fadeOut),
-    sound: z.string().max(80).default("")
+    sound: z.string().max(80).default(""),
+    // How long it stays. A kept template carries its "until" too, and it is the
+    // send that refuses one whose moment has passed, not the store.
+    hold: z.enum(["timed", "until", "manual"]).default("timed"),
+    until: z.string().max(40).default("")
 });
 
 export interface AnnouncementTemplate {
