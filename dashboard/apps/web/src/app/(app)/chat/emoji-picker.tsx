@@ -452,6 +452,8 @@ export function EmojiPicker({
                     ref={panel}
                     role="dialog"
                     data-state="open"
+                    // Pointer events back on, for a composer inside a dialog: a
+                    // modal dialog turns them off on the body, where this is drawn.
                     aria-label="Emoji, GIFs and stickers"
                     style={{
                         left: at.left,
@@ -460,7 +462,7 @@ export function EmojiPicker({
                         width: PANEL_WIDTH,
                         maxHeight: at.maxHeight
                     }}
-                    className="fixed z-50 flex flex-col overflow-hidden rounded-lg border border-border-strong bg-elevated shadow-popover"
+                    className="pointer-events-auto fixed z-50 flex flex-col overflow-hidden rounded-lg border border-border-strong bg-elevated shadow-popover"
                 >
                     <div className={cn("flex shrink-0 border-b border-border", !media && "hidden")}>
                         {(
