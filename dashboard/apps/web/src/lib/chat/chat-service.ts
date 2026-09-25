@@ -1130,15 +1130,61 @@ async function requireGroupOwner(actor: ChatActor, channelId: string): Promise<v
 export async function deleteChannel(actor: ChatActor, channelId: string): Promise<void> {
     const access = await requireChannel(actor, channelId);
     if (!access.mayAdminister) throw new ChatAccessError("You cannot delete that channel");
-    // Bytes first: the attachment rows cascade with the channel, and they are
-    // the only record of where the files were written. Deleted after them, the
-    // files would be unreachable and unfindable, and would sit on the NAS for
-    // the life of the instance.
+    await discardChannel(channelId);
+    publishChatChange({ channelId, kind: "channels", actorId: actor.id });
+}
+
+/**
+ * A channel and everything stored for it, gone.
+ *
+ * Bytes first: the attachment rows cascade with the channel, and they are the
+ * only record of where the files were written. Deleted after them, the files
+ * would be unreachable and unfindable, and would sit on the NAS for the life of
+ * the instance.
+ */
+async function discardChannel(channelId: string): Promise<void> {
     await discardChannelFiles([channelId]);
     await discardAvatars("channel", channelId);
     await dropGrantsFor("chat.channel", channelId);
-    await prisma.chatChannel.delete({ where: { id: channelId } });
-    publishChatChange({ channelId, kind: "channels", actorId: actor.id });
+    await prisma.chatChannel.deleteMany({ where: { id: channelId } });
+}
+
+/**
+ * A group nobody is in any more, gone.
+ *
+ * A group is its people: with none left there is nobody who can open it, read
+ * it or be asked about it, and keeping it would be keeping every message and
+ * file in it for no one. Asked again right before the delete, so somebody added
+ * in the same moment keeps the group.
+ */
+async function discardIfEmpty(channelId: string): Promise<boolean> {
+    const left = await prisma.chatChannelMember.count({ where: { channelId } });
+    if (left > 0) return false;
+    await discardChannel(channelId);
+    return true;
+}
+
+/**
+ * Every group (or one-to-one conversation) left with nobody in it, gone.
+ *
+ * Leaving takes a group with its last member (`removeChannelMember`); this is
+ * for the other ways a group empties - an account deleted or closed takes its
+ * memberships with it and never passes through the leave - and for groups left
+ * empty before that rule existed.
+ */
+export async function sweepEmptyGroups(): Promise<{ removed: number }> {
+    const empty = await prisma.chatChannel.findMany({
+        // A one-to-one conversation too, once both accounts are gone: nobody
+        // can reach it either.
+        where: { kind: { in: ["group", "dm"] }, members: { none: {} } },
+        select: { id: true },
+        take: 200
+    });
+    let removed = 0;
+    for (const group of empty) {
+        if (await discardIfEmpty(group.id)) removed += 1;
+    }
+    return { removed };
 }
 
 export async function addChannelMembers(
@@ -1257,6 +1303,12 @@ export async function removeChannelMember(
         throw new ChatAccessError("You cannot remove people from that channel");
     }
     const removed = await prisma.chatChannelMember.deleteMany({ where: { channelId, userId } });
+    // The last one out takes the group with them: a group with nobody in it is
+    // messages and files kept for no one. There is nobody left to tell.
+    if (group && removed.count > 0 && (await discardIfEmpty(channelId))) {
+        publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [userId] });
+        return;
+    }
     if (group) await passOnOwnership(channelId, userId);
     // A group only, because in a group the membership is the room: the people
     // in it are who it is. Leaving a channel is leaving the space around it,
