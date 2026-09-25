@@ -34,7 +34,10 @@ async function defaultImportOf(provided: object): Promise<unknown> {
             {
                 name: "shared",
                 setup(plugin) {
-                    plugin.onResolve({ filter: /^shared$/ }, (args) => ({ path: args.path, namespace: "shared" }));
+                    plugin.onResolve({ filter: /^shared$/ }, (args) => ({
+                        path: args.path,
+                        namespace: "shared"
+                    }));
                     plugin.onLoad({ filter: /.*/, namespace: "shared" }, () => ({
                         contents: `module.exports = globalThis[Symbol.for("polaris.test-shared")];`,
                         loader: "js"
@@ -46,14 +49,18 @@ async function defaultImportOf(provided: object): Promise<unknown> {
     (globalThis as Record<symbol, unknown>)[SLOT] = provided;
     run += 1;
     const source = `${out.outputFiles[0]!.text}\n// ${run}`;
-    const module = (await import(`data:text/javascript,${encodeURIComponent(source)}`)) as { default: unknown };
+    const module = (await import(`data:text/javascript,${encodeURIComponent(source)}`)) as {
+        default: unknown;
+    };
     return module.default;
 }
 
 /** An ES module namespace, the shape the page's bundler hands over for an ES
  *  module such as Next's browser build of `next/image`. */
 function namespace(members: Record<string, unknown>): object {
-    return Object.freeze(Object.assign(Object.create(null), members, { [Symbol.toStringTag]: "Module" }));
+    return Object.freeze(
+        Object.assign(Object.create(null), members, { [Symbol.toStringTag]: "Module" })
+    );
 }
 
 function Image() {
@@ -68,7 +75,9 @@ describe("a default import from the dashboard", () => {
         // What used to happen: the namespace itself, which React cannot draw.
         expect(await defaultImportOf(namespace({ default: Image, getImageProps }))).not.toBe(Image);
 
-        expect(await defaultImportOf(asCommonJs(namespace({ default: Image, getImageProps })))).toBe(Image);
+        expect(
+            await defaultImportOf(asCommonJs(namespace({ default: Image, getImageProps })))
+        ).toBe(Image);
     });
 
     it("is the component, when a CommonJS module was read as a namespace", async () => {
@@ -93,7 +102,10 @@ describe("a default import from the dashboard", () => {
     });
 
     it("keeps every named export", () => {
-        const shaped = asCommonJs(namespace({ default: Image, getImageProps })) as Record<string, unknown>;
+        const shaped = asCommonJs(namespace({ default: Image, getImageProps })) as Record<
+            string,
+            unknown
+        >;
         expect(shaped.getImageProps).toBe(getImageProps);
         expect(shaped.__esModule).toBe(true);
     });
