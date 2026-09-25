@@ -196,7 +196,7 @@ describe("every subject that can be deleted drops its photos first", () => {
         { file: "src/lib/user-admin-service.ts", call: "prisma.user.delete(" },
         { file: "src/lib/orgs/org-service.ts", call: "prisma.organization.delete(" },
         { file: "src/lib/chat/chat-service.ts", call: "prisma.chatSpace.delete(" },
-        { file: "src/lib/chat/chat-service.ts", call: "prisma.chatChannel.delete(" }
+        { file: "src/lib/chat/chat-service.ts", call: "prisma.chatChannel.deleteMany(" }
     ];
 
     for (const site of SITES) {

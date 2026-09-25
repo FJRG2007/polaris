@@ -28,6 +28,7 @@ import { sweepRetention } from "@/lib/retention-service";
 import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { sweepUploads } from "@/lib/chat/uploads";
+import { sweepEmptyGroups } from "@/lib/chat/chat-service";
 import { probeAllDomains } from "@/lib/watch/health-probe";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
 import { evaluateAlarms } from "@/lib/watch/alarm-evaluator";
@@ -301,6 +302,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: HOUR,
         leaseMs: null,
         run: sweepUploads
+    },
+    {
+        key: "chat-empty-groups",
+        // A group whose last member went some other way than leaving - an
+        // account deleted takes its memberships with it. Hourly: nobody can see
+        // an empty group, so this only reclaims what it was holding.
+        everyMs: HOUR,
+        leaseMs: null,
+        run: sweepEmptyGroups
     },
     {
         key: "service-crons",

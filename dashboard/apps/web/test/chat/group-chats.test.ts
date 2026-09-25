@@ -31,7 +31,20 @@ let written: {
     removed?: string[];
     added?: string[];
     options?: Record<string, unknown>;
+    /** Channels deleted, and whose stored files were thrown away first. */
+    deleted?: string[];
+    filesDiscarded?: string[];
 } = {};
+/** Groups the sweep finds with nobody in them. */
+let emptyGroups: string[] = [];
+
+vi.mock("@/lib/chat/attachments", () => ({
+    discardChannelFiles: async (ids: string[]) => {
+        written.filesDiscarded = [...(written.filesDiscarded ?? []), ...ids];
+    }
+}));
+vi.mock("@/lib/avatar-service", () => ({ discardAvatars: async () => undefined }));
+vi.mock("@/lib/access/grants", () => ({ dropGrantsFor: async () => undefined }));
 
 vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
 
@@ -60,6 +73,11 @@ vi.mock("@polaris/db", () => ({
                 written.name = data.name;
                 written.options = data;
                 return {};
+            },
+            findMany: async () => emptyGroups.map((id) => ({ id })),
+            deleteMany: async ({ where }: { where: { id: string } }) => {
+                written.deleted = [...(written.deleted ?? []), where.id];
+                return { count: 1 };
             }
         },
         chatChannelMember: {
@@ -84,6 +102,7 @@ vi.mock("@polaris/db", () => ({
             },
             deleteMany: async ({ where }: { where: { userId: string } }) => {
                 written.removed = [...(written.removed ?? []), where.userId];
+                members = members.filter((id) => id !== where.userId);
                 return { count: 1 };
             }
         },
@@ -105,6 +124,7 @@ beforeEach(() => {
     kind = "group";
     members = ["ada", "grace", "alan"];
     written = {};
+    emptyGroups = [];
 });
 
 describe("naming a group", () => {
@@ -258,10 +278,40 @@ describe("leaving", () => {
         expect(written.removed).toBeUndefined();
     });
 
+    it("keeps the group while anybody is still in it", async () => {
+        await chat.removeChannelMember(ada, "channel-1", "ada");
+        expect(written.deleted).toBeUndefined();
+    });
+
+    it("takes the group with the last person out, files first", async () => {
+        members = ["ada"];
+        await chat.removeChannelMember(ada, "channel-1", "ada");
+        expect(written.filesDiscarded).toEqual(["channel-1"]);
+        expect(written.deleted).toEqual(["channel-1"]);
+    });
+
     it("is refused in a one-to-one conversation, which is between two people", async () => {
         kind = "dm";
         await expect(chat.removeChannelMember(ada, "channel-1", "ada")).rejects.toThrow(
             /cannot be left/
         );
+    });
+});
+
+/**
+ * A group can also empty without anybody leaving: an account deleted takes its
+ * memberships with it. The sweep is what keeps those from staying forever.
+ */
+describe("groups left with nobody in them", () => {
+    it("are removed by the sweep, and one somebody joined in the meantime is kept", async () => {
+        emptyGroups = ["channel-1"];
+        members = [];
+        expect(await chat.sweepEmptyGroups()).toEqual({ removed: 1 });
+        expect(written.deleted).toEqual(["channel-1"]);
+
+        written = {};
+        members = ["grace"];
+        expect(await chat.sweepEmptyGroups()).toEqual({ removed: 0 });
+        expect(written.deleted).toBeUndefined();
     });
 });
