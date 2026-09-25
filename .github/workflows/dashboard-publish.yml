@@ -55,6 +55,8 @@ on:
 permissions:
   contents: read
   packages: write
+  # Read by `changes`, to find the last run that published.
+  actions: read
 
 # One publish at a time. An image is now pushed untagged and named minutes later by
 # the `tag` job, so two overlapping runs interleave: the older one's `tag` can land
@@ -92,10 +94,27 @@ jobs:
           BEFORE: ${{ github.event.before }}
           SHA: ${{ github.sha }}
           EVENT: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
           all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out relay true; out vision true; out face true; }
+          # Measured from the last run that published, not from the push before
+          # this one. A run that failed its suites or was cancelled built nothing
+          # that got tagged, so its changes are still unpublished - and measured
+          # from the push before, the next push that touches only the extension
+          # rebuilt no image and left those commits "waiting on a build" on every
+          # deployment's Update card until something else touched `apps/web`.
+          # Runs never overlap (see `concurrency`), so each successful run covers
+          # everything since the one before it.
+          LAST=$(gh api "repos/$REPO/actions/workflows/dashboard-publish.yml/runs?branch=main&status=success&per_page=1" \
+            --jq '.workflow_runs[0].head_sha // empty' 2>/dev/null || true)
+          if [ -n "$LAST" ] && git cat-file -e "${LAST}^{commit}" 2>/dev/null \
+             && git merge-base --is-ancestor "$LAST" "$SHA"; then
+            echo "Measuring from the last published commit $LAST (push base was ${BEFORE:-none})."
+            BEFORE="$LAST"
+          fi
           if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE:-}" ] \
              || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
              || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
