@@ -44,6 +44,7 @@ export function ThreadPanel({
     viewerId,
     canPost,
     canModerate,
+    roomMentions = true,
     highlightId = null,
     onClose,
     onChanged
@@ -55,6 +56,9 @@ export function ThreadPanel({
     viewerId: string;
     canPost: boolean;
     canModerate: boolean;
+    /** Whether the reply box offers `@everyone` and `@here` - the channel's
+     *  answer, handed down like its rules. */
+    roomMentions?: boolean;
     /** A reply to point at, for somebody who arrived from a link to it rather
      *  than by opening the thread. Scrolled to once the thread has drawn. */
     highlightId?: string | null;
@@ -211,6 +215,7 @@ export function ThreadPanel({
                     // to a thread belongs to that thread and not to the channel it
                     // hangs off.
                     draftKey={threadDraftKey(root.id)}
+                    roomMentions={roomMentions}
                     rules={rules}
                     insert={inserting}
                     disabled={!canPost}

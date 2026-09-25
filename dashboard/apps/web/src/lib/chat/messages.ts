@@ -26,12 +26,12 @@ import {
     resolveChatReferences,
     type ChatReferenceView
 } from "./references";
-import { announceRoomMention } from "./room-mentions";
+import { announceRoomMention, refuseRoomMention } from "./room-mentions";
 import { pollsFor, type ChatPollView } from "./polls";
 import { mentionsReader, readerTeams } from "./notify";
 import { noticePeople, renderNotice } from "./notice-text";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
-import { isBlankMarkdown } from "@/components/rich-text/markdown";
+import { channelMentions, isBlankMarkdown } from "@/components/rich-text/markdown";
 import { allowedBy, maySee, receiptsBetween } from "@/lib/privacy-service";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
 import { knownPreviews, unfurl, type KnownPreview, type LinkPreviewView } from "./link-preview";
@@ -376,6 +376,7 @@ export async function send(
 ): Promise<string> {
     const access = await requirePostable(actor, input.channelId);
     await requireSendable(actor, access, input.body);
+    await refuseRoomMention(actor, access, input.body);
     await refuseIfBlocked(actor, access);
 
     // Nothing but whitespace, whatever punctuation it serialized into. The
@@ -662,6 +663,13 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
     // about how often somebody speaks, and rewriting what you already said is
     // not speaking again.
     await requireSendable(actor, editable, input.body, { wait: false });
+    // Asked of an edit too, or rewriting a message to add `@everyone` would light
+    // the mark and the toast the send refused. Not of one that already named the
+    // room when it went: it was allowed then, it has already been announced, and
+    // fixing a typo in it is not saying it again.
+    if (channelMentions(message.body).size === 0) {
+        await refuseRoomMention(actor, editable, input.body);
+    }
     // Emptying a message is deleting it, and there is a delete for that.
     if (isBlankMarkdown(input.body)) throw new ChatRuleError("Write something first");
 

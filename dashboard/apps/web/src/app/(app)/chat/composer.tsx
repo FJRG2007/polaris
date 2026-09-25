@@ -83,6 +83,7 @@ const COUNTER_WITHIN = 200;
 export function Composer({
     channelId,
     draftKey = null,
+    roomMentions = true,
     rules,
     disabled,
     attachable = true,
@@ -125,6 +126,9 @@ export function Composer({
      * message that was not sent, not a draft - see `drafts`.
      */
     draftKey?: string | null;
+    /** Whether @ offers `@everyone` and `@here`. Off for somebody the group's
+     *  owner has kept them from; the send refuses them either way. */
+    roomMentions?: boolean;
     /** What this kind of conversation allows: how long a message may be, how
      *  many files it may carry and how big one may be. Enforced again on the
      *  server; here so a limit is met while typing rather than after a
@@ -967,6 +971,7 @@ export function Composer({
                         // this account shares a Tasks space with, which is what
                         // it used to offer and is a different question entirely.
                         mentionsIn={channelId}
+                        roomMentions={roomMentions}
                         mentionSource={mentionSource}
                         focusWhere={focusWhere}
                         // A screenshot on the clipboard is a screenshot somebody

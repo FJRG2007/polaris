@@ -98,7 +98,10 @@ vi.mock("@/lib/privacy-service", () => ({
 }));
 vi.mock("@/lib/chat/live", () => ({ publishChatChange: () => undefined }));
 vi.mock("@/lib/chat/rules", () => ({ rulesForChannel: async () => ({ keepEditHistory: false }) }));
-vi.mock("@/lib/chat/room-mentions", () => ({ announceRoomMention: async () => undefined }));
+vi.mock("@/lib/chat/room-mentions", () => ({
+    announceRoomMention: async () => undefined,
+    refuseRoomMention: async () => undefined
+}));
 vi.mock("@/lib/chat/link-preview", () => ({
     knownPreviews: async () => new Map(),
     unfurl: async () => undefined

@@ -210,6 +210,17 @@ describe("who may add people to a group", () => {
         ).rejects.toThrow(/Only the owner/);
     });
 
+    it("keeps @everyone and @here open or closed by the owner alone", async () => {
+        await chat.setGroupOptions(ada, "channel-1", { membersMayMention: false });
+        expect(written.options).toEqual({ membersMayMention: false });
+
+        written = {};
+        await expect(
+            chat.setGroupOptions(grace, "channel-1", { membersMayMention: true })
+        ).rejects.toThrow(/Only the owner/);
+        expect(written.options).toBeUndefined();
+    });
+
     it("is decided the same way for the button as for the service", () => {
         const group = {
             kind: "group",

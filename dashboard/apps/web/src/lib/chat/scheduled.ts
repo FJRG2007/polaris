@@ -28,6 +28,7 @@ import { send } from "./messages";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { removeStoredFiles, type StoredAttachment } from "./attachments";
+import { refuseRoomMention } from "./room-mentions";
 import { ChatAccessError, requirePostable, type ChatActor } from "./access";
 
 /** One waiting message, as the screen that lists them draws it. */
@@ -78,7 +79,10 @@ export async function scheduleMessage(
     input: core.ChatScheduleInput,
     attachments: readonly StoredAttachment[] = []
 ): Promise<string> {
-    await requirePostable(actor, input.channelId);
+    const access = await requirePostable(actor, input.channelId);
+    // Said now rather than discovered when it fails to go. Asked again then as
+    // well, through `send`: the owner may close it in between.
+    await refuseRoomMention(actor, access, input.body);
 
     const sendAt = new Date(input.sendAt);
     const refusal = core.scheduleRefusal(sendAt);

@@ -29,6 +29,7 @@ import {
     messageable,
     picturesAllowed,
     invitesAllowed,
+    roomMentionsAllowed,
     reachableSpaceIds,
     requireChannel,
     requireSpace,
@@ -113,6 +114,12 @@ export interface ChatChannelView {
     /** Whether this reader may add people here. Only decides what the screen
      *  offers; adding asks the same question again. */
     readonly mayInvite: boolean;
+    /** Whether the owner has let the rest of the group use `@everyone` and
+     *  `@here`. */
+    readonly membersMayMention: boolean;
+    /** Whether this reader may use `@everyone` and `@here` here. Only decides
+     *  what the composer offers; sending asks the same question again. */
+    readonly mayMentionRoom: boolean;
     /** How long somebody waits between messages here, in seconds. Zero is off.
      *  Read by the composer so the wait is shown while it applies rather than
      *  discovered by being refused. */
@@ -679,6 +686,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             createdById: true,
             membersMayEdit: true,
             membersMayInvite: true,
+            membersMayMention: true,
             slowmode: true,
             userLimit: true,
             members: { select: { userId: true, user: { select: { name: true } } } }
@@ -758,6 +766,8 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             membersMayEdit: channel.membersMayEdit,
             membersMayInvite: channel.membersMayInvite,
             mayInvite: invitesAllowed({ ...channel, mayAdminister }, actor.id),
+            membersMayMention: channel.membersMayMention,
+            mayMentionRoom: roomMentionsAllowed(channel, actor.id),
             slowmode: channel.slowmode,
             userLimit: channel.kind === "voice" ? channel.userLimit : 0,
             others: channel.spaceId ? [] : others,
@@ -1041,19 +1051,26 @@ export async function renameGroup(
 /**
  * What the owner of a group has decided about it.
  *
- * Two switches. Whether the rest of the group may change its name and its
+ * Three switches. Whether the rest of the group may change its name and its
  * picture - off to begin with, because a group photo anybody can change is a
- * group photo that changes. And whether they may add people - on to begin with,
- * because that is how every group worked before the owner could close it.
- * Either may be sent alone; the other is left as it was.
+ * group photo that changes. Whether they may add people, and whether they may
+ * use `@everyone` and `@here` - both on to begin with, because that is how every
+ * group worked before the owner could close them. Any may be sent alone; the
+ * others are left as they were.
  */
 export async function setGroupOptions(
     actor: ChatActor,
     channelId: string,
-    options: { membersMayEdit?: boolean; membersMayInvite?: boolean }
+    options: { membersMayEdit?: boolean; membersMayInvite?: boolean; membersMayMention?: boolean }
 ): Promise<void> {
     await requireGroupOwner(actor, channelId);
-    if (options.membersMayEdit === undefined && options.membersMayInvite === undefined) return;
+    if (
+        options.membersMayEdit === undefined &&
+        options.membersMayInvite === undefined &&
+        options.membersMayMention === undefined
+    ) {
+        return;
+    }
     await prisma.chatChannel.update({
         where: { id: channelId },
         data: {
@@ -1062,6 +1079,9 @@ export async function setGroupOptions(
                 : {}),
             ...(options.membersMayInvite !== undefined
                 ? { membersMayInvite: options.membersMayInvite }
+                : {}),
+            ...(options.membersMayMention !== undefined
+                ? { membersMayMention: options.membersMayMention }
                 : {})
         }
     });

@@ -5,9 +5,9 @@
  *
  * A group has no administrators - everybody in one is equal in it, which is what
  * makes it a group rather than a channel - so it has an owner instead: whoever
- * started it, until they hand it over. Three things are theirs and nobody else's:
+ * started it, until they hand it over. Four things are theirs and nobody else's:
  * whether the rest of the group may change how it looks, whether they may add
- * people, and who runs it next.
+ * people, whether they may use `@everyone` and `@here`, and who runs it next.
  *
  * Only shown to the owner. A screen that offers a switch the server will refuse
  * is worse than one that does not offer it, and the owner is the only person for
@@ -34,6 +34,7 @@ import {
 interface GroupOptions {
     membersMayEdit?: boolean;
     membersMayInvite?: boolean;
+    membersMayMention?: boolean;
 }
 
 export function GroupSettingsDialog({
@@ -63,10 +64,14 @@ export function GroupSettingsDialog({
 
     // Shown as flipped while the server answers, and put back if it refuses.
     const [pending, setPending] = useState<GroupOptions>({});
-    useEffect(() => setPending({}), [channel.membersMayEdit, channel.membersMayInvite]);
+    useEffect(
+        () => setPending({}),
+        [channel.membersMayEdit, channel.membersMayInvite, channel.membersMayMention]
+    );
     const shown = {
         membersMayEdit: pending.membersMayEdit ?? channel.membersMayEdit,
-        membersMayInvite: pending.membersMayInvite ?? channel.membersMayInvite
+        membersMayInvite: pending.membersMayInvite ?? channel.membersMayInvite,
+        membersMayMention: pending.membersMayMention ?? channel.membersMayMention
     };
 
     const setSwitch = async (change: GroupOptions) => {
@@ -136,6 +141,25 @@ export function GroupSettingsDialog({
                             disabled={busy}
                             onChange={(next: boolean) => void setSwitch({ membersMayInvite: next })}
                             aria-label="Let anybody add people"
+                        />
+                    </label>
+
+                    <label className="flex items-start justify-between gap-3">
+                        <span className="flex min-w-0 flex-col">
+                            <span className="text-sm font-medium">
+                                Let anybody use @everyone and @here
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                Off, only you can notify the whole group at once.
+                            </span>
+                        </span>
+                        <Switch
+                            checked={shown.membersMayMention}
+                            disabled={busy}
+                            onChange={(next: boolean) =>
+                                void setSwitch({ membersMayMention: next })
+                            }
+                            aria-label="Let anybody use @everyone and @here"
                         />
                     </label>
 

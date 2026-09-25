@@ -558,7 +558,11 @@ export async function reportMessageAction(
  * browser is still a value from outside.
  */
 const groupOptionsSchema = z
-    .object({ membersMayEdit: z.boolean().optional(), membersMayInvite: z.boolean().optional() })
+    .object({
+        membersMayEdit: z.boolean().optional(),
+        membersMayInvite: z.boolean().optional(),
+        membersMayMention: z.boolean().optional()
+    })
     .strict();
 
 export async function setGroupOptionsAction(
