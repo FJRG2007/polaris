@@ -245,12 +245,13 @@ async function start(): Promise<void> {
                 });
                 return;
             }
+            const before = field.value;
             const reply = await askBackground({ kind: "itemsFor", url: location.href });
             // Dropped down by itself on a box that has been filled since - by the
             // login picked a moment ago, which puts the cursor in each box it
             // types into - or that somebody has already left: offering the list
             // there is asking again for what was just answered.
-            if (offered && (field.value !== "" || document.activeElement !== field)) return;
+            if (offered && (field.value !== before || document.activeElement !== field)) return;
             if (!reply.ok) {
                 // Locked, most often. Not offered by itself - a panel that drops
                 // down only to say "locked" on every click is one people learn to

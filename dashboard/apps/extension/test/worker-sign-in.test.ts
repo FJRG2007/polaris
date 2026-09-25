@@ -288,6 +288,51 @@ describe("a sign-in that asks for the password on its next page", () => {
         expect(typed).toHaveLength(calls);
     });
 
+    it("waits for the name's fill when the password box shows up while it is typing", async () => {
+        const key = await unlockedVault();
+        ciphers = [
+            await login(key, "item-1", {
+                name: "Shop",
+                username: "someone",
+                password: "hunter2",
+                uri: SITE
+            })
+        ];
+        revision = 2;
+        await ask({ kind: "sync" });
+        found.push(
+            { user: true, pass: false, code: false },
+            { user: false, pass: true, code: false }
+        );
+        let asking: Promise<Reply> | null = null;
+        const scripting = fakeBrowser.scripting as unknown as Record<string, unknown>;
+        const typing = scripting.executeScript as (injection: {
+            args?: unknown[];
+        }) => Promise<unknown>;
+        scripting.executeScript = vi.fn(async (injection: { args?: unknown[] }) => {
+            // The page reveals the password box the moment the name is typed.
+            asking ??= ask({ kind: "continueSignIn" }, { tabId: TAB, url: `${SITE}/login` });
+            return typing(injection);
+        });
+
+        await ask({ kind: "fill", id: "item-1" }, { tabId: TAB, url: `${SITE}/login` });
+        const next = await asking!;
+
+        expect(next.ok).toBe(true);
+        expect(typed.at(-1)).toEqual(["someone", "hunter2", null]);
+    });
+
+    it("keeps another tab's waiting step through a fill here", async () => {
+        await pickedOnFirstPage();
+        found.push({ user: true, pass: true, code: false });
+        await ask({ kind: "fill", id: "item-1" }, { tabId: TAB + 1, url: `${SITE}/login` });
+        found.push({ user: false, pass: true, code: false });
+
+        const next = await ask({ kind: "continueSignIn" }, { tabId: TAB, url: `${SITE}/password` });
+
+        expect(next.ok).toBe(true);
+    });
+
     it("has nothing to finish after a fill that already typed the password", async () => {
         const key = await unlockedVault();
         ciphers = [
@@ -394,5 +439,18 @@ describe("the tab an approval opens", () => {
         await answered();
 
         expect((await fakeBrowser.tabs.get(approval!.id!)).url).toBe("https://news.example.com/");
+    });
+});
+
+describe("the Unlock Polaris row on a locked page", () => {
+    it("opens the popup in a tab when the browser will not open it from a page", async () => {
+        const action = (fakeBrowser as unknown as { action: Record<string, unknown> }).action;
+        action.openPopup = vi.fn(() => Promise.reject(new Error("needs a user gesture")));
+
+        const reply = await ask({ kind: "openUnlock" }, { tabId: 7, url: `${SITE}/login` });
+
+        expect(reply.ok).toBe(true);
+        const tabs = await fakeBrowser.tabs.query({});
+        expect(tabs.map((tab) => tab.url)).toContain(fakeBrowser.runtime.getURL("/popup.html"));
     });
 });

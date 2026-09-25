@@ -2082,6 +2082,20 @@ function typeIntoPage(
 async function fill(id: string, page: PageContext | null = null): Promise<messages.Reply> {
     const target = page ?? (await activeTab());
     if (!target) return { ok: false, error: "There is no page to fill." };
+    const running = fillTab(id, target);
+    filling.set(target.tabId, running);
+    try {
+        return await running;
+    } finally {
+        if (filling.get(target.tabId) === running) filling.delete(target.tabId);
+    }
+}
+
+/** The fill still typing into each tab, so a page asking for the next step waits
+ *  for the step it is asking about to have been written. */
+const filling = new Map<number, Promise<messages.Reply>>();
+
+async function fillTab(id: string, target: PageContext): Promise<messages.Reply> {
     const tab = { id: target.tabId, url: target.url };
     const login = (await logins()).find((one) => one.id === id);
     if (!login) return { ok: false, error: "That item is not open." };
@@ -2135,17 +2149,17 @@ async function fill(id: string, page: PageContext | null = null): Promise<messag
                 : filled.user && !filled.pass && login.password
                   ? "password"
                   : null;
-        await SECOND_STEP.setValue(
-            next === null
-                ? null
-                : {
-                      stage: next,
-                      tabId: tab.id,
-                      itemId: login.id,
-                      url: tab.url,
-                      until: Date.now() + SECOND_STEP_FOR_MS
-                  }
-        );
+        if (next !== null) {
+            await SECOND_STEP.setValue({
+                stage: next,
+                tabId: tab.id,
+                itemId: login.id,
+                url: tab.url,
+                until: Date.now() + SECOND_STEP_FOR_MS
+            });
+        } else if ((await SECOND_STEP.getValue())?.tabId === tab.id) {
+            await SECOND_STEP.setValue(null);
+        }
         return { ok: true };
     } catch {
         return { ok: false, error: "This page cannot be filled." };
@@ -2747,6 +2761,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "continueSignIn": {
                 if (!page) return { ok: false, error: "There is no page here." };
+                await filling.get(page.tabId);
                 const held = stepFor(await SECOND_STEP.getValue(), page, Date.now(), "password");
                 if (!held) return { ok: false, error: "There is nothing waiting for this page." };
                 // Once, like the code: a second password box on the same page is
@@ -3009,13 +3024,22 @@ function typeIntoFocused(value: string, mode: "password" | "code" | "text"): boo
  * Open the popup, for an entry that needs the vault while it is locked.
  *
  * The toolbar popup is where the vault is unlocked, and a right-click is a
- * gesture the browser accepts for opening it. A browser without the call just
- * does nothing, which is what the entry did before.
+ * gesture the browser accepts for opening it. A browser without the call, or one
+ * that refuses it (Firefox, asked from a page's list rather than a gesture), gets
+ * the same popup in a tab instead.
  */
 async function askToUnlock(): Promise<void> {
     const api = browser as unknown as Record<"action" | "browserAction", { openPopup?: () => Promise<void> } | undefined>;
     const action = api.action ?? api.browserAction;
-    await action?.openPopup?.().catch(() => undefined);
+    const opened = await Promise.resolve()
+        .then(() => action?.openPopup?.())
+        .then(
+            () => action?.openPopup !== undefined,
+            () => false
+        );
+    if (opened) return;
+    const url = browser.runtime.getURL("/popup.html");
+    await browser.tabs.create({ url }).catch(() => undefined);
 }
 
 /** Run the typing function in the frame that was clicked. */
