@@ -716,7 +716,11 @@ export async function moveCipher(
                 reprompt: input.reprompt ?? 0,
                 revisionDate: new Date(),
                 ...(collections.length > 0
-                    ? { collections: { create: collections.map((collectionId) => ({ collectionId })) } }
+                    ? {
+                          collections: {
+                              create: collections.map((collectionId) => ({ collectionId }))
+                          }
+                      }
                     : {})
             },
             select: CIPHER_SELECT

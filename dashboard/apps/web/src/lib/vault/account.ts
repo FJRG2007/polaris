@@ -247,7 +247,10 @@ export async function bumpRevisionFor(
     const everyone = new Set([userId]);
     for (const member of members) if (member.userId) everyone.add(member.userId);
     await prisma.vaultAccount
-        .updateMany({ where: { userId: { in: [...everyone] } }, data: { revisionDate: new Date() } })
+        .updateMany({
+            where: { userId: { in: [...everyone] } },
+            data: { revisionDate: new Date() }
+        })
         .catch(() => undefined);
 }
 
@@ -310,7 +313,10 @@ export async function deleteVault(userId: string): Promise<void> {
         prisma.vaultAttachment.findMany({
             where: {
                 cipher: {
-                    OR: [{ userId }, ...(orphanedIds.length > 0 ? [{ organizationId: { in: orphanedIds } }] : [])]
+                    OR: [
+                        { userId },
+                        ...(orphanedIds.length > 0 ? [{ organizationId: { in: orphanedIds } }] : [])
+                    ]
                 }
             },
             select: { storedPath: true }

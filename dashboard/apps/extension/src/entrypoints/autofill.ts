@@ -433,7 +433,8 @@ async function start(): Promise<void> {
         if (!password) {
             // The first page of a sign-in that asks for the name alone: the
             // worker keeps it for the page that asks for the password.
-            if (username.trim() !== "") void askBackground({ kind: "captured", username, password: "" });
+            if (username.trim() !== "")
+                void askBackground({ kind: "captured", username, password: "" });
             return;
         }
         if (password.value === "") return;
@@ -464,7 +465,8 @@ async function start(): Promise<void> {
             const editable =
                 box instanceof HTMLTextAreaElement ||
                 (box instanceof HTMLElement && box.isContentEditable) ||
-                (box instanceof HTMLInputElement && !["hidden", "button", "submit", "checkbox", "radio"].includes(box.type));
+                (box instanceof HTMLInputElement &&
+                    !["hidden", "button", "submit", "checkbox", "radio"].includes(box.type));
             if (!editable) return;
             const password = box instanceof HTMLInputElement && box.type === "password";
             void askBackground({ kind: "menuTarget", password });

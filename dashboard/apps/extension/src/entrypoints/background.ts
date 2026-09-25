@@ -724,9 +724,7 @@ async function openApproval(url: string, reuse: ApprovalTab | null = null): Prom
         if (moved) return reuse;
     }
     // Where somebody was is a nicety: not knowing it must not stop the approval.
-    const [from] = await browser.tabs
-        .query({ active: true, currentWindow: true })
-        .catch(() => []);
+    const [from] = await browser.tabs.query({ active: true, currentWindow: true }).catch(() => []);
     const opened = await browser.tabs.create({
         url,
         ...(from?.id !== undefined ? { openerTabId: from.id } : {})
@@ -1332,7 +1330,10 @@ async function capture(
     }
     const first = await FIRST_STEP.getValue();
     const earlier =
-        first && first.tabId === page.tabId && first.until > Date.now() && sameSite(first.url, page.url)
+        first &&
+        first.tabId === page.tabId &&
+        first.until > Date.now() &&
+        sameSite(first.url, page.url)
             ? first.username
             : "";
 
@@ -2384,7 +2385,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     // it - the whole vault, any field of any item as a string, the accounts - is
     // refused here before it is read.
     const page: PageContext | null =
-        sender.tab?.id !== undefined && typeof sender.url === "string" && /^https?:/i.test(sender.url)
+        sender.tab?.id !== undefined &&
+        typeof sender.url === "string" &&
+        /^https?:/i.test(sender.url)
             ? { tabId: sender.tab.id, url: sender.url }
             : null;
     if (sender.tab && (page === null || !messages.FROM_PAGE.has(request.kind))) return false;
@@ -2805,7 +2808,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "captured":
-                return page ? capture(page, request) : { ok: false, error: "There is no page here." };
+                return page
+                    ? capture(page, request)
+                    : { ok: false, error: "There is no page here." };
 
             case "pendingCapture": {
                 if (!page) return { ok: false, error: "There is no page here." };
@@ -2980,7 +2985,9 @@ function typeIntoFocused(value: string, mode: "password" | "code" | "text"): boo
     const active = document.activeElement;
     const put = (field: HTMLInputElement | HTMLTextAreaElement, text: string): void => {
         const proto =
-            field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+            field instanceof HTMLTextAreaElement
+                ? HTMLTextAreaElement.prototype
+                : HTMLInputElement.prototype;
         Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(field, text);
         field.dispatchEvent(new Event("input", { bubbles: true }));
         field.dispatchEvent(new Event("change", { bubbles: true }));
@@ -2989,7 +2996,8 @@ function typeIntoFocused(value: string, mode: "password" | "code" | "text"): boo
     if (active instanceof HTMLElement && active.isContentEditable) {
         return document.execCommand("insertText", false, value);
     }
-    if (!(active instanceof HTMLInputElement) && !(active instanceof HTMLTextAreaElement)) return false;
+    if (!(active instanceof HTMLInputElement) && !(active instanceof HTMLTextAreaElement))
+        return false;
     if (active.disabled || active.readOnly) return false;
 
     if (mode === "code" && active instanceof HTMLInputElement && active.maxLength === 1) {
@@ -3029,7 +3037,10 @@ function typeIntoFocused(value: string, mode: "password" | "code" | "text"): boo
  * the same popup in a tab instead.
  */
 async function askToUnlock(): Promise<void> {
-    const api = browser as unknown as Record<"action" | "browserAction", { openPopup?: () => Promise<void> } | undefined>;
+    const api = browser as unknown as Record<
+        "action" | "browserAction",
+        { openPopup?: () => Promise<void> } | undefined
+    >;
     const action = api.action ?? api.browserAction;
     const opened = await Promise.resolve()
         .then(() => action?.openPopup?.())
@@ -3081,7 +3092,9 @@ async function fromMenu(
     if (entry === MENU.generate) {
         // Needs no vault: the generator is pure, and a password made for a form
         // is offered for saving when the form goes, like one typed by hand.
-        const options = readGeneratorOptions(await storage.getItem<unknown>(GENERATOR_KEY).catch(() => null));
+        const options = readGeneratorOptions(
+            await storage.getItem<unknown>(GENERATOR_KEY).catch(() => null)
+        );
         const value = generatePassword(options);
         if (value) await typeInFrame(tab.id, frameId, value, "password");
         return;
@@ -3127,7 +3140,12 @@ async function setupMenus(): Promise<void> {
     fitted = null;
     menus.create({ id: MENU.root, title: "Polaris", contexts: ["editable"] });
     for (const entry of MENU_ENTRIES) {
-        menus.create({ id: entry.id, parentId: MENU.root, title: entry.title, contexts: ["editable"] });
+        menus.create({
+            id: entry.id,
+            parentId: MENU.root,
+            title: entry.title,
+            contexts: ["editable"]
+        });
     }
 }
 
@@ -3142,7 +3160,9 @@ async function fitMenu(target: MenuTarget): Promise<void> {
     const shown = visibleEntries(target);
     await Promise.all(
         MENU_ENTRIES.map((entry) =>
-            Promise.resolve(menus.update(entry.id, { visible: shown[entry.id] })).catch(() => undefined)
+            Promise.resolve(menus.update(entry.id, { visible: shown[entry.id] })).catch(
+                () => undefined
+            )
         )
     );
 }
