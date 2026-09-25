@@ -399,9 +399,9 @@ async function start(): Promise<void> {
 
     // Tell the worker what kind of box the pointer is over, so the right-click
     // menu that opens on it offers what fits: a new password on a password box,
-    // the code and your email on any other. Only when the kind changes - this
-    // fires on every box the pointer crosses.
-    let pointed: boolean | null = null;
+    // the code and your email on any other. The menu is one for the whole
+    // browser, so every box entered reports, and the worker skips a kind it has
+    // already applied.
     document.addEventListener(
         "pointerover",
         (event) => {
@@ -412,8 +412,6 @@ async function start(): Promise<void> {
                 (box instanceof HTMLInputElement && !["hidden", "button", "submit", "checkbox", "radio"].includes(box.type));
             if (!editable) return;
             const password = box instanceof HTMLInputElement && box.type === "password";
-            if (password === pointed) return;
-            pointed = password;
             void askBackground({ kind: "menuTarget", password });
         },
         true

@@ -2795,7 +2795,16 @@ function typeIntoFocused(value: string, mode: "password" | "code" | "text"): boo
     if (active.disabled || active.readOnly) return false;
 
     if (mode === "code" && active instanceof HTMLInputElement && active.maxLength === 1) {
-        const row = [...document.querySelectorAll("input")].filter((one) => one.maxLength === 1);
+        const single = (root: ParentNode): HTMLInputElement[] =>
+            [...root.querySelectorAll("input")].filter((one) => one.maxLength === 1);
+        let row: HTMLInputElement[] = [];
+        for (let node = active.parentElement; node; node = node.parentElement) {
+            const near = single(node);
+            if (near.length - near.indexOf(active) >= value.length || node === active.form) {
+                row = near;
+                break;
+            }
+        }
         const from = row.indexOf(active);
         const digits = row.slice(from, from + value.length);
         if (digits.length === value.length) {
@@ -2821,7 +2830,8 @@ function typeIntoFocused(value: string, mode: "password" | "code" | "text"): boo
  * does nothing, which is what the entry did before.
  */
 async function askToUnlock(): Promise<void> {
-    const action = browser.action as unknown as { openPopup?: () => Promise<void> } | undefined;
+    const api = browser as unknown as Record<"action" | "browserAction", { openPopup?: () => Promise<void> } | undefined>;
+    const action = api.action ?? api.browserAction;
     await action?.openPopup?.().catch(() => undefined);
 }
 
@@ -2851,10 +2861,14 @@ async function typeInFrame(
 async function fromMenu(
     entry: string | number,
     tab: { id?: number; url?: string } | undefined,
-    frameId: number | undefined
+    frameId: number | undefined,
+    frameUrl: string | undefined
 ): Promise<void> {
-    if (tab?.id === undefined || !tab.url || !/^https?:/i.test(tab.url)) return;
-    if (isBlockedHost(await BLOCKED.getValue(), tab.url)) return;
+    const here = frameId ? frameUrl : tab?.url;
+    if (tab?.id === undefined || !tab.url || !here) return;
+    if (![tab.url, here].every((url) => /^https?:/i.test(url))) return;
+    const blocked = await BLOCKED.getValue();
+    if (isBlockedHost(blocked, tab.url) || isBlockedHost(blocked, here)) return;
     const page = { tabId: tab.id, url: tab.url };
 
     if (entry === MENU.generate) {
@@ -2879,7 +2893,7 @@ async function fromMenu(
     }
 
     if (entry === MENU.code) {
-        const login = (await forUrl(page.url)).find((one) => one.totp);
+        const login = (await forUrl(here)).find((one) => one.totp);
         const code = login?.totp ? await totpCode(login.totp) : null;
         if (code) await typeInFrame(tab.id, frameId, code, "code");
         return;
@@ -2903,16 +2917,21 @@ async function setupMenus(): Promise<void> {
     const menus = browser.contextMenus;
     if (!menus) return;
     await menus.removeAll();
+    fitted = null;
     menus.create({ id: MENU.root, title: "Polaris", contexts: ["editable"] });
     for (const entry of MENU_ENTRIES) {
         menus.create({ id: entry.id, parentId: MENU.root, title: entry.title, contexts: ["editable"] });
     }
 }
 
+/** What the entries were last fitted to, so a hover over a box of the same kind costs nothing. */
+let fitted: MenuTarget | null = null;
+
 /** Show the entries that fit the box the pointer is over. */
 async function fitMenu(target: MenuTarget): Promise<void> {
     const menus = browser.contextMenus;
-    if (!menus) return;
+    if (!menus || target === fitted) return;
+    fitted = target;
     const shown = visibleEntries(target);
     await Promise.all(
         MENU_ENTRIES.map((entry) =>
@@ -3011,7 +3030,7 @@ export default defineBackground(() => {
     // command above: the build's stand-in browser has no menu API.
     void setupMenus();
     browser.contextMenus?.onClicked.addListener(
-        (info, tab) => void fromMenu(info.menuItemId, tab, info.frameId)
+        (info, tab) => void fromMenu(info.menuItemId, tab, info.frameId, info.frameUrl)
     );
 
     // The deadline is enforced on a period, not only when something asks. On
