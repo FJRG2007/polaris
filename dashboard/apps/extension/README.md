@@ -44,16 +44,24 @@ documented in `dashboard/docs/vault.md`. This extension is another client of tha
 same surface, so it adds no server code: it is let in through
 `/vault/identity/connect/authorize` and its `/claim`, reads everything from
 `/vault/api/sync`, refreshes at `/vault/identity/connect/token`, and polls
-`/vault/api/accounts/revision-date` to know when to sync again.
+`/vault/api/accounts/revision-date` to know when to sync again. Polaris pushes
+nothing, so it asks while the vault is open: when you switch tabs, when a page
+finishes loading, before a list is drawn, and once a minute. Each look is the
+revision date alone, at most one every ten seconds, and the items come down
+only when it moved - so a login you save in the dashboard is there when you go
+back to the site.
 
 Signing in is asking Polaris itself, not typing a password into this extension. A
 tab opens on the dashboard, somebody who is already signed in and has their vault
 open approves the request, and the vault key arrives sealed to a pair this
 extension made for the exchange - the same shape as a TV app signing in to a
-streaming service. The master password is not a way in: it only unlocks a vault
-that has already signed in and since locked itself. More than one account can be
-signed in at once; the popup's account line switches between them without
-signing out.
+streaming service. The tab closes itself once you answer and puts you back on
+the page you were on. Connecting the browser and letting it into the vault are
+two approvals, but one detour: when the account has a vault, the connection's
+tab goes straight on to the vault's. The master password is not a way in: it
+only unlocks a vault that has already signed in and since locked itself. More
+than one account can be signed in at once; the popup's account line switches
+between them without signing out.
 
 The cryptography is not reimplemented here either. `@polaris/vault-crypto` is the
 module the Polaris web vault uses, pinned against Bitwarden's own test vectors, so
@@ -108,7 +116,10 @@ manifest is written to avoid, and a page can read anything running inside it.
 The popup is not the only way to use this. With "Show it here" in the popup,
 Polaris also appears inside that site's own pages:
 
-- the mark beside a login box, which offers what the vault has for the page,
+- the mark beside a login box, which offers what the vault has for the page.
+  You pick a login once: a sign-in that asks for the name on one page and the
+  password on the next gets the password on its own, and the authenticator's
+  code after it. Nothing is submitted for you,
 - the mark beside a **new** password box, which makes one for you and fills the
   confirmation with it,
 - the mark beside a one-time-code box, which types the code for the item you

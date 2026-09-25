@@ -169,7 +169,31 @@ async function start(): Promise<void> {
 
         place();
         watchForBreaches(at(fields.newPassword));
+        claimPassword();
         claimCode();
+    };
+
+    /**
+     * Type the password for the login picked on the page before, the moment the
+     * page asks for it.
+     *
+     * A sign-in that asks for the name alone and the password next: somebody
+     * picked a login on the first page, and picking it again on the second was
+     * a step for nothing. The worker remembered the pick for this tab and site
+     * and fills it itself, so nothing about the login crosses to this script.
+     * Asked once per box, and never over something already typed.
+     */
+    const passwordAsked = new WeakSet<HTMLInputElement>();
+    const claimPassword = (): void => {
+        const box = at(seen.fields.password);
+        if (!box || passwordAsked.has(box) || box.value !== "") return;
+        passwordAsked.add(box);
+        void askBackground({ kind: "continueSignIn" }).then((reply) => {
+            if (!reply.ok) return;
+            // Filled, so the list is not to drop down on it later either.
+            offeredOn.add(box);
+            dismiss();
+        });
     };
 
     /**
@@ -190,7 +214,11 @@ async function start(): Promise<void> {
         claimed.add(first);
         void askBackground({ kind: "secondStepCode" }).then((reply) => {
             if (!reply.ok || !("code" in reply) || !first.isConnected) return;
-            if (boxes.every((box) => box.value === "")) putCode(boxes, reply.code);
+            if (!boxes.every((box) => box.value === "")) return;
+            putCode(boxes, reply.code);
+            // A list that dropped down on the box while the code was on its way
+            // is offering what has just been typed.
+            dismiss();
         });
     };
 
@@ -218,11 +246,30 @@ async function start(): Promise<void> {
                 return;
             }
             const reply = await askBackground({ kind: "itemsFor", url: location.href });
+            // Dropped down by itself on a box that has been filled since - by the
+            // login picked a moment ago, which puts the cursor in each box it
+            // types into - or that somebody has already left: offering the list
+            // there is asking again for what was just answered.
+            if (offered && (field.value !== "" || document.activeElement !== field)) return;
             if (!reply.ok) {
                 // Locked, most often. Not offered by itself - a panel that drops
                 // down only to say "locked" on every click is one people learn to
-                // swat - but the mark answers with why it has nothing.
-                if (!offered) menu(field, [], reply.error, async () => undefined);
+                // swat - but the mark answers with why it has nothing, and with
+                // the way to unlock when that is why.
+                if (offered) return;
+                if ("locked" in reply && reply.locked) {
+                    list(
+                        field,
+                        [
+                            choice("Unlock Polaris", reply.error, () => {
+                                void askBackground({ kind: "openUnlock" });
+                            })
+                        ],
+                        reply.error
+                    );
+                    return;
+                }
+                menu(field, [], reply.error, async () => undefined);
                 return;
             }
             const items = "items" in reply ? reply.items : [];
@@ -243,6 +290,13 @@ async function start(): Promise<void> {
             if (offered && items.length === 0 && fresh.length === 0) return;
             const logins = items.map((item) =>
                 choice(item.name, [item.username, item.vault].filter(Boolean).join(" - "), () => {
+                    // The boxes this fill types into are answered: the list is
+                    // not to drop down again on the password box as the fill
+                    // passes through it.
+                    for (const index of [seen.fields.username, seen.fields.password]) {
+                        const box = at(index);
+                        if (box) offeredOn.add(box);
+                    }
                     void askBackground({ kind: "fill", id: item.id });
                 })
             );
@@ -580,8 +634,17 @@ function mark(role: Role, onPress: () => void): HTMLElement {
     return host;
 }
 
+/** The panel open under a field right now, closed by whatever makes it moot. */
+let floatingClose: (() => void) | null = null;
+
+/** Close the panel under a field, if one is open: what it offered has just been
+ *  typed without it. */
+function dismiss(): void {
+    floatingClose?.();
+}
+
 /** The panel every menu below is drawn inside: ours, under the field, in a shadow
- *  root the page cannot reach into. */
+ *  root the page cannot reach into. One at a time. */
 function floating(field: HTMLInputElement): {
     host: HTMLElement;
     panel: HTMLElement;
@@ -613,7 +676,10 @@ function floating(field: HTMLInputElement): {
         document.removeEventListener("mousedown", away, true);
         document.removeEventListener("keydown", onKey, true);
         field.removeEventListener("blur", close);
+        if (floatingClose === close) floatingClose = null;
     };
+    floatingClose?.();
+    floatingClose = close;
     const away = (event: Event): void => {
         if (!host.contains(event.target as Node)) close();
     };
