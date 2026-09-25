@@ -364,6 +364,11 @@ const LINK_WAITING = storage.defineItem<LinkWaiting | null>("session:link.waitin
     fallback: null
 });
 
+/** The popup opened in a tab to unlock, and the tab somebody was on when it opened. */
+const UNLOCK_TAB = storage.defineItem<ApprovalTab | null>("session:vault.unlockTab", {
+    fallback: null
+});
+
 const LOCK_AT = storage.defineItem<number | null>("session:vault.lockAt", { fallback: null });
 const TIMEOUT = storage.defineItem<number>("local:vault.timeoutMs", {
     fallback: DEFAULT_TIMEOUT_MS
@@ -1055,7 +1060,6 @@ async function collectLink(): Promise<void> {
         // is spent, and the first check after the switch would read the refusal as
         // a disconnection and close its vault.
         await inTurn(() => dropParked(accounts.accountId(origin, claim.account.email)));
-        await LINK_WAITING.setValue({ ...still, state: "approved" });
         // Connecting is the first half of what somebody came for, and the vault
         // is the second. Where the account may use one and this browser is not
         // in it yet, its approval opens in the same tab straight away - one
@@ -1064,8 +1068,9 @@ async function collectLink(): Promise<void> {
         const [canVault, inVault] = await Promise.all([LINK_VAULT.getValue(), REFRESH.getValue()]);
         const chained =
             canVault && inVault === null && still.tab?.tabId != null
-                ? await requestVault(origin, claim.token, still.tab)
+                ? await requestVault(origin, claim.token, still.tab).catch(() => null)
                 : null;
+        await LINK_WAITING.setValue({ ...still, state: "approved" });
         if (!chained?.ok) await closeApproval(still.tab);
         return;
     }
@@ -2579,6 +2584,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // land after a switch and be read as the incoming account's.
                 void inTurn(() => sync(false));
                 await badge();
+                if (ours) void leaveUnlockTab(sender.tab?.id);
                 return { ok: true, status: await status() };
             }
 
@@ -3057,7 +3063,27 @@ async function askToUnlock(): Promise<void> {
         );
     if (opened) return;
     const url = browser.runtime.getURL("/popup.html");
-    await browser.tabs.create({ url }).catch(() => undefined);
+    const [from] = await browser.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+    const tab = await browser.tabs
+        .create({ url, ...(from?.id !== undefined ? { openerTabId: from.id } : {}) })
+        .catch(() => null);
+    if (tab?.id !== undefined)
+        await UNLOCK_TAB.setValue({ tabId: tab.id, returnTo: from?.id ?? null });
+}
+
+/**
+ * Close the popup's tab once it has unlocked, and put somebody back on the page
+ * they came from - which is where the logins it just opened are for.
+ */
+async function leaveUnlockTab(tabId: number | undefined): Promise<void> {
+    const held = await UNLOCK_TAB.getValue();
+    if (tabId === undefined || held?.tabId !== tabId) return;
+    await UNLOCK_TAB.setValue(null);
+    const tab = await browser.tabs.get(tabId).catch(() => null);
+    await browser.tabs.remove(tabId).catch(() => undefined);
+    if (tab?.active && held.returnTo !== null) {
+        await browser.tabs.update(held.returnTo, { active: true }).catch(() => undefined);
+    }
 }
 
 /** Run the typing function in the frame that was clicked. */
