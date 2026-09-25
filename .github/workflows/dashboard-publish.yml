@@ -55,6 +55,8 @@ on:
 permissions:
   contents: read
   packages: write
+  # Read by `changes`, to find the last run that published.
+  actions: read
 
 # One publish at a time. An image is now pushed untagged and named minutes later by
 # the `tag` job, so two overlapping runs interleave: the older one's `tag` can land
@@ -92,10 +94,29 @@ jobs:
           BEFORE: ${{ github.event.before }}
           SHA: ${{ github.sha }}
           EVENT: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out relay true; out vision true; out face true; }
+          all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out hytale true; out relay true; out vision true; out face true; }
+          # Measured from the last run that published, not from the push before
+          # this one. A run that failed its suites or was cancelled built nothing
+          # that got tagged, so its changes are still unpublished - and measured
+          # from the push before, the next push that touches only the extension
+          # rebuilt no image and left those commits "waiting on a build" on every
+          # deployment's Update card until something else touched `apps/web`.
+          # Runs never overlap (see `concurrency`), so each successful run covers
+          # everything since the one before it. A re-run of a commit that already
+          # published finds itself here, and keeps the push base so it rebuilds
+          # what that push changed instead of nothing.
+          LAST=$(gh api "repos/$REPO/actions/workflows/dashboard-publish.yml/runs?branch=main&status=success&per_page=1" \
+            --jq '.workflow_runs[0].head_sha // empty' 2>/dev/null || true)
+          if [ -n "$LAST" ] && [ "$LAST" != "$SHA" ] && git cat-file -e "${LAST}^{commit}" 2>/dev/null \
+             && git merge-base --is-ancestor "$LAST" "$SHA"; then
+            echo "Measuring from the last published commit $LAST (push base was ${BEFORE:-none})."
+            BEFORE="$LAST"
+          fi
           if [ "$EVENT" = "workflow_dispatch" ] || [ -z "${BEFORE:-}" ] \
              || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
              || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
@@ -612,13 +633,15 @@ jobs:
   # build does not hold back a web that did.
   #
   # `!cancelled()` rather than `always()`: a cancelled run must leave `latest` where
-  # it is, and a skipped dashboard-ci (nothing here was rebuilt) skips this too,
-  # since its result is then not 'success'. A push that only touched the extension
-  # does run dashboard-ci, so this runs and tags nothing - every step below is
-  # guarded on its own image's result, and all of them were skipped.
+  # it is. A skipped dashboard-ci means no image it covers was rebuilt, so this
+  # still runs and names the ones outside its reach (Hytale, camera relay,
+  # vision, face): a run that built them and tagged nothing would read as
+  # published, and the next run would measure past it. A push that only touched
+  # the extension does run dashboard-ci, so this runs and tags nothing - every
+  # step below is guarded on its own image's result, and all of them were skipped.
   tag:
     needs: [dashboard-ci, web, bridge, guard, hytale, relay, vision, face]
-    if: ${{ !cancelled() && needs.dashboard-ci.result == 'success' }}
+    if: ${{ !cancelled() && (needs.dashboard-ci.result == 'success' || needs.dashboard-ci.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: docker/setup-buildx-action@v3
