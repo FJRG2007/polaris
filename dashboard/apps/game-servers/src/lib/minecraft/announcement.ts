@@ -20,6 +20,7 @@
 
 import { BROADCAST_TAG } from "./broadcast";
 import type { MinecraftEdition } from "./service";
+import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 import { MOTD_COLORS, SECTION, motdSpans, stripMotd, type MotdSpan } from "./motd";
 import {
     fillValues,
@@ -469,6 +470,26 @@ export function announcementProblems(
         problems.chat = `At most ${CHAT_MAX_LINES} lines`;
     } else if (visibleLength(stripMotd(chat)) > CHAT_MAX) {
         problems.chat = `At most ${CHAT_MAX} characters`;
+    }
+
+    // Each part becomes one command, and one command has to fit in what the
+    // game reads at once. Said under the part that is too long, like any other
+    // problem with it, rather than once for the whole announcement.
+    const target = isAnnouncementTarget(announcement.target) ? announcement.target : EVERYBODY;
+    for (const field of [...lineFields, "chat"] as const) {
+        if (problems[field] || !hasText(announcement[field])) continue;
+        const alone: Announcement = {
+            ...BLANK_ANNOUNCEMENT,
+            target,
+            tagged: announcement.tagged,
+            [field]: announcement[field]
+        };
+        const longest = Math.max(
+            ...announcementCommands(edition, alone).map((line) => commandBytes(line))
+        );
+        if (longest > COMMAND_BYTES_MAX) {
+            problems[field] = "Too much formatting for one line. Use fewer colours or styles here.";
+        }
     }
 
     if (announcement.hold !== "timed") {

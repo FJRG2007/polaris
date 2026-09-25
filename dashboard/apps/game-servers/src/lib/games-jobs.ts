@@ -346,6 +346,18 @@ export function gameJobTable(): readonly AppJob[] {
             // Unleased: starting a loop that is already running does nothing.
             leaseMs: null,
             run: async () => (await import("./minecraft/live-display-service")).sweepLiveDisplays()
+        },
+        {
+            key: "game-xray",
+            // Every minute, and all it does is start the loop that places and
+            // watches the Anti X-Ray honeypots on a server that has lost it -
+            // after Polaris restarted or updated. The loop runs every few seconds
+            // in this process and stops once there is nothing left to watch or
+            // put back.
+            everyMs: Number(process.env.POLARIS_GAME_XRAY_MS) || MINUTE,
+            // Unleased: starting a loop that is already running does nothing.
+            leaseMs: null,
+            run: async () => (await import("./minecraft/xray-service")).sweepXrayTraps()
         }
     ];
 }
