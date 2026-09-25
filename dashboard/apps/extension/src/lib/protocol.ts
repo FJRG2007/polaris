@@ -273,14 +273,21 @@ export async function claimAuthorization(
  * so whatever comes back has to be stored in place of what was sent, and a
  * failure means this session is over rather than that it should be retried.
  */
-export async function refresh(base: string, refreshToken: string): Promise<VaultToken | null> {
+export async function refresh(
+    base: string,
+    refreshToken: string,
+    deviceName?: string
+): Promise<VaultToken | null> {
     const reply = await ask(vaultUrl(base, "identity/connect/token"), {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: tokenForm({
             grant_type: "refresh_token",
             refresh_token: refreshToken,
-            client_id: "browser"
+            client_id: "browser",
+            // Restated on every refresh, so the name the session list shows
+            // follows this browser rather than whatever it was called at sign-in.
+            deviceName
         }).toString()
     });
     if (!reply || !reply.ok) return null;

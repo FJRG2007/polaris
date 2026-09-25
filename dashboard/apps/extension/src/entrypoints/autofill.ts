@@ -15,7 +15,9 @@
  * - **The login**, offered on the username or password box. Choosing one sends
  *   the same `fill` message the popup sends, so the two strings reach the page
  *   exactly where they always did and no new path carries a password. This script
- *   never sees one: it asks for names and gets names.
+ *   never sees one: it asks for names and gets names. On a site with nothing
+ *   saved, or a sign-up form, the same menu offers your own email and name and a
+ *   password made on the spot - the account you are about to create.
  * - **A password to use**, offered on the box a new one is being invented in.
  *   Made here by `@polaris/core`'s generator, the same one the popup and the web
  *   vault use, and typed into the new-password box and its confirmation together.
@@ -110,6 +112,9 @@ async function start(): Promise<void> {
             confirmPassword: null,
             oneTimeCode: null,
             oneTimeCodeBoxes: [],
+            fullName: null,
+            givenName: null,
+            familyName: null,
             purpose: "none"
         },
         inputs: []
@@ -164,6 +169,28 @@ async function start(): Promise<void> {
 
         place();
         watchForBreaches(at(fields.newPassword));
+        claimCode();
+    };
+
+    /**
+     * Type the code for the login just filled, the moment the page asks for it.
+     *
+     * The sign-in's second step: the worker remembered which login went into
+     * this tab, and the first code box that appears on the same site gets that
+     * login's code, worked out now so it has not turned over. Asked once per
+     * box, and never over something already typed. Nothing is submitted.
+     */
+    const claimed = new WeakSet<HTMLInputElement>();
+    const claimCode = (): void => {
+        const boxes = seen.fields.oneTimeCodeBoxes
+            .map((index) => at(index))
+            .filter((box): box is HTMLInputElement => box !== null);
+        const [first] = boxes;
+        if (!first || claimed.has(first) || boxes.some((box) => box.value !== "")) return;
+        claimed.add(first);
+        void askBackground({ kind: "secondStepCode" }).then((reply) => {
+            if (reply.ok && "code" in reply && first.isConnected) putCode(boxes, reply.code);
+        });
     };
 
     /**
@@ -207,10 +234,18 @@ async function start(): Promise<void> {
                 });
                 return;
             }
-            if (offered && items.length === 0) return;
-            menu(field, items, "Nothing saved for this site.", async (item) => {
-                await askBackground({ kind: "fill", id: item.id });
-            });
+            // Nothing saved here, or a form that is making an account: what is
+            // offered is what a sign-up asks for - who you are, and a password.
+            const signingUp = seen.fields.purpose === "signup";
+            if (offered && items.length === 0 && !signingUp) return;
+            const fresh = items.length === 0 || signingUp ? await newAccount(field) : [];
+            if (offered && items.length === 0 && fresh.length === 0) return;
+            const logins = items.map((item) =>
+                choice(item.name, [item.username, item.vault].filter(Boolean).join(" - "), () => {
+                    void askBackground({ kind: "fill", id: item.id });
+                })
+            );
+            list(field, [...logins, ...fresh], "Nothing saved for this site.");
         } finally {
             open = false;
         }
@@ -250,6 +285,63 @@ async function start(): Promise<void> {
         true
     );
 
+    /**
+     * What to offer on a form for an account that is not in the vault yet.
+     *
+     * Your own email and name, from the account this extension is signed in as,
+     * into the boxes that ask for them - and a password made here, into the new
+     * password box and its confirmation. Nothing is saved by this: the offer to
+     * save follows the form going, the same as for anything typed by hand.
+     */
+    const newAccount = async (field: HTMLInputElement): Promise<Choice[]> => {
+        const { fields } = seen;
+        const offered: Choice[] = [];
+
+        const reply = await askBackground({ kind: "myDetails" });
+        const details = reply.ok && "details" in reply ? reply.details : null;
+        const userBox = at(fields.username) ?? (field.type === "password" ? null : field);
+        if (details?.email && userBox) {
+            const { email, name } = details;
+            offered.push(
+                choice("Use my email", email, () => {
+                    put(userBox, email);
+                    if (name) fillName(name);
+                })
+            );
+        } else if (details?.name && (fields.fullName !== null || fields.givenName !== null)) {
+            const { name } = details;
+            offered.push(choice("Use my name", name, () => fillName(name)));
+        }
+
+        const passwordBox = at(fields.newPassword) ?? at(fields.password);
+        if (passwordBox) {
+            const options = await savedOptions();
+            offered.push(
+                choice("Make a password", "A strong one, for both password boxes", () =>
+                    offerGenerated(passwordBox, options, (value) => {
+                        put(passwordBox, value);
+                        const confirm = at(fields.confirmPassword);
+                        if (confirm && confirm !== passwordBox) put(confirm, value);
+                    })
+                )
+            );
+        }
+        return offered;
+    };
+
+    /** Somebody's name into the boxes that ask for it, whole or in halves. Only
+     *  into empty ones: what was typed by hand is theirs. */
+    const fillName = (name: string): void => {
+        const { fields } = seen;
+        const [given = "", ...rest] = name.trim().split(/\s+/);
+        const into = (box: HTMLInputElement | null, value: string): void => {
+            if (box && box.value === "" && value !== "") put(box, value);
+        };
+        into(at(fields.fullName), name.trim());
+        into(at(fields.givenName), given);
+        into(at(fields.familyName), rest.join(" "));
+    };
+
     refresh();
     // The page keeps moving: a field can be replaced, revealed, or scrolled.
     // One debounced look rather than one per mutation, because a login page
@@ -280,8 +372,14 @@ async function start(): Promise<void> {
     const submitted = (): void => {
         const { fields } = seen;
         const password = at(fields.newPassword) ?? at(fields.password);
-        if (!password || password.value === "") return;
         const username = at(fields.username)?.value ?? "";
+        if (!password) {
+            // The first page of a sign-in that asks for the name alone: the
+            // worker keeps it for the page that asks for the password.
+            if (username.trim() !== "") void askBackground({ kind: "captured", username, password: "" });
+            return;
+        }
+        if (password.value === "") return;
         void askBackground({
             kind: "captured",
             username,
@@ -303,10 +401,11 @@ async function start(): Promise<void> {
                 "button, input[type=submit], input[type=button], [role=button]"
             );
             if (!pressed || !looksLikeSubmit(pressed)) return;
-            const password = at(seen.fields.newPassword) ?? at(seen.fields.password);
-            // Only a press that belongs with the password box: a cookie banner's
+            const box =
+                at(seen.fields.newPassword) ?? at(seen.fields.password) ?? at(seen.fields.username);
+            // Only a press that belongs with the login's boxes: a cookie banner's
             // button is not somebody signing in.
-            if (!password || !sharesForm(pressed, password)) return;
+            if (!box || !sharesForm(pressed, box)) return;
             submitted();
         },
         true
@@ -532,12 +631,36 @@ function action(label: string, onPress: () => void, primary = false): HTMLButton
 }
 
 /** The chooser: the logins for this page, or the ones carrying a code. */
+/** One row in a chooser: what it is, a line under it, and what pressing it does. */
+interface Choice {
+    readonly label: string;
+    readonly detail: string;
+    readonly pick: () => void;
+}
+
+function choice(label: string, detail: string, pick: () => void): Choice {
+    return { label, detail, pick };
+}
+
 function menu(
     field: HTMLInputElement,
     items: readonly ItemSummary[],
     empty: string,
     onChoose: (item: ItemSummary) => Promise<void>
 ): void {
+    list(
+        field,
+        items.map((item) =>
+            choice(item.name, [item.username, item.vault].filter(Boolean).join(" - "), () => {
+                void onChoose(item);
+            })
+        ),
+        empty
+    );
+}
+
+/** A chooser under a field, drawn from rows. */
+function list(field: HTMLInputElement, items: readonly Choice[], empty: string): void {
     const { panel, close } = floating(field);
 
     if (items.length === 0) {
@@ -563,10 +686,10 @@ function menu(
             cursor: pointer;
         `;
         const name = document.createElement("span");
-        name.textContent = item.name;
+        name.textContent = item.label;
         name.style.cssText = "display:block;";
         const who = document.createElement("span");
-        who.textContent = [item.username, item.vault].filter(Boolean).join(" - ");
+        who.textContent = item.detail;
         who.style.cssText = "display:block;font-size:12px;color:hsl(222 10% 66%);";
         row.append(name, who);
         row.addEventListener("mouseenter", () => {
@@ -578,7 +701,7 @@ function menu(
         row.addEventListener("mousedown", (event) => {
             event.preventDefault();
             close();
-            void onChoose(item);
+            item.pick();
         });
         panel.append(row);
     }

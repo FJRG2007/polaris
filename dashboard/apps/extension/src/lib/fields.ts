@@ -128,6 +128,10 @@ export interface PageFields extends FoundFields {
     /** Every box the code goes in, in order: one for an ordinary code box,
      *  one per digit for a split one, none when the page asks for no code. */
     readonly oneTimeCodeBoxes: readonly number[];
+    /** Where somebody's own name goes on a sign-up: whole, or in two halves. */
+    readonly fullName: number | null;
+    readonly givenName: number | null;
+    readonly familyName: number | null;
     readonly purpose: FormPurpose;
 }
 
@@ -228,6 +232,16 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
                 ? "signin"
                 : "none";
 
+    // Somebody's name, but never in a box already taken as the username or the
+    // code: "nombre de usuario" is a username.
+    const nameBox = (kind: NameKind): number | null =>
+        usable.find(
+            (index) =>
+                index !== username &&
+                !oneTimeCodeBoxes.includes(index) &&
+                nameKind(fields[index]) === kind
+        ) ?? null;
+
     return {
         username,
         password: current,
@@ -235,8 +249,34 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
         confirmPassword,
         oneTimeCode,
         oneTimeCodeBoxes,
+        fullName: nameBox("full"),
+        givenName: nameBox("given"),
+        familyName: nameBox("family"),
         purpose
     };
+}
+
+/** Which part of somebody's name a box asks for. */
+type NameKind = "full" | "given" | "family";
+
+const GIVEN_WORDS = /first.?name|given.?name|fname|\bnombre\b(?! completo| de usuario)/i;
+const FAMILY_WORDS = /last.?name|surname|family.?name|lname|apellido/i;
+const FULL_WORDS = /full.?name|nombre completo|(?:^|\s)name(?:\s|$)/i;
+
+/** Which part of a name this box is for, or null for a box that is not one. The
+ *  page's own token first, then the words it carries. */
+function nameKind(field: FieldFacts | undefined): NameKind | null {
+    if (!field || field.type !== "text") return null;
+    const token = field.autocomplete;
+    if (token === "name") return "full";
+    if (token === "given-name") return "given";
+    if (token === "family-name") return "family";
+    if (token !== "" && token !== "off") return null;
+    if (NOT_A_LOGIN.test(field.words) || /user|login|company|empresa/i.test(field.words)) return null;
+    if (FAMILY_WORDS.test(field.words)) return "family";
+    if (GIVEN_WORDS.test(field.words)) return "given";
+    if (FULL_WORDS.test(field.words)) return "full";
+    return null;
 }
 
 /**
@@ -307,6 +347,14 @@ function settleRoles(said: readonly PasswordRole[]): PasswordRole[] {
     }
 
     const settled = [...said];
+    // A confirmation with no new password named is confirming the box right
+    // before it: "Min. 8 characters" followed by "Repeat password" is a password
+    // being set, and reading the first as the current one made it a sign-in -
+    // no password offered, and the login menu where the generator belonged.
+    const confirmAt = settled.indexOf("confirm");
+    if (!settled.includes("new") && confirmAt > 0 && settled[confirmAt - 1] === "unknown") {
+        settled[confirmAt - 1] = "new";
+    }
     const firstNew = settled.indexOf("new");
     for (const [index, role] of settled.entries()) {
         if (role !== "unknown") continue;

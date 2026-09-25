@@ -143,6 +143,34 @@ describe("what the form is for", () => {
         expect(form).toMatchObject({ purpose: "change", password: 0, newPassword: 1, confirmPassword: 2 });
     });
 
+    it("reads a box followed by its confirmation as a password being set", () => {
+        // "Set your password to activate your account": the first box says only
+        // how long it must be, the second that it repeats the first.
+        const form = readForm([
+            field({ type: "password", words: "min. 8 characters", form: FORM }),
+            field({ type: "password", words: "repeat password", form: FORM })
+        ]);
+        expect(form).toMatchObject({
+            purpose: "signup",
+            password: null,
+            newPassword: 0,
+            confirmPassword: 1
+        });
+    });
+
+    it("finds where somebody's own name goes, and never in the username box", () => {
+        const form = readForm([
+            field({ words: "first name", form: FORM }),
+            field({ words: "apellidos", form: FORM }),
+            field({ words: "nombre de usuario", form: FORM }),
+            field({ type: "password", autocomplete: "new-password", form: FORM })
+        ]);
+        expect(form).toMatchObject({ givenName: 0, familyName: 1, fullName: null, username: 2 });
+
+        const whole = readForm([field({ autocomplete: "name" }), field({ words: "email", type: "email" })]);
+        expect(whole).toMatchObject({ fullName: 0, username: 1 });
+    });
+
     it("never offers to fill a new password with the saved one", () => {
         const form = readForm([
             field({ words: "email", form: FORM }),

@@ -220,6 +220,18 @@ export type Request =
       }
     /** The current one-time code for an item, and how long it has left. */
     | { readonly kind: "totpNow"; readonly id: string }
+    /**
+     * The code for the login just filled into this tab, asked by the box that
+     * wants it - see `lib/second-step.ts`. Names no item: the worker answers from
+     * what it remembered for the sender's tab and site, once.
+     */
+    | { readonly kind: "secondStepCode" }
+    /**
+     * The signed-in person's own name and email, to type into a sign-up on a site
+     * with nothing saved for it. Asked when the menu opens there, so a page is
+     * never handed them unless somebody is about to choose them.
+     */
+    | { readonly kind: "myDetails" }
     /** Whether the tab in front of somebody is one they have shut this out of. */
     | { readonly kind: "blocked" }
     /**
@@ -340,6 +352,8 @@ export type Reply =
     | { readonly ok: true; readonly count: number | null }
     /** What the worker is holding for this tab, and what to say about it. */
     | { readonly ok: true; readonly offer: OfferedCapture }
+    /** The person this extension is signed in as, for a sign-up form. */
+    | { readonly ok: true; readonly details: ExtensionAccount }
     /**
      * A request to be let in by Polaris: where it stands, and what to show while
      * it is in flight.
@@ -393,6 +407,8 @@ export const FROM_PAGE: ReadonlySet<Request["kind"]> = new Set([
     "itemsFor",
     "fill",
     "totpNow",
+    "secondStepCode",
+    "myDetails",
     "breach",
     "captured",
     "pendingCapture",

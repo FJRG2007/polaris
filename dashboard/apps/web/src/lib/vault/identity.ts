@@ -266,7 +266,10 @@ export async function vaultSignIn(input: SignInInput): Promise<SignInResult> {
  * has to end the credential here as well, or a session already open keeps
  * rotating - and each rotation hands back the wrapped keys - for a month.
  */
-export async function vaultRefresh(refreshToken: string): Promise<SignInResult> {
+export async function vaultRefresh(
+    refreshToken: string,
+    deviceName: string | null = null
+): Promise<SignInResult> {
     const row = await prisma.vaultRefreshToken.findUnique({
         where: { tokenHash: hashToken(refreshToken) },
         select: {
@@ -293,6 +296,16 @@ export async function vaultRefresh(refreshToken: string): Promise<SignInResult> 
         where: { id: row.id },
         data: { revokedAt: new Date() }
     });
+    // A client may restate its own name as it refreshes, so a name it got wrong
+    // at sign-in - the extension called Brave "Chrome" - corrects itself on the
+    // next refresh rather than only on the next approval. Only the device this
+    // token belongs to, and only its label.
+    if (deviceName && row.deviceId) {
+        await prisma.vaultDevice.update({
+            where: { id: row.deviceId },
+            data: { name: deviceName }
+        });
+    }
     return {
         ok: true,
         body: await tokenBody(row.userId, row.deviceId, row.device?.identifier ?? null)
