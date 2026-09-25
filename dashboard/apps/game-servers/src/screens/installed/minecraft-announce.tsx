@@ -35,6 +35,7 @@ import {
     type Announcement,
     type Hold
 } from "../../lib/minecraft/announcement";
+import { COMMAND_BYTES_MAX, commandBytes } from "../../lib/minecraft/command-size";
 import { VARIABLES, previewText, visibleLength } from "../../lib/minecraft/text-vars";
 import {
     readLiveDisplayAction,
@@ -134,8 +135,6 @@ function toLocalInput(iso: string): string {
 const { useConfirm } = hostUi.confirmDialog;
 const { CopyButton } = hostUi.copyButton;
 
-/** The longest one command may be; the server-side guard refuses anything past it. */
-const COMMAND_MAX = 512;
 
 /** "No sound" as a select value. An empty value is what a select reads as
  *  "nothing chosen", so the empty sound id rides under a name of its own. */
@@ -238,7 +237,6 @@ export function MinecraftAnnounce({
             };
         }
     }, [edition, draft]);
-    const tooLong = built.lines.some((line) => line.length > COMMAND_MAX);
     // The same check the server runs, on every keystroke: the button is never
     // live for something that is then refused.
     const problems = useMemo(() => announcementProblems(draft, edition), [draft, edition]);
@@ -643,12 +641,6 @@ export function MinecraftAnnounce({
                             {error}
                         </p>
                     )}
-                    {tooLong && (
-                        <p role="alert" className="text-sm text-danger">
-                            One part has too much formatting for a single command. Use fewer colours
-                            or styles in it.
-                        </p>
-                    )}
 
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-xs text-muted-foreground">
@@ -679,7 +671,6 @@ export function MinecraftAnnounce({
                                     !running ||
                                     pending ||
                                     empty ||
-                                    tooLong ||
                                     blocked ||
                                     built.problem !== null
                                 }
@@ -709,7 +700,7 @@ export function MinecraftAnnounce({
                                         <code
                                             className={cn(
                                                 "min-w-0 flex-1 break-all rounded bg-muted px-1.5 py-1 text-[11px]",
-                                                line.length > COMMAND_MAX && "text-danger"
+                                                commandBytes(line) > COMMAND_BYTES_MAX && "text-danger"
                                             )}
                                         >
                                             {line}

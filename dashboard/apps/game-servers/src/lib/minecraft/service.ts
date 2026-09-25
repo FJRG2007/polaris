@@ -25,6 +25,7 @@ import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
 import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
 import { liveContext } from "./live-values";
+import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 import { readsPlayerList } from "./text-vars";
 import { announcementCommands, announcementProblems, type Announcement } from "./announcement";
 import { host } from "@polaris/app-host";
@@ -66,9 +67,6 @@ const CONSOLE_ANSWER_MS = 700;
  */
 const COMMAND_TIMEOUT_MS = 15_000;
 
-/** Long enough for a ban reason, short enough that no single field can carry a
- *  script into the console. */
-const MAX_COMMAND_LENGTH = 512;
 
 /** More words than any command the panel builds, and far fewer than a list
  *  somebody assembled. */
@@ -206,7 +204,7 @@ async function withPorts<T>(
  *  this is belt and braces - but a moderation screen is exactly where a crafted
  *  player name would arrive. */
 function assertSafeArgument(value: string): void {
-    if (value.length === 0 || value.length > MAX_COMMAND_LENGTH)
+    if (value.length === 0 || commandBytes(value) > COMMAND_BYTES_MAX)
         throw new Error("That command is not valid");
     if (/[\0\r\n]/.test(value)) throw new Error("That command is not valid");
 }
@@ -303,7 +301,7 @@ export async function sendAnnouncement(
     const lines = announcementCommands(install.edition, announcement, context);
     if (lines.length === 0) throw new Error("There is nothing to send yet");
     for (const line of lines) {
-        if (line.length > MAX_COMMAND_LENGTH) {
+        if (commandBytes(line) > COMMAND_BYTES_MAX) {
             throw new Error(
                 "That is too much formatting for one line. Use fewer colours or styles."
             );

@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
     BLANK_ANNOUNCEMENT,
     announcementCommands,
+    announcementProblems,
     bedrockComponent,
     isAnnouncementTarget,
     javaComponent,
@@ -204,5 +205,41 @@ describe("templates a server keeps", () => {
         }));
         expect(() => withTemplate(full, one)).toThrow(/Only/);
         expect(withTemplate(full, { ...one, id: "t0", name: "Renamed" })[0]?.name).toBe("Renamed");
+    });
+});
+
+/**
+ * How long a part may be. One part is one command, and one command is one RCON
+ * packet the game reads in full - so the limit is the packet's, in bytes, and a
+ * part past it is said under that part rather than once for the whole thing.
+ */
+describe("a part with a lot of formatting", () => {
+    const warning =
+        "&8[&cDymo&8] &fReckmy&7, we have detected possible &cX-Ray &7use.\n&7This is your &efirst warning&7. If it happens again, you will receive a &ctemporary ban&7. &8(&7Read the &brules &7with &b/rules&8)";
+
+    it("sends a warning with ten colour changes, which the old 512 limit refused", () => {
+        const problems = announcementProblems(
+            { ...BLANK_ANNOUNCEMENT, target: "Reckmy", chat: warning, tagged: false },
+            "java"
+        );
+        expect(problems.chat).toBeUndefined();
+        const [line] = announcementCommands("java", {
+            ...BLANK_ANNOUNCEMENT,
+            target: "Reckmy",
+            chat: warning,
+            tagged: false
+        });
+        expect(line!.length).toBeGreaterThan(512);
+    });
+
+    it("names the part that is too long, and only that part", () => {
+        const colours = "0123456789abcdef";
+        const busy = Array.from({ length: 100 }, (_, index) => `&${colours[index % 16]}é`).join("");
+        const problems = announcementProblems(
+            { ...BLANK_ANNOUNCEMENT, title: "Fine", actionbar: busy },
+            "java"
+        );
+        expect(problems.actionbar).toMatch(/Too much formatting/);
+        expect(problems.title).toBeUndefined();
     });
 });
