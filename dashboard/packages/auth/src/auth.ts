@@ -61,9 +61,15 @@ function requestOrigin(headers: Headers | undefined): DeviceOrigin {
     };
 }
 
-/** Session lifetime: 7 days, refreshed at most once per day. Exported so the
- *  compliance evidence reports the lifetime this instance actually runs. */
-export const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
+/**
+ * Session lifetime: 30 days from the last renewal, renewed at most once per day.
+ * A session in use never runs out - somebody who opens Polaris once a month stays
+ * signed in, the way a chat app keeps you - and one left alone for a month ends.
+ * The renewal happens in the browser (`SessionKeeper`), because it is the only
+ * place the new cookie can be handed back. Exported so the compliance evidence
+ * reports the lifetime this instance actually runs.
+ */
+export const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 export const SESSION_UPDATE_AGE = 60 * 60 * 24;
 
 /** The shortest password an account may set, reported by the same evidence. */
@@ -871,7 +877,11 @@ export async function refuseProtectedEndpoint(auth: Auth, request: Request): Pro
     const endpoint = [...PROTECTED_ENDPOINTS].find((known) => path.endsWith(known));
     if (!endpoint) return null;
 
-    const session = await auth.api.getSession({ headers: request.headers }).catch(() => null);
+    // No renewal here: this runs before better-auth's own handler, and a cookie
+    // renewed on a response nobody sends back is a session whose cookie runs out.
+    const session = await auth.api
+        .getSession({ headers: request.headers, query: { disableRefresh: true } })
+        .catch(() => null);
     if (!session) return null;
 
     // An account its owner has shut down changes nothing, by any door. Checked

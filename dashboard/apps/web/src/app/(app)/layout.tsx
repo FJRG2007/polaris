@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import { requireUser } from "@/lib/session";
 import { AppChrome } from "@/components/app-chrome";
 import { ProvideAppHostUi } from "@/components/app-host/client";
+import { SessionKeeper } from "@/components/session-keeper";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
     const user = await requireUser();
@@ -20,6 +21,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             {/* Before the screens, so an installable app's components find the
                 dashboard's pieces when they render. */}
             <ProvideAppHostUi />
+            <SessionKeeper />
             {children}
         </AppChrome>
     );

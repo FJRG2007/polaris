@@ -41,10 +41,21 @@ export interface SessionUser {
  * better-auth throw "Unsupported state or unable to authenticate data"; treat
  * that as simply logged-out so the user is sent to sign in again with a fresh
  * cookie, instead of the raw error surfacing on a protected page.
+ *
+ * Read without renewing. A renewal moves the session's expiry in the database
+ * and hands the browser a new cookie in the same breath - but a page or an action
+ * has no response to put that cookie on, so it was dropped while the database was
+ * moved. The row then looked fresh, nothing ever renewed the cookie, and it ran
+ * out a week after signing in, in the middle of whatever somebody was doing (a
+ * call, once). Renewal belongs to `SessionKeeper`, which asks better-auth's own
+ * endpoint, whose response does reach the browser.
  */
 export async function getSession() {
     try {
-        return await auth.api.getSession({ headers: await headers() });
+        return await auth.api.getSession({
+            headers: await headers(),
+            query: { disableRefresh: true }
+        });
     } catch {
         return null;
     }

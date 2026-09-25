@@ -84,7 +84,8 @@ export const setPinSchema = z
 /** Inactivity before the dashboard locks. 0 disables the lock entirely. */
 export const IDLE_LOCK_CHOICES = [0, 5, 15, 30, 60, 120, 480] as const;
 
-/** Absolute session lifetime. 0 keeps the instance default (7 days). */
+/** Absolute session lifetime. 0 keeps the instance default: a session in use
+ *  never ends, and one left unused for 30 days does. */
 export const SESSION_MAX_CHOICES = [0, 60, 480, 1440, 10080, 43200] as const;
 
 export const sessionLimitsSchema = z.object({
