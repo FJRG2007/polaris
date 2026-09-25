@@ -14,14 +14,14 @@ import * as zod from "zod";
 import * as React from "react";
 import * as ui from "@polaris/ui";
 import * as core from "@polaris/core";
-import * as zoom from "@polaris/ui/zoom";
 import * as nextLink from "next/link";
 import * as nextImage from "next/image";
+import * as zoom from "@polaris/ui/zoom";
 import * as jsxRuntime from "react/jsx-runtime";
 import * as nextNavigation from "next/navigation";
 import * as hostClient from "@polaris/app-host/client";
-import * as catalogSearch from "@polaris/core/catalog-search";
 import { fromWire, toWire } from "@/lib/app-bundles/wire";
+import * as catalogSearch from "@polaris/core/catalog-search";
 
 type Router = { push: (href: string) => void; refresh: () => void };
 
@@ -68,6 +68,14 @@ function moduleFor(side: string, spec: string): object {
  * A module with no default gets itself as one. And a CommonJS module that was
  * itself read as a namespace (Node does this) has its real default one level
  * down, which is taken rather than handed on as an object.
+ *
+ * The mark is not always read. An app's source is an ES module package, and
+ * esbuild imports CommonJS into one the way Node does - `__toESM(mod, 1)` -
+ * which makes the whole object the default whatever it says. So where the
+ * default is a component, what is handed over is itself a component that draws
+ * it, carrying the named exports: both readings of `import Link from
+ * "next/link"` are then something React can draw. Without it the Game servers
+ * list, which links every row, stopped with error 130.
  */
 export function asCommonJs(found: object): object {
     if (!("default" in found)) return { ...found, default: found, __esModule: true };
@@ -79,7 +87,31 @@ export function asCommonJs(found: object): object {
         "default" in value
     )
         value = (value as { default: unknown }).default;
-    return { ...found, default: value, __esModule: true };
+    if (!isComponent(value)) return { ...found, default: value, __esModule: true };
+    const component = value;
+    function SharedDefault(props: Record<string, unknown>) {
+        return React.createElement(component, props);
+    }
+    // Defined one by one: a function already owns `name` and `length`, read-only,
+    // and a module exporting either must not make handing it over throw.
+    const members: Record<string, unknown> = { ...found, default: component, __esModule: true };
+    for (const [key, member] of Object.entries(members)) {
+        if (Object.getOwnPropertyDescriptor(SharedDefault, key)?.configurable === false) continue;
+        Object.defineProperty(SharedDefault, key, {
+            value: member,
+            enumerable: true,
+            configurable: true,
+            writable: true
+        });
+    }
+    return SharedDefault;
+}
+
+/** Whether a value is something React draws: a function, or one of React's own
+ *  wrappers (`forwardRef`, `memo`, `lazy`), which are objects carrying `$$typeof`. */
+function isComponent(value: unknown): value is React.ElementType {
+    if (typeof value === "function") return true;
+    return value !== null && typeof value === "object" && "$$typeof" in value;
 }
 
 interface ActionAnswer {

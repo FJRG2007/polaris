@@ -13,6 +13,8 @@
  */
 
 import { build } from "esbuild";
+import { createElement, forwardRef } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { asCommonJs } from "@/components/app-bundles/runtime";
 
@@ -22,10 +24,20 @@ const SLOT = Symbol.for("polaris.test-shared");
 let run = 0;
 
 /** What a bundle's `import thing from "shared"` evaluates to, given what the
- *  dashboard hands it for "shared". */
-async function defaultImportOf(provided: object): Promise<unknown> {
+ *  dashboard hands it for "shared". `node` is an importer esbuild reads the way
+ *  Node does - an app's own source, which is an ES module package - where the
+ *  interop is `__toESM(mod, 1)` and the `__esModule` mark is not consulted. */
+async function defaultImportOf(
+    provided: object,
+    node = false,
+    contents = 'import thing from "shared"; export default thing;'
+): Promise<unknown> {
     const out = await build({
-        stdin: { contents: 'import thing from "shared"; export default thing;', loader: "js" },
+        stdin: {
+            contents,
+            loader: "js",
+            ...(node ? { sourcefile: "screen.mjs" } : {})
+        },
         bundle: true,
         write: false,
         format: "esm",
@@ -99,6 +111,55 @@ describe("a default import from the dashboard", () => {
         const ui = namespace({ Button: Image });
         const found = (await defaultImportOf(asCommonJs(ui))) as { Button: unknown };
         expect(found.Button).toBe(Image);
+    });
+
+    it("is drawable when the app reads it the way Node does", async () => {
+        // `next/link` as the page hands it over, read from an app's screen.
+        function Link(props: { href: string; children?: string }) {
+            return createElement("a", { href: props.href }, props.children);
+        }
+        function useLinkStatus() {
+            return { pending: false };
+        }
+        const provided = asCommonJs(namespace({ default: Link, useLinkStatus }));
+
+        // What used to happen: the module itself, which React cannot draw.
+        expect(await defaultImportOf(namespace({ default: Link, useLinkStatus }), true)).not.toBe(
+            Link
+        );
+
+        const imported = await defaultImportOf(provided, true);
+        expect(typeof imported).toBe("function");
+        expect(
+            renderToStaticMarkup(createElement(imported as typeof Link, { href: "/x" }, "go"))
+        ).toBe('<a href="/x">go</a>');
+        // And read the other way, it is the component itself.
+        expect(await defaultImportOf(provided)).toBe(Link);
+    });
+
+    it("keeps a named import beside it when read the way Node does", async () => {
+        function Link() {
+            return null;
+        }
+        function useLinkStatus() {
+            return { pending: false };
+        }
+        const named = await defaultImportOf(
+            asCommonJs(namespace({ default: Link, useLinkStatus })),
+            true,
+            'import { useLinkStatus } from "shared"; export default useLinkStatus;'
+        );
+        expect(named).toBe(useLinkStatus);
+    });
+
+    it("draws a forwardRef default read the way Node does", async () => {
+        const Picture = forwardRef<HTMLImageElement, { alt: string }>((props, ref) =>
+            createElement("img", { alt: props.alt, ref })
+        );
+        const imported = await defaultImportOf(asCommonJs(namespace({ default: Picture })), true);
+        expect(renderToStaticMarkup(createElement(imported as typeof Picture, { alt: "a" }))).toBe(
+            '<img alt="a"/>'
+        );
     });
 
     it("keeps every named export", () => {
