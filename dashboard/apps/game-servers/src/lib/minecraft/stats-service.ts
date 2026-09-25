@@ -14,9 +14,10 @@
  */
 
 import * as world from "./world";
-import { withServerContainer } from "./service";
-import { readPlayerStats, type PlayerStats } from "../games-activity";
 import { host } from "@polaris/app-host";
+import { withServerContainer } from "./service";
+import { miningFigures, type MiningFigures } from "./xray";
+import { readPlayerStats, type PlayerStats } from "../games-activity";
 
 const { listEnvVars } = host.envVarService;
 
@@ -77,5 +78,59 @@ export async function readMinecraftStats(
         });
     } catch {
         return null;
+    }
+}
+
+/** One player's mining, as the X-Ray screen shows it beside the evidence. */
+export interface PlayerMining {
+    readonly name: string;
+    readonly figures: MiningFigures;
+}
+
+/**
+ * The mining figures of every player the world has stats for, read in one pass:
+ * the usercache for the names and every stats file with a marker between them.
+ * Empty for Bedrock and for a server that cannot be reached.
+ */
+export async function readAllMining(ownerId: string, installedAppId: string): Promise<PlayerMining[]> {
+    try {
+        return await withServerContainer(ownerId, installedAppId, async (server) => {
+            if (server.edition === "bedrock") return [];
+            const vars = await listEnvVars("application", server.applicationId, ownerId).catch(() => []);
+            const level = vars.find((entry) => entry.key === world.levelEnvKey("java"))?.value?.trim();
+            if (!level || !/^[\w.-]+$/.test(level)) return [];
+
+            const cache = await server.run(["cat", "--", `${world.DATA_DIR}/usercache.json`]);
+            const names = new Map<string, string>();
+            if (cache.code === 0) {
+                try {
+                    for (const entry of JSON.parse(cache.output) as CacheEntry[]) {
+                        if (typeof entry?.name === "string" && typeof entry?.uuid === "string") {
+                            names.set(entry.uuid.toLowerCase(), entry.name);
+                        }
+                    }
+                } catch {
+                    // No names: the uuids are shown instead.
+                }
+            }
+            const dir = `${world.DATA_DIR}/${level}/stats`;
+            const all = await server.run([
+                "sh",
+                "-c",
+                `for f in "${dir}"/*.json; do [ -f "$f" ] || continue; printf '\\n@@%s\\n' "$(basename "$f" .json)"; cat "$f"; done`
+            ]);
+            if (all.code !== 0) return [];
+            const found: PlayerMining[] = [];
+            for (const part of all.output.split("\n@@").slice(1)) {
+                const newline = part.indexOf("\n");
+                const uuid = part.slice(0, newline).trim().toLowerCase();
+                const figures = miningFigures(part.slice(newline + 1));
+                if (!figures) continue;
+                found.push({ name: names.get(uuid) ?? uuid, figures });
+            }
+            return found;
+        });
+    } catch {
+        return [];
     }
 }
