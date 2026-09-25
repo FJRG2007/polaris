@@ -51,8 +51,35 @@ function moduleFor(side: string, spec: string): object {
         throw new Error(`A server module of an app was loaded in the browser (${spec})`);
     const found = MODULES[spec];
     if (!found) throw new Error(`The dashboard does not provide ${spec} to apps`);
-    // Read as a CommonJS module: `default` is the module when it has none.
-    return "default" in found ? found : { ...found, default: found, __esModule: true };
+    return asCommonJs(found);
+}
+
+/**
+ * A module of the page's, in the shape a bundle reads it: CommonJS, marked as
+ * compiled from ES modules, with the real default export on `default`.
+ *
+ * The bundle asks for these through `require` (see the bundler's shared
+ * plugin), and esbuild takes `default` from what it is handed only when that is
+ * marked `__esModule`; otherwise the whole object becomes the default. An ES
+ * namespace carries no such mark, so `import Image from "next/image"` got the
+ * namespace - `{ default, getImageProps }` - and React refused it as a
+ * component: "Appearance could not be shown", error 130, on every game server.
+ *
+ * A module with no default gets itself as one. And a CommonJS module that was
+ * itself read as a namespace (Node does this) has its real default one level
+ * down, which is taken rather than handed on as an object.
+ */
+export function asCommonJs(found: object): object {
+    if (!("default" in found)) return { ...found, default: found, __esModule: true };
+    let value = (found as { default: unknown }).default;
+    if (
+        value !== null &&
+        typeof value === "object" &&
+        (value as { __esModule?: unknown }).__esModule === true &&
+        "default" in value
+    )
+        value = (value as { default: unknown }).default;
+    return { ...found, default: value, __esModule: true };
 }
 
 interface ActionAnswer {
