@@ -62,7 +62,11 @@ vi.mock("@polaris/db", () => ({
         $transaction: transaction
     }
 }));
-vi.mock("@/lib/vault/account", () => ({ bumpRevision: vi.fn(async () => undefined) }));
+const bumpRevisionFor = vi.fn(async () => undefined);
+vi.mock("@/lib/vault/account", () => ({
+    bumpRevision: vi.fn(async () => undefined),
+    bumpRevisionFor
+}));
 vi.mock("@/lib/vault/blobs", () => ({ deleteVaultBlob: deleteBlob }));
 
 const ciphers = await import("../../src/lib/vault/ciphers");
@@ -148,6 +152,46 @@ describe("createCipher", () => {
         folderFindFirst.mockResolvedValue({ id: FOLDER });
         await ciphers.createCipher(USER, input({ folderId: FOLDER }));
         expect(cipherCreate.mock.calls[0]?.[0].data.folderId).toBe(FOLDER);
+    });
+});
+
+/**
+ * Who is told to sync when an item changes.
+ *
+ * Every member of a shared vault syncs its items, and the revision date is the
+ * only thing that tells a client there is something new - so an item written
+ * into one has to move it for all of them, or a login added in the dashboard
+ * never reaches the extension of the person it was shared with.
+ */
+describe("who is told an item changed", () => {
+    it("tells the members of the vault a new item went into", async () => {
+        orgUsers.mockResolvedValue([{ id: "member-1", orgId: ORG, accessAll: true }]);
+        await ciphers.createCipher(USER, input({ organizationId: ORG }));
+        expect(bumpRevisionFor).toHaveBeenCalledWith(USER, [ORG]);
+    });
+
+    it("tells only the author about a personal item", async () => {
+        cipherCreate.mockResolvedValue(cipherRow({ userId: USER, organizationId: null }));
+        await ciphers.createCipher(USER, input());
+        expect(bumpRevisionFor).toHaveBeenCalledWith(USER, [null]);
+    });
+
+    it("tells the vault an item was taken to the trash, read before it moved", async () => {
+        cipherFindMany.mockResolvedValue([{ id: CIPHER, organizationId: ORG }] as never);
+        await ciphers.deleteCiphers(USER, [CIPHER], true);
+        expect(bumpRevisionFor).toHaveBeenCalledWith(USER, [ORG]);
+    });
+
+    it("tells both the vault an item leaves and the one it arrives in", async () => {
+        const OTHER = "018f2b7a-0000-7000-8000-0000000000c7";
+        orgUsers.mockResolvedValue([{ id: "member-1", orgId: OTHER, accessAll: true }]);
+        collections.mockResolvedValue([{ id: COLLECTION }]);
+        cipherFindMany.mockResolvedValue([{ id: CIPHER, organizationId: ORG }] as never);
+        const moved = await ciphers.moveCipher(USER, CIPHER, input({ organizationId: OTHER }), [
+            COLLECTION
+        ]);
+        expect(moved.ok).toBe(true);
+        expect(bumpRevisionFor).toHaveBeenCalledWith(USER, [ORG, OTHER]);
     });
 });
 

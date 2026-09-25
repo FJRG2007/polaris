@@ -150,7 +150,9 @@ Named here rather than left to be discovered:
   flows do not. Polaris has its own account successor, which is a different
   thing and does not reach the vault.
 - Push notifications, and therefore live sync between clients. They sync on
-  their own schedule.
+  their own schedule. A change to an item moves the revision date for every
+  member of the vault it is in, so a client that polls it - the Polaris
+  extension does, whenever it is about to show a list - picks it up.
 - Member management from a client (inviting, confirming, changing a role).
   Read-only from clients; done in Polaris at `/vault/vaults`.
 - Reading a KeePass `.kdbx` directly. It is a database rather than an export;

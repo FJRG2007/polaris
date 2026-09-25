@@ -13,7 +13,7 @@
 
 import { prisma } from "@polaris/db";
 import type { CipherInput } from "@polaris/core";
-import { bumpRevision } from "@/lib/vault/account";
+import { bumpRevision, bumpRevisionFor } from "@/lib/vault/account";
 import { ORG_USER_CONFIRMED } from "@polaris/core";
 import { deleteVaultBlob } from "@/lib/vault/blobs";
 
@@ -355,8 +355,22 @@ export async function createCipher(
         select: CIPHER_SELECT
     });
     if (input.favorite) await setFavorite(userId, row.id, true);
-    await bumpRevision(userId);
+    await bumpRevisionFor(userId, [organizationId]);
     return toCipherResponse(row, input.favorite === true);
+}
+
+/**
+ * Which vaults these items are in, for the revision bump that has to reach
+ * their members. Read before a write that moves or removes them, since after it
+ * the answer is gone.
+ */
+export async function organizationsOf(cipherIds: readonly string[]): Promise<(string | null)[]> {
+    if (cipherIds.length === 0) return [];
+    const rows = await prisma.vaultCipher.findMany({
+        where: { id: { in: [...cipherIds] } },
+        select: { organizationId: true }
+    });
+    return rows.map((row) => row.organizationId ?? null);
 }
 
 /** Why a write was refused. */
@@ -400,7 +414,7 @@ export async function updateCipher(
     if (input.favorite !== null && input.favorite !== undefined) {
         await setFavorite(userId, cipherId, input.favorite);
     }
-    await bumpRevision(userId);
+    await bumpRevisionFor(userId, [row.organizationId]);
     return { ok: true, cipher: toCipherResponse(row, await isStarred(userId, cipherId)) };
 }
 
@@ -470,7 +484,7 @@ export async function setCipherCollections(
             select: CIPHER_SELECT
         });
     });
-    await bumpRevision(userId);
+    await bumpRevisionFor(userId, [current.organizationId]);
     return { ok: true, cipher: toCipherResponse(row, await isStarred(userId, cipherId)) };
 }
 
@@ -603,18 +617,19 @@ export async function deleteCiphers(
         if (await mayWrite(userId, id)) writable.push(id);
     }
     if (writable.length === 0) return 0;
+    const vaults = await organizationsOf(writable);
     if (soft) {
         const { count } = await prisma.vaultCipher.updateMany({
             where: { id: { in: writable } },
             data: { deletedDate: new Date(), revisionDate: new Date() }
         });
-        await bumpRevision(userId);
+        await bumpRevisionFor(userId, vaults);
         return count;
     }
     const paths = await attachmentPaths(writable);
     const { count } = await prisma.vaultCipher.deleteMany({ where: { id: { in: writable } } });
     for (const path of paths) await deleteVaultBlob(path);
-    await bumpRevision(userId);
+    await bumpRevisionFor(userId, vaults);
     return count;
 }
 
@@ -629,7 +644,7 @@ export async function restoreCiphers(userId: string, cipherIds: string[]): Promi
         where: { id: { in: writable } },
         data: { deletedDate: null, revisionDate: new Date() }
     });
-    await bumpRevision(userId);
+    await bumpRevisionFor(userId, await organizationsOf(writable));
     return count;
 }
 
@@ -683,6 +698,9 @@ export async function moveCipher(
     }
 
     const folderId = target ? null : await ownFolderId(userId, input.folderId);
+    // The vault it is leaving, read while it is still there: its members stop
+    // seeing the item, and they only find out by syncing.
+    const leaving = await organizationsOf([cipherId]);
     const row = await prisma.$transaction(async (tx) => {
         await tx.vaultCollectionCipher.deleteMany({ where: { cipherId } });
         return tx.vaultCipher.update({
@@ -704,7 +722,7 @@ export async function moveCipher(
             select: CIPHER_SELECT
         });
     });
-    await bumpRevision(userId);
+    await bumpRevisionFor(userId, [...leaving, target]);
     return { ok: true, cipher: toCipherResponse(row, await isStarred(userId, cipherId)) };
 }
 
