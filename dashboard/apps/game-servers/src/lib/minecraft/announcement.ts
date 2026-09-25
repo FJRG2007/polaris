@@ -323,8 +323,8 @@ export type AnnouncementPart = "all" | "title" | "actionbar";
  * (`{player}`, their level) through `execute as <target> run ... @s`, where the
  * game fills them in; the account's by one line per player online, with their
  * values written in. Scores are only kept for objectives that exist, so the ones
- * a line reads are created first - asking again for one that exists changes
- * nothing.
+ * a line reads are created before the whole announcement goes; a repeat of one
+ * part is sent after that and does not ask again.
  */
 export function announcementCommands(
     edition: MinecraftEdition,
@@ -364,14 +364,16 @@ export function announcementCommands(
     const held = announcement.hold !== "timed";
     const fields = [announcement.title, announcement.subtitle, announcement.actionbar];
     if (part === "all") fields.push(announcement.chat);
-    const lines: string[] = java
-        ? fields
-              .flatMap((text) => objectivesIn(text))
-              .filter(
-                  (one, index, all) => all.findIndex((other) => other.name === one.name) === index
-              )
-              .map((one) => `scoreboard objectives add ${one.name} ${one.criterion}`)
-        : [];
+    const lines: string[] =
+        java && part === "all"
+            ? fields
+                  .flatMap((text) => objectivesIn(text))
+                  .filter(
+                      (one, index, all) =>
+                          all.findIndex((other) => other.name === one.name) === index
+                  )
+                  .map((one) => `scoreboard objectives add ${one.name} ${one.criterion}`)
+            : [];
 
     const title = hasText(announcement.title);
     const subtitle = hasText(announcement.subtitle);
@@ -408,6 +410,28 @@ export function announcementCommands(
     ) {
         lines.push(
             `execute as ${target} at @s run playsound ${announcement.sound} master @s ~ ~ ~ 1 1`
+        );
+    }
+    return lines;
+}
+
+/** What takes an announcement off the screen straight away, rather than
+ *  leaving it to fade. */
+export function clearAnnouncementCommands(
+    edition: MinecraftEdition,
+    announcement: Announcement
+): string[] {
+    const target = announcement.target;
+    if (!isAnnouncementTarget(target)) throw new Error("Choose everybody or one player");
+    const lines: string[] = [];
+    if (hasText(announcement.title) || hasText(announcement.subtitle)) {
+        lines.push(`title ${target} clear`);
+    }
+    if (hasText(announcement.actionbar)) {
+        lines.push(
+            edition === "bedrock"
+                ? `titleraw ${target} actionbar {"rawtext":[{"text":""}]}`
+                : `title ${target} actionbar {"text":""}`
         );
     }
     return lines;

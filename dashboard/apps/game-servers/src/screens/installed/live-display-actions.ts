@@ -13,11 +13,8 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { CALL_GROUP_KEY, readCallGroup } from "../../lib/minecraft/live-values";
-import {
-    readPinned,
-    applySidebar,
-    unpinAnnouncement
-} from "../../lib/minecraft/live-display-service";
+import { readPinned } from "../../lib/minecraft/pinned";
+import { applySidebar, unpinAnnouncement } from "../../lib/minecraft/live-display-service";
 import {
     SIDEBAR_KEY,
     hasSidebarProblems,
@@ -121,15 +118,16 @@ export async function saveLiveDisplayAction(
     if (hasSidebarProblems(sidebar)) return { error: "Fix what is marked on the panel first" };
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
+        const current = await stateOf(installedAppId, user.id);
         // Only a group the person choosing it is in: otherwise this would be a way
-        // to read who is in a call nobody let them see.
-        if (callGroupId) {
+        // to read who is in a call nobody let them see. The one already chosen is
+        // left as it is, so another manager can still save the panel.
+        if (callGroupId && callGroupId !== current.callGroupId) {
             const member = await prisma.chatChannelMember.count({
                 where: { userId: user.id, channelId: callGroupId, channel: { kind: "group" } }
             });
             if (member === 0) return { error: "Choose a group you are in" };
         }
-        const current = await stateOf(installedAppId, user.id);
         if (sidebar.enabled && current.sidebarRefusal) return { error: current.sidebarRefusal };
         await patchInstallConfig(installedAppId, {
             [SIDEBAR_KEY]: sidebar,

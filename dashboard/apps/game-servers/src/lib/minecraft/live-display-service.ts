@@ -24,9 +24,10 @@ import {
     ACTIONBAR_EVERY_MS,
     HELD_TITLE_EVERY_MS,
     announcementCommands,
+    clearAnnouncementCommands,
     hasText,
-    holdEndsAt,
-    type Announcement
+    type Announcement,
+    type SendContext
 } from "./announcement";
 import {
     readSidebar,
@@ -35,36 +36,14 @@ import {
     sidebarRefusal,
     type SidebarConfig
 } from "./sidebar";
-import { announcementSchema } from "./announcement-templates";
+import { PINNED_KEY, pinOver, pinnedAt, readPinned, type PinnedAnnouncement } from "./pinned";
 
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
-
-/** Where the announcement being kept up is recorded on the install. */
-export const PINNED_KEY = "pinnedAnnouncement";
-
-/** An announcement being kept on screen, and when it comes down. */
-export interface PinnedAnnouncement {
-    readonly announcement: Announcement;
-    readonly sentAt: number;
-    /** A moment, or null for "until somebody takes it down". */
-    readonly endsAt: number | null;
-}
 
 /** How often the loop wakes. The action bar's period, the shortest of them. */
 const TICK_MS = ACTIONBAR_EVERY_MS;
 /** How often the panel and the values it shows are read again. */
 const PANEL_EVERY_MS = 10_000;
-
-export function readPinned(config: Record<string, unknown>): PinnedAnnouncement | null {
-    const stored = config[PINNED_KEY] as Record<string, unknown> | null | undefined;
-    if (!stored || typeof stored !== "object") return null;
-    const announcement = announcementSchema.safeParse(stored.announcement);
-    if (!announcement.success) return null;
-    const sentAt = Number(stored.sentAt);
-    const endsAt = stored.endsAt === null ? null : Number(stored.endsAt);
-    if (!Number.isFinite(sentAt) || (endsAt !== null && !Number.isFinite(endsAt))) return null;
-    return { announcement: announcement.data, sentAt, endsAt };
-}
 
 interface Loop {
     readonly ownerId: string;
@@ -75,6 +54,10 @@ interface Loop {
     lastPanel: number;
     /** What the panel was last written as, or null when Polaris has not written it. */
     panel: { title: string; lines: string[] } | null;
+    /** Moved on every pin and unpin, so a tick that read the one before sends nothing. */
+    pinVersion: number;
+    /** The values last read, reused until the panel's period is up. */
+    context: { key: string; at: number; value: SendContext } | null;
 }
 
 const loops = new Map<string, Loop>();
@@ -98,16 +81,18 @@ async function settingsOf(installedAppId: string): Promise<{
     };
 }
 
-/** Send lines to the game, stopping at the first it refuses. */
+/** Send lines to the game, stopping at the first it refuses. False when the
+ *  server is not running and nothing was sent. */
 async function say(
     ownerId: string,
     installedAppId: string,
     lines: readonly string[]
-): Promise<void> {
-    if (lines.length === 0) return;
-    await withServerContainer(ownerId, installedAppId, async (server) => {
-        if (!server.running) return;
+): Promise<boolean> {
+    if (lines.length === 0) return true;
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        if (!server.running) return false;
         for (const line of lines) await server.say([line]);
+        return true;
     });
 }
 
@@ -116,21 +101,37 @@ function heldTexts(announcement: Announcement): string[] {
     return [announcement.title, announcement.subtitle, announcement.actionbar];
 }
 
+/** What takes each of these off the screen. */
+function clearAll(
+    edition: "java" | "bedrock",
+    pinned: readonly (PinnedAnnouncement | null)[]
+): string[] {
+    return pinned
+        .filter((one): one is PinnedAnnouncement => one !== null)
+        .flatMap((one) => clearAnnouncementCommands(edition, one.announcement));
+}
+
 async function tick(installedAppId: string, loop: Loop): Promise<void> {
+    const version = loop.pinVersion;
     const settings = await settingsOf(installedAppId);
     if (!settings) return stopLoop(installedAppId);
     const now = Date.now();
-    let pinned = readPinned(settings.config);
+    const stored = readPinned(settings.config);
+    const pinned = pinnedAt(stored, now);
     const sidebar: SidebarConfig = readSidebar(settings.config);
     const panelOn = sidebar.enabled && sidebarRefusal(settings.edition, settings.release) === null;
 
-    // Down at its moment, and taken off the screen rather than left to fade.
-    if (pinned && pinned.endsAt !== null && now >= pinned.endsAt) {
-        await patchInstallConfig(installedAppId, { [PINNED_KEY]: null });
-        await say(loop.ownerId, installedAppId, clearCommands(pinned.announcement)).catch(
+    // Down at its moment, and taken off the screen rather than left to fade;
+    // a held one it went over is back straight away.
+    if (stored && pinned !== stored) {
+        if (loop.pinVersion !== version) return;
+        await patchInstallConfig(installedAppId, { [PINNED_KEY]: pinned });
+        const gone = [stored, stored.underneath].filter((one) => one !== pinned);
+        await say(loop.ownerId, installedAppId, clearAll(settings.edition, gone)).catch(
             () => undefined
         );
-        pinned = null;
+        loop.lastActionbar = 0;
+        loop.lastTitle = 0;
     }
 
     if (!pinned && !panelOn) {
@@ -154,13 +155,9 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
 
     const texts = [
         ...(pinned ? heldTexts(pinned.announcement) : []),
-        ...(duePanel ? [sidebar.title, ...sidebar.lines] : [])
+        ...(panelOn ? [sidebar.title, ...sidebar.lines] : [])
     ];
-    const needsList = texts.some((text) => readsPlayerList(text));
-    const players = needsList
-        ? await onlinePlayers(loop.ownerId, installedAppId).catch(() => null)
-        : null;
-    const context = await liveContext(installedAppId, texts, players);
+    const context = await contextFor(installedAppId, loop, texts, now, duePanel);
 
     const lines: string[] = [];
     if (pinned && dueTitle) {
@@ -175,30 +172,50 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
         );
         loop.lastActionbar = now;
     }
+    let panel: Loop["panel"] = null;
     if (duePanel) {
         const title = fillValues(sidebar.title, context.values);
         const shownLines = sidebar.lines.map((line) => fillValues(line, context.values));
         lines.push(...sidebarCommands(title, shownLines, loop.panel));
-        loop.panel = { title, lines: shownLines };
+        panel = { title, lines: shownLines };
         loop.lastPanel = now;
     } else if (!panelOn && loop.panel) {
         lines.push(...sidebarOffCommands());
-        loop.panel = null;
     }
-    await say(loop.ownerId, installedAppId, lines);
+    if (loop.pinVersion !== version) return;
+    const sent = await say(loop.ownerId, installedAppId, lines).catch((error: unknown) => {
+        // Written from scratch next time: nothing here knows how far it got.
+        if (duePanel) loop.panel = null;
+        throw error;
+    });
+    if (duePanel) loop.panel = sent ? panel : null;
+    else if (!panelOn && sent) loop.panel = null;
 }
 
-/** What takes a pinned announcement off the screen straight away. */
-function clearCommands(announcement: Announcement): string[] {
-    const target = announcement.target;
-    const lines: string[] = [];
-    if (hasText(announcement.title) || hasText(announcement.subtitle)) {
-        lines.push(`title ${target} clear`);
+/**
+ * The values the texts are written with, read again when the texts change, when
+ * the panel is due, or once the panel's period is up - not on every action bar,
+ * which would ask the server who is on every two seconds.
+ */
+async function contextFor(
+    installedAppId: string,
+    loop: Loop,
+    texts: readonly string[],
+    now: number,
+    fresh: boolean
+): Promise<SendContext> {
+    const key = JSON.stringify(texts);
+    const cached = loop.context;
+    if (!fresh && cached && cached.key === key && now - cached.at < PANEL_EVERY_MS) {
+        return cached.value;
     }
-    if (hasText(announcement.actionbar)) {
-        lines.push(`title ${target} actionbar {"text":""}`);
-    }
-    return lines;
+    const needsList = texts.some((text) => readsPlayerList(text));
+    const players = needsList
+        ? await onlinePlayers(loop.ownerId, installedAppId).catch(() => null)
+        : null;
+    const value = await liveContext(installedAppId, texts, players);
+    loop.context = { key, at: now, value };
+    return value;
 }
 
 function stopLoop(installedAppId: string): void {
@@ -212,7 +229,12 @@ function stopLoop(installedAppId: string): void {
  * it has none. Cheap to call again: a running loop is left as it is.
  */
 export function startLiveDisplay(ownerId: string, installedAppId: string): void {
-    if (loops.has(installedAppId)) return;
+    loopFor(ownerId, installedAppId);
+}
+
+function loopFor(ownerId: string, installedAppId: string): Loop {
+    const running = loops.get(installedAppId);
+    if (running) return running;
     const loop: Loop = {
         ownerId,
         timer: setInterval(() => {
@@ -236,17 +258,21 @@ export function startLiveDisplay(ownerId: string, installedAppId: string): void 
         lastActionbar: 0,
         lastTitle: 0,
         lastPanel: 0,
-        panel: null
+        panel: null,
+        pinVersion: 0,
+        context: null
     };
     // A loop must never keep the process alive on its own.
     loop.timer.unref?.();
     loops.set(installedAppId, loop);
+    return loop;
 }
 
 /**
  * Record an announcement to keep up after it was sent, and start its loop.
- * Replaces whatever was pinned on this server: one at a time, so the screen
- * never has two held titles fighting over it.
+ * One is on top at a time, so the screen never has two held titles fighting
+ * over it; a timed one goes over a held one and gives the screen back to it
+ * when its time is over (`pinOver`).
  */
 export async function pinAnnouncement(
     ownerId: string,
@@ -254,29 +280,28 @@ export async function pinAnnouncement(
     announcement: Announcement,
     sentAt: number
 ): Promise<PinnedAnnouncement> {
-    const pinned: PinnedAnnouncement = {
-        announcement,
-        sentAt,
-        endsAt: holdEndsAt(announcement, sentAt)
-    };
+    const settings = await settingsOf(installedAppId);
+    const current = settings ? pinnedAt(readPinned(settings.config), sentAt) : null;
+    const pinned = pinOver(current, announcement, sentAt);
     await patchInstallConfig(installedAppId, { [PINNED_KEY]: pinned });
-    const loop = loops.get(installedAppId);
-    if (loop) {
-        // The new one is sent straight away by the caller; the repeats start
-        // from now, not from where the last one's were.
-        loop.lastActionbar = sentAt;
-        loop.lastTitle = sentAt;
-    }
-    startLiveDisplay(ownerId, installedAppId);
+    const loop = loopFor(ownerId, installedAppId);
+    // The new one is sent straight away by the caller; the repeats start from
+    // then, not from where the last one's were.
+    loop.pinVersion += 1;
+    loop.lastActionbar = sentAt;
+    loop.lastTitle = sentAt;
     return pinned;
 }
 
-/** Take the pinned announcement down now. */
+/** Take the pinned announcement, and any held one under it, down now. */
 export async function unpinAnnouncement(ownerId: string, installedAppId: string): Promise<void> {
     const settings = await settingsOf(installedAppId);
     const pinned = settings ? readPinned(settings.config) : null;
     await patchInstallConfig(installedAppId, { [PINNED_KEY]: null });
-    if (pinned) await say(ownerId, installedAppId, clearCommands(pinned.announcement));
+    const loop = loops.get(installedAppId);
+    if (loop) loop.pinVersion += 1;
+    if (!settings || !pinned) return;
+    await say(ownerId, installedAppId, clearAll(settings.edition, [pinned, pinned.underneath]));
 }
 
 /**

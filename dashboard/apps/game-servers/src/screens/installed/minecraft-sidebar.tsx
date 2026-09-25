@@ -225,7 +225,16 @@ export function MinecraftSidebar({
                             }}
                             options={[
                                 { value: NO_GROUP, label: "None" },
-                                ...state.groups.map((one) => ({ value: one.id, label: one.name }))
+                                ...state.groups.map((one) => ({ value: one.id, label: one.name })),
+                                ...(state.callGroupId &&
+                                !state.groups.some((one) => one.id === state.callGroupId)
+                                    ? [
+                                          {
+                                              value: state.callGroupId,
+                                              label: "A group you are not in"
+                                          }
+                                      ]
+                                    : [])
                             ]}
                             aria-label="Chat group whose call is shown"
                         />

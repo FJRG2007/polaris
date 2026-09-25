@@ -12,6 +12,7 @@ import {
     BLANK_ANNOUNCEMENT,
     announcementCommands,
     announcementProblems,
+    clearAnnouncementCommands,
     holdEndsAt,
     javaComponent,
     needsRepeating,
@@ -24,6 +25,7 @@ import {
     variableProblem,
     visibleLength
 } from "@polaris-app/game-servers/src/lib/minecraft/text-vars";
+import { pinOver, pinnedAt, readPinned } from "@polaris-app/game-servers/src/lib/minecraft/pinned";
 import {
     DEFAULT_SIDEBAR,
     readSidebar,
@@ -192,6 +194,48 @@ describe("keeping it on screen", () => {
         const title = announcementCommands("java", held, undefined, "title");
         expect(title[0]).toBe("title @a times 0 240 20");
         expect(title.some((line) => line.includes("tellraw"))).toBe(false);
+    });
+
+    it("creates the scores once, not on every repeat", () => {
+        const held = draft({ actionbar: "Level {player.level}", hold: "manual" });
+        expect(announcementCommands("java", held)[0]).toBe(
+            "scoreboard objectives add polaris_level level"
+        );
+        expect(
+            announcementCommands("java", held, undefined, "actionbar").some((line) =>
+                line.startsWith("scoreboard")
+            )
+        ).toBe(false);
+    });
+
+    it("takes it down in each edition's own words", () => {
+        const shown = draft({ title: "Event", actionbar: "Go", hold: "manual" });
+        expect(clearAnnouncementCommands("java", shown)).toEqual([
+            "title @a clear",
+            'title @a actionbar {"text":""}'
+        ]);
+        expect(clearAnnouncementCommands("bedrock", shown)).toEqual([
+            "title @a clear",
+            'titleraw @a actionbar {"rawtext":[{"text":""}]}'
+        ]);
+    });
+
+    it("brings a held one back once a short one sent over it is done", () => {
+        const held = pinOver(null, draft({ title: "Event", hold: "manual" }), NOW);
+        const quick = pinOver(held, draft({ actionbar: "Hi", stay: 5 }), NOW + 1_000);
+        expect(quick.underneath?.announcement.title).toBe("Event");
+        expect(pinnedAt(quick, NOW + 3_000)).toBe(quick);
+        expect(pinnedAt(quick, NOW + 7_000)?.announcement.title).toBe("Event");
+
+        const stored = readPinned({ pinnedAnnouncement: JSON.parse(JSON.stringify(quick)) });
+        expect(stored?.underneath?.announcement.hold).toBe("manual");
+    });
+
+    it("lets a held one replace whatever was up", () => {
+        const first = pinOver(null, draft({ title: "One", hold: "manual" }), NOW);
+        const second = pinOver(first, draft({ title: "Two", hold: "manual" }), NOW + 1_000);
+        expect(second.underneath).toBeNull();
+        expect(pinnedAt(second, NOW + 60_000)?.announcement.title).toBe("Two");
     });
 });
 
