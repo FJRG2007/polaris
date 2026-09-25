@@ -103,6 +103,29 @@ const JAVA_COLOR_NAMES: Readonly<Record<string, string>> = {
     "#ffffff": "white"
 };
 
+/**
+ * Where each player's own name goes: "Hi {player}" reads "Hi Steve" on Steve's
+ * screen and "Hi Alex" on Alex's.
+ *
+ * The game does this itself. A text component `{"selector":"@s"}` is drawn as
+ * the name of whoever `@s` is when the command runs, so a line that carries one
+ * is sent through `execute as <target> run ... @s`, and `@s` is every recipient
+ * in turn. Polaris never needs the list of who is online to do it.
+ */
+export const PLAYER_TOKEN = "{player}";
+
+const PLAYER_SPLIT = /(\{player\})/i;
+
+/** Whether a field asks for each player's name. */
+export function hasPlayerToken(text: string): boolean {
+    return PLAYER_SPLIT.test(text);
+}
+
+/** The text as one player would read it, for a preview. */
+export function withPlayerName(text: string, name: string): string {
+    return text.replace(/\{player\}/gi, name);
+}
+
 /** A player name, or the one selector this offers. Checked before anything is
  *  put into a command: a target is the one part of it that is not JSON. */
 export function isAnnouncementTarget(target: string): boolean {
@@ -138,7 +161,19 @@ export function javaComponent(text: string, prefix: boolean): string {
     if (prefix) runs.push({ text: `[${BROADCAST_TAG}] `, color: "gray" });
     lines.forEach((spans, index) => {
         if (index > 0) runs.push({ text: "\n" });
-        for (const span of spans) if (span.text) runs.push(javaRun(span));
+        for (const span of spans) {
+            for (const piece of span.text.split(PLAYER_SPLIT)) {
+                if (!piece) continue;
+                // The name, styled as the words around it: the run with its text
+                // swapped for the selector that draws the recipient's name.
+                if (PLAYER_SPLIT.test(piece)) {
+                    const { text: _, ...style } = javaRun(span);
+                    runs.push({ selector: "@s", ...style });
+                } else {
+                    runs.push(javaRun({ ...span, text: piece }));
+                }
+            }
+        }
     });
     return JSON.stringify(runs);
 }
@@ -168,6 +203,9 @@ function nearestCode(hex: string): string {
  *  `rawtext` entry, reset between runs so nothing leaks from one to the next. */
 export function bedrockComponent(text: string, prefix: boolean): string {
     const lines = motdSpans(text);
+    // Text between names is one entry; each name is a selector entry of its own,
+    // which Bedrock draws in whatever formatting the text before it left on.
+    const rawtext: Record<string, string>[] = [];
     let written = prefix ? `${SECTION}7[${BROADCAST_TAG}] ${SECTION}r` : "";
     lines.forEach((spans, index) => {
         if (index > 0) written += "\n";
@@ -178,10 +216,20 @@ export function bedrockComponent(text: string, prefix: boolean): string {
                 span.italic ? `${SECTION}o` : "",
                 span.obfuscated ? `${SECTION}k` : ""
             ].join("");
-            written += `${SECTION}r${SECTION}${nearestCode(span.color)}${styles}${span.text}`;
+            const codes = `${SECTION}r${SECTION}${nearestCode(span.color)}${styles}`;
+            for (const piece of span.text.split(PLAYER_SPLIT)) {
+                if (!piece) continue;
+                if (PLAYER_SPLIT.test(piece)) {
+                    rawtext.push({ text: `${written}${codes}` }, { selector: "@s" });
+                    written = "";
+                } else {
+                    written += `${codes}${piece}`;
+                }
+            }
         }
     });
-    return JSON.stringify({ rawtext: [{ text: written }] });
+    if (written || rawtext.length === 0) rawtext.push({ text: written });
+    return JSON.stringify({ rawtext });
 }
 
 /** Whether a field has anything to show once its codes are taken away. */
@@ -214,6 +262,13 @@ export function announcementCommands(
         java ? javaComponent(text, prefix) : bedrockComponent(text, prefix);
     const empty = java ? '{"text":""}' : '{"rawtext":[{"text":""}]}';
 
+    // A line with a player's name in it is run as each recipient, so the name in
+    // it is theirs - see `PLAYER_TOKEN`. One without stays a single command.
+    const send = (command: string, text: string, rest: string): string =>
+        hasPlayerToken(text)
+            ? `execute as ${target} run ${command} @s ${rest}`
+            : `${command} ${target} ${rest}`;
+
     const lines: string[] = [];
     const title = hasText(announcement.title);
     const subtitle = hasText(announcement.subtitle);
@@ -221,14 +276,22 @@ export function announcementCommands(
         lines.push(
             `${verb} ${target} times ${ticks(announcement.fadeIn)} ${ticks(announcement.stay)} ${ticks(announcement.fadeOut)}`
         );
-        if (subtitle) lines.push(`${verb} ${target} subtitle ${body(announcement.subtitle)}`);
-        lines.push(`${verb} ${target} title ${title ? body(announcement.title) : empty}`);
+        if (subtitle) {
+            lines.push(
+                send(verb, announcement.subtitle, `subtitle ${body(announcement.subtitle)}`)
+            );
+        }
+        lines.push(
+            send(verb, announcement.title, `title ${title ? body(announcement.title) : empty}`)
+        );
     }
     if (hasText(announcement.actionbar)) {
-        lines.push(`${verb} ${target} actionbar ${body(announcement.actionbar)}`);
+        lines.push(send(verb, announcement.actionbar, `actionbar ${body(announcement.actionbar)}`));
     }
     if (hasText(announcement.chat)) {
-        lines.push(`tellraw ${target} ${body(announcement.chat, announcement.tagged)}`);
+        lines.push(
+            send("tellraw", announcement.chat, body(announcement.chat, announcement.tagged))
+        );
     }
     if (
         java &&

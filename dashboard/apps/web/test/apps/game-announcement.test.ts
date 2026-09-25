@@ -12,6 +12,7 @@ import {
     bedrockComponent,
     isAnnouncementTarget,
     javaComponent,
+    withPlayerName,
     type Announcement
 } from "@polaris-app/game-servers/src/lib/minecraft/announcement";
 import {
@@ -129,6 +130,60 @@ describe("the commands, in the order the game needs them", () => {
             draft({ chat: "x", sound: "minecraft:x; stop" })
         );
         expect(lines.some((line) => line.includes("playsound"))).toBe(false);
+    });
+});
+
+/**
+ * "Hi {player}": each recipient reads their own name. The game resolves a
+ * `@s` selector component per player when the command runs as that player, so
+ * only the lines that carry the name are sent that way.
+ */
+describe("each player's own name", () => {
+    it("draws the name as a selector, in the style of the words around it", () => {
+        expect(JSON.parse(javaComponent("&6Hi {player}!", false))).toEqual([
+            { text: "" },
+            { text: "Hi ", color: "gold" },
+            { selector: "@s", color: "gold" },
+            { text: "!", color: "gold" }
+        ]);
+    });
+
+    it("gives Bedrock a selector entry between the text around it", () => {
+        const parsed = JSON.parse(bedrockComponent("Hi {PLAYER}", false)) as {
+            rawtext: Record<string, string>[];
+        };
+        expect(parsed.rawtext.map((entry) => Object.keys(entry)[0])).toEqual(["text", "selector"]);
+        expect(parsed.rawtext[1]).toEqual({ selector: "@s" });
+        expect(parsed.rawtext[0]?.text.endsWith("Hi §r§f")).toBe(true);
+    });
+
+    it("runs only the lines that carry the name as each player", () => {
+        const lines = announcementCommands(
+            "java",
+            draft({
+                title: "Welcome {player}",
+                subtitle: "Restart soon",
+                chat: "See you, {player}"
+            })
+        );
+        expect(lines).toEqual([
+            "title @a times 10 70 20",
+            `title @a subtitle ${javaComponent("Restart soon", false)}`,
+            `execute as @a run title @s title ${javaComponent("Welcome {player}", false)}`,
+            `execute as @a run tellraw @s ${javaComponent("See you, {player}", true)}`
+        ]);
+    });
+
+    it("does the same for one player, and on Bedrock", () => {
+        expect(
+            announcementCommands("bedrock", draft({ target: "Alex", actionbar: "{player}" }))
+        ).toEqual([
+            `execute as Alex run titleraw @s actionbar ${bedrockComponent("{player}", false)}`
+        ]);
+    });
+
+    it("reads as one player would in the preview", () => {
+        expect(withPlayerName("Hi {player}, bye {Player}", "Steve")).toBe("Hi Steve, bye Steve");
     });
 });
 
