@@ -454,3 +454,31 @@ describe("the Unlock Polaris row on a locked page", () => {
         expect(tabs.map((tab) => tab.url)).toContain(fakeBrowser.runtime.getURL("/popup.html"));
     });
 });
+
+/**
+ * The popup opened in a tab has to work as the popup: that is where the row above
+ * sends somebody when the toolbar will not open. The worker tells its own pages
+ * from web pages by origin, and a web page asking the same is still refused.
+ */
+describe("the popup opened in a tab", () => {
+    it("is answered like the popup", async () => {
+        const reply = await ask(
+            { kind: "status" },
+            { tabId: 9, url: fakeBrowser.runtime.getURL("/popup.html") }
+        );
+
+        expect(reply.ok && "status" in reply).toBe(true);
+    });
+
+    it("does not let a web page ask what only the popup may", async () => {
+        let answered = false;
+        const held = await fakeBrowser.runtime.onMessage.trigger(
+            { kind: "status" },
+            { id: fakeBrowser.runtime.id, tab: { id: 9 } as never, url: `${SITE}/login` },
+            () => (answered = true)
+        );
+
+        expect(held).not.toContain(true);
+        expect(answered).toBe(false);
+    });
+});

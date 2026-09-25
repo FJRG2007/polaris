@@ -2390,7 +2390,14 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
         /^https?:/i.test(sender.url)
             ? { tabId: sender.tab.id, url: sender.url }
             : null;
-    if (sender.tab && (page === null || !messages.FROM_PAGE.has(request.kind))) return false;
+    // The popup opened in a tab - where the browser would not open it over the
+    // toolbar - is still one of the extension's own pages. Its address is this
+    // extension's own origin, which no web page and no content script can have.
+    const ours =
+        typeof sender.url === "string" && sender.url.startsWith(browser.runtime.getURL("/"));
+    if (sender.tab && !ours && (page === null || !messages.FROM_PAGE.has(request.kind))) {
+        return false;
+    }
 
     const answer = async (): Promise<messages.Reply> => {
         switch (request.kind) {
