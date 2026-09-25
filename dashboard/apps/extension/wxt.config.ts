@@ -69,7 +69,9 @@ export default defineConfig({
         // worker is recycled and takes the key with it; a manifest v2 background
         // page is persistent and never is, so without a timer of its own an
         // unlocked vault on Firefox would stay unlocked until the browser closed.
-        permissions: ["storage", "activeTab", "scripting", "alarms"],
+        // `contextMenus` is Polaris's own entries in the right-click menu on a
+        // box you can type into. It carries no install warning.
+        permissions: ["storage", "activeTab", "scripting", "alarms", "contextMenus"],
         // Filling from the keyboard, without going through the toolbar. The
         // browser owns the binding - somebody can change or remove it in its own
         // shortcuts screen - and it does nothing at all while the vault is

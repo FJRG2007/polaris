@@ -41,6 +41,11 @@ describe("the Chromium manifest", () => {
         expect(found).toContain("object-src 'self'");
     });
 
+    it("asks for the right-click menu, which carries no install warning", () => {
+        const manifest = manifestFor({ browser: "chrome", manifestVersion: 3 });
+        expect(manifest["permissions"]).toContain("contextMenus");
+    });
+
     it("holds every web page, and nothing that is not one", () => {
         // What puts the list of logins under a login box on every site, the way
         // a password manager's is. Web pages only: no file://, no browser pages.

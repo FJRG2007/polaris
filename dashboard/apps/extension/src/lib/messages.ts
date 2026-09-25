@@ -227,6 +227,12 @@ export type Request =
      */
     | { readonly kind: "secondStepCode" }
     /**
+     * What kind of box the pointer is over, so the right-click menu that opens
+     * next offers what fits it - see `lib/context-menu.ts`. A yes or no, about
+     * the page the sender is on.
+     */
+    | { readonly kind: "menuTarget"; readonly password: boolean }
+    /**
      * The signed-in person's own name and email, to type into a sign-up on a site
      * with nothing saved for it. Asked when the menu opens there, so a page is
      * never handed them unless somebody is about to choose them.
@@ -393,6 +399,8 @@ export type Reply =
  * - `fill` and `totpNow` put a credential into that page, which is the whole
  *   feature - and both are checked against the sender's own address first, so
  *   neither can be turned into a fill on a site the item was never saved for.
+ * - `menuTarget` says only whether the pointer is over a password box, so the
+ *   right-click menu can fit the box; it reads nothing and answers nothing.
  * - `breach`, `captured`, `saveCaptured` and `dismissCapture` carry values the
  *   page already has, because somebody typed them into it.
  *
@@ -409,6 +417,7 @@ export const FROM_PAGE: ReadonlySet<Request["kind"]> = new Set([
     "totpNow",
     "secondStepCode",
     "myDetails",
+    "menuTarget",
     "breach",
     "captured",
     "pendingCapture",
