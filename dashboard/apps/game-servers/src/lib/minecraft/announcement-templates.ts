@@ -35,7 +35,7 @@ const seconds = z.number().min(0).max(SECONDS_MAX);
  *  length caps allow for codes: `&x&f&f&0&0&0&0` is fourteen characters of
  *  formatting in front of the words. */
 export const announcementSchema = z.object({
-    target: z.string().trim().refine(isAnnouncementTarget, "Choose everybody or one player"),
+    target: z.string().trim().max(900).refine(isAnnouncementTarget, "Choose who it goes to"),
     title: line.default(""),
     subtitle: line.default(""),
     actionbar: line.default(""),

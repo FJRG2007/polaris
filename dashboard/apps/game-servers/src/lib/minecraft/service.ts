@@ -28,6 +28,7 @@ import { liveContext } from "./live-values";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 import { readsPlayerList, readsServer } from "./text-vars";
 import { announcementCommands, announcementProblems, type Announcement } from "./announcement";
+import { parseTarget } from "./announce-target";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -306,7 +307,13 @@ export async function sendAnnouncement(
               liveContext(installedAppId, texts, players, server.running ? server : null, figures)
           ).catch(() => liveContext(installedAppId, texts, players, null, figures))
         : await liveContext(installedAppId, texts, players);
-    const lines = announcementCommands(install.edition, announcement, context);
+    // Operators are Polaris's word, not the game's: they become the names of the
+    // ones on the server now.
+    const withOperators =
+        parseTarget(announcement.target)?.kind === "operators"
+            ? { ...context, operators: await operatorsOnline(install, ownerId) }
+            : context;
+    const lines = announcementCommands(install.edition, announcement, withOperators);
     if (lines.length === 0) throw new Error("There is nothing to send yet");
     for (const line of lines) {
         if (commandBytes(line) > COMMAND_BYTES_MAX) {
@@ -776,6 +783,23 @@ async function readPlayerList(
     return parse.parsePlayerListFromLog(
         await readAppRuntimeLog(install.applicationId, ownerId, 80)
     );
+}
+
+/** The operators who are on the server now, by name. Java only: Bedrock keeps
+ *  its operators by xuid. */
+async function operatorsOnline(install: MinecraftInstall, ownerId: string): Promise<string[]> {
+    if (install.edition === "bedrock") return [];
+    const [ops, players] = await Promise.all([
+        readServerFile(install, ownerId, "ops.json"),
+        readPlayerList(install, ownerId)
+    ]);
+    const operators = new Set(parse.parseNameFile(ops).map((name) => name.toLowerCase()));
+    return (players?.players ?? []).filter((name) => operators.has(name.toLowerCase()));
+}
+
+/** The same, by the install's id, for the loop that keeps an announcement up. */
+export async function onlineOperators(ownerId: string, installedAppId: string): Promise<string[]> {
+    return operatorsOnline(await resolveInstall(ownerId, installedAppId), ownerId);
 }
 
 /** How far back to read for the arrivals and departures. Enough to cover an
