@@ -34,6 +34,22 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/announce-actions", () =
                     fadeOut: 1,
                     sound: ""
                 }
+            },
+            {
+                id: "t2",
+                name: "Raid",
+                announcement: {
+                    target: "@a",
+                    title: "",
+                    subtitle: "",
+                    actionbar: "",
+                    chat: "",
+                    tagged: true,
+                    fadeIn: 0.5,
+                    stay: 3.5,
+                    fadeOut: 1,
+                    sound: "minecraft:event.raid.horn"
+                }
             }
         ]
     }),
@@ -84,6 +100,28 @@ describe("the Announce screen", () => {
         const preview = screen.getByLabelText("Preview of the announcement in the game");
         expect(preview.textContent).toContain("Restarting");
         expect((screen.getByLabelText("Title") as HTMLTextAreaElement).value).toBe("Restarting");
+    });
+
+    it("sends a sound on its own, with nothing written", async () => {
+        render(<MinecraftAnnounce installedAppId="s1" running edition="java" players={[]} />);
+        fireEvent.click(await screen.findByText("Raid"));
+        const send = screen.getByRole("button", { name: /^Send$/ }) as HTMLButtonElement;
+        expect(send.disabled).toBe(false);
+        await act(async () => {
+            fireEvent.click(send);
+        });
+        await waitFor(() => expect(sent).toHaveLength(1));
+        expect(sent[0]).toMatchObject({
+            announcement: { title: "", chat: "", sound: "minecraft:event.raid.horn" }
+        });
+    });
+
+    it("does not count a sound on Bedrock, which plays none", async () => {
+        render(<MinecraftAnnounce installedAppId="s1" running edition="bedrock" players={[]} />);
+        fireEvent.click(await screen.findByText("Raid"));
+        expect((screen.getByRole("button", { name: /^Send$/ }) as HTMLButtonElement).disabled).toBe(
+            true
+        );
     });
 
     it("will not send while the server is stopped, or with nothing written", () => {
