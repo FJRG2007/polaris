@@ -112,11 +112,9 @@ vi.mock("@polaris/db", () => ({
             },
             deleteMany: async () => ({ count: 0 })
         },
-        $transaction: async (work: unknown) => {
-            closed.push(meeting.id);
-            meeting.endedAt = new Date();
-            return Array.isArray(work) ? [] : undefined;
-        }
+        // What Prisma answers for a list: each operation's own result, in order.
+        // The close reads its count to know whether it was the one that closed.
+        $transaction: async (work: unknown) => (Array.isArray(work) ? Promise.all(work) : undefined)
     }
 }));
 
