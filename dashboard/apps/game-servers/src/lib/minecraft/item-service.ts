@@ -14,7 +14,8 @@
 
 import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
-import { normalizeItemId, stacksFor } from "./items";
+import { planStackMove } from "./stack-move";
+import { maxStackFor, normalizeItemId, stacksFor } from "./items";
 import { readLiveInventory } from "./inventory-service";
 import { parseStack, type InventoryItem } from "./inventory";
 import { withServerContainer, type ServerContainer } from "./service";
@@ -63,7 +64,7 @@ const REFUSALS: Record<WriteRefusal, string> = {
     unsupported:
         "This server is older than the command that moves an item into a slot (Minecraft 1.17).",
     occupied:
-        "Drop part of a stack on an empty slot. Splitting onto an occupied one is not something the game does.",
+        "Drop part of a stack on an empty slot or on the same item. Splitting onto something else is not something the game does.",
     indivisible:
         "That stack carries its own data, so the items in it are not interchangeable and cannot be split.",
     recipient: "The other player has to be on the server to receive it. Nothing was moved.",
@@ -192,7 +193,8 @@ export async function moveStack(
     to: number,
     expected: { readonly from: InventoryItem | null; readonly to: InventoryItem | null },
     /** How many to move. Absent, or the whole stack, moves all of it. Fewer
-     *  splits, which the game does with a right-click and a modifier. */
+     *  splits, which the game does with a right-click and a modifier. Onto the
+     *  same item either tops that stack up - see `stack-move`. */
     count?: number
 ): Promise<void> {
     if (from === to) return;
@@ -210,23 +212,21 @@ export async function moveStack(
         const moving = itemArgument(source);
         if (!moving.ok) refuse(moving.why);
 
-        const part =
-            count === undefined ? source.count : Math.max(1, Math.min(count, source.count));
-        if (part < source.count) {
-            // A split is two writes of the same item, so nothing has to be
-            // reconstructed and nothing can be lost - but only for a stack whose
-            // items are interchangeable. One carrying its own data is one item
-            // wearing that data, and there is no half of it.
-            if (source.data !== null) refuse("indivisible");
-            if (target !== null) refuse("occupied");
-            await writeSlot(server, installedAppId, player, to, moving.value, part);
+        const plan = planStackMove(source, target, count, maxStackFor(source.id));
+        if (plan.kind === "refuse") refuse(plan.why);
+        if (plan.kind === "full") return;
+        if (plan.kind === "merge" || plan.kind === "split") {
+            // The same item on both sides, so nothing has to be reconstructed and
+            // nothing can be lost: the target is written first, then what is left.
+            const onTarget = plan.kind === "merge" ? plan.target : plan.moved;
+            await writeSlot(server, installedAppId, player, to, moving.value, onTarget);
             await writeSlot(
                 server,
                 installedAppId,
                 player,
                 from,
-                moving.value,
-                source.count - part
+                plan.source > 0 ? moving.value : AIR,
+                Math.max(1, plan.source)
             );
             return;
         }

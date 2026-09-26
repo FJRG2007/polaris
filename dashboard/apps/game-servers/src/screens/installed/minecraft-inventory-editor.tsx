@@ -395,7 +395,7 @@ export function InventoryEditor({
                 {editable && (
                     <p className="text-xs text-muted-foreground">
                         {live
-                            ? "Drag to move a stack. Hold Ctrl to move one of it, and right-click to split it in half."
+                            ? "Drag a stack anywhere: bag, hotbar, worn or offhand. Onto the same item it stacks up. Hold Ctrl to move one of it, and right-click to split it in half."
                             : "Drag an item from the palette onto the slot it should land in."}
                     </p>
                 )}
