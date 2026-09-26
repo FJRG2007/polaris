@@ -129,10 +129,9 @@ export function AppSwitcher({
                 <span className="sr-only sm:not-sr-only">{current.label}</span>
                 <ChevronDown className="hidden size-4 text-muted-foreground sm:block" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-                align="start"
-                className="max-h-[min(34rem,var(--radix-dropdown-menu-content-available-height))] w-[19.5rem] overflow-y-auto p-2"
-            >
+            {/* Height, width and scrolling come from the menu itself, which keeps
+                inside what is left of the screen - see DropdownMenuContent. */}
+            <DropdownMenuContent align="start" className="w-[19.5rem] p-2">
                 {sections.map((section, index) => (
                     <div
                         key={section.label}
