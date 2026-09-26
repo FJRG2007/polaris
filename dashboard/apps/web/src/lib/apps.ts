@@ -2,7 +2,9 @@
  * The Polaris app registry - what appears in the top-left switcher. Deliberately
  * small so the dashboard stays legible as it grows: Drive, the umbrella Apps
  * pillar (marketplace + everything Polaris installs and runs), and Management.
- * Everything installable lives under Apps rather than sprawling the switcher.
+ * What is installed from the marketplace lives under Apps, except the few apps
+ * that are a whole product of their own - Places, Tools, Game servers - which
+ * join the switcher once somebody installs them (`requiresApp`).
  */
 
 import type { OrgPermission, Permission } from "@polaris/core";
@@ -93,6 +95,7 @@ import {
     Wrench,
     type LucideIcon
 } from "lucide-react";
+import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 
 export interface AppEntry {
     id: string;
@@ -239,6 +242,24 @@ export const POLARIS_APPS: AppEntry[] = [
         href: "/tools",
         permission: "tools.use",
         requiresApp: "tools"
+    },
+    {
+        /**
+         * Minecraft, ARK and FiveM servers on your own machines.
+         *
+         * An app of its own, beside Places and Tools, rather than a screen in
+         * Apps: somebody who runs a server for their friends is not deploying
+         * anything, and it only exists once somebody installs it. Its path stays
+         * under /apps because every server's own screens already live there, with
+         * the installed apps, and links to them are in people's bookmarks.
+         */
+        id: "games",
+        label: "Game servers",
+        description: "Minecraft, ARK and FiveM servers on your own machines",
+        icon: Gamepad2,
+        href: "/apps/games",
+        permission: "games.read",
+        requiresApp: GAME_SERVERS_APP_ID
     },
     {
         id: "tasks",
@@ -576,6 +597,32 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["master password", "kdf", "argon2", "export", "delete vault"]
         }
     ],
+    games: [
+        {
+            // Out of the rail: the app is this one screen, and a rail listing it
+            // alone beside itself would be a column of nothing. Kept so search
+            // still finds it by the games it runs.
+            label: "Servers",
+            href: "/apps/games",
+            needs: "games.read",
+            requiresApp: "game-servers",
+            icon: Gamepad2,
+            hidden: true,
+            keywords: [
+                "minecraft",
+                "java",
+                "bedrock",
+                "ark",
+                "survival evolved",
+                "fivem",
+                "players",
+                "console",
+                "rcon",
+                "mods",
+                "plugins"
+            ]
+        }
+    ],
     apps: [
         {
             label: "Deploy",
@@ -588,25 +635,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/apps/marketplace",
             icon: Store,
             keywords: ["install", "catalog"]
-        },
-        {
-            label: "Game servers",
-            href: "/apps/games",
-            needs: "games.read",
-            requiresApp: "game-servers",
-            icon: Gamepad2,
-            keywords: [
-                "minecraft",
-                "java",
-                "bedrock",
-                "ark",
-                "survival evolved",
-                "players",
-                "console",
-                "rcon",
-                "mods",
-                "plugins"
-            ]
         },
         {
             label: "Servers",
@@ -2173,18 +2201,30 @@ export function resolveSubapp(pathname: string): AppSubapp | null {
     );
 }
 
-/** Whether a path belongs to an app: its own subtree, or one of its extra
- *  `match` prefixes (exact segment or a nested path under it). */
-function appOwnsPath(app: AppEntry, pathname: string): boolean {
+/** How specific an app's claim on a path is: the longest of its own subtree and
+ *  its extra `match` prefixes that owns it, or -1 when none does. */
+function claimOn(app: AppEntry, pathname: string): number {
     const owns = (base: string) => pathname === base || pathname.startsWith(`${base}/`);
-    return owns(app.href) || (app.match?.some(owns) ?? false);
+    return Math.max(-1, ...[app.href, ...(app.match ?? [])].filter(owns).map((base) => base.length));
 }
 
 /** The app the current path belongs to, defaulting to the first app (Overview),
- *  which is the one screen that belongs to no app in particular. */
+ *  which is the one screen that belongs to no app in particular.
+ *
+ *  The most specific claim wins: Apps owns `/apps`, and Game servers answers
+ *  inside it at `/apps/games`. */
 export function resolveActiveApp(pathname: string): AppEntry {
+    let best: AppEntry | null = null;
+    let bestClaim = -1;
+    for (const app of POLARIS_APPS) {
+        const claim = claimOn(app, pathname);
+        if (claim > bestClaim) {
+            best = app;
+            bestClaim = claim;
+        }
+    }
     // POLARIS_APPS is a non-empty literal, so [0] is always present.
-    return POLARIS_APPS.find((app) => appOwnsPath(app, pathname)) ?? POLARIS_APPS[0]!;
+    return best ?? POLARIS_APPS[0]!;
 }
 
 /**

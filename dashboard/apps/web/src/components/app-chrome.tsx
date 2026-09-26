@@ -17,6 +17,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AppNav } from "@/components/app-nav";
+import { getFavoriteApps } from "@/lib/app-launcher-service";
 import { appBaseUrl } from "@/lib/domain-service";
 import { getCapabilities } from "@polaris/config";
 import { heldSectionPermissions, installedSectionApps, reachableAppNav } from "@/lib/app-access";
@@ -92,7 +93,8 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         organizations,
         presence,
         status,
-        soundVolume
+        soundVolume,
+        favoriteApps
     ] = await Promise.all([
         // The open shelf's, as the bell shows them - see `lib/shelf`.
         openShelfFor(user.id).then((shelf) => listNotifications(user.id, shelf)),
@@ -110,7 +112,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         presenceChoiceOf(user.id),
         ownStatus(user.id),
         // A sound at the wrong volume is not worth failing the page over.
-        getSoundVolume(user.id).catch(() => DEFAULT_SOUND_VOLUME)
+        getSoundVolume(user.id).catch(() => DEFAULT_SOUND_VOLUME),
+        // The apps pinned to the top of the switcher. Never worth a failed page.
+        getFavoriteApps(user.id).catch(() => [])
     ]);
     // Seeded here rather than fetched by the provider, so the badge on the tab
     // icon is right on the first paint instead of appearing a second into the
@@ -248,6 +252,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                     <AppNav
                                                                         appIds={apps.ids}
                                                                         guestAppIds={apps.guestIds}
+                                                                        favorites={favoriteApps}
                                                                     />
                                                                     <ScopeSwitcher
                                                                         personalName={user.name}

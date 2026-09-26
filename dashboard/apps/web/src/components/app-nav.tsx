@@ -18,36 +18,60 @@
  *  An app that remembered where it was left leads back there rather than to its
  *  front door - see `last-place`. Read after mount rather than during render:
  *  the server has no idea what one browser remembers, and a link that differed
- *  between the two would fail hydration. */
+ *  between the two would fail hydration. The recent apps that fill the top row
+ *  are read the same way, from the history the Overview's "Recently visited"
+ *  card keeps (`recent-places`); the pins come from the account. */
 
 import Link from "next/link";
-import { readPlace } from "@/lib/last-place";
-import { AppSwitcher } from "@polaris/ui";
+import * as nav from "@/lib/apps";
 import { useEffect, useState } from "react";
+import { readPlace } from "@/lib/last-place";
 import { usePathname } from "next/navigation";
-import { POLARIS_APPS, resolveActiveApp } from "@/lib/apps";
+import { AppSwitcher, useToast } from "@polaris/ui";
+import { launcherLayout } from "@/lib/app-launcher";
 import { badgeLabel } from "@/lib/notification-badge";
+import { readRecentPlaces } from "@/lib/overview/recent-places";
+import { useInstalledNav } from "@/components/use-installed-nav";
 import { anythingWaiting, useAppUnread } from "@/components/app-unread";
+import { saveFavoriteAppsAction } from "@/app/(app)/app-launcher-actions";
 
-export function AppNav({ appIds, guestAppIds = [] }: { appIds: string[]; guestAppIds?: string[] }) {
+export function AppNav({
+    appIds,
+    guestAppIds = [],
+    favorites: savedFavorites = []
+}: {
+    appIds: string[];
+    guestAppIds?: string[];
+    /** The apps this account pinned, in its order. */
+    favorites?: string[];
+}) {
     const pathname = usePathname();
+    const toast = useToast();
     const allowed = new Set(appIds);
     const asGuest = new Set(guestAppIds);
     const waiting = useAppUnread();
     const [places, setPlaces] = useState<Record<string, string>>({});
+    const [recent, setRecent] = useState<string[]>([]);
+    const [favorites, setFavorites] = useState<string[]>(savedFavorites);
+    // A game server's own screens live with the installed apps, and belong to
+    // Game servers. The path only says "an installed app"; whether it is a game
+    // server is the answer the rail already asks for (a server has screens).
+    const installedId = nav.installedAppIdForPath(pathname);
+    const installed = useInstalledNav(installedId);
 
     // Re-read on every navigation: leaving Tasks is the moment the entry that
-    // leads back into it becomes wrong.
+    // leads back into it becomes wrong, and the moment it becomes recent.
     useEffect(() => {
         const found: Record<string, string> = {};
-        for (const app of POLARIS_APPS) {
+        for (const app of nav.POLARIS_APPS) {
             const place = readPlace(app.id, app.href);
             if (place) found[app.id] = place;
         }
         setPlaces(found);
+        setRecent(readRecentPlaces().map((place) => nav.resolveActiveApp(place.href).id));
     }, [pathname]);
 
-    const apps = POLARIS_APPS.filter((app) => allowed.has(app.id)).map((app) => {
+    const apps = nav.POLARIS_APPS.filter((app) => allowed.has(app.id)).map((app) => {
         const entry =
             asGuest.has(app.id) && app.guest
                 ? { ...app, label: app.guest.label, description: app.guest.description, href: app.guest.href }
@@ -60,12 +84,38 @@ export function AppNav({ appIds, guestAppIds = [] }: { appIds: string[]; guestAp
         const badge = badgeLabel(waiting[app.id] ?? 0);
         return badge ? { ...entry, badge } : entry;
     });
-    const current = resolveActiveApp(pathname);
+    const layout = launcherLayout({ available: apps.map((app) => app.id), favorites, recent });
+    const isGameServer = installedId !== null && installed !== null && installed.tabs.length > 0;
+    const current = isGameServer ? (nav.POLARIS_APPS.find((app) => app.id === "games") ?? nav.resolveActiveApp(pathname)) : nav.resolveActiveApp(pathname);
+
+    // Optimistic: the star fills at once and comes back off, with a note, if the
+    // save is refused. Sent whole, so two quick clicks cannot interleave into a
+    // list neither of them meant.
+    function togglePin(appId: string) {
+        const before = favorites;
+        const next = before.includes(appId) ? before.filter((id) => id !== appId) : [...before, appId];
+        setFavorites(next);
+        void saveFavoriteAppsAction(next)
+            .then((answer) => {
+                if (!answer.error) return;
+                setFavorites(before);
+                toast.show({ title: answer.error });
+            })
+            .catch(() => {
+                setFavorites(before);
+                toast.show({ title: "Your favorites could not be saved. Try again in a moment." });
+            });
+    }
+
     return (
         <AppSwitcher
             apps={apps}
             currentAppId={current.id}
             currentApp={current.hidden ? current : undefined}
+            featured={layout.featured}
+            featuredLabel={layout.pinned ? "Favorites" : recent.length > 0 ? "Recent" : "Suggested"}
+            pinned={favorites}
+            onTogglePin={togglePin}
             // Moving between apps keeps the page. An anchor here reloaded the
             // whole dashboard, which among other things hung up on whoever was
             // on the other end of a call.
