@@ -415,9 +415,10 @@ export function announcementCommands(
             ...send("tellraw", announcement.chat, (filled) => body(filled, announcement.tagged))
         );
     }
-    const sound = java && announcement.sound
-        ? ANNOUNCE_SOUNDS.find((one) => one.id === announcement.sound)
-        : undefined;
+    const sound =
+        java && announcement.sound
+            ? ANNOUNCE_SOUNDS.find((one) => one.id === announcement.sound)
+            : undefined;
     if (sound) {
         lines.push(
             `execute as ${target} at @s run playsound ${sound.id} master @s ~ ~ ~ ${sound.volume ?? 1} 1`
