@@ -29,6 +29,10 @@ export class HostdPorts implements RuntimePorts {
         this.client = new HostdClient({ signal });
     }
 
+    public holdImages<T>(work: () => Promise<T>): Promise<T> {
+        return withImageUse(LOCAL_MACHINE, work);
+    }
+
     public async composeUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
         // The daemon writes values into the compose file as they are, so a `$` in any
         // of them is escaped here - see `forCompose`. Held open against a prune:

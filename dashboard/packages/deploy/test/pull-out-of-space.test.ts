@@ -81,6 +81,32 @@ describe("a pull with no room left", () => {
         expect(reclaimed.mock.calls).toEqual([[], [{ whenIdle: true }]]);
     });
 
+    it("holds the machine from the pull until the containers are up, and lets go before tidying", async () => {
+        // A pulled or built image has no release label until it is pinned, and
+        // nothing runs it until compose starts it: a prune in between takes it.
+        const { ctx, ports, reclaimed } = context({ failures: 0, freed: 0 });
+        const order: string[] = [];
+        let held = false;
+        const holdImages = vi.fn(async <T>(work: () => Promise<T>): Promise<T> => {
+            held = true;
+            try {
+                return await work();
+            } finally {
+                held = false;
+            }
+        });
+        Object.assign(ports, { holdImages });
+        ports.pull.mockImplementation(async () => void order.push(`pull held=${held}`));
+        ports.composeUp.mockImplementation(async () => void order.push(`up held=${held}`));
+        reclaimed.mockImplementation(async () => {
+            order.push(`tidy held=${held}`);
+            return 0;
+        });
+        await new ComposeRuntime().deployApplication(plan(), ctx);
+        expect(holdImages).toHaveBeenCalledTimes(1);
+        expect(order).toEqual(["pull held=true", "up held=true", "tidy held=false"]);
+    });
+
     it("says what it did, in the log the operator is watching", async () => {
         const { ctx, logged } = context({ failures: 1, freed: 6_500_000_000 });
         await new ComposeRuntime().deployApplication(plan(), ctx);

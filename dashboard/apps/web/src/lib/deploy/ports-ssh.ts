@@ -46,7 +46,7 @@ export class SshPorts implements RuntimePorts {
 
     /** Hold this machine's image store open while `work` brings an image onto
      *  it, so no prune runs underneath - see `image-store-lock`. */
-    private holding<T>(work: () => Promise<T>): Promise<T> {
+    public holdImages<T>(work: () => Promise<T>): Promise<T> {
         return withImageUse(sshMachine(this.target.address, this.target.port), work);
     }
 
@@ -79,7 +79,7 @@ export class SshPorts implements RuntimePorts {
             `docker compose -p ${quoteArg(spec.project)} -f ${quoteArg(file)} up -d --remove-orphans`
         ].join("; ");
         // Compose fetches any image it does not have yet.
-        await this.holding(() => this.run(command, onOutput));
+        await this.holdImages(() => this.run(command, onOutput));
     }
 
     public async composeDown(project: string, onOutput?: OutputSink): Promise<void> {
@@ -102,7 +102,7 @@ export class SshPorts implements RuntimePorts {
             ...ensurePrivateNetworksScript(spec.networks, true),
             `docker stack deploy -c ${quoteArg(file)} --detach=true --with-registry-auth --prune ${quoteArg(spec.project)}`
         ].join("; ");
-        await this.holding(() => this.run(command, onOutput));
+        await this.holdImages(() => this.run(command, onOutput));
     }
 
     public async stackDown(project: string, onOutput?: OutputSink): Promise<void> {
@@ -141,7 +141,7 @@ export class SshPorts implements RuntimePorts {
                   ].join("\n")
                 : `docker build -t ${quoteArg(request.tag)} -f ${quoteArg(dockerfile)} -`;
         const client = await this.connect();
-        await this.holding(() => new Promise<void>((resolve, reject) => {
+        await this.holdImages(() => new Promise<void>((resolve, reject) => {
             client.exec(script, (error, channel) => {
                 if (error || !channel) {
                     reject(error ?? new Error("could not open the exec channel"));
@@ -187,7 +187,7 @@ export class SshPorts implements RuntimePorts {
     }
 
     public async pull(image: string, onOutput?: OutputSink): Promise<void> {
-        await this.holding(() => this.run(`docker pull ${quoteArg(image)}`, onOutput));
+        await this.holdImages(() => this.run(`docker pull ${quoteArg(image)}`, onOutput));
     }
 
     /**
@@ -223,7 +223,7 @@ export class SshPorts implements RuntimePorts {
     /** `docker load` on the server, fed the archive on stdin. */
     public async importImage(archive: NodeJS.ReadableStream, _size: number, onOutput?: OutputSink): Promise<void> {
         const client = await this.connect();
-        await this.holding(() => new Promise<void>((resolve, reject) => {
+        await this.holdImages(() => new Promise<void>((resolve, reject) => {
             client.exec("docker load", (error, channel) => {
                 if (error || !channel) {
                     reject(error ?? new Error("could not open the exec channel"));

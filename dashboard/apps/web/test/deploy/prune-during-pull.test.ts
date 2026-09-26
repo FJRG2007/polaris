@@ -127,6 +127,75 @@ describe("the lock itself", () => {
         await stuck;
     });
 
+    it("still sees a pull that was waiting on a prune once that prune is done", async () => {
+        let releasePrune!: () => void;
+        const prune = lock.withImagePrune("orphan", () => new Promise<void>((resolve) => (releasePrune = resolve)));
+        await settle();
+        let releasePull!: () => void;
+        const pulling = lock.withImageUse("orphan", () => new Promise<void>((resolve) => (releasePull = resolve)));
+        await settle();
+        releasePrune();
+        await prune;
+        await settle();
+        await expect(lock.withImagePrune("orphan", async () => "swept", { whenIdle: true })).rejects.toBeInstanceOf(
+            lock.ImageStoreBusy
+        );
+        releasePull();
+        await pulling;
+    });
+
+    it("keeps a prune off between one step and the next of the same hold", async () => {
+        const order: string[] = [];
+        let releaseBuild!: () => void;
+        let pruning!: Promise<unknown>;
+        const deploy = lock.withImageUse("span", async () => {
+            await lock.withImageUse("span", () => new Promise<void>((resolve) => (releaseBuild = resolve)));
+            order.push("built");
+            await settle();
+            await lock.withImageUse("span", async () => {
+                order.push("pinned");
+            });
+        });
+        await settle();
+        pruning = lock.withImagePrune("span", async () => {
+            order.push("prune");
+        });
+        await settle();
+        releaseBuild();
+        await Promise.all([deploy, pruning]);
+        expect(order).toEqual(["built", "pinned", "prune"]);
+    });
+
+    it("lets a hold make room for itself without waiting on itself", async () => {
+        const order: string[] = [];
+        await lock.withImageUse("self", async () => {
+            await lock.withImagePrune("self", async () => {
+                order.push("tidy");
+            }, { whenIdle: true });
+            await lock.withImagePrune("self", async () => {
+                order.push("rescue");
+            }, { waitMs: 1000 });
+            await lock.withImageUse("self", async () => {
+                order.push("pull");
+            });
+        });
+        expect(order).toEqual(["tidy", "rescue", "pull"]);
+        await expect(lock.withImagePrune("self", async () => "swept", { whenIdle: true })).resolves.toBe("swept");
+    });
+
+    it("does not tidy over another hold on the machine from inside its own", async () => {
+        let releaseOther!: () => void;
+        const other = lock.withImageUse("two", () => new Promise<void>((resolve) => (releaseOther = resolve)));
+        await settle();
+        await lock.withImageUse("two", async () => {
+            await expect(lock.withImagePrune("two", async () => "swept", { whenIdle: true })).rejects.toBeInstanceOf(
+                lock.ImageStoreBusy
+            );
+        });
+        releaseOther();
+        await other;
+    });
+
     it("lets go of the machine when the work fails", async () => {
         await expect(lock.withImageUse("m", async () => Promise.reject(new Error("pull failed")))).rejects.toThrow(
             "pull failed"

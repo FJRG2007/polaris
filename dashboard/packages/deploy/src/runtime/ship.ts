@@ -41,6 +41,20 @@ export function buildPorts(ctx: RuntimeContext): RuntimePorts {
 }
 
 /**
+ * The machine a release is fetched or built on: the build machine for a build
+ * made elsewhere, the one that runs it otherwise. What arrives there has no
+ * release label until it is pinned; what is carried on from there already has.
+ */
+export function fetchPorts(plan: AppDeployPlan, ctx: RuntimeContext): RuntimePorts {
+    return plan.build.method === "image" ? ctx.ports : buildPorts(ctx);
+}
+
+/** Run `work` with the machine's image store held open, where it can be. */
+export function holdImages<T>(ports: RuntimePorts, work: () => Promise<T>): Promise<T> {
+    return ports.holdImages ? ports.holdImages(work) : work();
+}
+
+/**
  * Copy `image` from one machine to another, saying how it goes.
  *
  * `stageDir` is where the archive waits between the two; it is removed whatever

@@ -104,6 +104,13 @@ export interface RuntimePorts {
      */
     reclaimSpace?(options?: { whenIdle?: boolean }): Promise<number>;
     /**
+     * Keep a prune off the machine's image store while `work` runs, across
+     * every fetch, build and start inside it. A prune asked for from inside it
+     * lets it go for as long as the prune takes. Optional: a target with no
+     * prune of its own has nothing to hold off.
+     */
+    holdImages?<T>(work: () => Promise<T>): Promise<T>;
+    /**
      * How full the machine's disk is, 0 to 1, or null where it cannot be asked.
      *
      * Asked BEFORE a pull rather than only after one fails, and that ordering is
