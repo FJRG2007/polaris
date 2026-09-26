@@ -976,13 +976,19 @@ function Row({
                 "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-card-hover data-[state=open]:bg-card-hover",
                 // Every size here has its `md:` twin set back to the line above,
                 // so the desktop rail is untouched.
-                roomy && "gap-3 rounded-lg py-2.5 text-[0.9375rem] md:gap-2 md:rounded-md md:py-1.5 md:text-sm",
+                roomy &&
+                    "gap-3 rounded-lg py-2.5 text-[0.9375rem] md:gap-2 md:rounded-md md:py-1.5 md:text-sm",
                 active ? "bg-card-hover text-foreground" : "text-muted-foreground",
                 shout && "font-medium text-foreground"
             )}
         >
             {icon}
-            <span className={cn("flex min-w-0 flex-1 flex-col leading-tight", roomy && "gap-0.5 md:gap-0")}>
+            <span
+                className={cn(
+                    "flex min-w-0 flex-1 flex-col leading-tight",
+                    roomy && "gap-0.5 md:gap-0"
+                )}
+            >
                 <span className="min-w-0 truncate" title={label}>
                     <PersonName id={personId} name={label} />
                 </span>
