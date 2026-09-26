@@ -35,6 +35,7 @@ import { notify } from "@/lib/notifications/dispatch";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { diskFullness, localDisk } from "@/lib/deploy/local-disk";
 import { hostSpace, reclaimHostSpace } from "@/lib/deploy/host-space";
+import { ImageStoreBusy } from "@/lib/deploy/image-store-lock";
 import { reclaimServerSpace, serverDiskFullness, serversWithDeployments } from "@/lib/deploy/server-space";
 
 /** What was last reported, so a disk that is tight for a month is one message
@@ -117,7 +118,16 @@ export async function sweepHostSpace(): Promise<HousekeepingSweep> {
         return { before, after: before, freed: 0, reclaimed: false };
     }
 
-    const freed = (await reclaimHostSpace()) ?? 0;
+    // Skipped, not queued, while a deploy is fetching or building here: that
+    // deploy tidies up when it finishes, and the next sweep is six hours away
+    // rather than never. Nothing is reported, because nothing was decided.
+    let freed: number;
+    try {
+        freed = (await reclaimHostSpace({ whenIdle: true })) ?? 0;
+    } catch (error) {
+        if (error instanceof ImageStoreBusy) return { before, after: before, freed: 0, reclaimed: false };
+        throw error;
+    }
     const settled = await localDisk();
     const after = settled ? diskFullness(settled) : before;
 
@@ -149,7 +159,10 @@ export async function sweepServerSpace(): Promise<{ id: string; name: string; fr
         // Null is "could not ask", never "there is room". A machine that is down
         // is not a machine with a healthy disk, and pruning is not what fixes it.
         if (fullness === null || fullness < HIGH_WATER) continue;
-        const freed = await reclaimServerSpace(server.id);
+        const freed = await reclaimServerSpace(server.id, { whenIdle: true }).catch((error: unknown) => {
+            if (error instanceof ImageStoreBusy) return 0;
+            throw error;
+        });
         swept.push({ id: server.id, name: server.name, freed: freed ?? 0 });
     }
     return swept;

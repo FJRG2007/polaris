@@ -96,8 +96,13 @@ export interface RuntimePorts {
      * cannot be asked (a remote engine, an edition with no daemon) should not
      * force every caller to guard - the runtime falls through to reporting the
      * failure exactly as it did before.
+     *
+     * `whenIdle` is for tidying rather than rescue: when something else is
+     * fetching or building on the machine the prune is skipped (resolving 0)
+     * instead of queued, because a prune over a pull deletes the layers it is
+     * unpacking. Without it the prune waits for the machine to go quiet.
      */
-    reclaimSpace?(): Promise<number>;
+    reclaimSpace?(options?: { whenIdle?: boolean }): Promise<number>;
     /**
      * How full the machine's disk is, 0 to 1, or null where it cannot be asked.
      *

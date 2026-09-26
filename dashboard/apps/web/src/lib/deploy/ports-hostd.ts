@@ -9,6 +9,7 @@ import { Readable } from "node:stream";
 import { HostdClient } from "@polaris/hostd-client";
 import { reclaimHostSpace } from "@/lib/deploy/host-space";
 import { forCompose, isReleaseImage } from "@polaris/deploy";
+import { ImageStoreBusy, LOCAL_MACHINE, withImageUse } from "@/lib/deploy/image-store-lock";
 import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts, WorldTrimOptions } from "@polaris/deploy";
 
 /** Where the optimizer is put inside the container. The daemon runs this one
@@ -30,9 +31,12 @@ export class HostdPorts implements RuntimePorts {
 
     public async composeUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
         // The daemon writes values into the compose file as they are, so a `$` in any
-        // of them is escaped here - see `forCompose`.
-        const res = await this.client.deployUp(forCompose(spec));
-        await drain(res, onOutput);
+        // of them is escaped here - see `forCompose`. Held open against a prune:
+        // compose fetches any image it does not have yet - see `image-store-lock`.
+        await withImageUse(LOCAL_MACHINE, async () => {
+            const res = await this.client.deployUp(forCompose(spec));
+            await drain(res, onOutput);
+        });
     }
 
     public async composeDown(project: string, onOutput?: OutputSink): Promise<void> {
@@ -41,8 +45,10 @@ export class HostdPorts implements RuntimePorts {
     }
 
     public async stackUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
-        const res = await this.client.stackUp(forCompose(spec));
-        await drain(res, onOutput);
+        await withImageUse(LOCAL_MACHINE, async () => {
+            const res = await this.client.stackUp(forCompose(spec));
+            await drain(res, onOutput);
+        });
     }
 
     public async stackDown(project: string, onOutput?: OutputSink): Promise<void> {
@@ -52,20 +58,24 @@ export class HostdPorts implements RuntimePorts {
 
     public async build(request: BuildRequest, onOutput?: OutputSink): Promise<string> {
         const tar = await bufferStream(request.contextTar);
-        const res = await this.client.deployBuild(
-            request.tag,
-            request.dockerfile ?? "Dockerfile",
-            tar,
-            request.builder ?? "docker",
-            request.root ?? ""
-        );
-        await drain(res, onOutput);
+        await withImageUse(LOCAL_MACHINE, async () => {
+            const res = await this.client.deployBuild(
+                request.tag,
+                request.dockerfile ?? "Dockerfile",
+                tar,
+                request.builder ?? "docker",
+                request.root ?? ""
+            );
+            await drain(res, onOutput);
+        });
         return request.tag;
     }
 
     public async pull(image: string, onOutput?: OutputSink): Promise<void> {
-        const res = await this.client.deployPull(image);
-        await drain(res, onOutput);
+        await withImageUse(LOCAL_MACHINE, async () => {
+            const res = await this.client.deployPull(image);
+            await drain(res, onOutput);
+        });
     }
 
     /**
@@ -74,8 +84,13 @@ export class HostdPorts implements RuntimePorts {
      * allowlist refuses a volume prune, so this cannot cross that line even by
      * asking differently.
      */
-    public async reclaimSpace(): Promise<number> {
-        return (await reclaimHostSpace()) ?? 0;
+    public async reclaimSpace(options: { whenIdle?: boolean } = {}): Promise<number> {
+        try {
+            return (await reclaimHostSpace(options)) ?? 0;
+        } catch (error) {
+            if (error instanceof ImageStoreBusy) return 0;
+            throw error;
+        }
     }
 
     public async inspectImage(image: string): Promise<number[]> {
@@ -117,8 +132,10 @@ export class HostdPorts implements RuntimePorts {
     }
 
     public async importImage(archive: NodeJS.ReadableStream, size: number, onOutput?: OutputSink): Promise<void> {
-        const response = await this.client.imageImport(archive, size);
-        await drain(response, onOutput);
+        await withImageUse(LOCAL_MACHINE, async () => {
+            const response = await this.client.imageImport(archive, size);
+            await drain(response, onOutput);
+        });
     }
 
     public async login(registry: string, username: string, password: string): Promise<void> {

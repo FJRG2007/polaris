@@ -25,6 +25,7 @@ import type { Client } from "ssh2";
 import { execCommand } from "@polaris/ssh";
 import { quoteArg } from "@polaris/deploy";
 import { borrowSsh } from "@/lib/connection-pool";
+import { sshMachine, withImageUse } from "@/lib/deploy/image-store-lock";
 import type { SshLease } from "@polaris/ssh";
 import type { RunnerRelease } from "./runner-release";
 import { getHostConnection, type HostConnection } from "@/lib/host-service";
@@ -72,7 +73,11 @@ export class RunnerHost implements RunnerMachine {
      *  workspace job - a directory on the machine itself - possible at all. */
     public readonly reach = "login" as const;
 
-    private constructor(private readonly lease: SshLease) {}
+    private constructor(
+        private readonly lease: SshLease,
+        /** Which machine's image store a pull here holds open - see `image-store-lock`. */
+        private readonly machine: string
+    ) {}
 
     private get client(): Client {
         return this.lease.client;
@@ -94,7 +99,8 @@ export class RunnerHost implements RunnerMachine {
                 username: host.username,
                 auth: host.auth,
                 pinnedHostKey: host.hostKey
-            })
+            }),
+            sshMachine(host.address, host.port)
         );
     }
 
@@ -170,9 +176,9 @@ echo "disk=$(df -Pk "$HOME" 2>/dev/null | awk 'NR == 2 {print $4 * 1024}')"`);
     }
 
     private async pullImage(release: RunnerRelease): Promise<RunResult> {
-        return this.runWithTimeout(
-            `docker pull ${quoteArg(release.image)} >/dev/null`,
-            PREPARE_TIMEOUT_MS
+        // Held open so a sweep of this machine cannot prune the layers mid-pull.
+        return withImageUse(this.machine, () =>
+            this.runWithTimeout(`docker pull ${quoteArg(release.image)} >/dev/null`, PREPARE_TIMEOUT_MS)
         );
     }
 

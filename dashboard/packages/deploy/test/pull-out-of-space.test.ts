@@ -72,6 +72,15 @@ describe("a pull with no room left", () => {
         expect(attempts()).toBe(2);
     });
 
+    it("waits for the machine to make room, but only tidies when nothing else is fetching", async () => {
+        // A prune over another deploy's pull deletes the layers it is unpacking.
+        // The one the deploy cannot go on without may wait its turn; the tidy at
+        // the end is skipped instead, since that other deploy tidies after itself.
+        const { ctx, reclaimed } = context({ failures: 1, freed: 6_500_000_000 });
+        await new ComposeRuntime().deployApplication(plan(), ctx);
+        expect(reclaimed.mock.calls).toEqual([[], [{ whenIdle: true }]]);
+    });
+
     it("says what it did, in the log the operator is watching", async () => {
         const { ctx, logged } = context({ failures: 1, freed: 6_500_000_000 });
         await new ComposeRuntime().deployApplication(plan(), ctx);
@@ -147,6 +156,9 @@ describe("making room before the pull rather than after it fails", () => {
         // for a threshold means carrying every superseded one until the machine
         // is nearly full.
         expect(order).toEqual(["ask", "free", "pull", "free"]);
+        // Neither is a rescue, so neither queues behind another deploy's pull.
+        expect(ctx.ports.reclaimSpace).toHaveBeenNthCalledWith(1, { whenIdle: true });
+        expect(ctx.ports.reclaimSpace).toHaveBeenNthCalledWith(2, { whenIdle: true });
     });
 
     it("does not touch a machine with room", async () => {

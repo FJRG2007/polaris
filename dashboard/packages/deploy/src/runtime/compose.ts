@@ -138,7 +138,9 @@ const TIGHT = 0.8;
  */
 async function tidyAfter(ctx: RuntimeContext): Promise<void> {
     if (!ctx.ports.reclaimSpace) return;
-    const freed = await ctx.ports.reclaimSpace().catch(() => 0);
+    // Skipped while another deploy is fetching on this machine: its own tidy
+    // runs when it finishes, and a prune now would take its half-unpacked layers.
+    const freed = await ctx.ports.reclaimSpace({ whenIdle: true }).catch(() => 0);
     if (freed > 0) {
         ctx.log(
             Buffer.from(
@@ -156,7 +158,7 @@ async function pullWithRoom(image: string, ctx: RuntimeContext, sink: OutputSink
     if (ctx.ports.diskFullness && ctx.ports.reclaimSpace) {
         const fullness = await ctx.ports.diskFullness().catch(() => null);
         if (fullness !== null && fullness >= TIGHT) {
-            const freed = await ctx.ports.reclaimSpace().catch(() => 0);
+            const freed = await ctx.ports.reclaimSpace({ whenIdle: true }).catch(() => 0);
             if (freed > 0) {
                 ctx.log(
                     Buffer.from(
