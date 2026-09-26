@@ -75,7 +75,7 @@ describe("watching movement", () => {
     let players: Player[] = [];
     let log = "";
     let ops: string[] = [];
-    let logAdmin = true;
+    let logAdmin: boolean | null = true;
     let looks = 0;
 
     const entity = (one: Player, data: string) =>
@@ -109,7 +109,9 @@ describe("watching movement", () => {
                     .map((one) => entity(one, '"minecraft:overworld"'))
                     .join("\n");
             if (command === "gamerule logAdminCommands")
-                return `Gamerule logAdminCommands is currently set to: ${logAdmin}`;
+                return logAdmin === null
+                    ? "Unknown or incomplete command"
+                    : `Gamerule logAdminCommands is currently set to: ${logAdmin}`;
             return "";
         };
         fake.run = (argv) => {
@@ -237,6 +239,20 @@ describe("watching movement", () => {
         expect(incidents("Alex")).toEqual([]);
         expect((fake.config.xrayTraps as { teleportCheck: string | null }).teleportCheck).toMatch(
             /logAdminCommands/
+        );
+    });
+
+    it("stands the teleport check down, and says why, when the server does not answer about logging", async () => {
+        logAdmin = null;
+        await start();
+        players = [{ name: "Alex", x: 0, y: 64, z: 0 }];
+        await look();
+        await look();
+        players = [{ name: "Alex", x: 3000, y: 64, z: 0 }];
+        await look();
+        expect(incidents("Alex")).toEqual([]);
+        expect((fake.config.xrayTraps as { teleportCheck: string | null }).teleportCheck).toMatch(
+            /did not say/
         );
     });
 

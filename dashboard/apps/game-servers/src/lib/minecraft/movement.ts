@@ -71,17 +71,21 @@ export function movementObjectiveCommands(): string[] {
 }
 
 /**
- * Everybody in the air who has no reason to be: three blocks of air under their
- * feet, air under every corner of them too (somebody sneaking or bridging at an
- * edge stands with their middle over nothing), and none of what legitimately
- * keeps somebody up. Both spellings of the
+ * Everybody in the air who has no reason to be: air where their feet are and
+ * three blocks of air under them, air at and under every corner of them too
+ * (somebody sneaking or bridging at an edge stands with their middle over
+ * nothing, and somebody on a slab, a bed or a path has their feet inside the
+ * block they stand on), and none of what legitimately keeps somebody up. Both spellings of the
  * status effects are asked for - `active_effects` since 1.20.2, `ActiveEffects`
  * (25 levitation, 28 slow falling) before it - and the one a version does not
  * know simply never matches.
  */
 export const AIRBORNE_COMMAND = [
     "execute as @a[gamemode=!creative,gamemode=!spectator] at @s",
+    "if block ~ ~ ~ minecraft:air",
     "if block ~ ~-1 ~ minecraft:air if block ~ ~-2 ~ minecraft:air if block ~ ~-3 ~ minecraft:air",
+    "if block ~0.3 ~ ~0.3 minecraft:air if block ~-0.3 ~ ~0.3 minecraft:air",
+    "if block ~0.3 ~ ~-0.3 minecraft:air if block ~-0.3 ~ ~-0.3 minecraft:air",
     "if block ~0.3 ~-1 ~0.3 minecraft:air if block ~-0.3 ~-1 ~0.3 minecraft:air",
     "if block ~0.3 ~-1 ~-0.3 minecraft:air if block ~-0.3 ~-1 ~-0.3 minecraft:air",
     "unless entity @s[nbt={FallFlying:1b}]",

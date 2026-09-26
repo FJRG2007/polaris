@@ -96,7 +96,20 @@ describe("the launcher's top row", () => {
             favorites: ["admin"],
             recent: ["places"]
         });
-        expect(layout).toEqual({ featured: ["drive", "chat"], pinned: false, rest: [] });
+        expect(layout).toEqual({
+            featured: ["drive", "chat"],
+            pinned: false,
+            visited: false,
+            rest: []
+        });
+    });
+
+    it("calls the row recent only when a recent app actually made it in", () => {
+        expect(launcherLayout({ available, favorites: [], recent: ["chat", "chat"] }).visited).toBe(
+            true
+        );
+        expect(launcherLayout({ available, favorites: [], recent: ["admin"] }).visited).toBe(false);
+        expect(launcherLayout({ available, favorites: [], recent: [] }).visited).toBe(false);
     });
 });
 

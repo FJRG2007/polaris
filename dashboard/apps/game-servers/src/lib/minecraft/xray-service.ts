@@ -482,6 +482,8 @@ const LOG_READ_MAX = 1_000_000;
 const NO_ADMIN_LOG =
     "Teleports are not checked: this server does not log what operators run (the logAdminCommands game rule is off), so an operator's teleport cannot be told apart";
 const NO_LOG = "Teleports are not checked: the server log cannot be read";
+const UNKNOWN_ADMIN_LOG =
+    "Teleports are not checked: this server did not say whether it logs what operators run (the logAdminCommands game rule)";
 
 /** How long the server log is now, or null where it cannot be read. */
 async function logLength(server: ServerContainer): Promise<number | null> {
@@ -563,8 +565,15 @@ async function watchMovement(
 
     // Read only if some jump needs explaining, and at most once a look.
     let log: string | null | undefined;
-    const teleportCheck = loop.logAdmin === false ? NO_ADMIN_LOG : size === null ? NO_LOG : null;
-    const judgeTeleports = teleportCheck === null && loop.logAdmin === true;
+    const teleportCheck =
+        loop.logAdmin === false
+            ? NO_ADMIN_LOG
+            : loop.logAdmin === null
+              ? UNKNOWN_ADMIN_LOG
+              : size === null
+                ? NO_LOG
+                : null;
+    const judgeTeleports = teleportCheck === null;
 
     const found: { name: string; incident: movement.Incident }[] = [];
     const present = new Set<string>();

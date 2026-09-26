@@ -172,6 +172,18 @@ describe("hovering", () => {
             expect(AIRBORNE_COMMAND).toContain(`if block ${corner} minecraft:air`);
         }
     });
+
+    it("needs air where the feet are, so somebody on a slab or a bed is standing", () => {
+        for (const spot of [
+            "~ ~ ~",
+            "~0.3 ~ ~0.3",
+            "~-0.3 ~ ~0.3",
+            "~0.3 ~ ~-0.3",
+            "~-0.3 ~ ~-0.3"
+        ]) {
+            expect(AIRBORNE_COMMAND).toContain(`if block ${spot} minecraft:air`);
+        }
+    });
 });
 
 describe("teleporting", () => {

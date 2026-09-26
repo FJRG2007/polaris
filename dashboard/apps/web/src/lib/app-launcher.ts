@@ -57,6 +57,8 @@ export interface LauncherLayout {
     featured: string[];
     /** Whether anything in it was pinned, which is what the row is called by. */
     pinned: boolean;
+    /** Whether, pins aside, any of it came from somewhere recently visited. */
+    visited: boolean;
     /** Every other app this account can open, in registry order. */
     rest: string[];
 }
@@ -85,10 +87,20 @@ export function launcherLayout({
         if (open.has(id) && !featured.includes(id)) featured.push(id);
     };
     favorites.forEach(add);
-    const pinned = featured.length > 0;
-    for (const id of [...recent, ...available]) {
+    const pins = featured.length;
+    for (const id of recent) {
         if (featured.length >= LAUNCHER_ROW_SIZE) break;
         add(id);
     }
-    return { featured, pinned, rest: available.filter((id) => !featured.includes(id)) };
+    const visited = featured.length > pins;
+    for (const id of available) {
+        if (featured.length >= LAUNCHER_ROW_SIZE) break;
+        add(id);
+    }
+    return {
+        featured,
+        pinned: pins > 0,
+        visited,
+        rest: available.filter((id) => !featured.includes(id))
+    };
 }

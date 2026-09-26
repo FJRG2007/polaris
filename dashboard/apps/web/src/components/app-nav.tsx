@@ -99,19 +99,25 @@ export function AppNav({
     // save is refused. Sent whole, so two quick clicks cannot interleave into a
     // list neither of them meant.
     function togglePin(appId: string) {
-        const before = favorites;
-        const next = before.includes(appId)
-            ? before.filter((id) => id !== appId)
-            : [...before, appId];
+        const pinning = !favorites.includes(appId);
+        const next = pinning ? [...favorites, appId] : favorites.filter((id) => id !== appId);
         setFavorites(next);
+        const undo = () =>
+            setFavorites((current) =>
+                current.includes(appId) !== pinning
+                    ? current
+                    : pinning
+                      ? current.filter((id) => id !== appId)
+                      : [...current, appId]
+            );
         void saveFavoriteAppsAction(next)
             .then((answer) => {
                 if (!answer.error) return;
-                setFavorites(before);
+                undo();
                 toast.show({ title: answer.error });
             })
             .catch(() => {
-                setFavorites(before);
+                undo();
                 toast.show({ title: "Your favorites could not be saved. Try again in a moment." });
             });
     }
@@ -122,7 +128,7 @@ export function AppNav({
             currentAppId={current.id}
             currentApp={current.hidden ? current : undefined}
             featured={layout.featured}
-            featuredLabel={layout.pinned ? "Favorites" : recent.length > 0 ? "Recent" : "Suggested"}
+            featuredLabel={layout.pinned ? "Favorites" : layout.visited ? "Recent" : "Suggested"}
             pinned={favorites}
             onTogglePin={togglePin}
             // Moving between apps keeps the page. An anchor here reloaded the
