@@ -74,11 +74,16 @@ export function AppNav({
     const apps = nav.POLARIS_APPS.filter((app) => allowed.has(app.id)).map((app) => {
         const entry =
             asGuest.has(app.id) && app.guest
-                ? { ...app, label: app.guest.label, description: app.guest.description, href: app.guest.href }
-                // A guest reaches the app through a subject rather than through
-                // the app, so their entry leads to that subject and never to a
-                // remembered screen behind it.
-                : { ...app, href: places[app.id] ?? app.href };
+                ? {
+                      ...app,
+                      label: app.guest.label,
+                      description: app.guest.description,
+                      href: app.guest.href
+                  }
+                : // A guest reaches the app through a subject rather than through
+                  // the app, so their entry leads to that subject and never to a
+                  // remembered screen behind it.
+                  { ...app, href: places[app.id] ?? app.href };
         // Whatever that app has waiting, whichever app it is. Naming them
         // here is what left Mail with a number and no dot beside it.
         const badge = badgeLabel(waiting[app.id] ?? 0);
@@ -86,14 +91,18 @@ export function AppNav({
     });
     const layout = launcherLayout({ available: apps.map((app) => app.id), favorites, recent });
     const isGameServer = installedId !== null && installed !== null && installed.tabs.length > 0;
-    const current = isGameServer ? (nav.POLARIS_APPS.find((app) => app.id === "games") ?? nav.resolveActiveApp(pathname)) : nav.resolveActiveApp(pathname);
+    const current = isGameServer
+        ? (nav.POLARIS_APPS.find((app) => app.id === "games") ?? nav.resolveActiveApp(pathname))
+        : nav.resolveActiveApp(pathname);
 
     // Optimistic: the star fills at once and comes back off, with a note, if the
     // save is refused. Sent whole, so two quick clicks cannot interleave into a
     // list neither of them meant.
     function togglePin(appId: string) {
         const before = favorites;
-        const next = before.includes(appId) ? before.filter((id) => id !== appId) : [...before, appId];
+        const next = before.includes(appId)
+            ? before.filter((id) => id !== appId)
+            : [...before, appId];
         setFavorites(next);
         void saveFavoriteAppsAction(next)
             .then((answer) => {

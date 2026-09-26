@@ -152,7 +152,11 @@ export function MinecraftXray({
     const { suspects, incidents } = useMemo(
         () =>
             view
-                ? buildSuspects({ honeypots: view.players, movement: view.movement, mining: view.mining })
+                ? buildSuspects({
+                      honeypots: view.players,
+                      movement: view.movement,
+                      mining: view.mining
+                  })
                 : { suspects: [], incidents: [] },
         [view]
     );
@@ -160,7 +164,8 @@ export function MinecraftXray({
         const needle = search.trim().toLowerCase();
         return suspects.filter((one) => {
             if (needle && !one.key.includes(needle)) return false;
-            if (filter === "suspicious") return one.xray.level !== "unlikely" || one.movement.level !== "unlikely";
+            if (filter === "suspicious")
+                return one.xray.level !== "unlikely" || one.movement.level !== "unlikely";
             if (filter === "xray") return one.hits > 0;
             if (filter === "movement") return one.flights + one.teleports > 0;
             return true;
@@ -248,7 +253,9 @@ export function MinecraftXray({
                             aria-label="Hide honeypots"
                         />
                     </div>
-                    {view.refusal && <p className="text-xs text-muted-foreground">{view.refusal}.</p>}
+                    {view.refusal && (
+                        <p className="text-xs text-muted-foreground">{view.refusal}.</p>
+                    )}
 
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1 text-sm">
@@ -317,7 +324,9 @@ export function MinecraftXray({
                                     value={draft.banHits}
                                     disabled={!canManage}
                                     onChange={(event) =>
-                                        change({ banHits: Math.round(Number(event.target.value) || 0) })
+                                        change({
+                                            banHits: Math.round(Number(event.target.value) || 0)
+                                        })
                                     }
                                 />
                                 <span className="text-xs text-muted-foreground">
@@ -421,7 +430,10 @@ export function MinecraftXray({
                                 : "No player matches."
                         }
                         rows={shown.map((suspect) => (
-                            <tr key={suspect.key} className="border-t border-border hover:bg-card-hover">
+                            <tr
+                                key={suspect.key}
+                                className="border-t border-border hover:bg-card-hover"
+                            >
                                 <td className="px-3 py-2 align-top">
                                     <p className="truncate font-medium" title={suspect.name}>
                                         {suspect.name}
@@ -452,7 +464,8 @@ export function MinecraftXray({
                                     {suspect.lastAt ? display.dateTime(suspect.lastAt) : "-"}
                                 </td>
                                 <td className="px-3 py-2 text-right align-top">
-                                    {(suspect.hits > 0 || suspect.flights + suspect.teleports > 0) && (
+                                    {(suspect.hits > 0 ||
+                                        suspect.flights + suspect.teleports > 0) && (
                                         <PlayerIconAction
                                             label={`Clear ${suspect.name}`}
                                             icon={<Eraser className="size-4" />}

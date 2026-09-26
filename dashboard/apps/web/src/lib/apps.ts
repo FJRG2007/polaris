@@ -2205,7 +2205,10 @@ export function resolveSubapp(pathname: string): AppSubapp | null {
  *  its extra `match` prefixes that owns it, or -1 when none does. */
 function claimOn(app: AppEntry, pathname: string): number {
     const owns = (base: string) => pathname === base || pathname.startsWith(`${base}/`);
-    return Math.max(-1, ...[app.href, ...(app.match ?? [])].filter(owns).map((base) => base.length));
+    return Math.max(
+        -1,
+        ...[app.href, ...(app.match ?? [])].filter(owns).map((base) => base.length)
+    );
 }
 
 /** The app the current path belongs to, defaulting to the first app (Overview),

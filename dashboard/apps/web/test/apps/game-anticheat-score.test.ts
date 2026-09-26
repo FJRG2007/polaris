@@ -78,7 +78,9 @@ describe("the X-Ray score", () => {
     });
 
     it("caps what the figures can add", () => {
-        expect(xrayScore(1, figures(100, 200)).value - xrayScore(1, null).value).toBe(MINING_WEIGHT_MAX);
+        expect(xrayScore(1, figures(100, 200)).value - xrayScore(1, null).value).toBe(
+            MINING_WEIGHT_MAX
+        );
     });
 });
 
@@ -118,7 +120,9 @@ function flights(looks: (Sample | null)[]): number {
 
 describe("hovering", () => {
     it("is an incident after enough looks in the air, and one flight is one incident", () => {
-        const looks = Array.from({ length: HOVER_SAMPLES + 5 }, (_, index) => sample(100, index * 3, NOW + index * 4000));
+        const looks = Array.from({ length: HOVER_SAMPLES + 5 }, (_, index) =>
+            sample(100, index * 3, NOW + index * 4000)
+        );
         expect(flights(looks)).toBe(1);
     });
 
@@ -128,7 +132,9 @@ describe("hovering", () => {
     });
 
     it("is not a fall", () => {
-        const falling = [0, 1, 2, 3].map((index) => sample(300 - index * 60, 0, NOW + index * 4000));
+        const falling = [0, 1, 2, 3].map((index) =>
+            sample(300 - index * 60, 0, NOW + index * 4000)
+        );
         expect(flights(falling)).toBe(0);
     });
 
@@ -157,7 +163,12 @@ describe("hovering", () => {
     });
 
     it("needs air under every corner, so somebody sneaking at an edge is standing", () => {
-        for (const corner of ["~0.3 ~-1 ~0.3", "~-0.3 ~-1 ~0.3", "~0.3 ~-1 ~-0.3", "~-0.3 ~-1 ~-0.3"]) {
+        for (const corner of [
+            "~0.3 ~-1 ~0.3",
+            "~-0.3 ~-1 ~0.3",
+            "~0.3 ~-1 ~-0.3",
+            "~-0.3 ~-1 ~-0.3"
+        ]) {
             expect(AIRBORNE_COMMAND).toContain(`if block ${corner} minecraft:air`);
         }
     });
@@ -170,7 +181,9 @@ describe("teleporting", () => {
 
     it("is not sprinting, a pearl, or a portal", () => {
         expect(isTeleport(sample(64, 0), sample(64, 60, NOW + 4000))).toBe(false);
-        expect(isTeleport(sample(64, 0), sample(64, 1000, NOW + 4000, "minecraft:the_nether"))).toBe(false);
+        expect(
+            isTeleport(sample(64, 0), sample(64, 1000, NOW + 4000, "minecraft:the_nether"))
+        ).toBe(false);
     });
 
     it("is not judged in the End, where gateways move you a thousand blocks", () => {
@@ -179,18 +192,45 @@ describe("teleporting", () => {
     });
 
     it("is explained by an operator's or the console's /tp in the log", () => {
-        expect(explainedByLog("[12:00:01] [Server thread/INFO]: [Admin: Teleported Steve to 1.0, 64.0, 2.0]", "Steve")).toBe(true);
-        expect(explainedByLog("[12:00:01] [Server thread/INFO]: [Rcon: Teleported Steve to Alex]", "steve")).toBe(true);
+        expect(
+            explainedByLog(
+                "[12:00:01] [Server thread/INFO]: [Admin: Teleported Steve to 1.0, 64.0, 2.0]",
+                "Steve"
+            )
+        ).toBe(true);
+        expect(
+            explainedByLog(
+                "[12:00:01] [Server thread/INFO]: [Rcon: Teleported Steve to Alex]",
+                "steve"
+            )
+        ).toBe(true);
     });
 
     it("is explained by a teleport command somebody ran through a plugin", () => {
-        expect(explainedByLog("[12:00:01] [Server thread/INFO]: Alex issued server command: /tpaccept", "Steve")).toBe(true);
-        expect(explainedByLog("[12:00:01] [Server thread/INFO]: Steve issued server command: /essentials:home base", "Steve")).toBe(true);
+        expect(
+            explainedByLog(
+                "[12:00:01] [Server thread/INFO]: Alex issued server command: /tpaccept",
+                "Steve"
+            )
+        ).toBe(true);
+        expect(
+            explainedByLog(
+                "[12:00:01] [Server thread/INFO]: Steve issued server command: /essentials:home base",
+                "Steve"
+            )
+        ).toBe(true);
     });
 
     it("is not explained by somebody else being teleported, or by chat", () => {
-        expect(explainedByLog("[12:00:01] [Server thread/INFO]: [Admin: Teleported Alex to 1.0, 64.0, 2.0]", "Steve")).toBe(false);
-        expect(explainedByLog("[12:00:01] [Server thread/INFO]: <Steve> tp me please", "Steve")).toBe(false);
+        expect(
+            explainedByLog(
+                "[12:00:01] [Server thread/INFO]: [Admin: Teleported Alex to 1.0, 64.0, 2.0]",
+                "Steve"
+            )
+        ).toBe(false);
+        expect(
+            explainedByLog("[12:00:01] [Server thread/INFO]: <Steve> tp me please", "Steve")
+        ).toBe(false);
     });
 
     it("reads whether the game logs operators' commands", () => {
@@ -204,21 +244,50 @@ describe("keeping incidents", () => {
     it("keeps the newest and counts only the last fortnight", () => {
         let evidence = withIncident(undefined, "Steve", incidentAt("flying", sample(100), null));
         for (let index = 0; index < MAX_INCIDENTS + 5; index += 1) {
-            evidence = withIncident(evidence, "Steve", incidentAt("teleport", sample(64, index, NOW - index), 500));
+            evidence = withIncident(
+                evidence,
+                "Steve",
+                incidentAt("teleport", sample(64, index, NOW - index), 500)
+            );
         }
         expect(evidence.incidents).toHaveLength(MAX_INCIDENTS);
-        const old = withIncident(undefined, "Steve", incidentAt("flying", sample(100, 0, NOW - MOVEMENT_WINDOW_MS - 1), null));
+        const old = withIncident(
+            undefined,
+            "Steve",
+            incidentAt("flying", sample(100, 0, NOW - MOVEMENT_WINDOW_MS - 1), null)
+        );
         expect(countingIncidents(old, NOW)).toEqual([]);
     });
 
     it("tells the owner again only once what was reported has left the window", () => {
-        const reported = { ...withIncident(undefined, "Steve", incidentAt("flying", sample(100, 0, NOW - 1000), null)), reportedAt: NOW - 500 };
+        const reported = {
+            ...withIncident(
+                undefined,
+                "Steve",
+                incidentAt("flying", sample(100, 0, NOW - 1000), null)
+            ),
+            reportedAt: NOW - 500
+        };
         expect(alreadyReported(reported, NOW)).toBe(true);
-        expect(alreadyReported(withIncident(reported, "Steve", incidentAt("flying", sample(100), null)), NOW)).toBe(true);
+        expect(
+            alreadyReported(
+                withIncident(reported, "Steve", incidentAt("flying", sample(100), null)),
+                NOW
+            )
+        ).toBe(true);
         const later = NOW + MOVEMENT_WINDOW_MS;
-        const fresh = withIncident(reported, "Steve", incidentAt("flying", sample(100, 0, later), null));
+        const fresh = withIncident(
+            reported,
+            "Steve",
+            incidentAt("flying", sample(100, 0, later), null)
+        );
         expect(alreadyReported(fresh, later)).toBe(false);
-        expect(alreadyReported(withIncident(undefined, "Steve", incidentAt("flying", sample(100), null)), NOW)).toBe(false);
+        expect(
+            alreadyReported(
+                withIncident(undefined, "Steve", incidentAt("flying", sample(100), null)),
+                NOW
+            )
+        ).toBe(false);
     });
 
     it("reads settings and evidence saved before movement existed", () => {

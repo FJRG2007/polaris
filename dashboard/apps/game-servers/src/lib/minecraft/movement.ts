@@ -95,7 +95,8 @@ export const AIRBORNE_COMMAND = [
 ].join(" ");
 
 /** Everybody on a horse, in a boat or a minecart right now. */
-export const RIDING_COMMAND = "execute as @a[nbt={RootVehicle:{}}] run data get entity @s Dimension";
+export const RIDING_COMMAND =
+    "execute as @a[nbt={RootVehicle:{}}] run data get entity @s Dimension";
 
 /** Who died since the last look, and who glided on an elytra. */
 export function sinceCommand(objective: string): string {
@@ -144,7 +145,10 @@ function gap(left: Sample, right: Sample): number {
  * is the one that makes it an incident. `airborne` is their sample when
  * `AIRBORNE_COMMAND` listed them, null when it did not.
  */
-export function nextHover(track: Track, airborne: Sample | null): { track: Track; flying: boolean } {
+export function nextHover(
+    track: Track,
+    airborne: Sample | null
+): { track: Track; flying: boolean } {
     if (!airborne) return { track: { ...track, hover: [], flagged: false }, flying: false };
     const previous = track.hover.at(-1);
     const continues =
@@ -155,7 +159,8 @@ export function nextHover(track: Track, airborne: Sample | null): { track: Track
     const hover = continues ? [...track.hover, airborne].slice(-HOVER_SAMPLES) : [airborne];
     const flagged = continues ? track.flagged : false;
     let travel = 0;
-    for (let index = 1; index < hover.length; index += 1) travel += gap(hover[index - 1]!, hover[index]!);
+    for (let index = 1; index < hover.length; index += 1)
+        travel += gap(hover[index - 1]!, hover[index]!);
     const flying = !flagged && hover.length >= HOVER_SAMPLES && travel >= HOVER_MIN_TRAVEL;
     return { track: { ...track, hover, flagged: flagged || flying }, flying };
 }
@@ -192,7 +197,13 @@ export function explainedByLog(log: string, name: string): boolean {
     const came = new RegExp(`\\b${escaped} (?:joined|left) the game`, "i");
     return stripFormatting(log)
         .split("\n")
-        .some((line) => teleported.test(line) || came.test(line) || TELEPORT_VERBS.test(line) || /Spread \d+ /.test(line));
+        .some(
+            (line) =>
+                teleported.test(line) ||
+                came.test(line) ||
+                TELEPORT_VERBS.test(line) ||
+                /Spread \d+ /.test(line)
+        );
 }
 
 const dimensionSchema = z.string().max(64);
@@ -234,7 +245,11 @@ export function alreadyReported(evidence: MovementEvidence | undefined, now: num
 }
 
 /** Add one, keeping the newest `MAX_INCIDENTS`. */
-export function withIncident(evidence: MovementEvidence | undefined, name: string, incident: Incident): MovementEvidence {
+export function withIncident(
+    evidence: MovementEvidence | undefined,
+    name: string,
+    incident: Incident
+): MovementEvidence {
     return {
         name,
         incidents: [...(evidence?.incidents ?? []), incident].slice(-MAX_INCIDENTS),
@@ -243,7 +258,11 @@ export function withIncident(evidence: MovementEvidence | undefined, name: strin
 }
 
 /** An incident as it is stored, rounded to the block it happened at. */
-export function incidentAt(kind: Incident["kind"], sample: Sample, distance: number | null): Incident {
+export function incidentAt(
+    kind: Incident["kind"],
+    sample: Sample,
+    distance: number | null
+): Incident {
     return {
         kind,
         dimension: sample.dimension,

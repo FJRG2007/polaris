@@ -26,7 +26,12 @@ export const MAX_FAVORITE_APPS = POLARIS_APPS.length;
 const PINNABLE = new Set(POLARIS_APPS.filter((app) => !app.hidden).map((app) => app.id));
 
 export const favoriteAppsSchema = z
-    .array(z.string().trim().refine((id) => PINNABLE.has(id), "That app does not exist."))
+    .array(
+        z
+            .string()
+            .trim()
+            .refine((id) => PINNABLE.has(id), "That app does not exist.")
+    )
     .max(MAX_FAVORITE_APPS)
     .refine((ids) => new Set(ids).size === ids.length, "An app can only be pinned once.");
 
@@ -38,7 +43,9 @@ export function parseFavoriteApps(raw: string | null | undefined): string[] {
     try {
         const parsed = z.array(z.unknown()).safeParse(JSON.parse(raw));
         if (!parsed.success) return [];
-        const ids = parsed.data.flatMap((id) => (typeof id === "string" && PINNABLE.has(id.trim()) ? [id.trim()] : []));
+        const ids = parsed.data.flatMap((id) =>
+            typeof id === "string" && PINNABLE.has(id.trim()) ? [id.trim()] : []
+        );
         return [...new Set(ids)].slice(0, MAX_FAVORITE_APPS);
     } catch {
         return [];

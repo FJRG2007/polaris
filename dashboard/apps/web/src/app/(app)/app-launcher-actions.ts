@@ -17,7 +17,8 @@ import { saveFavoriteApps } from "@/lib/app-launcher-service";
 export async function saveFavoriteAppsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = favoriteAppsSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Those favorites could not be saved." };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Those favorites could not be saved." };
     await saveFavoriteApps(user.id, parsed.data);
     return {};
 }

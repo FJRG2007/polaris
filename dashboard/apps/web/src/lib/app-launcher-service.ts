@@ -13,11 +13,17 @@ import { prisma } from "@polaris/db";
 import { parseFavoriteApps } from "@/lib/app-launcher";
 
 export const getFavoriteApps = cache(async (userId: string): Promise<string[]> => {
-    const row = await prisma.user.findUnique({ where: { id: userId }, select: { favoriteApps: true } });
+    const row = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { favoriteApps: true }
+    });
     return parseFavoriteApps(row?.favoriteApps);
 });
 
-export async function saveFavoriteApps(userId: string, favorites: readonly string[]): Promise<void> {
+export async function saveFavoriteApps(
+    userId: string,
+    favorites: readonly string[]
+): Promise<void> {
     await prisma.user.update({
         where: { id: userId },
         data: { favoriteApps: favorites.length > 0 ? JSON.stringify(favorites) : null }

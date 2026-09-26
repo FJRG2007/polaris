@@ -55,7 +55,10 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/timeout-service", () => ({
 }));
 
 import { DEFAULT_XRAY_SETTINGS } from "@polaris-app/game-servers/src/lib/minecraft/xray";
-import { AIRBORNE_COMMAND, RIDING_COMMAND } from "@polaris-app/game-servers/src/lib/minecraft/movement";
+import {
+    AIRBORNE_COMMAND,
+    RIDING_COMMAND
+} from "@polaris-app/game-servers/src/lib/minecraft/movement";
 
 const INSTALL = "018f2b7a-0000-7000-8000-0000000000e2";
 
@@ -75,7 +78,8 @@ describe("watching movement", () => {
     let logAdmin = true;
     let looks = 0;
 
-    const entity = (one: Player, data: string) => `${one.name} has the following entity data: ${data}`;
+    const entity = (one: Player, data: string) =>
+        `${one.name} has the following entity data: ${data}`;
     const pos = (one: Player) => entity(one, `[${one.x}d, ${one.y}d, ${one.z}d]`);
 
     beforeEach(() => {
@@ -94,9 +98,16 @@ describe("watching movement", () => {
             }
             if (command === "execute as @a run data get entity @s Dimension")
                 return players.map((one) => entity(one, '"minecraft:overworld"')).join("\n");
-            if (command === AIRBORNE_COMMAND) return players.filter((one) => one.airborne).map(pos).join("\n");
+            if (command === AIRBORNE_COMMAND)
+                return players
+                    .filter((one) => one.airborne)
+                    .map(pos)
+                    .join("\n");
             if (command === RIDING_COMMAND)
-                return players.filter((one) => one.riding).map((one) => entity(one, '"minecraft:overworld"')).join("\n");
+                return players
+                    .filter((one) => one.riding)
+                    .map((one) => entity(one, '"minecraft:overworld"'))
+                    .join("\n");
             if (command === "gamerule logAdminCommands")
                 return `Gamerule logAdminCommands is currently set to: ${logAdmin}`;
             return "";
@@ -105,7 +116,11 @@ describe("watching movement", () => {
             if (argv[0] === "stat") return { code: 0, output: `${log.length}\n` };
             if (argv[0] === "sh" && argv[2]?.startsWith("tail"))
                 return { code: 0, output: log.slice(Number(argv[4]) - 1).slice(-Number(argv[5])) };
-            if (argv[0] === "cat") return { code: 0, output: JSON.stringify(ops.map((name) => ({ name, uuid: "x" }))) };
+            if (argv[0] === "cat")
+                return {
+                    code: 0,
+                    output: JSON.stringify(ops.map((name) => ({ name, uuid: "x" })))
+                };
             return { code: 1, output: "" };
         };
         fake.config = {
@@ -134,7 +149,9 @@ describe("watching movement", () => {
     }
 
     function incidents(name: string): { kind: string }[] {
-        const stored = fake.config.xrayTraps as { movement?: Record<string, { incidents: { kind: string }[] }> };
+        const stored = fake.config.xrayTraps as {
+            movement?: Record<string, { incidents: { kind: string }[] }>;
+        };
         return stored.movement?.[name.toLowerCase()]?.incidents ?? [];
     }
 
@@ -188,7 +205,8 @@ describe("watching movement", () => {
         const answer = fake.answer;
         fake.answer = (command) => {
             if (command === RIDING_COMMAND && players[0]?.x === 0) {
-                log += "[12:00:01] [Server thread/INFO]: [Admin: Teleported Alex to 3000.0, 64.0, 0.0]\n";
+                log +=
+                    "[12:00:01] [Server thread/INFO]: [Admin: Teleported Alex to 3000.0, 64.0, 0.0]\n";
                 players = [{ name: "Alex", x: 3000, y: 64, z: 0 }];
             }
             return answer(command);
@@ -217,7 +235,9 @@ describe("watching movement", () => {
         players = [{ name: "Alex", x: 3000, y: 64, z: 0 }];
         await look();
         expect(incidents("Alex")).toEqual([]);
-        expect((fake.config.xrayTraps as { teleportCheck: string | null }).teleportCheck).toMatch(/logAdminCommands/);
+        expect((fake.config.xrayTraps as { teleportCheck: string | null }).teleportCheck).toMatch(
+            /logAdminCommands/
+        );
     });
 
     it("tells the owner once a player looks likely to be cheating", async () => {

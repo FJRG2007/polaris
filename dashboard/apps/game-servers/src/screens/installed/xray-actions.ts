@@ -90,7 +90,10 @@ async function viewOf(
             .sort((left, right) => right.hits.length - left.hits.length),
         mining: withMining && !bedrock ? await readAllMining(ownerId, installedAppId) : [],
         movement: Object.values(state.movement)
-            .map((evidence) => ({ name: evidence.name, incidents: countingIncidents(evidence, now) }))
+            .map((evidence) => ({
+                name: evidence.name,
+                incidents: countingIncidents(evidence, now)
+            }))
             .filter((player) => player.incidents.length > 0),
         teleportCheck: state.settings.movement ? state.teleportCheck : null,
         refusal: bedrock ? "Bedrock keeps no per-player mining counters Polaris can watch" : null
@@ -139,7 +142,11 @@ export async function saveXraySettingsAction(
             action: "games.xray.settings",
             targetType: "installedApp",
             targetId: installedAppId,
-            metadata: { enabled: settings.enabled, action: settings.action, movement: settings.movement }
+            metadata: {
+                enabled: settings.enabled,
+                action: settings.action,
+                movement: settings.movement
+            }
         });
         return { view: await viewOf(access.ownerId, installedAppId, false) };
     } catch (caught) {

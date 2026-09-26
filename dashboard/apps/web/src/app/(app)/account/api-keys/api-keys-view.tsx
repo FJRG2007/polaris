@@ -180,9 +180,7 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                         <span className="text-xs text-muted-foreground">Expiry</span>
                         <Select
                             value={filters.expiry}
-                            onValueChange={(value) =>
-                                change("expiry", value as list.ExpiryFilter)
-                            }
+                            onValueChange={(value) => change("expiry", value as list.ExpiryFilter)}
                             className="w-44"
                             options={list.EXPIRY_FILTERS.map((value) => ({
                                 value,
@@ -221,8 +219,8 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
 
             {keys.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                    A key lets a script act as you, with a subset of your own permissions and
-                    only from where you allow.
+                    A key lets a script act as you, with a subset of your own permissions and only
+                    from where you allow.
                 </p>
             ) : (
                 // Scrolls sideways rather than shrinking: nine columns on a phone
@@ -235,16 +233,30 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                                 <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
                                     Name
                                 </th>
-                                <th scope="col" className="px-3 py-2 font-medium">Key</th>
-                                <th scope="col" className="px-3 py-2 font-medium">Environment</th>
-                                <th scope="col" className="px-3 py-2 font-medium">App</th>
-                                <th scope="col" className="px-3 py-2 font-medium">Expires</th>
-                                <th scope="col" className="px-3 py-2 font-medium">Created</th>
-                                <th scope="col" className="px-3 py-2 font-medium">Last used</th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    Key
+                                </th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    Environment
+                                </th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    App
+                                </th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    Expires
+                                </th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    Created
+                                </th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    Last used
+                                </th>
                                 <th scope="col" className="px-3 py-2 text-right font-medium">
                                     Calls today
                                 </th>
-                                <th scope="col" className="px-3 py-2 font-medium">Compromised</th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    Compromised
+                                </th>
                                 <th scope="col" className="px-3 py-2">
                                     <span className="sr-only">Actions</span>
                                 </th>

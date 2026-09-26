@@ -134,7 +134,10 @@ export function AppSwitcher({
                 className="max-h-[min(34rem,var(--radix-dropdown-menu-content-available-height))] w-[19.5rem] overflow-y-auto p-2"
             >
                 {sections.map((section, index) => (
-                    <div key={section.label} className={cn(index > 0 && "mt-2 border-t border-border pt-2")}>
+                    <div
+                        key={section.label}
+                        className={cn(index > 0 && "mt-2 border-t border-border pt-2")}
+                    >
                         {sections.length > 1 ? (
                             <DropdownMenuLabel className="px-1 pb-1 pt-0.5 text-[0.6875rem] font-medium uppercase tracking-wider text-foreground-subtle">
                                 {section.label}
@@ -182,7 +185,9 @@ function AppTile({
     Anchor: ElementType;
 }) {
     const Icon = app.icon;
-    const pinLabel = pinned ? `Remove ${app.label} from favorites` : `Add ${app.label} to favorites`;
+    const pinLabel = pinned
+        ? `Remove ${app.label} from favorites`
+        : `Add ${app.label} to favorites`;
     return (
         <div className="group/tile relative">
             <DropdownMenuItem asChild disabled={app.locked}>
@@ -207,7 +212,9 @@ function AppTile({
                             <Lock className="absolute -bottom-1 -right-1 !size-3.5 rounded-full bg-elevated p-0.5 text-muted-foreground" />
                         ) : null}
                     </span>
-                    <span className={cn("w-full truncate text-xs leading-4", active && "font-medium")}>
+                    <span
+                        className={cn("w-full truncate text-xs leading-4", active && "font-medium")}
+                    >
                         {app.label}
                     </span>
                 </Anchor>

@@ -155,14 +155,34 @@ export function buildSuspects(input: {
     }[];
     readonly movement: readonly {
         readonly name: string;
-        readonly incidents: readonly (PointAt & { kind: "flying" | "teleport"; distance: number | null })[];
+        readonly incidents: readonly (PointAt & {
+            kind: "flying" | "teleport";
+            distance: number | null;
+        })[];
     }[];
     readonly mining: readonly { readonly name: string; readonly figures: MiningFigures }[];
 }): { suspects: Suspect[]; incidents: SuspectIncident[] } {
-    const rows = new Map<string, { name: string; hits: PointAt[]; moves: SuspectIncident[]; mining: MiningFigures | null; warnedAt: number | null; bannedAt: number | null }>();
+    const rows = new Map<
+        string,
+        {
+            name: string;
+            hits: PointAt[];
+            moves: SuspectIncident[];
+            mining: MiningFigures | null;
+            warnedAt: number | null;
+            bannedAt: number | null;
+        }
+    >();
     const row = (name: string) => {
         const key = name.toLowerCase();
-        const held = rows.get(key) ?? { name, hits: [], moves: [], mining: null, warnedAt: null, bannedAt: null };
+        const held = rows.get(key) ?? {
+            name,
+            hits: [],
+            moves: [],
+            mining: null,
+            warnedAt: null,
+            bannedAt: null
+        };
         rows.set(key, held);
         return held;
     };
@@ -225,7 +245,8 @@ export function buildSuspects(input: {
     }
     suspects.sort(
         (left, right) =>
-            Math.max(right.xray.value, right.movement.value) - Math.max(left.xray.value, left.movement.value) ||
+            Math.max(right.xray.value, right.movement.value) -
+                Math.max(left.xray.value, left.movement.value) ||
             left.name.localeCompare(right.name)
     );
     incidents.sort((left, right) => right.at - left.at);

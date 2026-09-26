@@ -16,14 +16,27 @@ import { reachableApps } from "@/lib/app-access";
 import { Gamepad2, HardDrive } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { APP_SECTIONS, POLARIS_APPS, resolveActiveApp } from "@/lib/apps";
-import { LAUNCHER_ROW_SIZE, favoriteAppsSchema, launcherLayout, parseFavoriteApps } from "@/lib/app-launcher";
+import {
+    LAUNCHER_ROW_SIZE,
+    favoriteAppsSchema,
+    launcherLayout,
+    parseFavoriteApps
+} from "@/lib/app-launcher";
 
 describe("Game servers in the switcher", () => {
     it("is an app of its own, turned on by its install", async () => {
         const games = POLARIS_APPS.find((app) => app.id === "games");
-        expect(games).toMatchObject({ label: "Game servers", href: "/apps/games", requiresApp: "game-servers" });
+        expect(games).toMatchObject({
+            label: "Game servers",
+            href: "/apps/games",
+            requiresApp: "game-servers"
+        });
         const reach = (installed: string[]) =>
-            reachableApps({ isAdmin: true, can: async () => true, isInstalled: async (id) => installed.includes(id) });
+            reachableApps({
+                isAdmin: true,
+                can: async () => true,
+                isInstalled: async (id) => installed.includes(id)
+            });
         expect((await reach([])).map((app) => app.id)).not.toContain("games");
         expect((await reach(["game-servers"])).map((app) => app.id)).toContain("games");
     });
@@ -42,7 +55,17 @@ describe("Game servers in the switcher", () => {
 });
 
 describe("the launcher's top row", () => {
-    const available = ["overview", "drive", "vault", "apps", "games", "tasks", "chat", "mail", "notes"];
+    const available = [
+        "overview",
+        "drive",
+        "vault",
+        "apps",
+        "games",
+        "tasks",
+        "chat",
+        "mail",
+        "notes"
+    ];
 
     it("suggests the first apps somebody can open when there is nothing else", () => {
         const layout = launcherLayout({ available, favorites: [], recent: [] });
@@ -68,7 +91,11 @@ describe("the launcher's top row", () => {
     });
 
     it("never draws an app the account cannot open", () => {
-        const layout = launcherLayout({ available: ["drive", "chat"], favorites: ["admin"], recent: ["places"] });
+        const layout = launcherLayout({
+            available: ["drive", "chat"],
+            favorites: ["admin"],
+            recent: ["places"]
+        });
         expect(layout).toEqual({ featured: ["drive", "chat"], pinned: false, rest: [] });
     });
 });
@@ -96,13 +123,31 @@ describe("stored favorites", () => {
 
 describe("the switcher", () => {
     const apps = [
-        { id: "drive", label: "Drive", description: "Files across every NAS", icon: HardDrive, href: "/drive" },
-        { id: "games", label: "Game servers", description: "Servers", icon: Gamepad2, href: "/apps/games" }
+        {
+            id: "drive",
+            label: "Drive",
+            description: "Files across every NAS",
+            icon: HardDrive,
+            href: "/drive"
+        },
+        {
+            id: "games",
+            label: "Game servers",
+            description: "Servers",
+            icon: Gamepad2,
+            href: "/apps/games"
+        }
     ];
 
     it("draws the trigger for the app somebody is in", () => {
         const html = renderToStaticMarkup(
-            <AppSwitcher apps={apps} currentAppId="games" featured={["games"]} pinned={["games"]} onTogglePin={() => undefined} />
+            <AppSwitcher
+                apps={apps}
+                currentAppId="games"
+                featured={["games"]}
+                pinned={["games"]}
+                onTogglePin={() => undefined}
+            />
         );
         expect(html).toContain("Game servers");
         expect(html).not.toContain("Files across every NAS");
