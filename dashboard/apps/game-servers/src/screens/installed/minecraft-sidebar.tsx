@@ -241,7 +241,7 @@ export function MinecraftSidebar({
                         <span className="text-xs text-muted-foreground">
                             {state.groups.length === 0
                                 ? "You are in no chat group yet. Create one in Chat to show who is in its call."
-                                : "Whose call {call.count} and {call.members} read, here and in announcements."}
+                                : "Whose call {call.count}, {call.members} and {call.max} read, here and in announcements."}
                         </span>
                     </label>
 

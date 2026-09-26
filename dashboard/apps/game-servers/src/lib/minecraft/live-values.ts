@@ -29,6 +29,11 @@ function joined(names: readonly string[]): string {
     return names.join(", ");
 }
 
+/** How many people the chat group has - everybody the call could hold. */
+async function groupSize(groupId: string): Promise<number> {
+    return prisma.chatChannelMember.count({ where: { channelId: groupId } });
+}
+
 /** Who is in the chat group's call right now, by the name they show there. */
 async function callMembers(groupId: string): Promise<string[]> {
     const participants = await prisma.meetingParticipant.findMany({
@@ -68,11 +73,15 @@ export async function liveContext(
         "server.max": players ? String(players.max) : null,
         "server.players": players && players.players.length > 0 ? joined(players.players) : null
     };
+    const group = readCallGroup(config);
     if (used.has("call.count") || used.has("call.members")) {
-        const group = readCallGroup(config);
         const inCall = group ? await callMembers(group).catch(() => null) : null;
         values["call.count"] = inCall ? String(inCall.length) : null;
         values["call.members"] = inCall && inCall.length > 0 ? joined(inCall) : null;
+    }
+    if (used.has("call.max")) {
+        const size = group ? await groupSize(group).catch(() => null) : null;
+        values["call.max"] = size === null ? null : String(size);
     }
 
     if (!texts.some((text) => usesAccount(text))) return { values, recipients: null };

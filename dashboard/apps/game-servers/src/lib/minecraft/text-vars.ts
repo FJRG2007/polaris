@@ -137,6 +137,16 @@ export const VARIABLES: readonly VariableSpec[] = [
         width: 3
     },
     {
+        // Beside `{call.count}` the way `{server.max}` sits beside
+        // `{server.online}`: "In call: 2/5" is how many of the group are in it.
+        name: "call.max",
+        label: "People in the group",
+        kind: "server",
+        sample: "5",
+        bedrock: true,
+        width: 3
+    },
+    {
         name: "call.members",
         label: "Who is in the group's call",
         kind: "server",
