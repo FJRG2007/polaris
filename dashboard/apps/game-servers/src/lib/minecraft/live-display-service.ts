@@ -18,8 +18,8 @@
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { liveContext } from "./live-values";
-import { fillValues, readsPlayerList, readsServer, variablesIn } from "./text-vars";
-import { LEVELS_VARIABLE, spreadLevelLines } from "./player-events";
+import { fillValues, LEVELS_VARIABLE, readsPlayerList, readsServer, variablesIn } from "./text-vars";
+import { spreadLevelLines } from "./player-events";
 import { editionOf, onlinePlayers, withServerContainer } from "./service";
 import {
     ACTIONBAR_EVERY_MS,

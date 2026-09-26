@@ -13,7 +13,7 @@ import type { PlayerList } from "./parse";
 import type { Recipient, SendContext } from "./announcement";
 import type { ServerContainer } from "./service";
 import * as events from "./player-events";
-import { usesAccount, variablesIn, type VariableValues } from "./text-vars";
+import { DEATH_VARIABLES, LEVELS_VARIABLE, usesAccount, variablesIn, type VariableValues } from "./text-vars";
 
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { voicePresence } = host.chatCalls;
@@ -91,13 +91,13 @@ export async function liveContext(
     }
 
     const lists: Record<string, readonly string[]> = {};
-    if (used.has(events.LEVELS_VARIABLE) && server) {
+    if (used.has(LEVELS_VARIABLE) && server) {
         const levels = events.readLevels(await server.say([events.LEVELS_COMMAND]).catch(() => ""));
         const rows = levels.map(events.levelText);
-        values[events.LEVELS_VARIABLE] = rows.length > 0 ? joined(rows) : null;
-        lists[events.LEVELS_VARIABLE] = rows;
+        values[LEVELS_VARIABLE] = rows.length > 0 ? joined(rows) : null;
+        lists[LEVELS_VARIABLE] = rows;
     }
-    if (used.has("death.player") || used.has("death.message")) {
+    if (DEATH_VARIABLES.some((name) => used.has(name))) {
         const death = await lastDeath(installedAppId, config, server ?? null);
         values["death.player"] = death?.player ?? null;
         values["death.message"] = death?.message ?? null;

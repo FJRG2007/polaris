@@ -87,7 +87,7 @@ export function parsePlayerListFromLog(log: string): PlayerList | null {
 export function parsePlayerLevels(output: string): Map<string, number> {
     const found = new Map<string, number>();
     for (const match of stripFormatting(output).matchAll(
-        /^(\w{1,16}) has the following entity data:\s*(\d{1,7})\b/gm
+        /^(\S{1,40}) has the following entity data:\s*(\d{1,7})\b/gm
     )) {
         const [, name, level] = match;
         if (name && level) found.set(name, Number(level));

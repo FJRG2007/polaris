@@ -15,7 +15,7 @@
  */
 
 import { z } from "zod";
-import { stripFormatting } from "./parse";
+import { parsePlayerLevels, stripFormatting } from "./parse";
 import { DEATH_TEMPLATES } from "./death-messages";
 
 /** Where the last death is kept on the install. */
@@ -39,9 +39,12 @@ export interface LastDeath {
     readonly at: number;
 }
 
+/** The longest death message kept; a longer one is cut to it. */
+const DEATH_MESSAGE_MAX = 256;
+
 const lastDeathSchema = z.object({
     player: z.string().min(1).max(40),
-    message: z.string().min(1).max(256),
+    message: z.string().min(1).max(DEATH_MESSAGE_MAX),
     at: z.number().int().nonnegative()
 });
 
@@ -71,7 +74,7 @@ export function deathIn(message: string): { player: string; message: string } | 
     const text = stripFormatting(message).trim();
     for (const pattern of PATTERNS) {
         const found = pattern.exec(text);
-        if (found) return { player: found[1] as string, message: text };
+        if (found) return { player: found[1] as string, message: text.slice(0, DEATH_MESSAGE_MAX) };
     }
     return null;
 }
@@ -102,11 +105,7 @@ export interface PlayerLevel {
 
 /** Everybody's level out of `LEVELS_COMMAND`, highest first. */
 export function readLevels(output: string): PlayerLevel[] {
-    const found: PlayerLevel[] = [];
-    const pattern = /^(\S{1,40}) has the following entity data: (\d+)/gm;
-    for (const match of stripFormatting(output).matchAll(pattern)) {
-        found.push({ name: match[1] as string, level: Number(match[2]) });
-    }
+    const found = [...parsePlayerLevels(output)].map(([name, level]) => ({ name, level }));
     return found.sort((left, right) => right.level - left.level || left.name.localeCompare(right.name));
 }
 
@@ -114,9 +113,6 @@ export function readLevels(output: string): PlayerLevel[] {
 export function levelText(player: PlayerLevel): string {
     return `${player.name} Lv ${player.level}`;
 }
-
-/** The variable that becomes a line a player on the side panel. */
-export const LEVELS_VARIABLE = "server.levels";
 
 /**
  * The panel's lines with the one that shows `{server.levels}` written out once

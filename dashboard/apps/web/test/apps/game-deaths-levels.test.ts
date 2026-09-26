@@ -95,6 +95,7 @@ describe("levels", () => {
             { name: "Alex", level: 5 },
             { name: "Zed", level: 5 }
         ]);
+        expect(events.readLevels(".Steve has the following entity data: 3")).toEqual([{ name: ".Steve", level: 3 }]);
     });
 
     it("spread a side panel line into a line a player, in the room left", () => {
@@ -147,6 +148,17 @@ describe("what the side panel and announcements are filled with", () => {
         );
         // Seen again, not written again.
         expect(fake.patched).toHaveLength(1);
+    });
+
+    it("keeps a death with a long custom name once, cut to fit", async () => {
+        const killer = "K".repeat(300);
+        fake.log = `[18:01:02] [Server thread/INFO]: Steve was slain by ${killer}
+`;
+        const first = await liveContext("install", ["{death.message}"], null, server);
+        expect(first.values["death.message"]).toHaveLength(256);
+        await liveContext("install", ["{death.message}"], null, server);
+        expect(fake.patched).toHaveLength(1);
+        expect(events.readLastDeath(fake.config)?.message).toBe(first.values["death.message"]);
     });
 
     it("reads as the fallback before anybody has died", async () => {
