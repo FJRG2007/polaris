@@ -81,6 +81,7 @@ import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
 import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mic-cleanup";
 import { callDevices, isDenial, openMedia, openScreen, refused, settle } from "./call-media";
 import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
+import { extraPublications, oneVoice, serialized, type PublishedTrack } from "./call-tracks";
 import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
 import {
     cameraBackground,
@@ -861,15 +862,19 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         const faces = new Map<string, MediaStreamTrack[]>();
         const shared = new Map<string, MediaStreamTrack[]>();
         for (const participant of current.remoteParticipants.values()) {
-            const camera: MediaStreamTrack[] = [];
+            const own: PublishedTrack<MediaStreamTrack>[] = [];
             const display: MediaStreamTrack[] = [];
             for (const publication of participant.trackPublications.values()) {
                 const track = publication.track?.mediaStreamTrack;
                 if (!track || track.readyState !== "live") continue;
                 const onScreen =
                     publication.source === SCREEN || publication.source === SCREEN_AUDIO;
-                (onScreen ? display : camera).push(track);
+                if (onScreen) display.push(track);
+                else own.push({ source: publication.source, kind: track.kind, track });
             }
+            // Heard once, however many microphones they have up - see
+            // `call-tracks`.
+            const camera = oneVoice(own, MICROPHONE);
             // Only where there is something live in it, exactly as a shared
             // screen is. A participant who has published nothing yet used to be
             // given an empty `MediaStream` all the same, and an empty stream is
@@ -963,7 +968,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * moment of black rectangle, which is why it is reserved for somebody
      * deliberately moving the bar and never used by the automatic walk.
      */
-    const publish = useCallback(
+    const publishOnce = useCallback(
         async (
             source: Track.Source,
             track: MediaStreamTrack | null,
@@ -1062,6 +1067,41 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             }
         },
         [levelNow]
+    );
+
+    /** One publish per source at a time - see `call-tracks`. */
+    const sendQueue = useMemo(() => serialized(), []);
+
+    /**
+     * `publishOnce`, in turn with every other publish of the same source, and
+     * followed by taking down anything else of that source still on the
+     * connection. The turn is what stops two callers both finding no microphone
+     * up and both putting one up; the sweep is what clears one that got up
+     * anyway - a publish that timed out here and still arrived at the server, then
+     * retried by `repairMic` with the other track.
+     */
+    const publish = useCallback(
+        (source: Track.Source, track: MediaStreamTrack | null, options?: { again?: boolean }) =>
+            sendQueue(String(source), async () => {
+                const done = await publishOnce(source, track, options);
+                const local = room.current?.localParticipant;
+                if (!done || !local) return done;
+                const all = [...local.trackPublications.values()];
+                // The one carrying this track - or, should a swap have been
+                // refused and left the old track up, whichever is up: a sweep
+                // must never take a voice down because it could not tell which
+                // publication was the voice.
+                const keep = track
+                    ? (all.find(
+                          (one) => one.source === source && one.track?.mediaStreamTrack === track
+                      ) ?? local.getTrackPublication(source))
+                    : undefined;
+                for (const extra of extraPublications(all, source, keep)) {
+                    if (extra.track) await local.unpublishTrack(extra.track, false).catch(() => undefined);
+                }
+                return done;
+            }),
+        [publishOnce, sendQueue]
     );
 
     /**
