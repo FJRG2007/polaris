@@ -12,10 +12,11 @@
 
 import * as mc from "../../lib/minecraft/motd";
 import { McLine } from "../../components/mc-text";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
+import { moved, useListOrder } from "../../components/use-list-order";
 import { previewText } from "../../lib/minecraft/text-vars";
 import { FieldNote, insertsFor } from "./minecraft-announce";
-import { Button, Card, CardBody, Select, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, Select, Switch, cn } from "@polaris/ui";
 import { FormattedTextField } from "../../components/formatted-text-field";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
@@ -49,11 +50,22 @@ export function MinecraftSidebar({
     const [note, setNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    const load = useCallback((next: LiveDisplayState) => {
-        setState(next);
-        setDraft(next.sidebar);
-        setGroup(next.callGroupId);
-    }, []);
+    // Moving a line changes the panel on the next save, like any other edit:
+    // Polaris rewrites the lines on the running server, no restart.
+    const order = useListOrder(DEFAULT_SIDEBAR.lines.length, (from, to) =>
+        setDraft((current) => ({ ...current, lines: moved(current.lines, from, to) }))
+    );
+    const { reset: resetOrder } = order;
+
+    const load = useCallback(
+        (next: LiveDisplayState) => {
+            setState(next);
+            setDraft(next.sidebar);
+            setGroup(next.callGroupId);
+            resetOrder(next.sidebar.lines.length);
+        },
+        [resetOrder]
+    );
 
     useEffect(() => {
         void readLiveDisplayAction(installedAppId).then((answer) => {
@@ -165,7 +177,34 @@ export function MinecraftSidebar({
                             </span>
                         </span>
                         {draft.lines.map((line, index) => (
-                            <div key={index} className="flex items-start gap-1">
+                            <div
+                                key={order.ids[index] ?? `line-${index}`}
+                                className={cn(
+                                    "relative flex items-start gap-1 rounded-md transition-opacity",
+                                    order.dragging === index && "opacity-40"
+                                )}
+                                {...(canManage ? order.rowProps(index) : {})}
+                            >
+                                {/* Where the dragged line would land. */}
+                                {order.dragging !== null && order.dropAt === index && (
+                                    <span className="pointer-events-none absolute inset-x-0 -top-1.5 h-0.5 rounded-full bg-primary" />
+                                )}
+                                {order.dragging !== null &&
+                                    order.dropAt === draft.lines.length &&
+                                    index === draft.lines.length - 1 && (
+                                        <span className="pointer-events-none absolute inset-x-0 -bottom-1.5 h-0.5 rounded-full bg-primary" />
+                                    )}
+                                {canManage && draft.lines.length > 1 && (
+                                    <button
+                                        type="button"
+                                        {...order.handleProps(index, draft.lines.length)}
+                                        className="mt-1.5 flex size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+                                        aria-label={`Move line ${index + 1}. Drag it, or use the up and down arrow keys`}
+                                        title="Drag to move, or use the arrow keys"
+                                    >
+                                        <GripVertical className="size-4" />
+                                    </button>
+                                )}
                                 <div className="min-w-0 flex-1">
                                     <FormattedTextField
                                         value={line}
@@ -187,11 +226,12 @@ export function MinecraftSidebar({
                                 <Button
                                     size="icon"
                                     variant="ghost"
-                                    onClick={() =>
+                                    onClick={() => {
+                                        order.removed(index);
                                         change({
                                             lines: draft.lines.filter((_, at) => at !== index)
-                                        })
-                                    }
+                                        });
+                                    }}
                                     aria-label={`Remove line ${index + 1}`}
                                     title={`Remove line ${index + 1}`}
                                 >
@@ -209,10 +249,17 @@ export function MinecraftSidebar({
                             size="sm"
                             className="self-start"
                             disabled={draft.lines.length >= SIDEBAR_LINES_MAX}
-                            onClick={() => change({ lines: [...draft.lines, ""] })}
+                            onClick={() => {
+                                order.added();
+                                change({ lines: [...draft.lines, ""] });
+                            }}
                         >
                             <Plus className="size-4" /> Add a line
                         </Button>
+                        <p className="text-xs text-muted-foreground">
+                            An empty line is a gap. Drag one under the title to space it from
+                            the lines below.
+                        </p>
                     </div>
 
                     <label className="flex flex-col gap-1 text-sm">
@@ -241,7 +288,7 @@ export function MinecraftSidebar({
                         <span className="text-xs text-muted-foreground">
                             {state.groups.length === 0
                                 ? "You are in no chat group yet. Create one in Chat to show who is in its call."
-                                : "Whose call {call.count} and {call.members} read, here and in announcements."}
+                                : "Whose call {call.count}, {call.members} and {call.max} read, here and in announcements."}
                         </span>
                     </label>
 

@@ -155,7 +155,8 @@ export function MinecraftXray({
                 ? buildSuspects({
                       honeypots: view.players,
                       movement: view.movement,
-                      mining: view.mining
+                      mining: view.mining,
+                      players: view.online
                   })
                 : { suspects: [], incidents: [] },
         [view]
@@ -406,7 +407,9 @@ export function MinecraftXray({
                         <p className="text-xs text-muted-foreground">
                             From what was found in the last 14 days. Only honeypots can confirm
                             X-Ray; the mining rate is context and on its own never goes past
-                            Unlikely.
+                            Unlikely. Everybody online is listed. Mining counts are the
+                            game&apos;s own and arrive when the server saves, a few minutes
+                            behind.
                         </p>
                     </div>
                     <PlayersTable

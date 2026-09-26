@@ -14,6 +14,7 @@ import type { Recipient, SendContext } from "./announcement";
 import { usesAccount, variablesIn, type VariableValues } from "./text-vars";
 
 const { readInstallConfig } = host.appsInstallConfig;
+const { voicePresence } = host.chatCalls;
 
 /** Where the chat group whose call `{call.*}` reads is kept on the install. */
 export const CALL_GROUP_KEY = "callGroupId";
@@ -29,18 +30,23 @@ function joined(names: readonly string[]): string {
     return names.join(", ");
 }
 
-/** Who is in the chat group's call right now, by the name they show there. */
+/** How many people the chat group has - everybody the call could hold. */
+async function groupSize(groupId: string): Promise<number> {
+    return prisma.chatChannelMember.count({ where: { channelId: groupId } });
+}
+
+/**
+ * Who is in the chat group's call right now, by the name they show there.
+ *
+ * Asked of the chat rather than read off the seats, so the panel and the chat
+ * agree on who is there. A seat stays open for a while after somebody closes the
+ * tab or loses the connection - only their browser going quiet says they left -
+ * and counting open seats kept them "in call" on every screen long after the
+ * chat had stopped showing them.
+ */
 async function callMembers(groupId: string): Promise<string[]> {
-    const participants = await prisma.meetingParticipant.findMany({
-        where: {
-            leftAt: null,
-            admission: "admitted",
-            meeting: { channelId: groupId, endedAt: null }
-        },
-        select: { name: true },
-        orderBy: { joinedAt: "asc" }
-    });
-    return [...new Set(participants.map((one) => one.name))];
+    const byChannel = await voicePresence([groupId]);
+    return [...new Set((byChannel.get(groupId) ?? []).map((one) => one.name))];
 }
 
 /**
@@ -68,11 +74,15 @@ export async function liveContext(
         "server.max": players ? String(players.max) : null,
         "server.players": players && players.players.length > 0 ? joined(players.players) : null
     };
+    const group = readCallGroup(config);
     if (used.has("call.count") || used.has("call.members")) {
-        const group = readCallGroup(config);
         const inCall = group ? await callMembers(group).catch(() => null) : null;
         values["call.count"] = inCall ? String(inCall.length) : null;
         values["call.members"] = inCall && inCall.length > 0 ? joined(inCall) : null;
+    }
+    if (used.has("call.max")) {
+        const size = group ? await groupSize(group).catch(() => null) : null;
+        values["call.max"] = size === null ? null : String(size);
     }
 
     if (!texts.some((text) => usesAccount(text))) return { values, recipients: null };

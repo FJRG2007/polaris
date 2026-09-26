@@ -351,7 +351,8 @@ const AWAITED = [
     "publishChatChange",
     "requestOrigin",
     "safeName",
-    "serviceRef"
+    "serviceRef",
+    "subscribeMeetingEvents"
 ];
 
 /** Where the arguments that open at `from` are closed. */

@@ -13,7 +13,7 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
-import { editionOf } from "../../lib/minecraft/service";
+import { editionOf, onlinePlayers } from "../../lib/minecraft/service";
 import { startXrayTraps, updateXray } from "../../lib/minecraft/xray-service";
 import { readAllMining, type PlayerMining } from "../../lib/minecraft/stats-service";
 import {
@@ -50,6 +50,8 @@ export interface XrayView {
     readonly traps: { readonly overworld: number; readonly nether: number };
     readonly players: readonly XrayPlayer[];
     readonly mining: readonly PlayerMining[];
+    /** Who is online now, listed whether or not anything was found. */
+    readonly online: readonly string[];
     /** Flying and teleport incidents that still count, per player. */
     readonly movement: readonly MovementPlayer[];
     /** Why teleports are not being checked right now, or null while they are. */
@@ -89,6 +91,7 @@ async function viewOf(
             .filter((player) => player.hits.length > 0)
             .sort((left, right) => right.hits.length - left.hits.length),
         mining: withMining && !bedrock ? await readAllMining(ownerId, installedAppId) : [],
+        online: (await onlinePlayers(ownerId, installedAppId).catch(() => null))?.players ?? [],
         movement: Object.values(state.movement)
             .map((evidence) => ({
                 name: evidence.name,

@@ -23,7 +23,8 @@ import {
     cn
 } from "@polaris/ui";
 import * as mc from "../lib/minecraft/motd";
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { acceptCompletion, completionSpot, completionsFor } from "../lib/minecraft/completion";
 
 export function FormattedTextField({
     value,
@@ -68,6 +69,20 @@ export function FormattedTextField({
         return mc.codesOver(map, from, to);
     }, [map, raw, selection]);
     const shown = raw ? value : map.plain;
+
+    // The variables offered as they are typed. Worked out from the text and the
+    // caret on every render, so there is no second copy of either to go stale;
+    // only which one is highlighted, and whether the list was sent away, is kept.
+    const listId = useId();
+    const [highlight, setHighlight] = useState(0);
+    const [dismissedAt, setDismissedAt] = useState<number | null>(null);
+    const spot =
+        inserts.length > 0 && selection.start === selection.end
+            ? completionSpot(shown, selection.start)
+            : null;
+    const offered = spot ? completionsFor(spot.query, inserts) : [];
+    const suggesting = spot !== null && offered.length > 0 && dismissedAt !== spot.from;
+    const current = Math.min(highlight, Math.max(0, offered.length - 1));
 
     /**
      * Apply a code to whatever is selected.
@@ -150,6 +165,25 @@ export function FormattedTextField({
         [raw, shown, value, onChange]
     );
 
+    /** Write the highlighted variable over what was typed of it. */
+    const complete = useCallback(
+        (index: number) => {
+            const field = area.current;
+            const option = offered[index];
+            if (!spot || !option) return;
+            const next = acceptCompletion(shown, selection.start, spot, option);
+            onChange(raw ? next.text : mc.replaceMotdPlain(value, next.text));
+            setHighlight(0);
+            setSelection({ start: next.caret, end: next.caret });
+            requestAnimationFrame(() => {
+                if (!field) return;
+                field.focus();
+                field.setSelectionRange(next.caret, next.caret);
+            });
+        },
+        [offered, spot, shown, selection.start, raw, value, onChange]
+    );
+
     /** What the person typed, folded back into the string with its codes. */
     const edit = useCallback(
         (typed: string) => {
@@ -228,25 +262,105 @@ export function FormattedTextField({
                 </Button>
             </div>
 
-            <textarea
-                ref={area}
-                value={shown}
-                onChange={(event) => edit(event.target.value)}
-                onKeyDown={(event) => {
-                    if (singleLine && event.key === "Enter") event.preventDefault();
-                }}
-                onSelect={(event) =>
-                    setSelection({
-                        start: event.currentTarget.selectionStart,
-                        end: event.currentTarget.selectionEnd
-                    })
-                }
-                rows={rows}
-                placeholder={placeholder}
-                aria-label={raw ? `${label}, with its formatting codes` : label}
-                spellCheck={false}
-                className="w-full resize-none rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm hover:border-border-strong focus:border-border-strong"
-            />
+            <div className="relative">
+                <textarea
+                    ref={area}
+                    value={shown}
+                    onChange={(event) => {
+                        edit(event.target.value);
+                        // Where the caret is after the keystroke, which the list
+                        // is worked out from; the select event is not sure to
+                        // arrive before the next render.
+                        setSelection({
+                            start: event.target.selectionStart,
+                            end: event.target.selectionEnd
+                        });
+                        setHighlight(0);
+                        setDismissedAt(null);
+                    }}
+                    onKeyDown={(event) => {
+                        if (suggesting) {
+                            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                                event.preventDefault();
+                                const step = event.key === "ArrowDown" ? 1 : -1;
+                                setHighlight((current + step + offered.length) % offered.length);
+                                return;
+                            }
+                            if (event.key === "Enter" || event.key === "Tab") {
+                                event.preventDefault();
+                                complete(current);
+                                return;
+                            }
+                            if (event.key === "Escape") {
+                                // The field's own Escape, not the dialog's around it.
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setDismissedAt(spot?.from ?? null);
+                                return;
+                            }
+                        }
+                        // Asked for again, the way an editor does it.
+                        if (event.key === " " && event.ctrlKey) {
+                            event.preventDefault();
+                            setDismissedAt(null);
+                            return;
+                        }
+                        if (singleLine && event.key === "Enter") event.preventDefault();
+                    }}
+                    onSelect={(event) =>
+                        setSelection({
+                            start: event.currentTarget.selectionStart,
+                            end: event.currentTarget.selectionEnd
+                        })
+                    }
+                    onBlur={() => setDismissedAt(spot?.from ?? null)}
+                    onFocus={() => setDismissedAt(null)}
+                    rows={rows}
+                    placeholder={placeholder}
+                    aria-label={raw ? `${label}, with its formatting codes` : label}
+                    role={inserts.length > 0 ? "combobox" : undefined}
+                    aria-autocomplete={inserts.length > 0 ? "list" : undefined}
+                    aria-expanded={inserts.length > 0 ? suggesting : undefined}
+                    aria-controls={suggesting ? listId : undefined}
+                    aria-activedescendant={suggesting ? `${listId}-${current}` : undefined}
+                    spellCheck={false}
+                    className="w-full resize-none rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm hover:border-border-strong focus:border-border-strong"
+                />
+                {suggesting && (
+                    <ul
+                        id={listId}
+                        role="listbox"
+                        aria-label="Variables"
+                        className="absolute left-0 top-full z-50 mt-1 max-h-60 w-72 max-w-full overflow-y-auto overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 shadow-popover"
+                    >
+                        {offered.map((option, index) => (
+                            <li
+                                key={option.text}
+                                id={`${listId}-${index}`}
+                                role="option"
+                                aria-selected={index === current}
+                                title={option.title}
+                                // Chosen on the press rather than the click, so the
+                                // field never loses the caret in between.
+                                onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    complete(index);
+                                }}
+                                onMouseEnter={() => setHighlight(index)}
+                                className={cn(
+                                    "flex cursor-pointer items-baseline justify-between gap-3 rounded px-2 py-1 text-xs",
+                                    index === current && "bg-card-hover"
+                                )}
+                            >
+                                <code className="shrink-0 font-mono text-foreground">
+                                    {option.text}
+                                </code>
+                                <span className="truncate text-muted-foreground">{option.label}</span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">{footnote}</span>
