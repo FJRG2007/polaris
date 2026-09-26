@@ -194,7 +194,10 @@ describe("a call in a direct message", () => {
         state.startLine = true;
         await Promise.all([meetings.end(ana, "m1"), meetings.end(ana, "m1")]);
         expect(state.alerts).toEqual([{ userId: "ben", event: "chat.callMissed" }]);
-        expect(state.notices.map((notice) => notice.kind)).toEqual(["callStarted", "callUnanswered"]);
+        expect(state.notices.map((notice) => notice.kind)).toEqual([
+            "callStarted",
+            "callUnanswered"
+        ]);
     });
 
     it("keeps the old missed-call line for a call with no start line", async () => {
