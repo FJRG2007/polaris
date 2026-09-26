@@ -32,13 +32,18 @@ const state = vi.hoisted(() => ({
     endedAt: null as Date | null,
     startLine: false,
     notices: [] as { kind: string; subjectId: string }[],
-    bodies: [] as string[]
+    bodies: [] as string[],
+    alerts: [] as { userId: string; event: string }[]
 }));
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({}) }));
 vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
 vi.mock("@/lib/blocks", () => ({ blockersOf: async () => new Set() }));
-vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }));
+vi.mock("@/lib/notifications/dispatch", () => ({
+    notify: async (alert: { userId: string; event: string }) => {
+        state.alerts.push({ userId: alert.userId, event: alert.event });
+    }
+}));
 vi.mock("@/lib/chat/live", () => ({ publishChatChange: () => undefined }));
 vi.mock("@/lib/chat/meeting-events", () => ({ publishMeetingEvent: () => undefined }));
 vi.mock("@/lib/chat/meeting-files", () => ({ discardMeetingChat: async () => undefined }));
@@ -80,8 +85,11 @@ vi.mock("@polaris/db", () => ({
                     members: [{ userId: "ana" }, { userId: "ben" }]
                 }
             }),
+            // Like the database: the close is conditional on the row still being
+            // open, so only the first of two closes changes anything.
             updateMany: async ({ data }: { data: { endedAt?: Date } }) => {
                 if (data.endedAt) {
+                    if (state.endedAt !== null) return { count: 0 };
                     state.endedAt = data.endedAt;
                     state.running = null;
                 }
@@ -105,6 +113,7 @@ vi.mock("@polaris/db", () => ({
         chatMessage: {
             findFirst: async () => (state.startLine ? { id: "line" } : null)
         },
+        user: { findUnique: async () => ({ name: "Ana" }) },
         $transaction: async (operations: Promise<unknown>[]) => Promise.all(operations)
     }
 }));
@@ -123,6 +132,7 @@ beforeEach(() => {
     state.startLine = false;
     state.notices = [];
     state.bodies = [];
+    state.alerts = [];
 });
 
 describe("the wording", () => {
@@ -174,6 +184,17 @@ describe("a call in a direct message", () => {
             "callUnanswered"
         ]);
         expect(state.bodies).toEqual([]);
+    });
+
+    it("tells whoever missed it once when two ends arrive together", async () => {
+        // The last person out and the timer that found the room empty, say. Both
+        // read the call as open before either closed it, and every missed call
+        // reached the bell twice.
+        await meetings.startOrJoin(ana, "c1");
+        state.startLine = true;
+        await Promise.all([meetings.end(ana, "m1"), meetings.end(ana, "m1")]);
+        expect(state.alerts).toEqual([{ userId: "ben", event: "chat.callMissed" }]);
+        expect(state.notices.map((notice) => notice.kind)).toEqual(["callStarted", "callUnanswered"]);
     });
 
     it("keeps the old missed-call line for a call with no start line", async () => {

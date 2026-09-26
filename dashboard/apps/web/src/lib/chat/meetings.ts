@@ -1297,13 +1297,14 @@ async function endIfEmpty(meetingId: string): Promise<void> {
  *  was forwarded cannot reopen the room later, and `liveKey` is released so the
  *  conversation can hold a call again. */
 async function closeMeeting(meetingId: string): Promise<void> {
-    // Read before the row is closed, since a closed meeting is about to be one
-    // nothing can be told about.
-    const stillLive = await prisma.meeting.findFirst({
-        where: { id: meetingId, endedAt: null },
-        select: { id: true }
-    });
-    await prisma.$transaction([
+    // Whether THIS call closed it is the count the close itself returns, not a
+    // read before it. Two ends arrive together often - the last person out and
+    // the timer that noticed the room empty, a tab closing on both devices - and
+    // both of them read the row as still open before either wrote to it. Every
+    // missed call reached the bell twice, twenty milliseconds apart. The update
+    // is conditional on the row still being open, so the database lets exactly
+    // one of them through.
+    const [closed] = await prisma.$transaction([
         prisma.meeting.updateMany({
             where: { id: meetingId, endedAt: null },
             data: { endedAt: new Date(), guestToken: null, liveKey: null }
@@ -1328,7 +1329,7 @@ async function closeMeeting(meetingId: string): Promise<void> {
     // Only for the one caller that actually closed it. Ending is reached from
     // several places - the last person out, a lone call timing out, the host
     // pressing the button - and each would otherwise announce it again.
-    if (stillLive) {
+    if (closed.count > 0) {
         await announceCall(meetingId, "ended", "");
         await noteCallOutcome(meetingId);
     }
