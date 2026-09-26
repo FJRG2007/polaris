@@ -102,6 +102,14 @@ describe("the commands, in the order the game needs them", () => {
         expect(lines[2]).toContain("playsound minecraft:entity.player.levelup");
     });
 
+    it("plays the raid horn loud enough to hear, and every other sound at 1", () => {
+        // 0.01 in the game's own sounds.json: at 1 it reached nobody.
+        const horn = announcementCommands("java", draft({ chat: "Raid!", sound: "minecraft:event.raid.horn" }));
+        expect(horn.at(-1)).toMatch(/playsound minecraft:event\.raid\.horn master @s ~ ~ ~ 100 1$/);
+        const bell = announcementCommands("java", draft({ chat: "Ding", sound: "minecraft:block.bell.use" }));
+        expect(bell.at(-1)).toMatch(/playsound minecraft:block\.bell\.use master @s ~ ~ ~ 1 1$/);
+    });
+
     it("uses Bedrock's verbs there, and plays no Java sound", () => {
         const lines = announcementCommands(
             "bedrock",

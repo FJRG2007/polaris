@@ -91,8 +91,19 @@ export const BLANK_ANNOUNCEMENT: Announcement = {
     until: ""
 };
 
-/** The sounds on offer, by what they are for rather than by resource name. */
-export const ANNOUNCE_SOUNDS: readonly { readonly id: string; readonly label: string }[] = [
+/** The sounds on offer, by what they are for rather than by resource name.
+ *
+ *  `volume` is what `playsound` is handed, for a sound the game itself defines
+ *  as nearly silent. The raid horn is 0.01 in the game's own sounds.json -
+ *  the game plays it at 64 from a distance, as a horn across the valley - so
+ *  played at 1 on top of the player it was a hundredth of anything, and nobody
+ *  heard it. The client caps what reaches the speakers at full volume, so this
+ *  brings it up to that and no further. */
+export const ANNOUNCE_SOUNDS: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly volume?: number;
+}[] = [
     { id: "", label: "No sound" },
     { id: "minecraft:block.note_block.pling", label: "Pling" },
     { id: "minecraft:entity.experience_orb.pickup", label: "Experience orb" },
@@ -101,7 +112,7 @@ export const ANNOUNCE_SOUNDS: readonly { readonly id: string; readonly label: st
     { id: "minecraft:block.bell.use", label: "Bell" },
     { id: "minecraft:block.beacon.activate", label: "Beacon" },
     { id: "minecraft:block.note_block.bass", label: "Warning (bass)" },
-    { id: "minecraft:event.raid.horn", label: "Raid horn" },
+    { id: "minecraft:event.raid.horn", label: "Raid horn", volume: 100 },
     { id: "minecraft:entity.ender_dragon.growl", label: "Dragon growl" }
 ];
 
@@ -404,13 +415,12 @@ export function announcementCommands(
             ...send("tellraw", announcement.chat, (filled) => body(filled, announcement.tagged))
         );
     }
-    if (
-        java &&
-        announcement.sound &&
-        ANNOUNCE_SOUNDS.some((one) => one.id === announcement.sound)
-    ) {
+    const sound = java && announcement.sound
+        ? ANNOUNCE_SOUNDS.find((one) => one.id === announcement.sound)
+        : undefined;
+    if (sound) {
         lines.push(
-            `execute as ${target} at @s run playsound ${announcement.sound} master @s ~ ~ ~ 1 1`
+            `execute as ${target} at @s run playsound ${sound.id} master @s ~ ~ ~ ${sound.volume ?? 1} 1`
         );
     }
     return lines;
