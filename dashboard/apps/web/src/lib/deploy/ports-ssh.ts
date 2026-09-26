@@ -11,6 +11,7 @@ import { PassThrough } from "node:stream";
 import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
 import { DF_ROOT, PRUNE_EVERY_ENGINE, freeBytesFromDf } from "@/lib/deploy/server-space";
+import { ImageStoreBusy, sshMachine, withImagePrune, withImageUse } from "@/lib/deploy/image-store-lock";
 import { ensurePrivateNetworksScript, forCompose, isReleaseImage, parseReclaimedBytes, quoteArg, renderComposeYaml, type BuildRequest, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts, type WorldTrimOptions } from "@polaris/deploy";
 
 /** Where compose files and volume data live on a managed remote server. */
@@ -43,6 +44,12 @@ export class SshPorts implements RuntimePorts {
         signal?.addEventListener("abort", () => void this.dispose().catch(() => undefined), { once: true });
     }
 
+    /** Hold this machine's image store open while `work` brings an image onto
+     *  it, so no prune runs underneath - see `image-store-lock`. */
+    public holdImages<T>(work: () => Promise<T>): Promise<T> {
+        return withImageUse(sshMachine(this.target.address, this.target.port), work);
+    }
+
     private async connect(): Promise<Client> {
         if (this.client) return this.client;
         this.client = await openSshClient({
@@ -71,7 +78,8 @@ export class SshPorts implements RuntimePorts {
             ...ensurePrivateNetworksScript(spec.networks, false),
             `docker compose -p ${quoteArg(spec.project)} -f ${quoteArg(file)} up -d --remove-orphans`
         ].join("; ");
-        await this.run(command, onOutput);
+        // Compose fetches any image it does not have yet.
+        await this.holdImages(() => this.run(command, onOutput));
     }
 
     public async composeDown(project: string, onOutput?: OutputSink): Promise<void> {
@@ -94,7 +102,7 @@ export class SshPorts implements RuntimePorts {
             ...ensurePrivateNetworksScript(spec.networks, true),
             `docker stack deploy -c ${quoteArg(file)} --detach=true --with-registry-auth --prune ${quoteArg(spec.project)}`
         ].join("; ");
-        await this.run(command, onOutput);
+        await this.holdImages(() => this.run(command, onOutput));
     }
 
     public async stackDown(project: string, onOutput?: OutputSink): Promise<void> {
@@ -133,7 +141,7 @@ export class SshPorts implements RuntimePorts {
                   ].join("\n")
                 : `docker build -t ${quoteArg(request.tag)} -f ${quoteArg(dockerfile)} -`;
         const client = await this.connect();
-        await new Promise<void>((resolve, reject) => {
+        await this.holdImages(() => new Promise<void>((resolve, reject) => {
             client.exec(script, (error, channel) => {
                 if (error || !channel) {
                     reject(error ?? new Error("could not open the exec channel"));
@@ -156,7 +164,7 @@ export class SshPorts implements RuntimePorts {
                 });
                 tar.pipe(channel);
             });
-        });
+        }));
         return request.tag;
     }
 
@@ -179,7 +187,7 @@ export class SshPorts implements RuntimePorts {
     }
 
     public async pull(image: string, onOutput?: OutputSink): Promise<void> {
-        await this.run(`docker pull ${quoteArg(image)}`, onOutput);
+        await this.holdImages(() => this.run(`docker pull ${quoteArg(image)}`, onOutput));
     }
 
     /**
@@ -215,7 +223,7 @@ export class SshPorts implements RuntimePorts {
     /** `docker load` on the server, fed the archive on stdin. */
     public async importImage(archive: NodeJS.ReadableStream, _size: number, onOutput?: OutputSink): Promise<void> {
         const client = await this.connect();
-        await new Promise<void>((resolve, reject) => {
+        await this.holdImages(() => new Promise<void>((resolve, reject) => {
             client.exec("docker load", (error, channel) => {
                 if (error || !channel) {
                     reject(error ?? new Error("could not open the exec channel"));
@@ -237,7 +245,7 @@ export class SshPorts implements RuntimePorts {
                 });
                 archive.pipe(channel);
             });
-        });
+        }));
     }
 
     public async inspectImage(image: string): Promise<number[]> {
@@ -307,7 +315,20 @@ export class SshPorts implements RuntimePorts {
         return total > 0 ? used / total : null;
     }
 
-    public async reclaimSpace(): Promise<number> {
+    public async reclaimSpace(options: { whenIdle?: boolean } = {}): Promise<number> {
+        try {
+            return await withImagePrune(
+                sshMachine(this.target.address, this.target.port),
+                () => this.prune(),
+                options
+            );
+        } catch (error) {
+            if (error instanceof ImageStoreBusy) return 0;
+            throw error;
+        }
+    }
+
+    private async prune(): Promise<number> {
         // Measured on the disk rather than read off what a prune printed, and
         // asked of every engine rather than of Docker alone. Both for the same
         // reason: a machine Polaris deploys to is not necessarily a Docker

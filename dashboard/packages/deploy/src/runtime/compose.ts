@@ -12,7 +12,7 @@ import { imageTag as toImageTag } from "../naming.js";
 import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
 import { tailIntoLog, waitUntilServing } from "./readiness.js";
-import { buildPorts, loadPrebuilt, shipRelease } from "./ship.js";
+import { buildPorts, fetchPorts, holdImages, loadPrebuilt, shipRelease } from "./ship.js";
 import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
 import { deployFailureReason, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
 import { appComposeSpec, dbComposeSpec, dbPlanImages, expandReplicas } from "../compose-spec.js";
@@ -138,7 +138,9 @@ const TIGHT = 0.8;
  */
 async function tidyAfter(ctx: RuntimeContext): Promise<void> {
     if (!ctx.ports.reclaimSpace) return;
-    const freed = await ctx.ports.reclaimSpace().catch(() => 0);
+    // Skipped while another deploy is fetching on this machine: its own tidy
+    // runs when it finishes, and a prune now would take its half-unpacked layers.
+    const freed = await ctx.ports.reclaimSpace({ whenIdle: true }).catch(() => 0);
     if (freed > 0) {
         ctx.log(
             Buffer.from(
@@ -156,7 +158,7 @@ async function pullWithRoom(image: string, ctx: RuntimeContext, sink: OutputSink
     if (ctx.ports.diskFullness && ctx.ports.reclaimSpace) {
         const fullness = await ctx.ports.diskFullness().catch(() => null);
         if (fullness !== null && fullness >= TIGHT) {
-            const freed = await ctx.ports.reclaimSpace().catch(() => 0);
+            const freed = await ctx.ports.reclaimSpace({ whenIdle: true }).catch(() => 0);
             if (freed > 0) {
                 ctx.log(
                     Buffer.from(
@@ -196,12 +198,54 @@ export class ComposeRuntime implements RuntimeDriver {
     }
 
     public async deployApplication(plan: AppDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
-        const sink = (chunk: Buffer): void => ctx.log(chunk);
         // The pipeline's own steps are timed and announced. Without this the log is
         // whatever docker happened to print, so a deploy that spends a minute
         // fetching the source and a second building it reads as a slow build - and
         // a step with no output of its own (mounting a share) looks like a hang.
         const step = timer(ctx);
+        // Held from the fetch until the containers are up: a freshly built or
+        // pulled image carries no release label until it is pinned, and nothing
+        // runs it until compose starts it, so a prune in between takes it.
+        const up = await holdImages(fetchPorts(plan, ctx), () => this.bringUp(plan, ctx, step));
+        if (!("spec" in up)) return up;
+        const { imageTag, effectivePlan, spec } = up;
+        // Not a success until it is serving: a container that exists and then
+        // exits, crash-loops or reports itself unhealthy must not be promoted.
+        // Every copy, one after another: a replica that cannot start is the same
+        // release failing, only less often.
+        const waited = step("Waiting for it to come up");
+        for (const service of spec.services) {
+            const ready = await waitUntilServing(ctx, service.name, plan);
+            if (!ready.ok) {
+                waited("it did not");
+                await tailIntoLog(ctx, service.name);
+                return fail(ctx, ready.reason);
+            }
+        }
+        waited();
+        // The release landed, so whatever it replaced is unreferenced from this
+        // moment. Handed back now rather than at a threshold: waiting means
+        // carrying every superseded image until the machine is nearly full,
+        // which is the state a pull cannot be recovered from.
+        await tidyAfter(ctx);
+        const guessed = plan.expose?.container;
+        const detected = effectivePlan.expose?.container;
+        return {
+            ok: true,
+            imageTag,
+            ...(guessed !== undefined && detected !== undefined && guessed !== detected
+                ? { detectedPort: { from: guessed, to: detected } }
+                : {})
+        };
+    }
+
+    /** Fetch or build the release, pin it, and start its containers. */
+    private async bringUp(
+        plan: AppDeployPlan,
+        ctx: RuntimeContext,
+        step: (label: string) => (note?: string) => void
+    ): Promise<DeployResult | { imageTag: string; effectivePlan: AppDeployPlan; spec: ComposeSpec }> {
+        const sink = (chunk: Buffer): void => ctx.log(chunk);
         let imageTag: string;
         let kept: string | null;
         try {
@@ -334,34 +378,7 @@ export class ComposeRuntime implements RuntimeDriver {
             return fail(ctx, deployFailureReason(reasonOf(error, ""), "compose up failed"));
         }
         started();
-        // Not a success until it is serving: a container that exists and then
-        // exits, crash-loops or reports itself unhealthy must not be promoted.
-        // Every copy, one after another: a replica that cannot start is the same
-        // release failing, only less often.
-        const waited = step("Waiting for it to come up");
-        for (const service of spec.services) {
-            const ready = await waitUntilServing(ctx, service.name, plan);
-            if (!ready.ok) {
-                waited("it did not");
-                await tailIntoLog(ctx, service.name);
-                return fail(ctx, ready.reason);
-            }
-        }
-        waited();
-        // The release landed, so whatever it replaced is unreferenced from this
-        // moment. Handed back now rather than at a threshold: waiting means
-        // carrying every superseded image until the machine is nearly full,
-        // which is the state a pull cannot be recovered from.
-        await tidyAfter(ctx);
-        const guessed = plan.expose?.container;
-        const detected = effectivePlan.expose?.container;
-        return {
-            ok: true,
-            imageTag,
-            ...(guessed !== undefined && detected !== undefined && guessed !== detected
-                ? { detectedPort: { from: guessed, to: detected } }
-                : {})
-        };
+        return { imageTag, effectivePlan, spec };
     }
 
     /**
@@ -400,6 +417,11 @@ export class ComposeRuntime implements RuntimeDriver {
     }
 
     public async deployDatabase(plan: DbDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
+        // Held from the pull until compose starts it, like an application.
+        return holdImages(ctx.ports, () => this.bringUpDatabase(plan, ctx));
+    }
+
+    private async bringUpDatabase(plan: DbDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
         for (const image of dbPlanImages(plan)) {
             if (plan.keepImages && (await ctx.ports.hasImage?.(image).catch(() => true)) !== false) continue;

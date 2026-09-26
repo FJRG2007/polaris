@@ -32,6 +32,7 @@
  */
 
 import { HostdClient } from "@polaris/hostd-client";
+import { LOCAL_MACHINE, withImagePrune } from "@/lib/deploy/image-store-lock";
 import { RELEASE_LABEL, RELEASE_REPOSITORY } from "@polaris/deploy";
 
 /** What the container store is holding, in bytes. */
@@ -189,9 +190,16 @@ async function prune(daemon: HostdClient, path: string): Promise<number | null> 
     }
 }
 
-/** Empty the build cache on its own, for somebody who wants exactly that. */
-export async function reclaimBuildCache(): Promise<number | null> {
-    return prune(new HostdClient(), BUILD_CACHE_PRUNE_PATH);
+/** Empty the build cache on its own, for somebody who wants exactly that. Never
+ *  while something is being built or fetched here - see `image-store-lock`. */
+export async function reclaimBuildCache(
+    options: { whenIdle?: boolean } = {}
+): Promise<number | null> {
+    return withImagePrune(
+        LOCAL_MACHINE,
+        () => prune(new HostdClient(), BUILD_CACHE_PRUNE_PATH),
+        options
+    );
 }
 
 /**
@@ -205,17 +213,31 @@ export async function reclaimBuildCache(): Promise<number | null> {
  * What this will never reach is a volume: not through a filter, not by asking
  * differently, and not by accident. The daemon's allowlist has no route for
  * pruning them at all.
+ *
+ * Nor does it run while anything is being fetched or built on this machine: an
+ * image still being unpacked has no container on it yet, so to a prune it is
+ * unused, and taking it is a deploy failing with a path that no longer exists.
+ * It waits for the machine to go quiet, or with `whenIdle` it does not run at
+ * all and throws ImageStoreBusy - see `image-store-lock`.
  */
-export async function reclaimHostSpace(): Promise<number | null> {
-    const daemon = new HostdClient();
-    let freed = 0;
-    let answered = false;
+export async function reclaimHostSpace(
+    options: { whenIdle?: boolean } = {}
+): Promise<number | null> {
+    return withImagePrune(
+        LOCAL_MACHINE,
+        async () => {
+            const daemon = new HostdClient();
+            let freed = 0;
+            let answered = false;
 
-    for (const path of [BUILD_CACHE_PRUNE_PATH, unusedImagesPrunePath()]) {
-        const removed = await prune(daemon, path);
-        if (removed === null) continue;
-        answered = true;
-        freed += removed;
-    }
-    return answered ? freed : null;
+            for (const path of [BUILD_CACHE_PRUNE_PATH, unusedImagesPrunePath()]) {
+                const removed = await prune(daemon, path);
+                if (removed === null) continue;
+                answered = true;
+                freed += removed;
+            }
+            return answered ? freed : null;
+        },
+        options
+    );
 }

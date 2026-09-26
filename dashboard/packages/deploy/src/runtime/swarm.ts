@@ -10,7 +10,7 @@
 import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
 import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
-import { buildPorts, loadPrebuilt, shipRelease } from "./ship.js";
+import { buildPorts, fetchPorts, holdImages, loadPrebuilt, shipRelease } from "./ship.js";
 import { appComposeSpec, dbComposeSpec, dbPlanImages, forSwarm } from "../compose-spec.js";
 import type {
     AppDeployPlan,
@@ -30,6 +30,11 @@ export class SwarmRuntime implements RuntimeDriver {
     }
 
     public async deployApplication(plan: AppDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
+        // Held until the stack is up - see the compose runtime.
+        return holdImages(fetchPorts(plan, ctx), () => this.bringUp(plan, ctx));
+    }
+
+    private async bringUp(plan: AppDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
         let imageTag: string;
         let kept: string | null;
@@ -85,6 +90,10 @@ export class SwarmRuntime implements RuntimeDriver {
     }
 
     public async deployDatabase(plan: DbDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
+        return holdImages(ctx.ports, () => this.bringUpDatabase(plan, ctx));
+    }
+
+    private async bringUpDatabase(plan: DbDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
         for (const image of dbPlanImages(plan)) await ctx.ports.pull(image, sink);
         const spec = forSwarm(dbComposeSpec(plan, ctx.target.proxyNetwork));

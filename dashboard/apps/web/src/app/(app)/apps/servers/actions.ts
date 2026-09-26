@@ -24,6 +24,7 @@ import {
     type HostSpace
 } from "@/lib/deploy/host-space";
 import { hostVolumes, removeHostVolume, type HostVolume } from "@/lib/deploy/host-volumes";
+import { ImageStoreBusy } from "@/lib/deploy/image-store-lock";
 import {
     removeStrayContainer,
     strayContainers,
@@ -522,6 +523,11 @@ export async function hostSpaceAction(): Promise<HostSpace | null> {
     return hostSpace().catch(() => null);
 }
 
+/** A prune refused because a deploy is fetching or building on the machine. */
+const BUSY = "busy" as const;
+const BUSY_MESSAGE =
+    "A deploy is downloading or building an image on this machine. Nothing was removed - try again once it finishes.";
+
 /**
  * Hand back the room that holds nothing anybody wrote.
  *
@@ -531,7 +537,10 @@ export async function hostSpaceAction(): Promise<HostSpace | null> {
  */
 export async function reclaimHostSpaceAction(): Promise<{ freed?: number; error?: string }> {
     const user = await requirePermission("system.manage");
-    const freed = await reclaimHostSpace().catch(() => null);
+    const freed = await reclaimHostSpace({ whenIdle: true }).catch((error: unknown) =>
+        error instanceof ImageStoreBusy ? BUSY : null
+    );
+    if (freed === BUSY) return { error: BUSY_MESSAGE };
     if (freed === null) {
         return { error: "This machine would not say. Nothing was removed." };
     }
@@ -552,7 +561,10 @@ export async function reclaimHostSpaceAction(): Promise<{ freed?: number; error?
  */
 export async function reclaimBuildCacheAction(): Promise<{ freed?: number; error?: string }> {
     const user = await requirePermission("system.manage");
-    const freed = await reclaimBuildCache().catch(() => null);
+    const freed = await reclaimBuildCache({ whenIdle: true }).catch((error: unknown) =>
+        error instanceof ImageStoreBusy ? BUSY : null
+    );
+    if (freed === BUSY) return { error: BUSY_MESSAGE };
     if (freed === null) {
         return { error: "This machine would not say. Nothing was removed." };
     }

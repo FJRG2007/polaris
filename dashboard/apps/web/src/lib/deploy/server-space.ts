@@ -26,6 +26,7 @@ import { prisma } from "@polaris/db";
 import { execCommand } from "@polaris/ssh";
 import { borrowSsh } from "@/lib/connection-pool";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
+import { sshMachine, withImagePrune } from "@/lib/deploy/image-store-lock";
 import { RELEASE_LABEL, parseReclaimedBytes } from "@polaris/deploy";
 
 /** How much of a command's output is kept. A prune prints a line per layer it
@@ -205,13 +206,29 @@ export const PRUNE_EVERY_ENGINE = [
  * Null means the server could not be reached at all, which is a different answer
  * from "nothing to free" and must never be read as one.
  */
-export async function reclaimServerSpace(hostId: string): Promise<number | null> {
-    const before = await serverFreeBytes(hostId);
-    const said = await onServer(hostId, PRUNE_EVERY_ENGINE);
-    if (said === null) return null;
-    const after = await serverFreeBytes(hostId);
-    if (before !== null && after !== null && after > before) return after - before;
-    // No `df` on this machine, or a disk that moved under the measurement. What
-    // the prune printed, where it printed anything.
-    return parseReclaimedBytes(said);
+export async function reclaimServerSpace(
+    hostId: string,
+    options: { whenIdle?: boolean } = {}
+): Promise<number | null> {
+    let connection;
+    try {
+        connection = await getHostConnectionUnscoped(hostId);
+    } catch {
+        return null;
+    }
+    // Never over a pull or a build on that machine - see `image-store-lock`.
+    return withImagePrune(
+        sshMachine(connection.address, connection.port),
+        async () => {
+            const before = await serverFreeBytes(hostId);
+            const said = await onServer(hostId, PRUNE_EVERY_ENGINE);
+            if (said === null) return null;
+            const after = await serverFreeBytes(hostId);
+            if (before !== null && after !== null && after > before) return after - before;
+            // No `df` on this machine, or a disk that moved under the measurement.
+            // What the prune printed, where it printed anything.
+            return parseReclaimedBytes(said);
+        },
+        options
+    );
 }
