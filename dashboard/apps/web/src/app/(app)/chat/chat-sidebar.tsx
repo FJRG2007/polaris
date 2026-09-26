@@ -28,6 +28,7 @@ import { Elsewhere } from "./elsewhere";
 import { usePresence } from "@/components/presence-store";
 import { rememberChannel } from "./recents";
 import { Avatar } from "@/components/avatar";
+import { RelativeTime } from "@/components/relative-time";
 import { channelLink, copyText } from "./links";
 import { openSearch } from "@/lib/search/open-search";
 import { useAppUrl } from "@/components/app-url";
@@ -384,6 +385,7 @@ export function ChatSidebar() {
                                 <Row
                                     key={channel.id}
                                     channel={channel}
+                                    roomy
                                     href={`/chat/c/${channel.id}`}
                                     active={open === channel.id}
                                     unread={channel.unread}
@@ -402,10 +404,21 @@ export function ChatSidebar() {
                                             // list was the one place in Polaris
                                             // where somebody's face did not say
                                             // whether they were there.
-                                            <Avatar
-                                                decorated
-                                                person={channel.others[0]}
-                                                size={24}
+                                            <PhoneSized
+                                                small={
+                                                    <Avatar
+                                                        decorated
+                                                        person={channel.others[0]}
+                                                        size={24}
+                                                    />
+                                                }
+                                                large={
+                                                    <Avatar
+                                                        decorated
+                                                        person={channel.others[0]}
+                                                        size={40}
+                                                    />
+                                                }
                                             />
                                         ) : (
                                             // A group is its picture, or the
@@ -413,12 +426,25 @@ export function ChatSidebar() {
                                             // icon shared by every group is
                                             // the one thing that cannot tell
                                             // two of them apart.
-                                            <ChatAvatar
-                                                kind="channel"
-                                                id={channel.id}
-                                                name={channel.name}
-                                                members={channel.others}
-                                                size={24}
+                                            <PhoneSized
+                                                small={
+                                                    <ChatAvatar
+                                                        kind="channel"
+                                                        id={channel.id}
+                                                        name={channel.name}
+                                                        members={channel.others}
+                                                        size={24}
+                                                    />
+                                                }
+                                                large={
+                                                    <ChatAvatar
+                                                        kind="channel"
+                                                        id={channel.id}
+                                                        name={channel.name}
+                                                        members={channel.others}
+                                                        size={40}
+                                                    />
+                                                }
                                             />
                                         )
                                     }
@@ -887,7 +913,8 @@ function Row({
     personId,
     channel,
     onManage,
-    occupancy = null
+    occupancy = null,
+    roomy = false
 }: {
     href: string;
     active: boolean;
@@ -912,6 +939,13 @@ function Row({
     /** Present for somebody who administers the space, so the menu can offer
      *  what only they may do. */
     onManage?: (channel: ChatChannelView) => void;
+    /**
+     * Drawn large on a phone, the way a messenger lists its conversations: a
+     * bigger face, a bigger name, and when the last message was. On a phone the
+     * list is the whole screen and is worked with a thumb; the compact row is a
+     * desktop rail's, and from `md` up that is exactly what this still draws.
+     */
+    roomy?: boolean;
 }) {
     // A muted conversation still counts its messages - it just does not shout
     // about them, which is the difference between muting and leaving.
@@ -940,24 +974,40 @@ function Row({
             data-active={active ? "" : undefined}
             className={cn(
                 "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-card-hover data-[state=open]:bg-card-hover",
+                // Every size here has its `md:` twin set back to the line above,
+                // so the desktop rail is untouched.
+                roomy && "gap-3 rounded-lg py-2.5 text-[0.9375rem] md:gap-2 md:rounded-md md:py-1.5 md:text-sm",
                 active ? "bg-card-hover text-foreground" : "text-muted-foreground",
                 shout && "font-medium text-foreground"
             )}
         >
             {icon}
-            <span className="flex min-w-0 flex-1 flex-col leading-tight">
+            <span className={cn("flex min-w-0 flex-1 flex-col leading-tight", roomy && "gap-0.5 md:gap-0")}>
                 <span className="min-w-0 truncate" title={label}>
                     <PersonName id={personId} name={label} />
                 </span>
                 {said && (
                     <span
-                        className="min-w-0 truncate text-[0.6875rem] text-foreground-subtle"
+                        className={cn(
+                            "min-w-0 truncate text-[0.6875rem] text-foreground-subtle",
+                            roomy && "text-[0.75rem] md:text-[0.6875rem]"
+                        )}
                         title={said}
                     >
                         {said}
                     </span>
                 )}
             </span>
+            {/* When they last wrote, on a phone only: the rail beside a
+                conversation has no room for it, and there the list is not what
+                somebody is reading. */}
+            {roomy && channel?.lastMessageAt && (
+                <RelativeTime
+                    iso={channel.lastMessageAt}
+                    formatStyle="narrow"
+                    className="shrink-0 text-xs text-foreground-subtle md:hidden"
+                />
+            )}
             {/* Said quietly, and only because a row that sits above a newer
                 conversation with nothing to explain it reads as a bug. */}
             {channel?.pinned && (
@@ -993,6 +1043,21 @@ function Row({
         </RowMenu>
     ) : (
         row
+    );
+}
+
+/**
+ * One of two renderings by screen width: `large` below `md`, `small` from it.
+ *
+ * For the faces in the direct-message list, whose size is a number the avatar
+ * lays its presence dot out from, not a class a breakpoint can change.
+ */
+function PhoneSized({ small, large }: { small: React.ReactNode; large: React.ReactNode }) {
+    return (
+        <>
+            <span className="contents md:hidden">{large}</span>
+            <span className="hidden md:contents">{small}</span>
+        </>
     );
 }
 
