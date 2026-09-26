@@ -14,6 +14,7 @@ import type { Recipient, SendContext } from "./announcement";
 import { usesAccount, variablesIn, type VariableValues } from "./text-vars";
 
 const { readInstallConfig } = host.appsInstallConfig;
+const { voicePresence } = host.chatCalls;
 
 /** Where the chat group whose call `{call.*}` reads is kept on the install. */
 export const CALL_GROUP_KEY = "callGroupId";
@@ -34,18 +35,18 @@ async function groupSize(groupId: string): Promise<number> {
     return prisma.chatChannelMember.count({ where: { channelId: groupId } });
 }
 
-/** Who is in the chat group's call right now, by the name they show there. */
+/**
+ * Who is in the chat group's call right now, by the name they show there.
+ *
+ * Asked of the chat rather than read off the seats, so the panel and the chat
+ * agree on who is there. A seat stays open for a while after somebody closes the
+ * tab or loses the connection - only their browser going quiet says they left -
+ * and counting open seats kept them "in call" on every screen long after the
+ * chat had stopped showing them.
+ */
 async function callMembers(groupId: string): Promise<string[]> {
-    const participants = await prisma.meetingParticipant.findMany({
-        where: {
-            leftAt: null,
-            admission: "admitted",
-            meeting: { channelId: groupId, endedAt: null }
-        },
-        select: { name: true },
-        orderBy: { joinedAt: "asc" }
-    });
-    return [...new Set(participants.map((one) => one.name))];
+    const byChannel = await voicePresence([groupId]);
+    return [...new Set((byChannel.get(groupId) ?? []).map((one) => one.name))];
 }
 
 /**

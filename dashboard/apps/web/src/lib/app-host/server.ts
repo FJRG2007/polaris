@@ -85,6 +85,8 @@ const load = {
     auditService: once(() => import("@/lib/audit-service")),
     backupsManage: once(() => import("@/lib/backups/manage")),
     chatLive: once(() => import("@/lib/chat/live")),
+    chatMeetingEvents: once(() => import("@/lib/chat/meeting-events")),
+    chatMeetings: once(() => import("@/lib/chat/meetings")),
     containerFilesService: once(() => import("@/lib/container-files-service")),
     cronOwners: once(() => import("@/lib/cron/owners")),
     deployDial: once(() => import("@/lib/deploy/dial")),
@@ -213,6 +215,13 @@ export const serverHost = {
     },
     chatLive: {
         publishChatChange: later(load.chatLive, "publishChatChange")
+    },
+    // Who is in a chat group's call, by the rule the chat itself draws it with,
+    // and a word when somebody joins or leaves one - what a game server's side
+    // panel needs to keep "in call: 2/5" true as it happens.
+    chatCalls: {
+        subscribeMeetingEvents: later(load.chatMeetingEvents, "subscribeMeetingEvents"),
+        voicePresence: later(load.chatMeetings, "voicePresence")
     },
     containerFilesService: {
         readContainerFile: later(load.containerFilesService, "readContainerFile"),

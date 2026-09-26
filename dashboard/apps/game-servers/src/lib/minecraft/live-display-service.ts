@@ -18,7 +18,7 @@
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { liveContext } from "./live-values";
-import { fillValues, readsPlayerList } from "./text-vars";
+import { fillValues, readsPlayerList, variablesIn } from "./text-vars";
 import { editionOf, onlinePlayers, withServerContainer } from "./service";
 import {
     ACTIONBAR_EVERY_MS,
@@ -39,6 +39,7 @@ import {
 import { PINNED_KEY, pinOver, pinnedAt, readPinned, type PinnedAnnouncement } from "./pinned";
 
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
+const { subscribeMeetingEvents } = host.chatCalls;
 
 /** How often the loop wakes. The action bar's period, the shortest of them. */
 const TICK_MS = ACTIONBAR_EVERY_MS;
@@ -58,9 +59,47 @@ interface Loop {
     pinVersion: number;
     /** The values last read, reused until the panel's period is up. */
     context: { key: string; at: number; value: SendContext } | null;
+    /** Whether what it shows reads a call, so a join or a leave redraws it. */
+    readsCall: boolean;
 }
 
 const loops = new Map<string, Loop>();
+
+/** Whether a text shows anything of a call. */
+function readsCall(text: string): boolean {
+    return variablesIn(text).some((use) => use.spec?.name.startsWith("call."));
+}
+
+let listening = false;
+
+/**
+ * Redraw every panel that shows a call the moment somebody joins or leaves one,
+ * rather than on the panel's next period.
+ *
+ * Every loop that reads a call is marked due rather than only the one whose
+ * group it was: the event names a meeting, not a group, and working out which
+ * group that is would be a query per event to save a redraw that costs nothing
+ * when the value did not change - `sidebarCommands` sends only what differs.
+ * Somebody who goes without leaving - a closed tab, a lost connection - raises
+ * no event, and is caught by the period instead, once the chat stops counting
+ * them.
+ */
+function listenForCalls(): void {
+    if (listening) return;
+    listening = true;
+    void subscribeMeetingEvents((event) => {
+        if (event.kind !== "roster" && event.kind !== "ended") return;
+        for (const loop of loops.values()) {
+            if (!loop.readsCall) continue;
+            loop.lastPanel = 0;
+            loop.context = null;
+        }
+    }).catch((error: unknown) => {
+        // Tried again with the next loop; until then the period still redraws.
+        listening = false;
+        console.warn("polaris: could not listen for call changes", String(error));
+    });
+}
 
 async function settingsOf(installedAppId: string): Promise<{
     config: Record<string, unknown>;
@@ -157,6 +196,7 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
         ...(pinned ? heldTexts(pinned.announcement) : []),
         ...(panelOn ? [sidebar.title, ...sidebar.lines] : [])
     ];
+    loop.readsCall = texts.some(readsCall);
     const context = await contextFor(installedAppId, loop, texts, now, duePanel);
 
     const lines: string[] = [];
@@ -260,8 +300,10 @@ function loopFor(ownerId: string, installedAppId: string): Loop {
         lastPanel: 0,
         panel: null,
         pinVersion: 0,
-        context: null
+        context: null,
+        readsCall: false
     };
+    listenForCalls();
     // A loop must never keep the process alive on its own.
     loop.timer.unref?.();
     loops.set(installedAppId, loop);

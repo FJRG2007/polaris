@@ -26,11 +26,23 @@ vi.mock("@polaris/db", () => ({
                 return fake.members;
             }
         },
-        meetingParticipant: { findMany: async () => fake.inCall.map((name) => ({ name })) }
+        // Never read for who is in the call: that is the chat's answer (below).
+        meetingParticipant: {
+            findMany: async () => {
+                throw new Error("open seats are not who is in the call");
+            }
+        }
     }
 }));
 vi.mock("@polaris/app-host", () => ({
-    host: { appsInstallConfig: { readInstallConfig: (raw: string) => JSON.parse(raw ?? "{}") } }
+    host: {
+        appsInstallConfig: { readInstallConfig: (raw: string) => JSON.parse(raw ?? "{}") },
+        chatCalls: {
+            // The chat's own rule: only the seats whose browser is still there.
+            voicePresence: async (channels: string[]) =>
+                new Map(channels.map((id) => [id, fake.inCall.map((name, at) => ({ id: `p${at}`, name }))]))
+        }
+    }
 }));
 
 const { liveContext } = await import("@polaris-app/game-servers/src/lib/minecraft/live-values");
@@ -58,6 +70,13 @@ describe("{call.max}", () => {
         expect(context.values["call.count"]).toBe("2");
         expect(fake.counted).toEqual([{ where: { channelId: GROUP } }]);
         expect(fillValues("In Call: {call.count}/{call.max}", context.values)).toBe("In Call: 2/5");
+    });
+
+    it("counts who the chat shows in the call, not every seat left open", async () => {
+        fake.inCall = ["Ada"];
+        const context = await liveContext("install", ["{call.count} {call.members}"], null);
+        expect(context.values["call.count"]).toBe("1");
+        expect(context.values["call.members"]).toBe("Ada");
     });
 
     it("is not asked for when no text uses it", async () => {
