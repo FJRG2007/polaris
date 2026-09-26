@@ -241,11 +241,15 @@ export function MinecraftAnnounce({
     const problems = useMemo(() => announcementProblems(draft, edition), [draft, edition]);
     const blocked = Object.keys(problems).length > 0;
     const inserts = useMemo(() => insertsFor(edition), [edition]);
+    // A sound on its own is something to send: a horn with nothing written is
+    // how "a raid is starting" is said without words. Java only - Bedrock's
+    // announcements carry no sound.
     const empty = !(
         hasText(draft.title) ||
         hasText(draft.subtitle) ||
         hasText(draft.actionbar) ||
-        hasText(draft.chat)
+        hasText(draft.chat) ||
+        (edition === "java" && draft.sound !== "")
     );
     const target =
         draft.target === EVERYBODY || players.includes(draft.target) ? draft.target : EVERYBODY;
