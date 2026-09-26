@@ -36,7 +36,10 @@ export function BillingView({ rates }: { rates: core.BillingRates | null }) {
                         aria-label="Refresh"
                         title="Refresh"
                     >
-                        <RefreshCw className={refreshing ? "size-4 animate-spin" : "size-4"} aria-hidden />
+                        <RefreshCw
+                            className={refreshing ? "size-4 animate-spin" : "size-4"}
+                            aria-hidden
+                        />
                     </Button>
                 }
             />
@@ -44,14 +47,26 @@ export function BillingView({ rates }: { rates: core.BillingRates | null }) {
             <RatesCard rates={rates} onChange={refresh} />
 
             <section className="flex flex-col gap-4">
-                <parts.StatementToolbar month={month} months={months} exportEndpoint="/api/admin/billing/export" />
+                <parts.StatementToolbar
+                    month={month}
+                    months={months}
+                    exportEndpoint="/api/admin/billing/export"
+                />
                 {error ? <p className="text-danger text-sm">{error}</p> : null}
-                {stale ? <p className="text-warning-ink text-sm">Showing the last statement read. {stale}</p> : null}
+                {stale ? (
+                    <p className="text-warning-ink text-sm">
+                        Showing the last statement read. {stale}
+                    </p>
+                ) : null}
                 <parts.StatementTotals view={data} />
                 <OwnersTable view={data} />
                 <div className="flex flex-col gap-2">
                     <h2 className="text-sm font-medium">Projects</h2>
-                    <parts.StatementTable view={data} showOwner emptyLabel="There are no projects on this Polaris yet." />
+                    <parts.StatementTable
+                        view={data}
+                        showOwner
+                        emptyLabel="There are no projects on this Polaris yet."
+                    />
                 </div>
                 <parts.StatementNotes view={data} />
             </section>
@@ -68,49 +83,58 @@ function OwnersTable({ view }: { view: parts.BillingResponse | null }) {
     return (
         <div className="flex flex-col gap-2">
             <h2 className="text-sm font-medium">By owner</h2>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full min-w-[32rem] text-sm">
-                    <thead>
-                        <tr className="border-border/60 border-b text-left">
-                            <th className="w-full max-w-0 px-2 py-1.5">Owner</th>
-                            <th className="px-2 py-1.5 text-right">Projects</th>
-                            <th className="px-2 py-1.5 text-right">CPU</th>
-                            <th className="px-2 py-1.5 text-right">Cost</th>
-                            <th className="px-2 py-1.5 text-right">Budget</th>
+                    <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                        <tr>
+                            <th className="w-full max-w-0 px-3 py-2 font-medium">Owner</th>
+                            <th className="px-3 py-2 font-medium text-right">Projects</th>
+                            <th className="px-3 py-2 font-medium text-right">CPU</th>
+                            <th className="px-3 py-2 font-medium text-right">Cost</th>
+                            <th className="px-3 py-2 font-medium text-right">Budget</th>
                         </tr>
                     </thead>
                     <tbody>
                         {statement === null
                             ? [0, 1].map((row) => (
-                                  <tr key={row} className="border-border/40 border-b last:border-0">
-                                      <td colSpan={5} className="px-2 py-2.5">
+                                  <tr key={row} className="border-t border-border">
+                                      <td colSpan={5} className="px-3 py-2.5">
                                           <Skeleton className="h-4 w-full" />
                                       </td>
                                   </tr>
                               ))
                             : statement.owners.map((entry) => {
                                   const budget =
-                                      entry.owner.kind === "org" ? (view?.budgets?.[entry.owner.id] ?? null) : null;
+                                      entry.owner.kind === "org"
+                                          ? (view?.budgets?.[entry.owner.id] ?? null)
+                                          : null;
                                   const spent = entry.cost?.total ?? 0;
-                                  const level = budget === null ? 0 : core.budgetLevel(spent, budget);
+                                  const level =
+                                      budget === null ? 0 : core.budgetLevel(spent, budget);
                                   return (
                                       <tr
                                           key={`${entry.owner.kind}:${entry.owner.id}`}
-                                          className="border-border/40 border-b last:border-0"
+                                          className="border-t border-border hover:bg-card-hover"
                                       >
-                                          <td className="w-full max-w-0 px-2 py-2">
+                                          <td className="w-full max-w-0 px-3 py-2">
                                               <OwnerName owner={entry.owner} />
                                           </td>
-                                          <td className="px-2 py-2 text-right tabular-nums">{entry.projects}</td>
-                                          <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">
+                                          <td className="px-3 py-2 text-right tabular-nums">
+                                              {entry.projects}
+                                          </td>
+                                          <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
                                               {parts.quantity(entry.usage.cpuHours)} vCPU-h
                                           </td>
-                                          <td className="px-2 py-2 text-right font-medium tabular-nums whitespace-nowrap">
+                                          <td className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap">
                                               {entry.cost ? format.currency(entry.cost.total) : "-"}
                                           </td>
                                           <td
-                                              className={`px-2 py-2 text-right tabular-nums whitespace-nowrap ${
-                                                  level >= 100 ? "text-danger" : level >= 80 ? "text-warning-ink" : "text-muted-foreground"
+                                              className={`px-3 py-2 text-right tabular-nums whitespace-nowrap ${
+                                                  level >= 100
+                                                      ? "text-danger"
+                                                      : level >= 80
+                                                        ? "text-warning-ink"
+                                                        : "text-muted-foreground"
                                               }`}
                                           >
                                               {budget === null
@@ -142,7 +166,10 @@ function OwnerName({ owner }: { owner: core.BillingOwner }) {
     );
     if (!href) return <span className="flex min-w-0 items-center gap-2">{label}</span>;
     return (
-        <Link href={href} className="hover:text-foreground flex min-w-0 items-center gap-2 font-medium">
+        <Link
+            href={href}
+            className="hover:text-foreground flex min-w-0 items-center gap-2 font-medium"
+        >
             {label}
         </Link>
     );

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
 /**
- * The app switcher on a phone. It lists every app with a line under each, which
- * is taller than the screen, and its surface clipped what did not fit - so the
- * bottom half of the list could not be reached. Menus now keep off the edge and
- * scroll inside what is left of the screen.
+ * The app switcher on a phone. Its list of apps can be taller than the screen,
+ * and its surface clipped what did not fit - so the bottom half of the list
+ * could not be reached. Menus now keep off the edge and scroll inside what is
+ * left of the screen. The grid it draws now carries no descriptions, so a long
+ * one can no longer push a tile off the side either.
  */
 
 import { AppSwitcher } from "@polaris/ui";
@@ -40,7 +41,7 @@ const APPS = [
 ];
 
 describe("the app switcher's surface", () => {
-    it("scrolls within the screen instead of clipping, and wraps long descriptions", async () => {
+    it("scrolls within the screen instead of clipping, and draws no descriptions", async () => {
         render(<AppSwitcher apps={APPS} currentAppId="drive" />);
         await userEvent.click(screen.getByRole("button"));
         const menu = await screen.findByRole("menu");
@@ -49,8 +50,9 @@ describe("the app switcher's surface", () => {
         expect(classes).toContain("max-w-[--radix-dropdown-menu-content-available-width]");
         expect(classes).toContain("overflow-y-auto");
         expect(classes).not.toContain("overflow-hidden");
-        const description = screen.getByText("Your mailboxes, read and answered here");
-        expect(description.parentElement?.className).toContain("min-w-0");
+        expect(menu.textContent).not.toContain("Your mailboxes, read and answered here");
+        // Long names cut at the tile's edge rather than widening it.
+        expect(screen.getByText("Mail").className).toContain("truncate");
         expect(screen.getAllByRole("menuitem")).toHaveLength(APPS.length);
     });
 });

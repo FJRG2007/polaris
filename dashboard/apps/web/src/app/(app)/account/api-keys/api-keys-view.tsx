@@ -53,8 +53,6 @@ import * as list from "./api-keys-filter";
 import {
     Badge,
     Button,
-    Card,
-    CardBody,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -131,153 +129,172 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
         <div className="flex flex-col gap-4">
             {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-            <Card>
-                <CardBody className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-end justify-between gap-2">
-                        <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
-                            <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Search</span>
-                                <Input
-                                    value={filters.search}
-                                    placeholder="Name or key"
-                                    autoComplete="off"
-                                    onChange={(event) => change("search", event.target.value)}
-                                />
-                            </label>
-                            <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Environment</span>
-                                <Select
-                                    value={filters.environment}
-                                    onValueChange={(value) => change("environment", value)}
-                                    className="w-40"
-                                    options={[
-                                        { value: "all", label: "All environments" },
-                                        ...API_KEY_ENVIRONMENTS.map((value) => ({
-                                            value,
-                                            label: API_KEY_ENVIRONMENT_LABELS[value]
-                                        }))
-                                    ]}
-                                />
-                            </label>
-                            {/* Offered only where there is something to choose
-                                between: an account with no app-minted keys does
-                                not need a picker whose every option is "all". */}
-                            {apps.length > 0 && (
-                                <label className="flex flex-col gap-1">
-                                    <span className="text-xs text-muted-foreground">App</span>
-                                    <Select
-                                        value={filters.app}
-                                        onValueChange={(value) => change("app", value)}
-                                        className="w-40"
-                                        options={[
-                                            { value: "all", label: "All apps" },
-                                            { value: "none", label: "No app" },
-                                            ...apps.map((app) => ({
-                                                value: app.id,
-                                                label: app.name
-                                            }))
-                                        ]}
-                                    />
-                                </label>
-                            )}
-                            <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Expiry</span>
-                                <Select
-                                    value={filters.expiry}
-                                    onValueChange={(value) =>
-                                        change("expiry", value as list.ExpiryFilter)
-                                    }
-                                    className="w-44"
-                                    options={list.EXPIRY_FILTERS.map((value) => ({
-                                        value,
-                                        label: list.EXPIRY_FILTER_LABELS[value]
-                                    }))}
-                                />
-                            </label>
-                            <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Sort by</span>
-                                <Select
-                                    value={filters.sort}
-                                    onValueChange={(value) => change("sort", value as list.KeySort)}
-                                    className="w-44"
-                                    options={list.KEY_SORTS.map((value) => ({
-                                        value,
-                                        label: list.KEY_SORT_LABELS[value]
-                                    }))}
-                                />
-                            </label>
-                        </div>
-                        <Button size="sm" asChild>
-                            <Link href="/account/api-keys/new" className="no-underline">
-                                <Plus className="size-4" />
-                                New key
-                            </Link>
-                        </Button>
-                    </div>
-
-                    <p className="text-xs text-muted-foreground">
-                        {keys.length === 0
-                            ? "No keys yet."
-                            : narrowed
-                              ? `Showing ${shown.length} of ${keys.length} keys`
-                              : `${keys.length} key${keys.length === 1 ? "" : "s"}`}
-                    </p>
-
-                    {keys.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                            A key lets a script act as you, with a subset of your own permissions
-                            and only from where you allow.
-                        </p>
-                    ) : shown.length === 0 ? (
-                        <div className="flex flex-col items-start gap-2 py-4">
-                            <p className="text-sm text-muted-foreground">
-                                No key matches those filters.
-                            </p>
-                            <Button size="sm" variant="ghost" onClick={() => setFilters(list.NO_FILTERS)}>
-                                Clear filters
-                            </Button>
-                        </div>
-                    ) : (
-                        // Scrolls sideways rather than shrinking: nine columns on
-                        // a phone would be nine unreadable ones.
-                        <div className="-mx-1 overflow-x-auto px-1">
-                            <table className="w-full min-w-[62rem] border-collapse text-sm">
-                                <thead>
-                                    <tr className="border-b border-border text-left text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
-                                        <th scope="col" className="w-full max-w-0 py-2 pr-3 font-medium">
-                                            Name
-                                        </th>
-                                        <th scope="col" className="py-2 pr-3 font-medium">Key</th>
-                                        <th scope="col" className="py-2 pr-3 font-medium">Environment</th>
-                                        <th scope="col" className="py-2 pr-3 font-medium">App</th>
-                                        <th scope="col" className="py-2 pr-3 font-medium">Expires</th>
-                                        <th scope="col" className="py-2 pr-3 font-medium">Created</th>
-                                        <th scope="col" className="py-2 pr-3 font-medium">Last used</th>
-                                        <th scope="col" className="py-2 pr-3 text-right font-medium">
-                                            Calls today
-                                        </th>
-                                        <th scope="col" className="py-2 pr-3 font-medium">Compromised</th>
-                                        <th scope="col" className="py-2 font-medium">
-                                            <span className="sr-only">Actions</span>
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {shown.map((key) => (
-                                        <KeyRow
-                                            key={key.id}
-                                            entry={key}
-                                            date={(iso) => format.date(iso)}
-                                            onRevoke={() => void revoke(key)}
-                                            onDelete={() => void remove(key)}
-                                        />
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+            <div className="flex flex-wrap items-end justify-between gap-2">
+                <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
+                    <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Search</span>
+                        <Input
+                            value={filters.search}
+                            placeholder="Name or key"
+                            autoComplete="off"
+                            onChange={(event) => change("search", event.target.value)}
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Environment</span>
+                        <Select
+                            value={filters.environment}
+                            onValueChange={(value) => change("environment", value)}
+                            className="w-40"
+                            options={[
+                                { value: "all", label: "All environments" },
+                                ...API_KEY_ENVIRONMENTS.map((value) => ({
+                                    value,
+                                    label: API_KEY_ENVIRONMENT_LABELS[value]
+                                }))
+                            ]}
+                        />
+                    </label>
+                    {/* Offered only where there is something to choose
+                        between: an account with no app-minted keys does
+                        not need a picker whose every option is "all". */}
+                    {apps.length > 0 && (
+                        <label className="flex flex-col gap-1">
+                            <span className="text-xs text-muted-foreground">App</span>
+                            <Select
+                                value={filters.app}
+                                onValueChange={(value) => change("app", value)}
+                                className="w-40"
+                                options={[
+                                    { value: "all", label: "All apps" },
+                                    { value: "none", label: "No app" },
+                                    ...apps.map((app) => ({
+                                        value: app.id,
+                                        label: app.name
+                                    }))
+                                ]}
+                            />
+                        </label>
                     )}
-                </CardBody>
-            </Card>
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Expiry</span>
+                        <Select
+                            value={filters.expiry}
+                            onValueChange={(value) => change("expiry", value as list.ExpiryFilter)}
+                            className="w-44"
+                            options={list.EXPIRY_FILTERS.map((value) => ({
+                                value,
+                                label: list.EXPIRY_FILTER_LABELS[value]
+                            }))}
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">Sort by</span>
+                        <Select
+                            value={filters.sort}
+                            onValueChange={(value) => change("sort", value as list.KeySort)}
+                            className="w-44"
+                            options={list.KEY_SORTS.map((value) => ({
+                                value,
+                                label: list.KEY_SORT_LABELS[value]
+                            }))}
+                        />
+                    </label>
+                </div>
+                <Button size="sm" asChild>
+                    <Link href="/account/api-keys/new" className="no-underline">
+                        <Plus className="size-4" />
+                        New key
+                    </Link>
+                </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+                {keys.length === 0
+                    ? "No keys yet."
+                    : narrowed
+                      ? `Showing ${shown.length} of ${keys.length} keys`
+                      : `${keys.length} key${keys.length === 1 ? "" : "s"}`}
+            </p>
+
+            {keys.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                    A key lets a script act as you, with a subset of your own permissions and only
+                    from where you allow.
+                </p>
+            ) : (
+                // Scrolls sideways rather than shrinking: nine columns on a phone
+                // would be nine unreadable ones. The same table every list in
+                // Polaris is drawn as - servers, containers, game servers.
+                <div className="overflow-x-auto rounded-lg border border-border">
+                    <table className="w-full min-w-[62rem] text-sm">
+                        <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                            <tr>
+                                <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
+                                    Name
+                                </th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    Key
+                                </th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    Environment
+                                </th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    App
+                                </th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    Expires
+                                </th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    Created
+                                </th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    Last used
+                                </th>
+                                <th scope="col" className="px-3 py-2 text-right font-medium">
+                                    Calls today
+                                </th>
+                                <th scope="col" className="px-3 py-2 font-medium">
+                                    Compromised
+                                </th>
+                                <th scope="col" className="px-3 py-2">
+                                    <span className="sr-only">Actions</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {shown.map((key) => (
+                                <KeyRow
+                                    key={key.id}
+                                    entry={key}
+                                    date={(iso) => format.date(iso)}
+                                    onRevoke={() => void revoke(key)}
+                                    onDelete={() => void remove(key)}
+                                />
+                            ))}
+                            {shown.length === 0 ? (
+                                <tr>
+                                    <td
+                                        colSpan={10}
+                                        className="px-3 py-10 text-center text-sm text-muted-foreground"
+                                    >
+                                        <span className="flex flex-col items-center gap-2">
+                                            No key matches those filters.
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => setFilters(list.NO_FILTERS)}
+                                            >
+                                                Clear filters
+                                            </Button>
+                                        </span>
+                                    </td>
+                                </tr>
+                            ) : null}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             {confirmElement}
         </div>
@@ -301,8 +318,8 @@ function KeyRow({
     const limits = describeLimits(entry);
 
     return (
-        <tr className="border-b border-border/60 last:border-b-0 hover:bg-muted/30">
-            <td className="max-w-0 py-2 pr-3 align-top">
+        <tr className="border-t border-border hover:bg-card-hover">
+            <td className="max-w-0 px-3 py-2 align-top">
                 <span className="flex min-w-0 items-center gap-2">
                     <Link
                         href={href}
@@ -339,16 +356,16 @@ function KeyRow({
                     </p>
                 ) : null}
             </td>
-            <td className="whitespace-nowrap py-2 pr-3 align-top font-mono text-xs text-muted-foreground">
+            <td className="whitespace-nowrap px-3 py-2 align-top font-mono text-xs text-muted-foreground">
                 {list.maskedKey(entry)}
             </td>
-            <td className="whitespace-nowrap py-2 pr-3 align-top">
+            <td className="whitespace-nowrap px-3 py-2 align-top">
                 <Badge variant={entry.environment === "production" ? "primary" : "neutral"}>
                     {API_KEY_ENVIRONMENT_LABELS[entry.environment as ApiKeyEnvironment] ??
                         entry.environment}
                 </Badge>
             </td>
-            <td className="whitespace-nowrap py-2 pr-3 align-top text-muted-foreground">
+            <td className="whitespace-nowrap px-3 py-2 align-top text-muted-foreground">
                 {entry.projectName ?? "None"}
             </td>
             {/* The same tone as the two date columns beside it. A date that is
@@ -357,7 +374,7 @@ function KeyRow({
                 two cases that do - it has run out, or it is about to. */}
             <td
                 className={cn(
-                    "whitespace-nowrap py-2 pr-3 align-top",
+                    "whitespace-nowrap px-3 py-2 align-top",
                     state === "expired"
                         ? "text-danger"
                         : soon
@@ -371,14 +388,14 @@ function KeyRow({
                     "Never"
                 )}
             </td>
-            <td className="whitespace-nowrap py-2 pr-3 align-top text-muted-foreground">
+            <td className="whitespace-nowrap px-3 py-2 align-top text-muted-foreground">
                 {date(entry.createdAt)}
             </td>
-            <td className="whitespace-nowrap py-2 pr-3 align-top text-muted-foreground">
+            <td className="whitespace-nowrap px-3 py-2 align-top text-muted-foreground">
                 {entry.lastUsedAt ? <RelativeTime iso={entry.lastUsedAt} /> : "Never"}
             </td>
             <td
-                className="whitespace-nowrap py-2 pr-3 text-right align-top tabular-nums"
+                className="whitespace-nowrap px-3 py-2 text-right align-top tabular-nums"
                 title={`${entry.usedRecently} calls in the last 30 days`}
             >
                 {entry.usedToday === 0 ? (
@@ -387,10 +404,10 @@ function KeyRow({
                     entry.usedToday
                 )}
             </td>
-            <td className="whitespace-nowrap py-2 pr-3 align-top text-xs text-muted-foreground">
+            <td className="whitespace-nowrap px-3 py-2 align-top text-xs text-muted-foreground">
                 Coming soon
             </td>
-            <td className="py-2 align-top">
+            <td className="px-3 py-2 align-top">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button

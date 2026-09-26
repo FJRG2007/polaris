@@ -59,7 +59,9 @@ export function useStatement(endpoint: string, cacheKey: string) {
     const params = useSearchParams();
     const months = useMemo(() => core.billingMonthsOffered(new Date(), ROLLUP_RETENTION_MS), []);
     const requested = params.get("month") ?? "";
-    const month = months.includes(requested) ? requested : (months[0] ?? core.billingMonthOf(new Date()));
+    const month = months.includes(requested)
+        ? requested
+        : (months[0] ?? core.billingMonthOf(new Date()));
     const resource = useLiveResource<BillingResponse>({
         url: `${endpoint}?month=${encodeURIComponent(month)}`,
         cacheKey: `${cacheKey}:${month}`,
@@ -85,7 +87,9 @@ export function useMonthNavigation(): (month: string) => void {
 }
 
 /** The display formatters with money in the statement's own currency. */
-export function useStatementFormat(currency: core.CurrencyCode | null | undefined): core.DisplayFormat {
+export function useStatementFormat(
+    currency: core.CurrencyCode | null | undefined
+): core.DisplayFormat {
     const display = useDisplayFormat();
     return useMemo(
         () => (currency ? core.createDisplayFormat({ ...display.preferences, currency }) : display),
@@ -136,7 +140,12 @@ export function StatementToolbar({
                 {children}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label="Export the statement" title="Export">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Export the statement"
+                            title="Export"
+                        >
                             <Download className="size-4" aria-hidden />
                         </Button>
                     </DropdownMenuTrigger>
@@ -184,13 +193,16 @@ function Tile({
                 <Skeleton className="h-7 w-24" />
             ) : (
                 <span className="truncate text-xl font-semibold tabular-nums">
-                    {value} <span className="text-muted-foreground text-xs font-normal">{unit}</span>
+                    {value}{" "}
+                    <span className="text-muted-foreground text-xs font-normal">{unit}</span>
                 </span>
             )}
             {loading ? (
                 <Skeleton className="h-4 w-16" />
             ) : (
-                <span className="text-muted-foreground text-xs tabular-nums">{cost ?? "Not priced"}</span>
+                <span className="text-muted-foreground text-xs tabular-nums">
+                    {cost ?? "Not priced"}
+                </span>
             )}
         </div>
     );
@@ -254,7 +266,13 @@ export function StatementTotals({ view }: { view: BillingResponse | null }) {
                     </span>
                 )}
                 <span className="text-muted-foreground text-xs">
-                    {loading ? "" : cost ? (view?.current ? "So far this month" : "For the month") : "No prices set"}
+                    {loading
+                        ? ""
+                        : cost
+                          ? view?.current
+                              ? "So far this month"
+                              : "For the month"
+                          : "No prices set"}
                 </span>
             </div>
         </div>
@@ -266,9 +284,14 @@ export function StatementNotes({ view }: { view: BillingResponse | null }) {
     const display = useDisplayFormat();
     if (!view) return null;
     const notes: string[] = [];
-    if (view.current) notes.push(`Figures run to ${display.dateTime(view.through)} and fill in as the month goes on.`);
+    if (view.current)
+        notes.push(
+            `Figures run to ${display.dateTime(view.through)} and fill in as the month goes on.`
+        );
     if (view.keptFrom) {
-        notes.push(`Usage before ${display.date(view.keptFrom)} is no longer kept, so this month starts there.`);
+        notes.push(
+            `Usage before ${display.date(view.keptFrom)} is no longer kept, so this month starts there.`
+        );
     }
     if (view.statement.usage.cpuUnmeasuredHours > 0) {
         notes.push(
@@ -299,9 +322,9 @@ function LoadingRows({ columns }: { columns: number }) {
     return (
         <>
             {[0, 1, 2].map((row) => (
-                <tr key={row} className="border-border/40 border-b last:border-0">
+                <tr key={row} className="border-t border-border">
                     {Array.from({ length: columns }, (_, cell) => (
-                        <td key={cell} className="px-2 py-2.5">
+                        <td key={cell} className="px-3 py-2.5">
                             <Skeleton className="h-4 w-full" />
                         </td>
                     ))}
@@ -333,17 +356,17 @@ export function StatementTable({
     const columns = showOwner ? 7 : 6;
 
     return (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full min-w-[40rem] text-sm">
-                <thead>
-                    <tr className="border-border/60 border-b text-left">
-                        <th className="w-full max-w-0 px-2 py-1.5">Project</th>
-                        {showOwner ? <th className="px-2 py-1.5">Owner</th> : null}
-                        <th className="px-2 py-1.5 text-right">CPU</th>
-                        <th className="px-2 py-1.5 text-right">Memory</th>
-                        <th className="px-2 py-1.5 text-right">Storage</th>
-                        <th className="px-2 py-1.5 text-right">Network out</th>
-                        <th className="px-2 py-1.5 text-right">Cost</th>
+                <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                    <tr>
+                        <th className="w-full max-w-0 px-3 py-2 font-medium">Project</th>
+                        {showOwner ? <th className="px-3 py-2 font-medium">Owner</th> : null}
+                        <th className="px-3 py-2 font-medium text-right">CPU</th>
+                        <th className="px-3 py-2 font-medium text-right">Memory</th>
+                        <th className="px-3 py-2 font-medium text-right">Storage</th>
+                        <th className="px-3 py-2 font-medium text-right">Network out</th>
+                        <th className="px-3 py-2 font-medium text-right">Cost</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -351,8 +374,11 @@ export function StatementTable({
                     {statement?.lines.map((line) => {
                         const href = ownerHref(line.owner);
                         return (
-                            <tr key={line.projectId} className="border-border/40 border-b last:border-0">
-                                <td className="w-full max-w-0 px-2 py-2">
+                            <tr
+                                key={line.projectId}
+                                className="border-t border-border hover:bg-card-hover"
+                            >
+                                <td className="w-full max-w-0 px-3 py-2">
                                     <Link
                                         href={`/apps/deploy/${line.projectId}`}
                                         className="hover:text-foreground block truncate font-medium"
@@ -362,9 +388,13 @@ export function StatementTable({
                                     </Link>
                                 </td>
                                 {showOwner ? (
-                                    <td className="text-muted-foreground max-w-[12rem] truncate px-2 py-2">
+                                    <td className="text-muted-foreground max-w-[12rem] truncate px-3 py-2">
                                         {href ? (
-                                            <Link href={href} className="hover:text-foreground" title={line.owner.name}>
+                                            <Link
+                                                href={href}
+                                                className="hover:text-foreground"
+                                                title={line.owner.name}
+                                            >
                                                 {line.owner.name}
                                             </Link>
                                         ) : (
@@ -372,19 +402,19 @@ export function StatementTable({
                                         )}
                                     </td>
                                 ) : null}
-                                <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">
+                                <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
                                     {quantity(line.usage.cpuHours)} vCPU-h
                                 </td>
-                                <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">
+                                <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
                                     {quantity(line.usage.memoryGbHours)} GB-h
                                 </td>
-                                <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">
+                                <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
                                     {quantity(line.usage.storageGbHours / hours)} GB-mo
                                 </td>
-                                <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">
+                                <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
                                     {quantity(line.usage.egressGb)} GB
                                 </td>
-                                <td className="px-2 py-2 text-right font-medium tabular-nums whitespace-nowrap">
+                                <td className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap">
                                     {line.cost ? format.currency(line.cost.total) : "-"}
                                 </td>
                             </tr>
@@ -392,7 +422,10 @@ export function StatementTable({
                     })}
                     {statement !== null && statement.lines.length === 0 ? (
                         <tr>
-                            <td colSpan={columns} className="text-muted-foreground px-2 py-8 text-center">
+                            <td
+                                colSpan={columns}
+                                className="text-muted-foreground px-3 py-8 text-center"
+                            >
                                 {emptyLabel}
                             </td>
                         </tr>

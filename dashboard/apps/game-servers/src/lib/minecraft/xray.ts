@@ -29,6 +29,7 @@
 
 import { z } from "zod";
 import { stripFormatting } from "./parse";
+import { movementEvidenceSchema, type MovementEvidence } from "./movement";
 
 /** Where the settings and the traps are kept on the install. */
 export const XRAY_KEY = "xrayTraps";
@@ -111,10 +112,16 @@ export const xraySettingsSchema = z.object({
         .max(400)
         .refine((value) => !/[\0\r\n]/.test(value), "One line"),
     /** Whether the Nether gets honeypots too. */
-    nether: z.boolean()
+    nether: z.boolean(),
+    /**
+     * Whether players are also watched for flying and teleporting they were not
+     * allowed to (see `movement.ts`). Defaulted so the settings saved before it
+     * existed still read as they were rather than falling back to all defaults.
+     */
+    movement: z.boolean().default(false)
 });
 
-export type XraySettings = z.infer<typeof xraySettingsSchema>;
+export type XraySettings = z.output<typeof xraySettingsSchema>;
 
 export const DEFAULT_XRAY_SETTINGS: XraySettings = {
     enabled: false,
@@ -123,7 +130,8 @@ export const DEFAULT_XRAY_SETTINGS: XraySettings = {
     banHits: 3,
     banHours: 24,
     warning: DEFAULT_WARNING,
-    nether: true
+    nether: true,
+    movement: false
 };
 
 export interface Honeypot {
@@ -160,13 +168,20 @@ export interface XrayState {
     /** Honeypots switched off whose ore could not be put back yet (their chunk
      *  was not loaded), retried until it can. */
     readonly cleanup: readonly Honeypot[];
+    /** What the movement watch saw, by lowercased name (see `movement.ts`). */
+    readonly movement: Readonly<Record<string, MovementEvidence>>;
+    /** Why teleports are not being checked on this server right now, or null
+     *  while they are. Written by the loop, which is the one that can tell. */
+    readonly teleportCheck: string | null;
 }
 
 export const EMPTY_XRAY: XrayState = {
     settings: DEFAULT_XRAY_SETTINGS,
     honeypots: [],
     evidence: {},
-    cleanup: []
+    cleanup: [],
+    movement: {},
+    teleportCheck: null
 };
 
 const dimension = z.enum(["minecraft:overworld", "minecraft:the_nether"]);
@@ -212,7 +227,19 @@ const storedSchema = z.object({
             }
             return kept;
         }),
-    cleanup: eachOf(trapSchema)
+    cleanup: eachOf(trapSchema),
+    movement: z
+        .record(z.string(), z.unknown())
+        .catch({})
+        .transform((entries) => {
+            const kept: Record<string, MovementEvidence> = {};
+            for (const [key, one] of Object.entries(entries)) {
+                const parsed = movementEvidenceSchema.safeParse(one);
+                if (parsed.success) kept[key] = parsed.data;
+            }
+            return kept;
+        }),
+    teleportCheck: z.string().max(200).nullable().catch(null)
 });
 
 /** The stored state, or an empty one for a server that never had it. */

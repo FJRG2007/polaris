@@ -1,7 +1,9 @@
 "use server";
 
 /**
- * Anti X-Ray: the settings, the evidence and the mining figures behind it.
+ * Anti X-Ray and the movement watch: the settings, the evidence and the mining
+ * figures behind it. The scores are worked out from these on the screen, by the
+ * same pure function the tests hold (`suspicion.ts`).
  *
  * Reading the evidence is the moderators'; turning the honeypots on or off and
  * choosing what happens automatically is the managers'. Clearing a player is a
@@ -23,6 +25,7 @@ import {
     type Verdict,
     type XraySettings
 } from "../../lib/minecraft/xray";
+import { countingIncidents, type Incident } from "../../lib/minecraft/movement";
 
 const { recordAudit } = host.auditService;
 const { requireGameServer } = host.appsInstallAccess;
@@ -36,12 +39,21 @@ export interface XrayPlayer {
     readonly bannedAt: number | null;
 }
 
+export interface MovementPlayer {
+    readonly name: string;
+    readonly incidents: readonly Incident[];
+}
+
 export interface XrayView {
     readonly settings: XraySettings;
     /** Honeypots in place, by dimension. */
     readonly traps: { readonly overworld: number; readonly nether: number };
     readonly players: readonly XrayPlayer[];
     readonly mining: readonly PlayerMining[];
+    /** Flying and teleport incidents that still count, per player. */
+    readonly movement: readonly MovementPlayer[];
+    /** Why teleports are not being checked right now, or null while they are. */
+    readonly teleportCheck: string | null;
     /** Why this server cannot have honeypots, or null. */
     readonly refusal: string | null;
 }
@@ -77,6 +89,13 @@ async function viewOf(
             .filter((player) => player.hits.length > 0)
             .sort((left, right) => right.hits.length - left.hits.length),
         mining: withMining && !bedrock ? await readAllMining(ownerId, installedAppId) : [],
+        movement: Object.values(state.movement)
+            .map((evidence) => ({
+                name: evidence.name,
+                incidents: countingIncidents(evidence, now)
+            }))
+            .filter((player) => player.incidents.length > 0),
+        teleportCheck: state.settings.movement ? state.teleportCheck : null,
         refusal: bedrock ? "Bedrock keeps no per-player mining counters Polaris can watch" : null
     };
 }
@@ -123,7 +142,11 @@ export async function saveXraySettingsAction(
             action: "games.xray.settings",
             targetType: "installedApp",
             targetId: installedAppId,
-            metadata: { enabled: settings.enabled, action: settings.action }
+            metadata: {
+                enabled: settings.enabled,
+                action: settings.action,
+                movement: settings.movement
+            }
         });
         return { view: await viewOf(access.ownerId, installedAppId, false) };
     } catch (caught) {
@@ -136,7 +159,8 @@ const clearSchema = z.object({
     player: z.string().trim().min(1).max(40)
 });
 
-/** Forget a player's evidence: the moderator looked and decided it was not cheating. */
+/** Forget a player's evidence, honeypots and movement alike: the moderator looked
+ *  and decided it was not cheating. */
 export async function clearXrayPlayerAction(
     input: z.input<typeof clearSchema>
 ): Promise<{ view?: XrayView; error?: string }> {
@@ -148,7 +172,8 @@ export async function clearXrayPlayerAction(
         const key = player.toLowerCase();
         const cleared = await updateXray(installedAppId, (state) => {
             const { [key]: _, ...evidence } = state.evidence;
-            return { ...state, evidence };
+            const { [key]: __, ...movement } = state.movement;
+            return { ...state, evidence, movement };
         });
         if (!cleared) return { error: "That server is not here" };
         await recordAudit({
