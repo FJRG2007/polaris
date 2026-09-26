@@ -59,7 +59,9 @@ describe("a prune over a pull on the local machine", () => {
     it("is skipped while a pull runs, when it is only tidying, and removes nothing", async () => {
         const pulling = new HostdPorts().pull("ghcr.io/fjrg2007/polaris-vision:latest");
         await settle();
-        await expect(reclaimHostSpace({ whenIdle: true })).rejects.toBeInstanceOf(lock.ImageStoreBusy);
+        await expect(reclaimHostSpace({ whenIdle: true })).rejects.toBeInstanceOf(
+            lock.ImageStoreBusy
+        );
         expect(await new HostdPorts().reclaimSpace({ whenIdle: true })).toBe(0);
         expect(asked).toEqual([]);
         finishPull();
@@ -88,7 +90,10 @@ describe("the lock itself", () => {
     it("holds a pull that arrives while a prune is waiting until the prune is done", async () => {
         const order: string[] = [];
         let releaseFirst!: () => void;
-        const first = lock.withImageUse("m", () => new Promise<void>((resolve) => (releaseFirst = resolve)));
+        const first = lock.withImageUse(
+            "m",
+            () => new Promise<void>((resolve) => (releaseFirst = resolve))
+        );
         const prune = lock.withImagePrune("m", async () => {
             order.push("prune");
         });
@@ -104,10 +109,17 @@ describe("the lock itself", () => {
 
     it("keeps machines apart", async () => {
         let release!: () => void;
-        const pulling = lock.withImageUse(lock.sshMachine("10.0.0.2", 22), () => new Promise<void>((resolve) => (release = resolve)));
-        await expect(lock.withImagePrune(lock.LOCAL_MACHINE, async () => "swept", { whenIdle: true })).resolves.toBe("swept");
+        const pulling = lock.withImageUse(
+            lock.sshMachine("10.0.0.2", 22),
+            () => new Promise<void>((resolve) => (release = resolve))
+        );
         await expect(
-            lock.withImagePrune(lock.sshMachine("10.0.0.2", 22), async () => "swept", { whenIdle: true })
+            lock.withImagePrune(lock.LOCAL_MACHINE, async () => "swept", { whenIdle: true })
+        ).resolves.toBe("swept");
+        await expect(
+            lock.withImagePrune(lock.sshMachine("10.0.0.2", 22), async () => "swept", {
+                whenIdle: true
+            })
         ).rejects.toBeInstanceOf(lock.ImageStoreBusy);
         release();
         await pulling;
@@ -116,9 +128,14 @@ describe("the lock itself", () => {
     it("gives up after waiting too long, and lets what queued behind it go", async () => {
         vi.useFakeTimers();
         let release!: () => void;
-        const stuck = lock.withImageUse("slow", () => new Promise<void>((resolve) => (release = resolve)));
+        const stuck = lock.withImageUse(
+            "slow",
+            () => new Promise<void>((resolve) => (release = resolve))
+        );
         // Caught as it is made: it rejects while the clock is being advanced.
-        const prune = lock.withImagePrune("slow", async () => "swept", { waitMs: 1000 }).catch((error: unknown) => error);
+        const prune = lock
+            .withImagePrune("slow", async () => "swept", { waitMs: 1000 })
+            .catch((error: unknown) => error);
         const queued = lock.withImageUse("slow", async () => "pulled");
         await vi.advanceTimersByTimeAsync(1500);
         expect(await prune).toBeInstanceOf(lock.ImageStoreBusy);
@@ -129,17 +146,23 @@ describe("the lock itself", () => {
 
     it("still sees a pull that was waiting on a prune once that prune is done", async () => {
         let releasePrune!: () => void;
-        const prune = lock.withImagePrune("orphan", () => new Promise<void>((resolve) => (releasePrune = resolve)));
+        const prune = lock.withImagePrune(
+            "orphan",
+            () => new Promise<void>((resolve) => (releasePrune = resolve))
+        );
         await settle();
         let releasePull!: () => void;
-        const pulling = lock.withImageUse("orphan", () => new Promise<void>((resolve) => (releasePull = resolve)));
+        const pulling = lock.withImageUse(
+            "orphan",
+            () => new Promise<void>((resolve) => (releasePull = resolve))
+        );
         await settle();
         releasePrune();
         await prune;
         await settle();
-        await expect(lock.withImagePrune("orphan", async () => "swept", { whenIdle: true })).rejects.toBeInstanceOf(
-            lock.ImageStoreBusy
-        );
+        await expect(
+            lock.withImagePrune("orphan", async () => "swept", { whenIdle: true })
+        ).rejects.toBeInstanceOf(lock.ImageStoreBusy);
         releasePull();
         await pulling;
     });
@@ -149,7 +172,10 @@ describe("the lock itself", () => {
         let releaseBuild!: () => void;
         let pruning!: Promise<unknown>;
         const deploy = lock.withImageUse("span", async () => {
-            await lock.withImageUse("span", () => new Promise<void>((resolve) => (releaseBuild = resolve)));
+            await lock.withImageUse(
+                "span",
+                () => new Promise<void>((resolve) => (releaseBuild = resolve))
+            );
             order.push("built");
             await settle();
             await lock.withImageUse("span", async () => {
@@ -169,37 +195,52 @@ describe("the lock itself", () => {
     it("lets a hold make room for itself without waiting on itself", async () => {
         const order: string[] = [];
         await lock.withImageUse("self", async () => {
-            await lock.withImagePrune("self", async () => {
-                order.push("tidy");
-            }, { whenIdle: true });
-            await lock.withImagePrune("self", async () => {
-                order.push("rescue");
-            }, { waitMs: 1000 });
+            await lock.withImagePrune(
+                "self",
+                async () => {
+                    order.push("tidy");
+                },
+                { whenIdle: true }
+            );
+            await lock.withImagePrune(
+                "self",
+                async () => {
+                    order.push("rescue");
+                },
+                { waitMs: 1000 }
+            );
             await lock.withImageUse("self", async () => {
                 order.push("pull");
             });
         });
         expect(order).toEqual(["tidy", "rescue", "pull"]);
-        await expect(lock.withImagePrune("self", async () => "swept", { whenIdle: true })).resolves.toBe("swept");
+        await expect(
+            lock.withImagePrune("self", async () => "swept", { whenIdle: true })
+        ).resolves.toBe("swept");
     });
 
     it("does not tidy over another hold on the machine from inside its own", async () => {
         let releaseOther!: () => void;
-        const other = lock.withImageUse("two", () => new Promise<void>((resolve) => (releaseOther = resolve)));
+        const other = lock.withImageUse(
+            "two",
+            () => new Promise<void>((resolve) => (releaseOther = resolve))
+        );
         await settle();
         await lock.withImageUse("two", async () => {
-            await expect(lock.withImagePrune("two", async () => "swept", { whenIdle: true })).rejects.toBeInstanceOf(
-                lock.ImageStoreBusy
-            );
+            await expect(
+                lock.withImagePrune("two", async () => "swept", { whenIdle: true })
+            ).rejects.toBeInstanceOf(lock.ImageStoreBusy);
         });
         releaseOther();
         await other;
     });
 
     it("lets go of the machine when the work fails", async () => {
-        await expect(lock.withImageUse("m", async () => Promise.reject(new Error("pull failed")))).rejects.toThrow(
-            "pull failed"
-        );
-        await expect(lock.withImagePrune("m", async () => "swept", { whenIdle: true })).resolves.toBe("swept");
+        await expect(
+            lock.withImageUse("m", async () => Promise.reject(new Error("pull failed")))
+        ).rejects.toThrow("pull failed");
+        await expect(
+            lock.withImagePrune("m", async () => "swept", { whenIdle: true })
+        ).resolves.toBe("swept");
     });
 });

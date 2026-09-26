@@ -178,7 +178,10 @@ echo "disk=$(df -Pk "$HOME" 2>/dev/null | awk 'NR == 2 {print $4 * 1024}')"`);
     private async pullImage(release: RunnerRelease): Promise<RunResult> {
         // Held open so a sweep of this machine cannot prune the layers mid-pull.
         return withImageUse(this.machine, () =>
-            this.runWithTimeout(`docker pull ${quoteArg(release.image)} >/dev/null`, PREPARE_TIMEOUT_MS)
+            this.runWithTimeout(
+                `docker pull ${quoteArg(release.image)} >/dev/null`,
+                PREPARE_TIMEOUT_MS
+            )
         );
     }
 

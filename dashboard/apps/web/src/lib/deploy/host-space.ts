@@ -192,8 +192,14 @@ async function prune(daemon: HostdClient, path: string): Promise<number | null> 
 
 /** Empty the build cache on its own, for somebody who wants exactly that. Never
  *  while something is being built or fetched here - see `image-store-lock`. */
-export async function reclaimBuildCache(options: { whenIdle?: boolean } = {}): Promise<number | null> {
-    return withImagePrune(LOCAL_MACHINE, () => prune(new HostdClient(), BUILD_CACHE_PRUNE_PATH), options);
+export async function reclaimBuildCache(
+    options: { whenIdle?: boolean } = {}
+): Promise<number | null> {
+    return withImagePrune(
+        LOCAL_MACHINE,
+        () => prune(new HostdClient(), BUILD_CACHE_PRUNE_PATH),
+        options
+    );
 }
 
 /**
@@ -214,7 +220,9 @@ export async function reclaimBuildCache(options: { whenIdle?: boolean } = {}): P
  * It waits for the machine to go quiet, or with `whenIdle` it does not run at
  * all and throws ImageStoreBusy - see `image-store-lock`.
  */
-export async function reclaimHostSpace(options: { whenIdle?: boolean } = {}): Promise<number | null> {
+export async function reclaimHostSpace(
+    options: { whenIdle?: boolean } = {}
+): Promise<number | null> {
     return withImagePrune(
         LOCAL_MACHINE,
         async () => {
