@@ -350,9 +350,29 @@ describe("the players list", () => {
                 { name: "Nobody", figures: figures(0, 0) }
             ]
         });
-        expect(suspects.map((one) => one.name)).toEqual(["Steve", "alex"]);
+        // Somebody with nothing against them is still a row - not missing.
+        expect(suspects.map((one) => one.name)).toEqual(["Steve", "alex", "Nobody"]);
         expect(suspects[0]?.xray.level).toBe("confirmed");
         expect(suspects[1]).toMatchObject({ flights: 1, mining: figures(4, 300) });
+        expect(suspects[2]).toMatchObject({ hits: 0, flights: 0, teleports: 0, mining: null });
         expect(incidents.map((one) => one.kind)).toEqual(["honeypot", "flying", "honeypot"]);
+    });
+
+    it("lists whoever is online, even before the game has written their counts", () => {
+        // Reckmy was mining and not in the table: nothing found yet, and the
+        // server had not saved the stats that would have put him there.
+        const { suspects } = buildSuspects({
+            honeypots: [],
+            movement: [],
+            mining: [{ name: "Solojose", figures: figures(4, 129) }],
+            players: ["Reckmy", "solojose"]
+        });
+        expect(suspects.map((one) => one.name).sort()).toEqual(["Reckmy", "Solojose"]);
+        expect(suspects.find((one) => one.name === "Reckmy")).toMatchObject({
+            xray: { level: "unlikely" },
+            movement: { level: "unlikely" },
+            mining: null,
+            lastAt: null
+        });
     });
 });

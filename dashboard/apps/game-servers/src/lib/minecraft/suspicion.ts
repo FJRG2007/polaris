@@ -161,6 +161,13 @@ export function buildSuspects(input: {
         })[];
     }[];
     readonly mining: readonly { readonly name: string; readonly figures: MiningFigures }[];
+    /**
+     * Everybody else to list, at nothing found: whoever is online now. A table
+     * of only the players something was found against left out the one somebody
+     * was looking at - a player mining right now whose counts the game had not
+     * written to disk yet - and reading as "not here" is not the same as "clean".
+     */
+    readonly players?: readonly string[];
 }): { suspects: Suspect[]; incidents: SuspectIncident[] } {
     const rows = new Map<
         string,
@@ -207,8 +214,11 @@ export function buildSuspects(input: {
         );
     }
     for (const one of input.mining) {
-        if (one.figures.deepRock + one.figures.netherRock > 0) row(one.name).mining = one.figures;
+        // Listed whatever they mined; the rate only once there is rock to rate.
+        const held = row(one.name);
+        if (one.figures.deepRock + one.figures.netherRock > 0) held.mining = one.figures;
     }
+    for (const name of input.players ?? []) row(name);
 
     const suspects: Suspect[] = [];
     const incidents: SuspectIncident[] = [];
