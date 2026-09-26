@@ -90,6 +90,7 @@ describe("stored favorites", () => {
         expect(parseFavoriteApps("{not json")).toEqual([]);
         expect(parseFavoriteApps('["nope"]')).toEqual([]);
         expect(parseFavoriteApps('["chat"]')).toEqual(["chat"]);
+        expect(parseFavoriteApps('["nope","chat","chat"]')).toEqual(["chat"]);
     });
 });
 

@@ -103,7 +103,8 @@ describe("watching movement", () => {
         };
         fake.run = (argv) => {
             if (argv[0] === "stat") return { code: 0, output: `${log.length}\n` };
-            if (argv[0] === "tail") return { code: 0, output: log.slice(log.length - Number(argv[2])) };
+            if (argv[0] === "sh" && argv[2]?.startsWith("tail"))
+                return { code: 0, output: log.slice(Number(argv[4]) - 1).slice(-Number(argv[5])) };
             if (argv[0] === "cat") return { code: 0, output: JSON.stringify(ops.map((name) => ({ name, uuid: "x" }))) };
             return { code: 1, output: "" };
         };
@@ -175,6 +176,24 @@ describe("watching movement", () => {
         await look();
         log += "[12:00:01] [Server thread/INFO]: [Admin: Teleported Alex to 3000.0, 64.0, 0.0]\n";
         players = [{ name: "Alex", x: 3000, y: 64, z: 0 }];
+        await look();
+        expect(incidents("Alex")).toEqual([]);
+    });
+
+    it("does not record a jump whose /tp was logged while the look was being taken", async () => {
+        await start();
+        players = [{ name: "Alex", x: 0, y: 64, z: 0 }];
+        await look();
+        await look();
+        const answer = fake.answer;
+        fake.answer = (command) => {
+            if (command === RIDING_COMMAND && players[0]?.x === 0) {
+                log += "[12:00:01] [Server thread/INFO]: [Admin: Teleported Alex to 3000.0, 64.0, 0.0]\n";
+                players = [{ name: "Alex", x: 3000, y: 64, z: 0 }];
+            }
+            return answer(command);
+        };
+        await look();
         await look();
         expect(incidents("Alex")).toEqual([]);
     });

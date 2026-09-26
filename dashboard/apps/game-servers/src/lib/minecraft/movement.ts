@@ -72,7 +72,9 @@ export function movementObjectiveCommands(): string[] {
 
 /**
  * Everybody in the air who has no reason to be: three blocks of air under their
- * feet, and none of what legitimately keeps somebody up. Both spellings of the
+ * feet, air under every corner of them too (somebody sneaking or bridging at an
+ * edge stands with their middle over nothing), and none of what legitimately
+ * keeps somebody up. Both spellings of the
  * status effects are asked for - `active_effects` since 1.20.2, `ActiveEffects`
  * (25 levitation, 28 slow falling) before it - and the one a version does not
  * know simply never matches.
@@ -80,6 +82,8 @@ export function movementObjectiveCommands(): string[] {
 export const AIRBORNE_COMMAND = [
     "execute as @a[gamemode=!creative,gamemode=!spectator] at @s",
     "if block ~ ~-1 ~ minecraft:air if block ~ ~-2 ~ minecraft:air if block ~ ~-3 ~ minecraft:air",
+    "if block ~0.3 ~-1 ~0.3 minecraft:air if block ~-0.3 ~-1 ~0.3 minecraft:air",
+    "if block ~0.3 ~-1 ~-0.3 minecraft:air if block ~-0.3 ~-1 ~-0.3 minecraft:air",
     "unless entity @s[nbt={FallFlying:1b}]",
     "unless entity @s[nbt={abilities:{mayfly:1b}}]",
     "unless entity @s[nbt={RootVehicle:{}}]",
@@ -219,6 +223,14 @@ export type MovementEvidence = z.output<typeof movementEvidenceSchema>;
 /** The incidents that still count. */
 export function countingIncidents(evidence: MovementEvidence | undefined, now: number): Incident[] {
     return (evidence?.incidents ?? []).filter((one) => now - one.at <= MOVEMENT_WINDOW_MS);
+}
+
+/** Whether the owner was already told about what still counts. Once everything
+ *  that was reported has left the window, a new run of incidents is told again. */
+export function alreadyReported(evidence: MovementEvidence | undefined, now: number): boolean {
+    const reportedAt = evidence?.reportedAt ?? null;
+    if (reportedAt === null) return false;
+    return countingIncidents(evidence, now).some((one) => one.at <= reportedAt);
 }
 
 /** Add one, keeping the newest `MAX_INCIDENTS`. */

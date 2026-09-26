@@ -490,19 +490,28 @@ async function logLength(server: ServerContainer): Promise<number | null> {
     return Number.isFinite(size) && size >= 0 ? size : null;
 }
 
-/** What the log gained since the last look. Null when that cannot be known, and
- *  nothing is concluded then. A log shorter than before was rotated: all of it
- *  is new. */
+/** What the log gained from byte `from` (measured before the last look sampled
+ *  anybody) up to now, so it covers everything that happened between the two
+ *  looks. Null when that cannot be known, and nothing is concluded then. A log
+ *  now shorter than `from` was rotated: all of it is new. */
 async function logSince(
     server: ServerContainer,
     from: number | null,
-    to: number | null
+    size: number | null
 ): Promise<string | null> {
-    if (from === null || to === null) return null;
-    const start = to < from ? 0 : from;
-    const read = Math.min(to - start, LOG_READ_MAX);
-    if (read <= 0) return "";
-    const result = await server.run(["tail", "-c", String(read), LOG_FILE]).catch(() => null);
+    if (from === null || size === null) return null;
+    const start = size < from ? 0 : from;
+    const result = await server
+        .run([
+            "sh",
+            "-c",
+            'tail -c "+$1" "$3" | tail -c "$2"',
+            "polaris",
+            String(start + 1),
+            String(LOG_READ_MAX),
+            LOG_FILE
+        ])
+        .catch(() => null);
     return result && result.code === 0 ? result.output : null;
 }
 
@@ -533,6 +542,12 @@ async function watchMovement(
         );
     }
 
+    // Measured before anybody's position, so whatever moved them since the
+    // last look is already in the part of the log that is read.
+    const logFrom = loop.logSize;
+    const size = await logLength(server);
+    loop.logSize = size;
+
     const positions = xray.readPositions(await server.say([xray.WHERE_EVERYBODY_IS[0]!]));
     const dimensions = xray.readDimensions(await server.say([xray.WHERE_EVERYBODY_IS[1]!]));
     const airborne = new Set(
@@ -546,9 +561,6 @@ async function watchMovement(
     const glided = namesIn(await server.say([movement.sinceCommand(movement.GLIDE_OBJECTIVE)]));
     if (glided.size > 0) await server.say([movement.resetCommand(movement.GLIDE_OBJECTIVE)]);
 
-    const size = await logLength(server);
-    const logFrom = loop.logSize;
-    loop.logSize = size;
     // Read only if some jump needs explaining, and at most once a look.
     let log: string | null | undefined;
     const teleportCheck = loop.logAdmin === false ? NO_ADMIN_LOG : size === null ? NO_LOG : null;
@@ -604,7 +616,8 @@ async function watchMovement(
     }
 }
 
-/** Tell the owner once, when a player's movement first looks likely to be cheating. */
+/** Tell the owner once, when a player's movement first looks likely to be cheating,
+ *  and again only after what was reported has left the window. */
 async function reportMovement(
     installedAppId: string,
     loop: Loop,
@@ -613,8 +626,8 @@ async function reportMovement(
 ): Promise<void> {
     const key = name.toLowerCase();
     const evidence = state.movement[key];
-    if (!evidence || evidence.reportedAt !== null) return;
     const now = Date.now();
+    if (!evidence || movement.alreadyReported(evidence, now)) return;
     const counting = movement.countingIncidents(evidence, now);
     const flights = counting.filter((one) => one.kind === "flying").length;
     const score = movementScore(flights, counting.length - flights);

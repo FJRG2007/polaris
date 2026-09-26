@@ -139,7 +139,7 @@ export async function saveXraySettingsAction(
             action: "games.xray.settings",
             targetType: "installedApp",
             targetId: installedAppId,
-            metadata: { enabled: settings.enabled, action: settings.action }
+            metadata: { enabled: settings.enabled, action: settings.action, movement: settings.movement }
         });
         return { view: await viewOf(access.ownerId, installedAppId, false) };
     } catch (caught) {

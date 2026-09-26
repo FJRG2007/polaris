@@ -15,6 +15,7 @@ import {
     MAX_INCIDENTS,
     MOVEMENT_WINDOW_MS,
     NEW_TRACK,
+    alreadyReported,
     countingIncidents,
     explainedByLog,
     incidentAt,
@@ -154,6 +155,12 @@ describe("hovering", () => {
             expect(AIRBORNE_COMMAND).toContain(reason);
         }
     });
+
+    it("needs air under every corner, so somebody sneaking at an edge is standing", () => {
+        for (const corner of ["~0.3 ~-1 ~0.3", "~-0.3 ~-1 ~0.3", "~0.3 ~-1 ~-0.3", "~-0.3 ~-1 ~-0.3"]) {
+            expect(AIRBORNE_COMMAND).toContain(`if block ${corner} minecraft:air`);
+        }
+    });
 });
 
 describe("teleporting", () => {
@@ -202,6 +209,16 @@ describe("keeping incidents", () => {
         expect(evidence.incidents).toHaveLength(MAX_INCIDENTS);
         const old = withIncident(undefined, "Steve", incidentAt("flying", sample(100, 0, NOW - MOVEMENT_WINDOW_MS - 1), null));
         expect(countingIncidents(old, NOW)).toEqual([]);
+    });
+
+    it("tells the owner again only once what was reported has left the window", () => {
+        const reported = { ...withIncident(undefined, "Steve", incidentAt("flying", sample(100, 0, NOW - 1000), null)), reportedAt: NOW - 500 };
+        expect(alreadyReported(reported, NOW)).toBe(true);
+        expect(alreadyReported(withIncident(reported, "Steve", incidentAt("flying", sample(100), null)), NOW)).toBe(true);
+        const later = NOW + MOVEMENT_WINDOW_MS;
+        const fresh = withIncident(reported, "Steve", incidentAt("flying", sample(100, 0, later), null));
+        expect(alreadyReported(fresh, later)).toBe(false);
+        expect(alreadyReported(withIncident(undefined, "Steve", incidentAt("flying", sample(100), null)), NOW)).toBe(false);
     });
 
     it("reads settings and evidence saved before movement existed", () => {

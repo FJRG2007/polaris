@@ -31,12 +31,15 @@ export const favoriteAppsSchema = z
     .refine((ids) => new Set(ids).size === ids.length, "An app can only be pinned once.");
 
 /** Read a stored list back. Anything unparseable is nothing pinned: a preference
- *  is not worth failing a page load over. */
+ *  is not worth failing a page load over. An app that can no longer be pinned -
+ *  renamed, removed, hidden - drops out on its own, and the rest stay pinned. */
 export function parseFavoriteApps(raw: string | null | undefined): string[] {
     if (!raw) return [];
     try {
-        const parsed = favoriteAppsSchema.safeParse(JSON.parse(raw));
-        return parsed.success ? parsed.data : [];
+        const parsed = z.array(z.unknown()).safeParse(JSON.parse(raw));
+        if (!parsed.success) return [];
+        const ids = parsed.data.flatMap((id) => (typeof id === "string" && PINNABLE.has(id.trim()) ? [id.trim()] : []));
+        return [...new Set(ids)].slice(0, MAX_FAVORITE_APPS);
     } catch {
         return [];
     }
