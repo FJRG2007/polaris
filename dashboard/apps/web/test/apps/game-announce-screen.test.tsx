@@ -61,9 +61,8 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/announce-actions", () =
     deleteAnnouncementTemplateAction: async () => ({ templates: [] })
 }));
 
-const { MinecraftAnnounce } = await import(
-    "@polaris-app/game-servers/src/screens/installed/minecraft-announce"
-);
+const { MinecraftAnnounce } =
+    await import("@polaris-app/game-servers/src/screens/installed/minecraft-announce");
 
 afterEach(() => {
     cleanup();
