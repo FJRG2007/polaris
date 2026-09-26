@@ -129,6 +129,32 @@ export const VARIABLES: readonly VariableSpec[] = [
         width: 24
     },
     {
+        // Everybody online and their level. Inline it reads "Steve Lv 12, Alex
+        // Lv 5"; alone on a side panel line it becomes a line a player.
+        name: "server.levels",
+        label: "Everybody's level",
+        kind: "server",
+        sample: "Steve Lv 12, Alex Lv 5",
+        bedrock: false,
+        width: 32
+    },
+    {
+        name: "death.player",
+        label: "Who died last",
+        kind: "server",
+        sample: "Steve",
+        bedrock: false,
+        width: 16
+    },
+    {
+        name: "death.message",
+        label: "The last death, as the game said it",
+        kind: "server",
+        sample: "Steve fell from a high place",
+        bedrock: false,
+        width: 40
+    },
+    {
         name: "call.count",
         label: "People in the group's call",
         kind: "server",
@@ -226,6 +252,14 @@ export function readsPlayerList(text: string): boolean {
         (use) =>
             use.spec?.kind === "account" ||
             ["server.online", "server.max", "server.players"].includes(use.spec?.name ?? "")
+    );
+}
+
+/** Whether it needs the server asked something beyond who is on: everybody's
+ *  level, or the log for the last death. */
+export function readsServer(text: string): boolean {
+    return variablesIn(text).some((use) =>
+        ["server.levels", "death.player", "death.message"].includes(use.spec?.name ?? "")
     );
 }
 

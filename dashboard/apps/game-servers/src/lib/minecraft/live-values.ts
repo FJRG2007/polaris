@@ -11,9 +11,11 @@ import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { PlayerList } from "./parse";
 import type { Recipient, SendContext } from "./announcement";
+import type { ServerContainer } from "./service";
+import * as events from "./player-events";
 import { usesAccount, variablesIn, type VariableValues } from "./text-vars";
 
-const { readInstallConfig } = host.appsInstallConfig;
+const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { voicePresence } = host.chatCalls;
 
 /** Where the chat group whose call `{call.*}` reads is kept on the install. */
@@ -54,12 +56,15 @@ async function callMembers(groupId: string): Promise<string[]> {
  *
  * `players` is who is online as the caller already asked the server, or null
  * when it could not say: `{server.online}` and friends then read as their
- * fallbacks rather than as a count that is wrong.
+ * fallbacks rather than as a count that is wrong. `server` is how everybody's
+ * level and the log are read, for the texts that need them (`readsServer`);
+ * without it those read as their fallbacks, or as the last death kept.
  */
 export async function liveContext(
     installedAppId: string,
     texts: readonly string[],
-    players: PlayerList | null
+    players: PlayerList | null,
+    server?: Pick<ServerContainer, "say" | "run"> | null
 ): Promise<SendContext> {
     const used = new Set(texts.flatMap((text) => variablesIn(text)).map((use) => use.spec?.name));
     const row = await prisma.installedApp.findUnique({
@@ -85,9 +90,48 @@ export async function liveContext(
         values["call.max"] = size === null ? null : String(size);
     }
 
-    if (!texts.some((text) => usesAccount(text))) return { values, recipients: null };
-    if (!players) return { values, recipients: null };
-    return { values, recipients: await accountsOf(installedAppId, players.players) };
+    const lists: Record<string, readonly string[]> = {};
+    if (used.has(events.LEVELS_VARIABLE) && server) {
+        const levels = events.readLevels(await server.say([events.LEVELS_COMMAND]).catch(() => ""));
+        const rows = levels.map(events.levelText);
+        values[events.LEVELS_VARIABLE] = rows.length > 0 ? joined(rows) : null;
+        lists[events.LEVELS_VARIABLE] = rows;
+    }
+    if (used.has("death.player") || used.has("death.message")) {
+        const death = await lastDeath(installedAppId, config, server ?? null);
+        values["death.player"] = death?.player ?? null;
+        values["death.message"] = death?.message ?? null;
+    }
+
+    const recipients =
+        texts.some((text) => usesAccount(text)) && players
+            ? await accountsOf(installedAppId, players.players)
+            : null;
+    return { values, recipients, lists };
+}
+
+/**
+ * The last death: the newest one in the end of the log, kept on the install as
+ * soon as it is seen so a restart - which starts the log again - does not lose
+ * it. Without a server to ask, or with nothing in the log, the one kept.
+ */
+async function lastDeath(
+    installedAppId: string,
+    config: Record<string, unknown>,
+    server: Pick<ServerContainer, "run"> | null
+): Promise<events.LastDeath | null> {
+    const kept = events.readLastDeath(config);
+    if (!server) return kept;
+    const tail = await server
+        .run(["tail", "-c", String(events.DEATH_LOG_BYTES), events.SERVER_LOG])
+        .catch(() => null);
+    const found = tail && tail.code === 0 ? events.lastDeathInLog(tail.output) : null;
+    if (!found || (kept && kept.player === found.player && kept.message === found.message)) {
+        return kept;
+    }
+    const next: events.LastDeath = { ...found, at: Date.now() };
+    await patchInstallConfig(installedAppId, { [events.LAST_DEATH_KEY]: next }).catch(() => undefined);
+    return next;
 }
 
 /** Each player online, with the Polaris account they are tied to, if any. */
