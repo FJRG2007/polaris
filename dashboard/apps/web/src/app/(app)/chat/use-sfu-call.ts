@@ -1097,7 +1097,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                       ) ?? local.getTrackPublication(source))
                     : undefined;
                 for (const extra of extraPublications(all, source, keep)) {
-                    if (extra.track) await local.unpublishTrack(extra.track, false).catch(() => undefined);
+                    if (extra.track)
+                        await local.unpublishTrack(extra.track, false).catch(() => undefined);
                 }
                 return done;
             }),

@@ -60,7 +60,10 @@ describe("publishing one source at a time", () => {
     it("puts up one microphone when two callers ask at the same moment", async () => {
         const turn = serialized();
         const { up, publish } = connection();
-        await Promise.all([turn(MIC, () => publish("joining")), turn(MIC, () => publish("filter changed"))]);
+        await Promise.all([
+            turn(MIC, () => publish("joining")),
+            turn(MIC, () => publish("filter changed"))
+        ]);
         expect(up).toEqual(["joining"]);
     });
 
