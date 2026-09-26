@@ -12,6 +12,9 @@
  * ones close to any player are looked at on every tick, so one blown up or built
  * over minutes ago is never pinned on the next person to find a diamond there.
  *
+ * The same loop also watches for flying and teleporting when that is switched on
+ * (`movement.ts`), since it is already asking the server where everybody is.
+ *
  * The loop is memory; what it knows is on the install's settings, and the minute
  * sweep (`sweepXrayTraps`) starts it again after Polaris restarts or updates.
  * Every write goes through `updateXray`, which only lands on the settings it
@@ -21,7 +24,10 @@
 
 import * as xray from "./xray";
 import { prisma } from "@polaris/db";
+import * as movement from "./movement";
+import { parseNameFile } from "./parse";
 import { host } from "@polaris/app-host";
+import { movementScore } from "./suspicion";
 import { javaComponent } from "./announcement";
 import { timeoutPlayer } from "./timeout-service";
 import { withServerContainer, type ServerContainer } from "./service";
@@ -55,6 +61,18 @@ interface Loop {
     readonly seen: Map<string, number>;
     lastPlace: number;
     lastAudit: number;
+    /** The movement watch: what it remembers per player, by lowercased name. */
+    readonly tracks: Map<string, movement.Track>;
+    moveCounters: boolean;
+    /** Who was riding at the last look: a jump is not judged if they were then or now. */
+    riding: Set<string>;
+    /** The operators, lowercased, and whether the game logs their commands -
+     *  read once a minute. */
+    operators: Set<string>;
+    logAdmin: boolean | null;
+    lastRules: number;
+    /** How long the server log was at the last look, to read only what is new. */
+    logSize: number | null;
 }
 
 const loops = new Map<string, Loop>();
@@ -116,10 +134,15 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     const current = await readState(installedAppId);
     if (!current) return stopLoop(installedAppId);
     const { state } = current;
-    if (!state.settings.enabled) {
-        if (state.honeypots.length === 0 && state.cleanup.length === 0)
-            return stopLoop(installedAppId);
-        return clearTraps(installedAppId, loop);
+    const traps = state.settings.enabled;
+    const watching = state.settings.movement;
+    if (!traps && (state.honeypots.length > 0 || state.cleanup.length > 0)) {
+        await clearTraps(installedAppId, loop);
+    }
+    if (!watching) loop.tracks.clear();
+    if (!traps && !watching) {
+        if (state.honeypots.length === 0 && state.cleanup.length === 0) stopLoop(installedAppId);
+        return;
     }
     const now = Date.now();
     const dims = xray.DIMENSIONS.filter(
@@ -130,6 +153,8 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
 
     await withServerContainer(loop.ownerId, installedAppId, async (server) => {
         if (!server.running || server.edition !== "java") return;
+        if (watching) await watchMovement(installedAppId, loop, server, state);
+        if (!traps) return;
         if (!loop.counters) {
             for (const line of xray.objectiveCommands()) await server.say([line]);
             loop.counters = true;
@@ -444,6 +469,173 @@ async function audit(
     }));
 }
 
+/** Player names, lowercased, out of a `data get entity @s Dimension` over a selector. */
+function namesIn(output: string): Set<string> {
+    return new Set([...xray.readDimensions(output).keys()].map((name) => name.toLowerCase()));
+}
+
+const LOG_FILE = "/data/logs/latest.log";
+/** The most of the log read for one look. A server that wrote more than this in
+ *  a few seconds is being flooded, and the part read is the newest. */
+const LOG_READ_MAX = 1_000_000;
+/** Why teleports cannot be judged, for the screen. */
+const NO_ADMIN_LOG =
+    "Teleports are not checked: this server does not log what operators run (the logAdminCommands game rule is off), so an operator's teleport cannot be told apart";
+const NO_LOG = "Teleports are not checked: the server log cannot be read";
+
+/** How long the server log is now, or null where it cannot be read. */
+async function logLength(server: ServerContainer): Promise<number | null> {
+    const result = await server.run(["stat", "-c", "%s", LOG_FILE]).catch(() => null);
+    const size = result && result.code === 0 ? Number(result.output.trim()) : Number.NaN;
+    return Number.isFinite(size) && size >= 0 ? size : null;
+}
+
+/** What the log gained since the last look. Null when that cannot be known, and
+ *  nothing is concluded then. A log shorter than before was rotated: all of it
+ *  is new. */
+async function logSince(
+    server: ServerContainer,
+    from: number | null,
+    to: number | null
+): Promise<string | null> {
+    if (from === null || to === null) return null;
+    const start = to < from ? 0 : from;
+    const read = Math.min(to - start, LOG_READ_MAX);
+    if (read <= 0) return "";
+    const result = await server.run(["tail", "-c", String(read), LOG_FILE]).catch(() => null);
+    return result && result.code === 0 ? result.output : null;
+}
+
+/**
+ * One look for flying and teleporting (see `movement.ts`). Operators are never
+ * judged, and a teleport is only judged while the game logs operators' commands,
+ * since that is how an operator's teleport is told apart.
+ */
+async function watchMovement(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    state: xray.XrayState
+): Promise<void> {
+    const now = Date.now();
+    if (!loop.moveCounters) {
+        for (const line of movement.movementObjectiveCommands()) await server.say([line]);
+        loop.moveCounters = true;
+    }
+    if (now - loop.lastRules >= PLACE_EVERY_MS) {
+        loop.lastRules = now;
+        loop.logAdmin = movement.readLogAdmin(await server.say([movement.LOG_ADMIN_COMMAND]));
+        const ops = await server.run(["cat", "--", "/data/ops.json"]).catch(() => null);
+        loop.operators = new Set(
+            (ops && ops.code === 0 ? parseNameFile(ops.output) : []).map((name) =>
+                name.toLowerCase()
+            )
+        );
+    }
+
+    const positions = xray.readPositions(await server.say([xray.WHERE_EVERYBODY_IS[0]!]));
+    const dimensions = xray.readDimensions(await server.say([xray.WHERE_EVERYBODY_IS[1]!]));
+    const airborne = new Set(
+        xray
+            .readPositions(await server.say([movement.AIRBORNE_COMMAND]))
+            .map((one) => one.name.toLowerCase())
+    );
+    const riding = namesIn(await server.say([movement.RIDING_COMMAND]));
+    const died = namesIn(await server.say([movement.sinceCommand(movement.DEATH_OBJECTIVE)]));
+    if (died.size > 0) await server.say([movement.resetCommand(movement.DEATH_OBJECTIVE)]);
+    const glided = namesIn(await server.say([movement.sinceCommand(movement.GLIDE_OBJECTIVE)]));
+    if (glided.size > 0) await server.say([movement.resetCommand(movement.GLIDE_OBJECTIVE)]);
+
+    const size = await logLength(server);
+    const logFrom = loop.logSize;
+    loop.logSize = size;
+    // Read only if some jump needs explaining, and at most once a look.
+    let log: string | null | undefined;
+    const teleportCheck = loop.logAdmin === false ? NO_ADMIN_LOG : size === null ? NO_LOG : null;
+    const judgeTeleports = teleportCheck === null && loop.logAdmin === true;
+
+    const found: { name: string; incident: movement.Incident }[] = [];
+    const present = new Set<string>();
+    for (const one of positions) {
+        const key = one.name.toLowerCase();
+        const dimension = dimensions.get(one.name);
+        if (!dimension) continue;
+        present.add(key);
+        const sample: movement.Sample = { dimension, x: one.x, y: one.y, z: one.z, at: now };
+        const track = loop.tracks.get(key) ?? movement.NEW_TRACK;
+        const operator = loop.operators.has(key);
+        const hover = movement.nextHover(track, airborne.has(key) && !operator ? sample : null);
+        if (hover.flying) {
+            found.push({ name: one.name, incident: movement.incidentAt("flying", sample, null) });
+        }
+        const previous = track.last;
+        const excused =
+            operator || riding.has(key) || loop.riding.has(key) || died.has(key) || glided.has(key);
+        if (previous && !excused && judgeTeleports && movement.isTeleport(previous, sample)) {
+            if (log === undefined) log = await logSince(server, logFrom, size);
+            if (log !== null && !movement.explainedByLog(log, one.name)) {
+                found.push({
+                    name: one.name,
+                    incident: movement.incidentAt(
+                        "teleport",
+                        sample,
+                        movement.distanceBetween(previous, sample)
+                    )
+                });
+            }
+        }
+        loop.tracks.set(key, { ...hover.track, last: sample });
+    }
+    for (const key of [...loop.tracks.keys()]) if (!present.has(key)) loop.tracks.delete(key);
+    loop.riding = riding;
+
+    if (found.length === 0 && teleportCheck === state.teleportCheck) return;
+    const next = await updateXray(installedAppId, (fresh) => {
+        const kept = { ...fresh.movement };
+        for (const { name, incident } of found) {
+            const key = name.toLowerCase();
+            kept[key] = movement.withIncident(kept[key], name, incident);
+        }
+        return { ...fresh, movement: kept, teleportCheck };
+    });
+    if (!next) return;
+    for (const name of new Set(found.map((one) => one.name))) {
+        await reportMovement(installedAppId, loop, next, name);
+    }
+}
+
+/** Tell the owner once, when a player's movement first looks likely to be cheating. */
+async function reportMovement(
+    installedAppId: string,
+    loop: Loop,
+    state: xray.XrayState,
+    name: string
+): Promise<void> {
+    const key = name.toLowerCase();
+    const evidence = state.movement[key];
+    if (!evidence || evidence.reportedAt !== null) return;
+    const now = Date.now();
+    const counting = movement.countingIncidents(evidence, now);
+    const flights = counting.filter((one) => one.kind === "flying").length;
+    const score = movementScore(flights, counting.length - flights);
+    if (score.level !== "likely" && score.level !== "confirmed") return;
+    await updateXray(installedAppId, (fresh) => {
+        const held = fresh.movement[key];
+        if (!held) return fresh;
+        return { ...fresh, movement: { ...fresh.movement, [key]: { ...held, reportedAt: now } } };
+    });
+    const serverName = (await readState(installedAppId))?.name ?? "Minecraft";
+    await createNotification({
+        userId: loop.ownerId,
+        type: "games.xray",
+        title: `${name} may be flying or teleporting on ${serverName}`,
+        body: `${score.reasons.join(". ")}. Nothing was done to them: look at where and when before deciding.`,
+        href: `/apps/installed/${installedAppId}/security`,
+        level: "warning",
+        actionRequired: true
+    }).catch(() => undefined);
+}
+
 /** Switched off: every honeypot back to rock, the ones it cannot reach yet kept to retry. */
 async function clearTraps(installedAppId: string, loop: Loop): Promise<void> {
     await withServerContainer(loop.ownerId, installedAppId, async (server) => {
@@ -498,13 +690,21 @@ export function startXrayTraps(ownerId: string, installedAppId: string): void {
         tick: 0,
         seen: new Map(),
         lastPlace: 0,
-        lastAudit: Date.now()
+        lastAudit: Date.now(),
+        tracks: new Map(),
+        moveCounters: false,
+        riding: new Set(),
+        operators: new Set(),
+        logAdmin: null,
+        lastRules: 0,
+        logSize: null
     };
     loop.timer.unref?.();
     loops.set(installedAppId, loop);
 }
 
-/** The minute sweep: a loop for every server that has honeypots on, or left to clear. */
+/** The minute sweep: a loop for every server that has honeypots or the movement
+ *  watch on, or honeypots left to clear. */
 export async function sweepXrayTraps(): Promise<{ running: number }> {
     const rows = await prisma.installedApp.findMany({
         where: { status: { not: "removed" }, catalogId: "minecraft" },
@@ -512,7 +712,12 @@ export async function sweepXrayTraps(): Promise<{ running: number }> {
     });
     for (const row of rows) {
         const state = xray.readXray(readInstallConfig(row.config));
-        if (state.settings.enabled || state.honeypots.length > 0 || state.cleanup.length > 0) {
+        if (
+            state.settings.enabled ||
+            state.settings.movement ||
+            state.honeypots.length > 0 ||
+            state.cleanup.length > 0
+        ) {
             startXrayTraps(row.ownerId, row.id);
         }
     }
