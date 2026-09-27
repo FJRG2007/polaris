@@ -349,13 +349,15 @@ export function FormattedTextField({
                                 onMouseEnter={() => setHighlight(index)}
                                 className={cn(
                                     "flex cursor-pointer items-baseline justify-between gap-3 rounded px-2 py-1 text-xs",
-                                    index === current && "bg-card-hover"
+                                    index === current && "bg-option-hover"
                                 )}
                             >
                                 <code className="shrink-0 font-mono text-foreground">
                                     {option.text}
                                 </code>
-                                <span className="truncate text-muted-foreground">{option.label}</span>
+                                <span className="truncate text-muted-foreground">
+                                    {option.label}
+                                </span>
                             </li>
                         ))}
                     </ul>

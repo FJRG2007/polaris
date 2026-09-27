@@ -124,9 +124,12 @@ export function AccountInput({
     // change handler and would open the list again on the name just chosen.
     const writing = useRef(false);
 
-    useEffect(() => () => {
-        if (timer.current) clearTimeout(timer.current);
-    }, []);
+    useEffect(
+        () => () => {
+            if (timer.current) clearTimeout(timer.current);
+        },
+        []
+    );
 
     const showing = open && results.length > 0;
 
@@ -178,7 +181,10 @@ export function AccountInput({
 
         const ticket = ++asked.current;
         timer.current = setTimeout(async () => {
-            const answer = await runAction(() => searchAccountsAction({ query }), () => undefined);
+            const answer = await runAction(
+                () => searchAccountsAction({ query }),
+                () => undefined
+            );
             if (ticket !== asked.current) return;
             const found = answer?.results ?? [];
             setResults(found);
@@ -302,66 +308,75 @@ export function AccountInput({
             />
             {showing && anchor
                 ? createPortal(
-                // A field that names an account matches on the identity beside
-                // the name, so the name here is the account's own rather than
-                // whatever the person typing once called them.
-                <RealNames>
-                    <ul
-                        id={listId}
-                        role="listbox"
-                        // Pointer events back on: a modal dialog turns them off on
-                        // the body while it is open, and this list is drawn there,
-                        // so inside a dialog it could be seen and not hovered or
-                        // chosen from. React still counts it as the dialog's own,
-                        // so choosing from it does not close the dialog.
-                        // Above the dialog it is usually inside, which sits at z-50.
-                        style={{ left: anchor.left, top: anchor.top, width: anchor.width }}
-                        className={cn(POPUP_CLASS, "pointer-events-auto fixed z-[60]")}
-                    >
-                        {results.map((account, index) => {
-                            const identity = identityOf(account);
-                            return (
-                                <li key={account.id}>
-                                    <PersonRow
-                                        as="button"
-                                        personId={account.id}
-                                        type="button"
-                                        role="option"
-                                        aria-selected={index === active}
-                                        // Mouse down rather than click: the blur that
-                                        // follows would have closed the list before a
-                                        // click ever landed.
-                                        onMouseDown={(event) => {
-                                            event.preventDefault();
-                                            choose(account);
-                                        }}
-                                        onMouseEnter={() => setActive(index)}
-                                        className={cn(
-                                            POPUP_ITEM_CLASS,
-                                            index === active ? "bg-muted" : "hover:bg-muted/60"
-                                        )}
-                                    >
-                                        <Avatar
-                                            person={{ id: account.id, name: account.name, image: account.image }}
-                                            size={20}
-                                        />
-                                        <span className="min-w-0 flex-1 truncate" title={account.name}>
-                                            <PersonName id={account.id} name={account.name} />
-                                        </span>
-                                        <span
-                                            className="max-w-[9rem] shrink-0 truncate text-[0.6875rem] text-muted-foreground"
-                                            title={identity}
-                                        >
-                                            {identity}
-                                        </span>
-                                    </PersonRow>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </RealNames>,
-                document.body
-              )
+                      // A field that names an account matches on the identity beside
+                      // the name, so the name here is the account's own rather than
+                      // whatever the person typing once called them.
+                      <RealNames>
+                          <ul
+                              id={listId}
+                              role="listbox"
+                              // Pointer events back on: a modal dialog turns them off on
+                              // the body while it is open, and this list is drawn there,
+                              // so inside a dialog it could be seen and not hovered or
+                              // chosen from. React still counts it as the dialog's own,
+                              // so choosing from it does not close the dialog.
+                              // Above the dialog it is usually inside, which sits at z-50.
+                              style={{ left: anchor.left, top: anchor.top, width: anchor.width }}
+                              className={cn(POPUP_CLASS, "pointer-events-auto fixed z-[60]")}
+                          >
+                              {results.map((account, index) => {
+                                  const identity = identityOf(account);
+                                  return (
+                                      <li key={account.id}>
+                                          <PersonRow
+                                              as="button"
+                                              personId={account.id}
+                                              type="button"
+                                              role="option"
+                                              aria-selected={index === active}
+                                              // Mouse down rather than click: the blur that
+                                              // follows would have closed the list before a
+                                              // click ever landed.
+                                              onMouseDown={(event) => {
+                                                  event.preventDefault();
+                                                  choose(account);
+                                              }}
+                                              onMouseEnter={() => setActive(index)}
+                                              className={cn(
+                                                  POPUP_ITEM_CLASS,
+                                                  index === active
+                                                      ? "bg-option-hover"
+                                                      : "hover:bg-option-hover/60"
+                                              )}
+                                          >
+                                              <Avatar
+                                                  person={{
+                                                      id: account.id,
+                                                      name: account.name,
+                                                      image: account.image
+                                                  }}
+                                                  size={20}
+                                              />
+                                              <span
+                                                  className="min-w-0 flex-1 truncate"
+                                                  title={account.name}
+                                              >
+                                                  <PersonName id={account.id} name={account.name} />
+                                              </span>
+                                              <span
+                                                  className="max-w-[9rem] shrink-0 truncate text-[0.6875rem] text-muted-foreground"
+                                                  title={identity}
+                                              >
+                                                  {identity}
+                                              </span>
+                                          </PersonRow>
+                                      </li>
+                                  );
+                              })}
+                          </ul>
+                      </RealNames>,
+                      document.body
+                  )
                 : null}
         </div>
     );

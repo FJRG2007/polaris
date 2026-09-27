@@ -21,7 +21,14 @@ import { renderSidebar } from "../../lib/minecraft/sidebar-render";
 import { moved, useListOrder } from "../../components/use-list-order";
 import { WholeNumberInput } from "../../components/whole-number-input";
 import { GripVertical, Loader2, Plus, Trash2, Trophy } from "lucide-react";
-import { SIDEBAR_BLOCKS, withBlock, withRotatingBlocks } from "../../lib/minecraft/sidebar-blocks";
+import {
+    SIDEBAR_BLOCKS,
+    rotatingBlocksAt,
+    withBlock,
+    withRotatingBlocks,
+    withRotatingBlocksAt,
+    type SidebarBlock
+} from "../../lib/minecraft/sidebar-blocks";
 import { RANKINGS, STATS_RANKINGS } from "../../lib/minecraft/rankings";
 import {
     Button,
@@ -40,7 +47,9 @@ import {
     DropdownMenuTrigger,
     Select,
     Switch,
-    cn
+    allChosen,
+    cn,
+    useRangeSelection
 } from "@polaris/ui";
 import * as side from "../../lib/minecraft/sidebar";
 import { VariablesHelp } from "../../components/variables-help";
@@ -64,7 +73,7 @@ export function MinecraftSidebar({
     const [state, setState] = useState<LiveDisplayState | null>(null);
     const [draft, setDraft] = useState<side.SidebarConfig>(side.DEFAULT_SIDEBAR);
     /** The "several leaderboards, taking turns" dialog, while it is open. */
-    const [rotating, setRotating] = useState<{ ids: string[]; every: number } | null>(null);
+    const [rotating, setRotating] = useState<Rotating | null>(null);
     const [group, setGroup] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
@@ -241,6 +250,23 @@ export function MinecraftSidebar({
                                             inserts={inserts}
                                             disabled={!canManage}
                                         />
+                                        {canManage && rotatingBlocksAt(draft.lines, index) ? (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="mt-1"
+                                                onClick={() => {
+                                                    const pair = rotatingBlocksAt(
+                                                        draft.lines,
+                                                        index
+                                                    );
+                                                    if (pair) setRotating({ ...pair, at: index });
+                                                }}
+                                            >
+                                                <Trophy className="size-4" /> Choose the
+                                                leaderboards taking turns here
+                                            </Button>
+                                        ) : null}
                                     </div>
                                     <Button
                                         size="icon"
@@ -319,7 +345,8 @@ export function MinecraftSidebar({
                                                             ids: SIDEBAR_BLOCKS.slice(0, 2).map(
                                                                 (block) => block.id
                                                             ),
-                                                            every: side.SIDEBAR_EVERY_DEFAULT * 2
+                                                            every: side.SIDEBAR_EVERY_DEFAULT * 2,
+                                                            at: null
                                                         }),
                                                     0
                                                 )
@@ -396,83 +423,32 @@ export function MinecraftSidebar({
             </div>
 
             {rotating ? (
-                <Dialog open onOpenChange={(open: boolean) => !open && setRotating(null)}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Leaderboards taking turns</DialogTitle>
-                        </DialogHeader>
-                        <p className="text-sm text-muted-foreground">
-                            Two lines that show each of these in turn: its heading, and the list
-                            under it.
-                        </p>
-                        <ul className="grid max-h-72 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
-                            {SIDEBAR_BLOCKS.map((block) => (
-                                <li key={block.id}>
-                                    <label className="flex cursor-pointer items-center gap-2 text-sm">
-                                        <Checkbox
-                                            checked={rotating.ids.includes(block.id)}
-                                            onChange={(event) =>
-                                                setRotating({
-                                                    ...rotating,
-                                                    ids: event.target.checked
-                                                        ? [...rotating.ids, block.id].slice(
-                                                              0,
-                                                              side.SIDEBAR_FRAMES_MAX
-                                                          )
-                                                        : rotating.ids.filter(
-                                                              (id) => id !== block.id
-                                                          )
-                                                })
-                                            }
-                                        />
-                                        {block.label}
-                                    </label>
-                                </li>
-                            ))}
-                        </ul>
-                        <label className="flex items-center gap-2 text-sm">
-                            Each for
-                            <WholeNumberInput
-                                min={side.SIDEBAR_EVERY_MIN}
-                                max={side.SIDEBAR_EVERY_MAX}
-                                value={rotating.every}
-                                onValueChange={(every) => setRotating({ ...rotating, every })}
-                                className="h-8 w-20"
-                                aria-label="Seconds each leaderboard shows"
-                            />
-                            seconds
-                        </label>
-                        {rotating.ids.length < 2 ? (
-                            <p className="text-xs text-muted-foreground">Choose at least two.</p>
-                        ) : null}
-                        <DialogFooter>
-                            <Button variant="ghost" onClick={() => setRotating(null)}>
-                                Cancel
-                            </Button>
-                            <Button
-                                disabled={
-                                    rotating.ids.length < 2 ||
-                                    draft.lines.length + 2 > side.SIDEBAR_LINES_MAX
-                                }
-                                onClick={() => {
-                                    addLines(
-                                        withRotatingBlocks(
-                                            draft.lines,
-                                            SIDEBAR_BLOCKS.filter((block) =>
-                                                rotating.ids.includes(block.id)
-                                            ),
-                                            rotating.every,
-                                            side.SIDEBAR_LINES_MAX
-                                        )
-                                    );
-                                    setRotating(null);
-                                }}
-                            >
-                                Add
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                <RotatingDialog
+                    rotating={rotating}
+                    onChange={setRotating}
+                    room={draft.lines.length + 2 <= side.SIDEBAR_LINES_MAX}
+                    onDone={(blocks) => {
+                        if (rotating.at === null) {
+                            addLines(
+                                withRotatingBlocks(
+                                    draft.lines,
+                                    blocks,
+                                    rotating.every,
+                                    side.SIDEBAR_LINES_MAX
+                                )
+                            );
+                        } else {
+                            const next = withRotatingBlocksAt(
+                                draft.lines,
+                                rotating.at,
+                                blocks,
+                                rotating.every
+                            );
+                            if (next) change({ lines: next });
+                        }
+                        setRotating(null);
+                    }}
+                />
             ) : null}
 
             {/* The preview kept in view, and what can be written in the room
@@ -482,6 +458,149 @@ export function MinecraftSidebar({
                 <VariablesHelp edition="java" scope="server" className="lg:min-h-0" />
             </div>
         </div>
+    );
+}
+
+/** The leaderboards being chosen to take turns: for a new pair, or for the
+ *  pair already at line `at`. */
+interface Rotating {
+    readonly ids: string[];
+    readonly every: number;
+    readonly at: number | null;
+}
+
+/**
+ * Which leaderboards take turns, and for how long each. Chosen the way files
+ * are in an explorer: a press takes or leaves one, Shift with a press a whole
+ * stretch, Ctrl+A everything. The number beside each is its turn.
+ */
+function RotatingDialog({
+    rotating,
+    onChange,
+    room,
+    onDone
+}: {
+    rotating: Rotating;
+    onChange: (next: Rotating | null) => void;
+    /** Whether the panel has room for two more lines, for a new pair. */
+    room: boolean;
+    onDone: (blocks: SidebarBlock[]) => void;
+}) {
+    const everyId = useMemo(() => SIDEBAR_BLOCKS.map((block) => block.id), []);
+    const setIds = useCallback(
+        (ids: string[]) => onChange({ ...rotating, ids: ids.slice(0, side.SIDEBAR_FRAMES_MAX) }),
+        [onChange, rotating]
+    );
+    const selection = useRangeSelection(everyId, rotating.ids, setIds);
+    const editing = rotating.at !== null;
+    const chosen = rotating.ids.flatMap(
+        (id) => SIDEBAR_BLOCKS.find((block) => block.id === id) ?? []
+    );
+
+    return (
+        <Dialog open onOpenChange={(open: boolean) => !open && onChange(null)}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Leaderboards taking turns</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground">
+                    Two lines that show each of these in turn: its heading, and the list under it.
+                    Shift-click takes a whole stretch, Ctrl+A all of them.
+                </p>
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span>
+                        {rotating.ids.length} of {SIDEBAR_BLOCKS.length} chosen
+                    </span>
+                    <span className="flex gap-1">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIds(allChosen(everyId, rotating.ids))}
+                        >
+                            Choose all
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={rotating.ids.length === 0}
+                            onClick={() => setIds([])}
+                        >
+                            Clear
+                        </Button>
+                    </span>
+                </div>
+                <ul
+                    className="grid max-h-72 select-none gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2"
+                    onKeyDown={selection.onKeyDown}
+                    aria-label="Leaderboards"
+                >
+                    {SIDEBAR_BLOCKS.map((block) => {
+                        const turn = rotating.ids.indexOf(block.id);
+                        return (
+                            <li key={block.id}>
+                                <label
+                                    className="flex cursor-pointer items-center gap-2 text-sm"
+                                    onClick={(event) => {
+                                        // A press on the words is taken here, with the keys
+                                        // held during it, rather than handed on to the box
+                                        // as a click that would not carry Shift. A press on
+                                        // the box is the box's own.
+                                        if (event.target instanceof HTMLInputElement) return;
+                                        event.preventDefault();
+                                        selection.press(block.id, event);
+                                    }}
+                                >
+                                    <Checkbox
+                                        checked={turn >= 0}
+                                        onChange={() => undefined}
+                                        onClick={(event) => selection.press(block.id, event)}
+                                    />
+                                    <span className="min-w-0 flex-1 truncate">{block.label}</span>
+                                    {turn >= 0 ? (
+                                        <span
+                                            className="shrink-0 text-xs tabular-nums text-muted-foreground"
+                                            title="Its turn"
+                                        >
+                                            {turn + 1}
+                                        </span>
+                                    ) : null}
+                                </label>
+                            </li>
+                        );
+                    })}
+                </ul>
+                <label className="flex items-center gap-2 text-sm">
+                    Each for
+                    <WholeNumberInput
+                        min={side.SIDEBAR_EVERY_MIN}
+                        max={side.SIDEBAR_EVERY_MAX}
+                        value={rotating.every}
+                        onValueChange={(every) => onChange({ ...rotating, every })}
+                        className="h-8 w-20"
+                        aria-label="Seconds each leaderboard shows"
+                    />
+                    seconds
+                </label>
+                {rotating.ids.length < 2 ? (
+                    <p className="text-xs text-muted-foreground">Choose at least two.</p>
+                ) : !editing && !room ? (
+                    <p className="text-xs text-danger">
+                        The panel has no room for two more lines. Remove one first.
+                    </p>
+                ) : null}
+                <DialogFooter>
+                    <Button variant="ghost" onClick={() => onChange(null)}>
+                        Cancel
+                    </Button>
+                    <Button
+                        disabled={chosen.length < 2 || (!editing && !room)}
+                        onClick={() => onDone(chosen)}
+                    >
+                        {editing ? "Save" : "Add"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 

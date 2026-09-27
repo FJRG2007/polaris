@@ -161,7 +161,7 @@ export function AgentSelect({
                                         setQuery("");
                                         setOpen(false);
                                     }}
-                                    className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-left font-normal"
+                                    className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-left font-normal hover:bg-option-hover"
                                 >
                                     <Check
                                         className={`size-4 shrink-0 ${option.key === value ? "opacity-100" : "opacity-0"}`}

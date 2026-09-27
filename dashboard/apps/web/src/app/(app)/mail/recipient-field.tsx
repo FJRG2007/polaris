@@ -185,7 +185,7 @@ export function RecipientField({
                                     className={cn(
                                         "flex w-full items-baseline gap-2 px-2 py-1.5 text-left text-[13px]",
                                         index === highlight
-                                            ? "bg-card text-foreground"
+                                            ? "bg-option-hover text-foreground"
                                             : "text-muted-foreground"
                                     )}
                                     // Pressing a suggestion must not blur the box

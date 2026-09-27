@@ -5,8 +5,8 @@
  * the name first.
  */
 
-import { plainLine, type SidebarLine } from "./sidebar";
 import { RANKINGS, STATS_RANKINGS } from "./rankings";
+import { plainLine, type SidebarLine } from "./sidebar";
 
 export interface SidebarBlock {
     readonly id: string;
@@ -64,14 +64,79 @@ export function withRotatingBlocks(
     max: number
 ): SidebarLine[] | null {
     if (blocks.length < 2 || lines.length + 2 > max) return null;
-    const turn = (frames: string[]): SidebarLine => ({
-        ...plainLine(frames[0] ?? ""),
-        frames,
-        every
-    });
-    return [
-        ...lines,
-        turn(blocks.map((block) => block.lines[0] ?? "")),
-        turn(blocks.map((block) => block.lines[1] ?? ""))
-    ];
+    return [...lines, ...turnLines(blocks, every, null, lines.length)];
+}
+
+/** The block a list line's text shows: written as the block writes it, or
+ *  with the block's variable in it however it was restyled since. */
+function blockShowing(text: string): SidebarBlock | null {
+    const shown = variableIn(text);
+    return (
+        SIDEBAR_BLOCKS.find((block) => block.lines[1] === text) ??
+        (shown
+            ? SIDEBAR_BLOCKS.find((block) => variableIn(block.lines[1] ?? "") === shown)
+            : null) ??
+        null
+    );
+}
+
+/** The first variable a text shows, by name. */
+function variableIn(text: string): string | null {
+    return /\{\s*([\w.]+)\s*[|}]/.exec(text)?.[1]?.toLowerCase() ?? null;
+}
+
+/**
+ * The leaderboards the line at `at` and the one under it take turns between,
+ * in turn order, and how long each shows - when they are a pair made by
+ * `withRotatingBlocks`. Null for any other line, so only such a pair offers
+ * to be chosen again.
+ */
+export function rotatingBlocksAt(
+    lines: readonly SidebarLine[],
+    at: number
+): { readonly ids: string[]; readonly every: number } | null {
+    const heading = lines[at];
+    const list = lines[at + 1];
+    if (!heading || !list || heading.frames.length < 2) return null;
+    if (heading.frames.length !== list.frames.length) return null;
+    // A heading shows no leaderboard of its own; a pair starts at the heading.
+    if (heading.frames.some((text) => blockShowing(text))) return null;
+    const ids = list.frames.map((text) => blockShowing(text)?.id ?? null);
+    if (ids.some((id) => id === null)) return null;
+    return { ids: ids as string[], every: heading.every };
+}
+
+/**
+ * The pair at `at` taking turns between other leaderboards. One that stays
+ * keeps its texts as they were restyled, and the lines keep their effects;
+ * one that is new comes as its block writes it.
+ */
+export function withRotatingBlocksAt(
+    lines: readonly SidebarLine[],
+    at: number,
+    blocks: readonly SidebarBlock[],
+    every: number
+): SidebarLine[] | null {
+    if (blocks.length < 2 || !rotatingBlocksAt(lines, at)) return null;
+    return [...lines.slice(0, at), ...turnLines(blocks, every, lines, at), ...lines.slice(at + 2)];
+}
+
+/** The heading line and the list line of a pair, from `lines` at `at` where it
+ *  already has them. */
+function turnLines(
+    blocks: readonly SidebarBlock[],
+    every: number,
+    lines: readonly SidebarLine[] | null,
+    at: number
+): [SidebarLine, SidebarLine] {
+    const had = lines ? rotatingBlocksAt(lines, at) : null;
+    const line = (row: 0 | 1): SidebarLine => {
+        const frames = blocks.map((block) => {
+            const was = had ? had.ids.indexOf(block.id) : -1;
+            return was >= 0 ? (lines?.[at + row]?.frames[was] ?? "") : (block.lines[row] ?? "");
+        });
+        const before = had ? lines?.[at + row] : undefined;
+        return { ...(before ?? plainLine("")), frames, every };
+    };
+    return [line(0), line(1)];
 }
