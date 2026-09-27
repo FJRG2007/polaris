@@ -131,6 +131,11 @@ export interface AppExtension {
      * failure: most of the time nobody is playing.
      */
     readonly relayChatMessage?: (message: RelayedChatMessage) => Promise<void>;
+
+    /** Whether a message could reach this account in the game at all: the app
+     *  knows which of its players is them. Until it does, the setting that
+     *  chooses which messages go there is not offered. */
+    readonly chatRelayReady?: (userId: string) => Promise<boolean>;
 }
 
 /** One Chat message on its way into a game, already decided to be wanted. */

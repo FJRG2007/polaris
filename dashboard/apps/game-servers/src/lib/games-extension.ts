@@ -97,6 +97,8 @@ export const gameServersExtension: AppExtension = {
     relayChatMessage: async (message) =>
         (await import("./minecraft/chat-relay")).relayChatToMinecraft(message),
 
+    chatRelayReady: async (userId) => (await import("./minecraft/chat-relay")).relayReady(userId),
+
     // Somebody invited because they play here has just made their account.
 
     claimLink: async ({ userId, installedAppId, grantedById, link }) => {

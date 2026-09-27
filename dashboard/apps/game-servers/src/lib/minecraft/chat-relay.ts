@@ -33,14 +33,14 @@
  */
 
 import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
 import { addressMatches } from "./access";
 import { BROADCAST_TAG } from "./broadcast";
 import { parseJoinAddresses } from "./parse";
 import { gameOfServer } from "@polaris/core";
-import { host } from "@polaris/app-host";
 import { playerSelector } from "./announcement";
-import { signInAddresses } from "../game-sign-in-addresses";
 import { editionOf, withServerContainer } from "./service";
+import { signInAddresses } from "../game-sign-in-addresses";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 
 /** What arrives, as core describes it. */
@@ -222,6 +222,49 @@ export async function relayTargets(
         targets.push({ installedAppId: link.installedAppId, ownerId, player: on.name });
     }
     return targets;
+}
+
+/**
+ * Whether a message could ever reach this account in Minecraft: a Java server
+ * has a player that is theirs by the rules above - on a server of their own,
+ * under the Minecraft name they gave, or on a link that follows their sign-ins
+ * (whose join address is only known, and checked, once they are playing). The
+ * setting that chooses which messages go there is not offered until it can.
+ */
+export async function relayReady(userId: string): Promise<boolean> {
+    const links = await prisma.gamePlayerLink.findMany({
+        where: { userId },
+        select: { installedAppId: true, player: true, followSignIns: true }
+    });
+    if (links.length === 0) return false;
+    const [connected, installs] = await Promise.all([
+        prisma.userConnection.findMany({
+            where: { userId, provider: "minecraft" },
+            select: { label: true }
+        }),
+        prisma.installedApp.findMany({
+            where: {
+                id: { in: [...new Set(links.map((link) => link.installedAppId))] },
+                status: { not: "removed" }
+            },
+            select: { id: true, ownerId: true, catalogId: true }
+        })
+    ]);
+    const ownNames = new Set(connected.map((connection) => connection.label.toLowerCase()));
+    const java = new Map(
+        installs
+            .filter(
+                (install) =>
+                    gameOfServer(install.catalogId)?.id === "minecraft" &&
+                    editionOf(install.catalogId) === "java"
+            )
+            .map((install) => [install.id, install.ownerId])
+    );
+    return links.some((link) => {
+        const ownerId = java.get(link.installedAppId);
+        if (!ownerId) return false;
+        return ownerId === userId || link.followSignIns || ownNames.has(link.player.toLowerCase());
+    });
 }
 
 /** Show the message to each of this account's players who are on. One server

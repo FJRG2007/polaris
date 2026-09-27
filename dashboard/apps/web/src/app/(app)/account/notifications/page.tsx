@@ -13,21 +13,24 @@ import { listSmsSenders } from "@/lib/notifications/sms-service";
 import { NotificationsPageView } from "./notifications-page-view";
 import { prisma } from "@polaris/db";
 import { inGameChoice } from "@/lib/chat/in-game-choice";
-import { relaysChatToGames } from "@/lib/app-extensions/registry";
+import { chatRelayReady, relaysChatToGames } from "@/lib/app-extensions/registry";
 
 export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
     const user = await requireUser();
-    const [rules, destinations, senders, deliveries, inGameOffered, account] = await Promise.all([
-        describeNotificationRules(user.id),
-        listDestinations(user.id),
-        listSmsSenders(user.id),
-        listDeliveries(user.id),
-        // Offered only where an installed app can show a message in a game.
-        relaysChatToGames().catch(() => false),
-        prisma.user.findUnique({ where: { id: user.id }, select: { messagesInGame: true } })
-    ]);
+    const [rules, destinations, senders, deliveries, inGameOffered, inGameReady, account] =
+        await Promise.all([
+            describeNotificationRules(user.id),
+            listDestinations(user.id),
+            listSmsSenders(user.id),
+            listDeliveries(user.id),
+            // Offered only where an installed app can show a message in a game.
+            relaysChatToGames().catch(() => false),
+            // And chosen only once a server knows which of its players is them.
+            chatRelayReady(user.id).catch(() => false),
+            prisma.user.findUnique({ where: { id: user.id }, select: { messagesInGame: true } })
+        ]);
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -45,6 +48,7 @@ export default async function NotificationsPage() {
                 messagesInGame={
                     inGameOffered ? inGameChoice(account?.messagesInGame ?? null) : null
                 }
+                inGameReady={inGameReady}
             />
         </div>
     );

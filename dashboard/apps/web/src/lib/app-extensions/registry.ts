@@ -193,6 +193,16 @@ export async function relaysChatToGames(): Promise<boolean> {
     return (await chatRelays()).length > 0;
 }
 
+/** Whether any installed app could show this account a Chat message in a game:
+ *  it knows which of its players they are. */
+export async function chatRelayReady(userId: string): Promise<boolean> {
+    for (const extension of await chatRelays()) {
+        const ready = await extension.chatRelayReady?.(userId).catch(() => false);
+        if (ready) return true;
+    }
+    return false;
+}
+
 /** What hands one message to every app that can show it in a game, resolved
  *  once however many readers it goes to, or null when no installed app can. One
  *  app failing does not stop another, and none of them can fail the message. */

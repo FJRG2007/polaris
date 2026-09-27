@@ -241,6 +241,29 @@ describe("the line a player is shown", () => {
     });
 });
 
+describe("whether an account is ready for it", () => {
+    it("is ready once a Java server knows which player it is, playing or not", async () => {
+        fake.sessions = [];
+        expect(await relay.relayReady(ANA)).toBe(true);
+    });
+
+    it("is not ready for a player the account never said is theirs, nor with no link at all", async () => {
+        fake.connections = [];
+        expect(await relay.relayReady(ANA)).toBe(false);
+        expect(await relay.relayReady("33333333-3333-4333-8333-333333333333")).toBe(false);
+    });
+
+    it("is ready through a link that follows the account's sign-ins", async () => {
+        fake.connections = [];
+        fake.links = fake.links.map((link) =>
+            link.installedAppId === "survival" && link.userId === ANA
+                ? { ...link, followSignIns: true }
+                : link
+        );
+        expect(await relay.relayReady(ANA)).toBe(true);
+    });
+});
+
 describe("who it is shown to", () => {
     it("is the account's linked player, only where they are on a Java server now", async () => {
         await relay.relayChatToMinecraft(MESSAGE);

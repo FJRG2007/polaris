@@ -22,7 +22,8 @@ export function NotificationsPageView({
     destinations,
     senders,
     deliveries,
-    messagesInGame
+    messagesInGame,
+    inGameReady = true
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
     destinations: DestinationView[];
@@ -30,6 +31,8 @@ export function NotificationsPageView({
     deliveries: DeliveryView[];
     /** Which Chat messages are shown inside a game, or null where no app can. */
     messagesInGame: InGameChoice | null;
+    /** Whether a server knows which of its players this account is. */
+    inGameReady?: boolean;
 }) {
     const [tab, setTab] = useState<"history" | "settings">("history");
 
@@ -67,6 +70,7 @@ export function NotificationsPageView({
                     senders={senders}
                     deliveries={deliveries}
                     messagesInGame={messagesInGame}
+                    inGameReady={inGameReady}
                 />
             ) : null}
         </div>
