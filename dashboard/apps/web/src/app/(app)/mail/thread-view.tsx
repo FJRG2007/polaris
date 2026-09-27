@@ -31,11 +31,7 @@ import { UnsubscribeButton } from "./unsubscribe-button";
 import { isViewable } from "@/app/(app)/drive/viewer/kind";
 import { saveFile } from "@/components/transfers/move-file";
 import type { ViewerTarget } from "@/app/(app)/drive/viewer/types";
-import {
-    openableAttachments,
-    positionOf,
-    stepFrom
-} from "./attachment-steps";
+import { openableAttachments, positionOf, stepFrom } from "./attachment-steps";
 
 /**
  * The viewer, fetched when a file is actually opened.
@@ -960,9 +956,7 @@ function MessageCard({
                                 sent. Above everything else on the message,
                                 because "it never arrived" changes what the
                                 reader is doing here. */}
-                            {message.delivery ? (
-                                <DeliveryNote delivery={message.delivery} />
-                            ) : null}
+                            {message.delivery ? <DeliveryNote delivery={message.delivery} /> : null}
                             {message.spamReason ? (
                                 <div className="mb-3 flex items-start gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-3 py-1.5 text-[12px] text-foreground">
                                     <ShieldAlert
@@ -991,11 +985,9 @@ function MessageCard({
                                         {message.folderRole === "junk" &&
                                         message.spamReasons.length > 1 ? (
                                             <ul className="mt-1 list-disc space-y-0.5 pl-4 text-foreground-subtle">
-                                                {message.spamReasons
-                                                    .slice(1)
-                                                    .map((said) => (
-                                                        <li key={said}>{said}</li>
-                                                    ))}
+                                                {message.spamReasons.slice(1).map((said) => (
+                                                    <li key={said}>{said}</li>
+                                                ))}
                                             </ul>
                                         ) : null}
                                     </div>
