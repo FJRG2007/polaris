@@ -6,41 +6,44 @@
  * anything the server's own variables can say.
  *
  * Checked as it is typed with the rules the save uses (`sidebar.ts`), and
- * previewed with sample values. Only the server's variables are offered: the
- * panel is the same for everybody, so nothing of one player's can go on it.
+ * previewed with sample values - moving, where a line takes turns or has an
+ * effect, drawn by the same function the server draws it with. Only the
+ * server's variables are offered: the panel is the same for everybody, so
+ * nothing of one player's can go on it.
  */
 
 import * as mc from "../../lib/minecraft/motd";
 import { McLine } from "../../components/mc-text";
 import { GripVertical, Loader2, Plus, Trash2, Trophy } from "lucide-react";
-import { SIDEBAR_BLOCKS, withBlock } from "../../lib/minecraft/sidebar-blocks";
+import { SIDEBAR_BLOCKS, withBlock, withRotatingBlocks } from "../../lib/minecraft/sidebar-blocks";
+import { SidebarLineEditor } from "./sidebar-line-editor";
+import { renderSidebar } from "../../lib/minecraft/sidebar-render";
 import { moved, useListOrder } from "../../components/use-list-order";
 import { previewText } from "../../lib/minecraft/text-vars";
-import { spreadListLines } from "../../lib/minecraft/rankings";
-import { FieldNote, insertsFor } from "./minecraft-announce";
+import { insertsFor } from "./minecraft-announce";
 import {
     Button,
     Card,
     CardBody,
+    Checkbox,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
+    Input,
     Select,
     Switch,
     cn
 } from "@polaris/ui";
-import { FormattedTextField } from "../../components/formatted-text-field";
 import { VariablesHelp } from "../../components/variables-help";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import {
-    DEFAULT_SIDEBAR,
-    SIDEBAR_LINES_MAX,
-    SIDEBAR_LINE_MAX,
-    SIDEBAR_TITLE_MAX,
-    sidebarProblems,
-    type SidebarConfig
-} from "../../lib/minecraft/sidebar";
+import * as side from "../../lib/minecraft/sidebar";
 import {
     readLiveDisplayAction,
     saveLiveDisplayAction,
@@ -58,7 +61,9 @@ export function MinecraftSidebar({
     canManage: boolean;
 }) {
     const [state, setState] = useState<LiveDisplayState | null>(null);
-    const [draft, setDraft] = useState<SidebarConfig>(DEFAULT_SIDEBAR);
+    const [draft, setDraft] = useState<side.SidebarConfig>(side.DEFAULT_SIDEBAR);
+    /** The "several leaderboards, taking turns" dialog, while it is open. */
+    const [rotating, setRotating] = useState<{ ids: string[]; every: number } | null>(null);
     const [group, setGroup] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
@@ -66,7 +71,7 @@ export function MinecraftSidebar({
 
     // Moving a line changes the panel on the next save, like any other edit:
     // Polaris rewrites the lines on the running server, no restart.
-    const order = useListOrder(DEFAULT_SIDEBAR.lines.length, (from, to) =>
+    const order = useListOrder(side.DEFAULT_SIDEBAR.lines.length, (from, to) =>
         setDraft((current) => ({ ...current, lines: moved(current.lines, from, to) }))
     );
     const { reset: resetOrder } = order;
@@ -88,10 +93,8 @@ export function MinecraftSidebar({
         });
     }, [installedAppId, load]);
 
-    const problems = useMemo(() => sidebarProblems(draft), [draft]);
-    const invalid = Boolean(
-        problems.title || problems.count || problems.lines.some((line) => line !== null)
-    );
+    const problems = useMemo(() => side.sidebarProblems(draft), [draft]);
+    const invalid = side.hasSidebarProblems(draft);
     // Only a change is worth a save: the same panel saved again is a round trip
     // that changes nothing on anybody's screen.
     const dirty =
@@ -99,12 +102,18 @@ export function MinecraftSidebar({
         (JSON.stringify(draft) !== JSON.stringify(state.sidebar) || group !== state.callGroupId);
     const inserts = useMemo(() => insertsFor("java", "server"), []);
 
-    const change = (patch: Partial<SidebarConfig>) => {
+    const change = (patch: Partial<side.SidebarConfig>) => {
         setDraft((current) => ({ ...current, ...patch }));
         setNote(null);
     };
-    const setLine = (index: number, value: string) =>
+    const setLine = (index: number, value: side.SidebarLine) =>
         change({ lines: draft.lines.map((line, at) => (at === index ? value : line)) });
+    /** Lines added at the end, told to the drag order so it keeps up. */
+    const addLines = (next: side.SidebarLine[] | null) => {
+        if (!next) return;
+        for (let added = draft.lines.length; added < next.length; added += 1) order.added();
+        change({ lines: next });
+    };
 
     function save(): void {
         setError(null);
@@ -167,20 +176,14 @@ export function MinecraftSidebar({
 
                         <div className="flex flex-col gap-1.5">
                             <span className="text-sm font-medium">Title</span>
-                            <FormattedTextField
-                                value={draft.title}
+                            <SidebarLineEditor
+                                line={draft.title}
                                 onChange={(title) => change({ title })}
-                                rows={1}
-                                singleLine
-                                label="Side panel title"
+                                label="Title"
+                                fits={side.SIDEBAR_TITLE_MAX}
+                                problems={problems.title}
                                 inserts={inserts}
-                                footnote={
-                                    <FieldNote
-                                        text={draft.title}
-                                        max={SIDEBAR_TITLE_MAX}
-                                        problem={problems.title}
-                                    />
-                                }
+                                disabled={!canManage}
                             />
                         </div>
 
@@ -188,7 +191,7 @@ export function MinecraftSidebar({
                             <span className="flex items-baseline gap-2">
                                 <span className="text-sm font-medium">Lines</span>
                                 <span className="text-xs text-muted-foreground">
-                                    {draft.lines.length}/{SIDEBAR_LINES_MAX}
+                                    {draft.lines.length}/{side.SIDEBAR_LINES_MAX}
                                 </span>
                             </span>
                             {draft.lines.map((line, index) => (
@@ -221,21 +224,15 @@ export function MinecraftSidebar({
                                         </button>
                                     )}
                                     <div className="min-w-0 flex-1">
-                                        <FormattedTextField
-                                            value={line}
+                                        <SidebarLineEditor
+                                            line={line}
                                             onChange={(value) => setLine(index, value)}
-                                            rows={1}
-                                            singleLine
                                             label={`Line ${index + 1}`}
+                                            fits={side.SIDEBAR_LINE_MAX}
+                                            problems={problems.lines[index] ?? []}
                                             placeholder="Leave empty for a gap"
                                             inserts={inserts}
-                                            footnote={
-                                                <FieldNote
-                                                    text={line}
-                                                    max={SIDEBAR_LINE_MAX}
-                                                    problem={problems.lines[index] ?? undefined}
-                                                />
-                                            }
+                                            disabled={!canManage}
                                         />
                                     </div>
                                     <Button
@@ -263,11 +260,8 @@ export function MinecraftSidebar({
                                 <Button
                                     variant="secondary"
                                     size="sm"
-                                    disabled={draft.lines.length >= SIDEBAR_LINES_MAX}
-                                    onClick={() => {
-                                        order.added();
-                                        change({ lines: [...draft.lines, ""] });
-                                    }}
+                                    disabled={draft.lines.length >= side.SIDEBAR_LINES_MAX}
+                                    onClick={() => addLines([...draft.lines, side.plainLine("")])}
                                 >
                                     <Plus className="size-4" /> Add a line
                                 </Button>
@@ -279,7 +273,9 @@ export function MinecraftSidebar({
                                         <Button
                                             variant="secondary"
                                             size="sm"
-                                            disabled={draft.lines.length + 2 > SIDEBAR_LINES_MAX}
+                                            disabled={
+                                                draft.lines.length + 2 > side.SIDEBAR_LINES_MAX
+                                            }
                                         >
                                             <Trophy className="size-4" /> Add a leaderboard
                                         </Button>
@@ -288,32 +284,47 @@ export function MinecraftSidebar({
                                         {SIDEBAR_BLOCKS.map((block) => (
                                             <DropdownMenuItem
                                                 key={block.id}
-                                                onSelect={() => {
-                                                    const next = withBlock(
-                                                        draft.lines,
-                                                        block,
-                                                        SIDEBAR_LINES_MAX
-                                                    );
-                                                    if (!next) return;
-                                                    for (
-                                                        let added = 0;
-                                                        added < block.lines.length;
-                                                        added += 1
+                                                onSelect={() =>
+                                                    addLines(
+                                                        withBlock(
+                                                            draft.lines,
+                                                            block,
+                                                            side.SIDEBAR_LINES_MAX
+                                                        )
                                                     )
-                                                        order.added();
-                                                    change({ lines: next });
-                                                }}
+                                                }
                                             >
                                                 {block.label}
                                             </DropdownMenuItem>
                                         ))}
+                                        <DropdownMenuSeparator />
+                                        {/* Opened after the menu has closed: a dialog
+                                            asked for from inside the menu would lose
+                                            its focus to the menu handing it back. */}
+                                        <DropdownMenuItem
+                                            onSelect={() =>
+                                                setTimeout(
+                                                    () =>
+                                                        setRotating({
+                                                            ids: SIDEBAR_BLOCKS.slice(0, 2).map(
+                                                                (block) => block.id
+                                                            ),
+                                                            every: side.SIDEBAR_EVERY_DEFAULT * 2
+                                                        }),
+                                                    0
+                                                )
+                                            }
+                                        >
+                                            Several, taking turns...
+                                        </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
                             <p className="text-xs text-muted-foreground">
                                 An empty line is a gap. Drag one under the title to space it from
                                 the lines below. Type {"{"} in a line for any value: players online,
-                                the call, the last death, a leaderboard.
+                                the call, the last death, a leaderboard. Animate makes a line take
+                                turns between texts or move.
                             </p>
                         </div>
 
@@ -374,6 +385,98 @@ export function MinecraftSidebar({
                 </Card>
             </div>
 
+            {rotating ? (
+                <Dialog open onOpenChange={(open: boolean) => !open && setRotating(null)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Leaderboards taking turns</DialogTitle>
+                        </DialogHeader>
+                        <p className="text-sm text-muted-foreground">
+                            Two lines that show each of these in turn: its heading, and the list
+                            under it.
+                        </p>
+                        <ul className="flex flex-col gap-1.5">
+                            {SIDEBAR_BLOCKS.map((block) => (
+                                <li key={block.id}>
+                                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                                        <Checkbox
+                                            checked={rotating.ids.includes(block.id)}
+                                            onChange={(event) =>
+                                                setRotating({
+                                                    ...rotating,
+                                                    ids: event.target.checked
+                                                        ? [...rotating.ids, block.id].slice(
+                                                              0,
+                                                              side.SIDEBAR_FRAMES_MAX
+                                                          )
+                                                        : rotating.ids.filter(
+                                                              (id) => id !== block.id
+                                                          )
+                                                })
+                                            }
+                                        />
+                                        {block.label}
+                                    </label>
+                                </li>
+                            ))}
+                        </ul>
+                        <label className="flex items-center gap-2 text-sm">
+                            Each for
+                            <Input
+                                type="number"
+                                inputMode="numeric"
+                                min={side.SIDEBAR_EVERY_MIN}
+                                max={side.SIDEBAR_EVERY_MAX}
+                                value={rotating.every}
+                                onChange={(event) => {
+                                    const seconds = Math.round(Number(event.target.value));
+                                    if (!Number.isFinite(seconds)) return;
+                                    setRotating({
+                                        ...rotating,
+                                        every: Math.min(
+                                            side.SIDEBAR_EVERY_MAX,
+                                            Math.max(side.SIDEBAR_EVERY_MIN, seconds)
+                                        )
+                                    });
+                                }}
+                                className="h-8 w-20"
+                                aria-label="Seconds each leaderboard shows"
+                            />
+                            seconds
+                        </label>
+                        {rotating.ids.length < 2 ? (
+                            <p className="text-xs text-muted-foreground">Choose at least two.</p>
+                        ) : null}
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => setRotating(null)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                disabled={
+                                    rotating.ids.length < 2 ||
+                                    draft.lines.length + 2 > side.SIDEBAR_LINES_MAX
+                                }
+                                onClick={() => {
+                                    addLines(
+                                        withRotatingBlocks(
+                                            draft.lines,
+                                            SIDEBAR_BLOCKS.filter((block) =>
+                                                rotating.ids.includes(block.id)
+                                            ),
+                                            rotating.every,
+                                            side.SIDEBAR_LINES_MAX
+                                        )
+                                    );
+                                    setRotating(null);
+                                }}
+                            >
+                                Add
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            ) : null}
+
             {/* The preview kept in view, and what can be written in the room
                 under it that the longer form beside it leaves. */}
             <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-[calc(var(--header-height)+1rem)] lg:max-h-[calc(100dvh-var(--header-height)-2rem)] lg:self-start">
@@ -394,9 +497,26 @@ const SAMPLE_LISTS: Readonly<Record<string, readonly string[]>> = {
     "rank.playtime": ["1. Steve 120h", "2. Alex 86h"]
 };
 
-/** The panel as it will read, every value at a sample. */
-function SidebarPreview({ sidebar }: { sidebar: SidebarConfig }) {
-    const title = mc.motdSpans(previewText(sidebar.title))[0] ?? [];
+/** How often the preview is drawn again while something on it moves: often
+ *  enough for the fastest step an effect has. */
+const PREVIEW_EVERY_MS = 250;
+
+/** The time, moving on while `moving`, standing still otherwise. */
+function useClock(moving: boolean): number {
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (!moving) return;
+        const timer = setInterval(() => setNow(Date.now()), PREVIEW_EVERY_MS);
+        return () => clearInterval(timer);
+    }, [moving]);
+    return now;
+}
+
+/** The panel as it will read, every value at a sample - moving the way it will. */
+function SidebarPreview({ sidebar }: { sidebar: side.SidebarConfig }) {
+    const now = useClock(side.animationPeriod(sidebar) !== null);
+    const shown = renderSidebar(sidebar, now, previewText, SAMPLE_LISTS);
+    const title = mc.motdSpans(shown.title)[0] ?? [];
     return (
         <Card className="shrink-0">
             <CardBody className="flex flex-col gap-2">
@@ -409,13 +529,11 @@ function SidebarPreview({ sidebar }: { sidebar: SidebarConfig }) {
                         <div className="text-center">
                             <McLine spans={title} />
                         </div>
-                        {spreadListLines(sidebar.lines, SAMPLE_LISTS, SIDEBAR_LINES_MAX).map(
-                            (line, index) => (
-                                <div key={index} className="min-h-5 whitespace-pre">
-                                    <McLine spans={mc.motdSpans(previewText(line))[0] ?? []} />
-                                </div>
-                            )
-                        )}
+                        {shown.lines.map((line, index) => (
+                            <div key={index} className="min-h-5 whitespace-pre">
+                                <McLine spans={mc.motdSpans(line)[0] ?? []} />
+                            </div>
+                        ))}
                     </div>
                 </div>
                 {!sidebar.enabled && (

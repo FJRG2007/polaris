@@ -5,6 +5,8 @@
  * the name first.
  */
 
+import { plainLine, type SidebarLine } from "./sidebar";
+
 export interface SidebarBlock {
     readonly id: string;
     /** What the menu offers. */
@@ -54,9 +56,36 @@ export const SIDEBAR_BLOCKS: readonly SidebarBlock[] = [
 /** The panel's lines with a block added at the end, or null when it does not
  *  fit in `max` lines. */
 export function withBlock(
-    lines: readonly string[],
+    lines: readonly SidebarLine[],
     block: SidebarBlock,
     max: number
-): string[] | null {
-    return lines.length + block.lines.length > max ? null : [...lines, ...block.lines];
+): SidebarLine[] | null {
+    return lines.length + block.lines.length > max
+        ? null
+        : [...lines, ...block.lines.map(plainLine)];
+}
+
+/**
+ * Several blocks in the room of one, taking turns: a heading line and a line
+ * under it, each with one text per block, turning together every `every`
+ * seconds. The way to show several leaderboards on a panel of fifteen lines.
+ * Null when it does not fit, or for fewer than two blocks.
+ */
+export function withRotatingBlocks(
+    lines: readonly SidebarLine[],
+    blocks: readonly SidebarBlock[],
+    every: number,
+    max: number
+): SidebarLine[] | null {
+    if (blocks.length < 2 || lines.length + 2 > max) return null;
+    const turn = (frames: string[]): SidebarLine => ({
+        ...plainLine(frames[0] ?? ""),
+        frames,
+        every
+    });
+    return [
+        ...lines,
+        turn(blocks.map((block) => block.lines[0] ?? "")),
+        turn(blocks.map((block) => block.lines[1] ?? ""))
+    ];
 }

@@ -1,15 +1,17 @@
 /**
  * How long one command to a Minecraft server may be.
  *
- * Java takes commands over RCON, and one RCON request is one packet: the game
- * reads 1446 bytes of it and no more. So the limit is in bytes rather than
- * characters - an accented letter is two, a section sign is two - and it sits
- * a little under the packet so the framing always fits.
+ * Java takes commands over RCON, through the console tool the server image
+ * ships, and that tool is the tighter of the two limits: it sends 1014 bytes and
+ * refuses anything longer without a word - it exits as if it had worked, prints
+ * nothing, and the game never hears of it. Measured against a running server on
+ * 2026-09-27 (1014 bytes arrive, 1015 do not). The game itself would read 1446.
+ * So the limit is in bytes rather than characters - an accented letter is two, a
+ * section sign is two - and it is the tool's.
  *
- * It used to be 512 characters, a limit chosen for a ban reason. A formatted
- * announcement is JSON with a run per colour change, and a chat line with ten
- * colours went past 512 while being nowhere near what the game takes - refused
- * with a message that did not say which part was too long.
+ * It used to be 1400, the game's packet less its framing, which let a command
+ * between the two lengths vanish: a richly formatted announcement, or a rainbow
+ * on the side panel, went nowhere and said nothing.
  *
  * What keeps a command from carrying a second one is not its length but the
  * newline check beside every use of this: one line is one command.
@@ -17,7 +19,7 @@
  * Pure, so the editor can measure exactly what the server will refuse.
  */
 
-export const COMMAND_BYTES_MAX = 1400;
+export const COMMAND_BYTES_MAX = 1014;
 
 const encoder = new TextEncoder();
 

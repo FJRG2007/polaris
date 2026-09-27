@@ -17,6 +17,7 @@ import {
 } from "@polaris-app/game-servers/src/lib/minecraft/sidebar-blocks";
 import {
     DEFAULT_SIDEBAR,
+    plainLine,
     SIDEBAR_LINES_MAX,
     sidebarProblems
 } from "@polaris-app/game-servers/src/lib/minecraft/sidebar";
@@ -53,18 +54,18 @@ describe("the ready-made blocks", () => {
             const problems = sidebarProblems({
                 ...DEFAULT_SIDEBAR,
                 enabled: true,
-                lines: [...block.lines]
+                lines: block.lines.map(plainLine)
             });
-            expect([block.id, problems.lines]).toEqual([block.id, block.lines.map(() => null)]);
+            expect([block.id, problems.lines]).toEqual([block.id, block.lines.map(() => [null])]);
         }
     });
 
     it("are not added where they do not fit", () => {
-        const full = Array.from({ length: SIDEBAR_LINES_MAX - 1 }, () => "");
+        const full = Array.from({ length: SIDEBAR_LINES_MAX - 1 }, () => plainLine(""));
         expect(withBlock(full, SIDEBAR_BLOCKS[0]!, SIDEBAR_LINES_MAX)).toBeNull();
-        expect(withBlock(["a"], SIDEBAR_BLOCKS[1]!, SIDEBAR_LINES_MAX)).toEqual([
-            "a",
-            ...SIDEBAR_BLOCKS[1]!.lines
+        expect(withBlock([plainLine("a")], SIDEBAR_BLOCKS[1]!, SIDEBAR_LINES_MAX)).toEqual([
+            plainLine("a"),
+            ...SIDEBAR_BLOCKS[1]!.lines.map(plainLine)
         ]);
     });
 });

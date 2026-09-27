@@ -26,7 +26,7 @@ vi.mock("@polaris/app-host", () => ({
 const { playedText, rankLines, spreadListLines, statsRanking } =
     await import("@polaris-app/game-servers/src/lib/minecraft/rankings");
 const { liveContext } = await import("@polaris-app/game-servers/src/lib/minecraft/live-values");
-const { sidebarProblems, DEFAULT_SIDEBAR } =
+const { sidebarProblems, DEFAULT_SIDEBAR, plainLine } =
     await import("@polaris-app/game-servers/src/lib/minecraft/sidebar");
 
 const HOUR = 3_600_000;
@@ -91,13 +91,9 @@ describe("lists on the side panel", () => {
             "{rank.playtime}",
             "{rank.level}"
         ];
-        expect(sidebarProblems({ ...DEFAULT_SIDEBAR, enabled: true, lines }).lines).toEqual([
-            null,
-            null,
-            null,
-            null,
-            null
-        ]);
+        expect(
+            sidebarProblems({ ...DEFAULT_SIDEBAR, enabled: true, lines: lines.map(plainLine) }).lines
+        ).toEqual([[null], [null], [null], [null], [null]]);
     });
 });
 

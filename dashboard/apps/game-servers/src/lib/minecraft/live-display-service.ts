@@ -18,8 +18,8 @@
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { liveContext } from "./live-values";
+import { renderSidebar } from "./sidebar-render";
 import { fillValues, readsPlayerList, readsServer, variablesIn } from "./text-vars";
-import { spreadListLines } from "./rankings";
 import { editionOf, onlinePlayers, onlineRoster, withServerContainer } from "./service";
 import { audienceNames, namedByPolaris, parseTarget, type Roster } from "./announce-target";
 import {
@@ -32,11 +32,12 @@ import {
     type SendContext
 } from "./announcement";
 import {
-    SIDEBAR_LINES_MAX,
+    animationPeriod,
     readSidebar,
     sidebarCommands,
     sidebarOffCommands,
     sidebarRefusal,
+    sidebarTexts,
     type SidebarConfig
 } from "./sidebar";
 import { PINNED_KEY, pinOver, pinnedAt, readPinned, type PinnedAnnouncement } from "./pinned";
@@ -48,6 +49,10 @@ const { subscribeMeetingEvents } = host.chatCalls;
 const TICK_MS = ACTIONBAR_EVERY_MS;
 /** How often the panel and the values it shows are read again. */
 const PANEL_EVERY_MS = 10_000;
+/** How often a panel that moves by itself is drawn again between those reads.
+ *  The shortest step an effect may have; a slower one simply changes nothing on
+ *  most of these, and nothing unchanged is sent. */
+const FRAME_EVERY_MS = 500;
 
 interface Loop {
     readonly ownerId: string;
@@ -67,6 +72,12 @@ interface Loop {
     /** Who is on and who the operators are, last read, for a held announcement
      *  sent to an audience Polaris names itself. */
     roster: { at: number; value: Roster } | null;
+    /** What a panel that moves by itself is drawn from between ticks: its
+     *  settings and the values last read. Null when it does not move. */
+    moving: { sidebar: SidebarConfig; context: SendContext } | null;
+    /** The timer that draws it, while there is one. */
+    frames: ReturnType<typeof setInterval> | null;
+    framing: boolean;
 }
 
 const loops = new Map<string, Loop>();
@@ -236,7 +247,7 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
 
     const texts = [
         ...(pinned ? heldTexts(pinned.announcement) : []),
-        ...(panelOn ? [sidebar.title, ...sidebar.lines] : [])
+        ...(panelOn ? sidebarTexts(sidebar) : [])
     ];
     loop.readsCall = texts.some(readsCall);
     const context = await contextFor(installedAppId, loop, texts, now, duePanel);
@@ -267,17 +278,26 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     }
     let panel: Loop["panel"] = null;
     if (duePanel) {
-        const title = fillValues(sidebar.title, context.values);
-        // A list - everybody's level, a leaderboard - is a line a row here,
-        // in the room the other lines leave.
-        const spread = spreadListLines(sidebar.lines, context.lists ?? {}, SIDEBAR_LINES_MAX);
-        const shownLines = spread.map((line) => fillValues(line, context.values));
-        lines.push(...sidebarCommands(title, shownLines, loop.panel));
-        panel = { title, lines: shownLines };
+        // A list - everybody's level, a leaderboard - is a line a row here, in
+        // the room the other lines leave; a line that takes turns shows the one
+        // that is up, and an effect is at its step.
+        const shown = renderSidebar(
+            sidebar,
+            now,
+            (text) => fillValues(text, context.values),
+            context.lists ?? {}
+        );
+        lines.push(...sidebarCommands(shown.title, shown.lines, loop.panel));
+        panel = shown;
         loop.lastPanel = now;
     } else if (!panelOn && loop.panel) {
         lines.push(...sidebarOffCommands());
     }
+    // Between reads, a panel that moves is drawn by the frame timer from these.
+    const moves = panelOn && animationPeriod(sidebar) !== null;
+    loop.moving = moves ? { sidebar, context } : null;
+    if (moves) startFrames(installedAppId, loop);
+    else stopFrames(loop);
     if (loop.pinVersion !== version) return;
     const sent = await say(loop.ownerId, installedAppId, lines).catch((error: unknown) => {
         // Written from scratch next time: nothing here knows how far it got.
@@ -326,8 +346,96 @@ async function contextFor(
 
 function stopLoop(installedAppId: string): void {
     const loop = loops.get(installedAppId);
-    if (loop) clearInterval(loop.timer);
+    if (loop) {
+        clearInterval(loop.timer);
+        stopFrames(loop);
+    }
     loops.delete(installedAppId);
+}
+
+function startFrames(installedAppId: string, loop: Loop): void {
+    if (loop.frames) return;
+    loop.frames = setInterval(() => {
+        if (loop.busy || loop.framing) return;
+        loop.framing = true;
+        void drawFrame(installedAppId, loop)
+            .catch(() => {
+                // Written from scratch on the next tick.
+                loop.panel = null;
+            })
+            .finally(() => {
+                loop.framing = false;
+            });
+    }, FRAME_EVERY_MS);
+    loop.frames.unref?.();
+}
+
+function stopFrames(loop: Loop): void {
+    if (loop.frames) clearInterval(loop.frames);
+    loop.frames = null;
+}
+
+/**
+ * One frame of a panel that moves: drawn again from what the last tick read,
+ * and only what changed sent - usually one line, or none - in one command to
+ * the server rather than one each.
+ */
+async function drawFrame(installedAppId: string, loop: Loop): Promise<void> {
+    const moving = loop.moving;
+    const before = loop.panel;
+    if (!moving || !before) return;
+    const shown = renderSidebar(
+        moving.sidebar,
+        Date.now(),
+        (text) => fillValues(text, moving.context.values),
+        moving.context.lists ?? {}
+    );
+    const commands = sidebarCommands(shown.title, shown.lines, before);
+    if (commands.length === 0) return;
+    const sent = await sayAll(loop.ownerId, installedAppId, commands);
+    // A tick that ran meanwhile wrote the panel itself; this frame is then stale.
+    if (loop.panel === before) loop.panel = sent ? shown : null;
+}
+
+/** Room for one batch in a command's arguments, in base64 characters. */
+const BATCH_MAX = 12_000;
+
+/**
+ * Send lines to the game as one command to the container rather than one each:
+ * the console tool reads them one per line from its input. A frame that
+ * changes three lines is then one round trip instead of three. False when the
+ * server is not running. Falls back to one at a time if the batch is refused.
+ */
+async function sayAll(
+    ownerId: string,
+    installedAppId: string,
+    lines: readonly string[]
+): Promise<boolean> {
+    if (lines.length === 0) return true;
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        if (!server.running) return false;
+        if (server.edition !== "java" || lines.some((line) => /[\r\n]/.test(line))) {
+            for (const line of lines) await server.say([line]);
+            return true;
+        }
+        const batches: string[][] = [[]];
+        for (const line of lines) {
+            const current = batches[batches.length - 1]!;
+            const size = Buffer.byteLength([...current, line].join("\n")) * 1.4;
+            if (current.length > 0 && size > BATCH_MAX) batches.push([line]);
+            else current.push(line);
+        }
+        for (const batch of batches) {
+            const encoded = Buffer.from(`${batch.join("\n")}\n`, "utf8").toString("base64");
+            const result = await server.run([
+                "sh",
+                "-c",
+                `printf %s ${encoded} | base64 -d | rcon-cli`
+            ]);
+            if (result.code !== 0) for (const line of batch) await server.say([line]);
+        }
+        return true;
+    });
 }
 
 /**
@@ -368,7 +476,10 @@ function loopFor(ownerId: string, installedAppId: string): Loop {
         pinVersion: 0,
         context: null,
         readsCall: false,
-        roster: null
+        roster: null,
+        moving: null,
+        frames: null,
+        framing: false
     };
     listenForCalls();
     // A loop must never keep the process alive on its own.

@@ -207,7 +207,7 @@ describe("the line a player is shown", () => {
             poll: Array.from({ length: 10 }, (_, index) => `${"答".repeat(47)}${index}`)
         });
         expect(line).not.toBeNull();
-        expect(Buffer.byteLength(line!, "utf8")).toBeLessThanOrEqual(1400);
+        expect(Buffer.byteLength(line!, "utf8")).toBeLessThanOrEqual(1014);
         expect(line).toContain("[Poll]");
         expect(line).toContain("画".repeat(48));
     });

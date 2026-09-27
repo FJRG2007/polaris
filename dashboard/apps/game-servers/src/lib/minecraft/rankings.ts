@@ -90,23 +90,33 @@ export function spreadListLines(
     lists: Readonly<Record<string, readonly string[]>>,
     max: number
 ): string[] {
+    return spreadListRows(lines, lists, max).map((row) => row.text);
+}
+
+/** The same, with the line each row came from - for what is drawn on a row by
+ *  the line's own settings, like the side panel's effects. */
+export function spreadListRows(
+    lines: readonly string[],
+    lists: Readonly<Record<string, readonly string[]>>,
+    max: number
+): { readonly text: string; readonly from: number }[] {
     const listOf = (line: string) => LIST_VARIABLES.find((name) => TOKEN(name).test(line)) ?? null;
     const listLines = lines.filter((line) => listOf(line) !== null).length;
-    if (listLines === 0) return [...lines];
+    if (listLines === 0) return lines.map((text, from) => ({ text, from }));
     const room = Math.max(listLines, max - (lines.length - listLines));
     const each = Math.max(1, Math.floor(room / listLines));
 
-    return lines.flatMap((line) => {
+    return lines.flatMap((line, from) => {
         const name = listOf(line);
-        if (!name) return [line];
+        if (!name) return [{ text: line, from }];
         const rows = lists[name] ?? [];
-        if (rows.length === 0) return [line];
+        if (rows.length === 0) return [{ text: line, from }];
         const shown =
             rows.length <= each
                 ? rows
                 : name === "server.levels"
                   ? [...rows.slice(0, each - 1), `+${rows.length - (each - 1)} more`]
                   : rows.slice(0, each);
-        return shown.map((row) => line.replace(TOKEN(name), row));
+        return shown.map((row) => ({ text: line.replace(TOKEN(name), row), from }));
     });
 }

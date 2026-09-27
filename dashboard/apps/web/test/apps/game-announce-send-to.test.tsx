@@ -239,7 +239,7 @@ describe("the lines it becomes", () => {
         const longest = "A".repeat(16);
         let caught = false;
         for (let pad = 0; pad <= 360; pad++) {
-            const chat = `${"&a&lx".repeat(30)}${"y".repeat(pad)}`;
+            const chat = `${"&a&lx".repeat(20)}${"y".repeat(pad)}`;
             const ops = announcementProblems(draft({ target: "@ops", chat }), "java").chat;
             expect(ops).toBe(announcementProblems(draft({ target: longest, chat }), "java").chat);
             if (ops && !announcementProblems(draft({ target: "@a", chat }), "java").chat)
