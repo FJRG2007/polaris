@@ -364,6 +364,15 @@ function distance(a: { x: number; y: number; z: number }, b: { x: number; y: num
     return Math.hypot(a.x - (b.x + 0.5), a.y - (b.y + 0.5), a.z - (b.z + 0.5));
 }
 
+/** Whether a honeypot is within `reach` of a player across the ground. */
+export function withinReach(
+    trap: { readonly x: number; readonly z: number },
+    player: { readonly x: number; readonly z: number },
+    reach: number
+): boolean {
+    return Math.hypot(player.x - trap.x, player.z - trap.z) <= reach;
+}
+
 /** How many honeypots a player is short of, counting every one within `reach`
  *  of them across the ground - so each player has their own, however far apart
  *  the players are. */
@@ -373,7 +382,7 @@ export function shortfall(
     each: number,
     reach: number
 ): number {
-    const near = traps.filter((trap) => Math.hypot(player.x - trap.x, player.z - trap.z) <= reach);
+    const near = traps.filter((trap) => withinReach(trap, player, reach));
     return Math.max(0, each - near.length);
 }
 

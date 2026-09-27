@@ -562,4 +562,23 @@ describe("watching a server", () => {
             covered.length
         );
     });
+
+    it("stops a placement pass after a bounded number of tries, however many players", async () => {
+        players = Array.from({ length: 30 }, (_, index) => ({
+            name: `Miner${index}`,
+            x: index * 1000,
+            y: -50,
+            z: 0,
+            mined: 0
+        }));
+        let tries = 0;
+        fake.answer = (command: string) => {
+            if (/ run setblock /.test(command)) tries += 1;
+            return answer(command);
+        };
+        await withTraps([]);
+        await look();
+        expect(tries).toBeGreaterThan(0);
+        expect(tries).toBeLessThanOrEqual(64);
+    });
 });
