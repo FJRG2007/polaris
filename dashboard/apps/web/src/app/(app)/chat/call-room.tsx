@@ -515,14 +515,18 @@ export function CallRoom({
      * Expanded for a stream, the call kept the whole column after the stream
      * ended or was put away - a column of empty call with the conversation hidden
      * behind it. Only on that change, though: a call somebody expanded with
-     * nothing on the stage stays the size they asked for.
+     * nothing on the stage stays the size they asked for, and a face enlarged
+     * and let go again is not a stream ending.
      */
-    const wasStaged = useRef(staged);
+    const watching = stages.length > 0;
+    const seen = useRef({ watching, expanded: false });
+    const expandedWatching = useRef(false);
     useEffect(() => {
-        const before = wasStaged.current;
-        wasStaged.current = staged;
-        if (before && !staged && expanded) onExpand?.(false);
-    }, [staged, expanded, onExpand]);
+        const before = seen.current;
+        seen.current = { watching, expanded };
+        if (expanded && !before.expanded) expandedWatching.current = watching;
+        if (expanded && expandedWatching.current && before.watching && !watching) onExpand?.(false);
+    }, [watching, expanded, onExpand]);
 
     /** Said out loud rather than worked out again outside, because it is decided
      *  here: what is being watched turns on what somebody in this room asked

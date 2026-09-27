@@ -128,4 +128,44 @@ describe("an expanded call whose stream ends", () => {
         view.rerender(room());
         expect(onExpand).not.toHaveBeenCalled();
     });
+
+    it("stays expanded when a stream came and went after it was expanded", () => {
+        HTMLMediaElement.prototype.play = () => Promise.resolve();
+        const onExpand = vi.fn();
+        const room = (screens: ReadonlyMap<string, MediaStream>) => (
+            <CallRoom
+                meetingId="m1"
+                place="channel"
+                call={callWith(screens)}
+                onLeave={() => undefined}
+                expanded
+                onExpand={onExpand}
+            />
+        );
+        const view = render(room(new Map()));
+        view.rerender(room(new Map([["p-alan", screenStream()]])));
+        view.rerender(room(new Map()));
+        expect(onExpand).not.toHaveBeenCalled();
+    });
+
+    it("gives the column back when it was expanded while a stream was on", () => {
+        HTMLMediaElement.prototype.play = () => Promise.resolve();
+        const onExpand = vi.fn();
+        const room = (screens: ReadonlyMap<string, MediaStream>, expanded: boolean) => (
+            <CallRoom
+                meetingId="m1"
+                place="channel"
+                call={callWith(screens)}
+                onLeave={() => undefined}
+                expanded={expanded}
+                onExpand={onExpand}
+            />
+        );
+        const shared = new Map([["p-alan", screenStream()]]);
+        const view = render(room(shared, false));
+        view.rerender(room(shared, true));
+        expect(onExpand).not.toHaveBeenCalled();
+        view.rerender(room(new Map(), true));
+        expect(onExpand).toHaveBeenCalledWith(false);
+    });
 });
