@@ -28,7 +28,11 @@ self.addEventListener("activate", (event) => {
     event.waitUntil(
         caches
             .keys()
-            .then((names) => Promise.all(names.filter((name) => name !== CACHE).map((name) => caches.delete(name))))
+            .then((names) =>
+                Promise.all(
+                    names.filter((name) => name !== CACHE).map((name) => caches.delete(name))
+                )
+            )
             .then(() => self.clients.claim())
     );
 });
@@ -37,7 +41,9 @@ self.addEventListener("fetch", (event) => {
     if (event.request.mode !== "navigate") return;
     event.respondWith(
         fetch(event.request).catch(() =>
-            caches.match(OFFLINE).then((page) => page || new Response("Polaris is not reachable.", { status: 503 }))
+            caches
+                .match(OFFLINE)
+                .then((page) => page || new Response("Polaris is not reachable.", { status: 503 }))
         )
     );
 });
@@ -53,7 +59,9 @@ self.addEventListener("notificationclick", (event) => {
     const data = notice.data || {};
     notice.close();
 
-    const pressed = (Array.isArray(data.actions) ? data.actions : []).find((one) => one && one.id === event.action);
+    const pressed = (Array.isArray(data.actions) ? data.actions : []).find(
+        (one) => one && one.id === event.action
+    );
     if (pressed) {
         const request = pressed.request || {};
         // Only a request back to this Polaris's own API.
@@ -69,7 +77,10 @@ self.addEventListener("notificationclick", (event) => {
         return;
     }
 
-    const href = typeof data.href === "string" && data.href.startsWith("/") && !data.href.startsWith("//") ? data.href : null;
+    const href =
+        typeof data.href === "string" && data.href.startsWith("/") && !data.href.startsWith("//")
+            ? data.href
+            : null;
     event.waitUntil(
         self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
             const target = windows.find((one) => one.focused) || windows[0];
