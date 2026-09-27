@@ -110,10 +110,16 @@ describe("how long a note stays", () => {
             const toast = useToast();
             return (
                 <>
-                    <button type="button" onClick={() => toast.show({ key: "ana", title: "Ana: hello" })}>
+                    <button
+                        type="button"
+                        onClick={() => toast.show({ key: "ana", title: "Ana: hello" })}
+                    >
                         first
                     </button>
-                    <button type="button" onClick={() => toast.show({ key: "ana", title: "Ana: still there?" })}>
+                    <button
+                        type="button"
+                        onClick={() => toast.show({ key: "ana", title: "Ana: still there?" })}
+                    >
                         second
                     </button>
                 </>
