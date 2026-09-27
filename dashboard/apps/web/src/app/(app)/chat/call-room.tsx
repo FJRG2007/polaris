@@ -61,16 +61,16 @@ import {
     type ShownReaction
 } from "./call-signals";
 import { LiveBadge } from "./call-roster";
-import { MicLevelMeter } from "./mic-level-meter";
 import { useSpeakers } from "./speaker-device";
 import { HandStrip } from "./call-hands-panel";
 import { useCallVolume } from "./call-volumes";
+import { MicLevelMeter } from "./mic-level-meter";
 import { PersonMenu, StreamMenu } from "./call-menus";
 import { useZoomPan } from "@/components/use-zoom-pan";
 import { setWatchedStreams } from "./call-stream-audio";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
-import { callBareFaces, directLayout, type CallPlace } from "./call-band";
 import type { SeatModeration } from "./call-moderation-menu";
+import { callBareFaces, directLayout, type CallPlace } from "./call-band";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
@@ -507,6 +507,22 @@ export function CallRoom({
     const column: { grown?: boolean; onGrow?: () => void } = onExpand
         ? { grown: expanded, onGrow: () => onExpand(!expanded) }
         : {};
+
+    /**
+     * An expanded call that was watching something gives the column back when
+     * there is nothing left to watch.
+     *
+     * Expanded for a stream, the call kept the whole column after the stream
+     * ended or was put away - a column of empty call with the conversation hidden
+     * behind it. Only on that change, though: a call somebody expanded with
+     * nothing on the stage stays the size they asked for.
+     */
+    const wasStaged = useRef(staged);
+    useEffect(() => {
+        const before = wasStaged.current;
+        wasStaged.current = staged;
+        if (before && !staged && expanded) onExpand?.(false);
+    }, [staged, expanded, onExpand]);
 
     /** Said out loud rather than worked out again outside, because it is decided
      *  here: what is being watched turns on what somebody in this room asked
