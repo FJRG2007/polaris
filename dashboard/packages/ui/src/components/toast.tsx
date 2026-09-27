@@ -25,10 +25,15 @@
  * - **One per key.** A second note with the same `key` replaces the first
  *   instead of stacking, so ten messages in one conversation are one note that
  *   keeps changing rather than ten.
+ *
+ * A note can also take an answer (`reply`): a message is answered where it
+ * arrived, without going to the conversation. The note stays while the answer is
+ * being written, says when it went, and goes.
  */
 
 import { cn } from "../lib/cn";
-import { X } from "lucide-react";
+import { Input } from "./input";
+import { Loader2, Reply, SendHorizontal, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
     createContext,
@@ -64,7 +69,19 @@ export interface Toast {
     readonly onPress?: () => void;
     /** How long it stays. Zero keeps it until it is dismissed. */
     readonly life?: number;
+    /** An answer written on the note itself, for a message. */
+    readonly reply?: ToastReply;
 }
+
+export interface ToastReply {
+    /** What the field says before anything is typed: "Reply to Ana". */
+    readonly placeholder: string;
+    /** Send it. Answers why it did not go, or null when it did. */
+    readonly send: (text: string) => Promise<string | null>;
+}
+
+/** How long a note that sent an answer says so before it goes. */
+const SENT_MS = 1500;
 
 interface Shown extends Toast {
     readonly id: string;
@@ -175,16 +192,45 @@ function useSeen(): boolean {
 
 function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }) {
     const [held, setHeld] = useState(false);
+    /** The answer being written on it: null while nobody has asked to. */
+    const [answer, setAnswer] = useState<string | null>(null);
+    const [sending, setSending] = useState(false);
+    const [sent, setSent] = useState(false);
+    const [problem, setProblem] = useState<string | null>(null);
     const seen = useSeen();
     const life = toast.life ?? LIFE_MS;
+    // Writing an answer holds the note like a pointer over it does: it must not
+    // go in the middle of a sentence.
+    const writing = answer !== null || sending;
 
     useEffect(() => {
-        if (held || !seen || life <= 0) return;
+        if (!sent) return;
+        const timer = setTimeout(onDismiss, SENT_MS);
+        return () => clearTimeout(timer);
+    }, [sent, onDismiss]);
+
+    const send = async () => {
+        const text = (answer ?? "").trim();
+        if (!toast.reply || text.length === 0 || sending) return;
+        setSending(true);
+        setProblem(null);
+        const refused = await toast.reply.send(text).catch(() => "That could not be sent");
+        setSending(false);
+        if (refused) {
+            setProblem(refused);
+            return;
+        }
+        setAnswer(null);
+        setSent(true);
+    };
+
+    useEffect(() => {
+        if (held || writing || sent || !seen || life <= 0) return;
         const timer = setTimeout(onDismiss, life);
         return () => clearTimeout(timer);
         // Re-armed when the pointer leaves, which is what "hover holds it" is,
         // and when somebody comes back to the tab, which is when they can read it.
-    }, [held, seen, life, onDismiss]);
+    }, [held, writing, sent, seen, life, onDismiss]);
 
     const pressable = Boolean(toast.onPress);
 
@@ -219,6 +265,66 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
                 {toast.media ? (
                     <span className="mt-2 flex max-h-40 overflow-hidden rounded-md empty:hidden">
                         {toast.media}
+                    </span>
+                ) : null}
+                {toast.reply ? (
+                    // Pressing anything here answers; it does not open what the
+                    // note points at.
+                    <span className="mt-2 block" onClick={(event) => event.stopPropagation()}>
+                        {sent ? (
+                            <span className="block text-xs text-muted-foreground">Sent</span>
+                        ) : answer === null ? (
+                            <button
+                                type="button"
+                                onClick={() => setAnswer("")}
+                                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-card-hover"
+                            >
+                                <Reply className="size-3.5" />
+                                Reply
+                            </button>
+                        ) : (
+                            <span className="flex items-center gap-1.5">
+                                <Input
+                                    autoFocus
+                                    value={answer}
+                                    disabled={sending}
+                                    onChange={(event) => setAnswer(event.target.value)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter" && !event.shiftKey) {
+                                            event.preventDefault();
+                                            void send();
+                                        } else if (event.key === "Escape") {
+                                            event.preventDefault();
+                                            setAnswer(null);
+                                            setProblem(null);
+                                        }
+                                    }}
+                                    placeholder={toast.reply.placeholder}
+                                    aria-label={toast.reply.placeholder}
+                                    maxLength={4000}
+                                    className="h-8 min-w-0 flex-1 text-xs"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => void send()}
+                                    disabled={sending || answer.trim().length === 0}
+                                    aria-label="Send"
+                                    title="Send"
+                                    className="shrink-0 rounded p-1.5 text-primary transition-colors hover:bg-card-hover disabled:opacity-50"
+                                >
+                                    {sending ? (
+                                        <Loader2 className="size-3.5 animate-spin" />
+                                    ) : (
+                                        <SendHorizontal className="size-3.5" />
+                                    )}
+                                </button>
+                            </span>
+                        )}
+                        {problem ? (
+                            <span role="alert" className="mt-1 block text-xs text-danger">
+                                {problem}
+                            </span>
+                        ) : null}
                     </span>
                 ) : null}
             </span>

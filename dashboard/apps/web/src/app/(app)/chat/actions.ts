@@ -224,6 +224,33 @@ export async function sendAction(input: unknown): Promise<{ id?: string; error?:
     return result.error ? { error: result.error } : { id: result.value };
 }
 
+/**
+ * Answer a message from its notice, without opening the conversation: the
+ * answer is sent, and the conversation is read up to it - somebody who answered
+ * has seen what they were answering, and the notice, the card and the unread
+ * count go with it, as they do on every messenger.
+ */
+export async function replyFromNoticeAction(
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatSendSchema.pick({ channelId: true, body: true }).safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That could not be sent" };
+
+    const sent = await guard(() => messages.send(me, parsed.data, [], null));
+    if (sent.error || !sent.value) return { error: sent.error ?? "That could not be sent" };
+    // Read up to the answer, which is after everything it answers. Not a reason
+    // to report the answer as unsent when it went: the next visit reads it.
+    const id = sent.value;
+    await messages
+        .markRead(me, { channelId: parsed.data.channelId, messageId: id })
+        .catch((caught: unknown) =>
+            console.error("polaris: a reply was sent but not read up to:", caught)
+        );
+    return { id };
+}
+
 /** Send a message on to another conversation. */
 export async function forwardAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const me = await actor();

@@ -43,6 +43,23 @@ import { attending } from "@/components/use-attention";
  */
 const shown = new Map<string, { close: () => void }>();
 
+/** What an answer written on each notice is handed to, by tag. */
+const answering = new Map<string, (text: string) => Promise<void>>();
+let hearing = false;
+
+/** Hear the app's answers, once per page. An answer to a notice nothing here
+ *  drew - one from before a reload - has nowhere to go and is dropped. */
+function listenForReplies(app: NonNullable<ReturnType<typeof desktopBridge>>): void {
+    if (hearing || !app.onNoticeReply) return;
+    hearing = true;
+    app.onNoticeReply(({ tag, text }) => {
+        const send = answering.get(tag);
+        answering.delete(tag);
+        const answer = text.trim();
+        if (send && answer.length > 0) void send(answer).catch(() => undefined);
+    });
+}
+
 /** Whether this browser can do it at all. */
 export function canNotify(): boolean {
     return desktopBridge() !== null || (typeof window !== "undefined" && "Notification" in window);
@@ -125,10 +142,25 @@ export async function notifyDesktop(input: {
      * thing a call must never do.
      */
     sound?: boolean;
+    /**
+     * A field on the notice itself to answer in, like a messenger's. Only the
+     * desktop app can draw one: a browser's notices take no text, so there the
+     * card in the tab is where an answer is written.
+     */
+    reply?: { placeholder: string; send: (text: string) => Promise<void> };
 }): Promise<{ close: () => void } | null> {
     const app = desktopBridge();
     if (app) {
-        const drawn = await app.notify(input).catch(() => false);
+        const { reply, ...drawnAs } = input;
+        const answerable = reply && app.onNoticeReply ? reply : null;
+        if (answerable) listenForReplies(app);
+        const drawn = await app
+            .notify({
+                ...drawnAs,
+                ...(answerable ? { reply: { placeholder: answerable.placeholder } } : {})
+            })
+            .catch(() => false);
+        if (answerable && drawn) answering.set(input.tag, answerable.send);
         if (!drawn) return null;
         const handle = { close: () => void app.closeNotice(input.tag).catch(() => undefined) };
         shown.set(input.tag, handle);
@@ -180,6 +212,7 @@ export async function notifyDesktop(input: {
  * whether there was a notice for it is this module's business.
  */
 export function closeDesktopNotice(tag: string): void {
+    answering.delete(tag);
     const app = desktopBridge();
     if (app) void app.closeNotice(tag).catch(() => undefined);
     const held = shown.get(tag);

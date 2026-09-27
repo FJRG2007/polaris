@@ -21,6 +21,10 @@
  * room is one note that keeps changing, which is what every messenger does and
  * what stops a busy channel from filling the screen.
  *
+ * Either can be answered where it is (`replyFromNoticeAction`): the answer goes
+ * to the conversation, which is then read up to it, so the note, the notice and
+ * the unread count go the way they do on every messenger.
+ *
  * The conversation open in this tab is only exempt while somebody is attending to
  * the tab. Left open behind another window, it is announced like any other - see
  * `lib/chat/message-alert` for the whole decision.
@@ -35,7 +39,7 @@ import { claimForDevice } from "@/lib/device-once";
 import { useCallback, useEffect, useRef } from "react";
 import { ToastPicture } from "@/components/toast-picture";
 import { useSessionScope } from "@/components/session-scope";
-import { messageToastsAction } from "@/app/(app)/chat/actions";
+import { messageToastsAction, replyFromNoticeAction } from "@/app/(app)/chat/actions";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
 import { closeDesktopNotice, notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
 import { noticeAllowed } from "@/lib/notifications/browser-notices";
@@ -50,6 +54,15 @@ import {
 /** How long the words wait for more of them before being fetched. A burst of
  *  five messages is one request, not five. */
 const SETTLE_MS = 400;
+
+/** Send an answer to a conversation from its notice. Answers why it did not go,
+ *  or null when it did. */
+async function answer(channelId: string, text: string): Promise<string | null> {
+    const result = await replyFromNoticeAction({ channelId, body: text }).catch(() => ({
+        error: "That could not be sent"
+    }));
+    return result.error ?? null;
+}
 
 export function MessageToasts() {
     const router = useRouter();
@@ -125,6 +138,9 @@ export function MessageToasts() {
             const who = message.inChannel
                 ? `${message.authorName} in ${message.conversation}`
                 : message.authorName;
+            const replyTo = message.inChannel
+                ? `Message #${message.conversation}`
+                : `Reply to ${message.authorName}`;
             if (alert.toast) {
                 const note: Toast = {
                     key: `message:${message.channelId}`,
@@ -144,7 +160,11 @@ export function MessageToasts() {
                             }}
                         />
                     ),
-                    onPress: () => go.current(`/chat/c/${message.channelId}/${message.messageId}`)
+                    onPress: () => go.current(`/chat/c/${message.channelId}/${message.messageId}`),
+                    reply: {
+                        placeholder: replyTo,
+                        send: (text) => answer(message.channelId, text)
+                    }
                 };
                 raise.current(note);
             }
@@ -173,7 +193,24 @@ export function MessageToasts() {
                             title: who,
                             body: message.excerpt,
                             tag: `message:${message.channelId}`,
-                            href: `/chat/c/${message.channelId}/${message.messageId}`
+                            href: `/chat/c/${message.channelId}/${message.messageId}`,
+                            reply: {
+                                placeholder: replyTo,
+                                send: async (text) => {
+                                    const refused = await answer(message.channelId, text);
+                                    // Said where it was written, since that is where
+                                    // somebody is looking: an answer that silently did
+                                    // not go is the worst way for this to fail.
+                                    if (refused) {
+                                        void notifyDesktop({
+                                            title: "Your reply was not sent",
+                                            body: refused,
+                                            tag: `reply-failed:${message.channelId}`,
+                                            href: `/chat/c/${message.channelId}`
+                                        });
+                                    }
+                                }
+                            }
                         });
                     }
                 );

@@ -32,7 +32,13 @@ export interface PolarisDesktop {
         /** Whether the notice rings. Only a call asks for it - see
          *  `desktop-notify`. */
         readonly sound?: boolean;
+        /** A field on the notice to answer in, with this placeholder. The answer
+         *  comes back through `onNoticeReply`. */
+        readonly reply?: { readonly placeholder: string };
     }): Promise<boolean>;
+    /** Hear the answers written on notices. Absent from an app older than the
+     *  feature, which then draws the notice without the field. */
+    onNoticeReply?(listener: (reply: { readonly tag: string; readonly text: string }) => void): () => void;
     closeNotice(tag: string): Promise<void>;
     pickFolder(): Promise<DesktopFolder>;
     pushLocal(input: { readonly serviceId: string; readonly name: string; readonly href?: string }): Promise<DesktopOutcome>;

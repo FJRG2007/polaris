@@ -8,7 +8,7 @@
  */
 
 import { contextBridge, ipcRenderer } from "electron";
-import { CHANNELS, VERSION_ARGUMENT, type PolarisDesktop } from "@/shared/bridge";
+import { CHANNELS, VERSION_ARGUMENT, type NoticeReply, type PolarisDesktop } from "@/shared/bridge";
 
 const version = process.argv.find((arg) => arg.startsWith(VERSION_ARGUMENT))?.slice(VERSION_ARGUMENT.length) ?? "";
 
@@ -17,6 +17,13 @@ const bridge: PolarisDesktop = {
     platform: process.platform,
     notify: (input) => ipcRenderer.invoke(CHANNELS.notify, input),
     closeNotice: (tag) => ipcRenderer.invoke(CHANNELS.closeNotice, tag),
+    onNoticeReply: (listener) => {
+        const heard = (_event: unknown, reply: NoticeReply) => listener(reply);
+        ipcRenderer.on(CHANNELS.noticeReply, heard);
+        return () => {
+            ipcRenderer.removeListener(CHANNELS.noticeReply, heard);
+        };
+    },
     pickFolder: () => ipcRenderer.invoke(CHANNELS.pickFolder),
     pushLocal: (input) => ipcRenderer.invoke(CHANNELS.pushLocal, input),
     openWindow: (input) => ipcRenderer.invoke(CHANNELS.openWindow, input)
