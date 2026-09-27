@@ -38,10 +38,16 @@ export interface PolarisDesktop {
     }): Promise<boolean>;
     /** Hear the answers written on notices. Absent from an app older than the
      *  feature, which then draws the notice without the field. */
-    onNoticeReply?(listener: (reply: { readonly tag: string; readonly text: string }) => void): () => void;
+    onNoticeReply?(
+        listener: (reply: { readonly tag: string; readonly text: string }) => void
+    ): () => void;
     closeNotice(tag: string): Promise<void>;
     pickFolder(): Promise<DesktopFolder>;
-    pushLocal(input: { readonly serviceId: string; readonly name: string; readonly href?: string }): Promise<DesktopOutcome>;
+    pushLocal(input: {
+        readonly serviceId: string;
+        readonly name: string;
+        readonly href?: string;
+    }): Promise<DesktopOutcome>;
     openWindow(input: { readonly path: string; readonly title: string }): Promise<DesktopOutcome>;
 }
 
@@ -51,7 +57,10 @@ const METHODS = ["notify", "closeNotice", "pickFolder", "pushLocal", "openWindow
 export function isDesktopBridge(value: unknown): value is PolarisDesktop {
     if (!value || typeof value !== "object") return false;
     const candidate = value as Record<string, unknown>;
-    return typeof candidate.version === "string" && METHODS.every((name) => typeof candidate[name] === "function");
+    return (
+        typeof candidate.version === "string" &&
+        METHODS.every((name) => typeof candidate[name] === "function")
+    );
 }
 
 /** The desktop app's bridge when this page runs inside the app, otherwise null. */
@@ -76,6 +85,9 @@ interface FeedRow {
  * the update is recorded as seen, so a result already on screen when the page
  * opened, or one already read elsewhere, never raises a notice.
  */
-export function arrivedDeployResults<T extends FeedRow>(seen: ReadonlySet<string>, rows: readonly T[]): T[] {
+export function arrivedDeployResults<T extends FeedRow>(
+    seen: ReadonlySet<string>,
+    rows: readonly T[]
+): T[] {
     return rows.filter((row) => !seen.has(row.id) && !row.read && DEPLOY_RESULTS.has(row.type));
 }
