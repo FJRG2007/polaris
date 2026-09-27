@@ -713,13 +713,15 @@ async function fetchSnippets(
  * Which folders are worth holding whole messages for.
  *
  * What somebody reads: the inbox, whatever they have filed into folders of their
- * own, and the archive. Not Sent, which is mail they wrote; not Spam or Trash,
- * which are read once if ever; and never Gmail's "All Mail", which is a second
- * copy of every message in the account and would double the disk this costs.
- * Anything left out still opens exactly as it did before - the body is fetched
- * then, and kept from then on.
+ * own, the archive, and Sent - the replies are half of every conversation on
+ * screen, and a body that is not held is one the search cannot find a word of
+ * (a search for something somebody wrote in their own reply came back empty).
+ * Not Spam or Trash, which are read once if ever; and never Gmail's "All Mail",
+ * which is a second copy of every message in the account and would double the
+ * disk this costs. Anything left out still opens exactly as it did before - the
+ * body is fetched then, and kept from then on.
  */
-const BODY_ROLES: ReadonlySet<string> = new Set(["inbox", "archive", "none"]);
+const BODY_ROLES: ReadonlySet<string> = new Set(["inbox", "archive", "none", "sent"]);
 
 /**
  * The size of message worth storing whole, and the ceiling on one part.

@@ -346,6 +346,9 @@ function offerOf(headers: unknown): core.UnsubscribeOffer | null {
  */
 const SEARCH_WINDOW = 2000;
 
+/** Where the rest of a conversation is not searched from another list. */
+const SEARCH_SET_ASIDE = ["trash", "junk"] as const;
+
 /**
  * The conversations a search admits.
  *
@@ -360,23 +363,35 @@ const SEARCH_WINDOW = 2000;
  * half-remembered name, a subject typed from memory, an address with one letter
  * wrong. Everything with an operator on it stays exact, because somebody who
  * wrote `from:ana` meant Ana.
+ *
+ * A conversation is searched whole: every message of one that is in the list
+ * being searched, not only the messages that put it there. A thread is in the
+ * inbox because of what arrived, and the replies somebody wrote to it are in
+ * Sent - searching the inbox for words from their own reply found nothing.
+ * The rest of a conversation's messages in Trash or Spam are left out, as they
+ * are from every other list; searching Trash or Spam itself reads them.
  */
 async function matchingThreads(
     accountIds: string[],
     query: MailListQuery,
     terms: core.MailSearchTerms
 ): Promise<Set<string>> {
+    const inView: Prisma.MailMessageWhereInput = {
+        ...(query.folderId ? { folderId: query.folderId } : {}),
+        ...(query.role ? { folder: { role: query.role } } : {}),
+        ...(query.labelId ? { labels: { some: { labelId: query.labelId } } } : {}),
+        ...(query.category ? { category: query.category } : {}),
+        ...(query.withAttachments ? { hasAttachments: true } : {}),
+        ...(query.unreadOnly ? { seen: false } : {}),
+        ...(query.starredOnly ? { flagged: true } : {}),
+        ...(query.importantOnly ? { important: true } : {})
+    };
     const messages = await prisma.mailMessage.findMany({
         where: {
             accountId: { in: accountIds },
-            ...(query.folderId ? { folderId: query.folderId } : {}),
-            ...(query.role ? { folder: { role: query.role } } : {}),
-            ...(query.labelId ? { labels: { some: { labelId: query.labelId } } } : {}),
-            ...(query.category ? { category: query.category } : {}),
-            ...(terms.hasAttachment || query.withAttachments ? { hasAttachments: true } : {}),
-            ...(query.unreadOnly ? { seen: false } : {}),
-            ...(query.starredOnly ? { flagged: true } : {}),
-            ...(query.importantOnly ? { important: true } : {}),
+            thread: { messages: { some: { accountId: { in: accountIds }, ...inView } } },
+            OR: [inView, { folder: { role: { notIn: [...SEARCH_SET_ASIDE] } } }],
+            ...(terms.hasAttachment ? { hasAttachments: true } : {}),
             ...(terms.unread === null ? {} : { seen: !terms.unread }),
             ...(terms.starred === null ? {} : { flagged: terms.starred }),
             ...(terms.after || terms.before
