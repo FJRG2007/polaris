@@ -103,7 +103,19 @@ describe("the line a player is shown", () => {
         const line = relay.relayCommand("Ana_MC", MESSAGE);
         expect(line?.startsWith("tellraw Ana_MC [")).toBe(true);
         const runs = JSON.parse(line!.slice("tellraw Ana_MC ".length)) as { text: string }[];
-        expect(runs.map((run) => run.text).join("")).toBe("[Polaris] Carla: see you at spawn");
+        expect(runs.map((run) => run.text).join("")).toBe(
+            `${relay.MESSAGE_MARK} [Polaris] Carla: see you at spawn`
+        );
+    });
+
+    it("marks the line as a message, apart from the server's own [Polaris] lines", () => {
+        const line = relay.relayCommand("Ana_MC", MESSAGE);
+        const runs = JSON.parse(line!.slice("tellraw Ana_MC ".length)) as {
+            text: string;
+            color?: string;
+        }[];
+        expect(relay.MESSAGE_MARK).toBe("✉");
+        expect(runs[1]).toEqual({ text: "✉ ", color: "aqua" });
     });
 
     it("names the conversation when it is not the author's own", () => {

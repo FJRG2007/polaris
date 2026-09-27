@@ -12,6 +12,7 @@ import { listDestinations } from "@/lib/notifications/destinations";
 import { listSmsSenders } from "@/lib/notifications/sms-service";
 import { NotificationsPageView } from "./notifications-page-view";
 import { prisma } from "@polaris/db";
+import { inGameChoice } from "@/lib/chat/in-game-choice";
 import { relaysChatToGames } from "@/lib/app-extensions/registry";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,9 @@ export default async function NotificationsPage() {
                 destinations={destinations}
                 senders={senders}
                 deliveries={deliveries}
-                messagesInGame={inGameOffered ? (account?.messagesInGame ?? false) : null}
+                messagesInGame={
+                    inGameOffered ? inGameChoice(account?.messagesInGame ?? null) : null
+                }
             />
         </div>
     );

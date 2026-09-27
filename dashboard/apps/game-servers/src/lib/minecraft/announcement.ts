@@ -18,7 +18,13 @@
  * Pure, so every command can be asserted without a server.
  */
 
-import { EVERYBODY, LONGEST_NAME, concreteTargets, parseTarget } from "./announce-target";
+import {
+    EVERYBODY,
+    LONGEST_NAME,
+    concreteTargets,
+    namedByPolaris,
+    parseTarget
+} from "./announce-target";
 import { BROADCAST_TAG } from "./broadcast";
 import type { MinecraftEdition } from "./service";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
@@ -320,8 +326,9 @@ export interface SendContext {
     /** A value that is also a list, a line an item where a line can be one:
      *  everybody's level, for the side panel. */
     readonly lists?: Readonly<Record<string, readonly string[]>>;
-    /** The operators online, for an announcement sent to them. */
-    readonly operators?: readonly string[];
+    /** Who an audience Polaris names itself is right now (`audienceNames`):
+     *  the operators online, or everybody online but them. */
+    readonly named?: readonly string[];
 }
 
 export const NO_CONTEXT: SendContext = { values: {}, recipients: null };
@@ -353,12 +360,14 @@ export function announcementCommands(
 ): string[] {
     const audience = parseTarget(announcement.target);
     if (!audience) throw new Error("Choose who it goes to");
-    const targets = concreteTargets(audience, context.operators);
+    const targets = concreteTargets(audience, context.named, edition);
     if (targets.length === 0) {
         throw new Error(
             audience.kind === "operators"
                 ? "No operator is on the server right now"
-                : "Choose who it goes to"
+                : audience.kind === "others"
+                  ? "Nobody but operators is on the server right now"
+                  : "Choose who it goes to"
         );
     }
     // The same lines for each of them, once - the scores behind a variable are
@@ -372,7 +381,7 @@ export function announcementCommands(
     );
 }
 
-/** The lines for one target: everybody's selector, or one player's name. */
+/** The lines for one target: a selector, or one player's name. */
 function commandsFor(
     edition: MinecraftEdition,
     announcement: Announcement,
@@ -389,11 +398,15 @@ function commandsFor(
     /** One command, or one per recipient when the text reads their account. */
     const send = (command: string, text: string, write: (filled: string) => string): string[] => {
         if (usesAccount(text) && context.recipients) {
-            const wanted = target === EVERYBODY ? null : target.toLowerCase();
+            // A selector narrower than everybody (a game mode) is kept around
+            // each name, so the game still only reaches the ones in it.
+            const selector = target.startsWith("@a[") ? target : null;
+            const wanted = target === EVERYBODY || selector ? null : target.toLowerCase();
             return context.recipients.flatMap((recipient) => {
                 if (wanted !== null && recipient.name.toLowerCase() !== wanted) return [];
-                const who = playerSelector(recipient.name);
-                if (!who) return [];
+                const own = playerSelector(recipient.name);
+                if (!own) return [];
+                const who = selector ? `${selector.slice(0, -1)},name=${own}]` : own;
                 const filled = fillValues(text, { ...context.values, ...recipient.values });
                 return [`execute as ${who} run ${command} @s ${write(filled)}`];
             });
@@ -462,16 +475,16 @@ function commandsFor(
 }
 
 /** What takes an announcement off the screen straight away, rather than
- *  leaving it to fade. `operators` is who it was on the screens of, for one
- *  sent to the operators. */
+ *  leaving it to fade. `named` is who it was on the screens of, for an
+ *  audience Polaris names itself. */
 export function clearAnnouncementCommands(
     edition: MinecraftEdition,
     announcement: Announcement,
-    operators: readonly string[] = []
+    named: readonly string[] = []
 ): string[] {
     const audience = parseTarget(announcement.target);
     if (!audience) throw new Error("Choose who it goes to");
-    return concreteTargets(audience, operators).flatMap((target) =>
+    return concreteTargets(audience, named, edition).flatMap((target) =>
         clearFor(edition, announcement, target)
     );
 }
@@ -517,7 +530,7 @@ export function announcementProblems(
     const problems: Partial<Record<AnnouncementField, string>> = {};
     const audience = parseTarget(announcement.target);
     if (!audience) problems.target = "Choose who it goes to";
-    else if (audience.kind === "operators" && edition === "bedrock") {
+    else if (namedByPolaris(audience) && edition === "bedrock") {
         problems.target = "Bedrock keeps no operators list Polaris can read";
     }
     const lineFields = ["title", "subtitle", "actionbar"] as const;
@@ -547,9 +560,11 @@ export function announcementProblems(
             ? audience.players.reduce((longest, name) =>
                   name.length > longest.length ? name : longest
               )
-            : audience?.kind === "operators"
+            : audience && namedByPolaris(audience)
               ? LONGEST_NAME
-              : EVERYBODY;
+              : audience?.kind === "gamemode"
+                ? announcement.target
+                : EVERYBODY;
     for (const field of [...lineFields, "chat"] as const) {
         if (problems[field] || !hasText(announcement[field])) continue;
         const alone: Announcement = {

@@ -57,7 +57,10 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/timeout-service", () => ({
 import { DEFAULT_XRAY_SETTINGS } from "@polaris-app/game-servers/src/lib/minecraft/xray";
 import {
     AIRBORNE_COMMAND,
-    RIDING_COMMAND
+    DEATH_OBJECTIVE,
+    JOIN_GRACE_MS,
+    RIDING_COMMAND,
+    sinceCommand
 } from "@polaris-app/game-servers/src/lib/minecraft/movement";
 
 const INSTALL = "018f2b7a-0000-7000-8000-0000000000e2";
@@ -77,6 +80,8 @@ describe("watching movement", () => {
     let ops: string[] = [];
     let logAdmin: boolean | null = true;
     let looks = 0;
+    /** Who the game's death counter says died since it was last reset. */
+    let deaths = new Set<string>();
 
     const entity = (one: Player, data: string) =>
         `${one.name} has the following entity data: ${data}`;
@@ -90,6 +95,7 @@ describe("watching movement", () => {
         ops = [];
         logAdmin = true;
         looks = 0;
+        deaths = new Set();
         fake.notified.length = 0;
         fake.answer = (command) => {
             if (command === "execute as @a run data get entity @s Pos") {
@@ -108,6 +114,14 @@ describe("watching movement", () => {
                     .filter((one) => one.riding)
                     .map((one) => entity(one, '"minecraft:overworld"'))
                     .join("\n");
+            if (command === sinceCommand(DEATH_OBJECTIVE))
+                return [...deaths]
+                    .map((name) => entity({ name, x: 0, y: 0, z: 0 }, '"minecraft:overworld"'))
+                    .join("\n");
+            const reset = /^scoreboard players reset (\w+) polaris_mv_death$/.exec(command);
+            if (reset) deaths.delete(reset[1]!);
+            if (command.startsWith("scoreboard players reset @a[scores={polaris_mv_death=1..}]"))
+                deaths.clear();
             if (command === "gamerule logAdminCommands")
                 return logAdmin === null
                     ? "Unknown or incomplete command"
@@ -216,6 +230,53 @@ describe("watching movement", () => {
         await look();
         await look();
         expect(incidents("Alex")).toEqual([]);
+    });
+
+    it("does not record the respawn of a player who waited on the death screen", async () => {
+        // Offgrid, 2026-09-27: shot by a Sentry, the death counted and reset at
+        // the next look, and the respawn 200 blocks away a few looks later.
+        await start();
+        players = [{ name: "ErMigue04", x: -5420, y: 123, z: -2280 }];
+        await look();
+        await look();
+        deaths.add("ErMigue04");
+        await look();
+        await look();
+        await look();
+        players = [{ name: "ErMigue04", x: -5420, y: 123, z: -2477 }];
+        await look();
+        await look();
+        expect(incidents("ErMigue04")).toEqual([]);
+    });
+
+    it("records a jump once a player who died has been seen back on their feet", async () => {
+        await start();
+        players = [{ name: "Alex", x: 0, y: 64, z: 0 }];
+        await look();
+        deaths.add("Alex");
+        await look();
+        await look();
+        players = [{ name: "Alex", x: 3, y: 64, z: 0 }];
+        await look();
+        players = [{ name: "Alex", x: 3000, y: 64, z: 0 }];
+        await look();
+        expect(incidents("Alex").map((one) => one.kind)).toEqual(["teleport"]);
+    });
+
+    it("does not record the server moving somebody who just joined, and does after", async () => {
+        await start();
+        players = [{ name: "Steve", x: 0, y: 64, z: 0 }];
+        await look();
+        players.push({ name: "Alex", x: 0, y: 64, z: 0 });
+        await look();
+        players = [players[0]!, { name: "Alex", x: 3000, y: 64, z: 0 }];
+        await look();
+        expect(incidents("Alex")).toEqual([]);
+        await vi.advanceTimersByTimeAsync(JOIN_GRACE_MS);
+        await look();
+        players = [players[0]!, { name: "Alex", x: 6000, y: 64, z: 0 }];
+        await look();
+        expect(incidents("Alex").map((one) => one.kind)).toEqual(["teleport"]);
     });
 
     it("does not record a jump on a horse", async () => {

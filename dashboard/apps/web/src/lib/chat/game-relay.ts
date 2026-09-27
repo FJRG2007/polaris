@@ -8,8 +8,10 @@
  *
  * Who gets one is exactly who the corner note would have been for - the same
  * mute, the same "all / mentions / nothing" level, the same blocks, read through
- * the same functions - and then only the accounts that turned it on
- * (`User.messagesInGame`). Which game, which player and whether they are on is
+ * the same functions - and then only the accounts it is on for
+ * (`User.messagesInGame`): by default a direct message or a group of up to
+ * `SMALL_GROUP_SIZE`, where somebody is writing to you; turned on, every channel and
+ * group too; turned off, nothing. Which game, which player and whether they are on is
  * the app's business, behind `relayChatMessage`; core knows nothing of any game.
  *
  * Never awaited by the send and never able to fail it: a message going out
@@ -22,6 +24,7 @@ import { blockedBy } from "@/lib/blocks";
 import { chatRelayer } from "@/lib/app-extensions/registry";
 import { conversationName, describeFiles } from "./toasts";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
+import { SMALL_GROUP_SIZE } from "./in-game-choice";
 import { messageable, reachableChannelIds } from "./access";
 import { mentionsReader, notifyLevels, readerTeams } from "./notify";
 
@@ -101,9 +104,10 @@ export async function relayToGames(messageId: string): Promise<void> {
  * corner note decides that: the same reach, and the same `chat.use`.
  *
  * A direct message or a group is read only by its members, so they are the
- * whole list. A channel in a space is also read by everybody who reaches the
- * space or was handed the room, with no row of their own on it, so it starts
- * from the accounts that turned it on instead.
+ * whole list: each one it is not turned off for, or in a group larger than
+ * `SMALL_GROUP_SIZE` each one that turned everything on. A channel in a space is also
+ * read by everybody who reaches the space or was handed the room, with no row of
+ * their own on it, so it starts from the accounts that turned everything on.
  */
 async function readersOf(
     channelId: string,
@@ -119,13 +123,15 @@ async function readersOf(
                   take: MOST_CANDIDATES
               })
           ).map((user) => user.id)
-        : (
+        : groupCandidates(
               await prisma.chatChannelMember.findMany({
-                  where: { channelId, userId: { not: authorId }, user: { messagesInGame: true } },
-                  select: { userId: true },
+                  where: { channelId },
+                  select: { userId: true, user: { select: { messagesInGame: true } } },
+                  orderBy: { userId: "asc" },
                   take: MOST_CANDIDATES
-              })
-          ).map((member) => member.userId);
+              }),
+              authorId
+          );
     if (candidates.length === 0) return [];
 
     const allowed = await messageable(candidates);
@@ -147,6 +153,20 @@ async function readersOf(
         muted: muting.get(userId)?.muted ?? false,
         mutedUntil: muting.get(userId)?.mutedUntil ?? null
     }));
+}
+
+/** The members of a direct message or group it is on for, as `readersOf` says. */
+export function groupCandidates(
+    members: readonly { userId: string; user: { messagesInGame: boolean | null } }[],
+    authorId: string
+): string[] {
+    const small = members.length <= SMALL_GROUP_SIZE;
+    return members
+        .filter((member) => member.userId !== authorId)
+        .filter((member) =>
+            member.user.messagesInGame === null ? small : member.user.messagesInGame
+        )
+        .map((member) => member.userId);
 }
 
 /**

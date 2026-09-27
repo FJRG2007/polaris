@@ -230,11 +230,12 @@ export function MinecraftAnnounce({
     // "commands" panel and the check that nothing is past the length cap.
     const built = useMemo(() => {
         try {
-            // Operators are only known when it goes; the preview writes one in.
+            // Operators, and everybody but them, are only known when it goes;
+            // the preview writes one in.
             const lines = announcementCommands(edition, draft, {
                 values: {},
                 recipients: null,
-                operators: ["Operator"]
+                named: ["Operator"]
             });
             return { lines, problem: null as string | null };
         } catch (caught) {
@@ -729,10 +730,14 @@ export function MinecraftAnnounce({
                         </details>
                     </CardBody>
                 </Card>
-                <VariablesHelp edition={edition} scope="all" />
             </div>
 
-            <AnnouncementPreview announcement={draft} edition={edition} />
+            {/* The preview kept in view, and what can be written in the room
+                under it that the longer form beside it leaves. */}
+            <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-[calc(var(--header-height)+1rem)] lg:max-h-[calc(100dvh-var(--header-height)-2rem)] lg:self-start">
+                <AnnouncementPreview announcement={draft} edition={edition} />
+                <VariablesHelp edition={edition} scope="all" className="lg:min-h-0" />
+            </div>
 
             {naming && (
                 <Dialog open onOpenChange={(open: boolean) => !open && setNaming(null)}>
@@ -882,7 +887,7 @@ function AnnouncementPreview({
     const tagged = announcement.tagged && hasText(announcement.chat);
 
     return (
-        <Card className="lg:sticky lg:top-[calc(var(--header-height)+1rem)] lg:self-start">
+        <Card className="shrink-0">
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-2">
                     <div>

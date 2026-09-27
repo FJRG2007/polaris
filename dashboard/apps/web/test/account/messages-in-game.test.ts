@@ -1,6 +1,7 @@
 /**
- * The switch for Chat messages in the game: saved on the account, only ever a
- * yes or a no, and off until somebody turns it on.
+ * Which Chat messages are shown in the game: saved on the account, only ever one
+ * of the three choices, and direct messages and small groups until somebody
+ * chooses otherwise.
  */
 
 import { join } from "node:path";
@@ -22,27 +23,41 @@ vi.mock("@polaris/db", () => ({
 }));
 
 const { setMessagesInGameAction } = await import("@/app/(app)/account/notifications/actions");
+const { inGameChoice } = await import("@/lib/chat/in-game-choice");
 
 beforeEach(() => {
     updates.length = 0;
 });
 
 describe("messages in the game", () => {
-    it("saves a yes or a no on the account", async () => {
-        expect(await setMessagesInGameAction(true)).toEqual({ on: true });
-        expect(updates).toEqual([{ where: { id: "u1" }, data: { messagesInGame: true } }]);
+    it("saves each choice on the account as the relay reads it", async () => {
+        expect(await setMessagesInGameAction("all")).toEqual({ choice: "all" });
+        expect(await setMessagesInGameAction("off")).toEqual({ choice: "off" });
+        expect(await setMessagesInGameAction("auto")).toEqual({ choice: "auto" });
+        expect(updates).toEqual([
+            { where: { id: "u1" }, data: { messagesInGame: true } },
+            { where: { id: "u1" }, data: { messagesInGame: false } },
+            { where: { id: "u1" }, data: { messagesInGame: null } }
+        ]);
     });
 
-    it("refuses anything that is not a yes or a no, and writes nothing", async () => {
+    it("refuses anything that is not one of the choices, and writes nothing", async () => {
+        expect((await setMessagesInGameAction(true)).error).toBeTruthy();
         expect((await setMessagesInGameAction("yes")).error).toBeTruthy();
         expect(updates).toEqual([]);
     });
 
-    it("is off for every account until it is turned on", () => {
+    it("reads a stored value back as the choice it was", () => {
+        expect(inGameChoice(null)).toBe("auto");
+        expect(inGameChoice(true)).toBe("all");
+        expect(inGameChoice(false)).toBe("off");
+    });
+
+    it("is the default for every account until it is chosen", () => {
         const schema = readFileSync(
             join(__dirname, "../../../../packages/db/prisma/schema.prisma"),
             "utf8"
         );
-        expect(schema).toMatch(/messagesInGame Boolean @default\(false\)/);
+        expect(schema).toMatch(/messagesInGame Boolean\?\n/);
     });
 });

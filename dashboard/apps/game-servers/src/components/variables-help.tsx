@@ -10,7 +10,7 @@
  */
 
 import * as mc from "../lib/minecraft/motd";
-import { Card, CardBody } from "@polaris/ui";
+import { Card, CardBody, cn } from "@polaris/ui";
 import type { MinecraftEdition } from "../lib/minecraft/service";
 import { VARIABLES, type VariableSpec } from "../lib/minecraft/text-vars";
 
@@ -34,11 +34,14 @@ const GROUP_ORDER = [
 
 export function VariablesHelp({
     edition,
-    scope
+    scope,
+    className
 }: {
     edition: MinecraftEdition;
     /** "server" where the text is the same for everybody (the side panel). */
     scope: "all" | "server";
+    /** Set where it shares a column of fixed height and scrolls within it. */
+    className?: string;
 }) {
     const offered = VARIABLES.filter(
         (spec) =>
@@ -50,7 +53,7 @@ export function VariablesHelp({
     })).filter((group) => group.specs.length > 0);
 
     return (
-        <Card>
+        <Card className={cn("overflow-y-auto", className)}>
             <CardBody className="flex flex-col gap-3 text-sm">
                 <div>
                     <p className="font-medium">What you can write</p>

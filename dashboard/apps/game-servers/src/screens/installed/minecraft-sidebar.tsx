@@ -372,10 +372,14 @@ export function MinecraftSidebar({
                         </div>
                     </CardBody>
                 </Card>
-                <VariablesHelp edition="java" scope="server" />
             </div>
 
-            <SidebarPreview sidebar={draft} />
+            {/* The preview kept in view, and what can be written in the room
+                under it that the longer form beside it leaves. */}
+            <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-[calc(var(--header-height)+1rem)] lg:max-h-[calc(100dvh-var(--header-height)-2rem)] lg:self-start">
+                <SidebarPreview sidebar={draft} />
+                <VariablesHelp edition="java" scope="server" className="lg:min-h-0" />
+            </div>
         </div>
     );
 }
@@ -393,10 +397,8 @@ const SAMPLE_LISTS: Readonly<Record<string, readonly string[]>> = {
 /** The panel as it will read, every value at a sample. */
 function SidebarPreview({ sidebar }: { sidebar: SidebarConfig }) {
     const title = mc.motdSpans(previewText(sidebar.title))[0] ?? [];
-    // As tall as it is and kept in view, like the announcement's: stretched to
-    // the height of the lines beside it, it was a page of empty card.
     return (
-        <Card className="lg:sticky lg:top-[calc(var(--header-height)+1rem)] lg:self-start">
+        <Card className="shrink-0">
             <CardBody className="flex flex-col gap-2">
                 <p className="text-sm font-medium">Preview</p>
                 <div className="flex min-h-40 justify-end rounded-md bg-[#6b8f4e] p-3">

@@ -19,6 +19,7 @@ import {
     setMessagesInGameAction
 } from "./actions";
 import { DEFAULT_SOUND_VOLUME } from "@/lib/notifications/sound-volume";
+import * as inGame from "@/lib/chat/in-game-choice";
 import {
     useCallback,
     useEffect,
@@ -93,8 +94,8 @@ export function NotificationSettingsView({
     destinations: DestinationView[];
     senders: SmsSenderView[];
     deliveries: DeliveryView[];
-    /** Whether Chat messages are shown inside a game, or null where no app can. */
-    messagesInGame?: boolean | null;
+    /** Which Chat messages are shown inside a game, or null where no app can. */
+    messagesInGame?: inGame.InGameChoice | null;
 }) {
     const [state, setState] = useState(
         () => new Map(rules.map((entry) => [entry.event, entry.rule]))
@@ -160,20 +161,34 @@ export function NotificationSettingsView({
  * this person is, not which machine they are at. Optimistic, and put back with
  * the reason if the save is refused.
  */
-function InGameCard({ initial }: { initial: boolean }) {
-    const [on, setOn] = useState(initial);
+const IN_GAME_LABEL: Record<inGame.InGameChoice, string> = {
+    auto: "Direct",
+    all: "Everything",
+    off: "Off"
+};
+
+const IN_GAME_HINT: Record<inGame.InGameChoice, string> = {
+    auto: `Direct messages and groups of up to ${inGame.SMALL_GROUP_SIZE} people`,
+    all: "Every conversation, channels and large groups included",
+    off: "None of them"
+};
+
+function InGameCard({ initial }: { initial: inGame.InGameChoice }) {
+    const [choice, setChoice] = useState(initial);
     const [problem, setProblem] = useState<string | null>(null);
     const [, startSaving] = useTransition();
 
-    function toggle(next: boolean) {
-        setOn(next);
+    function choose(next: inGame.InGameChoice) {
+        if (next === choice) return;
+        const previous = choice;
+        setChoice(next);
         setProblem(null);
         startSaving(async () => {
             const result = await setMessagesInGameAction(next).catch(() => ({
                 error: "That could not be saved. Try again."
             }));
             if ("error" in result && result.error) {
-                setOn(!next);
+                setChoice(previous);
                 setProblem(result.error);
             }
         });
@@ -187,13 +202,19 @@ function InGameCard({ initial }: { initial: boolean }) {
                         <p className="text-sm font-medium">Messages in Minecraft</p>
                         <p className="text-xs text-muted-foreground">
                             While you play on a server here, your Chat messages also appear in its
-                            game chat. Only you see them.
+                            game chat. Only you see them. {IN_GAME_HINT[choice]}.
                         </p>
                     </div>
-                    <Switch
-                        checked={on}
-                        onChange={toggle}
-                        aria-label="Show my Chat messages in Minecraft while I play"
+                    <SegmentedControl
+                        value={choice}
+                        onValueChange={choose}
+                        aria-label="Which Chat messages to show in Minecraft while I play"
+                        className="shrink-0"
+                        options={inGame.IN_GAME_CHOICES.map((option) => ({
+                            value: option,
+                            label: IN_GAME_LABEL[option],
+                            title: IN_GAME_HINT[option]
+                        }))}
                     />
                 </div>
                 {problem ? <p className="text-xs text-danger">{problem}</p> : null}
