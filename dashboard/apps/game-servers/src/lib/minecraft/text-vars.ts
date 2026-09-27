@@ -165,16 +165,14 @@ export const VARIABLES: readonly VariableSpec[] = [
         bedrock: false,
         width: 32
     },
-    ...STATS_RANKINGS.map(
-        (name): VariableSpec => ({
-            name,
-            label: RANKINGS[name].label,
-            kind: "server",
-            sample: RANKINGS[name].sample.join(", "),
-            bedrock: false,
-            width: 32
-        })
-    ),
+    ...STATS_RANKINGS.map((name): VariableSpec => ({
+        name,
+        label: RANKINGS[name].label,
+        kind: "server",
+        sample: RANKINGS[name].sample.join(", "),
+        bedrock: false,
+        width: 32
+    })),
     {
         name: "death.player",
         label: "Who died last",
@@ -351,17 +349,31 @@ export function previewText(text: string, values: VariableValues = {}): string {
 }
 
 /**
- * How long a text will be on screen at most, for the counter under a field: its
- * visible characters, with each variable counted at the widest value it takes.
+ * Values that are already settled while a text is written, by variable: the
+ * server's name is the same when the text is sent as when it is typed. A text is
+ * measured with these as they are instead of at the widest they could be, which
+ * counted a short name as 32 characters and refused a title that fits.
  */
-export function visibleLength(plain: string): number {
+export type KnownValues = Readonly<Record<string, string>>;
+
+/**
+ * How long a text will be on screen at most, for the counter under a field: its
+ * visible characters, with each variable counted at its value when that is
+ * known, and at the widest value it takes when it is not.
+ */
+export function visibleLength(plain: string, known: KnownValues = {}): number {
     let length = 0;
     let last = 0;
     for (const match of plain.matchAll(TOKEN)) {
         length += (match.index ?? 0) - last;
         const spec = variable(match[1] as string);
         const fallback = match[2]?.length ?? 0;
-        length += spec ? Math.max(spec.width, fallback) : match[0].length;
+        const value = spec ? known[spec.name] : undefined;
+        length += !spec
+            ? match[0].length
+            : value !== undefined
+              ? plainValue(value).length || fallback
+              : Math.max(spec.width, fallback);
         last = (match.index ?? 0) + match[0].length;
     }
     return length + plain.length - last;

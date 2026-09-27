@@ -38,7 +38,12 @@ import {
     type Hold
 } from "../../lib/minecraft/announcement";
 import { COMMAND_BYTES_MAX, commandBytes } from "../../lib/minecraft/command-size";
-import { VARIABLES, previewText, visibleLength } from "../../lib/minecraft/text-vars";
+import {
+    VARIABLES,
+    previewText,
+    visibleLength,
+    type KnownValues
+} from "../../lib/minecraft/text-vars";
 import {
     readLiveDisplayAction,
     stopPinnedAction,
@@ -103,8 +108,19 @@ export function insertsFor(edition: MinecraftEdition, scope: "all" | "server" = 
 }
 
 /** The counter and the problem under a field, as it is typed. */
-export function FieldNote({ text, max, problem }: { text: string; max: number; problem?: string }) {
-    const used = visibleLength(mc.stripMotd(text));
+export function FieldNote({
+    text,
+    max,
+    problem,
+    known
+}: {
+    text: string;
+    max: number;
+    problem?: string;
+    /** The values already settled, like the server's name, counted as they are. */
+    known?: KnownValues;
+}) {
+    const used = visibleLength(mc.stripMotd(text), known);
     return (
         <span
             className={cn("flex flex-wrap gap-x-2", problem ? "text-danger" : "")}
@@ -247,7 +263,11 @@ export function MinecraftAnnounce({
     }, [edition, draft]);
     // The same check the server runs, on every keystroke: the button is never
     // live for something that is then refused.
-    const problems = useMemo(() => announcementProblems(draft, edition), [draft, edition]);
+    const known = live?.known;
+    const problems = useMemo(
+        () => announcementProblems(draft, edition, Date.now(), known),
+        [draft, edition, known]
+    );
     const blocked = Object.keys(problems).length > 0;
     const inserts = useMemo(() => insertsFor(edition), [edition]);
     // A sound on its own is something to send: a horn with nothing written is
@@ -455,6 +475,7 @@ export function MinecraftAnnounce({
                                 footnote={
                                     <FieldNote
                                         text={draft.title}
+                                        known={known}
                                         max={LINE_MAX}
                                         problem={problems.title}
                                     />
@@ -473,6 +494,7 @@ export function MinecraftAnnounce({
                                 footnote={
                                     <FieldNote
                                         text={draft.subtitle}
+                                        known={known}
                                         max={LINE_MAX}
                                         problem={problems.subtitle}
                                     />
@@ -491,6 +513,7 @@ export function MinecraftAnnounce({
                                 footnote={
                                     <FieldNote
                                         text={draft.actionbar}
+                                        known={known}
                                         max={LINE_MAX}
                                         problem={problems.actionbar}
                                     />
@@ -508,6 +531,7 @@ export function MinecraftAnnounce({
                                 footnote={
                                     <FieldNote
                                         text={draft.chat}
+                                        known={known}
                                         max={CHAT_MAX}
                                         problem={problems.chat}
                                     />

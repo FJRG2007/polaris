@@ -94,8 +94,9 @@ export function MinecraftSidebar({
         });
     }, [installedAppId, load]);
 
-    const problems = useMemo(() => side.sidebarProblems(draft), [draft]);
-    const invalid = side.hasSidebarProblems(draft);
+    const known = state?.known;
+    const problems = useMemo(() => side.sidebarProblems(draft, known), [draft, known]);
+    const invalid = side.hasSidebarProblems(draft, known);
     // Only a change is worth a save: the same panel saved again is a round trip
     // that changes nothing on anybody's screen.
     const dirty =
@@ -183,12 +184,16 @@ export function MinecraftSidebar({
                                 label="Title"
                                 fits={side.SIDEBAR_TITLE_MAX}
                                 problems={problems.title}
+                                known={known}
                                 inserts={inserts}
                                 disabled={!canManage}
                             />
                         </div>
 
-                        <div className="flex flex-col gap-3">
+                        <div
+                            className="flex flex-col gap-3"
+                            {...(canManage ? order.listProps : {})}
+                        >
                             <span className="flex items-baseline gap-2">
                                 <span className="text-sm font-medium">Lines</span>
                                 <span className="text-xs text-muted-foreground">
@@ -231,6 +236,7 @@ export function MinecraftSidebar({
                                             label={`Line ${index + 1}`}
                                             fits={side.SIDEBAR_LINE_MAX}
                                             problems={problems.lines[index] ?? []}
+                                            known={known}
                                             placeholder="Leave empty for a gap"
                                             inserts={inserts}
                                             disabled={!canManage}
