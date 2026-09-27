@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { writePptx } from "@/lib/office/ooxml";
 import type { RenderNode } from "@polaris/pptx-render";
 import { renderPptxDeck } from "@/lib/office/pptx-deck";
@@ -66,6 +66,21 @@ describe("changing the words in a presentation", () => {
         const saved = await editPptxText(original, []);
         expect(saved.byteLength).toBe(original.byteLength);
         expect([...saved]).toEqual([...original]);
+    });
+
+    it("gives back the very same file when it is saved later than it was made", async () => {
+        // A zip stamps every part with a modification time. Saving a minute
+        // after the deck was written must not restamp the parts it never touched.
+        vi.useFakeTimers({ toFake: ["Date"] });
+        try {
+            vi.setSystemTime(new Date("2026-01-01T10:00:00Z"));
+            const original = await deckOf(["Hello"]);
+            vi.setSystemTime(new Date("2026-01-01T10:01:00Z"));
+            const saved = await editPptxText(original, []);
+            expect([...saved]).toEqual([...original]);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("changes the words it was asked to change", async () => {

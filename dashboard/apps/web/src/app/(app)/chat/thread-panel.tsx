@@ -20,14 +20,14 @@ import { useChat } from "./chat-context";
 import { threadDraftKey } from "./drafts";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
+import { useChatPane } from "./use-chat-pane";
 import type { PollDraft } from "./poll-dialog";
 import { useChatStream } from "./use-chat-stream";
+import { PersonCardProvider } from "./person-card";
 import { ResizeHandle, Skeleton } from "@polaris/ui";
+import { resetPaneLayout } from "./pane-preferences";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
-import { useChatPane } from "./use-chat-pane";
-import { resetPaneLayout } from "./pane-preferences";
-import { PersonCardProvider } from "./person-card";
 
 /**
  * What the thread may be narrowed and widened to.
@@ -99,7 +99,12 @@ export function ThreadPanel({
     // below the fold - which would look like the link went to the wrong place.
     useEffect(() => {
         if (!highlightId || messages === null) return;
-        document.getElementById(`message-${highlightId}`)?.scrollIntoView({ block: "center" });
+        // The newest reply is shown whole at the bottom rather than centred, so
+        // a picture in it that loads afterwards is not cut off below the fold.
+        const newest = messages[messages.length - 1]?.id === highlightId;
+        document
+            .getElementById(`message-${highlightId}`)
+            ?.scrollIntoView({ block: newest ? "end" : "center" });
     }, [highlightId, messages]);
 
     useChatStream(

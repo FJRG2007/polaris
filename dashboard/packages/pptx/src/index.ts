@@ -776,6 +776,13 @@ function buildZip(opened: OpenedPptx): JSZip {
         const ext = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
         zip.file(path, data, COMPRESSED_EXTENSIONS.has(ext) ? {} : { compression: "STORE" });
     }
+    // Every entry, the folders JSZip adds on its own included, is stamped with
+    // the time of this save; the original's timestamps are put back so an
+    // unchanged deck stays byte-identical whenever it is saved.
+    for (const [path, entry] of Object.entries(zip.files)) {
+        const date = archive.dateOf(path);
+        if (date) entry.date = date;
+    }
     return zip;
 }
 
