@@ -20,8 +20,8 @@ import { host } from "@polaris/app-host";
 import { liveContext } from "./live-values";
 import { fillValues, readsPlayerList, readsServer, variablesIn } from "./text-vars";
 import { spreadListLines } from "./rankings";
-import { editionOf, onlineOperators, onlinePlayers, withServerContainer } from "./service";
-import { parseTarget } from "./announce-target";
+import { editionOf, onlinePlayers, onlineRoster, withServerContainer } from "./service";
+import { audienceNames, namedByPolaris, parseTarget, type Roster } from "./announce-target";
 import {
     ACTIONBAR_EVERY_MS,
     HELD_TITLE_EVERY_MS,
@@ -64,8 +64,9 @@ interface Loop {
     context: { key: string; at: number; value: SendContext } | null;
     /** Whether what it shows reads a call, so a join or a leave redraws it. */
     readsCall: boolean;
-    /** The operators online, last read, for a held announcement sent to them. */
-    operators: { at: number; names: readonly string[] } | null;
+    /** Who is on and who the operators are, last read, for a held announcement
+     *  sent to an audience Polaris names itself. */
+    roster: { at: number; value: Roster } | null;
 }
 
 const loops = new Map<string, Loop>();
@@ -145,42 +146,49 @@ function heldTexts(announcement: Announcement): string[] {
     return [announcement.title, announcement.subtitle, announcement.actionbar];
 }
 
-/** What takes each of these off the screen. `operators` is who one sent to
- *  the operators is on the screens of. */
+const NOBODY: Roster = { players: [], operators: [] };
+
+/** Who one held announcement is on the screens of, where Polaris names them. */
+function namesFor(announcement: Announcement, roster: Roster): string[] {
+    const audience = parseTarget(announcement.target);
+    return audience ? audienceNames(audience, roster) : [];
+}
+
+/** What takes each of these off the screen. `roster` is who is on, for one
+ *  sent to an audience Polaris names itself. */
 function clearAll(
     edition: "java" | "bedrock",
     pinned: readonly (PinnedAnnouncement | null)[],
-    operators: readonly string[] = []
+    roster: Roster = NOBODY
 ): string[] {
     return pinned
         .filter((one): one is PinnedAnnouncement => one !== null)
-        .flatMap((one) => clearAnnouncementCommands(edition, one.announcement, operators));
+        .flatMap((one) =>
+            clearAnnouncementCommands(edition, one.announcement, namesFor(one.announcement, roster))
+        );
 }
 
-/** Whether any of these goes to the operators, whose names have to be read. */
-function toOperators(pinned: readonly (PinnedAnnouncement | null)[]): boolean {
-    return pinned.some(
-        (one) => one !== null && parseTarget(one.announcement.target)?.kind === "operators"
-    );
+/** Whether any of these goes to an audience whose names have to be read. */
+function toNamed(pinned: readonly (PinnedAnnouncement | null)[]): boolean {
+    return pinned.some((one) => {
+        const audience = one ? parseTarget(one.announcement.target) : null;
+        return audience !== null && namedByPolaris(audience);
+    });
 }
 
-/** How long the operators online are taken as read. The same period as the
- *  panel's values: a moment's delay for somebody who has just come on. */
-const OPERATORS_EVERY_MS = 10_000;
+/** How long who is on is taken as read. The same period as the panel's values:
+ *  a moment's delay for somebody who has just come on. */
+const ROSTER_EVERY_MS = 10_000;
 
-/** The operators online, read at most once a period for a loop. */
-async function operatorsFor(
-    installedAppId: string,
-    loop: Loop,
-    now: number
-): Promise<readonly string[]> {
-    const held = loop.operators;
-    if (held && now - held.at < OPERATORS_EVERY_MS) return held.names;
-    const names = await onlineOperators(loop.ownerId, installedAppId).catch(
-        () => held?.names ?? []
+/** Who is on and who the operators are, read at most once a period for a loop. */
+async function rosterFor(installedAppId: string, loop: Loop, now: number): Promise<Roster> {
+    const held = loop.roster;
+    if (held && now - held.at < ROSTER_EVERY_MS) return held.value;
+    const value = await onlineRoster(loop.ownerId, installedAppId).catch(
+        () => held?.value ?? NOBODY
     );
-    loop.operators = { at: now, names };
-    return names;
+    loop.roster = { at: now, value };
+    return value;
 }
 
 async function tick(installedAppId: string, loop: Loop): Promise<void> {
@@ -199,8 +207,8 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
         if (loop.pinVersion !== version) return;
         await patchInstallConfig(installedAppId, { [PINNED_KEY]: pinned });
         const gone = [stored, stored.underneath].filter((one) => one !== pinned);
-        const operators = toOperators(gone) ? await operatorsFor(installedAppId, loop, now) : [];
-        await say(loop.ownerId, installedAppId, clearAll(settings.edition, gone, operators)).catch(
+        const roster = toNamed(gone) ? await rosterFor(installedAppId, loop, now) : NOBODY;
+        await say(loop.ownerId, installedAppId, clearAll(settings.edition, gone, roster)).catch(
             () => undefined
         );
         loop.lastActionbar = 0;
@@ -233,16 +241,19 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     loop.readsCall = texts.some(readsCall);
     const context = await contextFor(installedAppId, loop, texts, now, duePanel);
 
-    // Held for the operators: whoever of them is on now, read at most once a
-    // period. With none on there is nobody to keep it up for - which is not a
-    // failure, and the panel beside it still goes.
+    // Held for the operators, or everybody but them: whoever of them is on now,
+    // read at most once a period. With none on there is nobody to keep it up
+    // for - which is not a failure, and the panel beside it still goes.
     const held =
-        pinned && toOperators([pinned])
-            ? { ...context, operators: await operatorsFor(installedAppId, loop, now) }
+        pinned && toNamed([pinned])
+            ? {
+                  ...context,
+                  named: namesFor(pinned.announcement, await rosterFor(installedAppId, loop, now))
+              }
             : context;
     const repeat = (part: "title" | "actionbar"): string[] => {
         if (!pinned) return [];
-        if (held.operators?.length === 0) return [];
+        if (held.named?.length === 0) return [];
         return announcementCommands(settings.edition, pinned.announcement, held, part);
     };
     const lines: string[] = [];
@@ -357,7 +368,7 @@ function loopFor(ownerId: string, installedAppId: string): Loop {
         pinVersion: 0,
         context: null,
         readsCall: false,
-        operators: null
+        roster: null
     };
     listenForCalls();
     // A loop must never keep the process alive on its own.
@@ -400,10 +411,10 @@ export async function unpinAnnouncement(ownerId: string, installedAppId: string)
     if (loop) loop.pinVersion += 1;
     if (!settings || !pinned) return;
     const both = [pinned, pinned.underneath];
-    const operators = toOperators(both)
-        ? await onlineOperators(ownerId, installedAppId).catch(() => [])
-        : [];
-    await say(ownerId, installedAppId, clearAll(settings.edition, both, operators));
+    const roster = toNamed(both)
+        ? await onlineRoster(ownerId, installedAppId).catch(() => NOBODY)
+        : NOBODY;
+    await say(ownerId, installedAppId, clearAll(settings.edition, both, roster));
 }
 
 /**

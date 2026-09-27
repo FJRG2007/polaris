@@ -28,7 +28,7 @@ import { liveContext } from "./live-values";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 import { readsPlayerList, readsServer } from "./text-vars";
 import { announcementCommands, announcementProblems, type Announcement } from "./announcement";
-import { parseTarget } from "./announce-target";
+import { audienceNames, namedByPolaris, parseTarget, type Roster } from "./announce-target";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -307,13 +307,17 @@ export async function sendAnnouncement(
               liveContext(installedAppId, texts, players, server.running ? server : null, figures)
           ).catch(() => liveContext(installedAppId, texts, players, null, figures))
         : await liveContext(installedAppId, texts, players);
-    // Operators are Polaris's word, not the game's: they become the names of the
-    // ones on the server now.
-    const withOperators =
-        parseTarget(announcement.target)?.kind === "operators"
-            ? { ...context, operators: await operatorsOnline(install, ownerId, players) }
+    // Operators, and everybody but them, are Polaris's word, not the game's:
+    // they become the names of the ones on the server now.
+    const audience = parseTarget(announcement.target);
+    const withNames =
+        audience && namedByPolaris(audience)
+            ? {
+                  ...context,
+                  named: audienceNames(audience, await rosterOnline(install, ownerId, players))
+              }
             : context;
-    const lines = announcementCommands(install.edition, announcement, withOperators);
+    const lines = announcementCommands(install.edition, announcement, withNames);
     if (lines.length === 0) throw new Error("There is nothing to send yet");
     for (const line of lines) {
         if (commandBytes(line) > COMMAND_BYTES_MAX) {
@@ -785,25 +789,25 @@ async function readPlayerList(
     );
 }
 
-/** The operators who are on the server now, by name. Java only: Bedrock keeps
- *  its operators by xuid. `known` is a player list already read for this send. */
-async function operatorsOnline(
+/** Who is on the server now and who the operators are, by name. Java only:
+ *  Bedrock keeps its operators by xuid, so there it is nobody. `known` is a
+ *  player list already read for this send. */
+async function rosterOnline(
     install: MinecraftInstall,
     ownerId: string,
     known: parse.PlayerList | null = null
-): Promise<string[]> {
-    if (install.edition === "bedrock") return [];
+): Promise<Roster> {
+    if (install.edition === "bedrock") return { players: [], operators: [] };
     const [ops, players] = await Promise.all([
         readServerFile(install, ownerId, "ops.json"),
         known ?? readPlayerList(install, ownerId)
     ]);
-    const operators = new Set(parse.parseNameFile(ops).map((name) => name.toLowerCase()));
-    return (players?.players ?? []).filter((name) => operators.has(name.toLowerCase()));
+    return { players: players?.players ?? [], operators: parse.parseNameFile(ops) };
 }
 
 /** The same, by the install's id, for the loop that keeps an announcement up. */
-export async function onlineOperators(ownerId: string, installedAppId: string): Promise<string[]> {
-    return operatorsOnline(await resolveInstall(ownerId, installedAppId), ownerId);
+export async function onlineRoster(ownerId: string, installedAppId: string): Promise<Roster> {
+    return rosterOnline(await resolveInstall(ownerId, installedAppId), ownerId);
 }
 
 /** How far back to read for the arrivals and departures. Enough to cover an

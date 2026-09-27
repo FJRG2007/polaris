@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Who an announcement goes to: everybody, the operators who are on, or players
- * picked out - one or several.
+ * Who an announcement goes to: everybody, the operators who are on, everybody
+ * but them, the players in one game mode, or players picked out - one or several.
  *
  * The picked players are the ones online, plus anybody a template names who is
  * not on right now: a name that drops off the list without a word is a message
@@ -13,14 +13,19 @@ import { Checkbox, Select } from "@polaris/ui";
 import type { MinecraftEdition } from "../../lib/minecraft/service";
 import {
     EVERYBODY,
+    GAME_MODES,
+    GAME_MODE_LABEL,
     MOST_PICKED,
+    NON_OPERATORS,
     OPERATORS,
+    gameModeTarget,
     isPickableName,
     parseTarget,
-    playersTarget
+    playersTarget,
+    type GameMode
 } from "../../lib/minecraft/announce-target";
 
-type Mode = "everybody" | "operators" | "players";
+type Mode = "everybody" | "operators" | "others" | GameMode | "players";
 
 export function SendTo({
     target,
@@ -38,7 +43,8 @@ export function SendTo({
 }) {
     const audience = parseTarget(target);
     // An empty pick is still "picking players", with nobody ticked yet.
-    const mode: Mode = audience?.kind ?? "players";
+    const mode: Mode =
+        audience?.kind === "gamemode" ? audience.mode : (audience?.kind ?? "players");
     const picked = audience?.kind === "players" ? audience.players : [];
     const offline = picked.filter(
         (name) => !players.some((one) => one.toLowerCase() === name.toLowerCase())
@@ -58,8 +64,11 @@ export function SendTo({
             <Select
                 value={mode}
                 onValueChange={(value) => {
+                    const mode = GAME_MODES.find((one) => one === value);
                     if (value === "everybody") onChange(EVERYBODY);
                     else if (value === "operators") onChange(OPERATORS);
+                    else if (value === "others") onChange(NON_OPERATORS);
+                    else if (mode) onChange(gameModeTarget(mode));
                     // Starts from whoever was already picked, or nobody.
                     else onChange(playersTarget(picked));
                 }}
@@ -68,8 +77,15 @@ export function SendTo({
                     // Bedrock keeps its operators by xuid, which the game will
                     // not aim a command at.
                     ...(edition === "java"
-                        ? [{ value: "operators", label: "Operators who are on" }]
+                        ? [
+                              { value: "operators", label: "Operators who are on" },
+                              { value: "others", label: "Everybody but operators" }
+                          ]
                         : []),
+                    ...GAME_MODES.map((one) => ({
+                        value: one,
+                        label: `Players in ${GAME_MODE_LABEL[one]}`
+                    })),
                     { value: "players", label: "Players I pick" }
                 ]}
                 aria-label="Send to"
@@ -117,6 +133,11 @@ export function SendTo({
             {mode === "operators" && (
                 <p className="text-xs text-muted-foreground">
                     Each operator who is on when it is sent.
+                </p>
+            )}
+            {mode === "others" && (
+                <p className="text-xs text-muted-foreground">
+                    Each player who is on when it is sent, operators left out.
                 </p>
             )}
             {problem && (

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 /**
- * Who an announcement goes to: everybody, the operators who are on, or players
- * picked out - one or several.
+ * Who an announcement goes to: everybody, the operators who are on, everybody
+ * but them, the players in one game mode, or players picked out - one or several.
  *
  * What is pinned: a target saved before there was a choice reads as it did;
  * several players get the same lines each, and nobody else does; operators
@@ -21,6 +21,7 @@ import {
     type Announcement
 } from "@polaris-app/game-servers/src/lib/minecraft/announcement";
 import {
+    audienceNames,
     describeTarget,
     parseTarget,
     playersTarget
@@ -108,7 +109,7 @@ describe("the lines it becomes", () => {
             draft({ target: "@ops", title: "Staff meeting" }),
             {
                 ...NONE,
-                operators: ["Admin1", "Admin2"]
+                named: ["Admin1", "Admin2"]
             }
         );
         expect(lines.some((line) => line.startsWith("title Admin1 title "))).toBe(true);
@@ -120,7 +121,7 @@ describe("the lines it becomes", () => {
         expect(() =>
             announcementCommands("java", draft({ target: "@ops", chat: "Hi" }), {
                 ...NONE,
-                operators: []
+                named: []
             })
         ).toThrow("No operator is on the server right now");
     });
@@ -134,6 +135,73 @@ describe("the lines it becomes", () => {
         ).toEqual(["title Admin1 clear"]);
     });
 
+    it("sends to everybody but the operators, by name, and refuses when only operators are on", () => {
+        const roster = { players: ["Admin1", "Steve", "alex"], operators: ["admin1", "Ghost"] };
+        const others = audienceNames({ kind: "others" }, roster);
+        expect(others).toEqual(["Steve", "alex"]);
+        expect(audienceNames({ kind: "operators" }, roster)).toEqual(["Admin1"]);
+        const lines = announcementCommands("java", draft({ target: "@others", chat: "Hi" }), {
+            ...NONE,
+            named: others
+        });
+        expect(lines.map((line) => line.split(" ")[1])).toEqual(["Steve", "alex"]);
+        expect(() =>
+            announcementCommands("java", draft({ target: "@others", chat: "Hi" }), {
+                ...NONE,
+                named: []
+            })
+        ).toThrow("Nobody but operators is on the server right now");
+        expect(describeTarget("@others")).toBe("everybody on the server but the operators");
+        expect(
+            clearAnnouncementCommands("java", draft({ target: "@others", title: "Hi" }), ["Steve"])
+        ).toEqual(["title Steve clear"]);
+    });
+
+    it("sends to the players in one game mode with the game's own selector", () => {
+        expect(parseTarget("@a[gamemode=creative]")).toEqual({
+            kind: "gamemode",
+            mode: "creative"
+        });
+        expect(parseTarget("@a[gamemode=hardcore]")).toBeNull();
+        expect(describeTarget("@a[gamemode=survival]")).toBe("the players in Survival");
+        const java = announcementCommands(
+            "java",
+            draft({ target: "@a[gamemode=survival]", title: "Hi", chat: "Hi" }),
+            NONE
+        );
+        expect(java.some((line) => line.startsWith("title @a[gamemode=survival] title "))).toBe(
+            true
+        );
+        expect(java.some((line) => line.startsWith("tellraw @a[gamemode=survival] "))).toBe(true);
+        expect(java.some((line) => / @a /.test(line))).toBe(false);
+        const bedrock = announcementCommands(
+            "bedrock",
+            draft({ target: "@a[gamemode=survival]", title: "Hi" }),
+            NONE
+        );
+        expect(bedrock.some((line) => line.startsWith("titleraw @a[m=survival] title "))).toBe(
+            true
+        );
+    });
+
+    it("keeps a game mode around each player a line written for their account goes to", () => {
+        const lines = announcementCommands(
+            "java",
+            draft({ target: "@a[gamemode=adventure]", chat: "Hi {polaris.name}" }),
+            {
+                values: {},
+                recipients: [
+                    { name: "Steve", values: { "polaris.name": "Steve B" } },
+                    { name: "Alex", values: { "polaris.name": "Alex C" } }
+                ]
+            }
+        );
+        const chat = lines.filter((line) => line.includes("tellraw"));
+        expect(chat).toHaveLength(2);
+        expect(chat[0]).toMatch(/^execute as @a\[gamemode=adventure,name=Steve\] run tellraw @s /);
+        expect(chat[1]).toMatch(/^execute as @a\[gamemode=adventure,name=Alex\] run tellraw @s /);
+    });
+
     it("says so under Send to, and refuses operators on Bedrock", () => {
         expect(announcementProblems(draft({ target: "", chat: "Hi" }), "java").target).toBe(
             "Choose who it goes to"
@@ -143,6 +211,13 @@ describe("the lines it becomes", () => {
         ).toMatch(/Bedrock/);
         expect(
             announcementProblems(draft({ target: "@ops", chat: "Hi" }), "java").target
+        ).toBeUndefined();
+        expect(
+            announcementProblems(draft({ target: "@others", chat: "Hi" }), "bedrock").target
+        ).toMatch(/Bedrock/);
+        expect(
+            announcementProblems(draft({ target: "@a[gamemode=creative]", chat: "Hi" }), "bedrock")
+                .target
         ).toBeUndefined();
     });
 
@@ -200,6 +275,41 @@ describe("the Send to control", () => {
         expect((screen.getByRole("checkbox", { name: "Steve" }) as HTMLInputElement).disabled).toBe(
             false
         );
+    });
+
+    it("offers everybody but operators and each game mode, and sends to what was chosen", async () => {
+        render(
+            <MinecraftAnnounce installedAppId="s1" running edition="java" players={["Steve"]} />
+        );
+        fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Hello" } });
+        fireEvent.click(screen.getByRole("combobox", { name: "Send to" }));
+        for (const label of [
+            "Operators who are on",
+            "Everybody but operators",
+            "Players in Survival",
+            "Players in Creative",
+            "Players in Adventure",
+            "Players in Spectator"
+        ]) {
+            expect(await screen.findByRole("option", { name: label })).toBeTruthy();
+        }
+        fireEvent.click(screen.getByRole("option", { name: "Players in Creative" }));
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: /^Send$/ }));
+        });
+        await waitFor(() => expect(sent).toHaveLength(1));
+        expect(sent[0]?.announcement.target).toBe("@a[gamemode=creative]");
+        expect(await screen.findByText("Sent to the players in Creative.")).toBeTruthy();
+    });
+
+    it("offers no operators choices on Bedrock", async () => {
+        render(
+            <MinecraftAnnounce installedAppId="s1" running edition="bedrock" players={["Steve"]} />
+        );
+        fireEvent.click(screen.getByRole("combobox", { name: "Send to" }));
+        expect(await screen.findByRole("option", { name: "Players in Survival" })).toBeTruthy();
+        expect(screen.queryByRole("option", { name: "Everybody but operators" })).toBeNull();
+        expect(screen.queryByRole("option", { name: "Operators who are on" })).toBeNull();
     });
 
     it("will not send to nobody", async () => {
