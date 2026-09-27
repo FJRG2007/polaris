@@ -364,6 +364,19 @@ function distance(a: { x: number; y: number; z: number }, b: { x: number; y: num
     return Math.hypot(a.x - (b.x + 0.5), a.y - (b.y + 0.5), a.z - (b.z + 0.5));
 }
 
+/** How many honeypots a player is short of, counting every one within `reach`
+ *  of them across the ground - so each player has their own, however far apart
+ *  the players are. */
+export function shortfall(
+    traps: readonly { readonly x: number; readonly z: number }[],
+    player: { readonly x: number; readonly z: number },
+    each: number,
+    reach: number
+): number {
+    const near = traps.filter((trap) => Math.hypot(player.x - trap.x, player.z - trap.z) <= reach);
+    return Math.max(0, each - near.length);
+}
+
 /** The honeypots near a player who just mined that ore: the ones to test. */
 export function trapsNear(
     traps: readonly Honeypot[],

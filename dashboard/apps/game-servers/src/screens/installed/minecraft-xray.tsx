@@ -260,7 +260,7 @@ export function MinecraftXray({
 
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Honeypots around the players</span>
+                            <span className="font-medium">Honeypots around each player</span>
                             <Input
                                 type="number"
                                 min={4}
@@ -274,7 +274,7 @@ export function MinecraftXray({
                                 }
                             />
                             <span className="text-xs text-muted-foreground">
-                                In each dimension. Between 4 and 40.
+                                Around every player, wherever they are. Between 4 and 40.
                             </span>
                         </label>
                         <label className="flex items-center justify-between gap-2 text-sm sm:mt-6">

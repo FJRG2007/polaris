@@ -292,6 +292,9 @@ describe("the game's own figures", () => {
 describe("watching a server", () => {
     const INSTALL = "018f2b7a-0000-7000-8000-0000000000e1";
     let world = new Map<string, string>();
+    /** Whether the world takes a honeypot where one is placed. Off unless a
+     *  test is about placing, so the rest see only the honeypots they set. */
+    let placing = false;
     let players: {
         name: string;
         x: number;
@@ -334,6 +337,20 @@ describe("watching a server", () => {
                 ? "Test passed, count: 1"
                 : "Test failed";
         }
+        if (command === "execute as @a run data get entity @s Dimension") {
+            return players
+                .map((one) => `${one.name} has the following entity data: "minecraft:overworld"`)
+                .join("\n");
+        }
+        const put =
+            /^execute in minecraft:overworld .* run setblock (-?\d+) (-?\d+) (-?\d+) minecraft:deepslate_diamond_ore$/.exec(
+                command
+            );
+        if (put) {
+            if (!placing) return "";
+            world.set(key(Number(put[1]), Number(put[2]), Number(put[3])), "ore");
+            return `Changed the block at ${put[1]}, ${put[2]}, ${put[3]}`;
+        }
         const told = /^tellraw (\S+) /.exec(command);
         if (told) {
             fake.warned.push(told[1] as string);
@@ -354,6 +371,7 @@ describe("watching a server", () => {
     beforeEach(() => {
         vi.useFakeTimers();
         world = new Map();
+        placing = false;
         players = [];
         fake.notified.length = 0;
         fake.banned.length = 0;
@@ -521,5 +539,27 @@ describe("watching a server", () => {
         };
         expect(stored.honeypots).toHaveLength(2);
         expect(stored.settings.perDimension).toBe(20);
+    });
+
+    it("puts honeypots around every player, however far from the others they are", async () => {
+        // Somebody who already has the full count around them...
+        const covered = Array.from({ length: DEFAULT_XRAY_SETTINGS.perDimension }, (_, index) =>
+            trap(30 + index, -50, 30)
+        );
+        placing = true;
+        players = [
+            { name: "Steve", x: 0, y: -50, z: 0, mined: 0 },
+            // ...and somebody mining five thousand blocks away, who used to get none.
+            { name: "Alex", x: 5000, y: -50, z: 5000, mined: 0 }
+        ];
+        await withTraps(covered);
+        await look();
+        const stored = (fake.config.xrayTraps as { honeypots: Honeypot[] }).honeypots;
+        const aroundAlex = stored.filter((one) => Math.hypot(one.x - 5000, one.z - 5000) <= 128);
+        expect(aroundAlex.length).toBeGreaterThan(0);
+        // Steve had his already: nothing more was put around him.
+        expect(stored.filter((one) => Math.hypot(one.x, one.z) <= 128)).toHaveLength(
+            covered.length
+        );
     });
 });

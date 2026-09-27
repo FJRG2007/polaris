@@ -403,25 +403,36 @@ async function place(
                 trap.dimension === dim &&
                 here.some((one) => Math.hypot(one.x - trap.x, one.z - trap.z) <= NEAR_ENOUGH)
         );
-        let missing = state.settings.perDimension - near.length;
-        let tries = 0;
-        while (missing > 0 && tries < PLACE_TRIES) {
-            const around = here[tries % here.length]!;
-            const [point] = xray.candidatePoints(dim, around, 1);
-            tries += 1;
-            if (!point) continue;
-            const answer = xray.readTest(
-                await server.say([xray.placeCommand(dim, point.x, point.y, point.z)])
+        // Every player gets their own, counted around them. Counting the whole
+        // dimension at once left anybody far from the first player with none at
+        // all: the quota was already met around somebody else.
+        for (const around of here) {
+            let missing = xray.shortfall(
+                [...state.honeypots, ...placed].filter((trap) => trap.dimension === dim),
+                around,
+                state.settings.perDimension,
+                NEAR_ENOUGH
             );
-            if (answer !== "passed") continue;
-            placed.push({ dimension: dim, ...point, placedAt: Date.now() });
-            loop.seen.set(trapKey({ dimension: dim, ...point }), loop.tick);
-            missing -= 1;
+            let tries = 0;
+            while (missing > 0 && tries < PLACE_TRIES) {
+                const [point] = xray.candidatePoints(dim, around, 1);
+                tries += 1;
+                if (!point) continue;
+                const answer = xray.readTest(
+                    await server.say([xray.placeCommand(dim, point.x, point.y, point.z)])
+                );
+                if (answer !== "passed") continue;
+                placed.push({ dimension: dim, ...point, placedAt: Date.now() });
+                loop.seen.set(trapKey({ dimension: dim, ...point }), loop.tick);
+                missing -= 1;
+            }
         }
         // Old ones far from everybody go, oldest first, once there are more than
-        // five times what is kept around the players.
+        // five times what is kept around the players - or twice that for each
+        // player, when they are spread wide enough to each have their own.
         const all = state.honeypots.filter((trap) => trap.dimension === dim);
-        const surplus = all.length + placed.length - state.settings.perDimension * 5;
+        const kept = state.settings.perDimension * Math.max(5, here.length * 2);
+        const surplus = all.length + placed.length - kept;
         if (surplus > 0) {
             retire.push(
                 ...all
