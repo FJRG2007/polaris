@@ -14,9 +14,23 @@ import { installedExtensions } from "./installed";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import type { BackupSource } from "@/lib/backups/sources/types";
 import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
-import type { AppExtension, AppJob, AppSlot, ExtensionInstall, GameServerSummary } from "./types";
+import type {
+    AppExtension,
+    AppJob,
+    AppSlot,
+    ExtensionInstall,
+    GameServerSummary,
+    RelayedChatMessage
+} from "./types";
 
-export type { AppExtension, AppJob, AppSlot, ExtensionInstall, GameServerSummary };
+export type {
+    AppExtension,
+    AppJob,
+    AppSlot,
+    ExtensionInstall,
+    GameServerSummary,
+    RelayedChatMessage
+};
 
 function extensions(): readonly AppExtension[] {
     return installedExtensions();
@@ -164,6 +178,36 @@ export function bootApps(): void {
             console.error(`polaris: ${extension.id} could not start:`, error);
         }
     }
+}
+
+/** The installed apps that can show a Chat message inside a game. */
+async function chatRelays(): Promise<AppExtension[]> {
+    const offering = extensions().filter((extension) => extension.relayChatMessage);
+    const installed = await Promise.all(offering.map((extension) => isAppInstalled(extension.id)));
+    return offering.filter((_, index) => installed[index]);
+}
+
+/** Whether any installed app can show Chat messages inside a game, which is
+ *  whether the setting that turns it on is worth offering. */
+export async function relaysChatToGames(): Promise<boolean> {
+    return (await chatRelays()).length > 0;
+}
+
+/** What hands one message to every app that can show it in a game, resolved
+ *  once however many readers it goes to, or null when no installed app can. One
+ *  app failing does not stop another, and none of them can fail the message. */
+export async function chatRelayer(): Promise<
+    ((message: RelayedChatMessage) => Promise<void>) | null
+> {
+    const relays = await chatRelays();
+    if (relays.length === 0) return null;
+    return async (message) => {
+        for (const extension of relays) {
+            await extension.relayChatMessage?.(message).catch((caught: unknown) => {
+                console.error("polaris: a message could not be shown in a game:", caught);
+            });
+        }
+    };
 }
 
 /** Whether this account reaches an app it holds no permission for. */

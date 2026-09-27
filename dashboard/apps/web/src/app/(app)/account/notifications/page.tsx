@@ -11,16 +11,21 @@ import { describeNotificationRules } from "@/lib/notifications/preferences";
 import { listDestinations } from "@/lib/notifications/destinations";
 import { listSmsSenders } from "@/lib/notifications/sms-service";
 import { NotificationsPageView } from "./notifications-page-view";
+import { prisma } from "@polaris/db";
+import { relaysChatToGames } from "@/lib/app-extensions/registry";
 
 export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
     const user = await requireUser();
-    const [rules, destinations, senders, deliveries] = await Promise.all([
+    const [rules, destinations, senders, deliveries, inGameOffered, account] = await Promise.all([
         describeNotificationRules(user.id),
         listDestinations(user.id),
         listSmsSenders(user.id),
-        listDeliveries(user.id)
+        listDeliveries(user.id),
+        // Offered only where an installed app can show a message in a game.
+        relaysChatToGames().catch(() => false),
+        prisma.user.findUnique({ where: { id: user.id }, select: { messagesInGame: true } })
     ]);
 
     return (
@@ -36,6 +41,7 @@ export default async function NotificationsPage() {
                 destinations={destinations}
                 senders={senders}
                 deliveries={deliveries}
+                messagesInGame={inGameOffered ? (account?.messagesInGame ?? false) : null}
             />
         </div>
     );

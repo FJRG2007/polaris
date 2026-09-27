@@ -10,13 +10,17 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { testDestination } from "@/lib/notifications/dispatch";
 import { soundVolumeSchema } from "@/lib/notifications/sound-volume";
 import { saveSoundVolume } from "@/lib/notifications/sound-volume-service";
 import { destinationInputSchema, isNotificationEvent, notificationRuleSchema } from "@polaris/core";
-import { getNotificationPreferences, saveNotificationPreferences } from "@/lib/notifications/preferences";
+import {
+    getNotificationPreferences,
+    saveNotificationPreferences
+} from "@/lib/notifications/preferences";
 import {
     createDestination,
     deleteDestination,
@@ -35,6 +39,20 @@ import {
     type NotificationPage
 } from "@/lib/notification-service";
 import { openShelfFor } from "@/lib/workspace-scope";
+
+/**
+ * Turn showing this account's Chat messages inside the game it is playing on or
+ * off. Saved on the account, so it holds on every device.
+ */
+export async function setMessagesInGameAction(
+    on: unknown
+): Promise<{ on?: boolean; error?: string }> {
+    const user = await requireUser();
+    const parsed = z.boolean().safeParse(on);
+    if (!parsed.success) return { error: "That could not be saved." };
+    await prisma.user.update({ where: { id: user.id }, data: { messagesInGame: parsed.data } });
+    return { on: parsed.data };
+}
 
 /** How many test alerts one account may send, and over what span. */
 const TEST_LIMIT = 10;
@@ -131,7 +149,10 @@ export async function saveNotificationRuleAction(input: unknown): Promise<{ erro
     }
 
     const preferences = await getNotificationPreferences(user.id);
-    await saveNotificationPreferences(user.id, { ...preferences, [parsed.data.event]: parsed.data.rule });
+    await saveNotificationPreferences(user.id, {
+        ...preferences,
+        [parsed.data.event]: parsed.data.rule
+    });
     revalidatePath("/account/notifications");
     return {};
 }

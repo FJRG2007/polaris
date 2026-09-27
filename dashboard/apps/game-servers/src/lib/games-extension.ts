@@ -92,13 +92,18 @@ export const gameServersExtension: AppExtension = {
     afterStart: async (installedAppId) =>
         (await import("./games-health")).clearCrashLoop(installedAppId),
 
-    adopt: async (ownerId) =>
-        (await import("./game-install")).adoptGameServersApp(ownerId),
+    adopt: async (ownerId) => (await import("./game-install")).adoptGameServersApp(ownerId),
+
+    relayChatMessage: async (message) =>
+        (await import("./minecraft/chat-relay")).relayChatToMinecraft(message),
 
     // Somebody invited because they play here has just made their account.
+
     claimLink: async ({ userId, installedAppId, grantedById, link }) => {
         if (link.kind !== "gamePlayer") return;
-        await (await import("./minecraft/player-invite")).claimPlayerInvite({
+        await (
+            await import("./minecraft/player-invite")
+        ).claimPlayerInvite({
             userId,
             installedAppId,
             grantedById,

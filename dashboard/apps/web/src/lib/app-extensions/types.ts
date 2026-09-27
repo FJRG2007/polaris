@@ -122,4 +122,26 @@ export interface AppExtension {
         readonly grantedById: string;
         readonly link: PendingAppLink;
     }) => Promise<void>;
+
+    /**
+     * Show one Chat message to one account inside whatever this app runs that
+     * the account is playing on right now, where only they see it. Called only
+     * for an account that turned it on and that the message would have
+     * interrupted anyway - see `chat/game-relay`. Nothing to do is not a
+     * failure: most of the time nobody is playing.
+     */
+    readonly relayChatMessage?: (message: RelayedChatMessage) => Promise<void>;
+}
+
+/** One Chat message on its way into a game, already decided to be wanted. */
+export interface RelayedChatMessage {
+    /** Whose screen it goes to. */
+    readonly userId: string;
+    readonly author: string;
+    /** What the conversation is called from the reader's side. */
+    readonly conversation: string;
+    /** Whether it is a channel rather than a direct message or a group. */
+    readonly inChannel: boolean;
+    /** The words, plain, or what was sent when there are none. */
+    readonly text: string;
 }
