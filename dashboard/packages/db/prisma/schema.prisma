@@ -126,9 +126,11 @@ model User {
     // fills that row with recent and suggested apps instead.
     favoriteApps  String?
     // Whether the messages this account receives in Chat are also shown to it,
-    // and only to it, inside the game server it is playing on right now. Off
-    // until the account turns it on; an app that can deliver one decides how.
-    messagesInGame Boolean @default(false)
+    // and only to it, inside the game server it is playing on right now. Null
+    // is the default: direct messages and small groups only. True adds every
+    // channel and large group, false is none. An app that can deliver one
+    // decides how.
+    messagesInGame Boolean?
     // Owned by the better-auth two-factor plugin; flipped on once the user has
     // verified their authenticator, and back off when they disable it.
     twoFactorEnabled Boolean @default(false)

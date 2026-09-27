@@ -13,6 +13,7 @@ import type { NotificationRule } from "@polaris/core";
 import type { DeliveryView } from "@/lib/notification-service";
 import type { DestinationView } from "@/lib/notifications/destinations";
 import type { SmsSenderView } from "@/lib/notifications/sms-service";
+import type { InGameChoice } from "@/lib/chat/in-game-choice";
 import { NotificationsView } from "./notifications-view";
 import { NotificationSettingsView } from "./notification-settings-view";
 
@@ -27,8 +28,8 @@ export function NotificationsPageView({
     destinations: DestinationView[];
     senders: SmsSenderView[];
     deliveries: DeliveryView[];
-    /** Whether Chat messages are shown inside a game, or null where no app can. */
-    messagesInGame: boolean | null;
+    /** Which Chat messages are shown inside a game, or null where no app can. */
+    messagesInGame: InGameChoice | null;
 }) {
     const [tab, setTab] = useState<"history" | "settings">("history");
 

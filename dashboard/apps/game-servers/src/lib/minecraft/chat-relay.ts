@@ -42,6 +42,9 @@ export interface ChatRelayInput {
     readonly text: string;
 }
 
+/** What marks a line as a Chat message: an envelope (U+2709). */
+export const MESSAGE_MARK = "✉";
+
 /** The longest message line sent into a game. */
 const MOST_TEXT = 200;
 
@@ -66,8 +69,11 @@ export function relayCommand(
     if (!target) return null;
     const author = literal(message.author, 48) || "Somebody";
     const where = literal(message.conversation, 48);
+    // An envelope ahead of the tag, so a message reads as one at a glance among
+    // the server's own lines; the game's font draws it without a resource pack.
     const runs: Record<string, unknown>[] = [
         { text: "" },
+        { text: `${MESSAGE_MARK} `, color: "aqua" },
         { text: `[${BROADCAST_TAG}] `, color: "gray" },
         { text: author, color: "yellow" }
     ];

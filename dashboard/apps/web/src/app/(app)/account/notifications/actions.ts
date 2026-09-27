@@ -39,19 +39,23 @@ import {
     type NotificationPage
 } from "@/lib/notification-service";
 import { openShelfFor } from "@/lib/workspace-scope";
+import { IN_GAME_CHOICES, storedInGame, type InGameChoice } from "@/lib/chat/in-game-choice";
 
 /**
- * Turn showing this account's Chat messages inside the game it is playing on or
- * off. Saved on the account, so it holds on every device.
+ * Which of this account's Chat messages are shown inside the game it is playing
+ * on. Saved on the account, so it holds on every device.
  */
 export async function setMessagesInGameAction(
-    on: unknown
-): Promise<{ on?: boolean; error?: string }> {
+    choice: unknown
+): Promise<{ choice?: InGameChoice; error?: string }> {
     const user = await requireUser();
-    const parsed = z.boolean().safeParse(on);
+    const parsed = z.enum(IN_GAME_CHOICES).safeParse(choice);
     if (!parsed.success) return { error: "That could not be saved." };
-    await prisma.user.update({ where: { id: user.id }, data: { messagesInGame: parsed.data } });
-    return { on: parsed.data };
+    await prisma.user.update({
+        where: { id: user.id },
+        data: { messagesInGame: storedInGame(parsed.data) }
+    });
+    return { choice: parsed.data };
 }
 
 /** How many test alerts one account may send, and over what span. */
