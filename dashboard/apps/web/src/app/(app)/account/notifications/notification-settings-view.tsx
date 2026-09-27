@@ -11,6 +11,7 @@
  * failed to send.
  */
 
+import Link from "next/link";
 import { DeliveryLog } from "./delivery-log";
 import { DestinationsCard } from "./destinations-card";
 import {
@@ -88,7 +89,8 @@ export function NotificationSettingsView({
     destinations,
     senders,
     deliveries,
-    messagesInGame = null
+    messagesInGame = null,
+    inGameReady = true
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
     destinations: DestinationView[];
@@ -96,6 +98,9 @@ export function NotificationSettingsView({
     deliveries: DeliveryView[];
     /** Which Chat messages are shown inside a game, or null where no app can. */
     messagesInGame?: inGame.InGameChoice | null;
+    /** Whether a server knows which of its players this account is; until then
+     *  there is nothing to choose. */
+    inGameReady?: boolean;
 }) {
     const [state, setState] = useState(
         () => new Map(rules.map((entry) => [entry.event, entry.rule]))
@@ -133,7 +138,9 @@ export function NotificationSettingsView({
             <BrowserNoticesCard />
             <SoundCard />
             <TabIconCard />
-            {messagesInGame !== null ? <InGameCard initial={messagesInGame} /> : null}
+            {messagesInGame !== null ? (
+                <InGameCard initial={messagesInGame} ready={inGameReady} />
+            ) : null}
 
             {groups.map((group) => (
                 <EventGroup
@@ -173,7 +180,7 @@ const IN_GAME_HINT: Record<inGame.InGameChoice, string> = {
     off: "None of them"
 };
 
-function InGameCard({ initial }: { initial: inGame.InGameChoice }) {
+function InGameCard({ initial, ready }: { initial: inGame.InGameChoice; ready: boolean }) {
     const [choice, setChoice] = useState(initial);
     const [problem, setProblem] = useState<string | null>(null);
     const [, startSaving] = useTransition();
@@ -202,7 +209,8 @@ function InGameCard({ initial }: { initial: inGame.InGameChoice }) {
                         <p className="text-sm font-medium">Messages in Minecraft</p>
                         <p className="text-xs text-muted-foreground">
                             While you play on a server here, your Chat messages also appear in its
-                            game chat. Only you see them. {IN_GAME_HINT[choice]}.
+                            game chat. Only you see them.
+                            {ready ? ` ${IN_GAME_HINT[choice]}.` : null}
                         </p>
                     </div>
                     <SegmentedControl
@@ -213,10 +221,21 @@ function InGameCard({ initial }: { initial: inGame.InGameChoice }) {
                         options={inGame.IN_GAME_CHOICES.map((option) => ({
                             value: option,
                             label: IN_GAME_LABEL[option],
-                            title: IN_GAME_HINT[option]
+                            title: ready ? IN_GAME_HINT[option] : inGame.IN_GAME_NOT_READY,
+                            disabled: !ready
                         }))}
                     />
                 </div>
+                {ready ? null : (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+                        <p className="min-w-0 text-xs text-muted-foreground">
+                            {inGame.IN_GAME_NOT_READY}
+                        </p>
+                        <Button asChild size="sm" variant="outline" className="shrink-0">
+                            <Link href="/account/connections">Connected accounts</Link>
+                        </Button>
+                    </div>
+                )}
                 {problem ? <p className="text-xs text-danger">{problem}</p> : null}
             </CardBody>
         </Card>

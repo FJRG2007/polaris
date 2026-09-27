@@ -9,8 +9,10 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const updates: unknown[] = [];
+let ready = true;
 
 vi.mock("@/lib/session", () => ({ requireUser: async () => ({ id: "u1" }) }));
+vi.mock("@/lib/app-extensions/registry", () => ({ chatRelayReady: async () => ready }));
 vi.mock("@polaris/db", () => ({
     prisma: {
         user: {
@@ -27,6 +29,7 @@ const { inGameChoice } = await import("@/lib/chat/in-game-choice");
 
 beforeEach(() => {
     updates.length = 0;
+    ready = true;
 });
 
 describe("messages in the game", () => {
@@ -44,6 +47,14 @@ describe("messages in the game", () => {
     it("refuses anything that is not one of the choices, and writes nothing", async () => {
         expect((await setMessagesInGameAction(true)).error).toBeTruthy();
         expect((await setMessagesInGameAction("yes")).error).toBeTruthy();
+        expect(updates).toEqual([]);
+    });
+
+    it("refuses every choice, and writes nothing, until a server knows which player the account is", async () => {
+        ready = false;
+        for (const choice of ["auto", "all", "off"]) {
+            expect((await setMessagesInGameAction(choice)).error).toMatch(/Minecraft username/);
+        }
         expect(updates).toEqual([]);
     });
 

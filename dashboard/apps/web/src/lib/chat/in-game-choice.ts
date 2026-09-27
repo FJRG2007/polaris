@@ -13,6 +13,11 @@ export const IN_GAME_CHOICES = ["auto", "all", "off"] as const;
 
 export type InGameChoice = (typeof IN_GAME_CHOICES)[number];
 
+/** Why the choice cannot be made yet, said the same on the screen and by the
+ *  action that refuses it. */
+export const IN_GAME_NOT_READY =
+    "No server knows which player is you yet. Add your Minecraft username in Connected accounts, or ask whoever runs the server to link your player to your account.";
+
 export function inGameChoice(stored: boolean | null): InGameChoice {
     return stored === null ? "auto" : stored ? "all" : "off";
 }

@@ -12,7 +12,13 @@
  * - **And the account agrees**: an operator can tie any name to any account, so
  *   the link alone is only the operator's word. It counts where the account
  *   says the same - the name is the Minecraft account it connected, proved or
- *   typed - or where the server is the account's own.
+ *   typed - where the server is the account's own, or where the link follows
+ *   the account's sign-ins and the player joined from where the account is
+ *   signed in to Polaris right now. That is checked here, on the join line the
+ *   server logged, rather than left to `enforcePlayerAddresses`: its sweep runs
+ *   on an interval, and it lets a player whose join line has aged out of the log
+ *   stay. A join address that cannot be read does not agree. A link that only
+ *   says who somebody is proves nothing and still needs the first.
  * - **Whether they are on** is the open visits the activity sweep already keeps
  *   (`GamePlayerSession`), so a message costs no question to any server that
  *   nobody linked to this account is playing on. A visit can be up to a minute
@@ -27,10 +33,14 @@
  */
 
 import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
+import { addressMatches } from "./access";
 import { BROADCAST_TAG } from "./broadcast";
+import { parseJoinAddresses } from "./parse";
 import { gameOfServer } from "@polaris/core";
 import { playerSelector } from "./announcement";
 import { editionOf, withServerContainer } from "./service";
+import { signInAddresses } from "../game-sign-in-addresses";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 
 /** What arrives, as core describes it. */
@@ -62,6 +72,11 @@ const LEAST_LABEL = 16;
 
 /** The shortest the words are cut to so the line fits in one command. */
 const LEAST_TEXT = 24;
+
+/** How much log to read back for a player's join line, as the address sweep does. */
+const JOIN_LOG_TAIL = 400;
+
+const { readAppRuntimeLog } = host.deployService;
 
 /** The game's formatting character and anything that is not a printable line. */
 function literal(value: string, max: number): string {
@@ -142,7 +157,7 @@ export async function relayTargets(
 ): Promise<{ installedAppId: string; ownerId: string; player: string }[]> {
     const links = await prisma.gamePlayerLink.findMany({
         where: { userId },
-        select: { installedAppId: true, player: true }
+        select: { installedAppId: true, player: true, followSignIns: true }
     });
     if (links.length === 0) return [];
     const connected = await prisma.userConnection.findMany({
@@ -156,7 +171,7 @@ export async function relayTargets(
             id: { in: [...new Set(links.map((link) => link.installedAppId))] },
             status: { not: "removed" }
         },
-        select: { id: true, ownerId: true, catalogId: true }
+        select: { id: true, ownerId: true, catalogId: true, applicationId: true }
     });
     const java = installs.filter(
         (install) =>
@@ -169,20 +184,87 @@ export async function relayTargets(
         where: { installedAppId: { in: java.map((install) => install.id) }, leftAt: null },
         select: { installedAppId: true, name: true }
     });
-    const owners = new Map(java.map((install) => [install.id, install.ownerId]));
+    const byId = new Map(java.map((install) => [install.id, install]));
+    const joins = new Map<string, Promise<Map<string, string>>>();
+    const joinedFrom = (install: { id: string; ownerId: string; applicationId: string | null }) => {
+        let found = joins.get(install.id);
+        if (!found) {
+            found = install.applicationId
+                ? readAppRuntimeLog(install.applicationId, install.ownerId, JOIN_LOG_TAIL)
+                      .then(parseJoinAddresses)
+                      .catch(() => new Map<string, string>())
+                : Promise.resolve(new Map<string, string>());
+            joins.set(install.id, found);
+        }
+        return found;
+    };
+    let signedInFrom: Promise<string[]> | undefined;
     const targets: { installedAppId: string; ownerId: string; player: string }[] = [];
     for (const link of links) {
-        const ownerId = owners.get(link.installedAppId);
-        if (!ownerId) continue;
-        if (ownerId !== userId && !ownNames.has(link.player.toLowerCase())) continue;
+        const install = byId.get(link.installedAppId);
+        if (!install) continue;
+        const ownerId = install.ownerId;
         const on = open.find(
             (visit) =>
                 visit.installedAppId === link.installedAppId &&
                 visit.name.toLowerCase() === link.player.toLowerCase()
         );
-        if (on) targets.push({ installedAppId: link.installedAppId, ownerId, player: on.name });
+        if (!on) continue;
+        if (ownerId !== userId && !ownNames.has(link.player.toLowerCase())) {
+            if (!link.followSignIns) continue;
+            const address = (await joinedFrom(install)).get(on.name.toLowerCase());
+            if (!address) continue;
+            signedInFrom ??= signInAddresses([userId])
+                .then((found) => found.get(userId) ?? [])
+                .catch(() => []);
+            if (!(await signedInFrom).some((rule) => addressMatches(rule, address))) continue;
+        }
+        targets.push({ installedAppId: link.installedAppId, ownerId, player: on.name });
     }
     return targets;
+}
+
+/**
+ * Whether a message could ever reach this account in Minecraft: a Java server
+ * has a player that is theirs by the rules above - on a server of their own,
+ * under the Minecraft name they gave, or on a link that follows their sign-ins
+ * (whose join address is only known, and checked, once they are playing). The
+ * setting that chooses which messages go there is not offered until it can.
+ */
+export async function relayReady(userId: string): Promise<boolean> {
+    const links = await prisma.gamePlayerLink.findMany({
+        where: { userId },
+        select: { installedAppId: true, player: true, followSignIns: true }
+    });
+    if (links.length === 0) return false;
+    const [connected, installs] = await Promise.all([
+        prisma.userConnection.findMany({
+            where: { userId, provider: "minecraft" },
+            select: { label: true }
+        }),
+        prisma.installedApp.findMany({
+            where: {
+                id: { in: [...new Set(links.map((link) => link.installedAppId))] },
+                status: { not: "removed" }
+            },
+            select: { id: true, ownerId: true, catalogId: true }
+        })
+    ]);
+    const ownNames = new Set(connected.map((connection) => connection.label.toLowerCase()));
+    const java = new Map(
+        installs
+            .filter(
+                (install) =>
+                    gameOfServer(install.catalogId)?.id === "minecraft" &&
+                    editionOf(install.catalogId) === "java"
+            )
+            .map((install) => [install.id, install.ownerId])
+    );
+    return links.some((link) => {
+        const ownerId = java.get(link.installedAppId);
+        if (!ownerId) return false;
+        return ownerId === userId || link.followSignIns || ownNames.has(link.player.toLowerCase());
+    });
 }
 
 /** Show the message to each of this account's players who are on. One server

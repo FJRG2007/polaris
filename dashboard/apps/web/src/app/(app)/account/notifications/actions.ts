@@ -39,7 +39,13 @@ import {
     type NotificationPage
 } from "@/lib/notification-service";
 import { openShelfFor } from "@/lib/workspace-scope";
-import { IN_GAME_CHOICES, storedInGame, type InGameChoice } from "@/lib/chat/in-game-choice";
+import { chatRelayReady } from "@/lib/app-extensions/registry";
+import {
+    IN_GAME_CHOICES,
+    IN_GAME_NOT_READY,
+    storedInGame,
+    type InGameChoice
+} from "@/lib/chat/in-game-choice";
 
 /**
  * Which of this account's Chat messages are shown inside the game it is playing
@@ -51,6 +57,11 @@ export async function setMessagesInGameAction(
     const user = await requireUser();
     const parsed = z.enum(IN_GAME_CHOICES).safeParse(choice);
     if (!parsed.success) return { error: "That could not be saved." };
+    // The same test the screen draws from: nothing to choose until a server
+    // knows which of its players is this account.
+    if (!(await chatRelayReady(user.id).catch(() => false))) {
+        return { error: IN_GAME_NOT_READY };
+    }
     await prisma.user.update({
         where: { id: user.id },
         data: { messagesInGame: storedInGame(parsed.data) }
