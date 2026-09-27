@@ -14,11 +14,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 const { visibleLength } = await import("@polaris-app/game-servers/src/lib/minecraft/text-vars");
-const { sidebarProblems, DEFAULT_SIDEBAR, plainLine, SIDEBAR_TITLE_MAX } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/sidebar"
-);
-const { announcementProblems, BLANK_ANNOUNCEMENT, LINE_MAX } = await import("@polaris-app/game-servers/src/lib/minecraft/announcement");
-const { FieldNote } = await import("@polaris-app/game-servers/src/screens/installed/minecraft-announce");
+const { sidebarProblems, DEFAULT_SIDEBAR, plainLine, SIDEBAR_TITLE_MAX } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/sidebar");
+const { announcementProblems, BLANK_ANNOUNCEMENT, LINE_MAX } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/announcement");
+const { FieldNote } =
+    await import("@polaris-app/game-servers/src/screens/installed/minecraft-announce");
 
 afterEach(cleanup);
 

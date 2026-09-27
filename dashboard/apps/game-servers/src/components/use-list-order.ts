@@ -56,7 +56,10 @@ export function useListOrder(count: number, onMove: (from: number, to: number) =
     /** New ids for a list that was replaced as a whole - loaded, or saved back. */
     const reset = useCallback((length: number) => setIds(Array.from({ length }, make)), []);
     const added = useCallback(() => setIds((current) => [...current, make()]), []);
-    const removed = useCallback((index: number) => setIds((current) => current.filter((_, at) => at !== index)), []);
+    const removed = useCallback(
+        (index: number) => setIds((current) => current.filter((_, at) => at !== index)),
+        []
+    );
 
     const move = (from: number, to: number) => {
         if (from === to) return;

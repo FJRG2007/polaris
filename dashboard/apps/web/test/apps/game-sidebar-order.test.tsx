@@ -29,12 +29,18 @@ describe("moving one item", () => {
 /** The panel's lines, as the editor draws them: a handle and a field each. */
 function Lines({ initial }: { initial: string[] }) {
     const [lines, setLines] = useState(initial);
-    const order = useListOrder(initial.length, (from, to) => setLines((current) => moved(current, from, to)));
+    const order = useListOrder(initial.length, (from, to) =>
+        setLines((current) => moved(current, from, to))
+    );
     return (
         <ul data-testid="list" {...order.listProps}>
             {lines.map((line, index) => (
                 <li key={order.ids[index]} data-testid="row" {...order.rowProps(index)}>
-                    <button type="button" aria-label={`Move line ${index + 1}`} {...order.handleProps(index, lines.length)} />
+                    <button
+                        type="button"
+                        aria-label={`Move line ${index + 1}`}
+                        {...order.handleProps(index, lines.length)}
+                    />
                     <input aria-label={`Line ${index + 1}`} defaultValue={line} />
                 </li>
             ))}
@@ -42,13 +48,23 @@ function Lines({ initial }: { initial: string[] }) {
     );
 }
 
-const values = () => screen.getAllByRole("textbox").map((field) => (field as HTMLInputElement).value);
+const values = () =>
+    screen.getAllByRole("textbox").map((field) => (field as HTMLInputElement).value);
 
 /** Rows 40px apart and 30px tall, the first at the top: jsdom lays nothing out. */
 function layOut() {
     screen.getAllByTestId("row").forEach((row, index) => {
         row.getBoundingClientRect = () =>
-            ({ top: index * 40, height: 30, bottom: index * 40 + 30, left: 0, right: 0, width: 0, x: 0, y: index * 40 }) as DOMRect;
+            ({
+                top: index * 40,
+                height: 30,
+                bottom: index * 40 + 30,
+                left: 0,
+                right: 0,
+                width: 0,
+                x: 0,
+                y: index * 40
+            }) as DOMRect;
     });
 }
 
@@ -83,7 +99,9 @@ describe("the panel's lines", () => {
     it("do not move past either end", () => {
         render(<Lines initial={["a", "b"]} />);
         fireEvent.keyDown(screen.getByRole("button", { name: "Move line 1" }), { key: "ArrowUp" });
-        fireEvent.keyDown(screen.getByRole("button", { name: "Move line 2" }), { key: "ArrowDown" });
+        fireEvent.keyDown(screen.getByRole("button", { name: "Move line 2" }), {
+            key: "ArrowDown"
+        });
         expect(values()).toEqual(["a", "b"]);
     });
 
@@ -126,13 +144,20 @@ describe("the panel's lines", () => {
         const rows = screen.getAllByTestId("row");
         expect(rows.map((row) => row.getAttribute("draggable"))).toEqual(["false", "false"]);
         fireEvent.pointerDown(screen.getByRole("button", { name: "Move line 2" }));
-        expect(screen.getAllByTestId("row").map((row) => row.getAttribute("draggable"))).toEqual(["false", "true"]);
+        expect(screen.getAllByTestId("row").map((row) => row.getAttribute("draggable"))).toEqual([
+            "false",
+            "true"
+        ]);
     });
 
     it("keeps each line's text with it, not with the slot it was in", () => {
         render(<Lines initial={["a", "b"]} />);
-        fireEvent.change(screen.getByRole("textbox", { name: "Line 1" }), { target: { value: "typed" } });
-        fireEvent.keyDown(screen.getByRole("button", { name: "Move line 1" }), { key: "ArrowDown" });
+        fireEvent.change(screen.getByRole("textbox", { name: "Line 1" }), {
+            target: { value: "typed" }
+        });
+        fireEvent.keyDown(screen.getByRole("button", { name: "Move line 1" }), {
+            key: "ArrowDown"
+        });
         expect(values()).toEqual(["b", "typed"]);
     });
 });

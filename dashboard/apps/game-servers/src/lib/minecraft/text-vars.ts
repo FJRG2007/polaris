@@ -165,16 +165,14 @@ export const VARIABLES: readonly VariableSpec[] = [
         bedrock: false,
         width: 32
     },
-    ...STATS_RANKINGS.map(
-        (name): VariableSpec => ({
-            name,
-            label: RANKINGS[name].label,
-            kind: "server",
-            sample: RANKINGS[name].sample.join(", "),
-            bedrock: false,
-            width: 32
-        })
-    ),
+    ...STATS_RANKINGS.map((name): VariableSpec => ({
+        name,
+        label: RANKINGS[name].label,
+        kind: "server",
+        sample: RANKINGS[name].sample.join(", "),
+        bedrock: false,
+        width: 32
+    })),
     {
         name: "death.player",
         label: "Who died last",
