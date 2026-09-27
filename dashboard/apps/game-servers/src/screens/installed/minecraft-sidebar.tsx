@@ -2,7 +2,7 @@
 
 /**
  * The side panel: the box on the right of every player's screen, written by
- * Polaris and kept current - who is online, who is in the call of a chat group,
+ * Polaris and kept current - who is online, who is in the call of the linked chat,
  * anything the server's own variables can say.
  *
  * Checked as it is typed with the rules the save uses (`sidebar.ts`), and
@@ -45,7 +45,6 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    Select,
     Switch,
     allChosen,
     cn,
@@ -60,9 +59,6 @@ import {
     type LiveDisplayState
 } from "./live-display-actions";
 
-/** "No group" as a select value: an empty value reads as nothing chosen. */
-const NO_GROUP = "none";
-
 export function MinecraftSidebar({
     installedAppId,
     canManage
@@ -74,7 +70,6 @@ export function MinecraftSidebar({
     const [draft, setDraft] = useState<side.SidebarConfig>(side.DEFAULT_SIDEBAR);
     /** The "several leaderboards, taking turns" dialog, while it is open. */
     const [rotating, setRotating] = useState<Rotating | null>(null);
-    const [group, setGroup] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -90,7 +85,6 @@ export function MinecraftSidebar({
         (next: LiveDisplayState) => {
             setState(next);
             setDraft(next.sidebar);
-            setGroup(next.callGroupId);
             resetOrder(next.sidebar.lines.length);
         },
         [resetOrder]
@@ -108,9 +102,7 @@ export function MinecraftSidebar({
     const invalid = side.hasSidebarProblems(draft, known);
     // Only a change is worth a save: the same panel saved again is a round trip
     // that changes nothing on anybody's screen.
-    const dirty =
-        state !== null &&
-        (JSON.stringify(draft) !== JSON.stringify(state.sidebar) || group !== state.callGroupId);
+    const dirty = state !== null && JSON.stringify(draft) !== JSON.stringify(state.sidebar);
     const inserts = useMemo(() => insertsFor("java", "server"), []);
 
     const change = (patch: Partial<side.SidebarConfig>) => {
@@ -131,8 +123,7 @@ export function MinecraftSidebar({
         startTransition(async () => {
             const result = await saveLiveDisplayAction({
                 installedAppId,
-                sidebar: { ...draft, lines: [...draft.lines] },
-                callGroupId: group
+                sidebar: { ...draft, lines: [...draft.lines] }
             });
             if (result.error || !result.state) {
                 setError(result.error ?? "That could not be saved");
@@ -365,38 +356,21 @@ export function MinecraftSidebar({
                             </p>
                         </div>
 
-                        <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Chat group for {"{call.*}"}</span>
-                            <Select
-                                value={group ?? NO_GROUP}
-                                onValueChange={(value) => {
-                                    setGroup(value === NO_GROUP ? null : value);
-                                    setNote(null);
-                                }}
-                                options={[
-                                    { value: NO_GROUP, label: "None" },
-                                    ...state.groups.map((one) => ({
-                                        value: one.id,
-                                        label: one.name
-                                    })),
-                                    ...(state.callGroupId &&
-                                    !state.groups.some((one) => one.id === state.callGroupId)
-                                        ? [
-                                              {
-                                                  value: state.callGroupId,
-                                                  label: "A group you are not in"
-                                              }
-                                          ]
-                                        : [])
-                                ]}
-                                aria-label="Chat group whose call is shown"
-                            />
-                            <span className="text-xs text-muted-foreground">
-                                {state.groups.length === 0
-                                    ? "You are in no chat group yet. Create one in Chat to show who is in its call."
-                                    : "Whose call {call.count}, {call.members} and {call.max} read, here and in announcements."}
-                            </span>
-                        </label>
+                        {/* Whose call it is lives on the server's Linked chat screen,
+                            with everything else that chat is used for. */}
+                        <p className="text-xs text-muted-foreground">
+                            {state.callLinked
+                                ? "{call.count}, {call.members} and {call.max} read the call of the chat this server is linked to. "
+                                : "{call.count}, {call.members} and {call.max} need a chat with a call. "}
+                            <a
+                                href={`/apps/installed/${installedAppId}/chat`}
+                                className="font-medium text-foreground underline-offset-2 hover:underline"
+                            >
+                                {state.callLinked
+                                    ? "Change it in Linked chat"
+                                    : "Link one in Linked chat"}
+                            </a>
+                        </p>
 
                         {error && (
                             <p role="alert" className="text-sm text-danger">

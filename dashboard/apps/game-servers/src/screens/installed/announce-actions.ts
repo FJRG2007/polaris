@@ -50,7 +50,8 @@ export async function sendAnnouncementAction(
         const sent = await sendAnnouncement(
             access.ownerId,
             parsed.data.installedAppId,
-            parsed.data.announcement
+            parsed.data.announcement,
+            user.id
         );
         // The game keeps an action bar up for about three seconds and has no
         // "until": anything meant to stay longer is sent again from here on.

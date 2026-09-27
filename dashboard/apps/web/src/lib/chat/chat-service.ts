@@ -10,6 +10,7 @@
 
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
+import type { ChatGameLinkView } from "./game-links";
 import { publishChatChange } from "./live";
 import { groupOwnerId } from "./ownership";
 import { prisma, type Prisma } from "@polaris/db";
@@ -140,6 +141,9 @@ export interface ChatChannelView {
      * says anything about one.
      */
     readonly blocked: boolean;
+    /** What an app has linked this conversation to - a game server whose call
+     *  or channel it is - for the badge beside its name. Usually empty. */
+    readonly gameLinks: readonly ChatGameLinkView[];
 }
 
 export interface ChatMemberView {
@@ -720,6 +724,16 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             .filter((channel) => channel.kind === "dm")
             .flatMap((channel) => channel.members.map((member) => member.userId))
     );
+    // Loaded when asked: it reaches the app registry, which a rail with no app
+    // installed has no reason to load. A badge is never worth the rail.
+    const linked = await import("./game-links")
+        .then((links) =>
+            links.gameLinksFor(
+                actor,
+                channels.filter((channel) => channel.kind !== "dm").map((channel) => channel.id)
+            )
+        )
+        .catch(() => new Map<string, ChatGameLinkView[]>());
 
     return channels.map((channel) => {
         const others = channel.members
@@ -771,7 +785,8 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             slowmode: channel.slowmode,
             userLimit: channel.kind === "voice" ? channel.userLimit : 0,
             others: channel.spaceId ? [] : others,
-            blocked: channel.kind === "dm" && others.some((other) => shut.has(other.id))
+            blocked: channel.kind === "dm" && others.some((other) => shut.has(other.id)),
+            gameLinks: linked.get(channel.id) ?? []
         };
     });
 }

@@ -56,6 +56,7 @@ const dm = {
     archived: false,
     unreadCount: 0,
     mayModerate: false,
+    gameLinks: [],
     others: [{ id: "grace", name: "Grace" }]
 };
 

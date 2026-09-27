@@ -1,7 +1,7 @@
 /**
  * The side panel: the box on the right of every player's screen, written by
  * Polaris - a title and up to fifteen lines, such as who is online or who is in
- * the call of a chat group - and kept current while the server runs.
+ * the call of the linked chat - and kept current while the server runs.
  *
  * It is the game's scoreboard sidebar. One objective, `polaris_side`, is shown
  * there; each line is a score holder with a display name, and the scores only

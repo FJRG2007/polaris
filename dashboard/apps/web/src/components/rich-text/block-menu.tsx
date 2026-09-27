@@ -11,6 +11,11 @@
  * The menu is a suggestion like the mention pickers, so it inherits the same
  * positioning and the same keys - arrows to move, enter to take, escape to
  * dismiss - rather than growing its own.
+ *
+ * It is also where a conversation's commands are offered: a chat linked to a
+ * game server answers `/online`, and somebody who types "/" there sees those
+ * first, above the blocks. Picking one writes it into the message, and sending
+ * the message is asking - the same list, not a second menu for the same key.
  */
 
 import { cn } from "@polaris/ui";
@@ -37,11 +42,14 @@ import {
     ListTodo,
     Minus,
     Quote,
+    Terminal,
     Type
 } from "lucide-react";
 
-interface BlockCommand {
+export interface BlockCommand {
     readonly label: string;
+    /** A line under the label, for a command whose name does not say it all. */
+    readonly detail?: string;
     /** What somebody would type looking for it, beyond the label itself. */
     readonly keywords: string;
     readonly icon: React.ComponentType<{ className?: string }>;
@@ -161,6 +169,14 @@ const Menu = forwardRef<SuggestionHandle, SuggestionProps<BlockCommand>>(functio
                         <span className="truncate" title={item.label}>
                             {item.label}
                         </span>
+                        {item.detail && (
+                            <span
+                                className="min-w-0 truncate text-xs text-muted-foreground"
+                                title={item.detail}
+                            >
+                                {item.detail}
+                            </span>
+                        )}
                     </button>
                 </li>
             ))}
@@ -168,11 +184,56 @@ const Menu = forwardRef<SuggestionHandle, SuggestionProps<BlockCommand>>(functio
     );
 });
 
+/** A command a conversation answers, as the menu lists it. */
+export interface SlashCommand {
+    /** What is typed after the slash. */
+    readonly name: string;
+    readonly description: string;
+}
+
+/** The commands as menu entries: picking one writes it, with a space after so
+ *  the menu does not open on it again, and Enter then sends it. */
+function commandEntries(commands: readonly SlashCommand[], term: string): BlockCommand[] {
+    return commands
+        .filter((command) => !term || command.name.toLowerCase().startsWith(term))
+        .map((command) => ({
+            label: `/${command.name}`,
+            detail: command.description,
+            keywords: command.description.toLowerCase(),
+            icon: Terminal,
+            run: (editor, range) =>
+                editor.chain().focus().deleteRange(range).insertContent(`/${command.name} `).run()
+        }));
+}
+
+/** What the list holds for what has been typed after the slash: the
+ *  conversation's commands first, then the blocks. */
+export function menuItems(commands: readonly SlashCommand[], query: string): BlockCommand[] {
+    const term = query.trim().toLowerCase();
+    const offered = commandEntries(commands, term);
+    if (!term) return [...offered, ...BLOCKS];
+    return [
+        ...offered,
+        ...BLOCKS.filter(
+            (block) => block.label.toLowerCase().includes(term) || block.keywords.includes(term)
+        )
+    ];
+}
+
 /** Typing "/" opens the list; typing on filters it. */
-export const BlockMenu = Extension.create({
+export const BlockMenu = Extension.create<{
+    /** The conversation's commands, read when the list opens so they can change
+     *  without the editor being built again. */
+    commands: () => readonly SlashCommand[];
+}>({
     name: "polarisBlockMenu",
 
+    addOptions() {
+        return { commands: () => [] };
+    },
+
     addProseMirrorPlugins() {
+        const commands = this.options.commands;
         return [
             Suggestion<BlockCommand>({
                 editor: this.editor,
@@ -182,15 +243,7 @@ export const BlockMenu = Extension.create({
                 // sentence is a slash, and inside code it is a path.
                 allow: ({ editor }) =>
                     !editor.isActive("codeBlock") && !editor.isActive("markdownBlock"),
-                items: ({ query }) => {
-                    const term = query.trim().toLowerCase();
-                    if (!term) return [...BLOCKS];
-                    return BLOCKS.filter(
-                        (block) =>
-                            block.label.toLowerCase().includes(term) ||
-                            block.keywords.includes(term)
-                    );
-                },
+                items: ({ query }) => menuItems(commands(), query),
                 command: ({ editor, range, props }) => props.run(editor, range),
                 render: () => {
                     let renderer: ReactRenderer<

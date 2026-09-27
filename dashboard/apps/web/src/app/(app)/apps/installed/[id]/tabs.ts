@@ -51,6 +51,10 @@ export const GAME_TABS: readonly GameTab[] = [
     // The box on the right of every player's screen. Its own screen rather than
     // the bottom of Announce, where nobody looking for it thought to scroll.
     { slug: "panel", label: "Side panel", permission: "games.console", games: ["minecraft"] },
+    // The chat group or space the server talks through: whose call `{call.*}`
+    // reads, where members ask it `/online`, where announcements are repeated.
+    // A setting of the server, so the manager's.
+    { slug: "chat", label: "Linked chat", permission: "games.manage", games: ["minecraft"] },
     { slug: "players", label: "Players", permission: "games.read", games: EVERY_GAME },
     { slug: "world", label: "World", permission: "games.manage", games: ["minecraft"] },
     { slug: "rules", label: "Rules", permission: "games.read", games: EVERY_GAME },

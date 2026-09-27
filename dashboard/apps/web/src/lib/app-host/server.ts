@@ -32,7 +32,14 @@ import { portKey } from "@/lib/apps/port-key";
 import { readInstallConfig } from "@/lib/apps/install-config-value";
 import type { InstalledSlotHost } from "@/components/app-extensions/installed-client";
 import type { LiveGrant } from "@/lib/access/grants";
-import type { AppExtension, AppJob, AppSlot } from "@/lib/app-extensions/types";
+import type {
+    AppExtension,
+    AppJob,
+    AppSlot,
+    ChatGameLink,
+    RelayedChannelMessage
+} from "@/lib/app-extensions/types";
+import type { LinkableConversations } from "@/lib/chat/game-links";
 import type { InstallConfig } from "@/lib/apps/install-config";
 import type { InstallSeed, InstalledAppSetting } from "@/lib/apps/install-service";
 import type { InstallAccessEntry, InstallAccessView } from "@/lib/apps/install-sharing";
@@ -85,6 +92,7 @@ const load = {
     appsPortRegistry: once(() => import("@/lib/apps/port-registry")),
     auditService: once(() => import("@/lib/audit-service")),
     backupsManage: once(() => import("@/lib/backups/manage")),
+    chatGameLinks: once(() => import("@/lib/chat/game-links")),
     chatLive: once(() => import("@/lib/chat/live")),
     chatMeetingEvents: once(() => import("@/lib/chat/meeting-events")),
     chatMeetings: once(() => import("@/lib/chat/meetings")),
@@ -218,6 +226,12 @@ export const serverHost = {
         shellQuote: backupsSourcesTypes.shellQuote,
         stageDir: backupsSourcesTypes.stageDir,
         stagedFrom: backupsSourcesTypes.stagedFrom
+    },
+    // What a game server may be linked to in Chat, and the line it writes into
+    // the linked channel when an announcement is repeated there.
+    chatLinks: {
+        linkableConversations: later(load.chatGameLinks, "linkableConversations"),
+        postAppNotice: later(load.chatGameLinks, "postAppNotice")
     },
     chatLive: {
         publishChatChange: later(load.chatLive, "publishChatChange")
@@ -366,6 +380,7 @@ declare module "@polaris/app-host" {
         AppJob: AppJob;
         AppSlot: AppSlot;
         BackupSource: BackupSource;
+        ChatGameLink: ChatGameLink;
         DiscoveredTarget: DiscoveredTarget;
         GamePort: GamePort;
         GamePortRow: GamePortRow;
@@ -378,7 +393,9 @@ declare module "@polaris/app-host" {
         InstallSeed: InstallSeed;
         InstalledAppSetting: InstalledAppSetting;
         InstalledSlotHost: InstalledSlotHost;
+        LinkableConversations: LinkableConversations;
         LiveGrant: LiveGrant;
+        RelayedChannelMessage: RelayedChannelMessage;
         SessionUser: SessionUser;
         SourceResource: SourceResource;
         StagedArtifact: StagedArtifact;

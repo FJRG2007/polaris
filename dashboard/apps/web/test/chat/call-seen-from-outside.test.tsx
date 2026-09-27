@@ -96,7 +96,8 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
                 spaceId: null,
                 archived: false,
                 unreadCount: 0,
-                mayModerate: false
+                mayModerate: false,
+                gameLinks: []
             }
         ],
         spaces: [],

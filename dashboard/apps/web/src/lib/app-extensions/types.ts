@@ -144,6 +144,67 @@ export interface AppExtension {
      * be one or two indexed reads rather than a question to any server.
      */
     readonly playingNow?: (userIds: readonly string[]) => Promise<readonly PlayingNow[]>;
+
+    /**
+     * Which of these Chat conversations one of its things is linked to - a game
+     * server whose operator chose the group or the channels it talks through.
+     * Chat draws a badge on each, and offers the commands it lists.
+     */
+    readonly chatGameLinks?: (channelIds: readonly string[]) => Promise<readonly ChatGameLink[]>;
+
+    /**
+     * The answers to a command somebody wrote in a conversation (`/online`,
+     * without the slash). Empty when it is not one of its commands, or not a
+     * conversation it is linked to. The writer is already a member: Chat let
+     * them write there.
+     */
+    readonly answerChatCommand?: (input: {
+        readonly channelId: string;
+        readonly command: string;
+    }) => Promise<readonly string[]>;
+
+    /**
+     * A message said in a conversation, whatever anybody's own settings, for an
+     * app that shows a linked channel to everybody inside what it runs. Nothing
+     * to do is not a failure: most channels are linked to nothing.
+     */
+    readonly relayChannelMessage?: (message: RelayedChannelMessage) => Promise<void>;
+}
+
+/** A command an app answers in a conversation linked to it. */
+export interface ChatCommandSpec {
+    /** What is typed after the slash. */
+    readonly name: string;
+    /** One line, for the list the composer shows. */
+    readonly description: string;
+}
+
+/** One Chat conversation an app's thing is linked to. */
+export interface ChatGameLink {
+    readonly channelId: string;
+    readonly installedAppId: string;
+    /** Whose shelf the thing is on, for deciding who may open it. */
+    readonly ownerId: string;
+    /** What its page calls it. */
+    readonly name: string;
+    /** The game it runs, by name ("Minecraft"). */
+    readonly game: string;
+    /** The game's mark, served from `public/logos`. */
+    readonly logo: string;
+    /** The commands it answers here. Empty where it only feeds the call. */
+    readonly commands: readonly ChatCommandSpec[];
+}
+
+/** One message said in a conversation, on its way to everybody in a game. */
+export interface RelayedChannelMessage {
+    readonly channelId: string;
+    readonly author: string;
+    /** What the conversation is called. */
+    readonly conversation: string;
+    readonly text: string;
+    readonly files: string | null;
+    readonly poll: readonly string[] | null;
+    readonly forwarded: boolean;
 }
 
 /** Somebody on one of an app's servers, as their presence card says it. */
@@ -175,4 +236,6 @@ export interface RelayedChatMessage {
     readonly poll: readonly string[] | null;
     /** Whether it was forwarded from another conversation. */
     readonly forwarded: boolean;
+    /** The conversation it was said in. */
+    readonly channelId: string;
 }

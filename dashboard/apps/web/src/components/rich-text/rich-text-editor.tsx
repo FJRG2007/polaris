@@ -17,7 +17,7 @@
 import { cn } from "@polaris/ui";
 import * as md from "./markdown";
 import * as refs from "./references";
-import { BlockMenu } from "./block-menu";
+import { BlockMenu, type SlashCommand } from "./block-menu";
 import { baseExtensions } from "./schema";
 import { RICH_TEXT_PROSE } from "./prose";
 import { runAction } from "@/lib/run-action";
@@ -127,6 +127,8 @@ export interface RichTextEditorProps {
      * the send will refuse is worse than not offering them.
      */
     roomMentions?: boolean;
+    /** Commands the conversation answers, offered first when "/" is typed. */
+    slashCommands?: readonly SlashCommand[];
     /**
      * Where @ looks, when the usual place is the wrong one.
      *
@@ -204,6 +206,7 @@ export function RichTextEditor({
     onPasteFiles,
     mentionsIn = null,
     roomMentions = true,
+    slashCommands,
     mentionSource = null,
     listAction,
     bordered = false,
@@ -217,6 +220,10 @@ export function RichTextEditor({
     // is asking, and it must not be a reason to focus on its own.
     const caret = useRef(focusWhere);
     caret.current = focusWhere;
+    // The same for the commands: they arrive with the conversation, after the
+    // editor was built, and read when the menu opens.
+    const commands = useRef(slashCommands);
+    commands.current = slashCommands;
 
     const search = useCallback(
         async (kinds: readonly refs.ReferenceKind[], query: string) => {
@@ -250,7 +257,7 @@ export function RichTextEditor({
         // a set of people nobody can point at.
         () => [
             ...baseExtensions(placeholder),
-            BlockMenu,
+            BlockMenu.configure({ commands: () => commands.current ?? [] }),
             mentionExtension(search, mentionsIn !== null && roomMentions)
         ],
         [placeholder, search, mentionsIn, roomMentions]

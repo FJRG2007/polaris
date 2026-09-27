@@ -56,6 +56,9 @@ export interface ChatRelayInput {
     /** A poll's answers, or null when it is not a poll. */
     readonly poll?: readonly string[] | null;
     readonly forwarded?: boolean;
+    /** The conversation it was said in. A server that shows that channel to
+     *  everybody playing already showed it to this player too. */
+    readonly channelId?: string;
 }
 
 /** What marks a line as a Chat message: an envelope (U+2709). */
@@ -102,7 +105,14 @@ export function relayCommand(
     message: Omit<ChatRelayInput, "userId">
 ): string | null {
     const target = playerSelector(player);
-    if (!target) return null;
+    return target ? relayLine(target, message) : null;
+}
+
+/**
+ * The same line, to a target already written as a command aims it: one
+ * player's selector, or `@a` for a channel shown to everybody playing.
+ */
+export function relayLine(target: string, message: Omit<ChatRelayInput, "userId">): string | null {
     const author = literal(message.author, 48) || "Somebody";
     const where = literal(message.conversation, 48);
     // An envelope ahead of the tag, so a message reads as one at a glance among
@@ -270,7 +280,11 @@ export async function relayReady(userId: string): Promise<boolean> {
 /** Show the message to each of this account's players who are on. One server
  *  that will not take it does not stop the next. */
 export async function relayChatToMinecraft(message: ChatRelayInput): Promise<void> {
+    const shown = message.channelId
+        ? await (await import("./chat-link-service")).serversShowing(message.channelId)
+        : new Set<string>();
     for (const target of await relayTargets(message.userId)) {
+        if (shown.has(target.installedAppId)) continue;
         const line = relayCommand(target.player, message);
         if (!line) continue;
         await withServerContainer(target.ownerId, target.installedAppId, async (server) => {

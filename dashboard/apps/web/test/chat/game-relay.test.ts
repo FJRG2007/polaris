@@ -41,6 +41,9 @@ const fake = vi.hoisted(() => ({
     levels: new Map<string, string>(),
     blocked: new Map<string, Set<string>>(),
     relayed: [] as Record<string, unknown>[],
+    /** Whether an installed app shows linked channels to everybody playing. */
+    showing: false,
+    shown: [] as Record<string, unknown>[],
     asked: [] as unknown[],
     namesRead: 0
 }));
@@ -93,6 +96,12 @@ vi.mock("@/lib/app-extensions/registry", () => ({
             ? async (message: Record<string, unknown>) => {
                   fake.relayed.push(message);
               }
+            : null,
+    channelRelayer: async () =>
+        fake.showing
+            ? async (message: Record<string, unknown>) => {
+                  fake.shown.push(message);
+              }
             : null
 }));
 vi.mock("@/lib/chat/access", () => ({
@@ -143,6 +152,8 @@ beforeEach(() => {
     fake.levels = new Map();
     fake.blocked = new Map();
     fake.relayed = [];
+    fake.showing = false;
+    fake.shown = [];
     fake.asked = [];
     fake.namesRead = 0;
 });
@@ -159,7 +170,8 @@ describe("relaying a message into a game", () => {
                 text: "see you at spawn",
                 files: null,
                 poll: null,
-                forwarded: false
+                forwarded: false,
+                channelId: "c1"
             },
             {
                 userId: BEN,
@@ -169,7 +181,8 @@ describe("relaying a message into a game", () => {
                 text: "see you at spawn",
                 files: null,
                 poll: null,
-                forwarded: false
+                forwarded: false,
+                channelId: "c1"
             }
         ]);
     });
@@ -282,7 +295,39 @@ describe("relaying a message into a game", () => {
 
     it("leaves a deleted message alone", async () => {
         fake.message = message("gone", { deletedAt: new Date() });
+        fake.showing = true;
         await relayToGames("m1");
         expect(fake.relayed).toEqual([]);
+        expect(fake.shown).toEqual([]);
+    });
+});
+
+describe("a channel a game server shows to everybody playing", () => {
+    it("is handed every message, whatever each reader chose, by the channel's own name", async () => {
+        fake.showing = true;
+        fake.offered = false;
+        fake.optedIn = new Set();
+        fake.message = message("raid at eight", { channel: { spaceId: "s1", name: "builders" } });
+        await relayToGames("m1");
+        expect(fake.shown).toEqual([
+            {
+                channelId: "c1",
+                author: "Carla",
+                conversation: "builders",
+                text: "raid at eight",
+                files: null,
+                poll: null,
+                forwarded: false
+            }
+        ]);
+        // Nobody's own setting was asked about: the operator linked it.
+        expect(fake.asked).toEqual([]);
+    });
+
+    it("never names an unnamed group after the people in it", async () => {
+        fake.showing = true;
+        await relayToGames("m1");
+        expect(fake.shown[0]).toMatchObject({ conversation: "Group" });
+        expect(fake.shown[0]).not.toHaveProperty("userId");
     });
 });

@@ -14,7 +14,9 @@ const fake = vi.hoisted(() => ({
     config: "{}",
     members: 0,
     inCall: [] as string[],
-    counted: [] as unknown[]
+    counted: [] as unknown[],
+    room: null as null | { userLimit: number; private: boolean },
+    spaceMembers: 0
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -24,6 +26,13 @@ vi.mock("@polaris/db", () => ({
             count: async (query: unknown) => {
                 fake.counted.push(query);
                 return fake.members;
+            }
+        },
+        chatChannel: { findUnique: async () => fake.room },
+        chatSpaceMember: {
+            count: async (query: unknown) => {
+                fake.counted.push(query);
+                return fake.spaceMembers;
             }
         },
         // Never read for who is in the call: that is the chat's answer (below).
@@ -63,6 +72,8 @@ beforeEach(() => {
     fake.members = 5;
     fake.inCall = ["Ada", "Grace"];
     fake.counted = [];
+    fake.room = null;
+    fake.spaceMembers = 0;
 });
 
 describe("{call.max}", () => {
@@ -93,6 +104,38 @@ describe("{call.max}", () => {
     it("is not asked for when no text uses it", async () => {
         await liveContext("install", ["In Call: {call.count}"], null);
         expect(fake.counted).toEqual([]);
+    });
+
+    it("reads a space's voice channel: its limit, or who may walk into it", async () => {
+        const VOICE = "01a09cdd-7a10-7811-833d-8b014c82de11";
+        const SPACE = "01a09cdd-7a10-7811-833d-8b014c82de10";
+        fake.config = JSON.stringify({
+            chatLink: {
+                kind: "space",
+                spaceId: SPACE,
+                callChannelId: VOICE,
+                textChannelId: null,
+                commands: false,
+                announcements: false,
+                relay: false
+            }
+        });
+        fake.spaceMembers = 12;
+        fake.room = { userLimit: 0, private: false };
+        let context = await liveContext("install", ["{call.count}/{call.max}"], null);
+        expect(context.values["call.count"]).toBe("2");
+        expect(context.values["call.max"]).toBe("12");
+        expect(fake.counted).toEqual([{ where: { spaceId: SPACE } }]);
+
+        fake.room = { userLimit: 4, private: false };
+        context = await liveContext("install", ["{call.max}"], null);
+        expect(context.values["call.max"]).toBe("4");
+
+        fake.counted = [];
+        fake.room = { userLimit: 0, private: true };
+        context = await liveContext("install", ["{call.max}"], null);
+        expect(context.values["call.max"]).toBe("5");
+        expect(fake.counted).toEqual([{ where: { channelId: VOICE } }]);
     });
 
     it("reads as its fallback when no group is chosen", async () => {

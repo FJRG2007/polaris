@@ -84,6 +84,7 @@ export function Composer({
     channelId,
     draftKey = null,
     roomMentions = true,
+    commands,
     rules,
     disabled,
     attachable = true,
@@ -129,6 +130,9 @@ export function Composer({
     /** Whether @ offers `@everyone` and `@here`. Off for somebody the group's
      *  owner has kept them from; the send refuses them either way. */
     roomMentions?: boolean;
+    /** Commands this conversation answers - a game server linked to it - for
+     *  the "/" list. */
+    commands?: React.ComponentProps<typeof RichTextEditor>["slashCommands"];
     /** What this kind of conversation allows: how long a message may be, how
      *  many files it may carry and how big one may be. Enforced again on the
      *  server; here so a limit is met while typing rather than after a
@@ -972,6 +976,7 @@ export function Composer({
                         // it used to offer and is a different question entirely.
                         mentionsIn={channelId}
                         roomMentions={roomMentions}
+                        slashCommands={commands}
                         mentionSource={mentionSource}
                         focusWhere={focusWhere}
                         // A screenshot on the clipboard is a screenshot somebody

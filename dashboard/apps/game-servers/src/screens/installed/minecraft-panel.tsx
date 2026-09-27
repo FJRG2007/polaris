@@ -22,6 +22,7 @@ import Link from "next/link";
 import { GameConsole } from "./game-console";
 import { CardBoundary } from "../../components/card-boundary";
 import { MinecraftAnnounce } from "./minecraft-announce";
+import { MinecraftChatLink } from "./minecraft-chat-link";
 import { MinecraftSidebar } from "./minecraft-sidebar";
 import { MinecraftXray } from "./minecraft-xray";
 import type { Permission } from "@polaris/core";
@@ -488,6 +489,7 @@ export function MinecraftPanel({
             {tab === "panel" && (
                 <MinecraftSidebar installedAppId={installedAppId} canManage={canManage} />
             )}
+            {tab === "chat" && <MinecraftChatLink installedAppId={installedAppId} />}
             {tab === "anticheat" &&
                 ((game?.edition ?? status?.edition ?? "java") === "bedrock" ? (
                     <Card>

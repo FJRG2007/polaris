@@ -32,6 +32,8 @@ const fake = vi.hoisted(() => ({
     joinLog: "",
     signedInFrom: {} as Record<string, string[]>,
     said: [] as { installedAppId: string; line: string }[],
+    /** The servers that already show a channel to everybody playing. */
+    showing: new Set<string>(),
     failing: new Set<string>()
 }));
 
@@ -82,6 +84,10 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
             }
         });
     }
+}));
+
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/chat-link-service", () => ({
+    serversShowing: async () => fake.showing
 }));
 
 const relay = await import("@polaris-app/game-servers/src/lib/minecraft/chat-relay");
@@ -139,6 +145,7 @@ beforeEach(() => {
         "[12:00:00] [Server thread/INFO]: Ana_MC[/203.0.113.7:51234] logged in with entity id 1";
     fake.signedInFrom = { [ANA]: ["203.0.113.7"] };
     fake.said = [];
+    fake.showing = new Set();
     fake.failing = new Set();
 });
 
@@ -270,6 +277,16 @@ describe("who it is shown to", () => {
         expect(fake.said).toHaveLength(1);
         expect(fake.said[0]?.installedAppId).toBe("survival");
         expect(fake.said[0]?.line.startsWith("tellraw Ana_MC ")).toBe(true);
+    });
+
+    it("is not sent again where the server already shows that channel to everybody", async () => {
+        fake.showing = new Set(["survival"]);
+        await relay.relayChatToMinecraft({ ...MESSAGE, channelId: "c1" });
+        expect(fake.said).toEqual([]);
+        // A message from another conversation still reaches them.
+        fake.showing = new Set();
+        await relay.relayChatToMinecraft({ ...MESSAGE, channelId: "c2" });
+        expect(fake.said.map((one) => one.installedAppId)).toEqual(["survival"]);
     });
 
     it("is nobody for an account that no operator linked", async () => {
