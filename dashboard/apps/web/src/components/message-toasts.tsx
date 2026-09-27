@@ -21,9 +21,10 @@
  * room is one note that keeps changing, which is what every messenger does and
  * what stops a busy channel from filling the screen.
  *
- * Either can be answered where it is (`replyFromNoticeAction`): the answer goes
- * to the conversation, which is then read up to it, so the note, the notice and
- * the unread count go the way they do on every messenger.
+ * Either can be answered where it is (`replyFromNoticeAction`): the conversation
+ * is read up to the message announced and the answer goes to it, so the note,
+ * the notice and the unread count go the way they do on every messenger. A card
+ * being answered stays through that read, so it can say whether the answer went.
  *
  * The conversation open in this tab is only exempt while somebody is attending to
  * the tab. Left open behind another window, it is announced like any other - see
@@ -41,7 +42,12 @@ import { ToastPicture } from "@/components/toast-picture";
 import { useSessionScope } from "@/components/session-scope";
 import { messageToastsAction, replyFromNoticeAction } from "@/app/(app)/chat/actions";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
-import { closeDesktopNotice, notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
+import {
+    answerUnclaimedReplies,
+    closeDesktopNotice,
+    notifyDesktop,
+    tabIsWatched
+} from "@/lib/desktop-notify";
 import { noticeAllowed } from "@/lib/notifications/browser-notices";
 import { notificationSoundEnabled } from "@/lib/notification-sound";
 import {
@@ -55,13 +61,41 @@ import {
  *  five messages is one request, not five. */
 const SETTLE_MS = 400;
 
+/** The tag of the notice announcing a conversation. */
+const TAG = "message:";
+
 /** Send an answer to a conversation from its notice. Answers why it did not go,
  *  or null when it did. */
-async function answer(channelId: string, text: string): Promise<string | null> {
-    const result = await replyFromNoticeAction({ channelId, body: text }).catch(() => ({
+async function answer(
+    channelId: string,
+    messageId: string | undefined,
+    text: string
+): Promise<string | null> {
+    const result = await replyFromNoticeAction({ channelId, messageId, body: text }).catch(() => ({
         error: "That could not be sent"
     }));
     return result.error ?? null;
+}
+
+/** Answer from the desktop app's notice, where a refusal is said with another
+ *  notice, since that is where somebody is looking: an answer that silently did
+ *  not go is the worst way for this to fail. */
+async function answerFromDesktop(
+    channelId: string,
+    messageId: string | undefined,
+    text: string
+): Promise<void> {
+    const refused = await answer(channelId, messageId, text);
+    if (refused) replyNotSent(channelId, refused);
+}
+
+function replyNotSent(channelId: string | null, why: string): void {
+    void notifyDesktop({
+        title: "Your reply was not sent",
+        body: why,
+        tag: `reply-failed:${channelId ?? "notice"}`,
+        href: channelId ? `/chat/c/${channelId}` : "/chat"
+    });
 }
 
 export function MessageToasts() {
@@ -103,6 +137,9 @@ export function MessageToasts() {
      * to prevent. One entry per conversation, so it is bounded by the rail.
      */
     const announced = useRef(new Map<string, string>());
+    /** Conversations whose card is sending an answer, kept through the read
+     *  that answer causes so the card can say whether it went. */
+    const replying = useRef(new Set<string>());
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     // The session scope, which is this account's id: it keys the claims that
     // settle which tab of a device acts, and tells this reader's read frame
@@ -143,7 +180,7 @@ export function MessageToasts() {
                 : `Reply to ${message.authorName}`;
             if (alert.toast) {
                 const note: Toast = {
-                    key: `message:${message.channelId}`,
+                    key: `${TAG}${message.channelId}`,
                     title: who,
                     body: message.excerpt,
                     // Bounded both ways and never stretched: a tall photo is shown
@@ -163,7 +200,14 @@ export function MessageToasts() {
                     onPress: () => go.current(`/chat/c/${message.channelId}/${message.messageId}`),
                     reply: {
                         placeholder: replyTo,
-                        send: (text) => answer(message.channelId, text)
+                        send: async (text) => {
+                            replying.current.add(message.channelId);
+                            try {
+                                return await answer(message.channelId, message.messageId, text);
+                            } finally {
+                                replying.current.delete(message.channelId);
+                            }
+                        }
                     }
                 };
                 raise.current(note);
@@ -192,24 +236,12 @@ export function MessageToasts() {
                         void notifyDesktop({
                             title: who,
                             body: message.excerpt,
-                            tag: `message:${message.channelId}`,
+                            tag: `${TAG}${message.channelId}`,
                             href: `/chat/c/${message.channelId}/${message.messageId}`,
                             reply: {
                                 placeholder: replyTo,
-                                send: async (text) => {
-                                    const refused = await answer(message.channelId, text);
-                                    // Said where it was written, since that is where
-                                    // somebody is looking: an answer that silently did
-                                    // not go is the worst way for this to fail.
-                                    if (refused) {
-                                        void notifyDesktop({
-                                            title: "Your reply was not sent",
-                                            body: refused,
-                                            tag: `reply-failed:${message.channelId}`,
-                                            href: `/chat/c/${message.channelId}`
-                                        });
-                                    }
-                                }
+                                send: (text) =>
+                                    answerFromDesktop(message.channelId, message.messageId, text)
                             }
                         });
                     }
@@ -234,8 +266,9 @@ export function MessageToasts() {
                     pending.current.delete(frame.channelId);
                     announced.current.delete(frame.channelId);
                     caughtUp.current.add(frame.channelId);
-                    closeDesktopNotice(`message:${frame.channelId}`);
-                    drop.current(`message:${frame.channelId}`);
+                    closeDesktopNotice(`${TAG}${frame.channelId}`);
+                    if (!replying.current.has(frame.channelId))
+                        drop.current(`${TAG}${frame.channelId}`);
                     return;
                 }
                 if (frame.kind !== "posted") return;
@@ -261,6 +294,27 @@ export function MessageToasts() {
             },
             [flush]
         )
+    );
+
+    // An answer to a notice drawn before this page was loaded - the desktop app
+    // reloads it when another notice is pressed - still goes where the notice's
+    // tag says; any other is said not to have gone rather than dropped.
+    useEffect(
+        () =>
+            answerUnclaimedReplies(async (tag, text) => {
+                if (!tag.startsWith(TAG)) {
+                    replyNotSent(null, "That notice can no longer be answered");
+                    return;
+                }
+                const channelId = tag.slice(TAG.length);
+                // The newest message there, which is what the notice announced.
+                const { toasts } = await messageToastsAction([channelId]).catch(() => ({
+                    toasts: []
+                }));
+                const newest = toasts.find((one) => one.channelId === channelId);
+                await answerFromDesktop(channelId, newest?.messageId, text);
+            }),
+        []
     );
 
     useEffect(() => {

@@ -45,10 +45,12 @@ const shown = new Map<string, { close: () => void }>();
 
 /** What an answer written on each notice is handed to, by tag. */
 const answering = new Map<string, (text: string) => Promise<void>>();
+/** What an answer to a notice nothing on this page drew is handed to: one from
+ *  before a reload, which the desktop app does itself when a notice is pressed. */
+let unclaimed: ((tag: string, text: string) => Promise<void>) | null = null;
 let hearing = false;
 
-/** Hear the app's answers, once per page. An answer to a notice nothing here
- *  drew - one from before a reload - has nowhere to go and is dropped. */
+/** Hear the app's answers, once per page. */
 function listenForReplies(app: NonNullable<ReturnType<typeof desktopBridge>>): void {
     if (hearing || !app.onNoticeReply) return;
     hearing = true;
@@ -56,8 +58,26 @@ function listenForReplies(app: NonNullable<ReturnType<typeof desktopBridge>>): v
         const send = answering.get(tag);
         answering.delete(tag);
         const answer = text.trim();
-        if (send && answer.length > 0) void send(answer).catch(() => undefined);
+        if (answer.length === 0) return;
+        if (send) void send(answer).catch(() => undefined);
+        else if (unclaimed) void unclaimed(tag, answer).catch(() => undefined);
     });
+}
+
+/**
+ * Take the answers written on notices this page did not draw. Listens from now,
+ * rather than from the first notice drawn, so an answer arriving right after a
+ * reload is heard. Answers a function that stops it.
+ */
+export function answerUnclaimedReplies(
+    handle: (tag: string, text: string) => Promise<void>
+): () => void {
+    unclaimed = handle;
+    const app = desktopBridge();
+    if (app) listenForReplies(app);
+    return () => {
+        if (unclaimed === handle) unclaimed = null;
+    };
 }
 
 /** Whether this browser can do it at all. */

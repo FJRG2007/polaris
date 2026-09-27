@@ -85,6 +85,8 @@ const SENT_MS = 1500;
 
 interface Shown extends Toast {
     readonly id: string;
+    /** Which showing this is: a note replaced under the same key is a new one. */
+    readonly shownAs: number;
 }
 
 interface ToastApi {
@@ -112,7 +114,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         next.current += 1;
         const id = toast.key ?? `toast-${next.current}`;
         setShown((current) =>
-            [...current.filter((one) => one.id !== id), { ...toast, id }].slice(-MOST)
+            [
+                ...current.filter((one) => one.id !== id),
+                { ...toast, id, shownAs: next.current }
+            ].slice(-MOST)
         );
     }, []);
 
@@ -202,6 +207,11 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
     // Writing an answer holds the note like a pointer over it does: it must not
     // go in the middle of a sentence.
     const writing = answer !== null || sending;
+    // A note replaced while it said "Sent" is about something new, which has not
+    // been answered; an answer half written or on its way is kept.
+    const showing = useRef(toast.shownAs);
+    showing.current = toast.shownAs;
+    useEffect(() => setSent(false), [toast.shownAs]);
 
     useEffect(() => {
         if (!sent) return;
@@ -214,6 +224,7 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
         if (!toast.reply || text.length === 0 || sending) return;
         setSending(true);
         setProblem(null);
+        const sentFrom = showing.current;
         const refused = await toast.reply.send(text).catch(() => "That could not be sent");
         setSending(false);
         if (refused) {
@@ -221,7 +232,7 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
             return;
         }
         setAnswer(null);
-        setSent(true);
+        if (showing.current === sentFrom) setSent(true);
     };
 
     useEffect(() => {

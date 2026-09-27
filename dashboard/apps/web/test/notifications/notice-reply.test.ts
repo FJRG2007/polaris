@@ -7,7 +7,8 @@
  * the answer goes. What is pinned: the field is asked for only where the app can
  * hand an answer back, and the function to send it never crosses into the app;
  * an answer reaches the notice it was written on, once; an app older than the
- * feature still draws the notice, without the field.
+ * feature still draws the notice, without the field; an answer to a notice this
+ * page did not draw - one from before a reload - is handed on, not dropped.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -81,5 +82,19 @@ describe("answering a notice in the desktop app", () => {
             reply: { placeholder: "Reply to Ana", send: async () => undefined }
         });
         expect(app.drawn[0]).toEqual({ title: "Ana", tag: "message:c1" });
+    });
+
+    it("hands on an answer to a notice drawn before the page was loaded", async () => {
+        const app = installApp(true);
+        const { answerUnclaimedReplies } = await import("@/lib/desktop-notify");
+        const handle = vi.fn(async () => undefined);
+        const stop = answerUnclaimedReplies(handle);
+        app.answer({ tag: "message:c1", text: " on my way " });
+        app.answer({ tag: "message:c1", text: "   " });
+        expect(handle).toHaveBeenCalledTimes(1);
+        expect(handle).toHaveBeenCalledWith("message:c1", "on my way");
+        stop();
+        app.answer({ tag: "message:c1", text: "again" });
+        expect(handle).toHaveBeenCalledTimes(1);
     });
 });

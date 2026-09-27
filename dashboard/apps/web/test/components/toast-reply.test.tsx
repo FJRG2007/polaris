@@ -6,7 +6,8 @@
  * What is pinned: the field opens from the note and pressing it does not open
  * what the note points at; the note does not go while the answer is being
  * written; Enter sends it, and the note says it went and then goes; an answer
- * that did not go says why and keeps what was written.
+ * that did not go says why and keeps what was written; a note replaced by a newer
+ * message after saying "Sent" is answerable again.
  */
 
 import { useEffect } from "react";
@@ -26,6 +27,20 @@ afterEach(() => {
     cleanup();
     vi.useRealTimers();
 });
+
+function Replace({ reply }: { reply: ToastReply }) {
+    const toast = useToast();
+    return (
+        <button
+            type="button"
+            onClick={() =>
+                toast.show({ key: "message:c1", title: "Ana", body: "one more thing", reply })
+            }
+        >
+            newer
+        </button>
+    );
+}
 
 function draw(send: ToastReply["send"]) {
     const onPress = vi.fn();
@@ -90,5 +105,26 @@ describe("answering on the note", () => {
         fireEvent.change(field, { target: { value: "   " } });
         fireEvent.keyDown(field, { key: "Enter" });
         expect(send).not.toHaveBeenCalled();
+    });
+
+    it("offers to answer again when a newer message replaces a note that said Sent", async () => {
+        const reply = { placeholder: "Reply to Ana", send: vi.fn(async () => null) };
+        render(
+            <ToastProvider>
+                <Raise reply={reply} onPress={() => undefined} />
+                <Replace reply={reply} />
+            </ToastProvider>
+        );
+        fireEvent.click(await screen.findByRole("button", { name: "Reply" }));
+        const field = screen.getByRole("textbox", { name: "Reply to Ana" });
+        fireEvent.change(field, { target: { value: "on my way" } });
+        await act(async () => {
+            fireEvent.keyDown(field, { key: "Enter" });
+        });
+        expect(screen.getByText("Sent")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "newer" }));
+        expect(screen.getByText("one more thing")).toBeTruthy();
+        expect(screen.queryByText("Sent")).toBeNull();
+        expect(screen.getByRole("button", { name: "Reply" })).toBeTruthy();
     });
 });

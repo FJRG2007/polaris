@@ -51,6 +51,10 @@ const dismissed: string[] = [];
 const closed: string[] = [];
 const played: string[] = [];
 const notices: Array<{ tag: string }> = [];
+const replies: Array<{ channelId: string; messageId?: string; body: string }> = [];
+/** Held open by a test that needs an answer to still be on its way. */
+let replyInFlight: Promise<void> | null = null;
+let unclaimed: ((tag: string, text: string) => Promise<void>) | null = null;
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn() }),
@@ -71,6 +75,15 @@ vi.mock("@/app/(app)/chat/use-chat-stream", () => ({
     }
 }));
 vi.mock("@/app/(app)/chat/actions", () => ({
+    replyFromNoticeAction: async (input: {
+        channelId: string;
+        messageId?: string;
+        body: string;
+    }) => {
+        replies.push(input);
+        if (replyInFlight) await replyInFlight;
+        return { id: "m-2" };
+    },
     messageToastsAction: async (ids: string[]) => ({
         toasts: (await hold())
             ? []
@@ -91,6 +104,10 @@ vi.mock("@/lib/call-sounds", () => ({ playCallSound: (name: string) => played.pu
 vi.mock("@/lib/notification-sound", () => ({ notificationSoundEnabled: () => soundOn }));
 vi.mock("@/lib/desktop-notify", () => ({
     tabIsWatched: () => watched,
+    answerUnclaimedReplies: (handle: (tag: string, text: string) => Promise<void>) => {
+        unclaimed = handle;
+        return () => undefined;
+    },
     closeDesktopNotice: (tag: string) => closed.push(tag),
     notifyDesktop: async (input: { tag: string }) => {
         notices.push(input);
@@ -123,6 +140,8 @@ beforeEach(() => {
     notices.length = 0;
     dismissed.length = 0;
     closed.length = 0;
+    replies.length = 0;
+    replyInFlight = null;
     inFlight = null;
     window.localStorage.clear();
 });
@@ -248,6 +267,38 @@ describe("catching up in another window", () => {
         );
         expect(closed).toEqual([`message:${CHANNEL}`]);
         expect(dismissed).toEqual([`message:${CHANNEL}`]);
+    });
+
+    it("keeps a card being answered through the read that answer causes", async () => {
+        watched = false;
+        await arrive();
+        let release: (() => void) | null = null;
+        replyInFlight = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const card = shown[0] as { reply: { send: (text: string) => Promise<string | null> } };
+        const sending = card.reply.send("on my way");
+        act(() =>
+            onFrame?.({ kind: "read", channelId: CHANNEL, userId: "scope" }, { owner: true })
+        );
+        expect(closed).toEqual([`message:${CHANNEL}`]);
+        expect(dismissed).toEqual([]);
+        release?.();
+        expect(await sending).toBeNull();
+        expect(replies).toEqual([{ channelId: CHANNEL, messageId: "m-1", body: "on my way" }]);
+
+        act(() =>
+            onFrame?.({ kind: "read", channelId: CHANNEL, userId: "scope" }, { owner: true })
+        );
+        expect(dismissed).toEqual([`message:${CHANNEL}`]);
+    });
+
+    it("sends an answer to a notice from before a reload, read up to its newest message", async () => {
+        render(<MessageToasts />);
+        await act(async () => {
+            await unclaimed?.(`message:${CHANNEL}`, "on my way");
+        });
+        expect(replies).toEqual([{ channelId: CHANNEL, messageId: "m-1", body: "on my way" }]);
     });
 
     it("says nothing about a conversation read while the words were being fetched", async () => {
