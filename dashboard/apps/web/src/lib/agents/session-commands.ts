@@ -792,10 +792,18 @@ export function interruptCommand(session = TMUX_SESSION): string {
     return `tmux send-keys -t ${shellQuote(session)} Escape`;
 }
 
+/**
+ * The most of a capture kept, from its end. The host daemon answers a command
+ * with 16 KiB at most and cuts the rest - which, for a screen read top to bottom,
+ * is the newest part, the one anybody is looking for. Kept to the end here
+ * instead, under that limit.
+ */
+export const CAPTURE_BYTES = 15 * 1024;
+
 /** What the agent's terminal currently shows, as text. For the list, which wants
  *  a line of context per session without opening a terminal to each one. */
 export function captureCommand(lines = 200, session = TMUX_SESSION): string {
-    return `tmux capture-pane -p -t ${shellQuote(session)} -S -${Math.max(1, Math.floor(lines))}`;
+    return `tmux capture-pane -p -t ${shellQuote(session)} -S -${Math.max(1, Math.floor(lines))} | tail -c ${CAPTURE_BYTES}`;
 }
 
 /**
@@ -813,7 +821,7 @@ export function captureCommand(lines = 200, session = TMUX_SESSION): string {
  * that wants the text rather than the picture.
  */
 export function captureJoinedCommand(lines = 200, session = TMUX_SESSION): string {
-    return `tmux capture-pane -p -J -t ${shellQuote(session)} -S -${Math.max(1, Math.floor(lines))}`;
+    return `tmux capture-pane -p -J -t ${shellQuote(session)} -S -${Math.max(1, Math.floor(lines))} | tail -c ${CAPTURE_BYTES}`;
 }
 
 /** Whether the agent is still running in there. A tmux session outlives the

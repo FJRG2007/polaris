@@ -54,6 +54,7 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/timeout-service", () => ({
     timeoutPlayer: async () => undefined
 }));
 
+import { fileAnswer } from "./container-fake";
 import { DEFAULT_XRAY_SETTINGS } from "@polaris-app/game-servers/src/lib/minecraft/xray";
 import {
     AIRBORNE_COMMAND,
@@ -129,9 +130,8 @@ describe("watching movement", () => {
             return "";
         };
         fake.run = (argv) => {
-            if (argv[0] === "stat") return { code: 0, output: `${log.length}\n` };
-            if (argv[0] === "sh" && argv[2]?.startsWith("tail"))
-                return { code: 0, output: log.slice(Number(argv[4]) - 1).slice(-Number(argv[5])) };
+            const read = fileAnswer(argv, log);
+            if (read) return read;
             if (argv[0] === "cat")
                 return {
                     code: 0,

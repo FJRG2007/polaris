@@ -23,11 +23,12 @@
  */
 
 import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
 import { withTimeout } from "@polaris/core";
 import { FIVEM_CONTAINER_PORT } from "./config";
 import { withServerContainer, type ServerContainer } from "../minecraft/service";
+import { mayBeCut, readContainerFile } from "../container-files";
 import { isRconRefusal, isSafeCommand, parseRconReply, rconRequest } from "./rcon";
-import { host } from "@polaris/app-host";
 
 /** The documents the server publishes about itself. A closed set: each is a path
  *  this module puts in a URL, so none of them is ever anything a caller composed. */
@@ -98,6 +99,27 @@ export async function withFivemServer<T>(
     });
 }
 
+/**
+ * A document longer than one command can answer - a full server's player list,
+ * the resource list of a big one - fetched into a file inside the container and
+ * read from there whole. Only the name, one of three fixed ones, is part of the
+ * path.
+ */
+async function readWholeDocument(container: ServerContainer, url: string, name: FivemDocument): Promise<string> {
+    const path = `/tmp/polaris-${name}`;
+    const script = [
+        `if command -v wget >/dev/null 2>&1; then wget -q -O ${path} -T ${HTTP_TIMEOUT_SECONDS} "${url}" && exit 0; fi`,
+        `if command -v curl >/dev/null 2>&1; then curl -fsS --max-time ${HTTP_TIMEOUT_SECONDS} -o ${path} "${url}" && exit 0; fi`,
+        "exit 1"
+    ].join("\n");
+    const fetched = await withTimeout(container.run(["sh", "-c", script]), COMMAND_TIMEOUT_MS, "The server did not answer in time");
+    if (fetched.code !== 0) throw new Error("The server is not answering yet");
+    const text = await readContainerFile(container, path);
+    await container.run(["rm", "-f", "--", path]).catch(() => undefined);
+    if (text === null) throw new Error("The server is not answering yet");
+    return text;
+}
+
 /** One of the server's own documents, read from inside the container. */
 async function readDocument(container: ServerContainer, name: FivemDocument): Promise<unknown> {
     const url = `http://127.0.0.1:${FIVEM_CONTAINER_PORT}/${name}`;
@@ -115,8 +137,9 @@ async function readDocument(container: ServerContainer, name: FivemDocument): Pr
         throw new Error("This server's image has no way for Polaris to read it. Redeploy it to get the current one.");
     }
     if (result.code !== 0) throw new Error("The server is not answering yet");
+    const text = mayBeCut(result.output) ? await readWholeDocument(container, url, name) : result.output;
     try {
-        return JSON.parse(result.output) as unknown;
+        return JSON.parse(text) as unknown;
     } catch {
         // A server that is still loading answers the port with something that is
         // not JSON. That is a server not ready, never a broken one.

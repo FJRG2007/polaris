@@ -9,6 +9,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fileAnswer } from "./container-fake";
 
 const fake = vi.hoisted(() => ({
     config: {} as Record<string, unknown>,
@@ -40,15 +41,16 @@ vi.mock("@polaris/app-host", () => ({
 const events = await import("@polaris-app/game-servers/src/lib/minecraft/player-events");
 const { spreadListLines } = await import("@polaris-app/game-servers/src/lib/minecraft/rankings");
 const { liveContext } = await import("@polaris-app/game-servers/src/lib/minecraft/live-values");
-const { fillValues, variableProblem } =
-    await import("@polaris-app/game-servers/src/lib/minecraft/text-vars");
-const { sidebarProblems, DEFAULT_SIDEBAR } =
-    await import("@polaris-app/game-servers/src/lib/minecraft/sidebar");
+const { fillValues, variableProblem } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/text-vars"
+);
+const { sidebarProblems, DEFAULT_SIDEBAR } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/sidebar"
+);
 
 const server = {
     say: async () => fake.levels,
-    run: async (argv: readonly string[]) =>
-        argv[0] === "tail" ? { code: 0, output: fake.log } : { code: 1, output: "" }
+    run: async (argv: readonly string[]) => fileAnswer(argv, fake.log) ?? { code: 1, output: "" }
 };
 
 beforeEach(() => {

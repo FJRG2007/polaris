@@ -29,6 +29,7 @@ import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 import { readsPlayerList, readsServer } from "./text-vars";
 import { announcementCommands, announcementProblems, type Announcement } from "./announcement";
 import { audienceNames, namedByPolaris, parseTarget, type Roster } from "./announce-target";
+import { readContainerFile } from "../container-files";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -503,10 +504,18 @@ async function readServerFile(
     ownerId: string,
     name: string
 ): Promise<string> {
-    const result = await withPorts(install, ownerId, (ports) =>
-        ports.runIn(install.container, ["cat", `${DATA_DIR}/${name}`])
+    // Through the reader that finishes what one command cannot carry: a
+    // whitelist or a ban list is past that limit long before anybody notices.
+    const content = await withPorts(install, ownerId, (ports) =>
+        readContainerFile(
+            {
+                run: (argv) => ports.runIn(install.container, argv),
+                readFile: (path) => ports.readFile(install.container, path)
+            },
+            `${DATA_DIR}/${name}`
+        )
     );
-    return result.code === 0 ? result.output : "";
+    return content ?? "";
 }
 
 /** Who is on and whether the server is answering at all. */

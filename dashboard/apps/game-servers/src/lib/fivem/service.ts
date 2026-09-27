@@ -22,18 +22,18 @@
  * says so rather than pretending otherwise.
  */
 
-import { prisma } from "@polaris/db";
-import { createHash, randomBytes } from "node:crypto";
 import * as guard from "./guard";
 import * as access from "./access";
+import { prisma } from "@polaris/db";
 import * as players from "./players";
 import { quoteArgument } from "./rcon";
+import { createHash, randomBytes } from "node:crypto";
 import { readCrashLoop, readRestartWatch } from "../games-health";
-import { readContainerFile, writeContainerFile } from "../container-files";
-import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
-import { NO_HTTP_CLIENT, RCON_PASSWORD_VAR, withFivemServer, type FivemTransport } from "./transport";
-import { findSetting, settingError, FIVEM_SETTINGS, type FivemSetting } from "./settings";
 import { readSetting, writeBlock, writeSetting, type CfgKey } from "./cfg";
+import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
+import { findSetting, settingError, FIVEM_SETTINGS, type FivemSetting } from "./settings";
+import { readContainerFile, readLinesPaged, writeContainerFile } from "../container-files";
+import { NO_HTTP_CLIENT, RCON_PASSWORD_VAR, withFivemServer, type FivemTransport } from "./transport";
 import {
     isLicenseKey,
     FIVEM_CATALOG_ID,
@@ -879,17 +879,17 @@ const SLOTS_SETTING = "sv_maxclients";
 export async function listFivemResources(ownerId: string, installedAppId: string): Promise<FivemResource[]> {
     return withFivemServer(ownerId, installedAppId, async (server) => {
         const [listing, info] = await Promise.all([
-            server.container.run([
-                "sh",
-                "-c",
-                // Depth-limited so a resource that vendors a copy of another one
-                // inside itself is not listed as two, and so a large server's
-                // node_modules are not walked at all.
+            // Depth-limited so a resource that vendors a copy of another one
+            // inside itself is not listed as two, and so a large server's
+            // node_modules are not walked at all. In pages: a big server has more
+            // resources than one command's answer holds.
+            readLinesPaged(
+                server.container,
                 `find ${RESOURCES_ROOT} -maxdepth 4 -name fxmanifest.lua -o -maxdepth 4 -name __resource.lua 2>/dev/null`
-            ]),
+            ),
             server.document("info.json").catch(() => null)
         ]);
-        const onDisk = listing.code === 0 ? parseResourceListing(listing.output, `${RESOURCES_ROOT}/`) : [];
+        const onDisk = parseResourceListing(listing.join("\n"), `${RESOURCES_ROOT}/`);
         const running = players.parseInfo(info)?.resources ?? [];
         return foldResources(onDisk, running, guard.GUARD_RESOURCE);
     });

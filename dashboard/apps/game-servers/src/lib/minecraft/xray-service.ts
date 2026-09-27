@@ -31,6 +31,7 @@ import { movementScore } from "./suspicion";
 import { javaComponent } from "./announcement";
 import { timeoutPlayer } from "./timeout-service";
 import { withServerContainer, type ServerContainer } from "./service";
+import { readContainerFile, readContainerRange } from "../container-files";
 
 const { readInstallConfig } = host.appsInstallConfig;
 const { createNotification } = host.notificationService;
@@ -493,7 +494,7 @@ async function counted(server: ServerContainer, objective: string): Promise<Set<
 const LOG_FILE = "/data/logs/latest.log";
 /** The most of the log read for one look. A server that wrote more than this in
  *  a few seconds is being flooded, and the part read is the newest. */
-const LOG_READ_MAX = 1_000_000;
+const LOG_READ_MAX = 256 * 1024;
 /** Why teleports cannot be judged, for the screen. */
 const NO_ADMIN_LOG =
     "Teleports are not checked: this server does not log what operators run (the logAdminCommands game rule is off), so an operator's teleport cannot be told apart";
@@ -519,18 +520,11 @@ async function logSince(
 ): Promise<string | null> {
     if (from === null || size === null) return null;
     const start = size < from ? 0 : from;
-    const result = await server
-        .run([
-            "sh",
-            "-c",
-            'tail -c "+$1" "$3" | tail -c "$2"',
-            "polaris",
-            String(start + 1),
-            String(LOG_READ_MAX),
-            LOG_FILE
-        ])
-        .catch(() => null);
-    return result && result.code === 0 ? result.output : null;
+    // In pieces: one command carries 16 KiB, and a busy few seconds writes more -
+    // the newest lines, the ones that explain a jump, were the ones cut off.
+    return readContainerRange(server, LOG_FILE, Math.max(start, size - LOG_READ_MAX), size).catch(
+        () => null
+    );
 }
 
 /**
@@ -552,12 +546,8 @@ async function watchMovement(
     if (now - loop.lastRules >= PLACE_EVERY_MS) {
         loop.lastRules = now;
         loop.logAdmin = movement.readLogAdmin(await server.say([movement.LOG_ADMIN_COMMAND]));
-        const ops = await server.run(["cat", "--", "/data/ops.json"]).catch(() => null);
-        loop.operators = new Set(
-            (ops && ops.code === 0 ? parseNameFile(ops.output) : []).map((name) =>
-                name.toLowerCase()
-            )
-        );
+        const ops = await readContainerFile(server, "/data/ops.json").catch(() => null);
+        loop.operators = new Set(parseNameFile(ops ?? "").map((name) => name.toLowerCase()));
     }
 
     // Measured before anybody's position, so whatever moved them since the

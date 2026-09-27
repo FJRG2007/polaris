@@ -45,10 +45,54 @@ export type ContainerFileRead =
     | { readonly state: "missing" }
     | { readonly state: "unreadable" };
 
-export async function readContainerFileState(server: ServerContainer, path: string): Promise<ContainerFileRead> {
+/**
+ * The most a `run` reports back. The host daemon cuts a command's output there
+ * (`EXEC_RUN_MAX_OUTPUT` in polaris-hostd), without saying so, because that route
+ * is meant for a status line - and a stats file, a whitelist or a stretch of log
+ * is often longer. Offgrid's leaderboard named one player out of seven, the one
+ * whose file came first, because the rest never arrived.
+ */
+export const RUN_OUTPUT_MAX = 16 * 1024;
+
+/** Whether a `run` said everything, or may have been cut at `RUN_OUTPUT_MAX`. A
+ *  few bytes short counts as cut: the daemon steps back to a character boundary. */
+export function mayBeCut(output: string): boolean {
+    return Buffer.byteLength(output, "utf8") >= RUN_OUTPUT_MAX - 4;
+}
+
+/** What reading a server's files needs of it. */
+export type FileReader = Pick<ServerContainer, "run" | "readFile">;
+
+async function collect(stream: ReadableStream<Uint8Array>): Promise<Buffer> {
+    const parts: Buffer[] = [];
+    const reader = stream.getReader();
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        parts.push(Buffer.from(value));
+    }
+    return Buffer.concat(parts);
+}
+
+/** A file's bytes, whole, however long - for the ones that are not text. */
+export async function readContainerBytes(server: Pick<ServerContainer, "readFile">, path: string): Promise<Buffer> {
+    assertSafePath(path);
+    return collect(await server.readFile(path));
+}
+
+export async function readContainerFileState(server: FileReader, path: string): Promise<ContainerFileRead> {
     assertSafePath(path);
     const result = await server.run(["cat", "--", path]);
-    if (result.code === 0) return { state: "read", content: result.output };
+    if (result.code === 0) {
+        if (!mayBeCut(result.output)) return { state: "read", content: result.output };
+        // Longer than a `run` carries: read it again whole, as a stream, which has
+        // no such limit. A file written back from a cut read would be a cut file.
+        const whole = await server
+            .readFile(path)
+            .then(collect)
+            .catch(() => null);
+        return whole ? { state: "read", content: whole.toString("utf8") } : { state: "unreadable" };
+    }
     // Both spellings, because the images do not agree: coreutils says "No such
     // file or directory" and busybox prefixes it with "can't open".
     return /no such file|can't open/i.test(result.output) ? { state: "missing" } : { state: "unreadable" };
@@ -57,9 +101,93 @@ export async function readContainerFileState(server: ServerContainer, path: stri
 /** One of the server's files as text, or null when it is not there. A file that
  *  does not exist is not a failure: a server nobody has made an admin has no admin
  *  list, and a server that has never started has no settings file. */
-export async function readContainerFile(server: ServerContainer, path: string): Promise<string | null> {
+export async function readContainerFile(server: FileReader, path: string): Promise<string | null> {
     const read = await readContainerFileState(server, path);
     return read.state === "read" ? read.content : null;
+}
+
+/** Bytes of a file per piece of `readContainerRange`: base64 of it, with its line
+ *  breaks, stays under `RUN_OUTPUT_MAX`. */
+const RANGE_PIECE = 11 * 1024;
+
+/**
+ * Part of a file - bytes `from` up to `to` - for the ones that are only ever
+ * read in part, like a log that is hundreds of megabytes long. In pieces a
+ * `run` can carry, each as base64 so a character split between two pieces is
+ * put back together rather than lost. Null when it cannot be read.
+ */
+export async function readContainerRange(
+    server: Pick<ServerContainer, "run">,
+    path: string,
+    from: number,
+    to: number
+): Promise<string | null> {
+    assertSafePath(path);
+    const parts: Buffer[] = [];
+    for (let at = Math.max(0, Math.floor(from)); at < to; ) {
+        const want = Math.min(RANGE_PIECE, Math.floor(to) - at);
+        const result = await server.run([
+            "sh",
+            "-c",
+            `tail -c +${at + 1} -- ${path} | head -c ${want} | base64`
+        ]);
+        if (result.code !== 0) return null;
+        const piece = Buffer.from(result.output.replace(/[^A-Za-z0-9+/=]/g, ""), "base64");
+        if (piece.length === 0) break;
+        parts.push(piece);
+        at += piece.length;
+    }
+    return Buffer.concat(parts).toString("utf8");
+}
+
+/** How big a file is, in bytes, or null when it cannot be told. */
+export async function containerFileSize(server: Pick<ServerContainer, "run">, path: string): Promise<number | null> {
+    assertSafePath(path);
+    const result = await server.run(["stat", "-c", "%s", "--", path]).catch(() => null);
+    const size = result && result.code === 0 ? Number(result.output.trim()) : Number.NaN;
+    return Number.isFinite(size) && size >= 0 ? size : null;
+}
+
+/** The last `bytes` of a file, or null when it cannot be read. */
+export async function readContainerTail(
+    server: Pick<ServerContainer, "run">,
+    path: string,
+    bytes: number
+): Promise<string | null> {
+    const size = await containerFileSize(server, path);
+    if (size === null) return null;
+    return readContainerRange(server, path, Math.max(0, size - bytes), size);
+}
+
+/** Lines per page of `readLinesPaged`, so a page of paths stays under
+ *  `RUN_OUTPUT_MAX` however long they are. */
+const LINES_PAGE = 150;
+
+/**
+ * Every line a listing command prints, however many, in pages a `run` can
+ * carry. `listing` is a shell pipeline of the caller's own; it is sorted here so
+ * each page takes up where the last one ended. Empty when it fails.
+ */
+export async function readLinesPaged(server: Pick<ServerContainer, "run">, listing: string): Promise<string[]> {
+    const lines: string[] = [];
+    for (let first = 1; ; first += LINES_PAGE) {
+        const result = await server.run([
+            "sh",
+            "-c",
+            `{ ${listing}; } | LC_ALL=C sort | sed -n '${first},${first + LINES_PAGE - 1}p'`
+        ]);
+        if (result.code !== 0) break;
+        const page = result.output.split("\n").filter((line) => line.length > 0);
+        lines.push(...page);
+        if (page.length < LINES_PAGE) break;
+    }
+    return lines;
+}
+
+/** Every entry in a folder, however many. Empty for a folder that is not there. */
+export async function listContainerDir(server: Pick<ServerContainer, "run">, dir: string): Promise<string[]> {
+    assertSafePath(dir);
+    return readLinesPaged(server, `ls -1A -- ${dir} 2>/dev/null`);
 }
 
 /**
