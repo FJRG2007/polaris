@@ -483,9 +483,22 @@ export function MinecraftPanel({
                         edition={status?.edition === "bedrock" ? "bedrock" : "java"}
                         players={[...(status?.players.players ?? [])]}
                     />
-                    <MinecraftSidebar installedAppId={installedAppId} canManage={canManage} />
                 </div>
             )}
+            {tab === "panel" && (
+                <MinecraftSidebar installedAppId={installedAppId} canManage={canManage} />
+            )}
+            {tab === "anticheat" &&
+                ((game?.edition ?? status?.edition ?? "java") === "bedrock" ? (
+                    <Card>
+                        <CardBody className="py-10 text-center text-sm text-muted-foreground">
+                            Anti-cheat reads what the game counts for each player, which only Java
+                            keeps.
+                        </CardBody>
+                    </Card>
+                ) : (
+                    <MinecraftXray installedAppId={installedAppId} canManage={canManage} />
+                ))}
             {tab === "players" && (
                 <MinecraftPlayers
                     installedAppId={installedAppId}
@@ -583,9 +596,6 @@ export function MinecraftPanel({
             )}
             {tab === "security" && (
                 <div className="flex flex-col gap-4">
-                    {(game?.edition ?? status?.edition ?? "java") !== "bedrock" && (
-                        <MinecraftXray installedAppId={installedAppId} canManage={canManage} />
-                    )}
                     <MinecraftSettings
                         installedAppId={installedAppId}
                         settings={settings.filter((setting) => setting.group === SECURITY_GROUP)}
@@ -623,6 +633,19 @@ export function MinecraftPanel({
                 </div>
             )}
 
+            {tab === "schedule" && (
+                <CardBoundary name="Schedule">
+                    <MinecraftSchedule
+                        runs={game?.routineRuns ?? null}
+                        installedAppId={installedAppId}
+                        state={game?.scheduleState ?? null}
+                        routed={game?.routed ?? false}
+                        canRoute={game?.canRoute ?? false}
+                        wakeOnJoin={game?.wakeOnJoin ?? true}
+                        schedule={game?.schedule ?? NO_SCHEDULE}
+                    />
+                </CardBoundary>
+            )}
             {tab === "settings" && (
                 <div className="flex flex-col gap-4">
                     <CardBoundary name="Appearance">
@@ -633,17 +656,6 @@ export function MinecraftPanel({
                             iconSetAt={game?.iconSetAt ?? null}
                             playersOnline={status?.players.online ?? 0}
                             onSaved={reloadSettings}
-                        />
-                    </CardBoundary>
-                    <CardBoundary name="Schedule">
-                        <MinecraftSchedule
-                            runs={game?.routineRuns ?? null}
-                            installedAppId={installedAppId}
-                            state={game?.scheduleState ?? null}
-                            routed={game?.routed ?? false}
-                            canRoute={game?.canRoute ?? false}
-                            wakeOnJoin={game?.wakeOnJoin ?? true}
-                            schedule={game?.schedule ?? NO_SCHEDULE}
                         />
                     </CardBoundary>
                     <CardBoundary name="Domain">

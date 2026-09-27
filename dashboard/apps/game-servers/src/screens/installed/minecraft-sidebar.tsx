@@ -12,13 +12,26 @@
 
 import * as mc from "../../lib/minecraft/motd";
 import { McLine } from "../../components/mc-text";
-import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
+import { GripVertical, Loader2, Plus, Trash2, Trophy } from "lucide-react";
+import { SIDEBAR_BLOCKS, withBlock } from "../../lib/minecraft/sidebar-blocks";
 import { moved, useListOrder } from "../../components/use-list-order";
 import { previewText } from "../../lib/minecraft/text-vars";
 import { spreadListLines } from "../../lib/minecraft/rankings";
 import { FieldNote, insertsFor } from "./minecraft-announce";
-import { Button, Card, CardBody, Select, Switch, cn } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    Select,
+    Switch,
+    cn
+} from "@polaris/ui";
 import { FormattedTextField } from "../../components/formatted-text-field";
+import { VariablesHelp } from "../../components/variables-help";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     DEFAULT_SIDEBAR,
@@ -132,189 +145,235 @@ export function MinecraftSidebar({
     const refused = state.sidebarRefusal;
     return (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <Card>
-                <CardBody className="flex flex-col gap-4">
-                    <div className="flex items-start justify-between gap-3">
-                        <div>
-                            <p className="text-sm font-medium">Side panel</p>
+            <div className="flex min-w-0 flex-col gap-4">
+                <Card>
+                    <CardBody className="flex flex-col gap-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <p className="text-sm font-medium">Side panel</p>
+                                <p className="text-xs text-muted-foreground">
+                                    A box on the right of every player&apos;s screen. Polaris keeps
+                                    its values current while the server runs.
+                                </p>
+                            </div>
+                            <Switch
+                                checked={draft.enabled}
+                                disabled={!canManage || (refused !== null && !draft.enabled)}
+                                onChange={(enabled) => change({ enabled })}
+                                aria-label="Show the side panel"
+                            />
+                        </div>
+                        {refused && <p className="text-xs text-muted-foreground">{refused}.</p>}
+
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-sm font-medium">Title</span>
+                            <FormattedTextField
+                                value={draft.title}
+                                onChange={(title) => change({ title })}
+                                rows={1}
+                                singleLine
+                                label="Side panel title"
+                                inserts={inserts}
+                                footnote={
+                                    <FieldNote
+                                        text={draft.title}
+                                        max={SIDEBAR_TITLE_MAX}
+                                        problem={problems.title}
+                                    />
+                                }
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-3">
+                            <span className="flex items-baseline gap-2">
+                                <span className="text-sm font-medium">Lines</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {draft.lines.length}/{SIDEBAR_LINES_MAX}
+                                </span>
+                            </span>
+                            {draft.lines.map((line, index) => (
+                                <div
+                                    key={order.ids[index] ?? `line-${index}`}
+                                    className={cn(
+                                        "relative flex items-start gap-1 rounded-md transition-opacity",
+                                        order.dragging === index && "opacity-40"
+                                    )}
+                                    {...(canManage ? order.rowProps(index) : {})}
+                                >
+                                    {/* Where the dragged line would land. */}
+                                    {order.dragging !== null && order.dropAt === index && (
+                                        <span className="pointer-events-none absolute inset-x-0 -top-1.5 h-0.5 rounded-full bg-primary" />
+                                    )}
+                                    {order.dragging !== null &&
+                                        order.dropAt === draft.lines.length &&
+                                        index === draft.lines.length - 1 && (
+                                            <span className="pointer-events-none absolute inset-x-0 -bottom-1.5 h-0.5 rounded-full bg-primary" />
+                                        )}
+                                    {canManage && draft.lines.length > 1 && (
+                                        <button
+                                            type="button"
+                                            {...order.handleProps(index, draft.lines.length)}
+                                            className="mt-1.5 flex size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+                                            aria-label={`Move line ${index + 1}. Drag it, or use the up and down arrow keys`}
+                                            title="Drag to move, or use the arrow keys"
+                                        >
+                                            <GripVertical className="size-4" />
+                                        </button>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                        <FormattedTextField
+                                            value={line}
+                                            onChange={(value) => setLine(index, value)}
+                                            rows={1}
+                                            singleLine
+                                            label={`Line ${index + 1}`}
+                                            placeholder="Leave empty for a gap"
+                                            inserts={inserts}
+                                            footnote={
+                                                <FieldNote
+                                                    text={line}
+                                                    max={SIDEBAR_LINE_MAX}
+                                                    problem={problems.lines[index] ?? undefined}
+                                                />
+                                            }
+                                        />
+                                    </div>
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => {
+                                            order.removed(index);
+                                            change({
+                                                lines: draft.lines.filter((_, at) => at !== index)
+                                            });
+                                        }}
+                                        aria-label={`Remove line ${index + 1}`}
+                                        title={`Remove line ${index + 1}`}
+                                    >
+                                        <Trash2 className="size-4" />
+                                    </Button>
+                                </div>
+                            ))}
+                            {problems.count && (
+                                <p role="alert" className="text-xs text-danger">
+                                    {problems.count}
+                                </p>
+                            )}
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    disabled={draft.lines.length >= SIDEBAR_LINES_MAX}
+                                    onClick={() => {
+                                        order.added();
+                                        change({ lines: [...draft.lines, ""] });
+                                    }}
+                                >
+                                    <Plus className="size-4" /> Add a line
+                                </Button>
+                                {/* The rankings and the last death, a heading and the
+                                list under it, for somebody who does not know the
+                                variables by name. */}
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            disabled={draft.lines.length + 2 > SIDEBAR_LINES_MAX}
+                                        >
+                                            <Trophy className="size-4" /> Add a leaderboard
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start">
+                                        {SIDEBAR_BLOCKS.map((block) => (
+                                            <DropdownMenuItem
+                                                key={block.id}
+                                                onSelect={() => {
+                                                    const next = withBlock(
+                                                        draft.lines,
+                                                        block,
+                                                        SIDEBAR_LINES_MAX
+                                                    );
+                                                    if (!next) return;
+                                                    for (
+                                                        let added = 0;
+                                                        added < block.lines.length;
+                                                        added += 1
+                                                    )
+                                                        order.added();
+                                                    change({ lines: next });
+                                                }}
+                                            >
+                                                {block.label}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                                A box on the right of every player&apos;s screen. Polaris keeps its
-                                values current while the server runs.
+                                An empty line is a gap. Drag one under the title to space it from
+                                the lines below. Type {"{"} in a line for any value: players online,
+                                the call, the last death, a leaderboard.
                             </p>
                         </div>
-                        <Switch
-                            checked={draft.enabled}
-                            disabled={!canManage || (refused !== null && !draft.enabled)}
-                            onChange={(enabled) => change({ enabled })}
-                            aria-label="Show the side panel"
-                        />
-                    </div>
-                    {refused && <p className="text-xs text-muted-foreground">{refused}.</p>}
 
-                    <div className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">Title</span>
-                        <FormattedTextField
-                            value={draft.title}
-                            onChange={(title) => change({ title })}
-                            rows={1}
-                            singleLine
-                            label="Side panel title"
-                            inserts={inserts}
-                            footnote={
-                                <FieldNote
-                                    text={draft.title}
-                                    max={SIDEBAR_TITLE_MAX}
-                                    problem={problems.title}
-                                />
-                            }
-                        />
-                    </div>
-
-                    <div className="flex flex-col gap-3">
-                        <span className="flex items-baseline gap-2">
-                            <span className="text-sm font-medium">Lines</span>
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">Chat group for {"{call.*}"}</span>
+                            <Select
+                                value={group ?? NO_GROUP}
+                                onValueChange={(value) => {
+                                    setGroup(value === NO_GROUP ? null : value);
+                                    setNote(null);
+                                }}
+                                options={[
+                                    { value: NO_GROUP, label: "None" },
+                                    ...state.groups.map((one) => ({
+                                        value: one.id,
+                                        label: one.name
+                                    })),
+                                    ...(state.callGroupId &&
+                                    !state.groups.some((one) => one.id === state.callGroupId)
+                                        ? [
+                                              {
+                                                  value: state.callGroupId,
+                                                  label: "A group you are not in"
+                                              }
+                                          ]
+                                        : [])
+                                ]}
+                                aria-label="Chat group whose call is shown"
+                            />
                             <span className="text-xs text-muted-foreground">
-                                {draft.lines.length}/{SIDEBAR_LINES_MAX}
+                                {state.groups.length === 0
+                                    ? "You are in no chat group yet. Create one in Chat to show who is in its call."
+                                    : "Whose call {call.count}, {call.members} and {call.max} read, here and in announcements."}
                             </span>
-                        </span>
-                        {draft.lines.map((line, index) => (
-                            <div
-                                key={order.ids[index] ?? `line-${index}`}
-                                className={cn(
-                                    "relative flex items-start gap-1 rounded-md transition-opacity",
-                                    order.dragging === index && "opacity-40"
-                                )}
-                                {...(canManage ? order.rowProps(index) : {})}
-                            >
-                                {/* Where the dragged line would land. */}
-                                {order.dragging !== null && order.dropAt === index && (
-                                    <span className="pointer-events-none absolute inset-x-0 -top-1.5 h-0.5 rounded-full bg-primary" />
-                                )}
-                                {order.dragging !== null &&
-                                    order.dropAt === draft.lines.length &&
-                                    index === draft.lines.length - 1 && (
-                                        <span className="pointer-events-none absolute inset-x-0 -bottom-1.5 h-0.5 rounded-full bg-primary" />
-                                    )}
-                                {canManage && draft.lines.length > 1 && (
-                                    <button
-                                        type="button"
-                                        {...order.handleProps(index, draft.lines.length)}
-                                        className="mt-1.5 flex size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
-                                        aria-label={`Move line ${index + 1}. Drag it, or use the up and down arrow keys`}
-                                        title="Drag to move, or use the arrow keys"
-                                    >
-                                        <GripVertical className="size-4" />
-                                    </button>
-                                )}
-                                <div className="min-w-0 flex-1">
-                                    <FormattedTextField
-                                        value={line}
-                                        onChange={(value) => setLine(index, value)}
-                                        rows={1}
-                                        singleLine
-                                        label={`Line ${index + 1}`}
-                                        placeholder="Leave empty for a gap"
-                                        inserts={inserts}
-                                        footnote={
-                                            <FieldNote
-                                                text={line}
-                                                max={SIDEBAR_LINE_MAX}
-                                                problem={problems.lines[index] ?? undefined}
-                                            />
-                                        }
-                                    />
-                                </div>
-                                <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => {
-                                        order.removed(index);
-                                        change({
-                                            lines: draft.lines.filter((_, at) => at !== index)
-                                        });
-                                    }}
-                                    aria-label={`Remove line ${index + 1}`}
-                                    title={`Remove line ${index + 1}`}
-                                >
-                                    <Trash2 className="size-4" />
-                                </Button>
-                            </div>
-                        ))}
-                        {problems.count && (
-                            <p role="alert" className="text-xs text-danger">
-                                {problems.count}
+                        </label>
+
+                        {error && (
+                            <p role="alert" className="text-sm text-danger">
+                                {error}
                             </p>
                         )}
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            className="self-start"
-                            disabled={draft.lines.length >= SIDEBAR_LINES_MAX}
-                            onClick={() => {
-                                order.added();
-                                change({ lines: [...draft.lines, ""] });
-                            }}
-                        >
-                            <Plus className="size-4" /> Add a line
-                        </Button>
-                        <p className="text-xs text-muted-foreground">
-                            An empty line is a gap. Drag one under the title to space it from the
-                            lines below.
-                        </p>
-                    </div>
-
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Chat group for {"{call.*}"}</span>
-                        <Select
-                            value={group ?? NO_GROUP}
-                            onValueChange={(value) => {
-                                setGroup(value === NO_GROUP ? null : value);
-                                setNote(null);
-                            }}
-                            options={[
-                                { value: NO_GROUP, label: "None" },
-                                ...state.groups.map((one) => ({ value: one.id, label: one.name })),
-                                ...(state.callGroupId &&
-                                !state.groups.some((one) => one.id === state.callGroupId)
-                                    ? [
-                                          {
-                                              value: state.callGroupId,
-                                              label: "A group you are not in"
-                                          }
-                                      ]
-                                    : [])
-                            ]}
-                            aria-label="Chat group whose call is shown"
-                        />
-                        <span className="text-xs text-muted-foreground">
-                            {state.groups.length === 0
-                                ? "You are in no chat group yet. Create one in Chat to show who is in its call."
-                                : "Whose call {call.count}, {call.members} and {call.max} read, here and in announcements."}
-                        </span>
-                    </label>
-
-                    {error && (
-                        <p role="alert" className="text-sm text-danger">
-                            {error}
-                        </p>
-                    )}
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-xs text-muted-foreground">
-                            {note ??
-                                (canManage
-                                    ? ""
-                                    : "Only somebody who manages this server can change it.")}
-                        </span>
-                        <Button
-                            disabled={!canManage || pending || invalid || !dirty}
-                            onClick={save}
-                        >
-                            {pending && <Loader2 className="size-4 animate-spin" />}
-                            Save
-                        </Button>
-                    </div>
-                </CardBody>
-            </Card>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">
+                                {note ??
+                                    (canManage
+                                        ? ""
+                                        : "Only somebody who manages this server can change it.")}
+                            </span>
+                            <Button
+                                disabled={!canManage || pending || invalid || !dirty}
+                                onClick={save}
+                            >
+                                {pending && <Loader2 className="size-4 animate-spin" />}
+                                Save
+                            </Button>
+                        </div>
+                    </CardBody>
+                </Card>
+                <VariablesHelp edition="java" scope="server" />
+            </div>
 
             <SidebarPreview sidebar={draft} />
         </div>
@@ -334,8 +393,10 @@ const SAMPLE_LISTS: Readonly<Record<string, readonly string[]>> = {
 /** The panel as it will read, every value at a sample. */
 function SidebarPreview({ sidebar }: { sidebar: SidebarConfig }) {
     const title = mc.motdSpans(previewText(sidebar.title))[0] ?? [];
+    // As tall as it is and kept in view, like the announcement's: stretched to
+    // the height of the lines beside it, it was a page of empty card.
     return (
-        <Card>
+        <Card className="lg:sticky lg:top-[calc(var(--header-height)+1rem)] lg:self-start">
             <CardBody className="flex flex-col gap-2">
                 <p className="text-sm font-medium">Preview</p>
                 <div className="flex min-h-40 justify-end rounded-md bg-[#6b8f4e] p-3">

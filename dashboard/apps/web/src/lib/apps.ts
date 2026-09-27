@@ -93,6 +93,8 @@ import {
     Webhook,
     Workflow,
     Wrench,
+    Megaphone,
+    PanelRight,
     type LucideIcon
 } from "lucide-react";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
@@ -1939,6 +1941,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
 export const INSTALLED_BASE = "/apps/installed";
 
 const RUNNING_GROUP = "Running it";
+const TALKING_GROUP = "Talking to players";
 const CONTENT_GROUP = "What is on it";
 const ACCESS_GROUP = "Who gets in";
 
@@ -1975,6 +1978,40 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         icon: ChartColumn,
         group: RUNNING_GROUP,
         keywords: ["cpu", "memory", "history", "metrics"]
+    },
+    announce: {
+        label: "Announce",
+        icon: Megaphone,
+        group: TALKING_GROUP,
+        keywords: [
+            "title",
+            "subtitle",
+            "action bar",
+            "broadcast",
+            "tellraw",
+            "sound",
+            "message everybody"
+        ]
+    },
+    panel: {
+        label: "Side panel",
+        icon: PanelRight,
+        group: TALKING_GROUP,
+        keywords: [
+            "scoreboard",
+            "sidebar",
+            "leaderboard",
+            "ranking",
+            "last death",
+            "levels",
+            "who is online"
+        ]
+    },
+    schedule: {
+        label: "Schedule",
+        icon: CalendarClock,
+        group: RUNNING_GROUP,
+        keywords: ["restart", "backup", "sleep", "wake on join", "automatic", "timer"]
     },
     world: {
         label: "World",
@@ -2015,6 +2052,21 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         icon: ShieldCheck,
         group: ACCESS_GROUP,
         keywords: ["whitelist", "bans", "firewall", "addresses"]
+    },
+    anticheat: {
+        label: "Anti-cheat",
+        icon: ScanFace,
+        group: ACCESS_GROUP,
+        keywords: [
+            "x-ray",
+            "xray",
+            "honeypot",
+            "cheating",
+            "flying",
+            "fly hack",
+            "teleport",
+            "diamonds"
+        ]
     },
     settings: {
         label: "Settings",
