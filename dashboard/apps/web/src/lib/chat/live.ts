@@ -40,11 +40,15 @@ export interface ChatChange {
      *      and nothing about the appearance: a browser drawing that face pulls
      *      it through the same endpoint it pulled the first one through, and a
      *      browser not drawing it does nothing at all.
+     *  activity - what somebody is playing or listening to changed. Carried
+     *      exactly like `appearance`: the id and the rooms, never the activity,
+     *      which a browser drawing that face pulls through the presence
+     *      endpoint and its privacy check.
      *  read - somebody caught up here. Two screens act on it and nobody else:
      *      their own other devices, which have an unread count to take down, and
      *      the person they were reading, whose ticks have just moved. Addressed
      *      through `audience`, because who may know is a setting. */
-    readonly kind: "posted" | "channels" | "typing" | "call" | "appearance" | "read";
+    readonly kind: "posted" | "channels" | "typing" | "call" | "appearance" | "read" | "activity";
     /** Only on `read`: the mark moved BACKWARDS - somebody put a conversation
      *  back to unread. The same fact changing, so it is the same frame, but the
      *  opposite instruction for anything that withdraws a notice about it. */
@@ -80,7 +84,7 @@ export interface ChatChange {
      */
     readonly movedTo?: { readonly meetingId: string; readonly channelId: string };
     /**
-     * Only on `appearance`: the conversations the person is in.
+     * Only on `appearance` and `activity`: the conversations the person is in.
      *
      * How the fan-out is kept honest. Somebody changing their decoration is
      * news to the people who might be looking at their face, which is the people

@@ -20,6 +20,7 @@ import type {
     AppSlot,
     ExtensionInstall,
     GameServerSummary,
+    PlayingNow,
     RelayedChatMessage
 } from "./types";
 
@@ -29,6 +30,7 @@ export type {
     AppSlot,
     ExtensionInstall,
     GameServerSummary,
+    PlayingNow,
     RelayedChatMessage
 };
 
@@ -218,6 +220,31 @@ export async function chatRelayer(): Promise<
             });
         }
     };
+}
+
+/**
+ * Who of these accounts is playing on a server an installed app runs, one visit
+ * each - the earliest, when somebody is somehow on two at once.
+ *
+ * One app failing is that app saying nothing, never the presence around it
+ * failing: this is asked on every refresh of every face on a screen.
+ */
+export async function playingNowFor(userIds: readonly string[]): Promise<Map<string, PlayingNow>> {
+    const found = new Map<string, PlayingNow>();
+    if (userIds.length === 0) return found;
+    const offering = extensions().filter((extension) => extension.playingNow);
+    for (const extension of offering) {
+        if (!(await isAppInstalled(extension.id).catch(() => false))) continue;
+        const playing = await extension.playingNow!(userIds).catch((caught: unknown) => {
+            console.error(`polaris: ${extension.id} could not say who is playing:`, caught);
+            return [];
+        });
+        for (const visit of playing) {
+            const held = found.get(visit.userId);
+            if (!held || visit.since < held.since) found.set(visit.userId, visit);
+        }
+    }
+    return found;
 }
 
 /** Whether this account reaches an app it holds no permission for. */

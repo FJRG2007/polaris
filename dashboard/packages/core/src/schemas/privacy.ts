@@ -91,6 +91,7 @@ export function audienceNeedsList(audience: PrivacyAudience): boolean {
 export const PRIVACY_FIELD_LABELS = {
     discoverable: "Whether people can find you",
     lastSeen: "When you were last here",
+    activity: "What you are playing or listening to",
     readReceipts: "That you have read a message",
     avatar: "Your photo",
     photoFullSize: "Opening your photo",
@@ -109,6 +110,8 @@ export const PRIVACY_FIELD_NOTES = {
     discoverable:
         "Who finds your account when they look for somebody. Anybody who cannot has to know your exact username to ask to be added, and is never told whether it exists.",
     lastSeen: "Whether other people can see that you are here now, or when you last were.",
+    activity:
+        "The game or song shown beside your name. Only ever shown to people who can also see that you are here, and never while you appear offline.",
     readReceipts:
         'The ticks under a message in a direct conversation. Turning this down also stops you seeing anybody else\'s, and "only" is how you leave them on for one person.',
     avatar: "Who sees your photo. Anybody who cannot gets your initials instead.",
@@ -145,6 +148,7 @@ export const PRIVACY_FIELDS = [
     "fileTransfers",
     "calls",
     "lastSeen",
+    "activity",
     "readReceipts",
     "forwarding"
 ] as const;
@@ -178,7 +182,7 @@ export const PRIVACY_SECTIONS = [
     {
         id: "presence",
         label: "Presence",
-        fields: ["lastSeen"]
+        fields: ["lastSeen", "activity"]
     },
     {
         id: "messages",
@@ -257,6 +261,17 @@ export const privacySettingsSchema = z.object({
      */
     discoverable: open,
     lastSeen: open,
+    /**
+     * Who sees what somebody is doing: the game, the song, the server.
+     *
+     * Open by default, which is the answer every place that shows this settled
+     * on, and safe for one reason stated here because it is what makes it safe:
+     * an activity is only ever drawn for a reader who can already see that the
+     * person is here. So this narrows the `lastSeen` audience and can never
+     * widen it - somebody hidden from a reader is hidden with everything they
+     * are doing, and somebody invisible is doing nothing at all.
+     */
+    activity: open,
     readReceipts: open,
     avatar: open,
     /**

@@ -138,6 +138,23 @@ export async function GET(request: Request): Promise<Response> {
                     return;
                 }
 
+                // What somebody is playing or listening to moved. The same
+                // fan-out as a face changing - the rooms they are in - and the
+                // same payload, the id alone: the browser asks the presence
+                // endpoint, which applies their privacy settings, and a reader
+                // their audience leaves out is told nothing there.
+                //
+                // Unlike a face, their own other screens are told too: the card
+                // on their own profile is how they see what is being shown, and
+                // it is not the tab that changed it - a desktop app or a music
+                // service did.
+                if (change.kind === "activity") {
+                    const mine = change.actorId === actor.id;
+                    if (!mine && !change.channels?.some((id) => reachable.has(id))) return;
+                    send({ kind: "activity", actorId: change.actorId });
+                    return;
+                }
+
                 // A change about who is in what is not about a channel this
                 // reader necessarily reaches yet - being added is exactly the
                 // case - so the audience decides, and the set is re-resolved.

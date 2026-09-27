@@ -136,6 +136,25 @@ export interface AppExtension {
      *  knows which of its players is them. Until it does, the setting that
      *  chooses which messages go there is not offered. */
     readonly chatRelayReady?: (userId: string) => Promise<boolean>;
+
+    /**
+     * Which of these accounts are playing on one of this app's servers right
+     * now, by the app's own record of who is on and its own rule for which
+     * player is which account. Asked for a page of faces at a time, so it must
+     * be one or two indexed reads rather than a question to any server.
+     */
+    readonly playingNow?: (userIds: readonly string[]) => Promise<readonly PlayingNow[]>;
+}
+
+/** Somebody on one of an app's servers, as their presence card says it. */
+export interface PlayingNow {
+    readonly userId: string;
+    /** The game, as people call it: "Minecraft". */
+    readonly game: string;
+    /** The server, as its owner named it. */
+    readonly server: string;
+    /** When this visit started. */
+    readonly since: Date;
 }
 
 /** One Chat message on its way into a game, already decided to be wanted. */

@@ -67,6 +67,7 @@ const AUDIENCE_COLUMNS = {
     followers: true,
     friendRequests: true,
     lastSeen: true,
+    activity: true,
     forwarding: true,
     fileTransfers: true,
     calls: true,

@@ -170,6 +170,7 @@ export * from "./chat-scope.js";
 export * from "./schemas/chat.js";
 export * from "./schemas/chat-rules.js";
 export * from "./schemas/privacy.js";
+export * from "./schemas/activity.js";
 export * from "./schemas/retention.js";
 export * from "./schemas/billing.js";
 export * from "./billing.js";

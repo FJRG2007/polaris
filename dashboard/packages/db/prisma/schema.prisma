@@ -324,6 +324,8 @@ model User {
     blocking            UserBlock[]          @relation("UserBlockBlocker")
     blockedBy           UserBlock[]          @relation("UserBlockBlocked")
     presenceSchedules   PresenceSchedule[]
+    activities          UserActivity[]
+    activitySettings    UserActivitySettings?
     mailAccounts        MailAccount[]
     mailLabels          MailLabel[]
     mailUploads         MailUpload[]
@@ -8723,7 +8725,77 @@ model UserPrivacy {
     // not what anybody expects, and a default that removed a button would read
     // as a bug rather than as a setting.
     forwarding   String   @default("everyone")
+    // Who sees what somebody is doing - the game, the song, the server - beside
+    // their face. Open by default, like the dot it rides on: it is only ever
+    // shown to a reader who can already see that they are here, so this narrows
+    // that audience and never widens it.
+    activity     String   @default("everyone")
     updatedAt    DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// What somebody is doing right now, as the card beside their presence draws it:
+// the game their desktop app saw running, the song their music service is
+// playing. One row per source, replaced as it changes and deleted when it stops.
+//
+// A Minecraft session on one of this instance's own servers has no row: the
+// game servers app already keeps who is on (`GamePlayerSession`), and a second
+// copy here would be a second thing to keep true.
+//
+// Every row lapses on its own. `expiresAt` is when it stops being believed
+// unless it is said again - a desktop app that crashed, a laptop closed in the
+// middle of a game - so nothing has to be running for a stale "Playing" to go
+// away: a read past it is a read of nothing.
+model UserActivity {
+    userId    String    @db.Uuid
+    // spotify | game
+    source    String
+    // What it is, in a form that does not change with its name: a game's
+    // executable, a track's id.
+    key       String
+    // The first line of the card: the game, the track.
+    name      String
+    // The two lines under it: the artists and the album, a game's nothing.
+    details   String    @default("")
+    state     String    @default("")
+    imageUrl  String?
+    // Where pressing it goes: the track on the service's own site.
+    linkUrl   String?
+    // When it started - a game launched, or where a track's first second would
+    // have been, so elapsed time is worked out on the reader's clock.
+    startedAt DateTime
+    // When it ends if nothing interrupts it: a track's last second. Null for a
+    // game, which ends when somebody closes it.
+    endsAt    DateTime?
+    expiresAt DateTime
+    updatedAt DateTime  @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([userId, source])
+    @@index([expiresAt])
+}
+
+// Whether somebody shares what they are doing at all, and from where.
+//
+// No row is the defaults - everything on - which is what a new account starts
+// on, as it does elsewhere: absence is not a stricter setting. Who sees it is
+// the `activity` audience on `UserPrivacy`, beside every other "who".
+model UserActivitySettings {
+    userId      String   @id @db.Uuid
+    share       Boolean  @default(true)
+    spotify     Boolean  @default(true)
+    games       Boolean  @default(true)
+    minecraft   Boolean  @default(true)
+    // Games never shown, by key, whatever the switches say.
+    hiddenGames String   @default("[]")
+    // Programs somebody told the desktop app are games, as [{executable, name}].
+    customGames String   @default("[]")
+    // Games the desktop app has seen, newest first, so the hide list can name
+    // them after they have been closed. Capped where it is written.
+    seenGames   String   @default("[]")
+    updatedAt   DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

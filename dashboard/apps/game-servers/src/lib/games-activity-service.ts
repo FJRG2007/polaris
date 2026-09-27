@@ -39,6 +39,7 @@ import {
 import { host } from "@polaris/app-host";
 
 const { patchInstallConfig } = host.appsInstallConfig;
+const { announceActivity } = host.activityLive;
 
 /** How often the sweep asks, which is what a gap in the readings is measured
  *  against. Kept beside the readers rather than imported from the job, because it
@@ -161,6 +162,19 @@ export async function sweepGameActivity(
             arrived += change.arrived.length;
         }
 
+        // Whoever arrived or left may be somebody's account, and their card says
+        // "Playing Minecraft" or stops saying it: their screens are told now
+        // rather than at the next presence refresh. Best effort - the card is
+        // right within a minute either way.
+        if (change.arrived.length > 0 || change.left.length > 0) {
+            const gone = new Set(change.left);
+            const names = [
+                ...change.arrived.map((player) => player.name),
+                ...open.filter((row) => gone.has(row.id)).map((row) => row.name)
+            ];
+            await announcePlayers(presence.id, names);
+        }
+
         // Written even when nothing changed, and especially then: this row is the
         // evidence that anybody looked, which is what keeps a quiet night apart
         // from a night when the sweep was not running.
@@ -169,6 +183,18 @@ export async function sweepGameActivity(
 
     await pruneActivity(now);
     return { known, arrived, left };
+}
+
+/** Tell the screens drawing these players' accounts that they arrived or left.
+ *  Never a reason to fail the sweep. */
+async function announcePlayers(installedAppId: string, names: readonly string[]): Promise<void> {
+    try {
+        const { accountsOfPlayers } = await import("./minecraft/playing-now");
+        const accounts = await accountsOfPlayers(installedAppId, names);
+        if (accounts.length > 0) await announceActivity(accounts);
+    } catch {
+        // The presence refresh picks it up within a minute.
+    }
 }
 
 /** One visit, as a screen reads it back. */

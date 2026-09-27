@@ -20,7 +20,7 @@
  * changing.
  */
 
-import type { Presence } from "@polaris/core";
+import type { ActivityView, Presence } from "@polaris/core";
 import {
     createContext,
     useCallback,
@@ -43,6 +43,27 @@ export interface PresenceOf {
     readonly note: string;
     /** The conversation of a call they are in and the reader could join. */
     readonly inCall: string | null;
+    /** What they are playing or listening to, as this reader may be told. Empty
+     *  whenever they are drawn as offline. Absent from a server that predates
+     *  it, which is a tab left open across an update. */
+    readonly activity?: readonly ActivityView[];
+}
+
+/** The event `announcePresence` raises, heard by the provider. */
+const CHANGED = "polaris:presence-changed";
+
+/**
+ * Tell the store that these people's presence changed, so any of them on screen
+ * is asked about again now rather than at the next refresh.
+ *
+ * An event rather than a call into the provider, because what hears about the
+ * change - the live channel's one reader, above every screen - sits outside the
+ * provider's tree, and a module-level event is how the face decorations already
+ * get the same news (see `announceAppearance`).
+ */
+export function announcePresence(ids: readonly string[]): void {
+    if (typeof window === "undefined" || ids.length === 0) return;
+    window.dispatchEvent(new CustomEvent(CHANGED, { detail: [...ids] }));
 }
 
 /** How long before what is on screen is asked about again. */
@@ -119,6 +140,22 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
     const refresh = useCallback(() => {
         void ask([...watched.current]);
+    }, [ask]);
+
+    // Somebody on screen started or stopped playing something. Only the ones
+    // actually drawn are asked about: a change to a face nobody is looking at
+    // costs nothing.
+    useEffect(() => {
+        const heard = (event: Event) => {
+            const ids = (event as CustomEvent<unknown>).detail;
+            if (!Array.isArray(ids)) return;
+            const drawn = ids.filter(
+                (id): id is string => typeof id === "string" && watched.current.has(id)
+            );
+            if (drawn.length > 0) void ask(drawn);
+        };
+        window.addEventListener(CHANGED, heard);
+        return () => window.removeEventListener(CHANGED, heard);
     }, [ask]);
 
     const store = useMemo<Store>(() => ({ people, watch, refresh }), [people, watch, refresh]);

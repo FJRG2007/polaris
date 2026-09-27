@@ -72,6 +72,7 @@ function once<M>(load: () => Promise<M>): () => Promise<M> {
 
 const load = {
     accessGrants: once(() => import("@/lib/access/grants")),
+    activityLive: once(() => import("@/lib/presence-activity/live")),
     apiSession: once(() => import("@/lib/api-session")),
     appContainerMetrics: once(() => import("@/lib/app-container-metrics")),
     appsInstallAccess: once(() => import("@/lib/apps/install-access")),
@@ -127,6 +128,11 @@ export const serverHost = {
         liveGrants: later(load.accessGrants, "liveGrants"),
         reachesAnySubject: later(load.accessGrants, "reachesAnySubject"),
         spendGrant: later(load.accessGrants, "spendGrant")
+    },
+    // Somebody's presence card changed because of something an app saw - a
+    // player arriving on a server - so the screens drawing them ask again.
+    activityLive: {
+        announceActivity: later(load.activityLive, "announceActivity")
     },
     apiSession: {
         apiUser: later(load.apiSession, "apiUser")

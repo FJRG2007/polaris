@@ -10,16 +10,19 @@ import { Button, Card, CardBody } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
 import { PrivacyView } from "./privacy-view";
 import { BlockedCard } from "./blocked-card";
+import { activitySettingsOf } from "@/lib/presence-activity/settings";
+import { ActivitySharingCard } from "./activity-sharing-card";
 import { listsFor, namePeople, privacyFor } from "@/lib/privacy-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function PrivacyPage() {
     const session = await requireUser();
-    const [settings, lists, blocked] = await Promise.all([
+    const [settings, lists, blocked, activity] = await Promise.all([
         privacyFor(session.id),
         listsFor(session.id),
-        listBlocked(session.id)
+        listBlocked(session.id),
+        activitySettingsOf(session.id)
     ]);
     // Every name any rule needs, in one read: a row draws the people it names,
     // and it holds their ids.
@@ -36,6 +39,9 @@ export default async function PrivacyPage() {
                 </p>
             </div>
             <PrivacyView settings={settings} lists={lists} people={people} />
+            {/* What is shared, beside the audience row above that decides who
+                sees it. */}
+            <ActivitySharingCard settings={activity.settings} seenGames={activity.seenGames} />
             {/* The same question by the clock rather than by audience, which is
                 why it is on this screen and not beside the display preferences.
                 A link rather than the thing itself: it is a list that grows, and

@@ -22,6 +22,7 @@ import { z } from "zod";
 import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from "react";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
+import { announcePresence } from "@/components/presence-store";
 import { announceAppearance } from "@/components/profile-style-store";
 import { useShelfSeed } from "@/components/shelf-scope";
 
@@ -105,6 +106,12 @@ export function ChatUnreadProvider({
             // none of this provider's business.
             if (kind === "appearance") {
                 if (typeof frame.actorId === "string") announceAppearance([frame.actorId]);
+                return;
+            }
+            // What somebody is playing or listening to, handed on the same way:
+            // the presence store asks again for that face if it is drawn.
+            if (kind === "activity") {
+                if (typeof frame.actorId === "string") announcePresence([frame.actorId]);
                 return;
             }
             if (typeof kind !== "string" || !COUNTED.has(kind)) return;
