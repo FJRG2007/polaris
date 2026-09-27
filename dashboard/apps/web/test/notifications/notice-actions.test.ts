@@ -86,6 +86,20 @@ describe("a notice's buttons in the desktop app", () => {
         });
     });
 
+    it("hands a press on a notice from before a reload to what takes unclaimed ones", async () => {
+        const app = installApp(true);
+        const { actOnUnclaimedNotices, notifyDesktop } = await import("@/lib/desktop-notify");
+        const unclaimed: { tag: string; action: string }[] = [];
+        actOnUnclaimedNotices(async (tag, action) => {
+            unclaimed.push({ tag, action });
+        });
+        app.press({ tag: "message:c2", action: "read" });
+        await notifyDesktop({ title: "Ana", tag: "message:c1", actions: [READ] });
+        app.press({ tag: "message:c1", action: "read" });
+        await vi.waitFor(() => expect(posted).toHaveLength(1));
+        expect(unclaimed).toEqual([{ tag: "message:c2", action: "read" }]);
+    });
+
     it("draws the notice without them in an app too old to hand a press back", async () => {
         const app = installApp(false);
         const { notifyDesktop } = await import("@/lib/desktop-notify");
@@ -117,15 +131,17 @@ describe("a notice's buttons in a browser", () => {
                 { permission: "granted", requestPermission: async () => "granted" }
             )
         );
+        const heard: ((event: { data: unknown }) => void)[] = [];
         Object.defineProperty(navigator, "serviceWorker", {
             configurable: true,
             value: {
                 getRegistration: async () => (worker ? registration : undefined),
-                addEventListener: () => undefined,
+                addEventListener: (_kind: string, listener: (event: { data: unknown }) => void) =>
+                    heard.push(listener),
                 startMessages: () => undefined
             }
         });
-        return { shown, closed };
+        return { shown, closed, heard };
     }
 
     it("is drawn by the service worker, with the buttons and their requests on it", async () => {
@@ -156,5 +172,18 @@ describe("a notice's buttons in a browser", () => {
         ).not.toBeNull();
         expect(browser.shown).toHaveLength(0);
         expect(Notification).toHaveBeenCalledTimes(1);
+    });
+
+    it("goes where a pressed notice points from page start, in a tab that drew nothing", async () => {
+        const browser = installBrowser(true);
+        const assign = vi.fn();
+        vi.stubGlobal("location", { ...window.location, assign });
+        const { listenToWorker } = await import("@/lib/desktop-notify");
+        listenToWorker();
+        listenToWorker();
+        expect(browser.heard).toHaveLength(1);
+        browser.heard[0]!({ data: { kind: "polaris-notice-open", href: "//elsewhere.test" } });
+        browser.heard[0]!({ data: { kind: "polaris-notice-open", href: "/chat/c/c1/m1" } });
+        expect(assign.mock.calls).toEqual([["/chat/c/c1/m1"]]);
     });
 });

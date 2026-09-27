@@ -70,6 +70,9 @@ export async function runNoticeAction(action: NoticeAction): Promise<boolean> {
 
 /** The buttons of each notice the desktop app drew, by tag. */
 const acting = new Map<string, readonly NoticeAction[]>();
+/** What a press on a notice nothing on this page drew is handed to: one from
+ *  before a reload, like an unclaimed answer. */
+let unclaimedAction: ((tag: string, action: string) => Promise<void>) | null = null;
 let hearingActions = false;
 
 /** Hear presses on the app's notice buttons, once per page. */
@@ -77,10 +80,29 @@ function listenForActions(app: NonNullable<ReturnType<typeof desktopBridge>>): v
     if (hearingActions || !app.onNoticeAction) return;
     hearingActions = true;
     app.onNoticeAction(({ tag, action }) => {
-        const pressed = acting.get(tag)?.find((one) => one.id === action);
+        const buttons = acting.get(tag);
         acting.delete(tag);
+        const pressed = buttons?.find((one) => one.id === action);
         if (pressed) void runNoticeAction(pressed);
+        else if (!buttons && unclaimedAction)
+            void unclaimedAction(tag, action).catch(() => undefined);
     });
+}
+
+/**
+ * Take the presses on buttons of notices this page did not draw. Listens from
+ * now, so a press arriving right after a reload is heard. Answers a function
+ * that stops it.
+ */
+export function actOnUnclaimedNotices(
+    handle: (tag: string, action: string) => Promise<void>
+): () => void {
+    unclaimedAction = handle;
+    const app = desktopBridge();
+    if (app) listenForActions(app);
+    return () => {
+        if (unclaimedAction === handle) unclaimedAction = null;
+    };
 }
 
 /** The service worker, when there is one running to draw a notice with buttons
@@ -94,8 +116,9 @@ async function noticeWorker(): Promise<ServiceWorkerRegistration | null> {
 let hearingWorker = false;
 
 /** Go where a notice the service worker handled points: it brings this window
- *  forward and says where. Once per page. */
-function listenToWorker(): void {
+ *  forward and says where. Once per page, from page start, since the window it
+ *  picks is not always the one that drew the notice. */
+export function listenToWorker(): void {
     if (hearingWorker || typeof navigator === "undefined" || !("serviceWorker" in navigator))
         return;
     hearingWorker = true;

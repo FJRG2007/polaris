@@ -47,6 +47,7 @@ import { useSessionScope } from "@/components/session-scope";
 import { messageToastsAction, replyFromNoticeAction } from "@/app/(app)/chat/actions";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
 import {
+    actOnUnclaimedNotices,
     answerUnclaimedReplies,
     closeDesktopNotice,
     notifyDesktop,
@@ -105,6 +106,12 @@ async function answerFromDesktop(
 ): Promise<void> {
     const refused = await answer(channelId, messageId, text);
     if (refused) replyNotSent(channelId, refused);
+}
+
+/** The newest message in a conversation, which is what its notice announced. */
+async function newestAnnounced(channelId: string): Promise<string | undefined> {
+    const { toasts } = await messageToastsAction([channelId]).catch(() => ({ toasts: [] }));
+    return toasts.find((one) => one.channelId === channelId)?.messageId;
 }
 
 function replyNotSent(channelId: string | null, why: string): void {
@@ -338,12 +345,20 @@ export function MessageToasts() {
                     return;
                 }
                 const channelId = tag.slice(TAG.length);
-                // The newest message there, which is what the notice announced.
-                const { toasts } = await messageToastsAction([channelId]).catch(() => ({
-                    toasts: []
-                }));
-                const newest = toasts.find((one) => one.channelId === channelId);
-                await answerFromDesktop(channelId, newest?.messageId, text);
+                const newest = await newestAnnounced(channelId);
+                await answerFromDesktop(channelId, newest, text);
+            }),
+        []
+    );
+
+    // A "Mark as read" pressed on a notice drawn before this page was loaded.
+    useEffect(
+        () =>
+            actOnUnclaimedNotices(async (tag, action) => {
+                if (!tag.startsWith(TAG) || action !== "read") return;
+                const channelId = tag.slice(TAG.length);
+                const newest = await newestAnnounced(channelId);
+                if (newest) await runNoticeAction(markReadAction(channelId, newest));
             }),
         []
     );

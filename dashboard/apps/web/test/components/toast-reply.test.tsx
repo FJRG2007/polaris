@@ -168,4 +168,21 @@ describe("answering on the note", () => {
         expect(screen.getByRole("alert").textContent).toBe("That could not be marked as read");
         expect(screen.getByText("Ana")).toBeTruthy();
     });
+
+    it("keeps a newer message's note when an older one's mark as read finishes", async () => {
+        let finish: (refused: string | null) => void = () => undefined;
+        const run = vi.fn(() => new Promise<string | null>((resolve) => (finish = resolve)));
+        const reply = { placeholder: "Reply to Ana", send: vi.fn(async () => null) };
+        const actions = [{ label: "Mark as read", run }];
+        render(
+            <ToastProvider>
+                <Raise reply={reply} onPress={() => undefined} actions={actions} />
+                <Replace reply={reply} />
+            </ToastProvider>
+        );
+        fireEvent.click(await screen.findByRole("button", { name: "Mark as read" }));
+        fireEvent.click(screen.getByRole("button", { name: "newer" }));
+        await act(async () => finish(null));
+        expect(screen.getByText("one more thing")).toBeTruthy();
+    });
 });

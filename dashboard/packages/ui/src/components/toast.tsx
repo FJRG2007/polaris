@@ -261,10 +261,12 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
 
     const act = async (action: ToastAction) => {
         if (acting) return;
+        const actedFrom = showing.current;
         setActing(action.label);
         setProblem(null);
         const refused = await action.run().catch(() => "That did not work");
         setActing(null);
+        if (showing.current !== actedFrom) return;
         if (refused) setProblem(refused);
         else onDismiss();
     };
