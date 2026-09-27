@@ -22,21 +22,21 @@
  * the moment it has one - see `gateDecisions` in `ark/access` for the rule.
  */
 
-import { prisma } from "@polaris/db";
-import { randomBytes } from "node:crypto";
-import { withTimeout } from "@polaris/core";
 import { ARK_ROOT } from "./files";
+import { prisma } from "@polaris/db";
 import * as arkAccess from "./access";
 import * as arkAdmins from "./admins";
-import { signedIn } from "../game-sign-in-addresses";
-import { arkExperienceCommand } from "./experience";
-import { withServerContainer } from "../minecraft/service";
-import { readCrashLoop, readRestartWatch } from "../games-health";
-import { parseProfileDump, type ArkProfile } from "./profile";
-import { readContainerFile, writeContainerFile } from "../container-files";
-import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
-import { isRconRefusal, parseArkPlayers, type ArkPlayer } from "./parse";
 import { host } from "@polaris/app-host";
+import { randomBytes } from "node:crypto";
+import { withTimeout } from "@polaris/core";
+import { arkExperienceCommand } from "./experience";
+import { signedIn } from "../game-sign-in-addresses";
+import { withServerContainer } from "../minecraft/service";
+import { parseProfileDump, type ArkProfile } from "./profile";
+import { readCrashLoop, readRestartWatch } from "../games-health";
+import { isRconRefusal, parseArkPlayers, type ArkPlayer } from "./parse";
+import { readContainerBytes, readContainerFile, writeContainerFile } from "../container-files";
+import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
 
 const { findApp } = host.appsCatalog;
 const { setEnvVars } = host.envVarService;
@@ -875,10 +875,12 @@ function usableProfileDir(raw: unknown): string | null {
  * holds the world and every tribe - and a player who has never joined has no file
  * and is simply absent from the result.
  *
- * One shell for all of them: on a registered machine each exec is its own SSH
+ * One shell finds all of them: on a registered machine each exec is its own SSH
  * handshake, and a full server would be twenty of them for one column. Each id is
  * looked for where the last one was found before anything is searched for, which
- * is what turns the common case into a read rather than a walk.
+ * is what turns the common case into a read rather than a walk. The files are
+ * then read one by one, whole, because together they are more than one command
+ * can answer.
  */
 export async function readArkProfiles(
     ownerId: string,
@@ -903,13 +905,24 @@ export async function readArkProfiles(
             `for id in ${wanted.join(" ")}; do`,
             'f=""; if [ -n "$d" ] && [ -f "$d/$id.arkprofile" ]; then f="$d/$id.arkprofile"; fi;',
             `if [ -z "$f" ]; then f=$(find ${SAVE_DIR} -maxdepth 3 -name "$id.arkprofile" 2>/dev/null | head -n 1); fi;`,
-            'if [ -n "$f" ]; then d=$(dirname "$f"); echo "== $id"; base64 "$f" | tr -d \'\\n\'; echo; fi;',
+            'if [ -n "$f" ]; then d=$(dirname "$f"); echo "== $id $f"; fi;',
             "done;",
             // Last, and on its own line, so the parser above it is untouched by it.
             'if [ -n "$d" ]; then echo "@@ $d"; fi'
         ].join(" ");
         const result = await server.run(["sh", "-c", script]);
-        return result.code === 0 ? result.output : "";
+        if (result.code !== 0) return "";
+        // Where each one is, then each one read whole on its own: one command
+        // answers 16 KiB at most, and every profile together is far more than
+        // that, which left all but the first survivors without a level.
+        const lines: string[] = [];
+        for (const match of result.output.matchAll(/^== (\d{17}) (\S+\.arkprofile)$/gm)) {
+            const bytes = await readContainerBytes(server, match[2]!).catch(() => null);
+            if (bytes) lines.push(`== ${match[1]}`, bytes.toString("base64"));
+        }
+        const at = /^@@ .+$/m.exec(result.output)?.[0];
+        if (at) lines.push(at);
+        return lines.join("\n");
     });
 
     const directory = usableProfileDir(/^@@ (.+)$/m.exec(found)?.[1]?.trim());

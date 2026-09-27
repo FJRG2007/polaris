@@ -15,10 +15,11 @@
 
 import * as world from "./world";
 import { host } from "@polaris/app-host";
-import { withServerContainer } from "./service";
-import { miningFigures, type MiningFigures } from "./xray";
-import { readPlayerStats, type PlayerStats } from "../games-activity";
 import type { PlayerFigures } from "./rankings";
+import { miningFigures, type MiningFigures } from "./xray";
+import { withServerContainer, type ServerContainer } from "./service";
+import { readPlayerStats, type PlayerStats } from "../games-activity";
+import { listContainerDir, readContainerFile, readContainerFiles } from "../container-files";
 
 const { listEnvVars } = host.envVarService;
 
@@ -29,23 +30,55 @@ interface CacheEntry {
     readonly uuid?: unknown;
 }
 
-/** The uuid this name is filed under, if the server has ever seen it. */
-export function uuidFor(usercache: string, name: string): string | null {
+/** Every uuid this name is filed under. Usually one; two where the server
+ *  switched between online and offline mode, which files the same player under a
+ *  different uuid from then on - and both files are that player's time. */
+export function uuidsFor(usercache: string, name: string): string[] {
+    const wanted = name.trim().toLowerCase();
+    return [...namesByUuid(usercache)]
+        .filter(([, cached]) => cached.trim().toLowerCase() === wanted)
+        .map(([uuid]) => uuid);
+}
+
+/** The usercache as uuid to name, lowercased uuids; empty when it cannot be read. */
+function namesByUuid(usercache: string): Map<string, string> {
+    const names = new Map<string, string>();
     let parsed: unknown;
     try {
         parsed = JSON.parse(usercache);
     } catch {
-        return null;
+        return names;
     }
-    if (!Array.isArray(parsed)) return null;
-    const wanted = name.trim().toLowerCase();
+    if (!Array.isArray(parsed)) return names;
     for (const entry of parsed as CacheEntry[]) {
-        if (typeof entry?.name !== "string" || typeof entry?.uuid !== "string") continue;
-        // Newest last in the file, so the last match wins: a name that changed
-        // hands is filed under whoever holds it now.
-        if (entry.name.trim().toLowerCase() === wanted) return entry.uuid;
+        if (typeof entry?.name === "string" && typeof entry?.uuid === "string") {
+            names.set(entry.uuid.toLowerCase(), entry.name);
+        }
     }
-    return null;
+    return names;
+}
+
+const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/;
+
+/** One player's figures from each of their files, added together. */
+export function addStats(all: readonly PlayerStats[]): PlayerStats | null {
+    if (all.length === 0) return null;
+    return all.reduce((sum, one) => ({
+        playedMs: sum.playedMs + one.playedMs,
+        deaths: sum.deaths + one.deaths,
+        mobKills: sum.mobKills + one.mobKills,
+        playerKills: sum.playerKills + one.playerKills
+    }));
+}
+
+/** The folder a Java world keeps its stats files in, or null when the level is
+ *  not one Polaris can name. */
+async function statsDir(server: ServerContainer, ownerId: string): Promise<string | null> {
+    if (server.edition === "bedrock") return null;
+    const vars = await listEnvVars("application", server.applicationId, ownerId).catch(() => []);
+    const level = vars.find((entry) => entry.key === world.levelEnvKey("java"))?.value?.trim();
+    if (!level || !/^[\w.-]+$/.test(level)) return null;
+    return `${world.DATA_DIR}/${level}/stats`;
 }
 
 /**
@@ -63,27 +96,18 @@ export async function readMinecraftStats(
 ): Promise<PlayerStats | null> {
     try {
         return await withServerContainer(ownerId, installedAppId, async (server) => {
-            if (server.edition === "bedrock") return null;
-
-            const vars = await listEnvVars("application", server.applicationId, ownerId).catch(
-                () => []
-            );
-            const level = vars
-                .find((entry) => entry.key === world.levelEnvKey("java"))
-                ?.value?.trim();
-            if (!level) return null;
-
-            const cache = await server.run(["cat", "--", `${world.DATA_DIR}/usercache.json`]);
-            if (cache.code !== 0) return null;
-            const uuid = uuidFor(cache.output, name);
-            if (uuid === null || !/^[0-9a-fA-F-]{32,36}$/.test(uuid)) return null;
-
-            const stats = await server.run([
-                "cat",
-                "--",
-                `${world.DATA_DIR}/${level}/stats/${uuid}.json`
-            ]);
-            return stats.code === 0 ? readPlayerStats(stats.output) : null;
+            const dir = await statsDir(server, ownerId);
+            if (!dir) return null;
+            const cache = await readContainerFile(server, `${world.DATA_DIR}/usercache.json`);
+            if (cache === null) return null;
+            const found: PlayerStats[] = [];
+            for (const uuid of uuidsFor(cache, name)) {
+                if (!UUID.test(uuid.toLowerCase())) continue;
+                const json = await readContainerFile(server, `${dir}/${uuid.toLowerCase()}.json`);
+                const stats = json === null ? null : readPlayerStats(json);
+                if (stats) found.push(stats);
+            }
+            return addStats(found);
         });
     } catch {
         return null;
@@ -97,9 +121,11 @@ export interface PlayerMining {
 }
 
 /**
- * Every stats file the world has, by the name of the player it belongs to, read
- * in one pass: the usercache for the names and every file with a marker between
- * them. Empty for Bedrock and for a server that cannot be reached.
+ * Every stats file the world has, by the name of the player it belongs to. In as
+ * many commands as their length needs: together they are longer than one command
+ * can answer, and reading them as one left all but the first few out. Empty for
+ * Bedrock and for
+ * a server that cannot be reached.
  */
 async function readAllStatsFiles(
     ownerId: string,
@@ -107,58 +133,52 @@ async function readAllStatsFiles(
 ): Promise<{ readonly name: string; readonly json: string }[]> {
     try {
         return await withServerContainer(ownerId, installedAppId, async (server) => {
-            if (server.edition === "bedrock") return [];
-            const vars = await listEnvVars("application", server.applicationId, ownerId).catch(
-                () => []
-            );
-            const level = vars
-                .find((entry) => entry.key === world.levelEnvKey("java"))
-                ?.value?.trim();
-            if (!level || !/^[\w.-]+$/.test(level)) return [];
-
-            const cache = await server.run(["cat", "--", `${world.DATA_DIR}/usercache.json`]);
-            const names = new Map<string, string>();
-            if (cache.code === 0) {
-                try {
-                    for (const entry of JSON.parse(cache.output) as CacheEntry[]) {
-                        if (typeof entry?.name === "string" && typeof entry?.uuid === "string") {
-                            names.set(entry.uuid.toLowerCase(), entry.name);
-                        }
-                    }
-                } catch {
-                    // No names: the uuids are shown instead.
-                }
+            const dir = await statsDir(server, ownerId);
+            if (!dir) return [];
+            const cache = await readContainerFile(server, `${world.DATA_DIR}/usercache.json`);
+            // No names: the uuids are shown instead.
+            const names = namesByUuid(cache ?? "");
+            const uuids = new Map<string, string>();
+            for (const entry of await listContainerDir(server, dir)) {
+                const uuid = entry.replace(/\.json$/, "").toLowerCase();
+                if (entry.endsWith(".json") && UUID.test(uuid)) uuids.set(`${dir}/${entry}`, uuid);
             }
-            const dir = `${world.DATA_DIR}/${level}/stats`;
-            const all = await server.run([
-                "sh",
-                "-c",
-                `for f in "${dir}"/*.json; do [ -f "$f" ] || continue; printf '\\n@@%s\\n' "$(basename "$f" .json)"; cat "$f"; done`
-            ]);
-            if (all.code !== 0) return [];
-            return all.output
-                .split("\n@@")
-                .slice(1)
-                .map((part) => {
-                    const newline = part.indexOf("\n");
-                    const uuid = part.slice(0, newline).trim().toLowerCase();
-                    return { name: names.get(uuid) ?? uuid, json: part.slice(newline + 1) };
-                });
+            const read = await readContainerFiles(server, [...uuids.keys()]);
+            return [...read].map(([path, json]) => {
+                const uuid = uuids.get(path)!;
+                return { name: names.get(uuid) ?? uuid, json };
+            });
         });
     } catch {
         return [];
     }
 }
 
-/** The mining figures of every player the world has stats for. */
+/** The mining figures of every player the world has stats for, a player's files
+ *  added together. */
 export async function readAllMining(
     ownerId: string,
     installedAppId: string
 ): Promise<PlayerMining[]> {
-    return (await readAllStatsFiles(ownerId, installedAppId)).flatMap((file) => {
+    const byName = new Map<string, PlayerMining>();
+    for (const file of await readAllStatsFiles(ownerId, installedAppId)) {
         const figures = miningFigures(file.json);
-        return figures ? [{ name: file.name, figures }] : [];
-    });
+        if (!figures) continue;
+        const key = file.name.toLowerCase();
+        const held = byName.get(key)?.figures;
+        byName.set(key, {
+            name: file.name,
+            figures: held
+                ? {
+                      diamonds: held.diamonds + figures.diamonds,
+                      deepRock: held.deepRock + figures.deepRock,
+                      debris: held.debris + figures.debris,
+                      netherRock: held.netherRock + figures.netherRock
+                  }
+                : figures
+        });
+    }
+    return [...byName.values()];
 }
 
 /** How long a reading of every player's figures stands. The game only writes
@@ -176,12 +196,22 @@ export async function readAllPlayerStats(
 ): Promise<PlayerFigures[]> {
     const held = figuresRead.get(installedAppId);
     if (held && Date.now() - held.at < FIGURES_TTL_MS) return held.value;
-    const value = readAllStatsFiles(ownerId, installedAppId).then((files) =>
-        files.flatMap((file) => {
+    // A player filed under two uuids is one row with the time of both.
+    const value = readAllStatsFiles(ownerId, installedAppId).then((files) => {
+        const byName = new Map<string, { name: string; all: PlayerStats[] }>();
+        for (const file of files) {
             const stats = readPlayerStats(file.json);
-            return stats ? [{ name: file.name, stats }] : [];
-        })
-    );
+            if (!stats) continue;
+            const key = file.name.toLowerCase();
+            const held = byName.get(key) ?? { name: file.name, all: [] };
+            held.all.push(stats);
+            byName.set(key, held);
+        }
+        return [...byName.values()].flatMap((one) => {
+            const stats = addStats(one.all);
+            return stats ? [{ name: one.name, stats }] : [];
+        });
+    });
     figuresRead.set(installedAppId, { at: Date.now(), value });
     return value;
 }

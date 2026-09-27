@@ -13,6 +13,7 @@ import type { PlayerList } from "./parse";
 import type { Recipient, SendContext } from "./announcement";
 import type { ServerContainer } from "./service";
 import * as events from "./player-events";
+import { searchContainerTail } from "../container-files";
 import {
     INLINE_TOP,
     LEVEL_RANKING,
@@ -151,10 +152,14 @@ async function lastDeath(
 ): Promise<events.LastDeath | null> {
     const kept = events.readLastDeath(config);
     if (!server) return kept;
-    const tail = await server
-        .run(["tail", "-c", String(events.DEATH_LOG_BYTES), events.SERVER_LOG])
-        .catch(() => null);
-    const found = tail && tail.code === 0 ? events.lastDeathInLog(tail.output) : null;
+    // In pieces from the end: one command carries 16 KiB, and the newest deaths
+    // are at the end of what would have been cut.
+    const found = await searchContainerTail(
+        server,
+        events.SERVER_LOG,
+        events.DEATH_LOG_BYTES,
+        events.lastDeathInLog
+    ).catch(() => null);
     if (!found || (kept && kept.player === found.player && kept.message === found.message)) {
         return kept;
     }
