@@ -12,7 +12,11 @@
  * - **And the account agrees**: an operator can tie any name to any account, so
  *   the link alone is only the operator's word. It counts where the account
  *   says the same - the name is the Minecraft account it connected, proved or
- *   typed - or where the server is the account's own.
+ *   typed - where the server is the account's own, or where the link follows
+ *   the account's sign-ins: that player is only let in from where the account
+ *   signs in to Polaris (`enforcePlayerAddresses` removes anybody else), so
+ *   whoever is playing under that name is whoever holds the account. A link
+ *   that only says who somebody is proves nothing and still needs the first.
  * - **Whether they are on** is the open visits the activity sweep already keeps
  *   (`GamePlayerSession`), so a message costs no question to any server that
  *   nobody linked to this account is playing on. A visit can be up to a minute
@@ -142,7 +146,7 @@ export async function relayTargets(
 ): Promise<{ installedAppId: string; ownerId: string; player: string }[]> {
     const links = await prisma.gamePlayerLink.findMany({
         where: { userId },
-        select: { installedAppId: true, player: true }
+        select: { installedAppId: true, player: true, followSignIns: true }
     });
     if (links.length === 0) return [];
     const connected = await prisma.userConnection.findMany({
@@ -174,7 +178,9 @@ export async function relayTargets(
     for (const link of links) {
         const ownerId = owners.get(link.installedAppId);
         if (!ownerId) continue;
-        if (ownerId !== userId && !ownNames.has(link.player.toLowerCase())) continue;
+        const agrees =
+            ownerId === userId || link.followSignIns || ownNames.has(link.player.toLowerCase());
+        if (!agrees) continue;
         const on = open.find(
             (visit) =>
                 visit.installedAppId === link.installedAppId &&

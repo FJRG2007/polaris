@@ -14,7 +14,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const ANA = "22222222-2222-4222-8222-222222222222";
 
 const fake = vi.hoisted(() => ({
-    links: [] as { installedAppId: string; player: string; userId: string }[],
+    links: [] as {
+        installedAppId: string;
+        player: string;
+        userId: string;
+        followSignIns: boolean;
+    }[],
     installs: [] as { id: string; ownerId: string; catalogId: string; status: string }[],
     sessions: [] as { installedAppId: string; name: string }[],
     connections: [] as { userId: string; label: string }[],
@@ -78,10 +83,15 @@ const MESSAGE = {
 
 beforeEach(() => {
     fake.links = [
-        { installedAppId: "survival", player: "ana_mc", userId: ANA },
-        { installedAppId: "creative", player: "ana_mc", userId: ANA },
-        { installedAppId: "bedrock", player: "ana_mc", userId: ANA },
-        { installedAppId: "survival", player: "ben_mc", userId: "someone-else" }
+        { installedAppId: "survival", player: "ana_mc", userId: ANA, followSignIns: false },
+        { installedAppId: "creative", player: "ana_mc", userId: ANA, followSignIns: false },
+        { installedAppId: "bedrock", player: "ana_mc", userId: ANA, followSignIns: false },
+        {
+            installedAppId: "survival",
+            player: "ben_mc",
+            userId: "someone-else",
+            followSignIns: false
+        }
     ];
     fake.installs = [
         { id: "survival", ownerId: "o1", catalogId: "minecraft", status: "running" },
@@ -217,6 +227,20 @@ describe("who it is shown to", () => {
         fake.connections = [{ userId: ANA, label: "someone_else" }];
         await relay.relayChatToMinecraft(MESSAGE);
         expect(fake.said).toEqual([]);
+    });
+
+    it("is a player an operator linked to follow the account's sign-ins, with nothing connected", async () => {
+        // Offgrid, 2026-09-27: every player linked from the Players list, none of
+        // them with a Minecraft name on their account, and only the owner saw
+        // anything. A player held to where the account signs in is its holder.
+        fake.connections = [];
+        fake.links = fake.links.map((link) =>
+            link.installedAppId === "survival" && link.userId === ANA
+                ? { ...link, followSignIns: true }
+                : link
+        );
+        await relay.relayChatToMinecraft(MESSAGE);
+        expect(fake.said.map((one) => one.installedAppId)).toEqual(["survival"]);
     });
 
     it("is the linked player on a server the account owns, whatever it connected", async () => {
