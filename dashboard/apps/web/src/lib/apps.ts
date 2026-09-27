@@ -1983,13 +1983,29 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         label: "Announce",
         icon: Megaphone,
         group: TALKING_GROUP,
-        keywords: ["title", "subtitle", "action bar", "broadcast", "tellraw", "sound", "message everybody"]
+        keywords: [
+            "title",
+            "subtitle",
+            "action bar",
+            "broadcast",
+            "tellraw",
+            "sound",
+            "message everybody"
+        ]
     },
     panel: {
         label: "Side panel",
         icon: PanelRight,
         group: TALKING_GROUP,
-        keywords: ["scoreboard", "sidebar", "leaderboard", "ranking", "last death", "levels", "who is online"]
+        keywords: [
+            "scoreboard",
+            "sidebar",
+            "leaderboard",
+            "ranking",
+            "last death",
+            "levels",
+            "who is online"
+        ]
     },
     schedule: {
         label: "Schedule",
@@ -2041,7 +2057,16 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         label: "Anti-cheat",
         icon: ScanFace,
         group: ACCESS_GROUP,
-        keywords: ["x-ray", "xray", "honeypot", "cheating", "flying", "fly hack", "teleport", "diamonds"]
+        keywords: [
+            "x-ray",
+            "xray",
+            "honeypot",
+            "cheating",
+            "flying",
+            "fly hack",
+            "teleport",
+            "diamonds"
+        ]
     },
     settings: {
         label: "Settings",

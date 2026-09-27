@@ -323,404 +323,412 @@ export function MinecraftAnnounce({
     return (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div className="flex min-w-0 flex-col gap-4">
-            <Card>
-                <CardBody className="flex flex-col gap-4">
-                    <div>
-                        <p className="text-sm font-medium">Announce</p>
-                        <p className="text-xs text-muted-foreground">
-                            Select some text and pick a color or a style for it. Leave a part empty
-                            to skip it.
-                        </p>
-                    </div>
-
-                    {live?.pinned && (
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
-                            <span className="min-w-0 text-xs">
-                                <span className="font-medium">On screen now: </span>
-                                <span className="text-muted-foreground">
-                                    {mc
-                                        .stripMotd(
-                                            live.pinned.announcement.title ||
-                                                live.pinned.announcement.actionbar ||
-                                                live.pinned.announcement.subtitle
-                                        )
-                                        .slice(0, 60)}
-                                    {" - "}
-                                    {live.pinned.endsAt === null
-                                        ? "until it is taken down"
-                                        : `until ${new Date(live.pinned.endsAt).toLocaleString()}`}
-                                </span>
-                            </span>
-                            <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={pending}
-                                onClick={stopPinned}
-                            >
-                                Take it down
-                            </Button>
+                <Card>
+                    <CardBody className="flex flex-col gap-4">
+                        <div>
+                            <p className="text-sm font-medium">Announce</p>
+                            <p className="text-xs text-muted-foreground">
+                                Select some text and pick a color or a style for it. Leave a part
+                                empty to skip it.
+                            </p>
                         </div>
-                    )}
 
-                    <div className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">Templates</span>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                            {templates.length === 0 && (
-                                <span className="text-xs text-muted-foreground">
-                                    None yet. Write one below and save it to send it again later.
-                                </span>
-                            )}
-                            {templates.map((template) => (
-                                <span
-                                    key={template.id}
-                                    className={cn(
-                                        "flex items-stretch overflow-hidden rounded-md border bg-surface",
-                                        from?.id === template.id
-                                            ? "border-primary"
-                                            : "border-border"
-                                    )}
-                                >
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setDraft({
-                                                ...BLANK_ANNOUNCEMENT,
-                                                ...template.announcement
-                                            });
-                                            setFrom(template);
-                                            setError(null);
-                                            setNote(null);
-                                        }}
-                                        className="max-w-48 truncate px-2 py-1 text-xs transition-colors hover:bg-muted"
-                                        title={`Load "${template.name}"`}
-                                    >
-                                        {template.name}
-                                    </button>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <button
-                                                type="button"
-                                                aria-label={`More for ${template.name}`}
-                                                title={`More for ${template.name}`}
-                                                className="border-l border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                            >
-                                                <MoreHorizontal className="size-3.5" />
-                                            </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="start">
-                                            <DropdownMenuItem
-                                                onSelect={() =>
-                                                    setNaming({
-                                                        id: template.id,
-                                                        name: template.name
-                                                    })
-                                                }
-                                            >
-                                                <Save className="size-4" /> Save what is written
-                                                into it
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                className="text-danger"
-                                                onSelect={() => void forget(template)}
-                                            >
-                                                <Trash2 className="size-4" /> Delete
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-
-                    <SendTo
-                        target={draft.target}
-                        players={players}
-                        edition={edition}
-                        onChange={(next) => set({ target: next })}
-                        problem={problems.target}
-                    />
-
-                    <Section title="Title" hint="Big, in the middle of the screen.">
-                        <FormattedTextField
-                            value={draft.title}
-                            onChange={(title) => set({ title })}
-                            rows={1}
-                            singleLine
-                            label="Title"
-                            inserts={inserts}
-                            footnote={
-                                <FieldNote
-                                    text={draft.title}
-                                    max={LINE_MAX}
-                                    problem={problems.title}
-                                />
-                            }
-                            placeholder="Server restart"
-                        />
-                    </Section>
-                    <Section title="Subtitle" hint="Smaller, under the title.">
-                        <FormattedTextField
-                            value={draft.subtitle}
-                            onChange={(subtitle) => set({ subtitle })}
-                            rows={1}
-                            singleLine
-                            label="Subtitle"
-                            inserts={inserts}
-                            footnote={
-                                <FieldNote
-                                    text={draft.subtitle}
-                                    max={LINE_MAX}
-                                    problem={problems.subtitle}
-                                />
-                            }
-                            placeholder="Back in a minute, don't leave"
-                        />
-                    </Section>
-                    <Section title="Action bar" hint="One line just above the hotbar.">
-                        <FormattedTextField
-                            value={draft.actionbar}
-                            onChange={(actionbar) => set({ actionbar })}
-                            rows={1}
-                            singleLine
-                            label="Action bar"
-                            inserts={inserts}
-                            footnote={
-                                <FieldNote
-                                    text={draft.actionbar}
-                                    max={LINE_MAX}
-                                    problem={problems.actionbar}
-                                />
-                            }
-                            placeholder="Check your inventory for a gift"
-                        />
-                    </Section>
-                    <Section title="Chat" hint={`Up to ${CHAT_MAX_LINES} lines in the chat.`}>
-                        <FormattedTextField
-                            value={draft.chat}
-                            onChange={(chat) => set({ chat })}
-                            rows={3}
-                            label="Chat message"
-                            inserts={inserts}
-                            footnote={
-                                <FieldNote
-                                    text={draft.chat}
-                                    max={CHAT_MAX}
-                                    problem={problems.chat}
-                                />
-                            }
-                            placeholder="Thanks for your patience!"
-                            actions={
-                                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Switch
-                                        checked={draft.tagged}
-                                        onChange={(tagged) => set({ tagged })}
-                                        aria-label="Start the chat message with [Polaris]"
-                                    />
-                                    [Polaris] in front
-                                </label>
-                            }
-                        />
-                    </Section>
-
-                    <div className="grid grid-cols-3 gap-2">
-                        {(
-                            [
-                                ["fadeIn", "Fade in"],
-                                ["stay", "On screen"],
-                                ["fadeOut", "Fade out"]
-                            ] as const
-                        ).map(([key, label]) => (
-                            <label key={key} className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">{label}</span>
-                                <span className="flex items-center gap-1">
-                                    <Input
-                                        type="number"
-                                        min={0}
-                                        max={SECONDS_MAX}
-                                        step={0.5}
-                                        value={draft[key]}
-                                        onChange={(event) => {
-                                            const seconds = Number(event.target.value);
-                                            if (!Number.isFinite(seconds)) return;
-                                            set({
-                                                [key]: Math.min(Math.max(seconds, 0), SECONDS_MAX)
-                                            });
-                                        }}
-                                        aria-label={`${label}, in seconds`}
-                                    />
-                                    <span className="text-xs text-muted-foreground">s</span>
-                                </span>
-                            </label>
-                        ))}
-                    </div>
-
-                    <div className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Stays on screen</span>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                            <Select
-                                value={draft.hold}
-                                onValueChange={(value) =>
-                                    set({
-                                        hold: value as Hold,
-                                        until: value === "until" ? draft.until : ""
-                                    })
-                                }
-                                options={HOLDS.map((hold) => ({
-                                    value: hold.value,
-                                    label: hold.label
-                                }))}
-                                aria-label="How long it stays on screen"
-                            />
-                            {draft.hold === "until" && (
-                                <Input
-                                    type="datetime-local"
-                                    value={toLocalInput(draft.until)}
-                                    onChange={(event) => {
-                                        const moment = Date.parse(event.target.value);
-                                        set({
-                                            until: Number.isFinite(moment)
-                                                ? new Date(moment).toISOString()
-                                                : ""
-                                        });
-                                    }}
-                                    aria-label="Until when"
-                                />
-                            )}
-                        </div>
-                        {(problems.hold || problems.until) && (
-                            <span role="alert" className="text-xs text-danger">
-                                {problems.hold ?? problems.until}
-                            </span>
-                        )}
-                        {!problems.hold && !problems.until && needsRepeating(draft) && (
-                            <span className="text-xs text-muted-foreground">
-                                {draft.hold === "timed"
-                                    ? "The game shows an action bar for about three seconds, so Polaris sends it again until the time is up."
-                                    : "Polaris keeps sending it until then. You can take it down from here at any time."}
-                            </span>
-                        )}
-                    </div>
-
-                    {java && (
-                        <div className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Sound</span>
-                            <span className="flex items-center gap-1">
-                                <span className="min-w-0 flex-1">
-                                    <Select
-                                        value={draft.sound || NO_SOUND}
-                                        // Picking one does not play it: a sound
-                                        // nobody asked to hear is a surprise, and
-                                        // the speaker beside it is one press away.
-                                        onValueChange={(value) =>
-                                            set({ sound: value === NO_SOUND ? "" : value })
-                                        }
-                                        options={ANNOUNCE_SOUNDS.map((sound) => ({
-                                            value: sound.id || NO_SOUND,
-                                            label: sound.label
-                                        }))}
-                                        aria-label="Sound"
-                                    />
+                        {live?.pinned && (
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
+                                <span className="min-w-0 text-xs">
+                                    <span className="font-medium">On screen now: </span>
+                                    <span className="text-muted-foreground">
+                                        {mc
+                                            .stripMotd(
+                                                live.pinned.announcement.title ||
+                                                    live.pinned.announcement.actionbar ||
+                                                    live.pinned.announcement.subtitle
+                                            )
+                                            .slice(0, 60)}
+                                        {" - "}
+                                        {live.pinned.endsAt === null
+                                            ? "until it is taken down"
+                                            : `until ${new Date(live.pinned.endsAt).toLocaleString()}`}
+                                    </span>
                                 </span>
                                 <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    disabled={!draft.sound || hearing}
-                                    onClick={() => hear(draft.sound)}
-                                    aria-label="Hear this sound"
-                                    title="Hear this sound"
+                                    size="sm"
+                                    variant="secondary"
+                                    disabled={pending}
+                                    onClick={stopPinned}
                                 >
-                                    {hearing ? (
+                                    Take it down
+                                </Button>
+                            </div>
+                        )}
+
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-xs font-medium text-muted-foreground">
+                                Templates
+                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {templates.length === 0 && (
+                                    <span className="text-xs text-muted-foreground">
+                                        None yet. Write one below and save it to send it again
+                                        later.
+                                    </span>
+                                )}
+                                {templates.map((template) => (
+                                    <span
+                                        key={template.id}
+                                        className={cn(
+                                            "flex items-stretch overflow-hidden rounded-md border bg-surface",
+                                            from?.id === template.id
+                                                ? "border-primary"
+                                                : "border-border"
+                                        )}
+                                    >
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setDraft({
+                                                    ...BLANK_ANNOUNCEMENT,
+                                                    ...template.announcement
+                                                });
+                                                setFrom(template);
+                                                setError(null);
+                                                setNote(null);
+                                            }}
+                                            className="max-w-48 truncate px-2 py-1 text-xs transition-colors hover:bg-muted"
+                                            title={`Load "${template.name}"`}
+                                        >
+                                            {template.name}
+                                        </button>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    aria-label={`More for ${template.name}`}
+                                                    title={`More for ${template.name}`}
+                                                    className="border-l border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                >
+                                                    <MoreHorizontal className="size-3.5" />
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="start">
+                                                <DropdownMenuItem
+                                                    onSelect={() =>
+                                                        setNaming({
+                                                            id: template.id,
+                                                            name: template.name
+                                                        })
+                                                    }
+                                                >
+                                                    <Save className="size-4" /> Save what is written
+                                                    into it
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    className="text-danger"
+                                                    onSelect={() => void forget(template)}
+                                                >
+                                                    <Trash2 className="size-4" /> Delete
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+
+                        <SendTo
+                            target={draft.target}
+                            players={players}
+                            edition={edition}
+                            onChange={(next) => set({ target: next })}
+                            problem={problems.target}
+                        />
+
+                        <Section title="Title" hint="Big, in the middle of the screen.">
+                            <FormattedTextField
+                                value={draft.title}
+                                onChange={(title) => set({ title })}
+                                rows={1}
+                                singleLine
+                                label="Title"
+                                inserts={inserts}
+                                footnote={
+                                    <FieldNote
+                                        text={draft.title}
+                                        max={LINE_MAX}
+                                        problem={problems.title}
+                                    />
+                                }
+                                placeholder="Server restart"
+                            />
+                        </Section>
+                        <Section title="Subtitle" hint="Smaller, under the title.">
+                            <FormattedTextField
+                                value={draft.subtitle}
+                                onChange={(subtitle) => set({ subtitle })}
+                                rows={1}
+                                singleLine
+                                label="Subtitle"
+                                inserts={inserts}
+                                footnote={
+                                    <FieldNote
+                                        text={draft.subtitle}
+                                        max={LINE_MAX}
+                                        problem={problems.subtitle}
+                                    />
+                                }
+                                placeholder="Back in a minute, don't leave"
+                            />
+                        </Section>
+                        <Section title="Action bar" hint="One line just above the hotbar.">
+                            <FormattedTextField
+                                value={draft.actionbar}
+                                onChange={(actionbar) => set({ actionbar })}
+                                rows={1}
+                                singleLine
+                                label="Action bar"
+                                inserts={inserts}
+                                footnote={
+                                    <FieldNote
+                                        text={draft.actionbar}
+                                        max={LINE_MAX}
+                                        problem={problems.actionbar}
+                                    />
+                                }
+                                placeholder="Check your inventory for a gift"
+                            />
+                        </Section>
+                        <Section title="Chat" hint={`Up to ${CHAT_MAX_LINES} lines in the chat.`}>
+                            <FormattedTextField
+                                value={draft.chat}
+                                onChange={(chat) => set({ chat })}
+                                rows={3}
+                                label="Chat message"
+                                inserts={inserts}
+                                footnote={
+                                    <FieldNote
+                                        text={draft.chat}
+                                        max={CHAT_MAX}
+                                        problem={problems.chat}
+                                    />
+                                }
+                                placeholder="Thanks for your patience!"
+                                actions={
+                                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <Switch
+                                            checked={draft.tagged}
+                                            onChange={(tagged) => set({ tagged })}
+                                            aria-label="Start the chat message with [Polaris]"
+                                        />
+                                        [Polaris] in front
+                                    </label>
+                                }
+                            />
+                        </Section>
+
+                        <div className="grid grid-cols-3 gap-2">
+                            {(
+                                [
+                                    ["fadeIn", "Fade in"],
+                                    ["stay", "On screen"],
+                                    ["fadeOut", "Fade out"]
+                                ] as const
+                            ).map(([key, label]) => (
+                                <label key={key} className="flex flex-col gap-1 text-sm">
+                                    <span className="font-medium">{label}</span>
+                                    <span className="flex items-center gap-1">
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={SECONDS_MAX}
+                                            step={0.5}
+                                            value={draft[key]}
+                                            onChange={(event) => {
+                                                const seconds = Number(event.target.value);
+                                                if (!Number.isFinite(seconds)) return;
+                                                set({
+                                                    [key]: Math.min(
+                                                        Math.max(seconds, 0),
+                                                        SECONDS_MAX
+                                                    )
+                                                });
+                                            }}
+                                            aria-label={`${label}, in seconds`}
+                                        />
+                                        <span className="text-xs text-muted-foreground">s</span>
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+
+                        <div className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">Stays on screen</span>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                                <Select
+                                    value={draft.hold}
+                                    onValueChange={(value) =>
+                                        set({
+                                            hold: value as Hold,
+                                            until: value === "until" ? draft.until : ""
+                                        })
+                                    }
+                                    options={HOLDS.map((hold) => ({
+                                        value: hold.value,
+                                        label: hold.label
+                                    }))}
+                                    aria-label="How long it stays on screen"
+                                />
+                                {draft.hold === "until" && (
+                                    <Input
+                                        type="datetime-local"
+                                        value={toLocalInput(draft.until)}
+                                        onChange={(event) => {
+                                            const moment = Date.parse(event.target.value);
+                                            set({
+                                                until: Number.isFinite(moment)
+                                                    ? new Date(moment).toISOString()
+                                                    : ""
+                                            });
+                                        }}
+                                        aria-label="Until when"
+                                    />
+                                )}
+                            </div>
+                            {(problems.hold || problems.until) && (
+                                <span role="alert" className="text-xs text-danger">
+                                    {problems.hold ?? problems.until}
+                                </span>
+                            )}
+                            {!problems.hold && !problems.until && needsRepeating(draft) && (
+                                <span className="text-xs text-muted-foreground">
+                                    {draft.hold === "timed"
+                                        ? "The game shows an action bar for about three seconds, so Polaris sends it again until the time is up."
+                                        : "Polaris keeps sending it until then. You can take it down from here at any time."}
+                                </span>
+                            )}
+                        </div>
+
+                        {java && (
+                            <div className="flex flex-col gap-1 text-sm">
+                                <span className="font-medium">Sound</span>
+                                <span className="flex items-center gap-1">
+                                    <span className="min-w-0 flex-1">
+                                        <Select
+                                            value={draft.sound || NO_SOUND}
+                                            // Picking one does not play it: a sound
+                                            // nobody asked to hear is a surprise, and
+                                            // the speaker beside it is one press away.
+                                            onValueChange={(value) =>
+                                                set({ sound: value === NO_SOUND ? "" : value })
+                                            }
+                                            options={ANNOUNCE_SOUNDS.map((sound) => ({
+                                                value: sound.id || NO_SOUND,
+                                                label: sound.label
+                                            }))}
+                                            aria-label="Sound"
+                                        />
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        disabled={!draft.sound || hearing}
+                                        onClick={() => hear(draft.sound)}
+                                        aria-label="Hear this sound"
+                                        title="Hear this sound"
+                                    >
+                                        {hearing ? (
+                                            <Loader2 className="size-4 animate-spin" />
+                                        ) : (
+                                            <Volume2 className="size-4" />
+                                        )}
+                                    </Button>
+                                </span>
+                                {heardError && (
+                                    <span className="text-xs text-danger">{heardError}</span>
+                                )}
+                            </div>
+                        )}
+
+                        {error && (
+                            <p role="alert" className="text-sm text-danger">
+                                {error}
+                            </p>
+                        )}
+
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">
+                                {note ?? (running ? "" : "Start the server to send it.")}
+                            </span>
+                            <span className="flex items-center gap-2">
+                                <Button
+                                    variant="secondary"
+                                    disabled={pending || empty}
+                                    onClick={() =>
+                                        setNaming(
+                                            from
+                                                ? { id: from.id, name: from.name }
+                                                : {
+                                                      name: mc
+                                                          .stripMotd(draft.title)
+                                                          .trim()
+                                                          .slice(0, MAX_TEMPLATE_NAME)
+                                                  }
+                                        )
+                                    }
+                                >
+                                    <Save className="size-4" />{" "}
+                                    {from ? "Save template" : "Save as template"}
+                                </Button>
+                                <Button
+                                    disabled={
+                                        !running ||
+                                        pending ||
+                                        empty ||
+                                        blocked ||
+                                        built.problem !== null
+                                    }
+                                    onClick={send}
+                                >
+                                    {pending ? (
                                         <Loader2 className="size-4 animate-spin" />
                                     ) : (
-                                        <Volume2 className="size-4" />
+                                        <Send className="size-4" />
                                     )}
+                                    Send
                                 </Button>
                             </span>
-                            {heardError && (
-                                <span className="text-xs text-danger">{heardError}</span>
-                            )}
                         </div>
-                    )}
 
-                    {error && (
-                        <p role="alert" className="text-sm text-danger">
-                            {error}
-                        </p>
-                    )}
-
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-xs text-muted-foreground">
-                            {note ?? (running ? "" : "Start the server to send it.")}
-                        </span>
-                        <span className="flex items-center gap-2">
-                            <Button
-                                variant="secondary"
-                                disabled={pending || empty}
-                                onClick={() =>
-                                    setNaming(
-                                        from
-                                            ? { id: from.id, name: from.name }
-                                            : {
-                                                  name: mc
-                                                      .stripMotd(draft.title)
-                                                      .trim()
-                                                      .slice(0, MAX_TEMPLATE_NAME)
-                                              }
-                                    )
-                                }
-                            >
-                                <Save className="size-4" />{" "}
-                                {from ? "Save template" : "Save as template"}
-                            </Button>
-                            <Button
-                                disabled={
-                                    !running ||
-                                    pending ||
-                                    empty ||
-                                    blocked ||
-                                    built.problem !== null
-                                }
-                                onClick={send}
-                            >
-                                {pending ? (
-                                    <Loader2 className="size-4 animate-spin" />
-                                ) : (
-                                    <Send className="size-4" />
-                                )}
-                                Send
-                            </Button>
-                        </span>
-                    </div>
-
-                    <details className="group rounded-md border border-border">
-                        <summary className="flex cursor-pointer items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground">
-                            <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
-                            The commands this sends
-                        </summary>
-                        <div className="flex flex-col gap-1 border-t border-border p-2">
-                            {built.lines.length === 0 ? (
-                                <span className="text-xs text-muted-foreground">Nothing yet.</span>
-                            ) : (
-                                built.lines.map((line, index) => (
-                                    <span key={index} className="flex items-start gap-1">
-                                        <code
-                                            className={cn(
-                                                "min-w-0 flex-1 break-all rounded bg-muted px-1.5 py-1 text-[11px]",
-                                                commandBytes(line) > COMMAND_BYTES_MAX &&
-                                                    "text-danger"
-                                            )}
-                                        >
-                                            {line}
-                                        </code>
-                                        <CopyButton value={line} label="this command" />
+                        <details className="group rounded-md border border-border">
+                            <summary className="flex cursor-pointer items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground">
+                                <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
+                                The commands this sends
+                            </summary>
+                            <div className="flex flex-col gap-1 border-t border-border p-2">
+                                {built.lines.length === 0 ? (
+                                    <span className="text-xs text-muted-foreground">
+                                        Nothing yet.
                                     </span>
-                                ))
-                            )}
-                        </div>
-                    </details>
-                </CardBody>
-            </Card>
+                                ) : (
+                                    built.lines.map((line, index) => (
+                                        <span key={index} className="flex items-start gap-1">
+                                            <code
+                                                className={cn(
+                                                    "min-w-0 flex-1 break-all rounded bg-muted px-1.5 py-1 text-[11px]",
+                                                    commandBytes(line) > COMMAND_BYTES_MAX &&
+                                                        "text-danger"
+                                                )}
+                                            >
+                                                {line}
+                                            </code>
+                                            <CopyButton value={line} label="this command" />
+                                        </span>
+                                    ))
+                                )}
+                            </div>
+                        </details>
+                    </CardBody>
+                </Card>
                 <VariablesHelp edition={edition} scope="all" />
             </div>
 

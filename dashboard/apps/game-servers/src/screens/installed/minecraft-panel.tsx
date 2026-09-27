@@ -492,8 +492,8 @@ export function MinecraftPanel({
                 ((game?.edition ?? status?.edition ?? "java") === "bedrock" ? (
                     <Card>
                         <CardBody className="py-10 text-center text-sm text-muted-foreground">
-                            Anti-cheat reads what the game counts for each player, which only
-                            Java keeps.
+                            Anti-cheat reads what the game counts for each player, which only Java
+                            keeps.
                         </CardBody>
                     </Card>
                 ) : (

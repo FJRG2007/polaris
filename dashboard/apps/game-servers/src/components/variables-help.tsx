@@ -16,7 +16,8 @@ import { VARIABLES, type VariableSpec } from "../lib/minecraft/text-vars";
 
 /** The headings the values are read under, in the order they are shown. */
 function groupOf(spec: VariableSpec): string {
-    if (spec.name.startsWith("rank.") || spec.name === "server.levels") return "Leaderboards and lists";
+    if (spec.name.startsWith("rank.") || spec.name === "server.levels")
+        return "Leaderboards and lists";
     if (spec.name.startsWith("death.")) return "Last death";
     if (spec.name.startsWith("call.")) return "The chat group's call";
     if (spec.kind === "game" || spec.kind === "account") return "The player reading it";
@@ -40,7 +41,8 @@ export function VariablesHelp({
     scope: "all" | "server";
 }) {
     const offered = VARIABLES.filter(
-        (spec) => (edition !== "bedrock" || spec.bedrock) && (scope === "all" || spec.kind === "server")
+        (spec) =>
+            (edition !== "bedrock" || spec.bedrock) && (scope === "all" || spec.kind === "server")
     );
     const groups = GROUP_ORDER.map((label) => ({
         label,
@@ -55,7 +57,8 @@ export function VariablesHelp({
                     <p className="text-xs text-muted-foreground">
                         Type {"{"} in a line to pick one. Polaris fills it in when it is sent. Add
                         what to show when there is nothing yet: {'{death.player | "Nobody"}'}.
-                        {scope === "server" && " A leaderboard or list alone on a line becomes a line a player."}
+                        {scope === "server" &&
+                            " A leaderboard or list alone on a line becomes a line a player."}
                     </p>
                 </div>
                 {groups.map((group) => (
@@ -65,7 +68,10 @@ export function VariablesHelp({
                         </p>
                         <dl className="flex flex-col gap-1">
                             {group.specs.map((spec) => (
-                                <div key={spec.name} className="flex flex-wrap items-baseline gap-x-2">
+                                <div
+                                    key={spec.name}
+                                    className="flex flex-wrap items-baseline gap-x-2"
+                                >
                                     <dt>
                                         <code className="rounded bg-muted px-1 font-mono text-xs">{`{${spec.name}}`}</code>
                                     </dt>
@@ -82,12 +88,16 @@ export function VariablesHelp({
                         Colours and styles
                     </p>
                     <p className="text-xs text-muted-foreground">
-                        Select text and use the buttons, or show the codes and type them: {"&"}{" "}
-                        and a character, which applies from there on. {"&r"} goes back to plain.
+                        Select text and use the buttons, or show the codes and type them: {"&"} and
+                        a character, which applies from there on. {"&r"} goes back to plain.
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                         {Object.entries(mc.MOTD_COLORS).map(([code, color]) => (
-                            <span key={code} className="flex items-center gap-1 text-xs" title={color.name}>
+                            <span
+                                key={code}
+                                className="flex items-center gap-1 text-xs"
+                                title={color.name}
+                            >
                                 <span
                                     className="size-3 rounded-sm border border-border"
                                     style={{ backgroundColor: color.hex }}
