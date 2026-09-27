@@ -4,8 +4,8 @@
  *
  * What is pinned: each counter is read from the same stats file as the rest,
  * with flying and falling left out of the distance; a player filed under two
- * uuids adds up, except the run since the last death, which is the longest of
- * the two; each ranking reads in its own unit and short enough for a line; and
+ * uuids adds up, except the run since the last death, which is the first
+ * file's; each ranking reads in its own unit and short enough for a line; and
  * every ranking is offered as a variable, a ready-made block and a preview.
  */
 
@@ -77,11 +77,12 @@ describe("the counters in a stats file", () => {
         expect(readTallies('{"DataVersion":4189}')).toBeNull();
     });
 
-    it("add up over two files of one player, but a life is the longer of the two", () => {
+    it("add up over two files of one player, but a life is the first file's", () => {
         const one = readTallies(file)!;
         const both = addTallies([one, { ...one, aliveTicks: 10 }])!;
         expect(both.mined).toBe(1_810);
         expect(both.aliveTicks).toBe(72_000);
+        expect(addTallies([{ ...one, aliveTicks: 10 }, one])!.aliveTicks).toBe(10);
         expect(addTallies([])).toBeNull();
     });
 });
@@ -102,11 +103,22 @@ describe("the new leaderboards", () => {
         expect(statsRanking("rank.chests", players)).toEqual(["1. Steve 12"]);
     });
 
+    it("show a scratch as a tenth of a heart, not as none", () => {
+        const scratched = (damageDealt: number) => [
+            { ...players[0]!, tallies: { ...players[0]!.tallies!, damageDealt } }
+        ];
+        expect(statsRanking("rank.damage", scratched(1))).toEqual(["1. Steve 0.1"]);
+        expect(statsRanking("rank.damage", scratched(9))).toEqual(["1. Steve 0.5"]);
+        expect(statsRanking("rank.damage", scratched(30))).toEqual(["1. Steve 2"]);
+    });
+
     it("stay short on a line", () => {
         expect(countText(9_999)).toBe("9999");
         expect(countText(37_403)).toBe("37.4k");
         expect(countText(17_000)).toBe("17k");
         expect(countText(2_500_000)).toBe("2.5M");
+        expect(countText(9_999.6)).toBe("10k");
+        expect(countText(999_960)).toBe("1M");
         expect(distanceText(85_000)).toBe("850m");
         expect(distanceText(41_250_000)).toBe("412.5km");
     });

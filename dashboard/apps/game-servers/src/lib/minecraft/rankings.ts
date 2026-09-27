@@ -111,13 +111,15 @@ export function readTallies(json: string): PlayerTallies | null {
 }
 
 /** A player's tallies from each of their files, added together - except the run
- *  since the last death, which is one life and not a sum of two. */
+ *  since the last death, which is one life and not a sum of two: it is the first
+ *  file's, the one the player joined under last, since a file they no longer use
+ *  stopped counting it the day they left it. */
 export function addTallies(all: readonly PlayerTallies[]): PlayerTallies | null {
     if (all.length === 0) return null;
     return all.reduce((sum, one) => {
         const added = { ...sum };
         for (const key of Object.keys(one) as (keyof PlayerTallies)[]) {
-            added[key] = key === "aliveTicks" ? Math.max(sum[key], one[key]) : sum[key] + one[key];
+            if (key !== "aliveTicks") added[key] = sum[key] + one[key];
         }
         return added;
     });
@@ -127,10 +129,11 @@ const TICK_MS = 50;
 
 /** A count that stays short on a line: 9999, then 12.3k, then 1.2M. */
 export function countText(value: number): string {
-    const short = (divided: number, unit: string) => `${Number(divided.toFixed(1))}${unit}`;
-    if (value < 10_000) return String(Math.round(value));
-    if (value < 1_000_000) return short(value / 1_000, "k");
-    return short(value / 1_000_000, "M");
+    const rounded = Math.round(value);
+    if (rounded < 10_000) return String(rounded);
+    const thousands = Number((value / 1_000).toFixed(1));
+    if (thousands < 1_000) return `${thousands}k`;
+    return `${Number((value / 1_000_000).toFixed(1))}M`;
 }
 
 /** Distance from centimetres: metres, or kilometres from one. */
@@ -139,9 +142,11 @@ export function distanceText(cm: number): string {
     return metres < 1_000 ? `${Math.floor(metres)}m` : `${Number((metres / 1_000).toFixed(1))}km`;
 }
 
-/** Damage in hearts, from the game's tenths of a health point. */
+/** Damage in hearts, from the game's tenths of a health point; a tenth under
+ *  one heart, so nobody on the board reads as none. */
 function heartsText(tenths: number): string {
-    return countText(Math.round(tenths / 20));
+    const hearts = tenths / 20;
+    return hearts < 1 ? String(Number(hearts.toFixed(1)) || 0.1) : countText(Math.round(hearts));
 }
 
 interface Ranking {
