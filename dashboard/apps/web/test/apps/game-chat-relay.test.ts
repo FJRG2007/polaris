@@ -153,6 +153,21 @@ describe("the line a player is shown", () => {
         expect(line).toContain("answer");
     });
 
+    it("shortens a poll's answers, then drops the last ones, before dropping the message", () => {
+        const line = relay.relayCommand("Ana_MC", {
+            ...MESSAGE,
+            author: "猫".repeat(48),
+            conversation: "犬".repeat(48),
+            text: "語".repeat(200),
+            files: "画".repeat(48),
+            poll: Array.from({ length: 10 }, (_, index) => `${"答".repeat(47)}${index}`)
+        });
+        expect(line).not.toBeNull();
+        expect(Buffer.byteLength(line!, "utf8")).toBeLessThanOrEqual(1400);
+        expect(line).toContain("[Poll]");
+        expect(line).toContain("画".repeat(48));
+    });
+
     it("names the conversation when it is not the author's own", () => {
         const line = relay.relayCommand("Ana_MC", {
             ...MESSAGE,

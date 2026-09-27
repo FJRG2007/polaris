@@ -57,6 +57,9 @@ const MOST_TEXT = 200;
 /** The longest a file's name or a poll's answer is shown. */
 const MOST_LABEL = 48;
 
+/** The shortest a poll's answer is cut to so the line fits in one command. */
+const LEAST_LABEL = 16;
+
 /** The shortest the words are cut to so the line fits in one command. */
 const LEAST_TEXT = 24;
 
@@ -76,8 +79,8 @@ function literal(value: string, max: number): string {
  * What is not words gets a label of its own beside them, so a photo with a
  * caption reads as both and a voice note is not an empty line: `[Photo]`,
  * `[3 files]`, a poll's question and answers, and whether it was forwarded.
- * Where it all would not fit in one command the words are cut first, and the
- * labels are kept.
+ * Where it all would not fit in one command the words are cut first, then a
+ * poll's answers, and the other labels are kept.
  */
 export function relayCommand(
     player: string,
@@ -102,9 +105,9 @@ export function relayCommand(
     head.push({ text: ": ", color: "gray" });
     if (message.forwarded) head.push({ text: "[Forwarded] ", color: "gray", italic: true });
 
-    const answers = (message.poll ?? []).map((one) => literal(one, MOST_LABEL)).filter(Boolean);
+    const poll = (message.poll ?? []).map((one) => literal(one, MOST_LABEL)).filter(Boolean);
     const files = message.files ? literal(message.files, MOST_LABEL) : "";
-    const body = (max: number): Record<string, unknown>[] => {
+    const body = (max: number, answers: readonly string[]): Record<string, unknown>[] => {
         const runs: Record<string, unknown>[] = [];
         const words = literal(message.text, max);
         if (message.poll) runs.push({ text: "[Poll] ", color: "aqua" });
@@ -114,9 +117,20 @@ export function relayCommand(
         if (runs.length === 0) runs.push({ text: "Sent a message", color: "gray", italic: true });
         return runs;
     };
+    const fitting = (max: number, answers: readonly string[]): string | null => {
+        const line = `tellraw ${target} ${JSON.stringify([...head, ...body(max, answers)])}`;
+        return commandBytes(line) <= COMMAND_BYTES_MAX ? line : null;
+    };
     for (let max = MOST_TEXT; max >= LEAST_TEXT; max = Math.floor(max / 2)) {
-        const line = `tellraw ${target} ${JSON.stringify([...head, ...body(max)])}`;
-        if (commandBytes(line) <= COMMAND_BYTES_MAX) return line;
+        const line = fitting(max, poll);
+        if (line) return line;
+    }
+    // Then a poll's answers: shorter, and at last only as many as fit.
+    const short = poll.map((one) => literal(one, LEAST_LABEL));
+    for (let kept = short.length; kept >= 0; kept -= 1) {
+        const answers = kept < short.length ? [...short.slice(0, kept), "..."] : short;
+        const line = fitting(LEAST_TEXT, answers);
+        if (line) return line;
     }
     return null;
 }

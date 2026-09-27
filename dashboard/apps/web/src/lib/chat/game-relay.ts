@@ -139,15 +139,7 @@ async function readersOf(
                   take: MOST_CANDIDATES
               })
           ).map((user) => user.id)
-        : groupCandidates(
-              await prisma.chatChannelMember.findMany({
-                  where: { channelId },
-                  select: { userId: true, user: { select: { messagesInGame: true } } },
-                  orderBy: { userId: "asc" },
-                  take: MOST_CANDIDATES
-              }),
-              authorId
-          );
+        : await groupMembers(channelId, authorId);
     if (candidates.length === 0) return [];
 
     const allowed = await messageable(candidates);
@@ -171,12 +163,33 @@ async function readersOf(
     }));
 }
 
+/** The members of a direct message or group it is on for, asked of the
+ *  database before the cap so a large group's opted-in members are not cut. */
+async function groupMembers(channelId: string, authorId: string): Promise<string[]> {
+    const size = await prisma.chatChannelMember.count({ where: { channelId } });
+    const small = size <= SMALL_GROUP_SIZE;
+    const members = await prisma.chatChannelMember.findMany({
+        where: {
+            channelId,
+            userId: { not: authorId },
+            user: small
+                ? { OR: [{ messagesInGame: true }, { messagesInGame: null }] }
+                : { messagesInGame: true }
+        },
+        select: { userId: true, user: { select: { messagesInGame: true } } },
+        orderBy: { userId: "asc" },
+        take: MOST_CANDIDATES
+    });
+    return groupCandidates(members, authorId, size);
+}
+
 /** The members of a direct message or group it is on for, as `readersOf` says. */
 export function groupCandidates(
     members: readonly { userId: string; user: { messagesInGame: boolean | null } }[],
-    authorId: string
+    authorId: string,
+    size: number = members.length
 ): string[] {
-    const small = members.length <= SMALL_GROUP_SIZE;
+    const small = size <= SMALL_GROUP_SIZE;
     return members
         .filter((member) => member.userId !== authorId)
         .filter((member) =>

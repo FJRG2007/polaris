@@ -16,6 +16,7 @@ import {
     MAX_INCIDENTS,
     MOVEMENT_WINDOW_MS,
     NEW_TRACK,
+    RESPAWN_GRACE_MS,
     alreadyReported,
     countingIncidents,
     explainedByLog,
@@ -270,6 +271,27 @@ describe("teleporting", () => {
         ).toBe(true);
     });
 
+    it("is not explained by the same words typed in chat or said", () => {
+        for (const line of [
+            "[12:00:01] [Server thread/INFO]: <Cheater> Teleported 5 entities to x",
+            "[12:00:01] [Server thread/INFO]: <Cheater> [Admin: Teleported 5 entities to x]",
+            "[12:00:01] [Server thread/INFO]: [Cheater] Teleported 5 entities to x",
+            "[12:00:01] [Server thread/INFO]: <Steve> Teleported Steve to 0.0, 64.0, 0.0",
+            "[12:00:01] [Server thread/INFO]: [Steve] [Admin: Teleported Steve to Alex]"
+        ]) {
+            expect(explainedByLog(line, "Steve")).toBe(false);
+        }
+        expect(
+            explainedByLog("[12:00:01] [Server thread/INFO]: Teleported 3 entities to Admin", "Steve")
+        ).toBe(true);
+        expect(
+            explainedByLog(
+                "[12:00:01] [Server thread/INFO]: [[Mod] Admin: Teleported 3 entities to Admin]",
+                "Steve"
+            )
+        ).toBe(true);
+    });
+
     it("is not explained by a count a command block wrote", () => {
         expect(
             explainedByLog(
@@ -329,6 +351,20 @@ describe("respawning and joining", () => {
             respawnAfter(
                 track(sample(64, 5, died + 4000), died),
                 sample(64, 5, died + 64_000, "minecraft:the_nether"),
+                false
+            )
+        ).toBeNull();
+    });
+
+    it("excuses the respawn jump once, and not a player who stood still long after", () => {
+        const died = NOW + 4000;
+        expect(
+            respawnAfter(track(sample(64, 0, died), died), sample(64, 5000, died + 4000), false)
+        ).toBeNull();
+        expect(
+            respawnAfter(
+                track(sample(64, 5, died + 4000), died),
+                sample(64, 5, died + RESPAWN_GRACE_MS + 4000),
                 false
             )
         ).toBeNull();

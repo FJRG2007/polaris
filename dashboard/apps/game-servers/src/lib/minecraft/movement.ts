@@ -69,6 +69,10 @@ export const JOIN_GRACE_MS = 60_000;
  *  death screen does not move. */
 export const RESPAWN_MOVE = 1;
 
+/** How long after a death its respawn still excuses a jump: a player who stood
+ *  still once back is not given a free teleport for the rest of the session. */
+export const RESPAWN_GRACE_MS = 5 * 60_000;
+
 /** Kept per player, oldest dropped first. */
 export const MAX_INCIDENTS = 50;
 
@@ -215,15 +219,19 @@ export function joining(track: Track, now: number): boolean {
 
 /**
  * Since when a player's next jump is their respawn, after this look: from the
- * look that saw them die until they are seen moving on a later one. The look
- * that saw the death may have sampled them still alive and running, so only
- * movement after it counts.
+ * look that saw them die until they are seen moving on a later one, the one
+ * jump that is the respawn itself, or `RESPAWN_GRACE_MS`. The look that saw the
+ * death may have sampled them still alive and running, so only movement after
+ * it counts; running never covers a teleport's distance.
  */
 export function respawnAfter(track: Track, sample: Sample, died: boolean): number | null {
     if (died) return sample.at;
     const since = track.diedAt;
     const previous = track.last;
-    if (since === null || !previous || previous.at <= since) return since;
+    if (since === null || sample.at - since > RESPAWN_GRACE_MS) return null;
+    if (!previous) return since;
+    if (isTeleport(previous, sample)) return null;
+    if (previous.at <= since) return since;
     const moved = previous.dimension !== sample.dimension || gap(previous, sample) > RESPAWN_MOVE;
     return moved ? null : since;
 }
@@ -253,8 +261,12 @@ export function explainedByLog(log: string, name: string): boolean {
     // suffix, and a selector that moved several players as a count. A count a
     // command block wrote is left out: a clock sweeping items or mobs writes one
     // on every run, whoever it moved.
-    const teleported = new RegExp(`Teleported .*\\b${escaped}\\b.* to `, "i");
-    const several = /Teleported \d+ entities to /i;
+    // Only the game's own feedback counts, where the line opens with it or with
+    // the name of whoever ran the command: a player can type the same words in
+    // chat or `/say`.
+    const feedback = "\\]: (?:\\[(?:[^\\]:]|\\[[^\\]]*\\])*: )?Teleported ";
+    const teleported = new RegExp(`${feedback}.*\\b${escaped}\\b.* to `, "i");
+    const several = new RegExp(`${feedback}\\d+ entities to `, "i");
     const commandBlock = /\[@: /;
     const came = new RegExp(`\\b${escaped} (?:joined|left) the game`, "i");
     return stripFormatting(log)

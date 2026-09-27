@@ -49,6 +49,7 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         chatMessage: { findUnique: async () => fake.message },
         chatChannelMember: {
+            count: async () => fake.members.length,
             findMany: async (query: MemberQuery) => {
                 fake.asked.push(query);
                 const user = query.select.user as { select?: Record<string, unknown> } | undefined;
