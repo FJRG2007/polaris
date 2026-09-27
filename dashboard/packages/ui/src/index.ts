@@ -51,7 +51,13 @@ export {
 } from "./components/confirm-delete-dialog";
 export { Switch } from "./components/switch";
 export { ColorPicker } from "./components/color-picker";
-export { ToastProvider, useToast, type Toast, type ToastReply } from "./components/toast";
+export {
+    ToastProvider,
+    useToast,
+    type Toast,
+    type ToastAction,
+    type ToastReply
+} from "./components/toast";
 export {
     Select,
     SelectRoot,

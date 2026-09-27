@@ -74,6 +74,15 @@ export interface Toast {
     readonly life?: number;
     /** An answer written on the note itself, for a message. */
     readonly reply?: ToastReply;
+    /** Things done from the note without going anywhere: "Mark as read". */
+    readonly actions?: readonly ToastAction[];
+}
+
+export interface ToastAction {
+    readonly label: string;
+    readonly icon?: ReactNode;
+    /** Does it; answers why it could not, or null. The note goes once it is done. */
+    readonly run: () => Promise<string | null>;
 }
 
 export interface ToastReply {
@@ -215,11 +224,13 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
     const [sending, setSending] = useState(false);
     const [sent, setSent] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
+    /** The action under way, by label. */
+    const [acting, setActing] = useState<string | null>(null);
     const seen = useSeen();
     const life = toast.life ?? LIFE_MS;
     // Writing an answer holds the note like a pointer over it does: it must not
     // go in the middle of a sentence.
-    const writing = answer !== null || sending;
+    const writing = answer !== null || sending || acting !== null;
     // A note replaced while it said "Sent" is about something new, which has not
     // been answered; an answer half written or on its way is kept.
     const showing = useRef(toast.shownAs);
@@ -246,6 +257,16 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
         }
         setAnswer(null);
         if (showing.current === sentFrom) setSent(true);
+    };
+
+    const act = async (action: ToastAction) => {
+        if (acting) return;
+        setActing(action.label);
+        setProblem(null);
+        const refused = await action.run().catch(() => "That did not work");
+        setActing(null);
+        if (refused) setProblem(refused);
+        else onDismiss();
     };
 
     useEffect(() => {
@@ -291,21 +312,42 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
                         {toast.media}
                     </span>
                 ) : null}
-                {toast.reply ? (
-                    // Pressing anything here answers; it does not open what the
-                    // note points at.
+                {toast.reply || toast.actions?.length ? (
+                    // Pressing anything here answers or acts; it does not open
+                    // what the note points at.
                     <span className="mt-2 block" onClick={(event) => event.stopPropagation()}>
                         {sent ? (
                             <span className="block text-xs text-muted-foreground">Sent</span>
-                        ) : answer === null ? (
-                            <button
-                                type="button"
-                                onClick={() => setAnswer("")}
-                                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-card-hover"
-                            >
-                                <Reply className="size-3.5" />
-                                Reply
-                            </button>
+                        ) : answer === null || !toast.reply ? (
+                            <span className="flex flex-wrap items-center gap-1">
+                                {toast.reply ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setAnswer("")}
+                                        disabled={acting !== null}
+                                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-card-hover disabled:opacity-50"
+                                    >
+                                        <Reply className="size-3.5" />
+                                        Reply
+                                    </button>
+                                ) : null}
+                                {toast.actions?.map((action) => (
+                                    <button
+                                        key={action.label}
+                                        type="button"
+                                        onClick={() => void act(action)}
+                                        disabled={acting !== null}
+                                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground disabled:opacity-50"
+                                    >
+                                        {acting === action.label ? (
+                                            <Loader2 className="size-3.5 animate-spin" />
+                                        ) : (
+                                            action.icon
+                                        )}
+                                        {action.label}
+                                    </button>
+                                ))}
+                            </span>
                         ) : (
                             <span className="flex items-center gap-1.5">
                                 <Input
@@ -323,8 +365,8 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
                                             setProblem(null);
                                         }
                                     }}
-                                    placeholder={toast.reply.placeholder}
-                                    aria-label={toast.reply.placeholder}
+                                    placeholder={toast.reply?.placeholder}
+                                    aria-label={toast.reply?.placeholder}
                                     maxLength={4000}
                                     className="h-8 min-w-0 flex-1 text-xs"
                                 />

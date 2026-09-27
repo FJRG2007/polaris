@@ -35,11 +35,18 @@ export interface PolarisDesktop {
         /** A field on the notice to answer in, with this placeholder. The answer
          *  comes back through `onNoticeReply`. */
         readonly reply?: { readonly placeholder: string };
+        /** Buttons on the notice. A press comes back through `onNoticeAction`. */
+        readonly actions?: readonly { readonly id: string; readonly text: string }[];
     }): Promise<boolean>;
     /** Hear the answers written on notices. Absent from an app older than the
      *  feature, which then draws the notice without the field. */
     onNoticeReply?(
         listener: (reply: { readonly tag: string; readonly text: string }) => void
+    ): () => void;
+    /** Hear a press on a notice's button. Absent from an app older than the
+     *  feature, which then draws the notice without the buttons. */
+    onNoticeAction?(
+        listener: (action: { readonly tag: string; readonly action: string }) => void
     ): () => void;
     closeNotice(tag: string): Promise<void>;
     pickFolder(): Promise<DesktopFolder>;

@@ -41,3 +41,42 @@ self.addEventListener("fetch", (event) => {
         )
     );
 });
+
+/*
+ * A notice drawn through here - one with buttons, like a message's "Mark as
+ * read". A press on a button makes the request the page put on it, which works
+ * with no Polaris tab open at all; a press on the notice brings a Polaris window
+ * forward on the page it names, or opens one.
+ */
+self.addEventListener("notificationclick", (event) => {
+    const notice = event.notification;
+    const data = notice.data || {};
+    notice.close();
+
+    const pressed = (Array.isArray(data.actions) ? data.actions : []).find((one) => one && one.id === event.action);
+    if (pressed) {
+        const request = pressed.request || {};
+        // Only a request back to this Polaris's own API.
+        if (typeof request.url !== "string" || !request.url.startsWith("/api/")) return;
+        event.waitUntil(
+            fetch(request.url, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(request.body ?? null)
+            }).catch(() => undefined)
+        );
+        return;
+    }
+
+    const href = typeof data.href === "string" && data.href.startsWith("/") && !data.href.startsWith("//") ? data.href : null;
+    event.waitUntil(
+        self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+            const target = windows.find((one) => one.focused) || windows[0];
+            if (!target) return self.clients.openWindow(href || "/");
+            return target.focus().then((focused) => {
+                if (href) (focused || target).postMessage({ kind: "polaris-notice-open", href });
+            });
+        })
+    );
+});

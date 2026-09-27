@@ -31,6 +31,9 @@ export interface Notice {
     readonly onClick?: () => void;
     /** A field on the notice to answer in, and what the answer is handed to. */
     readonly reply?: { readonly placeholder: string; readonly onReply: (text: string) => void; };
+    /** Buttons on the notice, and what a press on one is handed to, by id. */
+    readonly actions?: readonly { readonly id: string; readonly text: string }[];
+    readonly onAction?: (action: string) => void;
 }
 
 /** Show one. Answers false where the system has no notifications. */
@@ -44,8 +47,20 @@ export function showNotice(notice: Notice): boolean {
         silent: notice.silent ?? false,
         timeoutType: notice.insistent ? "never" : "default",
         urgency: notice.insistent ? "critical" : "normal",
-        ...(notice.reply ? { hasReply: true, replyPlaceholder: notice.reply.placeholder } : {})
+        ...(notice.reply ? { hasReply: true, replyPlaceholder: notice.reply.placeholder } : {}),
+        ...(notice.actions?.length
+            ? { actions: notice.actions.map((one) => ({ type: "button" as const, text: one.text })) }
+            : {})
     });
+    const { actions, onAction } = notice;
+    if (actions?.length && onAction) {
+        shown.on("action", (details, index) => {
+            const pressed = actions[details?.actionIndex ?? index];
+            if (!pressed) return;
+            onAction(pressed.id);
+            closeNotice(notice.tag);
+        });
+    }
     if (notice.reply) {
         const { onReply } = notice.reply;
         shown.on("reply", (_event, text) => {
