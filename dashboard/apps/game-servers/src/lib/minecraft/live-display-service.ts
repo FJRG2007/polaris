@@ -18,9 +18,16 @@
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { liveContext } from "./live-values";
+import { renderSidebar } from "./sidebar-render";
 import { fillValues, readsPlayerList, readsServer, variablesIn } from "./text-vars";
-import { spreadListLines } from "./rankings";
-import { editionOf, onlinePlayers, onlineRoster, withServerContainer } from "./service";
+import {
+    editionOf,
+    onlinePlayers,
+    onlineRoster,
+    openServerContainer,
+    withServerContainer,
+    type ServerContainer
+} from "./service";
 import { audienceNames, namedByPolaris, parseTarget, type Roster } from "./announce-target";
 import {
     ACTIONBAR_EVERY_MS,
@@ -32,11 +39,12 @@ import {
     type SendContext
 } from "./announcement";
 import {
-    SIDEBAR_LINES_MAX,
+    animationPeriod,
     readSidebar,
     sidebarCommands,
     sidebarOffCommands,
     sidebarRefusal,
+    sidebarTexts,
     type SidebarConfig
 } from "./sidebar";
 import { PINNED_KEY, pinOver, pinnedAt, readPinned, type PinnedAnnouncement } from "./pinned";
@@ -48,6 +56,10 @@ const { subscribeMeetingEvents } = host.chatCalls;
 const TICK_MS = ACTIONBAR_EVERY_MS;
 /** How often the panel and the values it shows are read again. */
 const PANEL_EVERY_MS = 10_000;
+/** How often a panel that moves by itself is drawn again between those reads.
+ *  The shortest step an effect may have; a slower one simply changes nothing on
+ *  most of these, and nothing unchanged is sent. */
+const FRAME_EVERY_MS = 500;
 
 interface Loop {
     readonly ownerId: string;
@@ -67,6 +79,17 @@ interface Loop {
     /** Who is on and who the operators are, last read, for a held announcement
      *  sent to an audience Polaris names itself. */
     roster: { at: number; value: Roster } | null;
+    /** What a panel that moves by itself is drawn from between ticks: its
+     *  settings and the values last read. Null when it does not move. */
+    moving: { sidebar: SidebarConfig; context: SendContext } | null;
+    /** The timer that draws it, while there is one. */
+    frames: ReturnType<typeof setInterval> | null;
+    /** The frame being drawn, which a tick waits for rather than racing it. */
+    frame: Promise<void> | null;
+    /** The server the frames are sent to, kept open while the panel moves and
+     *  opened again once a period, so a change of machine or container is
+     *  picked up. */
+    lease: { server: ServerContainer; close: () => Promise<void>; at: number } | null;
 }
 
 const loops = new Map<string, Loop>();
@@ -192,6 +215,7 @@ async function rosterFor(installedAppId: string, loop: Loop, now: number): Promi
 }
 
 async function tick(installedAppId: string, loop: Loop): Promise<void> {
+    if (loop.frame) await loop.frame;
     const version = loop.pinVersion;
     const settings = await settingsOf(installedAppId);
     if (!settings) return stopLoop(installedAppId);
@@ -236,7 +260,7 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
 
     const texts = [
         ...(pinned ? heldTexts(pinned.announcement) : []),
-        ...(panelOn ? [sidebar.title, ...sidebar.lines] : [])
+        ...(panelOn ? sidebarTexts(sidebar) : [])
     ];
     loop.readsCall = texts.some(readsCall);
     const context = await contextFor(installedAppId, loop, texts, now, duePanel);
@@ -267,17 +291,26 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     }
     let panel: Loop["panel"] = null;
     if (duePanel) {
-        const title = fillValues(sidebar.title, context.values);
-        // A list - everybody's level, a leaderboard - is a line a row here,
-        // in the room the other lines leave.
-        const spread = spreadListLines(sidebar.lines, context.lists ?? {}, SIDEBAR_LINES_MAX);
-        const shownLines = spread.map((line) => fillValues(line, context.values));
-        lines.push(...sidebarCommands(title, shownLines, loop.panel));
-        panel = { title, lines: shownLines };
+        // A list - everybody's level, a leaderboard - is a line a row here, in
+        // the room the other lines leave; a line that takes turns shows the one
+        // that is up, and an effect is at its step.
+        const shown = renderSidebar(
+            sidebar,
+            now,
+            (text) => fillValues(text, context.values),
+            context.lists ?? {}
+        );
+        lines.push(...sidebarCommands(shown.title, shown.lines, loop.panel));
+        panel = shown;
         loop.lastPanel = now;
     } else if (!panelOn && loop.panel) {
         lines.push(...sidebarOffCommands());
     }
+    // Between reads, a panel that moves is drawn by the frame timer from these.
+    const moves = panelOn && animationPeriod(sidebar) !== null;
+    loop.moving = moves ? { sidebar, context } : null;
+    if (moves) startFrames(installedAppId, loop);
+    else stopFrames(loop);
     if (loop.pinVersion !== version) return;
     const sent = await say(loop.ownerId, installedAppId, lines).catch((error: unknown) => {
         // Written from scratch next time: nothing here knows how far it got.
@@ -326,8 +359,76 @@ async function contextFor(
 
 function stopLoop(installedAppId: string): void {
     const loop = loops.get(installedAppId);
-    if (loop) clearInterval(loop.timer);
+    if (loop) {
+        clearInterval(loop.timer);
+        stopFrames(loop);
+    }
     loops.delete(installedAppId);
+}
+
+function startFrames(installedAppId: string, loop: Loop): void {
+    if (loop.frames) return;
+    loop.frames = setInterval(() => {
+        if (loop.busy || loop.frame) return;
+        loop.frame = drawFrame(installedAppId, loop).finally(() => {
+            loop.frame = null;
+        });
+    }, FRAME_EVERY_MS);
+    loop.frames.unref?.();
+}
+
+function stopFrames(loop: Loop): void {
+    if (loop.frames) clearInterval(loop.frames);
+    loop.frames = null;
+    releaseLease(loop);
+}
+
+function releaseLease(loop: Loop): void {
+    const lease = loop.lease;
+    loop.lease = null;
+    void lease?.close().catch(() => undefined);
+}
+
+/** The server a frame is sent to, opened once a period rather than every frame. */
+async function leaseFor(installedAppId: string, loop: Loop, now: number): Promise<ServerContainer> {
+    const held = loop.lease;
+    if (held && now - held.at < PANEL_EVERY_MS) return held.server;
+    releaseLease(loop);
+    const opened = await openServerContainer(loop.ownerId, installedAppId);
+    loop.lease = { ...opened, at: now };
+    return opened.server;
+}
+
+/**
+ * One frame of a panel that moves: drawn again from what the last tick read,
+ * and only what changed sent - usually one line, or none - in one command to
+ * the server rather than one each.
+ */
+async function drawFrame(installedAppId: string, loop: Loop): Promise<void> {
+    const moving = loop.moving;
+    const before = loop.panel;
+    if (!moving || !before) return;
+    const now = Date.now();
+    const shown = renderSidebar(
+        moving.sidebar,
+        now,
+        (text) => fillValues(text, moving.context.values),
+        moving.context.lists ?? {}
+    );
+    const commands = sidebarCommands(shown.title, shown.lines, before);
+    if (commands.length === 0) return;
+    let sent = false;
+    try {
+        const server = await leaseFor(installedAppId, loop, now);
+        if (server.running) {
+            await server.sayAll(commands);
+            sent = true;
+        }
+    } catch {
+        // Opened again, and the panel written from scratch, on the next tick.
+        releaseLease(loop);
+    }
+    if (loop.panel === before) loop.panel = sent ? shown : null;
 }
 
 /**
@@ -368,7 +469,11 @@ function loopFor(ownerId: string, installedAppId: string): Loop {
         pinVersion: 0,
         context: null,
         readsCall: false,
-        roster: null
+        roster: null,
+        moving: null,
+        frames: null,
+        frame: null,
+        lease: null
     };
     listenForCalls();
     // A loop must never keep the process alive on its own.

@@ -28,6 +28,7 @@ import {
 import { pinOver, pinnedAt, readPinned } from "@polaris-app/game-servers/src/lib/minecraft/pinned";
 import {
     DEFAULT_SIDEBAR,
+    plainLine,
     readSidebar,
     sidebarCommands,
     sidebarProblems,
@@ -249,9 +250,16 @@ describe("the side panel", () => {
     });
 
     it("refuses anything of one player's, since everybody sees the same panel", () => {
-        const problems = sidebarProblems({ ...DEFAULT_SIDEBAR, lines: ["Hi {player}", "ok"] });
-        expect(problems.lines[0]).toMatch(/same for everybody/);
-        expect(problems.lines[1]).toBeNull();
+        const problems = sidebarProblems({
+            ...DEFAULT_SIDEBAR,
+            lines: [
+                plainLine("Hi {player}"),
+                { ...plainLine("ok"), frames: ["ok", "{player.level}"] }
+            ]
+        });
+        expect(problems.lines[0]![0]).toMatch(/same for everybody/);
+        // Every text a line takes turns between is held to it.
+        expect(problems.lines[1]).toEqual([null, expect.stringMatching(/same for everybody/)]);
     });
 
     it("is written whole the first time, clearing whatever was there", () => {
@@ -284,8 +292,8 @@ describe("the side panel", () => {
 describe("the panel a server starts with", () => {
     it("passes its own checks, so switching it on is one press", () => {
         const problems = sidebarProblems({ ...DEFAULT_SIDEBAR, enabled: true });
-        expect(problems.title).toBeUndefined();
+        expect(problems.title).toEqual([null]);
         expect(problems.count).toBeUndefined();
-        expect(problems.lines.every((line) => line === null)).toBe(true);
+        expect(problems.lines.every((line) => line.every((one) => one === null))).toBe(true);
     });
 });

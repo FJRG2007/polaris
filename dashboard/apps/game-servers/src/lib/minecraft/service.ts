@@ -16,22 +16,22 @@
 
 import * as parse from "./parse";
 import { prisma } from "@polaris/db";
-import { withTimeout } from "@polaris/core";
-import { gameServerAddress } from "./address";
-import type { ExecResult, RuntimePorts, WorldTrimOptions } from "@polaris/deploy";
-import { experienceCommand, type ExperienceChange } from "./experience";
-import { readCrashLoop, readRestartWatch } from "../games-health";
-import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
-import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
-import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
-import { liveContext } from "./live-values";
-import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
-import { readsPlayerList, readsServer } from "./text-vars";
-import { announcementCommands, announcementProblems, type Announcement } from "./announcement";
-import { audienceNames, namedByPolaris, parseTarget, type Roster } from "./announce-target";
-import { readContainerFile } from "../container-files";
 import { host } from "@polaris/app-host";
+import { withTimeout } from "@polaris/core";
+import { liveContext } from "./live-values";
+import { gameServerAddress } from "./address";
 import type { AppHostTypes } from "@polaris/app-host";
+import { readContainerFile } from "../container-files";
+import { readsPlayerList, readsServer } from "./text-vars";
+import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
+import { readCrashLoop, readRestartWatch } from "../games-health";
+import { experienceCommand, type ExperienceChange } from "./experience";
+import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
+import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
+import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
+import type { ExecResult, RuntimePorts, WorldTrimOptions } from "@polaris/deploy";
+import { audienceNames, namedByPolaris, parseTarget, type Roster } from "./announce-target";
+import { announcementCommands, announcementProblems, type Announcement } from "./announcement";
 
 const { resolveWaf } = host.wafService;
 const { getHostLanIp } = host.hostAddress;
@@ -430,6 +430,13 @@ export interface ServerContainer {
     /** Send a command to the game and hand back what it said. */
     say(argv: readonly string[]): Promise<string>;
     /**
+     * Send several whole command lines to the game, as few trips to the
+     * container as it takes: on Java the console tool reads them one per line
+     * from its input. Each line is held to the same checks as `say`, and one
+     * the batch did not take is sent again on its own.
+     */
+    sayAll(lines: readonly string[]): Promise<void>;
+    /**
      * Stream a file out of the container, as bytes.
      *
      * `run` collects its output into a string, which is right for a command's
@@ -459,26 +466,84 @@ export async function withServerContainer<T>(
     work: (server: ServerContainer) => Promise<T>
 ): Promise<T> {
     const install = await resolveInstall(ownerId, installedAppId);
-    return withPorts(install, ownerId, async (ports) => {
-        const server: ServerContainer = {
-            installedAppId: install.installedAppId,
-            applicationId: install.applicationId,
-            edition: install.edition,
-            running: install.running,
-            run: (argv) => ports.runIn(install.container, argv),
-            runOk: async (argv, failure) => {
-                const result = await ports.runIn(install.container, argv);
-                if (result.code !== 0) throw new Error(containerFailure(result.output, failure));
-                return result.output;
-            },
-            say: (argv) => sendGameCommand(ports, install, argv),
-            readFile: (path) => ports.readFile(install.container, path),
-            trimWorld: ports.trimWorld
-                ? (script, options) => ports.trimWorld!(install.container, script, options)
-                : null
-        };
-        return work(server);
-    });
+    return withPorts(install, ownerId, async (ports) => work(containerOn(install, ports)));
+}
+
+/**
+ * The same container, held open until `close` rather than for one piece of
+ * work: for a caller that sends to it several times a second, where opening the
+ * ports each time would be a query and, on a registered machine, a handshake a
+ * frame. The caller owns the lifetime and must close it.
+ */
+export async function openServerContainer(
+    ownerId: string,
+    installedAppId: string
+): Promise<{ server: ServerContainer; close: () => Promise<void> }> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    const ports = await getPorts(install.target, ownerId);
+    return { server: containerOn(install, ports), close: () => ports.dispose() };
+}
+
+function containerOn(install: MinecraftInstall, ports: RuntimePorts): ServerContainer {
+    return {
+        installedAppId: install.installedAppId,
+        applicationId: install.applicationId,
+        edition: install.edition,
+        running: install.running,
+        run: (argv) => ports.runIn(install.container, argv),
+        runOk: async (argv, failure) => {
+            const result = await ports.runIn(install.container, argv);
+            if (result.code !== 0) throw new Error(containerFailure(result.output, failure));
+            return result.output;
+        },
+        say: (argv) => sendGameCommand(ports, install, argv),
+        sayAll: (lines) => sendGameLines(ports, install, lines),
+        readFile: (path) => ports.readFile(install.container, path),
+        trimWorld: ports.trimWorld
+            ? (script, options) => ports.trimWorld!(install.container, script, options)
+            : null
+    };
+}
+
+/** Room for one batch in a command's arguments, in base64 characters. */
+const BATCH_MAX = 12_000;
+
+async function sendGameLines(
+    ports: RuntimePorts,
+    install: MinecraftInstall,
+    lines: readonly string[]
+): Promise<void> {
+    for (const line of lines) assertSafeCommand([line]);
+    if (install.edition !== "java") {
+        for (const line of lines) await sendGameCommand(ports, install, [line]);
+        return;
+    }
+    const batches: string[][] = [];
+    let current: string[] = [];
+    for (const line of lines) {
+        const size = Buffer.byteLength([...current, line].join("\n")) * 1.4;
+        if (current.length > 0 && size > BATCH_MAX) {
+            batches.push(current);
+            current = [];
+        }
+        current.push(line);
+    }
+    if (current.length > 0) batches.push(current);
+    for (const batch of batches) {
+        const encoded = Buffer.from(`${batch.join("\n")}\n`, "utf8").toString("base64");
+        const result = await withTimeout(
+            ports.runIn(install.container, [
+                "sh",
+                "-c",
+                `printf %s ${encoded} | base64 -d | rcon-cli`
+            ]),
+            COMMAND_TIMEOUT_MS,
+            "The server did not answer in time"
+        );
+        if (result.code !== 0) {
+            for (const line of batch) await sendGameCommand(ports, install, [line]);
+        }
+    }
 }
 
 /**

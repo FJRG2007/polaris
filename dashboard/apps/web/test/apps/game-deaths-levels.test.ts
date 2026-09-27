@@ -44,7 +44,7 @@ const { liveContext } = await import("@polaris-app/game-servers/src/lib/minecraf
 const { fillValues, variableProblem } = await import(
     "@polaris-app/game-servers/src/lib/minecraft/text-vars"
 );
-const { sidebarProblems, DEFAULT_SIDEBAR } = await import(
+const { sidebarProblems, DEFAULT_SIDEBAR, plainLine } = await import(
     "@polaris-app/game-servers/src/lib/minecraft/sidebar"
 );
 
@@ -135,11 +135,10 @@ describe("levels", () => {
 describe("what the side panel and announcements are filled with", () => {
     it("accepts the new variables on the panel, and refuses them on Bedrock", () => {
         const lines = ["{server.levels}", "Last death: {death.player}", "{death.message}"];
-        expect(sidebarProblems({ ...DEFAULT_SIDEBAR, enabled: true, lines }).lines).toEqual([
-            null,
-            null,
-            null
-        ]);
+        expect(
+            sidebarProblems({ ...DEFAULT_SIDEBAR, enabled: true, lines: lines.map(plainLine) })
+                .lines
+        ).toEqual([[null], [null], [null]]);
         expect(variableProblem("{death.player}", "bedrock")).toMatch(/Bedrock/);
     });
 

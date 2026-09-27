@@ -40,14 +40,23 @@ vi.mock("@polaris/app-host", () => ({
         chatCalls: {
             // The chat's own rule: only the seats whose browser is still there.
             voicePresence: async (channels: string[]) =>
-                new Map(channels.map((id) => [id, fake.inCall.map((name, at) => ({ id: `p${at}`, name }))]))
+                new Map(
+                    channels.map((id) => [
+                        id,
+                        fake.inCall.map((name, at) => ({ id: `p${at}`, name }))
+                    ])
+                )
         }
     }
 }));
 
 const { liveContext } = await import("@polaris-app/game-servers/src/lib/minecraft/live-values");
-const { fillValues, variableProblem } = await import("@polaris-app/game-servers/src/lib/minecraft/text-vars");
-const { sidebarProblems, DEFAULT_SIDEBAR } = await import("@polaris-app/game-servers/src/lib/minecraft/sidebar");
+const { fillValues, variableProblem } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/text-vars"
+);
+const { sidebarProblems, DEFAULT_SIDEBAR, plainLine } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/sidebar"
+);
 
 beforeEach(() => {
     fake.config = JSON.stringify({ callGroupId: GROUP });
@@ -61,7 +70,9 @@ describe("{call.max}", () => {
         const line = "In Call: {call.count}/{call.max}";
         expect(variableProblem(line, "java")).toBeNull();
         expect(variableProblem(line, "bedrock")).toBeNull();
-        expect(sidebarProblems({ ...DEFAULT_SIDEBAR, enabled: true, lines: [line] }).lines).toEqual([null]);
+        expect(
+            sidebarProblems({ ...DEFAULT_SIDEBAR, enabled: true, lines: [plainLine(line)] }).lines
+        ).toEqual([[null]]);
     });
 
     it("reads how many people the chosen group has", async () => {
