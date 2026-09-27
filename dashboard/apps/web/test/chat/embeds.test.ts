@@ -482,12 +482,31 @@ describe("asking a site about its link", () => {
                 "https://www.reddit.com/oembed"
             ],
             ["https://streamable.com/abc12x", "https://api.streamable.com/oembed.json"],
-            ["https://dai.ly/x8abc12", "https://www.dailymotion.com/services/oembed"]
+            [
+                "https://www.dailymotion.com/video/x8abc12",
+                "https://www.dailymotion.com/services/oembed"
+            ]
         ];
         for (const [address, endpoint] of cases) {
             const asked = new URL(oembedFor(address)!);
             expect(`${asked.origin}${asked.pathname}`, address).toBe(endpoint);
             expect(asked.searchParams.get("url")).toBe(new URL(address).href);
+        }
+    });
+
+    it("asks Dailymotion about the video's page, whichever form was posted", () => {
+        // The newer player's address is not a page, and oEmbed has nothing to
+        // say about it; the page it plays does.
+        for (const address of [
+            "https://geo.dailymotion.com/player.html?video=x8abc12",
+            "https://dai.ly/x8abc12",
+            "https://www.dailymotion.com/embed/video/x8abc12"
+        ]) {
+            const asked = new URL(oembedFor(address)!);
+            expect(asked.origin, address).toBe("https://www.dailymotion.com");
+            expect(asked.searchParams.get("url"), address).toBe(
+                "https://www.dailymotion.com/video/x8abc12"
+            );
         }
     });
 

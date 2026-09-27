@@ -106,4 +106,19 @@ describe("a link Polaris cannot play", () => {
             "https://vm.tiktok.com/ZMabcdef/"
         );
     });
+
+    it("includes Twitch on a page Twitch will not play in, but nothing else", () => {
+        // Plain HTTP on a LAN address: Twitch refuses to play there, so a play
+        // button would only lead to its refusal. Other players do not care.
+        Object.defineProperty(window, "isSecureContext", { value: false, configurable: true });
+        try {
+            render(<LinkCard preview={preview("https://www.twitch.tv/somestreamer")} />);
+            expect(screen.queryByRole("button")).toBeNull();
+            cleanup();
+            render(<LinkCard preview={preview("https://youtu.be/dQw4w9WgXcQ")} />);
+            expect(screen.getByRole("button", { name: "Play this on YouTube, here" })).toBeTruthy();
+        } finally {
+            Object.defineProperty(window, "isSecureContext", { value: true, configurable: true });
+        }
+    });
 });

@@ -52,7 +52,10 @@ export interface Embed {
      *  parameter a player does not know is at best ignored. */
     readonly start: string | null;
     /** Twitch refuses to play inside a page unless it is told, in the address,
-     *  which site it is being shown on. That is only known in the browser. */
+     *  which site it is being shown on. That is only known in the browser. It
+     *  also refuses any page not served over HTTPS (localhost aside), so a
+     *  Polaris reached by a LAN address over plain HTTP shows the card instead
+     *  of a player that could only ever say no. */
     readonly needsParent: boolean;
 }
 
@@ -323,15 +326,31 @@ export function oembedFor(address: string): string | null {
                       ? "https://www.reddit.com/oembed"
                       : host === "streamable.com"
                         ? "https://api.streamable.com/oembed.json"
-                        : host === "dailymotion.com" || host === "dai.ly"
+                        : host === "dailymotion.com" ||
+                            host === "dai.ly" ||
+                            host === "geo.dailymotion.com"
                           ? "https://www.dailymotion.com/services/oembed"
                           : null;
     if (!endpoint) return null;
 
     const asked = new URL(endpoint);
-    asked.searchParams.set("url", url.href);
+    asked.searchParams.set(
+        "url",
+        asked.hostname === "www.dailymotion.com" ? dailymotionPage(url) : url.href
+    );
     asked.searchParams.set("format", "json");
     return asked.href;
+}
+
+/**
+ * The one address Dailymotion's oEmbed is sure to understand for a video: its
+ * page. A link to the newer player (`geo.dailymotion.com/player.html?video=`) is
+ * not a page, and asking about it as-is gets no title and no picture.
+ */
+function dailymotionPage(url: URL): string {
+    const embed = embedFor(url.href);
+    const id = embed ? embed.url.split("/").pop() : null;
+    return id ? `https://www.dailymotion.com/video/${id}` : url.href;
 }
 
 /** A web address, or null for anything else - a scheme that is not the web is

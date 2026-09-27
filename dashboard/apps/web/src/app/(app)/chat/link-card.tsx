@@ -9,8 +9,8 @@
  */
 
 import { cn } from "@polaris/ui";
-import { useState } from "react";
 import { Play } from "lucide-react";
+import { useEffect, useState } from "react";
 import { usableAccent } from "@/lib/chat/accent";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { embedFor, playerAddress, type EmbedShape } from "@/lib/chat/embeds";
@@ -41,8 +41,17 @@ const SHAPES: Readonly<Record<EmbedShape, string>> = {
  * card does not announce the reader to whoever runs the page.
  */
 export function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]> }) {
-    const embed = embedFor(preview.url);
     const [playing, setPlaying] = useState(false);
+
+    // Twitch plays only in a page served over HTTPS (or on localhost), which is
+    // exactly what the browser calls a secure context. Polaris reached by a LAN
+    // address over plain HTTP gets the card for a Twitch link rather than a
+    // play button whose player could only refuse. Read after mounting, since
+    // the server cannot know how the page was reached.
+    const [secure, setSecure] = useState(true);
+    useEffect(() => setSecure(window.isSecureContext ?? true), []);
+    const playable = embedFor(preview.url);
+    const embed = playable && (!playable.needsParent || secure) ? playable : null;
 
     // The edge takes the site's own colour when it has published a usable one,
     // so a video reads as YouTube at a glance. Everything else keeps Polaris'
