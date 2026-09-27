@@ -76,7 +76,9 @@ export function SendTo({
             />
             {mode === "players" &&
                 (listed.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nobody is on the server right now.</p>
+                    <p className="text-xs text-muted-foreground">
+                        Nobody is on the server right now.
+                    </p>
                 ) : (
                     <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
                         {listed.map((name) => {

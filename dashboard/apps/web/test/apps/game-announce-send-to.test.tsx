@@ -91,7 +91,11 @@ describe("what a target means", () => {
 
 describe("the lines it becomes", () => {
     it("sends the same to each player picked, and nobody else", () => {
-        const lines = announcementCommands("java", draft({ target: "Steve,Alex", chat: "Hi", sound: "minecraft:entity.player.levelup" }), NONE);
+        const lines = announcementCommands(
+            "java",
+            draft({ target: "Steve,Alex", chat: "Hi", sound: "minecraft:entity.player.levelup" }),
+            NONE
+        );
         expect(lines.filter((line) => line.startsWith("tellraw Steve "))).toHaveLength(1);
         expect(lines.filter((line) => line.startsWith("tellraw Alex "))).toHaveLength(1);
         expect(lines.some((line) => line.includes("@a"))).toBe(false);
@@ -99,10 +103,14 @@ describe("the lines it becomes", () => {
     });
 
     it("sends to the operators who are on, by name", () => {
-        const lines = announcementCommands("java", draft({ target: "@ops", title: "Staff meeting" }), {
-            ...NONE,
-            operators: ["Admin1", "Admin2"]
-        });
+        const lines = announcementCommands(
+            "java",
+            draft({ target: "@ops", title: "Staff meeting" }),
+            {
+                ...NONE,
+                operators: ["Admin1", "Admin2"]
+            }
+        );
         expect(lines.some((line) => line.startsWith("title Admin1 title "))).toBe(true);
         expect(lines.some((line) => line.startsWith("title Admin2 title "))).toBe(true);
         expect(lines.some((line) => line.includes("@a"))).toBe(false);
@@ -110,24 +118,32 @@ describe("the lines it becomes", () => {
 
     it("refuses when no operator is on, rather than reaching everybody", () => {
         expect(() =>
-            announcementCommands("java", draft({ target: "@ops", chat: "Hi" }), { ...NONE, operators: [] })
+            announcementCommands("java", draft({ target: "@ops", chat: "Hi" }), {
+                ...NONE,
+                operators: []
+            })
         ).toThrow("No operator is on the server right now");
     });
 
     it("takes a held one down from the same people", () => {
-        expect(clearAnnouncementCommands("java", draft({ target: "Steve,Alex", title: "Hi" }))).toEqual([
-            "title Steve clear",
-            "title Alex clear"
-        ]);
-        expect(clearAnnouncementCommands("java", draft({ target: "@ops", title: "Hi" }), ["Admin1"])).toEqual([
-            "title Admin1 clear"
-        ]);
+        expect(
+            clearAnnouncementCommands("java", draft({ target: "Steve,Alex", title: "Hi" }))
+        ).toEqual(["title Steve clear", "title Alex clear"]);
+        expect(
+            clearAnnouncementCommands("java", draft({ target: "@ops", title: "Hi" }), ["Admin1"])
+        ).toEqual(["title Admin1 clear"]);
     });
 
     it("says so under Send to, and refuses operators on Bedrock", () => {
-        expect(announcementProblems(draft({ target: "", chat: "Hi" }), "java").target).toBe("Choose who it goes to");
-        expect(announcementProblems(draft({ target: "@ops", chat: "Hi" }), "bedrock").target).toMatch(/Bedrock/);
-        expect(announcementProblems(draft({ target: "@ops", chat: "Hi" }), "java").target).toBeUndefined();
+        expect(announcementProblems(draft({ target: "", chat: "Hi" }), "java").target).toBe(
+            "Choose who it goes to"
+        );
+        expect(
+            announcementProblems(draft({ target: "@ops", chat: "Hi" }), "bedrock").target
+        ).toMatch(/Bedrock/);
+        expect(
+            announcementProblems(draft({ target: "@ops", chat: "Hi" }), "java").target
+        ).toBeUndefined();
     });
 
     it("measures an operators one against the longest name an operator can have", () => {
@@ -137,7 +153,8 @@ describe("the lines it becomes", () => {
             const chat = `${"&a&lx".repeat(30)}${"y".repeat(pad)}`;
             const ops = announcementProblems(draft({ target: "@ops", chat }), "java").chat;
             expect(ops).toBe(announcementProblems(draft({ target: longest, chat }), "java").chat);
-            if (ops && !announcementProblems(draft({ target: "@a", chat }), "java").chat) caught = true;
+            if (ops && !announcementProblems(draft({ target: "@a", chat }), "java").chat)
+                caught = true;
         }
         expect(caught).toBe(true);
     });
@@ -145,7 +162,14 @@ describe("the lines it becomes", () => {
 
 describe("the Send to control", () => {
     it("ticks several players and sends to exactly them", async () => {
-        render(<MinecraftAnnounce installedAppId="s1" running edition="java" players={["Steve", "Alex", "Zed"]} />);
+        render(
+            <MinecraftAnnounce
+                installedAppId="s1"
+                running
+                edition="java"
+                players={["Steve", "Alex", "Zed"]}
+            />
+        );
         fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Hello" } });
         fireEvent.click(screen.getByRole("combobox", { name: "Send to" }));
         fireEvent.click(await screen.findByRole("option", { name: "Players I pick" }));
@@ -160,19 +184,34 @@ describe("the Send to control", () => {
     });
 
     it("does not let a name that cannot be aimed at be ticked", async () => {
-        render(<MinecraftAnnounce installedAppId="s1" running edition="bedrock" players={["Steve", "Big Bob"]} />);
+        render(
+            <MinecraftAnnounce
+                installedAppId="s1"
+                running
+                edition="bedrock"
+                players={["Steve", "Big Bob"]}
+            />
+        );
         fireEvent.click(screen.getByRole("combobox", { name: "Send to" }));
         fireEvent.click(await screen.findByRole("option", { name: "Players I pick" }));
-        expect((screen.getByRole("checkbox", { name: /Big Bob/ }) as HTMLInputElement).disabled).toBe(true);
-        expect((screen.getByRole("checkbox", { name: "Steve" }) as HTMLInputElement).disabled).toBe(false);
+        expect(
+            (screen.getByRole("checkbox", { name: /Big Bob/ }) as HTMLInputElement).disabled
+        ).toBe(true);
+        expect((screen.getByRole("checkbox", { name: "Steve" }) as HTMLInputElement).disabled).toBe(
+            false
+        );
     });
 
     it("will not send to nobody", async () => {
-        render(<MinecraftAnnounce installedAppId="s1" running edition="java" players={["Steve"]} />);
+        render(
+            <MinecraftAnnounce installedAppId="s1" running edition="java" players={["Steve"]} />
+        );
         fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Hello" } });
         fireEvent.click(screen.getByRole("combobox", { name: "Send to" }));
         fireEvent.click(await screen.findByRole("option", { name: "Players I pick" }));
-        expect((screen.getByRole("button", { name: /^Send$/ }) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: /^Send$/ }) as HTMLButtonElement).disabled).toBe(
+            true
+        );
         expect(screen.getByRole("alert").textContent).toBe("Choose who it goes to");
     });
 });

@@ -159,7 +159,9 @@ function clearAll(
 
 /** Whether any of these goes to the operators, whose names have to be read. */
 function toOperators(pinned: readonly (PinnedAnnouncement | null)[]): boolean {
-    return pinned.some((one) => one !== null && parseTarget(one.announcement.target)?.kind === "operators");
+    return pinned.some(
+        (one) => one !== null && parseTarget(one.announcement.target)?.kind === "operators"
+    );
 }
 
 /** How long the operators online are taken as read. The same period as the
@@ -167,10 +169,16 @@ function toOperators(pinned: readonly (PinnedAnnouncement | null)[]): boolean {
 const OPERATORS_EVERY_MS = 10_000;
 
 /** The operators online, read at most once a period for a loop. */
-async function operatorsFor(installedAppId: string, loop: Loop, now: number): Promise<readonly string[]> {
+async function operatorsFor(
+    installedAppId: string,
+    loop: Loop,
+    now: number
+): Promise<readonly string[]> {
     const held = loop.operators;
     if (held && now - held.at < OPERATORS_EVERY_MS) return held.names;
-    const names = await onlineOperators(loop.ownerId, installedAppId).catch(() => held?.names ?? []);
+    const names = await onlineOperators(loop.ownerId, installedAppId).catch(
+        () => held?.names ?? []
+    );
     loop.operators = { at: now, names };
     return names;
 }
@@ -392,7 +400,9 @@ export async function unpinAnnouncement(ownerId: string, installedAppId: string)
     if (loop) loop.pinVersion += 1;
     if (!settings || !pinned) return;
     const both = [pinned, pinned.underneath];
-    const operators = toOperators(both) ? await onlineOperators(ownerId, installedAppId).catch(() => []) : [];
+    const operators = toOperators(both)
+        ? await onlineOperators(ownerId, installedAppId).catch(() => [])
+        : [];
     await say(ownerId, installedAppId, clearAll(settings.edition, both, operators));
 }
 

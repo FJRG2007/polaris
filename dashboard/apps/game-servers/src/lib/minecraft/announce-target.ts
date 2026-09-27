@@ -68,7 +68,10 @@ export function describeTarget(target: string): string {
  * player. Operators become the names of the ones online, which the caller
  * reads from the server; none online is none to send to.
  */
-export function concreteTargets(audience: Audience, operatorsOnline: readonly string[] = []): string[] {
+export function concreteTargets(
+    audience: Audience,
+    operatorsOnline: readonly string[] = []
+): string[] {
     if (audience.kind === "everybody") return [EVERYBODY];
     const names = audience.kind === "operators" ? operatorsOnline : audience.players;
     return names.filter(isPickableName);

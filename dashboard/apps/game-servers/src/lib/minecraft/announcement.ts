@@ -356,13 +356,20 @@ export function announcementCommands(
     const targets = concreteTargets(audience, context.operators);
     if (targets.length === 0) {
         throw new Error(
-            audience.kind === "operators" ? "No operator is on the server right now" : "Choose who it goes to"
+            audience.kind === "operators"
+                ? "No operator is on the server right now"
+                : "Choose who it goes to"
         );
     }
     // The same lines for each of them, once - the scores behind a variable are
     // set up once whoever reads them.
-    const lines = targets.flatMap((target) => commandsFor(edition, announcement, target, context, part));
-    return lines.filter((line, index) => !line.startsWith("scoreboard objectives add ") || lines.indexOf(line) === index);
+    const lines = targets.flatMap((target) =>
+        commandsFor(edition, announcement, target, context, part)
+    );
+    return lines.filter(
+        (line, index) =>
+            !line.startsWith("scoreboard objectives add ") || lines.indexOf(line) === index
+    );
 }
 
 /** The lines for one target: everybody's selector, or one player's name. */
@@ -537,7 +544,9 @@ export function announcementProblems(
     // are not known until it goes, so against the longest name there can be.
     const target =
         audience?.kind === "players"
-            ? audience.players.reduce((longest, name) => (name.length > longest.length ? name : longest))
+            ? audience.players.reduce((longest, name) =>
+                  name.length > longest.length ? name : longest
+              )
             : audience?.kind === "operators"
               ? LONGEST_NAME
               : EVERYBODY;
