@@ -12,9 +12,9 @@
  * in held a message's note until it was closed by hand. On screen is seen.
  */
 
+import { ToastProvider, useToast } from "../src/components/toast";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ToastProvider, useToast } from "../src/components/toast";
 
 let focused = true;
 let visibility: DocumentVisibilityState = "visible";
@@ -103,5 +103,33 @@ describe("how long a note stays", () => {
         act(raise);
         act(() => void vi.advanceTimersByTime(2500));
         expect(screen.getAllByText("First")).toHaveLength(1);
+    });
+
+    it("starts again when replaced under its key", () => {
+        function Chat() {
+            const toast = useToast();
+            return (
+                <>
+                    <button type="button" onClick={() => toast.show({ key: "ana", title: "Ana: hello" })}>
+                        first
+                    </button>
+                    <button type="button" onClick={() => toast.show({ key: "ana", title: "Ana: still there?" })}>
+                        second
+                    </button>
+                </>
+            );
+        }
+        render(
+            <ToastProvider>
+                <Chat />
+            </ToastProvider>
+        );
+        act(() => screen.getByText("first").click());
+        act(() => void vi.advanceTimersByTime(5900));
+        act(() => screen.getByText("second").click());
+        act(() => void vi.advanceTimersByTime(5000));
+        expect(screen.queryByText("Ana: still there?")).not.toBeNull();
+        act(() => void vi.advanceTimersByTime(1500));
+        expect(screen.queryByText("Ana: still there?")).toBeNull();
     });
 });

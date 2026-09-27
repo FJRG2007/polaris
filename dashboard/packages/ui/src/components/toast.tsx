@@ -36,8 +36,8 @@
 
 import { cn } from "../lib/cn";
 import { Input } from "./input";
-import { Loader2, Reply, SendHorizontal, X } from "lucide-react";
 import { createPortal } from "react-dom";
+import { Loader2, Reply, SendHorizontal, X } from "lucide-react";
 import {
     createContext,
     useCallback,
@@ -254,7 +254,7 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
         return () => clearTimeout(timer);
         // Re-armed when the pointer leaves, which is what "hover holds it" is,
         // and when somebody comes back to the tab, which is when they can read it.
-    }, [held, writing, sent, seen, life, onDismiss]);
+    }, [held, writing, sent, seen, life, onDismiss, toast.shownAs]);
 
     const pressable = Boolean(toast.onPress);
 
