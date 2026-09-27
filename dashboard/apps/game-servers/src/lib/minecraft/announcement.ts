@@ -37,6 +37,7 @@ import {
     usesPerPlayer,
     variableProblem,
     visibleLength,
+    type KnownValues,
     type VariableValues
 } from "./text-vars";
 
@@ -525,7 +526,8 @@ export type AnnouncementField =
 export function announcementProblems(
     announcement: Announcement,
     edition: MinecraftEdition,
-    now: number = Date.now()
+    now: number = Date.now(),
+    known: KnownValues = {}
 ): Partial<Record<AnnouncementField, string>> {
     const problems: Partial<Record<AnnouncementField, string>> = {};
     const audience = parseTarget(announcement.target);
@@ -537,7 +539,7 @@ export function announcementProblems(
     for (const field of lineFields) {
         const text = announcement[field];
         const wrong = variableProblem(text, edition);
-        const shown = visibleLength(stripMotd(text));
+        const shown = visibleLength(stripMotd(text), known);
         if (wrong) problems[field] = wrong;
         else if (shown > LINE_MAX) problems[field] = `At most ${LINE_MAX} characters on screen`;
     }
@@ -546,7 +548,7 @@ export function announcementProblems(
     if (chatWrong) problems.chat = chatWrong;
     else if (chat.split("\n").length > CHAT_MAX_LINES) {
         problems.chat = `At most ${CHAT_MAX_LINES} lines`;
-    } else if (visibleLength(stripMotd(chat)) > CHAT_MAX) {
+    } else if (visibleLength(stripMotd(chat), known) > CHAT_MAX) {
         problems.chat = `At most ${CHAT_MAX} characters`;
     }
 

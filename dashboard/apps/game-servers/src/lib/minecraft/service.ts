@@ -124,6 +124,8 @@ export interface MinecraftRoster {
 /** The install, its application and the target it runs on. */
 interface MinecraftInstall {
     readonly installedAppId: string;
+    /** What Polaris calls the server: the value of `{server.name}`. */
+    readonly name: string;
     readonly applicationId: string;
     readonly container: string;
     readonly portSubject: string;
@@ -173,6 +175,7 @@ async function resolveInstall(ownerId: string, installedAppId: string): Promise<
     }
     return {
         installedAppId: install.id,
+        name: install.name,
         applicationId: app.id,
         container: release.name,
         portSubject: release.portSubject,
@@ -286,7 +289,11 @@ export async function sendAnnouncement(
     const install = await resolveInstall(ownerId, installedAppId);
     // The editor runs the same check as it is typed; this is the one that
     // decides, with the edition the editor may not have been told.
-    const problem = Object.values(announcementProblems(announcement, install.edition))[0];
+    const problem = Object.values(
+        announcementProblems(announcement, install.edition, Date.now(), {
+            "server.name": install.name
+        })
+    )[0];
     if (problem) throw new Error(problem);
 
     const texts = [

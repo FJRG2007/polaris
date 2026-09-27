@@ -19,7 +19,7 @@ import { z } from "zod";
 import { stripMotd } from "./motd";
 import { javaComponent } from "./announcement";
 import type { MinecraftEdition } from "./service";
-import { usesPerPlayer, variableProblem, visibleLength } from "./text-vars";
+import { usesPerPlayer, variableProblem, visibleLength, type KnownValues } from "./text-vars";
 
 /** Where it lives on the install's settings. */
 export const SIDEBAR_KEY = "sidebar";
@@ -186,13 +186,13 @@ export function sidebarRefusal(edition: MinecraftEdition, release: string | null
 }
 
 /** What is wrong with one text of the panel, or null. */
-function textProblem(value: string, max: number): string | null {
+function textProblem(value: string, max: number, known: KnownValues): string | null {
     if (usesPerPlayer(value)) {
         return "The panel is the same for everybody: only {server.*} and {call.*} go on it";
     }
     const wrong = variableProblem(value, "java");
     if (wrong) return wrong;
-    if (visibleLength(stripMotd(value)) > max) return `At most ${max} characters`;
+    if (visibleLength(stripMotd(value), known) > max) return `At most ${max} characters`;
     return null;
 }
 
@@ -203,14 +203,17 @@ export function textMax(line: SidebarLine, fits: number): number {
 }
 
 /** Problems by field, for under each one - one per text of a line - and empty
- *  when it can be saved. */
-export function sidebarProblems(sidebar: SidebarConfig): {
+ *  when it can be saved. `known` is what the server's values already are. */
+export function sidebarProblems(
+    sidebar: SidebarConfig,
+    known: KnownValues = {}
+): {
     title: (string | null)[];
     lines: (string | null)[][];
     count?: string;
 } {
     const of = (line: SidebarLine, fits: number) =>
-        line.frames.map((frame) => textProblem(frame, textMax(line, fits)));
+        line.frames.map((frame) => textProblem(frame, textMax(line, fits), known));
     const title = of(sidebar.title, SIDEBAR_TITLE_MAX);
     const lines = sidebar.lines.map((line) => of(line, SIDEBAR_LINE_MAX));
     const count =
@@ -222,8 +225,8 @@ export function sidebarProblems(sidebar: SidebarConfig): {
     return { title, lines, ...(count ? { count } : {}) };
 }
 
-export function hasSidebarProblems(sidebar: SidebarConfig): boolean {
-    const found = sidebarProblems(sidebar);
+export function hasSidebarProblems(sidebar: SidebarConfig, known: KnownValues = {}): boolean {
+    const found = sidebarProblems(sidebar, known);
     return Boolean(
         found.count || found.title.some(Boolean) || found.lines.some((line) => line.some(Boolean))
     );

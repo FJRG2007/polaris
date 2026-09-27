@@ -10,6 +10,11 @@
  *
  * Native drag and drop, armed only from the handle, so pressing into one of the
  * row's text fields to select a word never picks the whole row up.
+ *
+ * The whole list is where a row can be let go, not only the rows themselves:
+ * the gaps between them and the heading above the first are where a hand
+ * naturally drops one, and letting go there used to do nothing - which read as
+ * a row that cannot be put first.
  */
 
 import { useCallback, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
@@ -35,6 +40,18 @@ export function useListOrder(count: number, onMove: (from: number, to: number) =
     /** Where the dragged row would land: before this index. */
     const [dropAt, setDropAt] = useState<number | null>(null);
     const handles = useRef(new Map<number, HTMLElement>());
+    const rows = useRef(new Map<number, HTMLElement>());
+
+    /** Where a row let go at this height lands: before the first row whose
+     *  middle is below it, or at the end. */
+    const landingAt = (y: number) => {
+        let at = 0;
+        for (const [index, row] of rows.current) {
+            const box = row.getBoundingClientRect();
+            if (y > box.top + box.height / 2) at = Math.max(at, index + 1);
+        }
+        return at;
+    };
 
     /** New ids for a list that was replaced as a whole - loaded, or saved back. */
     const reset = useCallback((length: number) => setIds(Array.from({ length }, make)), []);
@@ -57,28 +74,38 @@ export function useListOrder(count: number, onMove: (from: number, to: number) =
         setDropAt(null);
     };
 
+    /** Spread on the element around the rows - and around whatever sits over
+     *  the first of them, so letting go there puts a row first. */
+    const listProps = {
+        onDragOver: (event: DragEvent<HTMLElement>) => {
+            if (dragging === null) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            setDropAt(landingAt(event.clientY));
+        },
+        onDrop: (event: DragEvent) => {
+            if (dragging === null) return;
+            event.preventDefault();
+            // Read where it was let go rather than the last place it was over:
+            // the two differ by however far the last move went.
+            const at = landingAt(event.clientY);
+            // Landing below itself counts the gap it leaves behind.
+            move(dragging, at > dragging ? at - 1 : at);
+            end();
+        }
+    };
+
     /** Spread on the row. */
     const rowProps = (index: number) => ({
+        ref: (element: HTMLElement | null) => {
+            if (element) rows.current.set(index, element);
+            else rows.current.delete(index);
+        },
         draggable: armed === index,
         onDragStart: (event: DragEvent) => {
             event.dataTransfer.effectAllowed = "move";
             event.dataTransfer.setData("text/plain", String(index));
             setDragging(index);
-        },
-        onDragOver: (event: DragEvent<HTMLElement>) => {
-            if (dragging === null) return;
-            event.preventDefault();
-            event.dataTransfer.dropEffect = "move";
-            const box = event.currentTarget.getBoundingClientRect();
-            setDropAt(event.clientY < box.top + box.height / 2 ? index : index + 1);
-        },
-        onDrop: (event: DragEvent) => {
-            event.preventDefault();
-            if (dragging !== null && dropAt !== null) {
-                // Landing below itself counts the gap it leaves behind.
-                move(dragging, dropAt > dragging ? dropAt - 1 : dropAt);
-            }
-            end();
         },
         onDragEnd: end
     });
@@ -104,5 +131,5 @@ export function useListOrder(count: number, onMove: (from: number, to: number) =
         }
     });
 
-    return { ids, reset, added, removed, rowProps, handleProps, dragging, dropAt };
+    return { ids, reset, added, removed, listProps, rowProps, handleProps, dragging, dropAt };
 }

@@ -25,6 +25,7 @@ import {
 } from "../../lib/minecraft/sidebar";
 import { editionOf } from "../../lib/minecraft/service";
 import type { Announcement } from "../../lib/minecraft/announcement";
+import type { KnownValues } from "../../lib/minecraft/text-vars";
 
 const { recordAudit } = host.auditService;
 const { requireGameServer } = host.appsInstallAccess;
@@ -41,12 +42,15 @@ export interface LiveDisplayState {
     readonly callGroupId: string | null;
     /** The chat groups the viewer is in, to choose the one whose call is read. */
     readonly groups: readonly { readonly id: string; readonly name: string }[];
+    /** The server's values that are settled while a text is written, for the
+     *  counters: its name. */
+    readonly known: KnownValues;
 }
 
 async function stateOf(installedAppId: string, viewerId: string): Promise<LiveDisplayState> {
     const row = await prisma.installedApp.findUnique({
         where: { id: installedAppId },
-        select: { config: true, catalogId: true }
+        select: { config: true, catalogId: true, name: true }
     });
     const config = readInstallConfig(row?.config);
     const pinned = readPinned(config);
@@ -63,7 +67,8 @@ async function stateOf(installedAppId: string, viewerId: string): Promise<LiveDi
         callGroupId: readCallGroup(config),
         groups: memberships
             .map((one) => ({ id: one.channel.id, name: one.channel.name || "Unnamed group" }))
-            .sort((left, right) => left.name.localeCompare(right.name))
+            .sort((left, right) => left.name.localeCompare(right.name)),
+        known: row?.name ? { "server.name": row.name } : {}
     };
 }
 
@@ -115,10 +120,12 @@ export async function saveLiveDisplayAction(
     const parsed = sidebarInput.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the panel" };
     const { installedAppId, sidebar, callGroupId } = parsed.data;
-    if (hasSidebarProblems(sidebar)) return { error: "Fix what is marked on the panel first" };
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         const current = await stateOf(installedAppId, user.id);
+        if (hasSidebarProblems(sidebar, current.known)) {
+            return { error: "Fix what is marked on the panel first" };
+        }
         // Only a group the person choosing it is in: otherwise this would be a way
         // to read who is in a call nobody let them see. The one already chosen is
         // left as it is, so another manager can still save the panel.

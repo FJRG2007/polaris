@@ -18,6 +18,7 @@ import { EFFECT_DEFAULT_COLORS } from "../../lib/minecraft/sidebar-effects";
 import { Button, ColorPicker, Select, SegmentedControl, cn } from "@polaris/ui";
 import { WholeNumberInput } from "../../components/whole-number-input";
 import * as side from "../../lib/minecraft/sidebar";
+import type { KnownValues } from "../../lib/minecraft/text-vars";
 
 /** What each effect is called, and what it does, in a few words. */
 export const EFFECT_LABEL: Readonly<
@@ -61,7 +62,8 @@ export function SidebarLineEditor({
     problems,
     inserts,
     placeholder,
-    disabled
+    disabled,
+    known
 }: {
     line: side.SidebarLine;
     onChange: (next: side.SidebarLine) => void;
@@ -74,6 +76,8 @@ export function SidebarLineEditor({
     inserts: Parameters<typeof FormattedTextField>[0]["inserts"];
     placeholder?: string;
     disabled?: boolean;
+    /** The server's values already settled, for the counters. */
+    known?: KnownValues;
 }) {
     const [open, setOpen] = useState(false);
     const summary = lineSummary(line);
@@ -115,6 +119,7 @@ export function SidebarLineEditor({
                     <span className="flex flex-col">
                         <FieldNote
                             text={line.frames[0] ?? ""}
+                            known={known}
                             max={max}
                             problem={problems[0] ?? undefined}
                         />
@@ -148,6 +153,7 @@ export function SidebarLineEditor({
                                             footnote={
                                                 <FieldNote
                                                     text={frame}
+                                                    known={known}
                                                     max={max}
                                                     problem={problems[index] ?? undefined}
                                                 />
