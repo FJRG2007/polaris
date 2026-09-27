@@ -22,9 +22,13 @@
  *
  * A teleport is a jump between two looks further than anybody could have
  * walked, ridden, glided or thrown a pearl, in the same dimension. Ruled out: a
- * change of dimension (a portal), a death (respawning), a vehicle or an elytra
- * at any point since the last look, the End (its gateways move you a thousand
- * blocks), operators, and anything the server log explains - a `/tp` by an
+ * change of dimension (a portal), a respawn (from the look that saw them die
+ * until they are next seen moving, since the death screen can hold a player
+ * for as long as they like before the respawn moves them), the first
+ * `JOIN_GRACE_MS` after joining (a server that sends whoever connects to its
+ * spawn), a vehicle or an elytra at any point since the last look, the End
+ * (its gateways move you a thousand blocks), operators, and anything the
+ * server log explains - a `/tp` by an
  * operator or the console (the game logs those while `logAdminCommands` is on,
  * which is its default; with it off the teleport check stands down, because an
  * operator's teleport can no longer be told apart), or a teleport command
@@ -55,6 +59,15 @@ export const HOVER_MIN_TRAVEL = 0.5;
 
 /** Looks further apart than this say nothing about movement: the loop stalled. */
 export const MAX_LOOK_GAP_MS = 15_000;
+
+/** How long after joining a jump is still the server's own doing: a spawn,
+ *  lobby or login plugin moving whoever just connected. */
+export const JOIN_GRACE_MS = 60_000;
+
+/** How far a player must be seen moving, after the look that saw them die, to
+ *  have respawned without a jump (a bed beside where they fell). A body on the
+ *  death screen does not move. */
+export const RESPAWN_MOVE = 1;
 
 /** Kept per player, oldest dropped first. */
 export const MAX_INCIDENTS = 50;
@@ -107,8 +120,15 @@ export function sinceCommand(objective: string): string {
     return `execute as @a[scores={${objective}=1..}] run data get entity @s Dimension`;
 }
 
-export function resetCommand(objective: string): string {
-    return `scoreboard players reset @a[scores={${objective}=1..}] ${objective}`;
+/** Reset only the players that were read, so a death between the read and the
+ *  reset is still there at the next look. A name the game would not take
+ *  written out falls back to everybody counted. */
+export function resetCommands(objective: string, names: Iterable<string>): string[] {
+    return [...names].map((name) =>
+        /^[A-Za-z0-9_]{1,16}$/.test(name)
+            ? `scoreboard players reset ${name} ${objective}`
+            : `scoreboard players reset @a[scores={${objective}=1..}] ${objective}`
+    );
 }
 
 /** Whether the game writes operators' commands to its log. */
@@ -136,9 +156,20 @@ export interface Track {
     /** Whether the hover going on now was already recorded, so one long flight
      *  is one incident. */
     readonly flagged: boolean;
+    /** When they joined, where the watch saw them arrive; null for whoever was
+     *  already online when it started. */
+    readonly joinedAt: number | null;
+    /** The look that saw them die, until they are seen respawned. */
+    readonly diedAt: number | null;
 }
 
-export const NEW_TRACK: Track = { last: null, hover: [], flagged: false };
+export const NEW_TRACK: Track = {
+    last: null,
+    hover: [],
+    flagged: false,
+    joinedAt: null,
+    diedAt: null
+};
 
 function gap(left: Sample, right: Sample): number {
     return Math.hypot(left.x - right.x, left.y - right.y, left.z - right.z);
@@ -176,6 +207,26 @@ export function reachIn(ms: number): number {
     return 100 + 12 * (ms / 1000);
 }
 
+/** Whether a jump this look is still the server moving somebody who just joined. */
+export function joining(track: Track, now: number): boolean {
+    return track.joinedAt !== null && now - track.joinedAt <= JOIN_GRACE_MS;
+}
+
+/**
+ * Since when a player's next jump is their respawn, after this look: from the
+ * look that saw them die until they are seen moving on a later one. The look
+ * that saw the death may have sampled them still alive and running, so only
+ * movement after it counts.
+ */
+export function respawnAfter(track: Track, sample: Sample, died: boolean): number | null {
+    if (died) return sample.at;
+    const since = track.diedAt;
+    const previous = track.last;
+    if (since === null || !previous || previous.at <= since) return since;
+    const moved = previous.dimension !== sample.dimension || gap(previous, sample) > RESPAWN_MOVE;
+    return moved ? null : since;
+}
+
 /** Whether the jump between two looks at the same player is a teleport. */
 export function isTeleport(previous: Sample, next: Sample): boolean {
     if (previous.dimension !== next.dimension) return false;
@@ -197,7 +248,9 @@ const TELEPORT_VERBS =
  */
 export function explainedByLog(log: string, name: string): boolean {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const teleported = new RegExp(`Teleported ${escaped} to `, "i");
+    // The game writes the display name, which a team can wrap in a prefix or a
+    // suffix, and a selector that moved several players as a count.
+    const teleported = new RegExp(`Teleported (?:.*\\b${escaped}\\b.*|\\d+ entities) to `, "i");
     const came = new RegExp(`\\b${escaped} (?:joined|left) the game`, "i");
     return stripFormatting(log)
         .split("\n")

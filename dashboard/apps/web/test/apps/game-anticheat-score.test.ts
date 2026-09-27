@@ -12,6 +12,7 @@ import { CONFIRM_HITS, readXray } from "@polaris-app/game-servers/src/lib/minecr
 import {
     AIRBORNE_COMMAND,
     HOVER_SAMPLES,
+    JOIN_GRACE_MS,
     MAX_INCIDENTS,
     MOVEMENT_WINDOW_MS,
     NEW_TRACK,
@@ -20,8 +21,11 @@ import {
     explainedByLog,
     incidentAt,
     isTeleport,
+    joining,
     nextHover,
     readLogAdmin,
+    resetCommands,
+    respawnAfter,
     withIncident,
     type Sample,
     type Track
@@ -243,12 +247,103 @@ describe("teleporting", () => {
         expect(
             explainedByLog("[12:00:01] [Server thread/INFO]: <Steve> tp me please", "Steve")
         ).toBe(false);
+        expect(
+            explainedByLog(
+                "[12:00:01] [Server thread/INFO]: [Admin: Teleported Admin to Steve]",
+                "Steve"
+            )
+        ).toBe(false);
+    });
+
+    it("is explained by an operator's /tp on a name a team decorates, or on several players", () => {
+        expect(
+            explainedByLog(
+                "[12:00:01] [Server thread/INFO]: [Admin: Teleported [VIP] Steve to 1.0, 64.0, 2.0]",
+                "Steve"
+            )
+        ).toBe(true);
+        expect(
+            explainedByLog(
+                "[12:00:01] [Server thread/INFO]: [Admin: Teleported 3 entities to Admin]",
+                "Steve"
+            )
+        ).toBe(true);
     });
 
     it("reads whether the game logs operators' commands", () => {
         expect(readLogAdmin("Gamerule logAdminCommands is currently set to: true")).toBe(true);
         expect(readLogAdmin("Gamerule logAdminCommands is currently set to: false")).toBe(false);
         expect(readLogAdmin("Unknown or incomplete command")).toBeNull();
+    });
+});
+
+describe("respawning and joining", () => {
+    const track = (last: Sample | null, diedAt: number | null, joinedAt: number | null = null) =>
+        ({ ...NEW_TRACK, last, diedAt, joinedAt }) satisfies Track;
+
+    it("holds a death until the player is seen moving on a look after the one that saw it", () => {
+        // The look that saw the death: they may still have been running then.
+        expect(respawnAfter(track(sample(64, 0), null), sample(64, 5, NOW + 4000), true)).toBe(
+            NOW + 4000
+        );
+        const died = NOW + 4000;
+        // On the death screen: the body does not move, however long they wait.
+        expect(
+            respawnAfter(
+                track(sample(64, 5, died + 4000), died),
+                sample(64, 5, died + 60_000),
+                false
+            )
+        ).toBe(died);
+        // Respawned far away, or beside where they fell: either ends it.
+        expect(
+            respawnAfter(
+                track(sample(64, 5, died + 4000), died),
+                sample(64, 5000, died + 64_000),
+                false
+            )
+        ).toBeNull();
+        expect(
+            respawnAfter(
+                track(sample(64, 5, died + 4000), died),
+                sample(64, 9, died + 64_000),
+                false
+            )
+        ).toBeNull();
+        expect(
+            respawnAfter(
+                track(sample(64, 5, died + 4000), died),
+                sample(64, 5, died + 64_000, "minecraft:the_nether"),
+                false
+            )
+        ).toBeNull();
+    });
+
+    it("does not end a death on the look that saw it", () => {
+        const died = NOW + 4000;
+        expect(
+            respawnAfter(track(sample(64, 0, died), died), sample(64, 30, died + 4000), false)
+        ).toBe(died);
+    });
+
+    it("is nothing for a player who did not die", () => {
+        expect(
+            respawnAfter(track(sample(64, 0), null), sample(64, 5000, NOW + 4000), false)
+        ).toBeNull();
+    });
+
+    it("excuses the server moving somebody only for a while after they join", () => {
+        expect(joining(track(null, null, NOW), NOW + JOIN_GRACE_MS)).toBe(true);
+        expect(joining(track(null, null, NOW), NOW + JOIN_GRACE_MS + 1)).toBe(false);
+        expect(joining(track(null, null, null), NOW)).toBe(false);
+    });
+
+    it("resets only the players whose counts were read", () => {
+        expect(resetCommands("polaris_mv_death", ["Steve", "odd name"])).toEqual([
+            "scoreboard players reset Steve polaris_mv_death",
+            "scoreboard players reset @a[scores={polaris_mv_death=1..}] polaris_mv_death"
+        ]);
+        expect(resetCommands("polaris_mv_death", [])).toEqual([]);
     });
 });
 

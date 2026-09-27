@@ -63,6 +63,9 @@ interface Loop {
     lastAudit: number;
     /** The movement watch: what it remembers per player, by lowercased name. */
     readonly tracks: Map<string, movement.Track>;
+    /** Whether the watch has looked since it started, so somebody first seen
+     *  after that has just joined. */
+    moveLooked: boolean;
     moveCounters: boolean;
     /** Who was riding at the last look: a jump is not judged if they were then or now. */
     riding: Set<string>;
@@ -139,7 +142,10 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     if (!traps && (state.honeypots.length > 0 || state.cleanup.length > 0)) {
         await clearTraps(installedAppId, loop);
     }
-    if (!watching) loop.tracks.clear();
+    if (!watching) {
+        loop.tracks.clear();
+        loop.moveLooked = false;
+    }
     if (!traps && !watching) {
         if (state.honeypots.length === 0 && state.cleanup.length === 0) stopLoop(installedAppId);
         return;
@@ -474,6 +480,16 @@ function namesIn(output: string): Set<string> {
     return new Set([...xray.readDimensions(output).keys()].map((name) => name.toLowerCase()));
 }
 
+/** Who a counter says did it since the last look, lowercased, with only them
+ *  reset for the next one. */
+async function counted(server: ServerContainer, objective: string): Promise<Set<string>> {
+    const names = [
+        ...xray.readDimensions(await server.say([movement.sinceCommand(objective)])).keys()
+    ];
+    for (const line of movement.resetCommands(objective, names)) await server.say([line]);
+    return new Set(names.map((name) => name.toLowerCase()));
+}
+
 const LOG_FILE = "/data/logs/latest.log";
 /** The most of the log read for one look. A server that wrote more than this in
  *  a few seconds is being flooded, and the part read is the newest. */
@@ -558,10 +574,8 @@ async function watchMovement(
             .map((one) => one.name.toLowerCase())
     );
     const riding = namesIn(await server.say([movement.RIDING_COMMAND]));
-    const died = namesIn(await server.say([movement.sinceCommand(movement.DEATH_OBJECTIVE)]));
-    if (died.size > 0) await server.say([movement.resetCommand(movement.DEATH_OBJECTIVE)]);
-    const glided = namesIn(await server.say([movement.sinceCommand(movement.GLIDE_OBJECTIVE)]));
-    if (glided.size > 0) await server.say([movement.resetCommand(movement.GLIDE_OBJECTIVE)]);
+    const died = await counted(server, movement.DEATH_OBJECTIVE);
+    const glided = await counted(server, movement.GLIDE_OBJECTIVE);
 
     // Read only if some jump needs explaining, and at most once a look.
     let log: string | null | undefined;
@@ -583,15 +597,25 @@ async function watchMovement(
         if (!dimension) continue;
         present.add(key);
         const sample: movement.Sample = { dimension, x: one.x, y: one.y, z: one.z, at: now };
-        const track = loop.tracks.get(key) ?? movement.NEW_TRACK;
+        const track = loop.tracks.get(key) ?? {
+            ...movement.NEW_TRACK,
+            joinedAt: loop.moveLooked ? now : null
+        };
         const operator = loop.operators.has(key);
         const hover = movement.nextHover(track, airborne.has(key) && !operator ? sample : null);
         if (hover.flying) {
             found.push({ name: one.name, incident: movement.incidentAt("flying", sample, null) });
         }
         const previous = track.last;
+        const diedAt = movement.respawnAfter(track, sample, died.has(key));
         const excused =
-            operator || riding.has(key) || loop.riding.has(key) || died.has(key) || glided.has(key);
+            operator ||
+            riding.has(key) ||
+            loop.riding.has(key) ||
+            track.diedAt !== null ||
+            diedAt !== null ||
+            movement.joining(track, now) ||
+            glided.has(key);
         if (previous && !excused && judgeTeleports && movement.isTeleport(previous, sample)) {
             if (log === undefined) log = await logSince(server, logFrom, size);
             if (log !== null && !movement.explainedByLog(log, one.name)) {
@@ -605,8 +629,9 @@ async function watchMovement(
                 });
             }
         }
-        loop.tracks.set(key, { ...hover.track, last: sample });
+        loop.tracks.set(key, { ...hover.track, last: sample, diedAt });
     }
+    loop.moveLooked = true;
     for (const key of [...loop.tracks.keys()]) if (!present.has(key)) loop.tracks.delete(key);
     loop.riding = riding;
 
@@ -714,6 +739,7 @@ export function startXrayTraps(ownerId: string, installedAppId: string): void {
         lastPlace: 0,
         lastAudit: Date.now(),
         tracks: new Map(),
+        moveLooked: false,
         moveCounters: false,
         riding: new Set(),
         operators: new Set(),
