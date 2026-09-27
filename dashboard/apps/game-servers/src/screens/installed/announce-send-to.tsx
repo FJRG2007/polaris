@@ -15,6 +15,7 @@ import {
     EVERYBODY,
     MOST_PICKED,
     OPERATORS,
+    isPickableName,
     parseTarget,
     playersTarget
 } from "../../lib/minecraft/announce-target";
@@ -82,15 +83,24 @@ export function SendTo({
                             const checked = picked.some(
                                 (one) => one.toLowerCase() === name.toLowerCase()
                             );
+                            const pickable = isPickableName(name);
                             return (
                                 <li key={name}>
                                     <label className="flex cursor-pointer items-center gap-2">
                                         <Checkbox
                                             checked={checked}
-                                            disabled={!checked && picked.length >= MOST_PICKED}
+                                            disabled={
+                                                !pickable ||
+                                                (!checked && picked.length >= MOST_PICKED)
+                                            }
                                             onChange={(event) => toggle(name, event.target.checked)}
                                         />
                                         <span>{name}</span>
+                                        {!pickable && (
+                                            <span className="text-xs text-muted-foreground">
+                                                can't be picked by name
+                                            </span>
+                                        )}
                                         {offline.includes(name) && (
                                             <span className="text-xs text-muted-foreground">
                                                 not on now

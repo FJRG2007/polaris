@@ -311,7 +311,7 @@ export async function sendAnnouncement(
     // ones on the server now.
     const withOperators =
         parseTarget(announcement.target)?.kind === "operators"
-            ? { ...context, operators: await operatorsOnline(install, ownerId) }
+            ? { ...context, operators: await operatorsOnline(install, ownerId, players) }
             : context;
     const lines = announcementCommands(install.edition, announcement, withOperators);
     if (lines.length === 0) throw new Error("There is nothing to send yet");
@@ -786,12 +786,16 @@ async function readPlayerList(
 }
 
 /** The operators who are on the server now, by name. Java only: Bedrock keeps
- *  its operators by xuid. */
-async function operatorsOnline(install: MinecraftInstall, ownerId: string): Promise<string[]> {
+ *  its operators by xuid. `known` is a player list already read for this send. */
+async function operatorsOnline(
+    install: MinecraftInstall,
+    ownerId: string,
+    known: parse.PlayerList | null = null
+): Promise<string[]> {
     if (install.edition === "bedrock") return [];
     const [ops, players] = await Promise.all([
         readServerFile(install, ownerId, "ops.json"),
-        readPlayerList(install, ownerId)
+        known ?? readPlayerList(install, ownerId)
     ]);
     const operators = new Set(parse.parseNameFile(ops).map((name) => name.toLowerCase()));
     return (players?.players ?? []).filter((name) => operators.has(name.toLowerCase()));

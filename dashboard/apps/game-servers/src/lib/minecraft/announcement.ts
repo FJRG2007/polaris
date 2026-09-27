@@ -18,7 +18,7 @@
  * Pure, so every command can be asserted without a server.
  */
 
-import { EVERYBODY, concreteTargets, parseTarget } from "./announce-target";
+import { EVERYBODY, LONGEST_NAME, concreteTargets, parseTarget } from "./announce-target";
 import { BROADCAST_TAG } from "./broadcast";
 import type { MinecraftEdition } from "./service";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
@@ -533,12 +533,14 @@ export function announcementProblems(
     // Each part becomes one command, and one command has to fit in what the
     // game reads at once. Said under the part that is too long, like any other
     // problem with it, rather than once for the whole announcement.
-    // Measured against the longest name it may be written around; operators and
-    // everybody are measured as the selector, which is no longer than a name.
+    // Measured against the longest name it may be written around; the operators
+    // are not known until it goes, so against the longest name there can be.
     const target =
         audience?.kind === "players"
             ? audience.players.reduce((longest, name) => (name.length > longest.length ? name : longest))
-            : EVERYBODY;
+            : audience?.kind === "operators"
+              ? LONGEST_NAME
+              : EVERYBODY;
     for (const field of [...lineFields, "chat"] as const) {
         if (problems[field] || !hasText(announcement[field])) continue;
         const alone: Announcement = {

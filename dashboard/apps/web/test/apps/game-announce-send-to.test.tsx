@@ -129,6 +129,18 @@ describe("the lines it becomes", () => {
         expect(announcementProblems(draft({ target: "@ops", chat: "Hi" }), "bedrock").target).toMatch(/Bedrock/);
         expect(announcementProblems(draft({ target: "@ops", chat: "Hi" }), "java").target).toBeUndefined();
     });
+
+    it("measures an operators one against the longest name an operator can have", () => {
+        const longest = "A".repeat(16);
+        let caught = false;
+        for (let pad = 0; pad <= 360; pad++) {
+            const chat = `${"&a&lx".repeat(30)}${"y".repeat(pad)}`;
+            const ops = announcementProblems(draft({ target: "@ops", chat }), "java").chat;
+            expect(ops).toBe(announcementProblems(draft({ target: longest, chat }), "java").chat);
+            if (ops && !announcementProblems(draft({ target: "@a", chat }), "java").chat) caught = true;
+        }
+        expect(caught).toBe(true);
+    });
 });
 
 describe("the Send to control", () => {
@@ -145,6 +157,14 @@ describe("the Send to control", () => {
         await waitFor(() => expect(sent).toHaveLength(1));
         expect(sent[0]?.announcement.target).toBe("Steve,Zed");
         expect(await screen.findByText("Sent to Steve and Zed.")).toBeTruthy();
+    });
+
+    it("does not let a name that cannot be aimed at be ticked", async () => {
+        render(<MinecraftAnnounce installedAppId="s1" running edition="bedrock" players={["Steve", "Big Bob"]} />);
+        fireEvent.click(screen.getByRole("combobox", { name: "Send to" }));
+        fireEvent.click(await screen.findByRole("option", { name: "Players I pick" }));
+        expect((screen.getByRole("checkbox", { name: /Big Bob/ }) as HTMLInputElement).disabled).toBe(true);
+        expect((screen.getByRole("checkbox", { name: "Steve" }) as HTMLInputElement).disabled).toBe(false);
     });
 
     it("will not send to nobody", async () => {

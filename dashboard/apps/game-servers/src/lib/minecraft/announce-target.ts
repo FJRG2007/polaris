@@ -21,6 +21,15 @@ export const MOST_PICKED = 50;
 
 const JAVA_NAME = /^[A-Za-z0-9_]{1,16}$/;
 
+/** As long as any name a command can be aimed at, for measuring one before the
+ *  names are known. */
+export const LONGEST_NAME = "_".repeat(16);
+
+/** Whether a name can be picked out: the only names ever written into a command. */
+export function isPickableName(name: string): boolean {
+    return JAVA_NAME.test(name);
+}
+
 export type Audience =
     | { readonly kind: "everybody" }
     | { readonly kind: "operators" }
@@ -32,7 +41,7 @@ export function parseTarget(target: string): Audience | null {
     if (target === OPERATORS) return { kind: "operators" };
     const players = target.split(",");
     if (players.length === 0 || players.length > MOST_PICKED) return null;
-    if (!players.every((name) => JAVA_NAME.test(name))) return null;
+    if (!players.every(isPickableName)) return null;
     const unique = new Set(players.map((name) => name.toLowerCase()));
     if (unique.size !== players.length) return null;
     return { kind: "players", players };
@@ -62,5 +71,5 @@ export function describeTarget(target: string): string {
 export function concreteTargets(audience: Audience, operatorsOnline: readonly string[] = []): string[] {
     if (audience.kind === "everybody") return [EVERYBODY];
     const names = audience.kind === "operators" ? operatorsOnline : audience.players;
-    return names.filter((name) => JAVA_NAME.test(name));
+    return names.filter(isPickableName);
 }
