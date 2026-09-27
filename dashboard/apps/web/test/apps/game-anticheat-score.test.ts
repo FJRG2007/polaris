@@ -282,7 +282,10 @@ describe("teleporting", () => {
             expect(explainedByLog(line, "Steve")).toBe(false);
         }
         expect(
-            explainedByLog("[12:00:01] [Server thread/INFO]: Teleported 3 entities to Admin", "Steve")
+            explainedByLog(
+                "[12:00:01] [Server thread/INFO]: Teleported 3 entities to Admin",
+                "Steve"
+            )
         ).toBe(true);
         expect(
             explainedByLog(
