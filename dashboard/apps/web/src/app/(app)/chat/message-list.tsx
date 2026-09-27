@@ -826,7 +826,10 @@ function Message({
                                     aria-label={`View ${author}'s profile`}
                                     title={author}
                                     onClick={(event) =>
-                                        press({ id: message.authorId!, name: author }, event.currentTarget)
+                                        press(
+                                            { id: message.authorId!, name: author },
+                                            event.currentTarget
+                                        )
                                     }
                                     className="inline-flex rounded-full"
                                 >
