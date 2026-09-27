@@ -39,14 +39,26 @@ export interface ChatRelayInput {
     readonly author: string;
     readonly conversation: string;
     readonly inChannel: boolean;
+    /** The words, plain - a poll's question - or empty when there are none. */
     readonly text: string;
+    /** What files it carries ("Photo", "3 files", a file's name), or null. */
+    readonly files?: string | null;
+    /** A poll's answers, or null when it is not a poll. */
+    readonly poll?: readonly string[] | null;
+    readonly forwarded?: boolean;
 }
 
 /** What marks a line as a Chat message: an envelope (U+2709). */
-export const MESSAGE_MARK = "✉";
+export const MESSAGE_MARK = "\u2709";
 
 /** The longest message line sent into a game. */
 const MOST_TEXT = 200;
+
+/** The longest a file's name or a poll's answer is shown. */
+const MOST_LABEL = 48;
+
+/** The shortest the words are cut to so the line fits in one command. */
+const LEAST_TEXT = 24;
 
 /** The game's formatting character and anything that is not a printable line. */
 function literal(value: string, max: number): string {
@@ -60,6 +72,12 @@ function literal(value: string, max: number): string {
 /**
  * The `tellraw` that shows one message to one player, or null when the player's
  * name cannot be written as a target. Everything but the tag is plain text.
+ *
+ * What is not words gets a label of its own beside them, so a photo with a
+ * caption reads as both and a voice note is not an empty line: `[Photo]`,
+ * `[3 files]`, a poll's question and answers, and whether it was forwarded.
+ * Where it all would not fit in one command the words are cut first, and the
+ * labels are kept.
  */
 export function relayCommand(
     player: string,
@@ -71,7 +89,7 @@ export function relayCommand(
     const where = literal(message.conversation, 48);
     // An envelope ahead of the tag, so a message reads as one at a glance among
     // the server's own lines; the game's font draws it without a resource pack.
-    const runs: Record<string, unknown>[] = [
+    const head: Record<string, unknown>[] = [
         { text: "" },
         { text: `${MESSAGE_MARK} `, color: "aqua" },
         { text: `[${BROADCAST_TAG}] `, color: "gray" },
@@ -79,11 +97,28 @@ export function relayCommand(
     ];
     // A direct message is named after its author; saying "Ana in Ana" is noise.
     if (where && where !== author) {
-        runs.push({ text: message.inChannel ? ` in #${where}` : ` in ${where}`, color: "gray" });
+        head.push({ text: message.inChannel ? ` in #${where}` : ` in ${where}`, color: "gray" });
     }
-    runs.push({ text: ": ", color: "gray" }, { text: literal(message.text, MOST_TEXT) });
-    const line = `tellraw ${target} ${JSON.stringify(runs)}`;
-    return commandBytes(line) <= COMMAND_BYTES_MAX ? line : null;
+    head.push({ text: ": ", color: "gray" });
+    if (message.forwarded) head.push({ text: "[Forwarded] ", color: "gray", italic: true });
+
+    const answers = (message.poll ?? []).map((one) => literal(one, MOST_LABEL)).filter(Boolean);
+    const files = message.files ? literal(message.files, MOST_LABEL) : "";
+    const body = (max: number): Record<string, unknown>[] => {
+        const runs: Record<string, unknown>[] = [];
+        const words = literal(message.text, max);
+        if (message.poll) runs.push({ text: "[Poll] ", color: "aqua" });
+        if (words) runs.push({ text: words });
+        if (answers.length > 0) runs.push({ text: ` (${answers.join(" / ")})`, color: "gray" });
+        if (files) runs.push({ text: `${runs.length > 0 ? " " : ""}[${files}]`, color: "aqua" });
+        if (runs.length === 0) runs.push({ text: "Sent a message", color: "gray", italic: true });
+        return runs;
+    };
+    for (let max = MOST_TEXT; max >= LEAST_TEXT; max = Math.floor(max / 2)) {
+        const line = `tellraw ${target} ${JSON.stringify([...head, ...body(max)])}`;
+        if (commandBytes(line) <= COMMAND_BYTES_MAX) return line;
+    }
+    return null;
 }
 
 /** Where to show it: each Java server this account is linked on and playing on

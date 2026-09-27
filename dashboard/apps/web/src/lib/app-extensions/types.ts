@@ -142,6 +142,13 @@ export interface RelayedChatMessage {
     readonly conversation: string;
     /** Whether it is a channel rather than a direct message or a group. */
     readonly inChannel: boolean;
-    /** The words, plain, or what was sent when there are none. */
+    /** The words, plain - a poll's question - or empty when there are none. */
     readonly text: string;
+    /** What files it carries, as a label ("Photo", "3 files", a file's name),
+     *  or null for none. */
+    readonly files: string | null;
+    /** A poll's answers, in order, or null when it is not a poll. */
+    readonly poll: readonly string[] | null;
+    /** Whether it was forwarded from another conversation. */
+    readonly forwarded: boolean;
 }

@@ -107,6 +107,38 @@ function isAudio(contentType: string): boolean {
     return isPlayableMedia(contentType) && contentType.toLowerCase().startsWith("audio/");
 }
 
+/** What one or more files are, in a few words: "a photo", "3 videos", or the
+ *  file's own name. Null for none. */
+function filesPhrase(files: readonly Pick<ToastFile, "name" | "contentType" | "spoiler">[]): {
+    readonly phrase: string;
+    readonly named: boolean;
+} | null {
+    const [first] = files;
+    if (!first) return null;
+    if (files.length > 1) {
+        const count = files.length;
+        if (files.every((file) => file.spoiler))
+            return { phrase: `${count} spoilers`, named: false };
+        if (files.some((file) => file.spoiler)) return { phrase: `${count} files`, named: false };
+        if (files.every((file) => isInlineImage(file.contentType)))
+            return { phrase: `${count} photos`, named: false };
+        if (files.every((file) => isVideo(file.contentType)))
+            return { phrase: `${count} videos`, named: false };
+        return { phrase: `${count} files`, named: false };
+    }
+    if (first.spoiler) return { phrase: "a spoiler", named: false };
+    if (isInlineImage(first.contentType)) {
+        return first.contentType.toLowerCase().startsWith("image/gif")
+            ? { phrase: "a GIF", named: false }
+            : { phrase: "a photo", named: false };
+    }
+    if (isVideo(first.contentType)) return { phrase: "a video", named: false };
+    if (isAudio(first.contentType) && isVoiceFileName(first.name)) {
+        return { phrase: "a voice message", named: false };
+    }
+    return { phrase: first.name, named: true };
+}
+
 /**
  * What a message with no words in it sent, in words.
  *
@@ -114,27 +146,23 @@ function isAudio(contentType: string): boolean {
  * reads nothing under somebody's name says nothing happened.
  */
 export function describeFiles(files: readonly ToastFile[]): string {
-    const [first] = files;
-    if (!first) return "Sent a message";
-    if (files.length > 1) {
-        if (files.every((file) => file.spoiler)) return `Sent ${files.length} spoilers`;
-        if (files.some((file) => file.spoiler)) return `Sent ${files.length} files`;
-        if (files.every((file) => isInlineImage(file.contentType)))
-            return `Sent ${files.length} photos`;
-        if (files.every((file) => isVideo(file.contentType))) return `Sent ${files.length} videos`;
-        return `Sent ${files.length} files`;
-    }
-    if (first.spoiler) return "Sent a spoiler";
-    if (isInlineImage(first.contentType)) {
-        return first.contentType.toLowerCase().startsWith("image/gif")
-            ? "Sent a GIF"
-            : "Sent a photo";
-    }
-    if (isVideo(first.contentType)) return "Sent a video";
-    if (isAudio(first.contentType)) {
-        return isVoiceFileName(first.name) ? "Sent a voice message" : `Sent ${first.name}`;
-    }
-    return `Sent ${first.name}`;
+    const what = filesPhrase(files);
+    return what ? `Sent ${what.phrase}` : "Sent a message";
+}
+
+/**
+ * The files a message carries, as a label to set beside its words: "Photo",
+ * "Voice message", "3 files", or the file's name. Null for none. A spoiler is
+ * only ever called one, never named or described.
+ */
+export function filesLabel(
+    files: readonly Pick<ToastFile, "name" | "contentType" | "spoiler">[]
+): string | null {
+    const what = filesPhrase(files);
+    if (!what) return null;
+    if (what.named) return what.phrase;
+    const bare = what.phrase.replace(/^an? /, "");
+    return `${bare.charAt(0).toUpperCase()}${bare.slice(1)}`;
 }
 
 /** What a conversation is called from one reader's side: a channel's name, or

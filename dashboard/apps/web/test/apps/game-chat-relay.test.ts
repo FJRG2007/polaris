@@ -118,6 +118,41 @@ describe("the line a player is shown", () => {
         expect(runs[1]).toEqual({ text: "✉ ", color: "aqua" });
     });
 
+    /** The words of a line, after the author, as one string. */
+    function said(message: Parameters<typeof relay.relayCommand>[1]): string {
+        const line = relay.relayCommand("Ana_MC", message)!;
+        const runs = JSON.parse(line.slice("tellraw Ana_MC ".length)) as { text: string }[];
+        const text = runs.map((run) => run.text).join("");
+        return text.slice(text.indexOf(": ") + 2);
+    }
+
+    it("shows what a message carries beside its words, and alone when there are none", () => {
+        expect(said({ ...MESSAGE, text: "look", files: "Photo" })).toBe("look [Photo]");
+        expect(said({ ...MESSAGE, text: "", files: "Voice message" })).toBe("[Voice message]");
+        expect(said({ ...MESSAGE, text: "", files: "3 files" })).toBe("[3 files]");
+        expect(said({ ...MESSAGE, text: "", files: "plan.pdf" })).toBe("[plan.pdf]");
+        expect(said({ ...MESSAGE, text: "", files: null })).toBe("Sent a message");
+    });
+
+    it("shows a poll with its question and answers, and says when it was forwarded", () => {
+        expect(said({ ...MESSAGE, text: "Raid tonight?", poll: ["Yes", "No"] })).toBe(
+            "[Poll] Raid tonight? (Yes / No)"
+        );
+        expect(said({ ...MESSAGE, forwarded: true })).toBe("[Forwarded] see you at spawn");
+    });
+
+    it("cuts the words, not the labels, to fit one command", () => {
+        const line = relay.relayCommand("Ana_MC", {
+            ...MESSAGE,
+            text: "word ".repeat(40).trim(),
+            files: "x".repeat(200),
+            poll: Array.from({ length: 10 }, (_, index) => `${"answer ".repeat(6)}${index}`)
+        });
+        expect(line).not.toBeNull();
+        expect(line).toContain("[Poll]");
+        expect(line).toContain("answer");
+    });
+
     it("names the conversation when it is not the author's own", () => {
         const line = relay.relayCommand("Ana_MC", {
             ...MESSAGE,
