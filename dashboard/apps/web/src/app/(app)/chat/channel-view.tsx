@@ -678,28 +678,26 @@ export function ChannelView({
         // Centred instead, the list stopped following, and whatever loaded under
         // it afterwards (a picture, a link's preview) pushed the view up past
         // the bottom it should have stayed at.
-        if (held.current[held.current.length - 1]?.id === messageId) {
+        if (!newerThanRef.current && held.current[held.current.length - 1]?.id === messageId) {
             following.current = true;
             const list = scroller.current;
             if (list) list.scrollTop = list.scrollHeight;
             foot.current?.scrollIntoView({ block: "end" });
             setAway(false);
-            setHighlight(messageId);
-            setTimeout(() => setHighlight(null), HIGHLIGHT_MS);
-            return true;
-        }
-        following.current = false;
-        // The conversation has stopped settling, whatever the clock says. This
-        // is what a link to a message was fighting: the first second after a
-        // conversation opens, the list insists on the bottom every frame, so
-        // landing on an older message inside that second was undone before
-        // anybody saw it - the message was pointed at and the screen was at the
-        // newest line.
-        settling.current = 0;
-        element.scrollIntoView({ block: "center" });
-        if (scroller.current) {
-            readingAt.current = readingPosition(scroller.current);
-            setAway(readingOlder(scroller.current));
+        } else {
+            following.current = false;
+            // The conversation has stopped settling, whatever the clock says. This
+            // is what a link to a message was fighting: the first second after a
+            // conversation opens, the list insists on the bottom every frame, so
+            // landing on an older message inside that second was undone before
+            // anybody saw it - the message was pointed at and the screen was at the
+            // newest line.
+            settling.current = 0;
+            element.scrollIntoView({ block: "center" });
+            if (scroller.current) {
+                readingAt.current = readingPosition(scroller.current);
+                setAway(readingOlder(scroller.current));
+            }
         }
         setHighlight(messageId);
         setTimeout(() => setHighlight(null), HIGHLIGHT_MS);
