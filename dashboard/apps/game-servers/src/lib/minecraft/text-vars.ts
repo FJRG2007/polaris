@@ -183,14 +183,16 @@ export const VARIABLES: readonly VariableSpec[] = [
         bedrock: false,
         width: 32
     },
-    ...STATS_RANKINGS.map((name): VariableSpec => ({
-        name,
-        label: RANKINGS[name].label,
-        kind: "server",
-        sample: RANKINGS[name].sample.join(", "),
-        bedrock: false,
-        width: 32
-    })),
+    ...STATS_RANKINGS.map(
+        (name): VariableSpec => ({
+            name,
+            label: RANKINGS[name].label,
+            kind: "server",
+            sample: RANKINGS[name].sample.join(", "),
+            bedrock: false,
+            width: 32
+        })
+    ),
     {
         name: "death.player",
         label: "Who died last",
@@ -320,9 +322,7 @@ export function usesAccount(text: string): boolean {
 }
 
 /** The scores a text reads, so the objectives behind them exist before it goes. */
-export function objectivesIn(
-    text: string
-): { name: string; criterion: string; seed: string }[] {
+export function objectivesIn(text: string): { name: string; criterion: string; seed: string }[] {
     const found = new Map<string, { name: string; criterion: string; seed: string }>();
     for (const use of variablesIn(text)) {
         const objective = use.spec?.objective;

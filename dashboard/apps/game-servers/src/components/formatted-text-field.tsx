@@ -355,7 +355,9 @@ export function FormattedTextField({
                                 <code className="shrink-0 font-mono text-foreground">
                                     {option.text}
                                 </code>
-                                <span className="truncate text-muted-foreground">{option.label}</span>
+                                <span className="truncate text-muted-foreground">
+                                    {option.label}
+                                </span>
                             </li>
                         ))}
                     </ul>

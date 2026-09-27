@@ -516,7 +516,13 @@ function clearFor(edition: MinecraftEdition, announcement: Announcement, target:
 
 /** The fields a problem can be under. */
 export type AnnouncementField =
-    "target" | "title" | "subtitle" | "actionbar" | "chat" | "until" | "hold";
+    | "target"
+    | "title"
+    | "subtitle"
+    | "actionbar"
+    | "chat"
+    | "until"
+    | "hold";
 
 /**
  * What is wrong with an announcement, field by field, in words for under each
