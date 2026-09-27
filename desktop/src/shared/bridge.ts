@@ -24,6 +24,9 @@ export interface NoticeInput {
      *  answered where it arrived. The answer comes back through
      *  `onNoticeReply`. */
     readonly reply?: { readonly placeholder: string; };
+    /** Buttons on the notice, by id: "Mark as read". A press comes back through
+     *  `onNoticeAction` with the id. */
+    readonly actions?: readonly NoticeButton[];
     /** Notices sharing a tag replace each other. */
     readonly tag: string;
     /** A path on the Polaris to open when the notice is pressed. */
@@ -57,6 +60,8 @@ export interface PolarisDesktop {
     closeNotice(tag: string): Promise<void>;
     /** Hear what is written in a notice's answer field. Answers the way to stop. */
     onNoticeReply(listener: (reply: NoticeReply) => void): () => void;
+    /** Hear a press on one of a notice's buttons. Answers the way to stop. */
+    onNoticeAction(listener: (action: NoticeAction) => void): () => void;
     /** A folder picked with the system's own dialog, zipped for "Upload a folder".
      *  Null when the dialog was dismissed. */
     pickFolder(): Promise<PickedFolder>;
@@ -106,6 +111,18 @@ export interface PolarisLocal {
     };
 }
 
+/** A button on a notice. */
+export interface NoticeButton {
+    readonly id: string;
+    readonly text: string;
+}
+
+/** A press on a notice's button, handed back to the page that raised it. */
+export interface NoticeAction {
+    readonly tag: string;
+    readonly action: string;
+}
+
 /** An answer written on a notice, handed back to the page that raised it. */
 export interface NoticeReply {
     readonly tag: string;
@@ -115,6 +132,7 @@ export interface NoticeReply {
 export const CHANNELS = {
     notify: "desktop:notify",
     noticeReply: "desktop:notice-reply",
+    noticeAction: "desktop:notice-action",
     closeNotice: "desktop:close-notice",
     pickFolder: "desktop:pick-folder",
     pushLocal: "desktop:push-local",

@@ -25,12 +25,16 @@
  * is read up to the message announced and the answer goes to it, so the note,
  * the notice and the unread count go the way they do on every messenger. A card
  * being answered stays through that read, so it can say whether the answer went.
+ * Either can also just be marked read, the other button a messenger's notice
+ * has: the notice's own, pressed on the card, in the desktop app, or in a
+ * browser whose service worker runs - which hears it even with no tab open.
  *
  * The conversation open in this tab is only exempt while somebody is attending to
  * the tab. Left open behind another window, it is announced like any other - see
  * `lib/chat/message-alert` for the whole decision.
  */
 
+import { CheckCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { usePathname } from "next/navigation";
@@ -43,10 +47,13 @@ import { useSessionScope } from "@/components/session-scope";
 import { messageToastsAction, replyFromNoticeAction } from "@/app/(app)/chat/actions";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
 import {
+    actOnUnclaimedNotices,
     answerUnclaimedReplies,
     closeDesktopNotice,
     notifyDesktop,
-    tabIsWatched
+    runNoticeAction,
+    tabIsWatched,
+    type NoticeAction
 } from "@/lib/desktop-notify";
 import { noticeAllowed } from "@/lib/notifications/browser-notices";
 import { notificationSoundEnabled } from "@/lib/notification-sound";
@@ -63,6 +70,18 @@ const SETTLE_MS = 400;
 
 /** The tag of the notice announcing a conversation. */
 const TAG = "message:";
+
+/** "Mark as read" on a message's notice: the conversation read up to it. */
+function markReadAction(channelId: string, messageId: string): NoticeAction {
+    return {
+        id: "read",
+        text: "Mark as read",
+        request: {
+            url: `/api/chat/channels/${encodeURIComponent(channelId)}/read`,
+            body: { messageId }
+        }
+    };
+}
 
 /** Send an answer to a conversation from its notice. Answers why it did not go,
  *  or null when it did. */
@@ -87,6 +106,12 @@ async function answerFromDesktop(
 ): Promise<void> {
     const refused = await answer(channelId, messageId, text);
     if (refused) replyNotSent(channelId, refused);
+}
+
+/** The newest message in a conversation, which is what its notice announced. */
+async function newestAnnounced(channelId: string): Promise<string | undefined> {
+    const { toasts } = await messageToastsAction([channelId]).catch(() => ({ toasts: [] }));
+    return toasts.find((one) => one.channelId === channelId)?.messageId;
 }
 
 function replyNotSent(channelId: string | null, why: string): void {
@@ -208,7 +233,19 @@ export function MessageToasts() {
                                 replying.current.delete(message.channelId);
                             }
                         }
-                    }
+                    },
+                    actions: [
+                        {
+                            label: "Mark as read",
+                            icon: <CheckCheck className="size-3.5" />,
+                            run: async () =>
+                                (await runNoticeAction(
+                                    markReadAction(message.channelId, message.messageId)
+                                ))
+                                    ? null
+                                    : "That could not be marked as read"
+                        }
+                    ]
                 };
                 raise.current(note);
             }
@@ -242,7 +279,8 @@ export function MessageToasts() {
                                 placeholder: replyTo,
                                 send: (text) =>
                                     answerFromDesktop(message.channelId, message.messageId, text)
-                            }
+                            },
+                            actions: [markReadAction(message.channelId, message.messageId)]
                         });
                     }
                 );
@@ -307,12 +345,20 @@ export function MessageToasts() {
                     return;
                 }
                 const channelId = tag.slice(TAG.length);
-                // The newest message there, which is what the notice announced.
-                const { toasts } = await messageToastsAction([channelId]).catch(() => ({
-                    toasts: []
-                }));
-                const newest = toasts.find((one) => one.channelId === channelId);
-                await answerFromDesktop(channelId, newest?.messageId, text);
+                const newest = await newestAnnounced(channelId);
+                await answerFromDesktop(channelId, newest, text);
+            }),
+        []
+    );
+
+    // A "Mark as read" pressed on a notice drawn before this page was loaded.
+    useEffect(
+        () =>
+            actOnUnclaimedNotices(async (tag, action) => {
+                if (!tag.startsWith(TAG) || action !== "read") return;
+                const channelId = tag.slice(TAG.length);
+                const newest = await newestAnnounced(channelId);
+                if (newest) await runNoticeAction(markReadAction(channelId, newest));
             }),
         []
     );

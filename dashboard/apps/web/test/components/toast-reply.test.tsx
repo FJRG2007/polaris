@@ -12,14 +12,29 @@
 
 import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ToastProvider, useToast, type ToastReply } from "@polaris/ui";
+import { ToastProvider, useToast, type ToastAction, type ToastReply } from "@polaris/ui";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-function Raise({ reply, onPress }: { reply: ToastReply; onPress: () => void }) {
+function Raise({
+    reply,
+    onPress,
+    actions
+}: {
+    reply: ToastReply;
+    onPress: () => void;
+    actions?: ToastAction[];
+}) {
     const toast = useToast();
     useEffect(() => {
-        toast.show({ key: "message:c1", title: "Ana", body: "are you coming?", onPress, reply });
-    }, [toast, reply, onPress]);
+        toast.show({
+            key: "message:c1",
+            title: "Ana",
+            body: "are you coming?",
+            onPress,
+            reply,
+            actions
+        });
+    }, [toast, reply, onPress, actions]);
     return null;
 }
 
@@ -42,12 +57,12 @@ function Replace({ reply }: { reply: ToastReply }) {
     );
 }
 
-function draw(send: ToastReply["send"]) {
+function draw(send: ToastReply["send"], actions?: ToastAction[]) {
     const onPress = vi.fn();
     const reply = { placeholder: "Reply to Ana", send };
     render(
         <ToastProvider>
-            <Raise reply={reply} onPress={onPress} />
+            <Raise reply={reply} onPress={onPress} actions={actions} />
         </ToastProvider>
     );
     return { onPress };
@@ -126,5 +141,48 @@ describe("answering on the note", () => {
         expect(screen.getByText("one more thing")).toBeTruthy();
         expect(screen.queryByText("Sent")).toBeNull();
         expect(screen.getByRole("button", { name: "Reply" })).toBeTruthy();
+    });
+
+    it("marks it read from the note, which then goes - without opening the conversation", async () => {
+        const run = vi.fn(async () => null);
+        const { onPress } = draw(
+            vi.fn(async () => null),
+            [{ label: "Mark as read", run }]
+        );
+        await act(async () => {
+            fireEvent.click(await screen.findByRole("button", { name: "Mark as read" }));
+        });
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(onPress).not.toHaveBeenCalled();
+        expect(screen.queryByText("Ana")).toBeNull();
+    });
+
+    it("says why it could not be marked read, and stays", async () => {
+        draw(
+            vi.fn(async () => null),
+            [{ label: "Mark as read", run: async () => "That could not be marked as read" }]
+        );
+        await act(async () => {
+            fireEvent.click(await screen.findByRole("button", { name: "Mark as read" }));
+        });
+        expect(screen.getByRole("alert").textContent).toBe("That could not be marked as read");
+        expect(screen.getByText("Ana")).toBeTruthy();
+    });
+
+    it("keeps a newer message's note when an older one's mark as read finishes", async () => {
+        let finish: (refused: string | null) => void = () => undefined;
+        const run = vi.fn(() => new Promise<string | null>((resolve) => (finish = resolve)));
+        const reply = { placeholder: "Reply to Ana", send: vi.fn(async () => null) };
+        const actions = [{ label: "Mark as read", run }];
+        render(
+            <ToastProvider>
+                <Raise reply={reply} onPress={() => undefined} actions={actions} />
+                <Replace reply={reply} />
+            </ToastProvider>
+        );
+        fireEvent.click(await screen.findByRole("button", { name: "Mark as read" }));
+        fireEvent.click(screen.getByRole("button", { name: "newer" }));
+        await act(async () => finish(null));
+        expect(screen.getByText("one more thing")).toBeTruthy();
     });
 });

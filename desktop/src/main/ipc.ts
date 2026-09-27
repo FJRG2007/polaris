@@ -31,7 +31,11 @@ const noticeSchema = z.object({
     href: z.string().max(2048).optional(),
     insistent: z.boolean().optional(),
     sound: z.boolean().optional(),
-    reply: z.object({ placeholder: z.string().trim().min(1).max(120) }).optional()
+    reply: z.object({ placeholder: z.string().trim().min(1).max(120) }).optional(),
+    actions: z
+        .array(z.object({ id: z.string().min(1).max(40), text: z.string().trim().min(1).max(40) }))
+        .max(2)
+        .optional()
 });
 
 const windowSchema = z.object({
@@ -89,6 +93,16 @@ export function registerIpc(host: IpcHost): void {
                               if (!event.sender.isDestroyed()) {
                                   event.sender.send(CHANNELS.noticeReply, { tag: input.data.tag, text });
                               }
+                          }
+                      }
+                  }
+                : {}),
+            ...(input.data.actions?.length
+                ? {
+                      actions: input.data.actions,
+                      onAction: (action: string) => {
+                          if (!event.sender.isDestroyed()) {
+                              event.sender.send(CHANNELS.noticeAction, { tag: input.data.tag, action });
                           }
                       }
                   }

@@ -19,6 +19,7 @@
  */
 
 import { Download } from "lucide-react";
+import { listenToWorker } from "@/lib/desktop-notify";
 import { useDesktopBridge } from "@/components/desktop-app";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -55,6 +56,7 @@ function subscribe(listener: () => void): () => void {
 export function ServiceWorkerRegistration() {
     useEffect(() => {
         if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
+        listenToWorker();
         void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined);
     }, []);
     return null;

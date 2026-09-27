@@ -62,4 +62,18 @@ describe("a notice that can be answered", () => {
         expect(made[0]?.options.hasReply).toBeUndefined();
         expect(made[0]?.handlers.has("reply")).toBe(false);
     });
+
+    it("draws its buttons, and hands a press back by the button's id", () => {
+        const pressed: string[] = [];
+        showNotice({
+            title: "Ana",
+            tag: "message:c1",
+            actions: [{ id: "read", text: "Mark as read" }],
+            onAction: (action) => pressed.push(action)
+        });
+        expect(made[0]?.options).toMatchObject({ actions: [{ type: "button", text: "Mark as read" }] });
+        made[0]?.handlers.get("action")?.({ actionIndex: 0 }, 0);
+        expect(pressed).toEqual(["read"]);
+        expect(made[0]?.closed).toBe(true);
+    });
 });

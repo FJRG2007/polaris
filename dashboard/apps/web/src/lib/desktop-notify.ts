@@ -43,6 +43,95 @@ import { attending } from "@/components/use-attention";
  */
 const shown = new Map<string, { close: () => void }>();
 
+/**
+ * A button on a notice, and what it does: a request to Polaris, made by
+ * whichever of the page, the desktop app or the service worker hears the press.
+ * A request rather than a function because the service worker has to be able to
+ * make it with no page open - a browser's notice outlives the tab that drew it.
+ */
+export interface NoticeAction {
+    readonly id: string;
+    readonly text: string;
+    /** A path under `/api/`, posted to with this JSON. */
+    readonly request: { readonly url: string; readonly body: unknown };
+}
+
+/** Make an action's request. Answers whether Polaris took it. */
+export async function runNoticeAction(action: NoticeAction): Promise<boolean> {
+    if (!action.request.url.startsWith("/api/")) return false;
+    const answer = await fetch(action.request.url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(action.request.body)
+    }).catch(() => null);
+    return answer?.ok ?? false;
+}
+
+/** The buttons of each notice the desktop app drew, by tag. */
+const acting = new Map<string, readonly NoticeAction[]>();
+/** What a press on a notice nothing on this page drew is handed to: one from
+ *  before a reload, like an unclaimed answer. */
+let unclaimedAction: ((tag: string, action: string) => Promise<void>) | null = null;
+let hearingActions = false;
+
+/** Hear presses on the app's notice buttons, once per page. */
+function listenForActions(app: NonNullable<ReturnType<typeof desktopBridge>>): void {
+    if (hearingActions || !app.onNoticeAction) return;
+    hearingActions = true;
+    app.onNoticeAction(({ tag, action }) => {
+        const buttons = acting.get(tag);
+        acting.delete(tag);
+        const pressed = buttons?.find((one) => one.id === action);
+        if (pressed) void runNoticeAction(pressed);
+        else if (!buttons && unclaimedAction)
+            void unclaimedAction(tag, action).catch(() => undefined);
+    });
+}
+
+/**
+ * Take the presses on buttons of notices this page did not draw. Listens from
+ * now, so a press arriving right after a reload is heard. Answers a function
+ * that stops it.
+ */
+export function actOnUnclaimedNotices(
+    handle: (tag: string, action: string) => Promise<void>
+): () => void {
+    unclaimedAction = handle;
+    const app = desktopBridge();
+    if (app) listenForActions(app);
+    return () => {
+        if (unclaimedAction === handle) unclaimedAction = null;
+    };
+}
+
+/** The service worker, when there is one running to draw a notice with buttons
+ *  and hear a press on it - and, on a phone, to draw one at all. */
+async function noticeWorker(): Promise<ServiceWorkerRegistration | null> {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
+    const found = await navigator.serviceWorker.getRegistration("/").catch(() => undefined);
+    return found?.active ? found : null;
+}
+
+let hearingWorker = false;
+
+/** Go where a notice the service worker handled points: it brings this window
+ *  forward and says where. Once per page, from page start, since the window it
+ *  picks is not always the one that drew the notice. */
+export function listenToWorker(): void {
+    if (hearingWorker || typeof navigator === "undefined" || !("serviceWorker" in navigator))
+        return;
+    hearingWorker = true;
+    navigator.serviceWorker.addEventListener("message", (event: MessageEvent) => {
+        const said = event.data as { kind?: unknown; href?: unknown } | null;
+        if (said?.kind !== "polaris-notice-open" || typeof said.href !== "string") return;
+        // A path on this Polaris, never an address somewhere else.
+        if (said.href.startsWith("/") && !said.href.startsWith("//"))
+            window.location.assign(said.href);
+    });
+    navigator.serviceWorker.startMessages();
+}
+
 /** What an answer written on each notice is handed to, by tag. */
 const answering = new Map<string, (text: string) => Promise<void>>();
 /** What an answer to a notice nothing on this page drew is handed to: one from
@@ -168,25 +257,70 @@ export async function notifyDesktop(input: {
      * card in the tab is where an answer is written.
      */
     reply?: { placeholder: string; send: (text: string) => Promise<void> };
+    /** Buttons on the notice, like a messenger's "Mark as read". Drawn by the
+     *  desktop app, and by a browser whose service worker is running. */
+    actions?: readonly NoticeAction[];
 }): Promise<{ close: () => void } | null> {
     const app = desktopBridge();
     if (app) {
-        const { reply, ...drawnAs } = input;
+        const { reply, actions, ...drawnAs } = input;
         const answerable = reply && app.onNoticeReply ? reply : null;
+        const buttons = actions?.length && app.onNoticeAction ? actions : null;
         if (answerable) listenForReplies(app);
+        if (buttons) listenForActions(app);
         const drawn = await app
             .notify({
                 ...drawnAs,
-                ...(answerable ? { reply: { placeholder: answerable.placeholder } } : {})
+                ...(answerable ? { reply: { placeholder: answerable.placeholder } } : {}),
+                ...(buttons ? { actions: buttons.map(({ id, text }) => ({ id, text })) } : {})
             })
             .catch(() => false);
         if (answerable && drawn) answering.set(input.tag, answerable.send);
+        if (buttons && drawn) acting.set(input.tag, buttons);
         if (!drawn) return null;
         const handle = { close: () => void app.closeNotice(input.tag).catch(() => undefined) };
         shown.set(input.tag, handle);
         return handle;
     }
     if (!(await mayNotify())) return null;
+
+    // Drawn by the service worker where one is running: only its notices carry
+    // buttons, a press on one is heard even after the tab is gone, and a phone's
+    // browser draws no other kind at all.
+    const worker = input.actions?.length ? await noticeWorker() : null;
+    if (worker) {
+        try {
+            listenToWorker();
+            await worker.showNotification(input.title, {
+                body: input.body,
+                tag: input.tag,
+                icon: "/polaris-mark-128.png",
+                badge: "/polaris-mark-128.png",
+                requireInteraction: input.insistent ?? false,
+                silent: !(input.sound ?? false),
+                data: { href: input.href ?? null, actions: input.actions },
+                ...({
+                    actions: (input.actions ?? []).map((one) => ({
+                        action: one.id,
+                        title: one.text
+                    }))
+                } as object)
+            });
+            const handle = {
+                close: () => {
+                    shown.delete(input.tag);
+                    void worker
+                        .getNotifications({ tag: input.tag })
+                        .then((open) => open.forEach((one) => one.close()))
+                        .catch(() => undefined);
+                }
+            };
+            shown.set(input.tag, handle);
+            return handle;
+        } catch {
+            // Drawn the ordinary way below instead, without the buttons.
+        }
+    }
 
     try {
         const notice = new Notification(input.title, {
@@ -233,6 +367,7 @@ export async function notifyDesktop(input: {
  */
 export function closeDesktopNotice(tag: string): void {
     answering.delete(tag);
+    acting.delete(tag);
     const app = desktopBridge();
     if (app) void app.closeNotice(tag).catch(() => undefined);
     const held = shown.get(tag);

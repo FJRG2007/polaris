@@ -108,6 +108,7 @@ vi.mock("@/lib/desktop-notify", () => ({
         unclaimed = handle;
         return () => undefined;
     },
+    actOnUnclaimedNotices: () => () => undefined,
     closeDesktopNotice: (tag: string) => closed.push(tag),
     notifyDesktop: async (input: { tag: string }) => {
         notices.push(input);
