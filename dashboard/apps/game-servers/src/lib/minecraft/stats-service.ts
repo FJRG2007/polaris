@@ -18,6 +18,7 @@ import { host } from "@polaris/app-host";
 import { withServerContainer } from "./service";
 import { miningFigures, type MiningFigures } from "./xray";
 import { readPlayerStats, type PlayerStats } from "../games-activity";
+import type { PlayerFigures } from "./rankings";
 
 const { listEnvVars } = host.envVarService;
 
@@ -64,8 +65,12 @@ export async function readMinecraftStats(
         return await withServerContainer(ownerId, installedAppId, async (server) => {
             if (server.edition === "bedrock") return null;
 
-            const vars = await listEnvVars("application", server.applicationId, ownerId).catch(() => []);
-            const level = vars.find((entry) => entry.key === world.levelEnvKey("java"))?.value?.trim();
+            const vars = await listEnvVars("application", server.applicationId, ownerId).catch(
+                () => []
+            );
+            const level = vars
+                .find((entry) => entry.key === world.levelEnvKey("java"))
+                ?.value?.trim();
             if (!level) return null;
 
             const cache = await server.run(["cat", "--", `${world.DATA_DIR}/usercache.json`]);
@@ -73,7 +78,11 @@ export async function readMinecraftStats(
             const uuid = uuidFor(cache.output, name);
             if (uuid === null || !/^[0-9a-fA-F-]{32,36}$/.test(uuid)) return null;
 
-            const stats = await server.run(["cat", "--", `${world.DATA_DIR}/${level}/stats/${uuid}.json`]);
+            const stats = await server.run([
+                "cat",
+                "--",
+                `${world.DATA_DIR}/${level}/stats/${uuid}.json`
+            ]);
             return stats.code === 0 ? readPlayerStats(stats.output) : null;
         });
     } catch {
@@ -88,16 +97,23 @@ export interface PlayerMining {
 }
 
 /**
- * The mining figures of every player the world has stats for, read in one pass:
- * the usercache for the names and every stats file with a marker between them.
- * Empty for Bedrock and for a server that cannot be reached.
+ * Every stats file the world has, by the name of the player it belongs to, read
+ * in one pass: the usercache for the names and every file with a marker between
+ * them. Empty for Bedrock and for a server that cannot be reached.
  */
-export async function readAllMining(ownerId: string, installedAppId: string): Promise<PlayerMining[]> {
+async function readAllStatsFiles(
+    ownerId: string,
+    installedAppId: string
+): Promise<{ readonly name: string; readonly json: string }[]> {
     try {
         return await withServerContainer(ownerId, installedAppId, async (server) => {
             if (server.edition === "bedrock") return [];
-            const vars = await listEnvVars("application", server.applicationId, ownerId).catch(() => []);
-            const level = vars.find((entry) => entry.key === world.levelEnvKey("java"))?.value?.trim();
+            const vars = await listEnvVars("application", server.applicationId, ownerId).catch(
+                () => []
+            );
+            const level = vars
+                .find((entry) => entry.key === world.levelEnvKey("java"))
+                ?.value?.trim();
             if (!level || !/^[\w.-]+$/.test(level)) return [];
 
             const cache = await server.run(["cat", "--", `${world.DATA_DIR}/usercache.json`]);
@@ -120,17 +136,52 @@ export async function readAllMining(ownerId: string, installedAppId: string): Pr
                 `for f in "${dir}"/*.json; do [ -f "$f" ] || continue; printf '\\n@@%s\\n' "$(basename "$f" .json)"; cat "$f"; done`
             ]);
             if (all.code !== 0) return [];
-            const found: PlayerMining[] = [];
-            for (const part of all.output.split("\n@@").slice(1)) {
-                const newline = part.indexOf("\n");
-                const uuid = part.slice(0, newline).trim().toLowerCase();
-                const figures = miningFigures(part.slice(newline + 1));
-                if (!figures) continue;
-                found.push({ name: names.get(uuid) ?? uuid, figures });
-            }
-            return found;
+            return all.output
+                .split("\n@@")
+                .slice(1)
+                .map((part) => {
+                    const newline = part.indexOf("\n");
+                    const uuid = part.slice(0, newline).trim().toLowerCase();
+                    return { name: names.get(uuid) ?? uuid, json: part.slice(newline + 1) };
+                });
         });
     } catch {
         return [];
     }
+}
+
+/** The mining figures of every player the world has stats for. */
+export async function readAllMining(
+    ownerId: string,
+    installedAppId: string
+): Promise<PlayerMining[]> {
+    return (await readAllStatsFiles(ownerId, installedAppId)).flatMap((file) => {
+        const figures = miningFigures(file.json);
+        return figures ? [{ name: file.name, figures }] : [];
+    });
+}
+
+/** How long a reading of every player's figures stands. The game only writes
+ *  them when it saves, every few minutes, so reading them more often than this
+ *  would only read the same files again. */
+const FIGURES_TTL_MS = 60_000;
+
+const figuresRead = new Map<string, { at: number; value: Promise<PlayerFigures[]> }>();
+
+/** Playtime, deaths and kills for every player the world has figures for, for
+ *  the rankings; read at most once a minute per server. */
+export async function readAllPlayerStats(
+    ownerId: string,
+    installedAppId: string
+): Promise<PlayerFigures[]> {
+    const held = figuresRead.get(installedAppId);
+    if (held && Date.now() - held.at < FIGURES_TTL_MS) return held.value;
+    const value = readAllStatsFiles(ownerId, installedAppId).then((files) =>
+        files.flatMap((file) => {
+            const stats = readPlayerStats(file.json);
+            return stats ? [{ name: file.name, stats }] : [];
+        })
+    );
+    figuresRead.set(installedAppId, { at: Date.now(), value });
+    return value;
 }

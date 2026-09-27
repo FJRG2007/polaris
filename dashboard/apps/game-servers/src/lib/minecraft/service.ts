@@ -296,11 +296,15 @@ export async function sendAnnouncement(
     const players = texts.some((text) => readsPlayerList(text))
         ? await readPlayerList(install, ownerId).catch(() => null)
         : null;
+    // Every player's figures, for a leaderboard. Loaded when asked for: the
+    // module that reads them reads the server through this one.
+    const figures = async () =>
+        (await import("./stats-service")).readAllPlayerStats(ownerId, installedAppId);
     // The log and everybody's level only for a text that reads them.
     const context = texts.some((text) => readsServer(text))
         ? await withServerContainer(ownerId, installedAppId, (server) =>
-              liveContext(installedAppId, texts, players, server.running ? server : null)
-          ).catch(() => liveContext(installedAppId, texts, players))
+              liveContext(installedAppId, texts, players, server.running ? server : null, figures)
+          ).catch(() => liveContext(installedAppId, texts, players, null, figures))
         : await liveContext(installedAppId, texts, players);
     const lines = announcementCommands(install.edition, announcement, context);
     if (lines.length === 0) throw new Error("There is nothing to send yet");

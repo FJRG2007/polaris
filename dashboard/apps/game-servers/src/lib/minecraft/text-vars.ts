@@ -30,8 +30,21 @@ export const LEVELS_VARIABLE = "server.levels";
 /** The variables that read the last death. */
 export const DEATH_VARIABLES: readonly string[] = ["death.player", "death.message"];
 
+/** The leaderboards: level from who is on, the rest from the game's figures. */
+export const RANK_VARIABLES: readonly string[] = [
+    "rank.level",
+    "rank.deaths",
+    "rank.kills",
+    "rank.pvp",
+    "rank.playtime"
+];
+
 /** Every variable filled in by asking the server beyond who is on. */
-export const SERVER_READ_VARIABLES: readonly string[] = [LEVELS_VARIABLE, ...DEATH_VARIABLES];
+export const SERVER_READ_VARIABLES: readonly string[] = [
+    LEVELS_VARIABLE,
+    ...DEATH_VARIABLES,
+    ...RANK_VARIABLES
+];
 
 /** Where a variable's value comes from. */
 export type VariableKind = "game" | "account" | "server";
@@ -144,6 +157,48 @@ export const VARIABLES: readonly VariableSpec[] = [
         label: "Everybody's level",
         kind: "server",
         sample: "Steve Lv 12, Alex Lv 5",
+        bedrock: false,
+        width: 32
+    },
+    // Leaderboards. Inline they name the top five on one line; alone on a side
+    // panel line each becomes a line a place, as many as there is room for.
+    {
+        name: "rank.level",
+        label: "Top levels, of who is on",
+        kind: "server",
+        sample: "1. Steve 12, 2. Alex 5",
+        bedrock: false,
+        width: 32
+    },
+    {
+        name: "rank.deaths",
+        label: "Most deaths",
+        kind: "server",
+        sample: "1. Steve 42, 2. Alex 30",
+        bedrock: false,
+        width: 32
+    },
+    {
+        name: "rank.kills",
+        label: "Most mobs killed",
+        kind: "server",
+        sample: "1. Alex 812, 2. Steve 640",
+        bedrock: false,
+        width: 32
+    },
+    {
+        name: "rank.pvp",
+        label: "Most players killed",
+        kind: "server",
+        sample: "1. Alex 9, 2. Steve 4",
+        bedrock: false,
+        width: 32
+    },
+    {
+        name: "rank.playtime",
+        label: "Most time played",
+        kind: "server",
+        sample: "1. Steve 120h, 2. Alex 86h",
         bedrock: false,
         width: 32
     },

@@ -18,8 +18,8 @@
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { liveContext } from "./live-values";
-import { fillValues, LEVELS_VARIABLE, readsPlayerList, readsServer, variablesIn } from "./text-vars";
-import { spreadLevelLines } from "./player-events";
+import { fillValues, readsPlayerList, readsServer, variablesIn } from "./text-vars";
+import { spreadListLines } from "./rankings";
 import { editionOf, onlinePlayers, withServerContainer } from "./service";
 import {
     ACTIONBAR_EVERY_MS,
@@ -217,13 +217,9 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     let panel: Loop["panel"] = null;
     if (duePanel) {
         const title = fillValues(sidebar.title, context.values);
-        // Everybody's level is a line a player here, in the room the other
-        // lines leave.
-        const spread = spreadLevelLines(
-            sidebar.lines,
-            context.lists?.[LEVELS_VARIABLE] ?? [],
-            SIDEBAR_LINES_MAX
-        );
+        // A list - everybody's level, a leaderboard - is a line a row here,
+        // in the room the other lines leave.
+        const spread = spreadListLines(sidebar.lines, context.lists ?? {}, SIDEBAR_LINES_MAX);
         const shownLines = spread.map((line) => fillValues(line, context.values));
         lines.push(...sidebarCommands(title, shownLines, loop.panel));
         panel = { title, lines: shownLines };
@@ -264,10 +260,14 @@ async function contextFor(
         : null;
     // Asked of the running server only when a text reads its log or everybody's
     // level; the rest is Polaris's own and costs the server nothing.
+    // Loaded when a leaderboard asks for them, not with the loop: most panels
+    // never read a statistics file.
+    const figures = async () =>
+        (await import("./stats-service")).readAllPlayerStats(loop.ownerId, installedAppId);
     const value = texts.some((text) => readsServer(text))
         ? await withServerContainer(loop.ownerId, installedAppId, (server) =>
-              liveContext(installedAppId, texts, players, server.running ? server : null)
-          ).catch(() => liveContext(installedAppId, texts, players))
+              liveContext(installedAppId, texts, players, server.running ? server : null, figures)
+          ).catch(() => liveContext(installedAppId, texts, players, null, figures))
         : await liveContext(installedAppId, texts, players);
     loop.context = { key, at: now, value };
     return value;

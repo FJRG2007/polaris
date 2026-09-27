@@ -13,7 +13,21 @@ import type { PlayerList } from "./parse";
 import type { Recipient, SendContext } from "./announcement";
 import type { ServerContainer } from "./service";
 import * as events from "./player-events";
-import { DEATH_VARIABLES, LEVELS_VARIABLE, usesAccount, variablesIn, type VariableValues } from "./text-vars";
+import {
+    INLINE_TOP,
+    LEVEL_RANKING,
+    STATS_RANKINGS,
+    rankLines,
+    statsRanking,
+    type PlayerFigures
+} from "./rankings";
+import {
+    DEATH_VARIABLES,
+    LEVELS_VARIABLE,
+    usesAccount,
+    variablesIn,
+    type VariableValues
+} from "./text-vars";
 
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { voicePresence } = host.chatCalls;
@@ -64,7 +78,9 @@ export async function liveContext(
     installedAppId: string,
     texts: readonly string[],
     players: PlayerList | null,
-    server?: Pick<ServerContainer, "say" | "run"> | null
+    server?: Pick<ServerContainer, "say" | "run"> | null,
+    /** Every player's figures, for the rankings that read them. */
+    readFigures?: () => Promise<readonly PlayerFigures[]>
 ): Promise<SendContext> {
     const used = new Set(texts.flatMap((text) => variablesIn(text)).map((use) => use.spec?.name));
     const row = await prisma.installedApp.findUnique({
@@ -91,11 +107,24 @@ export async function liveContext(
     }
 
     const lists: Record<string, readonly string[]> = {};
-    if (used.has(LEVELS_VARIABLE) && server) {
+    const list = (name: string, rows: readonly string[], inline: readonly string[] = rows) => {
+        values[name] = inline.length > 0 ? joined(inline) : null;
+        lists[name] = rows;
+    };
+    if ((used.has(LEVELS_VARIABLE) || used.has(LEVEL_RANKING)) && server) {
         const levels = events.readLevels(await server.say([events.LEVELS_COMMAND]).catch(() => ""));
         const rows = levels.map(events.levelText);
-        values[LEVELS_VARIABLE] = rows.length > 0 ? joined(rows) : null;
-        lists[LEVELS_VARIABLE] = rows;
+        list(LEVELS_VARIABLE, rows);
+        const ranked = rankLines(levels.map((one) => ({ name: one.name, value: one.level })));
+        list(LEVEL_RANKING, ranked, ranked.slice(0, INLINE_TOP));
+    }
+    const wanted = STATS_RANKINGS.filter((name) => used.has(name));
+    if (wanted.length > 0 && readFigures) {
+        const figures = await readFigures().catch(() => []);
+        for (const name of wanted) {
+            const ranked = statsRanking(name, figures);
+            list(name, ranked, ranked.slice(0, INLINE_TOP));
+        }
     }
     if (DEATH_VARIABLES.some((name) => used.has(name))) {
         const death = await lastDeath(installedAppId, config, server ?? null);
@@ -130,7 +159,9 @@ async function lastDeath(
         return kept;
     }
     const next: events.LastDeath = { ...found, at: Date.now() };
-    await patchInstallConfig(installedAppId, { [events.LAST_DEATH_KEY]: next }).catch(() => undefined);
+    await patchInstallConfig(installedAppId, { [events.LAST_DEATH_KEY]: next }).catch(
+        () => undefined
+    );
     return next;
 }
 
