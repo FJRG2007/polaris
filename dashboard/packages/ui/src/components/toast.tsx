@@ -19,9 +19,12 @@
  * - **Hover holds it.** A note that vanished while it was being read would have
  *   to be gone looking for, which is the opposite of the point.
  * - **Its time runs only while somebody can see it.** A note raised while the
- *   tab is behind another window, or the window is minimised, waits for them to
- *   come back. It used to spend its six seconds unseen: a chime, somebody turning
- *   round to look, and nothing on the screen and nothing in the bell.
+ *   tab is hidden - another tab in front, the window minimised or covered -
+ *   waits for them to come back. It used to spend its six seconds unseen: a
+ *   chime, somebody turning round to look, and nothing on the screen and nothing
+ *   in the bell. A window that is on screen but not the one being typed in is
+ *   seen, though: waiting for it to be clicked kept a note there until it was
+ *   closed by hand.
  * - **One per key.** A second note with the same `key` replaces the first
  *   instead of stacking, so ten messages in one conversation are one note that
  *   keeps changing rather than ten.
@@ -158,23 +161,39 @@ function ToastStack({
     const [mounted, setMounted] = useState(false);
     useEffect(() => setMounted(true), []);
 
+    // One dismiss per note for as long as it is shown. A new one on every draw
+    // restarted every note's time whenever another arrived, so a busy chat kept
+    // them all on screen.
+    const closers = useRef(new Map<string, () => void>());
+    const closerOf = (id: string) => {
+        let closer = closers.current.get(id);
+        if (!closer) {
+            closer = () => onDismiss(id);
+            closers.current.set(id, closer);
+        }
+        return closer;
+    };
+    for (const id of closers.current.keys()) {
+        if (!shown.some((toast) => toast.id === id)) closers.current.delete(id);
+    }
+
     if (!mounted || shown.length === 0 || typeof document === "undefined") return null;
 
     return createPortal(
         <div className="pointer-events-none fixed right-4 top-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
             {shown.map((toast) => (
-                <ToastNote key={toast.id} toast={toast} onDismiss={() => onDismiss(toast.id)} />
+                <ToastNote key={toast.id} toast={toast} onDismiss={closerOf(toast.id)} />
             ))}
         </div>,
         document.body
     );
 }
 
-/** Whether somebody can see this tab: shown, and the window in front. The same
- *  two questions the app's own attention check asks. */
+/** Whether somebody can see this tab: the browser draws it. Not whether it
+ *  has the keyboard - a window on a second screen is read without being clicked. */
 function seenNow(): boolean {
     if (typeof document === "undefined") return true;
-    return document.visibilityState === "visible" && document.hasFocus();
+    return document.visibilityState === "visible";
 }
 
 /** Whether the tab is being looked at, kept current. */
@@ -184,13 +203,7 @@ function useSeen(): boolean {
         const update = () => setSeen(seenNow());
         update();
         document.addEventListener("visibilitychange", update);
-        window.addEventListener("focus", update);
-        window.addEventListener("blur", update);
-        return () => {
-            document.removeEventListener("visibilitychange", update);
-            window.removeEventListener("focus", update);
-            window.removeEventListener("blur", update);
-        };
+        return () => document.removeEventListener("visibilitychange", update);
     }, []);
     return seen;
 }
