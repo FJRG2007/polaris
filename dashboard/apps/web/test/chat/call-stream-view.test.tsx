@@ -349,7 +349,7 @@ describe("sharing a window that stopped sending pictures", () => {
                 onLeave={() => undefined}
             />
         );
-        expect(screen.getByText(/everybody sees it frozen/).getAttribute("role")).toBe("status");
+        expect(screen.getByText(/stopped sending new pictures/).getAttribute("role")).toBe("status");
         rerender(
             <CallRoom
                 meetingId="m1"
@@ -358,6 +358,6 @@ describe("sharing a window that stopped sending pictures", () => {
                 onLeave={() => undefined}
             />
         );
-        expect(screen.queryByText(/everybody sees it frozen/)).toBeNull();
+        expect(screen.queryByText(/stopped sending new pictures/)).toBeNull();
     });
 });

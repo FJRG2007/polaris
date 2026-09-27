@@ -650,17 +650,6 @@ export function CallRoom({
                 </p>
             )}
 
-            {call.shareStill && (
-                <p
-                    role="status"
-                    className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
-                >
-                    What you are sharing is not sending pictures, so everybody sees it frozen. The
-                    window is probably minimised - a game in full screen does that when you switch
-                    away. Bring it back, run the game in a window, or share your whole screen.
-                </p>
-            )}
-
             {/* What the call says about itself, in a strip of its own that
                 shrinks and scrolls before anything else gives way. On a square
                 or short screen these notices used to take their full height
@@ -673,6 +662,18 @@ export function CallRoom({
                 nothing looked exactly like one that worked. See
                 `call-diagnosis`. */}
                 <CallDiagnosisPanel audio={call.audio} />
+
+                {call.shareStill && (
+                    <p
+                        role="status"
+                        className="shrink-0 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
+                    >
+                        What you are sharing has stopped sending new pictures, so everybody sees the
+                        last one. If it is a minimised window - a game in full screen minimises when
+                        you switch away - bring it back, run the game in a window, or share your
+                        whole screen.
+                    </p>
+                )}
 
                 {/* A microphone that opened but is picking nothing up looks exactly
                 like somebody who is not talking, and the person it is happening
