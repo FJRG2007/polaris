@@ -75,12 +75,18 @@ async function collect(stream: ReadableStream<Uint8Array>): Promise<Buffer> {
 }
 
 /** A file's bytes, whole, however long - for the ones that are not text. */
-export async function readContainerBytes(server: Pick<ServerContainer, "readFile">, path: string): Promise<Buffer> {
+export async function readContainerBytes(
+    server: Pick<ServerContainer, "readFile">,
+    path: string
+): Promise<Buffer> {
     assertSafePath(path);
     return collect(await server.readFile(path));
 }
 
-export async function readContainerFileState(server: FileReader, path: string): Promise<ContainerFileRead> {
+export async function readContainerFileState(
+    server: FileReader,
+    path: string
+): Promise<ContainerFileRead> {
     assertSafePath(path);
     const result = await server.run(["cat", "--", path]);
     if (result.code === 0) {
@@ -95,7 +101,9 @@ export async function readContainerFileState(server: FileReader, path: string): 
     }
     // Both spellings, because the images do not agree: coreutils says "No such
     // file or directory" and busybox prefixes it with "can't open".
-    return /no such file|can't open/i.test(result.output) ? { state: "missing" } : { state: "unreadable" };
+    return /no such file|can't open/i.test(result.output)
+        ? { state: "missing" }
+        : { state: "unreadable" };
 }
 
 /** One of the server's files as text, or null when it is not there. A file that
@@ -116,7 +124,10 @@ const FILES_PER_RUN = 64;
  * longer than a whole answer is read on its own, as a stream. A file that is not
  * there or cannot be read is left out.
  */
-export async function readContainerFiles(server: FileReader, paths: readonly string[]): Promise<Map<string, string>> {
+export async function readContainerFiles(
+    server: FileReader,
+    paths: readonly string[]
+): Promise<Map<string, string>> {
     paths.forEach(assertSafePath);
     const read = new Map<string, string>();
     for (let next = 0; next < paths.length; ) {
@@ -137,7 +148,8 @@ export async function readContainerFiles(server: FileReader, paths: readonly str
             }
             const tag = line.slice(2);
             if (current !== null && (tag === "." || tag === "!")) {
-                if (tag === ".") read.set(current, Buffer.from(body.join(""), "base64").toString("utf8"));
+                if (tag === ".")
+                    read.set(current, Buffer.from(body.join(""), "base64").toString("utf8"));
                 settled.add(current);
                 current = null;
             } else {
@@ -205,7 +217,10 @@ export async function readContainerRange(
 }
 
 /** How big a file is, in bytes, or null when it cannot be told. */
-export async function containerFileSize(server: Pick<ServerContainer, "run">, path: string): Promise<number | null> {
+export async function containerFileSize(
+    server: Pick<ServerContainer, "run">,
+    path: string
+): Promise<number | null> {
     assertSafePath(path);
     const result = await server.run(["stat", "-c", "%s", "--", path]).catch(() => null);
     const size = result && result.code === 0 ? Number(result.output.trim()) : Number.NaN;
@@ -265,7 +280,10 @@ const LINES_PAGE = 150;
  * carry. `listing` is a shell pipeline of the caller's own; it is sorted here so
  * each page takes up where the last one ended. Empty when it fails.
  */
-export async function readLinesPaged(server: Pick<ServerContainer, "run">, listing: string): Promise<string[]> {
+export async function readLinesPaged(
+    server: Pick<ServerContainer, "run">,
+    listing: string
+): Promise<string[]> {
     const lines: string[] = [];
     let size = LINES_PAGE;
     for (let first = 1; ; ) {
@@ -288,7 +306,10 @@ export async function readLinesPaged(server: Pick<ServerContainer, "run">, listi
 }
 
 /** Every entry in a folder, however many. Empty for a folder that is not there. */
-export async function listContainerDir(server: Pick<ServerContainer, "run">, dir: string): Promise<string[]> {
+export async function listContainerDir(
+    server: Pick<ServerContainer, "run">,
+    dir: string
+): Promise<string[]> {
     assertSafePath(dir);
     return readLinesPaged(server, `ls -1A -- ${dir} 2>/dev/null`);
 }
@@ -312,7 +333,11 @@ export async function listContainerDir(server: Pick<ServerContainer, "run">, dir
  * from the one it replaces before the move, and taken from the folder when there
  * is nothing there to copy from.
  */
-export async function writeContainerFile(server: ServerContainer, path: string, content: string): Promise<void> {
+export async function writeContainerFile(
+    server: ServerContainer,
+    path: string,
+    content: string
+): Promise<void> {
     assertSafePath(path);
     const encoded = Buffer.from(content, "utf8").toString("base64");
     const temporary = `${path}.polaris-new`;
@@ -331,6 +356,10 @@ export async function writeContainerFile(server: ServerContainer, path: string, 
     const result = await server.run(["sh", "-c", script]);
     if (result.code !== 0) {
         const said = result.output.trim().slice(0, 200);
-        throw new Error(said.length > 0 ? `The server refused the write: ${said}` : "The file could not be written");
+        throw new Error(
+            said.length > 0
+                ? `The server refused the write: ${said}`
+                : "The file could not be written"
+        );
     }
 }

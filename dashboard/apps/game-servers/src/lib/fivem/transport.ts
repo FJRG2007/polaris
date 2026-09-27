@@ -106,7 +106,11 @@ export async function withFivemServer<T>(
  * read from there whole. Only the name, one of three fixed ones, and a random
  * suffix, so two reads at once never share a file, are part of the path.
  */
-async function readWholeDocument(container: ServerContainer, url: string, name: FivemDocument): Promise<string> {
+async function readWholeDocument(
+    container: ServerContainer,
+    url: string,
+    name: FivemDocument
+): Promise<string> {
     const path = `/tmp/polaris-${name}-${randomBytes(6).toString("hex")}`;
     const script = [
         `if command -v wget >/dev/null 2>&1; then wget -q -O ${path} -T ${HTTP_TIMEOUT_SECONDS} "${url}" && exit 0; fi`,
@@ -114,7 +118,11 @@ async function readWholeDocument(container: ServerContainer, url: string, name: 
         "exit 1"
     ].join("\n");
     try {
-        const fetched = await withTimeout(container.run(["sh", "-c", script]), COMMAND_TIMEOUT_MS, "The server did not answer in time");
+        const fetched = await withTimeout(
+            container.run(["sh", "-c", script]),
+            COMMAND_TIMEOUT_MS,
+            "The server did not answer in time"
+        );
         if (fetched.code !== 0) throw new Error("The server is not answering yet");
         const text = await readContainerFile(container, path);
         if (text === null) throw new Error("The server is not answering yet");
@@ -138,10 +146,14 @@ async function readDocument(container: ServerContainer, name: FivemDocument): Pr
         "The server did not answer in time"
     );
     if (result.code === NO_HTTP_CLIENT) {
-        throw new Error("This server's image has no way for Polaris to read it. Redeploy it to get the current one.");
+        throw new Error(
+            "This server's image has no way for Polaris to read it. Redeploy it to get the current one."
+        );
     }
     if (result.code !== 0) throw new Error("The server is not answering yet");
-    const text = mayBeCut(result.output) ? await readWholeDocument(container, url, name) : result.output;
+    const text = mayBeCut(result.output)
+        ? await readWholeDocument(container, url, name)
+        : result.output;
     try {
         return JSON.parse(text) as unknown;
     } catch {
@@ -158,7 +170,11 @@ async function readDocument(container: ServerContainer, name: FivemDocument): Pr
  * than a choice - and the reason this only ever runs against `127.0.0.1` from
  * inside the container.
  */
-async function runRcon(container: ServerContainer, password: string, command: string): Promise<string> {
+async function runRcon(
+    container: ServerContainer,
+    password: string,
+    command: string
+): Promise<string> {
     if (!isSafeCommand(command)) throw new Error("That command is not valid");
     const packet = rconRequest(password, command).toString("base64");
     const script = [
@@ -173,7 +189,9 @@ async function runRcon(container: ServerContainer, password: string, command: st
         "The server did not answer in time"
     );
     if (result.code === NO_UDP_CLIENT) {
-        throw new Error("This server's image has no way for Polaris to reach its console. Redeploy it to get the current one.");
+        throw new Error(
+            "This server's image has no way for Polaris to reach its console. Redeploy it to get the current one."
+        );
     }
     if (result.code !== 0) throw new Error("The server is not accepting commands yet");
     const raw = Buffer.from(result.output.replace(/\s+/g, ""), "base64");
@@ -183,7 +201,9 @@ async function runRcon(container: ServerContainer, password: string, command: st
     if (raw.length === 0) throw new Error("The server is not accepting commands yet");
     const said = parseRconReply(raw);
     if (isRconRefusal(said)) {
-        throw new Error("The server did not accept Polaris' console password. Set it again from the Access screen.");
+        throw new Error(
+            "The server did not accept Polaris' console password. Set it again from the Access screen."
+        );
     }
     return said;
 }

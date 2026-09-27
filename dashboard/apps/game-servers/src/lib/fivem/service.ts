@@ -33,7 +33,12 @@ import { readSetting, writeBlock, writeSetting, type CfgKey } from "./cfg";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
 import { findSetting, settingError, FIVEM_SETTINGS, type FivemSetting } from "./settings";
 import { readContainerFile, readLinesPaged, writeContainerFile } from "../container-files";
-import { NO_HTTP_CLIENT, RCON_PASSWORD_VAR, withFivemServer, type FivemTransport } from "./transport";
+import {
+    NO_HTTP_CLIENT,
+    RCON_PASSWORD_VAR,
+    withFivemServer,
+    type FivemTransport
+} from "./transport";
 import {
     isLicenseKey,
     FIVEM_CATALOG_ID,
@@ -109,7 +114,11 @@ export interface FivemLive {
     readonly crashLoop: CrashLoop | null;
 }
 
-const NOT_ANSWERING = (message: string, containerRunning: boolean | null, crashLoop: CrashLoop | null): FivemLive => ({
+const NOT_ANSWERING = (
+    message: string,
+    containerRunning: boolean | null,
+    crashLoop: CrashLoop | null
+): FivemLive => ({
     answering: false,
     containerRunning,
     players: [],
@@ -140,13 +149,18 @@ interface FivemReading {
     readonly dynamic: players.FivemDynamic | null;
 }
 
-async function readLive(ownerId: string, installedAppId: string, describe: boolean): Promise<FivemReading> {
+async function readLive(
+    ownerId: string,
+    installedAppId: string,
+    describe: boolean
+): Promise<FivemReading> {
     const quiet = (live: FivemLive): FivemReading => ({ live, info: null, dynamic: null });
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { applicationId: true, config: true }
     });
-    if (!install?.applicationId) return quiet(NOT_ANSWERING("This server has not been deployed yet", null, null));
+    if (!install?.applicationId)
+        return quiet(NOT_ANSWERING("This server has not been deployed yet", null, null));
 
     const app = await prisma.application.findFirst({
         where: { id: install.applicationId },
@@ -187,7 +201,11 @@ async function readLive(ownerId: string, installedAppId: string, describe: boole
     }
     if (state !== null && state !== "running") {
         return quiet(
-            NOT_ANSWERING("The container is not running. Redeploy it, or read the logs to see why it stopped.", false, null)
+            NOT_ANSWERING(
+                "The container is not running. Redeploy it, or read the logs to see why it stopped.",
+                false,
+                null
+            )
         );
     }
     const containerRunning = state === null ? null : true;
@@ -224,7 +242,11 @@ async function readLive(ownerId: string, installedAppId: string, describe: boole
         };
     } catch (caught) {
         return quiet(
-            NOT_ANSWERING(caught instanceof Error ? caught.message : "The server is not answering", containerRunning, null)
+            NOT_ANSWERING(
+                caught instanceof Error ? caught.message : "The server is not answering",
+                containerRunning,
+                null
+            )
         );
     }
 }
@@ -263,7 +285,10 @@ export interface FivemStatus extends FivemLive {
  */
 export async function readFivemPort(applicationId: string | null): Promise<number | null> {
     if (!applicationId) return null;
-    const app = await prisma.application.findUnique({ where: { id: applicationId }, select: { sourceConfig: true } });
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { sourceConfig: true }
+    });
     if (!app) return null;
     try {
         const config = JSON.parse(app.sourceConfig) as { hostPort?: unknown };
@@ -273,7 +298,10 @@ export async function readFivemPort(applicationId: string | null): Promise<numbe
     }
 }
 
-export async function getFivemStatus(ownerId: string, installedAppId: string): Promise<FivemStatus> {
+export async function getFivemStatus(
+    ownerId: string,
+    installedAppId: string
+): Promise<FivemStatus> {
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { applicationId: true }
@@ -283,7 +311,10 @@ export async function getFivemStatus(ownerId: string, installedAppId: string): P
         readLive(ownerId, installedAppId, true),
         applicationId ? readAppContainerMetricsOrNull(applicationId, ownerId) : null,
         applicationId
-            ? prisma.application.findFirst({ where: { id: applicationId }, select: { desiredState: true } })
+            ? prisma.application.findFirst({
+                  where: { id: applicationId },
+                  select: { desiredState: true }
+              })
             : null,
         readFivemPort(applicationId)
     ]);
@@ -309,12 +340,20 @@ export async function getFivemStatus(ownerId: string, installedAppId: string): P
  * Every moderation action below goes through here rather than round it, so there
  * is one place a command is refused and one place it is bounded.
  */
-export async function runFivemCommand(ownerId: string, installedAppId: string, command: string): Promise<string> {
+export async function runFivemCommand(
+    ownerId: string,
+    installedAppId: string,
+    command: string
+): Promise<string> {
     return withFivemServer(ownerId, installedAppId, (server) => server.rcon(command.trim()));
 }
 
 /** Say something to everyone who is playing. */
-export async function broadcastToFivem(ownerId: string, installedAppId: string, message: string): Promise<void> {
+export async function broadcastToFivem(
+    ownerId: string,
+    installedAppId: string,
+    message: string
+): Promise<void> {
     await runFivemCommand(ownerId, installedAppId, `say ${quoteArgument(message)}`);
 }
 
@@ -332,7 +371,11 @@ export async function messageFivemPlayer(
     message: string
 ): Promise<void> {
     if (!access.isBanReason(message)) throw new Error(access.REASON_HINT);
-    await runFivemCommand(ownerId, installedAppId, `${guard.DM_COMMAND} ${playerId} ${quoteArgument(message)}`);
+    await runFivemCommand(
+        ownerId,
+        installedAppId,
+        `${guard.DM_COMMAND} ${playerId} ${quoteArgument(message)}`
+    );
 }
 
 /** Throw somebody off. They can come straight back unless the allow list or a ban
@@ -358,7 +401,10 @@ export interface FivemAccessView extends access.FivemAccess {
     readonly handedOver: boolean;
 }
 
-export async function readFivemAccess(ownerId: string, installedAppId: string): Promise<FivemAccessView> {
+export async function readFivemAccess(
+    ownerId: string,
+    installedAppId: string
+): Promise<FivemAccessView> {
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { config: true }
@@ -415,10 +461,15 @@ export async function addAllowedPlayer(
     installedAppId: string,
     player: { identifier: string; label: string }
 ): Promise<FivemAccessView> {
-    if (!players.isIdentifier(player.identifier)) throw new Error("That is not a player identifier");
+    if (!players.isIdentifier(player.identifier))
+        throw new Error("That is not a player identifier");
     const config = await configOf(ownerId, installedAppId);
     await patchInstallConfig(installedAppId, {
-        [access.ALLOW_LIST_KEY]: access.withAllowed(access.readAllowList(config), player, new Date().toISOString())
+        [access.ALLOW_LIST_KEY]: access.withAllowed(
+            access.readAllowList(config),
+            player,
+            new Date().toISOString()
+        )
     });
     return handOver(ownerId, installedAppId);
 }
@@ -439,7 +490,9 @@ export async function removeAllowedPlayer(
     const config = await configOf(ownerId, installedAppId);
     const next = access.withoutAllowed(access.readAllowList(config), identifier);
     if (next.length === 0 && access.readExclusiveJoin(config)) {
-        throw new Error("Open the server to everyone first, or taking the last player off would keep you out too");
+        throw new Error(
+            "Open the server to everyone first, or taking the last player off would keep you out too"
+        );
     }
     await patchInstallConfig(installedAppId, { [access.ALLOW_LIST_KEY]: next });
     return handOver(ownerId, installedAppId);
@@ -466,15 +519,23 @@ export async function banFivemPlayer(
     ban: { identifier: string; label: string; reason: string; until?: string | null }
 ): Promise<FivemAccessView> {
     if (!players.isIdentifier(ban.identifier)) throw new Error("That is not a player identifier");
-    if (!access.isBanReason(ban.reason)) throw new Error("That reason is too long for the screen it is shown on");
+    if (!access.isBanReason(ban.reason))
+        throw new Error("That reason is too long for the screen it is shown on");
     const config = await configOf(ownerId, installedAppId);
     await patchInstallConfig(installedAppId, {
-        [access.BAN_LIST_KEY]: access.withBan(access.readBans(config), ban, new Date().toISOString())
+        [access.BAN_LIST_KEY]: access.withBan(
+            access.readBans(config),
+            ban,
+            new Date().toISOString()
+        )
     });
     const view = await handOver(ownerId, installedAppId);
-    await kickWhoever(ownerId, installedAppId, ban.identifier, ban.reason || access.DEFAULT_BAN_REASON).catch(
-        () => undefined
-    );
+    await kickWhoever(
+        ownerId,
+        installedAppId,
+        ban.identifier,
+        ban.reason || access.DEFAULT_BAN_REASON
+    ).catch(() => undefined);
     return view;
 }
 
@@ -502,7 +563,9 @@ async function kickWhoever(
     if (!live.answering) return;
     for (const player of live.players) {
         if (players.playerHasIdentifier(player, identifier)) {
-            await kickFivemPlayer(ownerId, installedAppId, player.id, reason).catch(() => undefined);
+            await kickFivemPlayer(ownerId, installedAppId, player.id, reason).catch(
+                () => undefined
+            );
         }
     }
 }
@@ -625,8 +688,16 @@ function handedDigest(current: access.FivemAccess): string {
 /** Write the resource itself and the list it reads. Idempotent: the same bytes
  *  every time, so a sweep that runs every minute writes nothing new. */
 async function installGuard(server: FivemTransport, current: access.FivemAccess): Promise<void> {
-    await writeContainerFile(server.container, `${guard.GUARD_ROOT}/fxmanifest.lua`, guard.GUARD_MANIFEST);
-    await writeContainerFile(server.container, `${guard.GUARD_ROOT}/server.lua`, guard.GUARD_SCRIPT);
+    await writeContainerFile(
+        server.container,
+        `${guard.GUARD_ROOT}/fxmanifest.lua`,
+        guard.GUARD_MANIFEST
+    );
+    await writeContainerFile(
+        server.container,
+        `${guard.GUARD_ROOT}/server.lua`,
+        guard.GUARD_SCRIPT
+    );
     await writeContainerFile(
         server.container,
         guard.GUARD_ACCESS_FILE,
@@ -657,12 +728,18 @@ function withGuardWiring(cfg: string, current: access.FivemAccess): string {
  * only the bans that are live - so this is about the screen and the file agreeing
  * with each other rather than about who gets in.
  */
-export async function sweepFivemBans(ownerId: string, installedAppId: string, now: Date = new Date()): Promise<number> {
+export async function sweepFivemBans(
+    ownerId: string,
+    installedAppId: string,
+    now: Date = new Date()
+): Promise<number> {
     const config = await configOf(ownerId, installedAppId);
     const held = access.readBans(config);
     const expired = access.expiredBans(held, now);
     if (expired.length === 0) return 0;
-    await patchInstallConfig(installedAppId, { [access.BAN_LIST_KEY]: access.activeBans(held, now) });
+    await patchInstallConfig(installedAppId, {
+        [access.BAN_LIST_KEY]: access.activeBans(held, now)
+    });
     await applyFivemAccess(ownerId, installedAppId).catch(() => undefined);
     return expired.length;
 }
@@ -680,7 +757,10 @@ export async function sweepFivemBans(ownerId: string, installedAppId: string, no
  * `ip:203.0.113.0/24` is not something any client ever presents - it would be a
  * rule that silently matches nobody.
  */
-export async function applyFivemFirewallBans(ownerId: string, installedAppId: string): Promise<number> {
+export async function applyFivemFirewallBans(
+    ownerId: string,
+    installedAppId: string
+): Promise<number> {
     const applicationId = await requireApplication(ownerId, installedAppId);
     const { resolveWaf } = await Promise.resolve(host.wafService);
     const waf = await resolveWaf(applicationId);
@@ -747,7 +827,9 @@ export async function applyPendingSetup(ownerId: string, installedAppId: string)
     // process, so the second one waits on the first rather than repeating it.
     const held = claimed.get(installedAppId);
     if (held) return held;
-    const work = applyPendingSetupOnce(ownerId, installedAppId).finally(() => claimed.delete(installedAppId));
+    const work = applyPendingSetupOnce(ownerId, installedAppId).finally(() =>
+        claimed.delete(installedAppId)
+    );
     claimed.set(installedAppId, work);
     return work;
 }
@@ -785,9 +867,11 @@ async function applyPendingSetupOnce(ownerId: string, installedAppId: string): P
     if (!written) return false;
     await patchInstallConfig(installedAppId, {
         [PENDING_SETUP_KEY]: null,
-        [access.ALLOW_LIST_KEY]: access.readAllowList(config).map((entry) =>
-            entry.appliedAt === null ? { ...entry, appliedAt: new Date().toISOString() } : entry
-        )
+        [access.ALLOW_LIST_KEY]: access
+            .readAllowList(config)
+            .map((entry) =>
+                entry.appliedAt === null ? { ...entry, appliedAt: new Date().toISOString() } : entry
+            )
     });
     await restartServer(ownerId, installedAppId).catch(() => undefined);
     return true;
@@ -821,7 +905,10 @@ export interface FivemRule {
 }
 
 /** Every rule the screen offers, read out of the server's own config. */
-export async function readFivemRules(ownerId: string, installedAppId: string): Promise<FivemRule[] | null> {
+export async function readFivemRules(
+    ownerId: string,
+    installedAppId: string
+): Promise<FivemRule[] | null> {
     const cfg = await withFivemServer(ownerId, installedAppId, (server) =>
         readContainerFile(server.container, SERVER_CFG)
     ).catch(() => null);
@@ -856,7 +943,10 @@ export async function writeFivemRules(
     }
     await withFivemServer(ownerId, installedAppId, async (server) => {
         const cfg = await readContainerFile(server.container, SERVER_CFG);
-        if (cfg === null) throw new Error("The server has not written its config yet. Start it once and try again.");
+        if (cfg === null)
+            throw new Error(
+                "The server has not written its config yet. Start it once and try again."
+            );
         let next = cfg;
         for (const change of wanted) next = writeSetting(next, change.setting, change.value);
         await writeContainerFile(server.container, SERVER_CFG, next);
@@ -876,7 +966,10 @@ export async function writeFivemRules(
 const SLOTS_SETTING = "sv_maxclients";
 
 /** Every resource the server has, and which of them are running. */
-export async function listFivemResources(ownerId: string, installedAppId: string): Promise<FivemResource[]> {
+export async function listFivemResources(
+    ownerId: string,
+    installedAppId: string
+): Promise<FivemResource[]> {
     return withFivemServer(ownerId, installedAppId, async (server) => {
         const [listing, info] = await Promise.all([
             // Depth-limited so a resource that vendors a copy of another one
@@ -904,7 +997,9 @@ export async function actOnResource(
 ): Promise<string> {
     if (!isResourceName(name)) throw new Error("That is not a resource name");
     if (name.toLowerCase() === guard.GUARD_RESOURCE && action === "stop") {
-        throw new Error("That resource is what keeps players off this server. Open the server to everyone instead.");
+        throw new Error(
+            "That resource is what keeps players off this server. Open the server to everyone instead."
+        );
     }
     return runFivemCommand(ownerId, installedAppId, `${action} ${name}`);
 }
@@ -941,8 +1036,10 @@ export async function installResourceFromUrl(
 ): Promise<void> {
     const archive = resourceArchiveOf(url);
     if (archive === null) throw new Error(RESOURCE_URL_HINT);
-    if (!isResourceName(name)) throw new Error("A resource name is letters, digits, dots, dashes and underscores");
-    if (name.toLowerCase() === guard.GUARD_RESOURCE) throw new Error("That name belongs to Polaris' own resource");
+    if (!isResourceName(name))
+        throw new Error("A resource name is letters, digits, dots, dashes and underscores");
+    if (name.toLowerCase() === guard.GUARD_RESOURCE)
+        throw new Error("That name belongs to Polaris' own resource");
     const link = Buffer.from(url.trim(), "utf8").toString("base64");
     const folder = Buffer.from(`${RESOURCES_ROOT}/${name}`, "utf8").toString("base64");
     const script = [
@@ -971,14 +1068,22 @@ export async function installResourceFromUrl(
     await withFivemServer(ownerId, installedAppId, async (server) => {
         const result = await server.container.run(["sh", "-c", script]);
         if (result.code === NO_MANIFEST) {
-            throw new Error("There is no resource in that archive - it has no fxmanifest.lua anywhere in it.");
+            throw new Error(
+                "There is no resource in that archive - it has no fxmanifest.lua anywhere in it."
+            );
         }
         if (result.code === NO_UNPACKER || result.code === NO_HTTP_CLIENT) {
-            throw new Error("This server's image cannot unpack that. Redeploy it to get the current one.");
+            throw new Error(
+                "This server's image cannot unpack that. Redeploy it to get the current one."
+            );
         }
         if (result.code !== 0) {
             const said = result.output.trim().slice(0, 200);
-            throw new Error(said.length > 0 ? `That could not be installed: ${said}` : "That could not be installed");
+            throw new Error(
+                said.length > 0
+                    ? `That could not be installed: ${said}`
+                    : "That could not be installed"
+            );
         }
         // On disk is not the same as known about; the server has to be told to look
         // again before the resource can be started.
@@ -999,7 +1104,10 @@ export async function refreshResources(ownerId: string, installedAppId: string):
  * would be given, and a server whose password cannot be read is one whose owner
  * has to change it to find out what it is.
  */
-export async function revealConsolePassword(ownerId: string, installedAppId: string): Promise<string | null> {
+export async function revealConsolePassword(
+    ownerId: string,
+    installedAppId: string
+): Promise<string | null> {
     const applicationId = await requireApplication(ownerId, installedAppId);
     const row = await prisma.envVar.findFirst({
         where: { scopeType: "application", scopeId: applicationId, key: RCON_PASSWORD_VAR },
@@ -1019,7 +1127,11 @@ export async function revealConsolePassword(ownerId: string, installedAppId: str
  * that can fail - a server that is not up cannot be told - and leaving the
  * environment ahead of the config would lock Polaris out of its own server.
  */
-export async function setConsolePassword(ownerId: string, installedAppId: string, password: string): Promise<void> {
+export async function setConsolePassword(
+    ownerId: string,
+    installedAppId: string,
+    password: string
+): Promise<void> {
     const applicationId = await requireApplication(ownerId, installedAppId);
     if (!access.isConsolePassword(password)) throw new Error(access.CONSOLE_PASSWORD_HINT);
     // Order matters, and it is the running server first.
@@ -1032,7 +1144,10 @@ export async function setConsolePassword(ownerId: string, installedAppId: string
     // changed, and pressing the button again still speaks the password that works.
     await withFivemServer(ownerId, installedAppId, async (server) => {
         const cfg = await readContainerFile(server.container, SERVER_CFG);
-        if (cfg === null) throw new Error("The server has not written its config yet. Start it once and try again.");
+        if (cfg === null)
+            throw new Error(
+                "The server has not written its config yet. Start it once and try again."
+            );
         // `set` is how the console changes a variable it already holds. Not
         // swallowed: a change the server did not take is not a change.
         await server.rcon(`set rcon_password ${quoteArgument(password)}`);
@@ -1040,7 +1155,11 @@ export async function setConsolePassword(ownerId: string, installedAppId: string
             { key: RCON_PASSWORD_VAR, value: password, isSecret: true }
         ]);
         // Last, because it is the one that only matters at the next boot.
-        await writeContainerFile(server.container, SERVER_CFG, writeSetting(cfg, RCON_PASSWORD_KEY, password));
+        await writeContainerFile(
+            server.container,
+            SERVER_CFG,
+            writeSetting(cfg, RCON_PASSWORD_KEY, password)
+        );
     });
 }
 
@@ -1055,7 +1174,11 @@ export async function setConsolePassword(ownerId: string, installedAppId: string
  * the old one until it is restarted. The screen says so rather than restarting
  * underneath whoever is playing.
  */
-export async function setLicenseKey(ownerId: string, installedAppId: string, key: string): Promise<void> {
+export async function setLicenseKey(
+    ownerId: string,
+    installedAppId: string,
+    key: string
+): Promise<void> {
     const applicationId = await requireApplication(ownerId, installedAppId);
     if (!isLicenseKey(key)) throw new Error(LICENSE_KEY_HINT);
     await setEnvVars("application", applicationId, ownerId, [
