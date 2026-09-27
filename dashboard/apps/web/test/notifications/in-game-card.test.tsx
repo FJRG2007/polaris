@@ -20,9 +20,8 @@ vi.mock("@/app/(app)/account/notifications/actions", () => ({
     setMessagesInGameAction: vi.fn()
 }));
 
-const { NotificationSettingsView } = await import(
-    "@/app/(app)/account/notifications/notification-settings-view"
-);
+const { NotificationSettingsView } =
+    await import("@/app/(app)/account/notifications/notification-settings-view");
 const { IN_GAME_NOT_READY } = await import("@/lib/chat/in-game-choice");
 
 function card(ready: boolean): string {
