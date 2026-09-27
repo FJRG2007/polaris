@@ -1418,9 +1418,7 @@ export function ChannelView({
                     return;
                 }
                 const staged: unknown = JSON.parse(sent.body || "{}");
-                uploaded.push(
-                    String((staged as { id?: unknown }).id ?? "")
-                );
+                uploaded.push(String((staged as { id?: unknown }).id ?? ""));
             }
 
             const form = new FormData();

@@ -143,7 +143,11 @@ vi.mock("@/app/(app)/chat/message-list", () => ({
     }) => (
         <ul>
             {messages.map((entry) => (
-                <li key={entry.id} id={`message-${entry.id}`} data-highlighted={entry.id === highlightId}>
+                <li
+                    key={entry.id}
+                    id={`message-${entry.id}`}
+                    data-highlighted={entry.id === highlightId}
+                >
                     {entry.id}
                     <button type="button" onClick={() => onJumpTo?.(entry.id)}>
                         quote of {entry.id}
@@ -224,7 +228,9 @@ describe("a jump to the newest message", () => {
         await user.click(screen.getByRole("button", { name: "quote of m2" }));
         await waitFor(() => expect(replaced).toContain("/chat/c/c1/m2"));
         await waitFor(() =>
-            expect(document.getElementById("message-m2")?.getAttribute("data-highlighted")).toBe("true")
+            expect(document.getElementById("message-m2")?.getAttribute("data-highlighted")).toBe(
+                "true"
+            )
         );
         expect(scrolledTo).not.toContain("message-m2");
     });
