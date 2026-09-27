@@ -16,6 +16,8 @@ import * as mc from "../../lib/minecraft/motd";
 import { McLine } from "../../components/mc-text";
 import type { MinecraftEdition } from "../../lib/minecraft/service";
 import { FormattedTextField } from "../../components/formatted-text-field";
+import { SendTo } from "./announce-send-to";
+import { describeTarget, parseTarget } from "../../lib/minecraft/announce-target";
 import {
     MAX_TEMPLATE_NAME,
     type AnnouncementTemplate
@@ -24,7 +26,6 @@ import {
     ANNOUNCE_SOUNDS,
     BLANK_ANNOUNCEMENT,
     CHAT_MAX_LINES,
-    EVERYBODY,
     LINE_MAX,
     CHAT_MAX,
     SECONDS_MAX,
@@ -228,7 +229,13 @@ export function MinecraftAnnounce({
     // "commands" panel and the check that nothing is past the length cap.
     const built = useMemo(() => {
         try {
-            return { lines: announcementCommands(edition, draft), problem: null as string | null };
+            // Operators are only known when it goes; the preview writes one in.
+            const lines = announcementCommands(edition, draft, {
+                values: {},
+                recipients: null,
+                operators: ["Operator"]
+            });
+            return { lines, problem: null as string | null };
         } catch (caught) {
             return {
                 lines: [],
@@ -251,8 +258,7 @@ export function MinecraftAnnounce({
         hasText(draft.chat) ||
         (edition === "java" && draft.sound !== "")
     );
-    const target =
-        draft.target === EVERYBODY || players.includes(draft.target) ? draft.target : EVERYBODY;
+    const target = draft.target;
 
     function send(): void {
         setError(null);
@@ -267,7 +273,7 @@ export function MinecraftAnnounce({
                 return;
             }
             setNote(
-                `${target === EVERYBODY ? "Sent to everybody on the server." : `Sent to ${target}.`}${
+                `Sent to ${describeTarget(target)}.${
                     result.kept ? " Polaris keeps it on screen." : ""
                 }`
             );
@@ -424,17 +430,13 @@ export function MinecraftAnnounce({
                         </div>
                     </div>
 
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Send to</span>
-                        <Select
-                            value={target}
-                            onValueChange={(value) => set({ target: value })}
-                            options={[
-                                { value: EVERYBODY, label: "Everybody on the server" },
-                                ...players.map((player) => ({ value: player, label: player }))
-                            ]}
-                        />
-                    </label>
+                    <SendTo
+                        target={draft.target}
+                        players={players}
+                        edition={edition}
+                        onChange={(next) => set({ target: next })}
+                        problem={problems.target}
+                    />
 
                     <Section title="Title" hint="Big, in the middle of the screen.">
                         <FormattedTextField
@@ -817,7 +819,8 @@ function AnnouncementPreview({
     const [phase, setPhase] = useState<Phase>("still");
     const timers = useRef<number[]>([]);
     // A name where {player} is, as one of the recipients would read it.
-    const reader = announcement.target === EVERYBODY ? "Steve" : announcement.target;
+    const audience = parseTarget(announcement.target);
+    const reader = audience?.kind === "players" ? (audience.players[0] ?? "Steve") : "Steve";
     const title = useMemo(
         () => mc.motdSpans(previewText(announcement.title, { player: reader }))[0] ?? [],
         [announcement.title, reader]

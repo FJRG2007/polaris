@@ -18,6 +18,7 @@
  * Pure, so every command can be asserted without a server.
  */
 
+import { EVERYBODY, LONGEST_NAME, concreteTargets, parseTarget } from "./announce-target";
 import { BROADCAST_TAG } from "./broadcast";
 import type { MinecraftEdition } from "./service";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
@@ -64,7 +65,7 @@ export interface Announcement {
 
 export type Hold = "timed" | "until" | "manual";
 
-export const EVERYBODY = "@a";
+export { EVERYBODY };
 
 /** How long one line may be before it stops fitting on a screen. */
 export const LINE_MAX = 120;
@@ -137,10 +138,11 @@ const JAVA_COLOR_NAMES: Readonly<Record<string, string>> = {
     "#ffffff": "white"
 };
 
-/** A player name, or the one selector this offers. Checked before anything is
- *  put into a command: a target is the one part of it that is not JSON. */
+/** Everybody, the operators, or players picked by name - see `announce-target`.
+ *  Checked before anything is put into a command: a target is the one part of
+ *  it that is not JSON. */
 export function isAnnouncementTarget(target: string): boolean {
-    return target === EVERYBODY || /^[A-Za-z0-9_]{1,16}$/.test(target);
+    return parseTarget(target) !== null;
 }
 
 /**
@@ -318,6 +320,8 @@ export interface SendContext {
     /** A value that is also a list, a line an item where a line can be one:
      *  everybody's level, for the side panel. */
     readonly lists?: Readonly<Record<string, readonly string[]>>;
+    /** The operators online, for an announcement sent to them. */
+    readonly operators?: readonly string[];
 }
 
 export const NO_CONTEXT: SendContext = { values: {}, recipients: null };
@@ -347,8 +351,35 @@ export function announcementCommands(
     context: SendContext = NO_CONTEXT,
     part: AnnouncementPart = "all"
 ): string[] {
-    const target = announcement.target;
-    if (!isAnnouncementTarget(target)) throw new Error("Choose everybody or one player");
+    const audience = parseTarget(announcement.target);
+    if (!audience) throw new Error("Choose who it goes to");
+    const targets = concreteTargets(audience, context.operators);
+    if (targets.length === 0) {
+        throw new Error(
+            audience.kind === "operators"
+                ? "No operator is on the server right now"
+                : "Choose who it goes to"
+        );
+    }
+    // The same lines for each of them, once - the scores behind a variable are
+    // set up once whoever reads them.
+    const lines = targets.flatMap((target) =>
+        commandsFor(edition, announcement, target, context, part)
+    );
+    return lines.filter(
+        (line, index) =>
+            !line.startsWith("scoreboard objectives add ") || lines.indexOf(line) === index
+    );
+}
+
+/** The lines for one target: everybody's selector, or one player's name. */
+function commandsFor(
+    edition: MinecraftEdition,
+    announcement: Announcement,
+    target: string,
+    context: SendContext,
+    part: AnnouncementPart
+): string[] {
     const java = edition !== "bedrock";
     const verb = java ? "title" : "titleraw";
     const body = (text: string, prefix = false): string =>
@@ -431,13 +462,21 @@ export function announcementCommands(
 }
 
 /** What takes an announcement off the screen straight away, rather than
- *  leaving it to fade. */
+ *  leaving it to fade. `operators` is who it was on the screens of, for one
+ *  sent to the operators. */
 export function clearAnnouncementCommands(
     edition: MinecraftEdition,
-    announcement: Announcement
+    announcement: Announcement,
+    operators: readonly string[] = []
 ): string[] {
-    const target = announcement.target;
-    if (!isAnnouncementTarget(target)) throw new Error("Choose everybody or one player");
+    const audience = parseTarget(announcement.target);
+    if (!audience) throw new Error("Choose who it goes to");
+    return concreteTargets(audience, operators).flatMap((target) =>
+        clearFor(edition, announcement, target)
+    );
+}
+
+function clearFor(edition: MinecraftEdition, announcement: Announcement, target: string): string[] {
     const lines: string[] = [];
     if (hasText(announcement.title) || hasText(announcement.subtitle)) {
         lines.push(`title ${target} clear`);
@@ -453,7 +492,14 @@ export function clearAnnouncementCommands(
 }
 
 /** The fields a problem can be under. */
-export type AnnouncementField = "title" | "subtitle" | "actionbar" | "chat" | "until" | "hold";
+export type AnnouncementField =
+    | "target"
+    | "title"
+    | "subtitle"
+    | "actionbar"
+    | "chat"
+    | "until"
+    | "hold";
 
 /**
  * What is wrong with an announcement, field by field, in words for under each
@@ -469,6 +515,11 @@ export function announcementProblems(
     now: number = Date.now()
 ): Partial<Record<AnnouncementField, string>> {
     const problems: Partial<Record<AnnouncementField, string>> = {};
+    const audience = parseTarget(announcement.target);
+    if (!audience) problems.target = "Choose who it goes to";
+    else if (audience.kind === "operators" && edition === "bedrock") {
+        problems.target = "Bedrock keeps no operators list Polaris can read";
+    }
     const lineFields = ["title", "subtitle", "actionbar"] as const;
     for (const field of lineFields) {
         const text = announcement[field];
@@ -489,7 +540,16 @@ export function announcementProblems(
     // Each part becomes one command, and one command has to fit in what the
     // game reads at once. Said under the part that is too long, like any other
     // problem with it, rather than once for the whole announcement.
-    const target = isAnnouncementTarget(announcement.target) ? announcement.target : EVERYBODY;
+    // Measured against the longest name it may be written around; the operators
+    // are not known until it goes, so against the longest name there can be.
+    const target =
+        audience?.kind === "players"
+            ? audience.players.reduce((longest, name) =>
+                  name.length > longest.length ? name : longest
+              )
+            : audience?.kind === "operators"
+              ? LONGEST_NAME
+              : EVERYBODY;
     for (const field of [...lineFields, "chat"] as const) {
         if (problems[field] || !hasText(announcement[field])) continue;
         const alone: Announcement = {
