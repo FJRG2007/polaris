@@ -10,10 +10,10 @@
  * the stage stays the size they asked for.
  */
 
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { CallRoom } from "@/app/(app)/chat/call-room";
-import type { CallState } from "@/app/(app)/chat/use-call";
 import { cleanup, render } from "@testing-library/react";
+import type { CallState } from "@/app/(app)/chat/use-call";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/(app)/chat/call-session", () => ({ useHeldCall: () => null }));
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({}));
