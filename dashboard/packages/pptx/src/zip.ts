@@ -109,6 +109,13 @@ export class PackageArchive {
         return this.entries.get(path) ?? null;
     }
 
+    /** When the original package says a part was last modified. Written back on
+     *  save, so an unchanged deck does not differ from the file that arrived by
+     *  the clock it was saved at. */
+    dateOf(path: string): Date | undefined {
+        return this.zip.files[path]?.date;
+    }
+
     /**
      * Read a part's relationships file. partPath e.g. 'ppt/slides/slide1.xml' →
      * 'ppt/slides/_rels/slide1.xml.rels'.
