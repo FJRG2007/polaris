@@ -49,18 +49,18 @@ import { useChatStream } from "./use-chat-stream";
 import { useVoiceSettings } from "./voice-settings";
 import { useCloseOnEscape } from "./close-on-escape";
 import type { RecordedSound } from "./voice-recorder";
-import type { KeptPick } from "@/components/file-picker/as-files";
-import { sendFile } from "@/components/transfers/move-file";
 import type * as messagesLib from "@/lib/chat/messages";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useAttention } from "@/components/use-attention";
 import { closeDesktopNotice } from "@/lib/desktop-notify";
 import type { ChatMessageView } from "@/lib/chat/messages";
+import { sendFile } from "@/components/transfers/move-file";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CallPreview, CallPreviewLine } from "./call-preview";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
+import type { KeptPick } from "@/components/file-picker/as-files";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
 import { unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { callBandHeight, callBandLimit, type CallPlace } from "./call-band";
@@ -673,6 +673,21 @@ export function ChannelView({
     const landOn = useCallback((messageId: string): boolean => {
         const element = document.getElementById(`message-${messageId}`);
         if (!element) return false;
+        // The newest message - what a message notice nearly always points at -
+        // is where the conversation opens anyway: at the bottom, following it.
+        // Centred instead, the list stopped following, and whatever loaded under
+        // it afterwards (a picture, a link's preview) pushed the view up past
+        // the bottom it should have stayed at.
+        if (held.current[held.current.length - 1]?.id === messageId) {
+            following.current = true;
+            const list = scroller.current;
+            if (list) list.scrollTop = list.scrollHeight;
+            foot.current?.scrollIntoView({ block: "end" });
+            setAway(false);
+            setHighlight(messageId);
+            setTimeout(() => setHighlight(null), HIGHLIGHT_MS);
+            return true;
+        }
         following.current = false;
         // The conversation has stopped settling, whatever the clock says. This
         // is what a link to a message was fighting: the first second after a

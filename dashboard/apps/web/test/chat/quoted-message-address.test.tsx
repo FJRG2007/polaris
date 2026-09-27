@@ -209,3 +209,19 @@ describe("a message quoted from this same conversation", () => {
         await waitFor(() => expect(scrolledTo).toContain("message-m1"));
     });
 });
+
+describe("a jump to the newest message", () => {
+    it("opens at the bottom and stays there, rather than centring it", async () => {
+        // A message notice points at the newest line nearly every time. Centred,
+        // the list stopped following the bottom, and a picture or a preview that
+        // loaded under it afterwards left the reader scrolled up past it.
+        const user = userEvent.setup();
+        render(<ChannelView channelId="c1" />);
+        await screen.findByText("m2");
+        scrolledTo = [];
+        await user.click(screen.getByRole("button", { name: "quote of m2" }));
+        await waitFor(() => expect(replaced).toContain("/chat/c/c1/m2"));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(scrolledTo).not.toContain("message-m2");
+    });
+});
