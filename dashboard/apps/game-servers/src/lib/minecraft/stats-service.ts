@@ -15,10 +15,10 @@
 
 import * as world from "./world";
 import { host } from "@polaris/app-host";
-import type { PlayerFigures } from "./rankings";
 import { miningFigures, type MiningFigures } from "./xray";
 import { withServerContainer, type ServerContainer } from "./service";
 import { readPlayerStats, type PlayerStats } from "../games-activity";
+import { addTallies, readTallies, type PlayerFigures, type PlayerTallies } from "./rankings";
 import { listContainerDir, readContainerFile, readContainerFiles } from "../container-files";
 
 const { listEnvVars } = host.envVarService;
@@ -28,6 +28,8 @@ const { listEnvVars } = host.envVarService;
 interface CacheEntry {
     readonly name?: unknown;
     readonly uuid?: unknown;
+    /** A month after the player last joined under this uuid: "2026-10-27 18:04:12 +0000". */
+    readonly expiresOn?: unknown;
 }
 
 /** Every uuid this name is filed under. Usually one; two where the server
@@ -40,22 +42,40 @@ export function uuidsFor(usercache: string, name: string): string[] {
         .map(([uuid]) => uuid);
 }
 
+/** The usercache's entries; none when it cannot be read. */
+function cacheEntries(usercache: string): CacheEntry[] {
+    try {
+        const parsed: unknown = JSON.parse(usercache);
+        return Array.isArray(parsed) ? (parsed as CacheEntry[]) : [];
+    } catch {
+        return [];
+    }
+}
+
 /** The usercache as uuid to name, lowercased uuids; empty when it cannot be read. */
 function namesByUuid(usercache: string): Map<string, string> {
     const names = new Map<string, string>();
-    let parsed: unknown;
-    try {
-        parsed = JSON.parse(usercache);
-    } catch {
-        return names;
-    }
-    if (!Array.isArray(parsed)) return names;
-    for (const entry of parsed as CacheEntry[]) {
+    for (const entry of cacheEntries(usercache)) {
         if (typeof entry?.name === "string" && typeof entry?.uuid === "string") {
             names.set(entry.uuid.toLowerCase(), entry.name);
         }
     }
     return names;
+}
+
+const EXPIRES_ON = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) ([+-]\d{2})(\d{2})$/;
+
+/** When each uuid was last joined under, as the usercache's expiry of it, in
+ *  milliseconds; a uuid whose expiry cannot be read is left out. */
+export function seenByUuid(usercache: string): Map<string, number> {
+    const seen = new Map<string, number>();
+    for (const entry of cacheEntries(usercache)) {
+        if (typeof entry?.uuid !== "string" || typeof entry?.expiresOn !== "string") continue;
+        const parts = EXPIRES_ON.exec(entry.expiresOn.trim());
+        const at = parts ? Date.parse(`${parts[1]}T${parts[2]}${parts[3]}:${parts[4]}`) : NaN;
+        if (Number.isFinite(at)) seen.set(entry.uuid.toLowerCase(), at);
+    }
+    return seen;
 }
 
 const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/;
@@ -130,7 +150,7 @@ export interface PlayerMining {
 async function readAllStatsFiles(
     ownerId: string,
     installedAppId: string
-): Promise<{ readonly name: string; readonly json: string }[]> {
+): Promise<{ readonly name: string; readonly json: string; readonly seen: number }[]> {
     try {
         return await withServerContainer(ownerId, installedAppId, async (server) => {
             const dir = await statsDir(server, ownerId);
@@ -138,6 +158,7 @@ async function readAllStatsFiles(
             const cache = await readContainerFile(server, `${world.DATA_DIR}/usercache.json`);
             // No names: the uuids are shown instead.
             const names = namesByUuid(cache ?? "");
+            const seen = seenByUuid(cache ?? "");
             const uuids = new Map<string, string>();
             for (const entry of await listContainerDir(server, dir)) {
                 const uuid = entry.replace(/\.json$/, "").toLowerCase();
@@ -146,7 +167,7 @@ async function readAllStatsFiles(
             const read = await readContainerFiles(server, [...uuids.keys()]);
             return [...read].map(([path, json]) => {
                 const uuid = uuids.get(path)!;
-                return { name: names.get(uuid) ?? uuid, json };
+                return { name: names.get(uuid) ?? uuid, json, seen: seen.get(uuid) ?? 0 };
             });
         });
     } catch {
@@ -188,8 +209,8 @@ const FIGURES_TTL_MS = 60_000;
 
 const figuresRead = new Map<string, { at: number; value: Promise<PlayerFigures[]> }>();
 
-/** Playtime, deaths and kills for every player the world has figures for, for
- *  the rankings; read at most once a minute per server. */
+/** Playtime, deaths, kills and the rest of the rankings' counters for every
+ *  player the world has figures for; read at most once a minute per server. */
 export async function readAllPlayerStats(
     ownerId: string,
     installedAppId: string
@@ -198,18 +219,31 @@ export async function readAllPlayerStats(
     if (held && Date.now() - held.at < FIGURES_TTL_MS) return held.value;
     // A player filed under two uuids is one row with the time of both.
     const value = readAllStatsFiles(ownerId, installedAppId).then((files) => {
-        const byName = new Map<string, { name: string; all: PlayerStats[] }>();
+        const byName = new Map<
+            string,
+            { name: string; all: PlayerStats[]; tallies: { seen: number; of: PlayerTallies }[] }
+        >();
         for (const file of files) {
             const stats = readPlayerStats(file.json);
             if (!stats) continue;
             const key = file.name.toLowerCase();
-            const held = byName.get(key) ?? { name: file.name, all: [] };
+            const held = byName.get(key) ?? { name: file.name, all: [], tallies: [] };
             held.all.push(stats);
+            const tallies = readTallies(file.json);
+            if (tallies) held.tallies.push({ seen: file.seen, of: tallies });
             byName.set(key, held);
         }
         return [...byName.values()].flatMap((one) => {
             const stats = addStats(one.all);
-            return stats ? [{ name: one.name, stats }] : [];
+            const tallies = addTallies(
+                one.tallies
+                    .sort(
+                        (left, right) =>
+                            right.seen - left.seen || right.of.aliveTicks - left.of.aliveTicks
+                    )
+                    .map((file) => file.of)
+            );
+            return stats ? [{ name: one.name, stats, ...(tallies ? { tallies } : {}) }] : [];
         });
     });
     figuresRead.set(installedAppId, { at: Date.now(), value });

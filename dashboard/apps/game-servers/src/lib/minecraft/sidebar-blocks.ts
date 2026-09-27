@@ -6,6 +6,7 @@
  */
 
 import { plainLine, type SidebarLine } from "./sidebar";
+import { RANKINGS, STATS_RANKINGS } from "./rankings";
 
 export interface SidebarBlock {
     readonly id: string;
@@ -21,26 +22,11 @@ export const SIDEBAR_BLOCKS: readonly SidebarBlock[] = [
         label: "Top levels",
         lines: ["&6&lTop levels", '&f{rank.level | "Nobody on"}']
     },
-    {
-        id: "rank.deaths",
-        label: "Most deaths",
-        lines: ["&6&lMost deaths", '&f{rank.deaths | "Nobody yet"}']
-    },
-    {
-        id: "rank.kills",
-        label: "Most mobs killed",
-        lines: ["&6&lMost mobs killed", '&f{rank.kills | "Nobody yet"}']
-    },
-    {
-        id: "rank.pvp",
-        label: "Most players killed",
-        lines: ["&6&lMost players killed", '&f{rank.pvp | "Nobody yet"}']
-    },
-    {
-        id: "rank.playtime",
-        label: "Most time played",
-        lines: ["&6&lMost time played", '&f{rank.playtime | "Nobody yet"}']
-    },
+    ...STATS_RANKINGS.map((id) => ({
+        id,
+        label: RANKINGS[id].label,
+        lines: [`&6&l${RANKINGS[id].label}`, `&f{${id} | "Nobody yet"}`]
+    })),
     {
         id: "death",
         label: "Last death",

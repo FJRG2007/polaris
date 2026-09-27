@@ -22,6 +22,7 @@ import { moved, useListOrder } from "../../components/use-list-order";
 import { WholeNumberInput } from "../../components/whole-number-input";
 import { GripVertical, Loader2, Plus, Trash2, Trophy } from "lucide-react";
 import { SIDEBAR_BLOCKS, withBlock, withRotatingBlocks } from "../../lib/minecraft/sidebar-blocks";
+import { RANKINGS, STATS_RANKINGS } from "../../lib/minecraft/rankings";
 import {
     Button,
     Card,
@@ -280,7 +281,10 @@ export function MinecraftSidebar({
                                             <Trophy className="size-4" /> Add a leaderboard
                                         </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start">
+                                    <DropdownMenuContent
+                                        align="start"
+                                        className="max-h-80 overflow-y-auto"
+                                    >
                                         {SIDEBAR_BLOCKS.map((block) => (
                                             <DropdownMenuItem
                                                 key={block.id}
@@ -395,7 +399,7 @@ export function MinecraftSidebar({
                             Two lines that show each of these in turn: its heading, and the list
                             under it.
                         </p>
-                        <ul className="flex flex-col gap-1.5">
+                        <ul className="grid max-h-72 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2">
                             {SIDEBAR_BLOCKS.map((block) => (
                                 <li key={block.id}>
                                     <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -479,10 +483,7 @@ export function MinecraftSidebar({
 const SAMPLE_LISTS: Readonly<Record<string, readonly string[]>> = {
     "server.levels": ["Steve Lv 12", "Alex Lv 5"],
     "rank.level": ["1. Steve 12", "2. Alex 5"],
-    "rank.deaths": ["1. Steve 42", "2. Alex 30"],
-    "rank.kills": ["1. Alex 812", "2. Steve 640"],
-    "rank.pvp": ["1. Alex 9", "2. Steve 4"],
-    "rank.playtime": ["1. Steve 120h", "2. Alex 86h"]
+    ...Object.fromEntries(STATS_RANKINGS.map((name) => [name, RANKINGS[name].sample]))
 };
 
 /** How often the preview is drawn again while something on it moves: often
