@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 
-const { describeFiles, previewOf } = await import("@/lib/chat/toasts");
+const { describeFiles, filesLabel, previewOf } = await import("@/lib/chat/toasts");
 const { plainExcerpt } = await import("@/components/rich-text/excerpt");
 
 function file(
@@ -51,6 +51,22 @@ describe("what a toast says for a message with no words", () => {
             "Sent 2 spoilers"
         );
         expect(describeFiles([file("video/mp4", hidden), file("video/mp4")])).toBe("Sent 2 files");
+    });
+});
+
+describe("the label for what a message carries", () => {
+    it("names each kind the way a toast does, as a label", () => {
+        expect(filesLabel([file("image/png")])).toBe("Photo");
+        expect(filesLabel([file("image/gif")])).toBe("GIF");
+        expect(filesLabel([file("video/mp4")])).toBe("Video");
+        expect(filesLabel([file("audio/webm", { name: "voice-message.webm" })])).toBe(
+            "Voice message"
+        );
+        expect(filesLabel([file("audio/mpeg", { name: "song.mp3" })])).toBe("song.mp3");
+        expect(filesLabel([file("application/pdf", { name: "plan.pdf" })])).toBe("plan.pdf");
+        expect(filesLabel([file("image/png"), file("image/jpeg")])).toBe("2 photos");
+        expect(filesLabel([file("image/png", { spoiler: true })])).toBe("Spoiler");
+        expect(filesLabel([])).toBeNull();
     });
 });
 

@@ -49,6 +49,7 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         chatMessage: { findUnique: async () => fake.message },
         chatChannelMember: {
+            count: async () => fake.members.length,
             findMany: async (query: MemberQuery) => {
                 fake.asked.push(query);
                 const user = query.select.user as { select?: Record<string, unknown> } | undefined;
@@ -118,7 +119,10 @@ function message(body: string, overrides: Record<string, unknown> = {}) {
         authorId: AUTHOR,
         channelId: "c1",
         deletedAt: null,
+        kind: "text",
+        forwarded: false,
         attachments: [],
+        poll: null,
         channel: { spaceId: null, name: "" },
         ...overrides
     };
@@ -152,16 +156,53 @@ describe("relaying a message into a game", () => {
                 author: "Carla",
                 conversation: "Carla, Ben",
                 inChannel: false,
-                text: "see you at spawn"
+                text: "see you at spawn",
+                files: null,
+                poll: null,
+                forwarded: false
             },
             {
                 userId: BEN,
                 author: "Carla",
                 conversation: "Carla, Ana",
                 inChannel: false,
-                text: "see you at spawn"
+                text: "see you at spawn",
+                files: null,
+                poll: null,
+                forwarded: false
             }
         ]);
+    });
+
+    it("carries what a message holds besides words: files, a poll, a forward", async () => {
+        fake.message = message("", {
+            attachments: [{ name: "voice-message.webm", contentType: "audio/webm", spoiler: false }]
+        });
+        await relayToGames("m1");
+        expect(fake.relayed[0]).toMatchObject({ text: "", files: "Voice message", poll: null });
+
+        fake.relayed = [];
+        fake.message = message("look at this", {
+            forwarded: true,
+            attachments: [
+                { name: "a.png", contentType: "image/png", spoiler: false },
+                { name: "b.png", contentType: "image/png", spoiler: false }
+            ]
+        });
+        await relayToGames("m1");
+        expect(fake.relayed[0]).toMatchObject({
+            text: "look at this",
+            files: "2 photos",
+            forwarded: true
+        });
+
+        fake.relayed = [];
+        fake.message = message("Raid tonight?", {
+            kind: "poll",
+            poll: { options: [{ text: "Yes" }, { text: "No" }] }
+        });
+        await relayToGames("m1");
+        expect(fake.relayed[0]).toMatchObject({ text: "Raid tonight?", poll: ["Yes", "No"] });
     });
 
     it("reaches a direct message or small group by default, and nobody who turned it off", async () => {

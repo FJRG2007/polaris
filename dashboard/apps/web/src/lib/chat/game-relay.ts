@@ -22,7 +22,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
 import { chatRelayer } from "@/lib/app-extensions/registry";
-import { conversationName, describeFiles } from "./toasts";
+import { conversationName, filesLabel } from "./toasts";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { SMALL_GROUP_SIZE } from "./in-game-choice";
 import { messageable, reachableChannelIds } from "./access";
@@ -30,6 +30,9 @@ import { mentionsReader, notifyLevels, readerTeams } from "./notify";
 
 /** How much of a message goes into the game: a line of chat, not an essay. */
 export const RELAY_EXCERPT = 200;
+
+/** The most of a poll's answers carried into the game; the rest are in Polaris. */
+const POLL_OPTIONS = 10;
 
 /** The most readers one message is relayed to. A room of hundreds is a channel
  *  rather than somebody waiting for you, and the game chat is not the place for
@@ -53,13 +56,18 @@ export async function relayToGames(messageId: string): Promise<void> {
         where: { id: messageId },
         select: {
             id: true,
+            kind: true,
             body: true,
             authorId: true,
             channelId: true,
             deletedAt: true,
+            forwarded: true,
             attachments: {
                 orderBy: { createdAt: "asc" },
-                select: { id: true, name: true, contentType: true, posterPath: true, spoiler: true }
+                select: { name: true, contentType: true, spoiler: true }
+            },
+            poll: {
+                select: { options: { orderBy: { position: "asc" }, select: { text: true } } }
             },
             channel: { select: { spaceId: true, name: true } }
         }
@@ -82,7 +90,12 @@ export async function relayToGames(messageId: string): Promise<void> {
                   select: { userId: true, user: { select: { name: true } } }
               })
     ]);
-    const text = plainExcerpt(message.body, RELAY_EXCERPT) || describeFiles(message.attachments);
+    const text = plainExcerpt(message.body, RELAY_EXCERPT);
+    const files = filesLabel(message.attachments);
+    const poll =
+        message.kind === "poll" && message.poll
+            ? message.poll.options.slice(0, POLL_OPTIONS).map((option) => option.text)
+            : null;
 
     let relayed = 0;
     for (const reader of readers) {
@@ -94,7 +107,10 @@ export async function relayToGames(messageId: string): Promise<void> {
             author: author?.name || "Somebody",
             conversation: conversationName({ ...channel, members }, reader.userId),
             inChannel: channel.spaceId !== null,
-            text
+            text,
+            files,
+            poll,
+            forwarded: message.forwarded
         });
     }
 }
@@ -123,15 +139,7 @@ async function readersOf(
                   take: MOST_CANDIDATES
               })
           ).map((user) => user.id)
-        : groupCandidates(
-              await prisma.chatChannelMember.findMany({
-                  where: { channelId },
-                  select: { userId: true, user: { select: { messagesInGame: true } } },
-                  orderBy: { userId: "asc" },
-                  take: MOST_CANDIDATES
-              }),
-              authorId
-          );
+        : await groupMembers(channelId, authorId);
     if (candidates.length === 0) return [];
 
     const allowed = await messageable(candidates);
@@ -155,12 +163,33 @@ async function readersOf(
     }));
 }
 
+/** The members of a direct message or group it is on for, asked of the
+ *  database before the cap so a large group's opted-in members are not cut. */
+async function groupMembers(channelId: string, authorId: string): Promise<string[]> {
+    const size = await prisma.chatChannelMember.count({ where: { channelId } });
+    const small = size <= SMALL_GROUP_SIZE;
+    const members = await prisma.chatChannelMember.findMany({
+        where: {
+            channelId,
+            userId: { not: authorId },
+            user: small
+                ? { OR: [{ messagesInGame: true }, { messagesInGame: null }] }
+                : { messagesInGame: true }
+        },
+        select: { userId: true, user: { select: { messagesInGame: true } } },
+        orderBy: { userId: "asc" },
+        take: MOST_CANDIDATES
+    });
+    return groupCandidates(members, authorId, size);
+}
+
 /** The members of a direct message or group it is on for, as `readersOf` says. */
 export function groupCandidates(
     members: readonly { userId: string; user: { messagesInGame: boolean | null } }[],
-    authorId: string
+    authorId: string,
+    size: number = members.length
 ): string[] {
-    const small = members.length <= SMALL_GROUP_SIZE;
+    const small = size <= SMALL_GROUP_SIZE;
     return members
         .filter((member) => member.userId !== authorId)
         .filter((member) =>
