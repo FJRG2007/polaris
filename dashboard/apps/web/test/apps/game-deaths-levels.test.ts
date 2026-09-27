@@ -19,7 +19,9 @@ const fake = vi.hoisted(() => ({
 
 vi.mock("@polaris/db", () => ({
     prisma: {
-        installedApp: { findUnique: async () => ({ name: "Survival", config: JSON.stringify(fake.config) }) }
+        installedApp: {
+            findUnique: async () => ({ name: "Survival", config: JSON.stringify(fake.config) })
+        }
     }
 }));
 vi.mock("@polaris/app-host", () => ({
@@ -38,8 +40,10 @@ vi.mock("@polaris/app-host", () => ({
 const events = await import("@polaris-app/game-servers/src/lib/minecraft/player-events");
 const { spreadListLines } = await import("@polaris-app/game-servers/src/lib/minecraft/rankings");
 const { liveContext } = await import("@polaris-app/game-servers/src/lib/minecraft/live-values");
-const { fillValues, variableProblem } = await import("@polaris-app/game-servers/src/lib/minecraft/text-vars");
-const { sidebarProblems, DEFAULT_SIDEBAR } = await import("@polaris-app/game-servers/src/lib/minecraft/sidebar");
+const { fillValues, variableProblem } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/text-vars");
+const { sidebarProblems, DEFAULT_SIDEBAR } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/sidebar");
 
 const server = {
     say: async () => fake.levels,
@@ -79,7 +83,10 @@ describe("recognising a death", () => {
             "[18:03:00 INFO]: Alex was blown up by Creeper",
             "[18:04:00] [Server thread/INFO]: Alex joined the game"
         ].join("\n");
-        expect(events.lastDeathInLog(log)).toEqual({ player: "Alex", message: "Alex was blown up by Creeper" });
+        expect(events.lastDeathInLog(log)).toEqual({
+            player: "Alex",
+            message: "Alex was blown up by Creeper"
+        });
         expect(events.lastDeathInLog("[1] [x]: nothing here")).toBeNull();
     });
 });
@@ -96,12 +103,16 @@ describe("levels", () => {
             { name: "Alex", level: 5 },
             { name: "Zed", level: 5 }
         ]);
-        expect(events.readLevels(".Steve has the following entity data: 3")).toEqual([{ name: ".Steve", level: 3 }]);
+        expect(events.readLevels(".Steve has the following entity data: 3")).toEqual([
+            { name: ".Steve", level: 3 }
+        ]);
     });
 
     it("spread a side panel line into a line a player, in the room left", () => {
         const lines = ["Online: {server.online}", "&e{server.levels}", "", "{death.message}"];
-        expect(spreadListLines(lines, { "server.levels": ["Steve Lv 12", "Alex Lv 5"] }, 15)).toEqual([
+        expect(
+            spreadListLines(lines, { "server.levels": ["Steve Lv 12", "Alex Lv 5"] }, 15)
+        ).toEqual([
             "Online: {server.online}",
             "&eSteve Lv 12",
             "&eAlex Lv 5",
@@ -109,27 +120,30 @@ describe("levels", () => {
             "{death.message}"
         ]);
         // Three other lines on a panel of five leave two: one player and the rest counted.
-        expect(spreadListLines(lines, { "server.levels": ["A Lv 3", "B Lv 2", "C Lv 1"] }, 5)).toEqual([
-            "Online: {server.online}",
-            "&eA Lv 3",
-            "&e+2 more",
-            "",
-            "{death.message}"
-        ]);
+        expect(
+            spreadListLines(lines, { "server.levels": ["A Lv 3", "B Lv 2", "C Lv 1"] }, 5)
+        ).toEqual(["Online: {server.online}", "&eA Lv 3", "&e+2 more", "", "{death.message}"]);
         // Nobody online: left for its fallback.
-        expect(spreadListLines(['{server.levels | "Nobody"}'], {}, 15)).toEqual(['{server.levels | "Nobody"}']);
+        expect(spreadListLines(['{server.levels | "Nobody"}'], {}, 15)).toEqual([
+            '{server.levels | "Nobody"}'
+        ]);
     });
 });
 
 describe("what the side panel and announcements are filled with", () => {
     it("accepts the new variables on the panel, and refuses them on Bedrock", () => {
         const lines = ["{server.levels}", "Last death: {death.player}", "{death.message}"];
-        expect(sidebarProblems({ ...DEFAULT_SIDEBAR, enabled: true, lines }).lines).toEqual([null, null, null]);
+        expect(sidebarProblems({ ...DEFAULT_SIDEBAR, enabled: true, lines }).lines).toEqual([
+            null,
+            null,
+            null
+        ]);
         expect(variableProblem("{death.player}", "bedrock")).toMatch(/Bedrock/);
     });
 
     it("reads everybody's level from the server", async () => {
-        fake.levels = "Steve has the following entity data: 12\nAlex has the following entity data: 5";
+        fake.levels =
+            "Steve has the following entity data: 12\nAlex has the following entity data: 5";
         const context = await liveContext("install", ["{server.levels}"], null, server);
         expect(context.values["server.levels"]).toBe("Steve Lv 12, Alex Lv 5");
         expect(context.lists?.["server.levels"]).toEqual(["Steve Lv 12", "Alex Lv 5"]);
@@ -143,7 +157,12 @@ describe("what the side panel and announcements are filled with", () => {
 
         // A restart: a new log with no death in it yet.
         fake.log = "[09:00:00] [Server thread/INFO]: Done (3.2s)!\n";
-        const after = await liveContext("install", ["{death.player} {death.message}"], null, server);
+        const after = await liveContext(
+            "install",
+            ["{death.player} {death.message}"],
+            null,
+            server
+        );
         expect(fillValues("{death.player}: {death.message}", after.values)).toBe(
             "Steve: Steve fell from a high place"
         );
@@ -163,7 +182,12 @@ describe("what the side panel and announcements are filled with", () => {
     });
 
     it("reads as the fallback before anybody has died", async () => {
-        const context = await liveContext("install", ['{death.player | "Nobody yet"}'], null, server);
+        const context = await liveContext(
+            "install",
+            ['{death.player | "Nobody yet"}'],
+            null,
+            server
+        );
         expect(fillValues('{death.player | "Nobody yet"}', context.values)).toBe("Nobody yet");
     });
 });

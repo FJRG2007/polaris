@@ -21,7 +21,13 @@ import {
     statsRanking,
     type PlayerFigures
 } from "./rankings";
-import { DEATH_VARIABLES, LEVELS_VARIABLE, usesAccount, variablesIn, type VariableValues } from "./text-vars";
+import {
+    DEATH_VARIABLES,
+    LEVELS_VARIABLE,
+    usesAccount,
+    variablesIn,
+    type VariableValues
+} from "./text-vars";
 
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { voicePresence } = host.chatCalls;
@@ -153,7 +159,9 @@ async function lastDeath(
         return kept;
     }
     const next: events.LastDeath = { ...found, at: Date.now() };
-    await patchInstallConfig(installedAppId, { [events.LAST_DEATH_KEY]: next }).catch(() => undefined);
+    await patchInstallConfig(installedAppId, { [events.LAST_DEATH_KEY]: next }).catch(
+        () => undefined
+    );
     return next;
 }
 

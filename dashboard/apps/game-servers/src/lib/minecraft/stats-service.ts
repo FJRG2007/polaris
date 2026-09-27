@@ -65,8 +65,12 @@ export async function readMinecraftStats(
         return await withServerContainer(ownerId, installedAppId, async (server) => {
             if (server.edition === "bedrock") return null;
 
-            const vars = await listEnvVars("application", server.applicationId, ownerId).catch(() => []);
-            const level = vars.find((entry) => entry.key === world.levelEnvKey("java"))?.value?.trim();
+            const vars = await listEnvVars("application", server.applicationId, ownerId).catch(
+                () => []
+            );
+            const level = vars
+                .find((entry) => entry.key === world.levelEnvKey("java"))
+                ?.value?.trim();
             if (!level) return null;
 
             const cache = await server.run(["cat", "--", `${world.DATA_DIR}/usercache.json`]);
@@ -74,7 +78,11 @@ export async function readMinecraftStats(
             const uuid = uuidFor(cache.output, name);
             if (uuid === null || !/^[0-9a-fA-F-]{32,36}$/.test(uuid)) return null;
 
-            const stats = await server.run(["cat", "--", `${world.DATA_DIR}/${level}/stats/${uuid}.json`]);
+            const stats = await server.run([
+                "cat",
+                "--",
+                `${world.DATA_DIR}/${level}/stats/${uuid}.json`
+            ]);
             return stats.code === 0 ? readPlayerStats(stats.output) : null;
         });
     } catch {
@@ -100,8 +108,12 @@ async function readAllStatsFiles(
     try {
         return await withServerContainer(ownerId, installedAppId, async (server) => {
             if (server.edition === "bedrock") return [];
-            const vars = await listEnvVars("application", server.applicationId, ownerId).catch(() => []);
-            const level = vars.find((entry) => entry.key === world.levelEnvKey("java"))?.value?.trim();
+            const vars = await listEnvVars("application", server.applicationId, ownerId).catch(
+                () => []
+            );
+            const level = vars
+                .find((entry) => entry.key === world.levelEnvKey("java"))
+                ?.value?.trim();
             if (!level || !/^[\w.-]+$/.test(level)) return [];
 
             const cache = await server.run(["cat", "--", `${world.DATA_DIR}/usercache.json`]);
@@ -139,7 +151,10 @@ async function readAllStatsFiles(
 }
 
 /** The mining figures of every player the world has stats for. */
-export async function readAllMining(ownerId: string, installedAppId: string): Promise<PlayerMining[]> {
+export async function readAllMining(
+    ownerId: string,
+    installedAppId: string
+): Promise<PlayerMining[]> {
     return (await readAllStatsFiles(ownerId, installedAppId)).flatMap((file) => {
         const figures = miningFigures(file.json);
         return figures ? [{ name: file.name, figures }] : [];
@@ -155,7 +170,10 @@ const figuresRead = new Map<string, { at: number; value: Promise<PlayerFigures[]
 
 /** Playtime, deaths and kills for every player the world has figures for, for
  *  the rankings; read at most once a minute per server. */
-export async function readAllPlayerStats(ownerId: string, installedAppId: string): Promise<PlayerFigures[]> {
+export async function readAllPlayerStats(
+    ownerId: string,
+    installedAppId: string
+): Promise<PlayerFigures[]> {
     const held = figuresRead.get(installedAppId);
     if (held && Date.now() - held.at < FIGURES_TTL_MS) return held.value;
     const value = readAllStatsFiles(ownerId, installedAppId).then((files) =>

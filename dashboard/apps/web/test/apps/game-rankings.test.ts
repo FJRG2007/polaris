@@ -23,11 +23,11 @@ vi.mock("@polaris/app-host", () => ({
     }
 }));
 
-const { playedText, rankLines, spreadListLines, statsRanking } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/rankings"
-);
+const { playedText, rankLines, spreadListLines, statsRanking } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/rankings");
 const { liveContext } = await import("@polaris-app/game-servers/src/lib/minecraft/live-values");
-const { sidebarProblems, DEFAULT_SIDEBAR } = await import("@polaris-app/game-servers/src/lib/minecraft/sidebar");
+const { sidebarProblems, DEFAULT_SIDEBAR } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/sidebar");
 
 const HOUR = 3_600_000;
 const figures = [
@@ -39,17 +39,30 @@ const figures = [
 describe("a ranking", () => {
     it("is best first, numbered, and leaves out whoever is at zero", () => {
         expect(statsRanking("rank.deaths", figures)).toEqual(["1. Steve 42", "2. Alex 30"]);
-        expect(statsRanking("rank.kills", figures)).toEqual(["1. Alex 812", "2. Steve 640", "3. Zed 3"]);
+        expect(statsRanking("rank.kills", figures)).toEqual([
+            "1. Alex 812",
+            "2. Steve 640",
+            "3. Zed 3"
+        ]);
         expect(statsRanking("rank.pvp", figures)).toEqual(["1. Alex 9", "2. Steve 4"]);
     });
 
     it("reads time played in hours, or minutes under one", () => {
-        expect(statsRanking("rank.playtime", figures)).toEqual(["1. Steve 120h", "2. Alex 86h", "3. Zed 40m"]);
+        expect(statsRanking("rank.playtime", figures)).toEqual([
+            "1. Steve 120h",
+            "2. Alex 86h",
+            "3. Zed 40m"
+        ]);
         expect(playedText(59 * 60_000)).toBe("59m");
     });
 
     it("orders a tie by name", () => {
-        expect(rankLines([{ name: "Bob", value: 5 }, { name: "Amy", value: 5 }])).toEqual(["1. Amy 5", "2. Bob 5"]);
+        expect(
+            rankLines([
+                { name: "Bob", value: 5 },
+                { name: "Amy", value: 5 }
+            ])
+        ).toEqual(["1. Amy 5", "2. Bob 5"]);
     });
 });
 
@@ -71,8 +84,20 @@ describe("lists on the side panel", () => {
     });
 
     it("are accepted on the panel", () => {
-        const lines = ["{rank.deaths}", "{rank.kills}", "{rank.pvp}", "{rank.playtime}", "{rank.level}"];
-        expect(sidebarProblems({ ...DEFAULT_SIDEBAR, enabled: true, lines }).lines).toEqual([null, null, null, null, null]);
+        const lines = [
+            "{rank.deaths}",
+            "{rank.kills}",
+            "{rank.pvp}",
+            "{rank.playtime}",
+            "{rank.level}"
+        ];
+        expect(sidebarProblems({ ...DEFAULT_SIDEBAR, enabled: true, lines }).lines).toEqual([
+            null,
+            null,
+            null,
+            null,
+            null
+        ]);
     });
 });
 
@@ -82,7 +107,13 @@ describe("filling them in", () => {
             name: `P${index}`,
             stats: { playedMs: 0, deaths: 10 - index, mobKills: 0, playerKills: 0 }
         }));
-        const context = await liveContext("install", ["{rank.deaths}"], null, null, async () => many);
+        const context = await liveContext(
+            "install",
+            ["{rank.deaths}"],
+            null,
+            null,
+            async () => many
+        );
         expect(context.lists?.["rank.deaths"]).toHaveLength(8);
         expect(context.values["rank.deaths"]).toBe("1. P0 10, 2. P1 9, 3. P2 8, 4. P3 7, 5. P4 6");
     });
@@ -95,7 +126,8 @@ describe("filling them in", () => {
 
     it("ranks levels from who is on", async () => {
         const server = {
-            say: async () => "Steve has the following entity data: 12\nAlex has the following entity data: 30",
+            say: async () =>
+                "Steve has the following entity data: 12\nAlex has the following entity data: 30",
             run: async () => ({ code: 1, output: "" })
         };
         const context = await liveContext("install", ["{rank.level}"], null, server);

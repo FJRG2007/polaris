@@ -258,8 +258,8 @@ export function MinecraftSidebar({
                             <Plus className="size-4" /> Add a line
                         </Button>
                         <p className="text-xs text-muted-foreground">
-                            An empty line is a gap. Drag one under the title to space it from
-                            the lines below.
+                            An empty line is a gap. Drag one under the title to space it from the
+                            lines below.
                         </p>
                     </div>
 
@@ -346,11 +346,13 @@ function SidebarPreview({ sidebar }: { sidebar: SidebarConfig }) {
                         <div className="text-center">
                             <McLine spans={title} />
                         </div>
-                        {spreadListLines(sidebar.lines, SAMPLE_LISTS, SIDEBAR_LINES_MAX).map((line, index) => (
-                            <div key={index} className="min-h-5 whitespace-pre">
-                                <McLine spans={mc.motdSpans(previewText(line))[0] ?? []} />
-                            </div>
-                        ))}
+                        {spreadListLines(sidebar.lines, SAMPLE_LISTS, SIDEBAR_LINES_MAX).map(
+                            (line, index) => (
+                                <div key={index} className="min-h-5 whitespace-pre">
+                                    <McLine spans={mc.motdSpans(previewText(line))[0] ?? []} />
+                                </div>
+                            )
+                        )}
                     </div>
                 </div>
                 {!sidebar.enabled && (

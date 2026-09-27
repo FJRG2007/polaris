@@ -106,7 +106,9 @@ export interface PlayerLevel {
 /** Everybody's level out of `LEVELS_COMMAND`, highest first. */
 export function readLevels(output: string): PlayerLevel[] {
     const found = [...parsePlayerLevels(output)].map(([name, level]) => ({ name, level }));
-    return found.sort((left, right) => right.level - left.level || left.name.localeCompare(right.name));
+    return found.sort(
+        (left, right) => right.level - left.level || left.name.localeCompare(right.name)
+    );
 }
 
 /** One player's level as it reads on a line. */

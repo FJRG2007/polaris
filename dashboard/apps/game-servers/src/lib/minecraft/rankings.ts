@@ -28,7 +28,11 @@ export const LEVEL_RANKING = "rank.level";
 export const STATS_RANKINGS = Object.keys(RANKINGS) as StatsRanking[];
 
 /** Every variable that is a list on the side panel. */
-export const LIST_VARIABLES: readonly string[] = ["server.levels", LEVEL_RANKING, ...STATS_RANKINGS];
+export const LIST_VARIABLES: readonly string[] = [
+    "server.levels",
+    LEVEL_RANKING,
+    ...STATS_RANKINGS
+];
 
 /** How many a ranking names when it is written into one line, in an
  *  announcement or beside other words. */
