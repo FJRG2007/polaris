@@ -185,6 +185,33 @@ export const EMPTY_QUERY: MailListQuery = {
     limit: 50
 };
 
+/** What a list asks of a message besides whose it is and whether it is snoozed. */
+function listFilter(query: MailListQuery): Prisma.MailMessageWhereInput {
+    return {
+        ...(query.folderId ? { folderId: query.folderId } : {}),
+        ...(query.role ? { folder: { role: query.role } } : {}),
+        ...(query.unreadOnly ? { seen: false } : {}),
+        ...(query.starredOnly ? { flagged: true } : {}),
+        ...(query.importantOnly ? { important: true } : {}),
+        ...(query.withAttachments ? { hasAttachments: true } : {}),
+        ...(query.category ? { category: query.category } : {}),
+        ...(query.labelId ? { labels: { some: { labelId: query.labelId } } } : {}),
+        ...(query.since || query.before
+            ? {
+                  sentAt: {
+                      ...(query.since ? { gte: query.since } : {}),
+                      ...(query.before ? { lte: query.before } : {})
+                  }
+              }
+            : {}),
+        // The search itself is not here. Who a message is from and to is stored
+        // as JSON, which the database cannot be asked about usefully - which is
+        // why searching for the sender's own address found nothing at all. It is
+        // answered in `matchingThreads` instead, over a bounded window.
+        ...(query.from ? { fromJson: { string_contains: query.from.trim().toLowerCase() } } : {})
+    };
+}
+
 /**
  * The conversations in a list.
  *
@@ -210,6 +237,7 @@ export async function listThreads(
         : await unifiedAccountIds(userId, shelfOrgId);
     if (accountIds.length === 0) return { threads: [], cursor: "" };
 
+    const view = listFilter(query);
     const messageWhere: Prisma.MailMessageWhereInput = {
         accountId: { in: accountIds },
         // A snoozed message is not in the list until its hour comes. Never moved
@@ -218,27 +246,7 @@ export async function listThreads(
         ...(query.snoozedOnly
             ? { snoozedUntil: { gt: new Date() } }
             : { OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }] }),
-        ...(query.folderId ? { folderId: query.folderId } : {}),
-        ...(query.role ? { folder: { role: query.role } } : {}),
-        ...(query.unreadOnly ? { seen: false } : {}),
-        ...(query.starredOnly ? { flagged: true } : {}),
-        ...(query.importantOnly ? { important: true } : {}),
-        ...(query.withAttachments ? { hasAttachments: true } : {}),
-        ...(query.category ? { category: query.category } : {}),
-        ...(query.labelId ? { labels: { some: { labelId: query.labelId } } } : {}),
-        ...(query.since || query.before
-            ? {
-                  sentAt: {
-                      ...(query.since ? { gte: query.since } : {}),
-                      ...(query.before ? { lte: query.before } : {})
-                  }
-              }
-            : {}),
-        // The search itself is not here. Who a message is from and to is stored
-        // as JSON, which the database cannot be asked about usefully - which is
-        // why searching for the sender's own address found nothing at all. It is
-        // answered in `matchingThreads` instead, over a bounded window.
-        ...(query.from ? { fromJson: { string_contains: query.from.trim().toLowerCase() } } : {})
+        ...view
     };
 
     // Which conversations the search admits, decided before the list is drawn so
@@ -246,7 +254,7 @@ export async function listThreads(
     const terms = query.query.trim() ? core.parseMailSearch(query.query) : core.EMPTY_SEARCH;
     const matched = core.searchIsEmpty(terms)
         ? null
-        : await matchingThreads(accountIds, query, terms);
+        : await matchingThreads(accountIds, messageWhere, Object.keys(view).length > 0, terms);
     if (matched && matched.size === 0) return { threads: [], cursor: "" };
 
     const threads = await prisma.mailThread.findMany({
@@ -346,8 +354,9 @@ function offerOf(headers: unknown): core.UnsubscribeOffer | null {
  */
 const SEARCH_WINDOW = 2000;
 
-/** Where the rest of a conversation is not searched from another list. */
-const SEARCH_SET_ASIDE = ["trash", "junk"] as const;
+/** Where the rest of a conversation is not searched from another list. All
+ *  Mail is only copies of messages already read from their own folders. */
+const SEARCH_SET_ASIDE = ["trash", "junk", "all"] as const;
 
 /**
  * The conversations a search admits.
@@ -368,29 +377,25 @@ const SEARCH_SET_ASIDE = ["trash", "junk"] as const;
  * being searched, not only the messages that put it there. A thread is in the
  * inbox because of what arrived, and the replies somebody wrote to it are in
  * Sent - searching the inbox for words from their own reply found nothing.
- * The rest of a conversation's messages in Trash or Spam are left out, as they
- * are from every other list; searching Trash or Spam itself reads them.
+ * The rest of a conversation's messages in Trash, Spam or All Mail are left
+ * out, as they are from every other list; searching one of those itself reads
+ * them. A list that narrows nothing already reads every message.
  */
 async function matchingThreads(
     accountIds: string[],
-    query: MailListQuery,
+    inList: Prisma.MailMessageWhereInput,
+    narrowed: boolean,
     terms: core.MailSearchTerms
 ): Promise<Set<string>> {
-    const inView: Prisma.MailMessageWhereInput = {
-        ...(query.folderId ? { folderId: query.folderId } : {}),
-        ...(query.role ? { folder: { role: query.role } } : {}),
-        ...(query.labelId ? { labels: { some: { labelId: query.labelId } } } : {}),
-        ...(query.category ? { category: query.category } : {}),
-        ...(query.withAttachments ? { hasAttachments: true } : {}),
-        ...(query.unreadOnly ? { seen: false } : {}),
-        ...(query.starredOnly ? { flagged: true } : {}),
-        ...(query.importantOnly ? { important: true } : {})
-    };
     const messages = await prisma.mailMessage.findMany({
         where: {
             accountId: { in: accountIds },
-            thread: { messages: { some: { accountId: { in: accountIds }, ...inView } } },
-            OR: [inView, { folder: { role: { notIn: [...SEARCH_SET_ASIDE] } } }],
+            ...(narrowed
+                ? {
+                      thread: { messages: { some: inList } },
+                      OR: [inList, { folder: { role: { notIn: [...SEARCH_SET_ASIDE] } } }]
+                  }
+                : {}),
             ...(terms.hasAttachment ? { hasAttachments: true } : {}),
             ...(terms.unread === null ? {} : { seen: !terms.unread }),
             ...(terms.starred === null ? {} : { flagged: terms.starred }),

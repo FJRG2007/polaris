@@ -4,8 +4,8 @@
  * A thread is in the inbox because of what arrived, and the reply somebody wrote
  * to it is in Sent. Searching the inbox for a word from their own reply used to
  * read only the inbox's messages and found nothing. The rest of a conversation is
- * searched too - except what of it is in Trash or Spam - and the replies' bodies
- * are held so there is something in them to find.
+ * searched too - except what of it is in Trash, Spam or All Mail - and the
+ * replies' bodies are held so there is something in them to find.
  */
 
 import { fileURLToPath } from "node:url";
@@ -95,15 +95,41 @@ describe("searching a list", () => {
         const where = asked[0]!.where;
         // Not only the inbox's own messages...
         expect(where.folderId).toBeUndefined();
-        // ...but every message of a thread that has one in the inbox,
-        expect(where.thread).toEqual({
-            messages: { some: { accountId: { in: ["acc1"] }, folderId: "inbox-folder" } }
-        });
-        // ...the inbox's own messages, and the rest wherever they are but Trash or Spam.
+        // ...but every message of a thread the inbox list shows,
+        const inList = (where.thread as { messages: { some: Record<string, unknown> } }).messages
+            .some;
+        expect(inList).toMatchObject({ accountId: { in: ["acc1"] }, folderId: "inbox-folder" });
+        // ...the inbox's own messages, and the rest wherever they are but Trash,
+        // Spam or the All Mail copies.
         expect(where.OR).toEqual([
-            { folderId: "inbox-folder" },
-            { folder: { role: { notIn: ["trash", "junk"] } } }
+            inList,
+            { folder: { role: { notIn: ["trash", "junk", "all"] } } }
         ]);
+    });
+
+    it("asks what the list itself asks, snooze and dates included", async () => {
+        asked.length = 0;
+        const since = new Date("2026-01-01T00:00:00Z");
+        await listThreads(
+            "u1",
+            { ...EMPTY_QUERY, folderId: "inbox-folder", since, query: "notario" },
+            null
+        );
+        const inList = (asked[0]!.where.thread as { messages: { some: Record<string, unknown> } })
+            .messages.some;
+        expect(inList.sentAt).toEqual({ gte: since });
+        expect(inList.OR).toEqual([
+            { snoozedUntil: null },
+            { snoozedUntil: { lte: expect.any(Date) } }
+        ]);
+    });
+
+    it("adds nothing to a list that narrows nothing", async () => {
+        asked.length = 0;
+        await listThreads("u1", { ...EMPTY_QUERY, query: "notario" }, null);
+        const where = asked[0]!.where;
+        expect(where.thread).toBeUndefined();
+        expect(where.OR).toBeUndefined();
     });
 });
 
