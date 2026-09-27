@@ -16,6 +16,7 @@ import * as mc from "../../lib/minecraft/motd";
 import { McLine } from "../../components/mc-text";
 import type { MinecraftEdition } from "../../lib/minecraft/service";
 import { FormattedTextField } from "../../components/formatted-text-field";
+import { VariablesHelp } from "../../components/variables-help";
 import { SendTo } from "./announce-send-to";
 import { describeTarget, parseTarget } from "../../lib/minecraft/announce-target";
 import {
@@ -321,6 +322,7 @@ export function MinecraftAnnounce({
 
     return (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="flex min-w-0 flex-col gap-4">
             <Card>
                 <CardBody className="flex flex-col gap-4">
                     <div>
@@ -719,6 +721,8 @@ export function MinecraftAnnounce({
                     </details>
                 </CardBody>
             </Card>
+                <VariablesHelp edition={edition} scope="all" />
+            </div>
 
             <AnnouncementPreview announcement={draft} edition={edition} />
 
@@ -870,7 +874,7 @@ function AnnouncementPreview({
     const tagged = announcement.tagged && hasText(announcement.chat);
 
     return (
-        <Card className="lg:sticky lg:top-4 lg:self-start">
+        <Card className="lg:sticky lg:top-[calc(var(--header-height)+1rem)] lg:self-start">
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-2">
                     <div>

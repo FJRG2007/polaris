@@ -31,6 +31,7 @@ import {
     cn
 } from "@polaris/ui";
 import { FormattedTextField } from "../../components/formatted-text-field";
+import { VariablesHelp } from "../../components/variables-help";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     DEFAULT_SIDEBAR,
@@ -144,6 +145,7 @@ export function MinecraftSidebar({
     const refused = state.sidebarRefusal;
     return (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="flex min-w-0 flex-col gap-4">
             <Card>
                 <CardBody className="flex flex-col gap-4">
                     <div className="flex items-start justify-between gap-3">
@@ -358,6 +360,8 @@ export function MinecraftSidebar({
                     </div>
                 </CardBody>
             </Card>
+                <VariablesHelp edition="java" scope="server" />
+            </div>
 
             <SidebarPreview sidebar={draft} />
         </div>
@@ -377,8 +381,10 @@ const SAMPLE_LISTS: Readonly<Record<string, readonly string[]>> = {
 /** The panel as it will read, every value at a sample. */
 function SidebarPreview({ sidebar }: { sidebar: SidebarConfig }) {
     const title = mc.motdSpans(previewText(sidebar.title))[0] ?? [];
+    // As tall as it is and kept in view, like the announcement's: stretched to
+    // the height of the lines beside it, it was a page of empty card.
     return (
-        <Card>
+        <Card className="lg:sticky lg:top-[calc(var(--header-height)+1rem)] lg:self-start">
             <CardBody className="flex flex-col gap-2">
                 <p className="text-sm font-medium">Preview</p>
                 <div className="flex min-h-40 justify-end rounded-md bg-[#6b8f4e] p-3">

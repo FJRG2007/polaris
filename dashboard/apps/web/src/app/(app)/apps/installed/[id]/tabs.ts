@@ -48,6 +48,9 @@ export const GAME_TABS: readonly GameTab[] = [
     // typed as JSON into the console. The same grant, since it is the server
     // talking to everybody on it; Minecraft only, the one game with titles.
     { slug: "announce", label: "Announce", permission: "games.console", games: ["minecraft"] },
+    // The box on the right of every player's screen. Its own screen rather than
+    // the bottom of Announce, where nobody looking for it thought to scroll.
+    { slug: "panel", label: "Side panel", permission: "games.console", games: ["minecraft"] },
     { slug: "players", label: "Players", permission: "games.read", games: EVERY_GAME },
     { slug: "world", label: "World", permission: "games.manage", games: ["minecraft"] },
     { slug: "rules", label: "Rules", permission: "games.read", games: EVERY_GAME },
@@ -60,7 +63,12 @@ export const GAME_TABS: readonly GameTab[] = [
     },
     { slug: "usage", label: "Usage", permission: "games.read", games: EVERY_GAME },
     { slug: "security", label: "Security", permission: "games.manage", games: EVERY_GAME },
+    // Anti X-Ray and the movement watch: reading the evidence is a moderator's,
+    // as it is on the players it is about.
+    { slug: "anticheat", label: "Anti-cheat", permission: "games.moderate", games: ["minecraft"] },
     { slug: "access", label: "Access", permission: "games.read", games: EVERY_GAME },
+    // Restarts, backups, sleeping when empty: when things happen on their own.
+    { slug: "schedule", label: "Schedule", permission: "games.manage", games: EVERY_GAME },
     { slug: "settings", label: "Settings", permission: "games.manage", games: EVERY_GAME }
 ];
 

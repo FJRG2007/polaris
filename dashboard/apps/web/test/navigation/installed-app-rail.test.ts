@@ -82,3 +82,17 @@ describe("installedAppSubapp", () => {
         expect(isSectionActive(`${overview}/players`, `${overview}/players`, sections)).toBe(true);
     });
 });
+
+describe("every screen of a game server is in its rail", () => {
+    it("has an entry for each tab, so a new screen cannot go missing from it", async () => {
+        // Announce, and the side panel, anti-cheat and schedule once they had
+        // screens of their own, were on the tab bar and absent from the rail:
+        // a slug the rail has no entry for is dropped without a word.
+        const { GAME_TABS } = await import("@/app/(app)/apps/installed/[id]/tabs");
+        const slugs = GAME_TABS.map((tab) => tab.slug);
+        const rail = installedAppSubapp("s1", { name: "Survival", tabs: slugs });
+        expect(rail?.sections.map((section) => section.href)).toEqual(
+            slugs.map((slug) => (slug ? `/apps/installed/s1/${slug}` : "/apps/installed/s1"))
+        );
+    });
+});

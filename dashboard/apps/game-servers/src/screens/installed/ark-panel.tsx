@@ -446,15 +446,17 @@ export function ArkPanel({
                 </div>
             )}
             {tab === "access" && <MinecraftAccess installedAppId={installedAppId} />}
+            {tab === "schedule" && (
+                <MinecraftSchedule
+                    runs={game?.routineRuns ?? null}
+                    installedAppId={installedAppId}
+                    schedule={game?.schedule ?? NO_SCHEDULE}
+                    state={game?.scheduleState ?? null}
+                    canRoute={game?.canRoute ?? false}
+                />
+            )}
             {tab === "settings" && (
                 <div className="flex flex-col gap-4">
-                    <MinecraftSchedule
-                        runs={game?.routineRuns ?? null}
-                        installedAppId={installedAppId}
-                        schedule={game?.schedule ?? NO_SCHEDULE}
-                        state={game?.scheduleState ?? null}
-                        canRoute={game?.canRoute ?? false}
-                    />
                     <MinecraftDomain
                         installedAppId={installedAppId}
                         hostname={game?.hostname ?? null}
