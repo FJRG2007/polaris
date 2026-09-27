@@ -20,9 +20,17 @@ const fake = vi.hoisted(() => ({
         userId: string;
         followSignIns: boolean;
     }[],
-    installs: [] as { id: string; ownerId: string; catalogId: string; status: string }[],
+    installs: [] as {
+        id: string;
+        ownerId: string;
+        catalogId: string;
+        status: string;
+        applicationId: string;
+    }[],
     sessions: [] as { installedAppId: string; name: string }[],
     connections: [] as { userId: string; label: string }[],
+    joinLog: "",
+    signedInFrom: {} as Record<string, string[]>,
     said: [] as { installedAppId: string; line: string }[],
     failing: new Set<string>()
 }));
@@ -53,6 +61,11 @@ vi.mock("@polaris/db", () => ({
         }
     }
 }));
+vi.mock("@polaris-app/game-servers/src/lib/game-sign-in-addresses", () => ({
+    signInAddresses: async (userIds: string[]) =>
+        new Map(userIds.map((user) => [user, fake.signedInFrom[user] ?? []]))
+}));
+vi.mock("@/lib/deploy-service", () => ({ readAppRuntimeLog: async () => fake.joinLog }));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     editionOf: (catalogId: string) => (catalogId === "minecraft-bedrock" ? "bedrock" : "java"),
     withServerContainer: async (
@@ -94,9 +107,27 @@ beforeEach(() => {
         }
     ];
     fake.installs = [
-        { id: "survival", ownerId: "o1", catalogId: "minecraft", status: "running" },
-        { id: "creative", ownerId: "o1", catalogId: "minecraft", status: "running" },
-        { id: "bedrock", ownerId: "o1", catalogId: "minecraft-bedrock", status: "running" }
+        {
+            id: "survival",
+            ownerId: "o1",
+            catalogId: "minecraft",
+            status: "running",
+            applicationId: "a1"
+        },
+        {
+            id: "creative",
+            ownerId: "o1",
+            catalogId: "minecraft",
+            status: "running",
+            applicationId: "a2"
+        },
+        {
+            id: "bedrock",
+            ownerId: "o1",
+            catalogId: "minecraft-bedrock",
+            status: "running",
+            applicationId: "a3"
+        }
     ];
     fake.sessions = [
         { installedAppId: "survival", name: "Ana_MC" },
@@ -104,6 +135,9 @@ beforeEach(() => {
         { installedAppId: "bedrock", name: "ana_mc" }
     ];
     fake.connections = [{ userId: ANA, label: "Ana_MC" }];
+    fake.joinLog =
+        "[12:00:00] [Server thread/INFO]: Ana_MC[/203.0.113.7:51234] logged in with entity id 1";
+    fake.signedInFrom = { [ANA]: ["203.0.113.7"] };
     fake.said = [];
     fake.failing = new Set();
 });
@@ -241,6 +275,29 @@ describe("who it is shown to", () => {
         );
         await relay.relayChatToMinecraft(MESSAGE);
         expect(fake.said.map((one) => one.installedAppId)).toEqual(["survival"]);
+    });
+
+    it("is nobody under a sign-ins link who joined from where the account is not signed in", async () => {
+        fake.connections = [];
+        fake.links = fake.links.map((link) =>
+            link.userId === ANA ? { ...link, followSignIns: true } : link
+        );
+        fake.signedInFrom = { [ANA]: ["198.51.100.4"] };
+        await relay.relayChatToMinecraft(MESSAGE);
+        expect(fake.said).toEqual([]);
+        fake.signedInFrom = {};
+        await relay.relayChatToMinecraft(MESSAGE);
+        expect(fake.said).toEqual([]);
+    });
+
+    it("is nobody under a sign-ins link whose join address the log no longer carries", async () => {
+        fake.connections = [];
+        fake.links = fake.links.map((link) =>
+            link.userId === ANA ? { ...link, followSignIns: true } : link
+        );
+        fake.joinLog = "";
+        await relay.relayChatToMinecraft(MESSAGE);
+        expect(fake.said).toEqual([]);
     });
 
     it("is the linked player on a server the account owns, whatever it connected", async () => {
