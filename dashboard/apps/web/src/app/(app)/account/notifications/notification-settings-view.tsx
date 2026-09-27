@@ -13,7 +13,11 @@
 
 import { DeliveryLog } from "./delivery-log";
 import { DestinationsCard } from "./destinations-card";
-import { saveNotificationRuleAction, saveSoundVolumeAction, setMessagesInGameAction } from "./actions";
+import {
+    saveNotificationRuleAction,
+    saveSoundVolumeAction,
+    setMessagesInGameAction
+} from "./actions";
 import { DEFAULT_SOUND_VOLUME } from "@/lib/notifications/sound-volume";
 import {
     useCallback,
@@ -27,7 +31,12 @@ import type { DeliveryView } from "@/lib/notification-service";
 import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import type { DestinationView } from "@/lib/notifications/destinations";
 import { drawFavicon } from "@/lib/favicon";
-import { mayNotify, noticeStanding, notifyDesktop, type NoticeStanding } from "@/lib/desktop-notify";
+import {
+    mayNotify,
+    noticeStanding,
+    notifyDesktop,
+    type NoticeStanding
+} from "@/lib/desktop-notify";
 import {
     NOTICE_KINDS,
     NOTICE_LABEL,
@@ -87,7 +96,9 @@ export function NotificationSettingsView({
     /** Whether Chat messages are shown inside a game, or null where no app can. */
     messagesInGame?: boolean | null;
 }) {
-    const [state, setState] = useState(() => new Map(rules.map((entry) => [entry.event, entry.rule])));
+    const [state, setState] = useState(
+        () => new Map(rules.map((entry) => [entry.event, entry.rule]))
+    );
     const [error, setError] = useState<string | null>(null);
     const [, startSaving] = useTransition();
 
@@ -133,7 +144,10 @@ export function NotificationSettingsView({
                 />
             ))}
 
-            <DestinationsCard destinations={destinations} smsReady={senders.some((s) => s.status === "connected")} />
+            <DestinationsCard
+                destinations={destinations}
+                smsReady={senders.some((s) => s.status === "connected")}
+            />
             <DeliveryLog deliveries={deliveries} />
         </div>
     );
@@ -172,8 +186,8 @@ function InGameCard({ initial }: { initial: boolean }) {
                     <div className="min-w-0">
                         <p className="text-sm font-medium">Messages in Minecraft</p>
                         <p className="text-xs text-muted-foreground">
-                            While you play on a server here, your Chat messages also appear in
-                            its game chat. Only you see them.
+                            While you play on a server here, your Chat messages also appear in its
+                            game chat. Only you see them.
                         </p>
                     </div>
                     <Switch
@@ -211,8 +225,12 @@ function InGameCard({ initial }: { initial: boolean }) {
 function BrowserNoticesCard() {
     const [standing, setStanding] = useState<NoticeStanding>("unsupported");
     const [asking, setAsking] = useState(false);
-    const [kinds, setKinds] = useState<Record<NoticeKind, boolean>>(() =>
-        Object.fromEntries(NOTICE_KINDS.map((kind) => [kind, true])) as Record<NoticeKind, boolean>
+    const [kinds, setKinds] = useState<Record<NoticeKind, boolean>>(
+        () =>
+            Object.fromEntries(NOTICE_KINDS.map((kind) => [kind, true])) as Record<
+                NoticeKind,
+                boolean
+            >
     );
     const [shown, setShown] = useState<string | null>(null);
 
@@ -227,8 +245,7 @@ function BrowserNoticesCard() {
     const said: Record<NoticeStanding, string> = {
         app: "The Polaris app draws these itself. Nothing to allow.",
         granted: "Polaris can tell you about these while you are on another tab.",
-        denied:
-            "This browser is blocking them. Allow notifications for this site in its settings to turn them back on.",
+        denied: "This browser is blocking them. Allow notifications for this site in its settings to turn them back on.",
         askable: "Let Polaris tell you about a call or a message while you are on another tab.",
         unsupported: "This browser cannot show them."
     };
@@ -308,7 +325,10 @@ function BrowserNoticesCard() {
 
                 <div className="flex flex-col divide-y divide-border rounded-md border border-border">
                     {NOTICE_KINDS.map((kind) => (
-                        <div key={kind} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <div
+                            key={kind}
+                            className="flex items-center justify-between gap-3 px-3 py-2"
+                        >
                             <div className="min-w-0">
                                 <p className={cn("text-sm", !working && "text-muted-foreground")}>
                                     {NOTICE_LABEL[kind].title}
@@ -583,7 +603,9 @@ function EventGroup({
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <p className="text-sm font-medium">{entry.label}</p>
-                                        <p className="text-xs text-muted-foreground">{entry.description}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {entry.description}
+                                        </p>
                                     </div>
                                     {isMuted(rule) ? <Badge>Muted</Badge> : null}
                                 </div>
@@ -621,7 +643,9 @@ function RuleChips({
         const on = rule.destinations.includes(id);
         onChange(eventId, {
             ...rule,
-            destinations: on ? rule.destinations.filter((entry) => entry !== id) : [...rule.destinations, id]
+            destinations: on
+                ? rule.destinations.filter((entry) => entry !== id)
+                : [...rule.destinations, id]
         });
     }
 
@@ -650,7 +674,11 @@ function RuleChips({
                     label={destination.name}
                     on={rule.destinations.includes(destination.id)}
                     disabled={!destination.enabled}
-                    title={destination.enabled ? destination.targetHint : "This destination is switched off"}
+                    title={
+                        destination.enabled
+                            ? destination.targetHint
+                            : "This destination is switched off"
+                    }
                     onClick={() => toggleDestination(destination.id)}
                 />
             ))}

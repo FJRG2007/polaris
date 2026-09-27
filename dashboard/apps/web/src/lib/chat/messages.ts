@@ -511,7 +511,9 @@ export async function send(
     // Loaded when it runs, so a Polaris with no game running pays nothing for it.
     void import("./game-relay")
         .then((relay) => relay.relayToGames(id))
-        .catch((error: unknown) => console.error("polaris: a message could not be relayed:", error));
+        .catch((error: unknown) =>
+            console.error("polaris: a message could not be relayed:", error)
+        );
 
     return id;
 }

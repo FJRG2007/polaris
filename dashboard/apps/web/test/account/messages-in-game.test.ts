@@ -39,7 +39,10 @@ describe("messages in the game", () => {
     });
 
     it("is off for every account until it is turned on", () => {
-        const schema = readFileSync(join(__dirname, "../../../../packages/db/prisma/schema.prisma"), "utf8");
+        const schema = readFileSync(
+            join(__dirname, "../../../../packages/db/prisma/schema.prisma"),
+            "utf8"
+        );
         expect(schema).toMatch(/messagesInGame Boolean @default\(false\)/);
     });
 });

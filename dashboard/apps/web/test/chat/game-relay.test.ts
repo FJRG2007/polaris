@@ -51,12 +51,19 @@ vi.mock("@polaris/db", () => ({
                 fake.asked.push(query);
                 if (query.select.user) {
                     fake.namesRead += 1;
-                    return fake.members.map((member) => ({ userId: member.userId, user: { name: member.name } }));
+                    return fake.members.map((member) => ({
+                        userId: member.userId,
+                        user: { name: member.name }
+                    }));
                 }
                 const only = query.where.userId?.in;
                 if (only) return fake.members.filter((member) => only.includes(member.userId));
                 return fake.members
-                    .filter((member) => member.userId !== query.where.userId?.not && fake.optedIn.has(member.userId))
+                    .filter(
+                        (member) =>
+                            member.userId !== query.where.userId?.not &&
+                            fake.optedIn.has(member.userId)
+                    )
                     .map((member) => ({ userId: member.userId }));
             }
         },
@@ -64,7 +71,9 @@ vi.mock("@polaris/db", () => ({
             findUnique: async () => ({ name: "Carla" }),
             findMany: async (query: { where: { id: { not: string } } }) => {
                 fake.asked.push(query);
-                return [...fake.optedIn].filter((id) => id !== query.where.id.not).map((id) => ({ id }));
+                return [...fake.optedIn]
+                    .filter((id) => id !== query.where.id.not)
+                    .map((id) => ({ id }));
             }
         }
     }
@@ -128,8 +137,20 @@ describe("relaying a message into a game", () => {
     it("reaches every reader who turned it on, as their side of the conversation reads", async () => {
         await relayToGames("m1");
         expect(fake.relayed).toEqual([
-            { userId: ANA, author: "Carla", conversation: "Carla, Ben", inChannel: false, text: "see you at spawn" },
-            { userId: BEN, author: "Carla", conversation: "Carla, Ana", inChannel: false, text: "see you at spawn" }
+            {
+                userId: ANA,
+                author: "Carla",
+                conversation: "Carla, Ben",
+                inChannel: false,
+                text: "see you at spawn"
+            },
+            {
+                userId: BEN,
+                author: "Carla",
+                conversation: "Carla, Ana",
+                inChannel: false,
+                text: "see you at spawn"
+            }
         ]);
     });
 

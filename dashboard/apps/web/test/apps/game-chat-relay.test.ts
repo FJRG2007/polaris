@@ -30,7 +30,9 @@ vi.mock("@polaris/db", () => ({
         },
         installedApp: {
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
-                fake.installs.filter((install) => where.id.in.includes(install.id) && install.status !== "removed")
+                fake.installs.filter(
+                    (install) => where.id.in.includes(install.id) && install.status !== "removed"
+                )
         },
         userConnection: {
             findMany: async ({ where }: { where: { userId: string; provider: string } }) =>
@@ -40,13 +42,19 @@ vi.mock("@polaris/db", () => ({
         },
         gamePlayerSession: {
             findMany: async ({ where }: { where: { installedAppId: { in: string[] } } }) =>
-                fake.sessions.filter((visit) => where.installedAppId.in.includes(visit.installedAppId))
+                fake.sessions.filter((visit) =>
+                    where.installedAppId.in.includes(visit.installedAppId)
+                )
         }
     }
 }));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     editionOf: (catalogId: string) => (catalogId === "minecraft-bedrock" ? "bedrock" : "java"),
-    withServerContainer: async (_owner: string, installedAppId: string, work: (server: unknown) => unknown) => {
+    withServerContainer: async (
+        _owner: string,
+        installedAppId: string,
+        work: (server: unknown) => unknown
+    ) => {
         if (fake.failing.has(installedAppId)) throw new Error("the server is not answering");
         return work({
             running: true,
@@ -60,7 +68,13 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
 
 const relay = await import("@polaris-app/game-servers/src/lib/minecraft/chat-relay");
 
-const MESSAGE = { userId: ANA, author: "Carla", conversation: "Carla", inChannel: false, text: "see you at spawn" };
+const MESSAGE = {
+    userId: ANA,
+    author: "Carla",
+    conversation: "Carla",
+    inChannel: false,
+    text: "see you at spawn"
+};
 
 beforeEach(() => {
     fake.links = [
@@ -93,12 +107,17 @@ describe("the line a player is shown", () => {
     });
 
     it("names the conversation when it is not the author's own", () => {
-        const line = relay.relayCommand("Ana_MC", { ...MESSAGE, conversation: "builders", inChannel: true });
+        const line = relay.relayCommand("Ana_MC", {
+            ...MESSAGE,
+            conversation: "builders",
+            inChannel: true
+        });
         expect(line).toContain('" in #builders"');
     });
 
     it("cannot be restyled, clicked or broken out of by what is written", () => {
-        const hostile = '\u00a74red &l bold "},{"text":"x","clickEvent":{"action":"run_command","value":"/op me"}}\nsecond';
+        const hostile =
+            '\u00a74red &l bold "},{"text":"x","clickEvent":{"action":"run_command","value":"/op me"}}\nsecond';
         const line = relay.relayCommand("Ana_MC", { ...MESSAGE, text: hostile })!;
         const runs = JSON.parse(line.slice("tellraw Ana_MC ".length)) as Record<string, unknown>[];
         // Still one run for the words, holding them literally, with nothing but text in it.
@@ -125,7 +144,10 @@ describe("who it is shown to", () => {
     });
 
     it("is nobody for an account that no operator linked", async () => {
-        await relay.relayChatToMinecraft({ ...MESSAGE, userId: "33333333-3333-4333-8333-333333333333" });
+        await relay.relayChatToMinecraft({
+            ...MESSAGE,
+            userId: "33333333-3333-4333-8333-333333333333"
+        });
         expect(fake.said).toEqual([]);
     });
 

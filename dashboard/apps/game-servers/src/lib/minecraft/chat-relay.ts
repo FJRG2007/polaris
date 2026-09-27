@@ -47,7 +47,10 @@ const MOST_TEXT = 200;
 
 /** The game's formatting character and anything that is not a printable line. */
 function literal(value: string, max: number): string {
-    const clean = value.replace(/\u00a7/g, "").replace(/[\u0000-\u001f\u007f]+/g, " ").trim();
+    const clean = value
+        .replace(/\u00a7/g, "")
+        .replace(/[\u0000-\u001f\u007f]+/g, " ")
+        .trim();
     return clean.length > max ? `${clean.slice(0, max - 3).trimEnd()}...` : clean;
 }
 
@@ -55,7 +58,10 @@ function literal(value: string, max: number): string {
  * The `tellraw` that shows one message to one player, or null when the player's
  * name cannot be written as a target. Everything but the tag is plain text.
  */
-export function relayCommand(player: string, message: Omit<ChatRelayInput, "userId">): string | null {
+export function relayCommand(
+    player: string,
+    message: Omit<ChatRelayInput, "userId">
+): string | null {
     const target = playerSelector(player);
     if (!target) return null;
     const author = literal(message.author, 48) || "Somebody";
@@ -99,7 +105,8 @@ export async function relayTargets(
     });
     const java = installs.filter(
         (install) =>
-            gameOfServer(install.catalogId)?.id === "minecraft" && editionOf(install.catalogId) === "java"
+            gameOfServer(install.catalogId)?.id === "minecraft" &&
+            editionOf(install.catalogId) === "java"
     );
     if (java.length === 0) return [];
 

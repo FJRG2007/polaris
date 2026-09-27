@@ -163,7 +163,10 @@ async function interrupts(
     if (core.muteInForce(reader)) return false;
     const level = (await notifyLevels(reader.userId, [channelId])).get(channelId) ?? "all";
     if (level === "none") return false;
-    if (level === "mentions" && !mentionsReader(body, reader.userId, await readerTeams(reader.userId))) {
+    if (
+        level === "mentions" &&
+        !mentionsReader(body, reader.userId, await readerTeams(reader.userId))
+    ) {
         return false;
     }
     return !(await blockedBy(reader.userId, [authorId])).has(authorId);

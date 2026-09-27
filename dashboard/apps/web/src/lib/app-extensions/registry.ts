@@ -23,7 +23,14 @@ import type {
     RelayedChatMessage
 } from "./types";
 
-export type { AppExtension, AppJob, AppSlot, ExtensionInstall, GameServerSummary, RelayedChatMessage };
+export type {
+    AppExtension,
+    AppJob,
+    AppSlot,
+    ExtensionInstall,
+    GameServerSummary,
+    RelayedChatMessage
+};
 
 function extensions(): readonly AppExtension[] {
     return installedExtensions();
@@ -189,7 +196,9 @@ export async function relaysChatToGames(): Promise<boolean> {
 /** What hands one message to every app that can show it in a game, resolved
  *  once however many readers it goes to, or null when no installed app can. One
  *  app failing does not stop another, and none of them can fail the message. */
-export async function chatRelayer(): Promise<((message: RelayedChatMessage) => Promise<void>) | null> {
+export async function chatRelayer(): Promise<
+    ((message: RelayedChatMessage) => Promise<void>) | null
+> {
     const relays = await chatRelays();
     if (relays.length === 0) return null;
     return async (message) => {

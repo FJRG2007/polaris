@@ -143,7 +143,10 @@ export function conversationName(
     channel: {
         readonly spaceId: string | null;
         readonly name: string;
-        readonly members: readonly { readonly userId: string; readonly user: { readonly name: string } }[];
+        readonly members: readonly {
+            readonly userId: string;
+            readonly user: { readonly name: string };
+        }[];
     },
     readerId: string
 ): string {
