@@ -23,6 +23,7 @@
  */
 
 import type { MinecraftEdition } from "./service";
+import { LEVEL_RANKING, RANKINGS, STATS_RANKINGS } from "./rankings";
 
 /** The variable that becomes a line a player on the side panel. */
 export const LEVELS_VARIABLE = "server.levels";
@@ -31,13 +32,7 @@ export const LEVELS_VARIABLE = "server.levels";
 export const DEATH_VARIABLES: readonly string[] = ["death.player", "death.message"];
 
 /** The leaderboards: level from who is on, the rest from the game's figures. */
-export const RANK_VARIABLES: readonly string[] = [
-    "rank.level",
-    "rank.deaths",
-    "rank.kills",
-    "rank.pvp",
-    "rank.playtime"
-];
+export const RANK_VARIABLES: readonly string[] = [LEVEL_RANKING, ...STATS_RANKINGS];
 
 /** Every variable filled in by asking the server beyond who is on. */
 export const SERVER_READ_VARIABLES: readonly string[] = [
@@ -170,38 +165,16 @@ export const VARIABLES: readonly VariableSpec[] = [
         bedrock: false,
         width: 32
     },
-    {
-        name: "rank.deaths",
-        label: "Most deaths",
-        kind: "server",
-        sample: "1. Steve 42, 2. Alex 30",
-        bedrock: false,
-        width: 32
-    },
-    {
-        name: "rank.kills",
-        label: "Most mobs killed",
-        kind: "server",
-        sample: "1. Alex 812, 2. Steve 640",
-        bedrock: false,
-        width: 32
-    },
-    {
-        name: "rank.pvp",
-        label: "Most players killed",
-        kind: "server",
-        sample: "1. Alex 9, 2. Steve 4",
-        bedrock: false,
-        width: 32
-    },
-    {
-        name: "rank.playtime",
-        label: "Most time played",
-        kind: "server",
-        sample: "1. Steve 120h, 2. Alex 86h",
-        bedrock: false,
-        width: 32
-    },
+    ...STATS_RANKINGS.map(
+        (name): VariableSpec => ({
+            name,
+            label: RANKINGS[name].label,
+            kind: "server",
+            sample: RANKINGS[name].sample.join(", "),
+            bedrock: false,
+            width: 32
+        })
+    ),
     {
         name: "death.player",
         label: "Who died last",

@@ -15,10 +15,10 @@
 
 import * as world from "./world";
 import { host } from "@polaris/app-host";
-import type { PlayerFigures } from "./rankings";
 import { miningFigures, type MiningFigures } from "./xray";
 import { withServerContainer, type ServerContainer } from "./service";
 import { readPlayerStats, type PlayerStats } from "../games-activity";
+import { addTallies, readTallies, type PlayerFigures, type PlayerTallies } from "./rankings";
 import { listContainerDir, readContainerFile, readContainerFiles } from "../container-files";
 
 const { listEnvVars } = host.envVarService;
@@ -188,8 +188,8 @@ const FIGURES_TTL_MS = 60_000;
 
 const figuresRead = new Map<string, { at: number; value: Promise<PlayerFigures[]> }>();
 
-/** Playtime, deaths and kills for every player the world has figures for, for
- *  the rankings; read at most once a minute per server. */
+/** Playtime, deaths, kills and the rest of the rankings' counters for every
+ *  player the world has figures for; read at most once a minute per server. */
 export async function readAllPlayerStats(
     ownerId: string,
     installedAppId: string
@@ -198,18 +198,24 @@ export async function readAllPlayerStats(
     if (held && Date.now() - held.at < FIGURES_TTL_MS) return held.value;
     // A player filed under two uuids is one row with the time of both.
     const value = readAllStatsFiles(ownerId, installedAppId).then((files) => {
-        const byName = new Map<string, { name: string; all: PlayerStats[] }>();
+        const byName = new Map<
+            string,
+            { name: string; all: PlayerStats[]; tallies: PlayerTallies[] }
+        >();
         for (const file of files) {
             const stats = readPlayerStats(file.json);
             if (!stats) continue;
             const key = file.name.toLowerCase();
-            const held = byName.get(key) ?? { name: file.name, all: [] };
+            const held = byName.get(key) ?? { name: file.name, all: [], tallies: [] };
             held.all.push(stats);
+            const tallies = readTallies(file.json);
+            if (tallies) held.tallies.push(tallies);
             byName.set(key, held);
         }
         return [...byName.values()].flatMap((one) => {
             const stats = addStats(one.all);
-            return stats ? [{ name: one.name, stats }] : [];
+            const tallies = addTallies(one.tallies);
+            return stats ? [{ name: one.name, stats, ...(tallies ? { tallies } : {}) }] : [];
         });
     });
     figuresRead.set(installedAppId, { at: Date.now(), value });
