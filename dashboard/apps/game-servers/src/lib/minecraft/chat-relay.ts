@@ -9,6 +9,10 @@
  *   account on that server (`GamePlayerLink`), and nothing looser. A name typed
  *   into a profile is a claim, and the words of somebody's messages are not
  *   something to hand to whoever happens to be called that.
+ * - **And the account agrees**: an operator can tie any name to any account, so
+ *   the link alone is only the operator's word. It counts where the account
+ *   says the same - the name is the Minecraft account it connected, proved or
+ *   typed - or where the server is the account's own.
  * - **Whether they are on** is the open visits the activity sweep already keeps
  *   (`GamePlayerSession`), so a message costs no question to any server that
  *   nobody linked to this account is playing on. A visit can be up to a minute
@@ -80,6 +84,11 @@ export async function relayTargets(
         select: { installedAppId: true, player: true }
     });
     if (links.length === 0) return [];
+    const connected = await prisma.userConnection.findMany({
+        where: { userId, provider: "minecraft" },
+        select: { label: true }
+    });
+    const ownNames = new Set(connected.map((connection) => connection.label.toLowerCase()));
 
     const installs = await prisma.installedApp.findMany({
         where: {
@@ -103,6 +112,7 @@ export async function relayTargets(
     for (const link of links) {
         const ownerId = owners.get(link.installedAppId);
         if (!ownerId) continue;
+        if (ownerId !== userId && !ownNames.has(link.player.toLowerCase())) continue;
         const on = open.find(
             (visit) =>
                 visit.installedAppId === link.installedAppId &&

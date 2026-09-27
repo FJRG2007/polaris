@@ -186,14 +186,19 @@ export async function relaysChatToGames(): Promise<boolean> {
     return (await chatRelays()).length > 0;
 }
 
-/** Hand one message to every app that can show it in a game. One app failing
- *  does not stop another, and none of them can fail the message. */
-export async function relayChatMessage(message: RelayedChatMessage): Promise<void> {
-    for (const extension of await chatRelays()) {
-        await extension.relayChatMessage?.(message).catch((caught: unknown) => {
-            console.error("polaris: a message could not be shown in a game:", caught);
-        });
-    }
+/** What hands one message to every app that can show it in a game, resolved
+ *  once however many readers it goes to, or null when no installed app can. One
+ *  app failing does not stop another, and none of them can fail the message. */
+export async function chatRelayer(): Promise<((message: RelayedChatMessage) => Promise<void>) | null> {
+    const relays = await chatRelays();
+    if (relays.length === 0) return null;
+    return async (message) => {
+        for (const extension of relays) {
+            await extension.relayChatMessage?.(message).catch((caught: unknown) => {
+                console.error("polaris: a message could not be shown in a game:", caught);
+            });
+        }
+    };
 }
 
 /** Whether this account reaches an app it holds no permission for. */

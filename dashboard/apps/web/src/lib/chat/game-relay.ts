@@ -19,10 +19,11 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
+import { chatRelayer } from "@/lib/app-extensions/registry";
 import { conversationName, describeFiles } from "./toasts";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
+import { messageable, reachableChannelIds } from "./access";
 import { mentionsReader, notifyLevels, readerTeams } from "./notify";
-import { relayChatMessage, relaysChatToGames } from "@/lib/app-extensions/registry";
 
 /** How much of a message goes into the game: a line of chat, not an essay. */
 export const RELAY_EXCERPT = 200;
@@ -32,13 +33,18 @@ export const RELAY_EXCERPT = 200;
  *  a whole server's worth of traffic. */
 const MOST_READERS = 50;
 
+/** The most accounts that turned it on looked at for one channel message, most
+ *  of whom will not be reading that channel at all. */
+const MOST_CANDIDATES = 200;
+
 /**
  * Show a message that has just been sent to whoever asked to see their messages
  * in a game. Resolves when every relay has been attempted; failures are logged
  * and swallowed.
  */
 export async function relayToGames(messageId: string): Promise<void> {
-    if (!(await relaysChatToGames())) return;
+    const relay = await chatRelayer();
+    if (!relay) return;
 
     const message = await prisma.chatMessage.findUnique({
         where: { id: messageId },
@@ -52,44 +58,95 @@ export async function relayToGames(messageId: string): Promise<void> {
                 orderBy: { createdAt: "asc" },
                 select: { id: true, name: true, contentType: true, posterPath: true, spoiler: true }
             },
-            channel: {
-                select: {
-                    spaceId: true,
-                    name: true,
-                    members: { select: { userId: true, user: { select: { name: true } } } }
-                }
-            }
+            channel: { select: { spaceId: true, name: true } }
         }
     });
     if (!message || message.deletedAt || !message.authorId) return;
     const authorId = message.authorId;
+    const { channelId, channel } = message;
 
-    // Only the members who turned it on are looked at at all - which is nearly
-    // always nobody, and then this costs one query.
-    const readers = await prisma.chatChannelMember.findMany({
-        where: {
-            channelId: message.channelId,
-            userId: { not: authorId },
-            user: { messagesInGame: true }
-        },
-        select: { userId: true, muted: true, mutedUntil: true },
-        take: MOST_READERS
-    });
+    const readers = await readersOf(channelId, channel.spaceId, authorId);
     if (readers.length === 0) return;
 
-    const author = await prisma.user.findUnique({ where: { id: authorId }, select: { name: true } });
+    // A channel is called by its name; only a direct message or a group needs
+    // the people in it, and only once somebody is going to be shown it.
+    const [author, members] = await Promise.all([
+        prisma.user.findUnique({ where: { id: authorId }, select: { name: true } }),
+        channel.spaceId
+            ? []
+            : prisma.chatChannelMember.findMany({
+                  where: { channelId },
+                  select: { userId: true, user: { select: { name: true } } }
+              })
+    ]);
     const text = plainExcerpt(message.body, RELAY_EXCERPT) || describeFiles(message.attachments);
 
+    let relayed = 0;
     for (const reader of readers) {
-        if (!(await interrupts(reader, message.channelId, authorId, message.body))) continue;
-        await relayChatMessage({
+        if (relayed >= MOST_READERS) break;
+        if (!(await interrupts(reader, channelId, authorId, message.body))) continue;
+        relayed += 1;
+        await relay({
             userId: reader.userId,
             author: author?.name || "Somebody",
-            conversation: conversationName(message.channel, reader.userId),
-            inChannel: message.channel.spaceId !== null,
+            conversation: conversationName({ ...channel, members }, reader.userId),
+            inChannel: channel.spaceId !== null,
             text
         });
     }
+}
+
+/**
+ * The accounts that turned it on and can read this conversation now, as the
+ * corner note decides that: the same reach, and the same `chat.use`.
+ *
+ * A direct message or a group is read only by its members, so they are the
+ * whole list. A channel in a space is also read by everybody who reaches the
+ * space or was handed the room, with no row of their own on it, so it starts
+ * from the accounts that turned it on instead.
+ */
+async function readersOf(
+    channelId: string,
+    spaceId: string | null,
+    authorId: string
+): Promise<{ userId: string; muted: boolean; mutedUntil: Date | null }[]> {
+    const candidates = spaceId
+        ? (
+              await prisma.user.findMany({
+                  where: { messagesInGame: true, id: { not: authorId } },
+                  select: { id: true },
+                  orderBy: { id: "asc" },
+                  take: MOST_CANDIDATES
+              })
+          ).map((user) => user.id)
+        : (
+              await prisma.chatChannelMember.findMany({
+                  where: { channelId, userId: { not: authorId }, user: { messagesInGame: true } },
+                  select: { userId: true },
+                  take: MOST_CANDIDATES
+              })
+          ).map((member) => member.userId);
+    if (candidates.length === 0) return [];
+
+    const allowed = await messageable(candidates);
+    const reading: string[] = [];
+    for (const userId of candidates) {
+        if (allowed.has(userId) && (await reachableChannelIds({ id: userId })).has(channelId)) {
+            reading.push(userId);
+        }
+    }
+    if (reading.length === 0) return [];
+
+    const rows = await prisma.chatChannelMember.findMany({
+        where: { channelId, userId: { in: reading } },
+        select: { userId: true, muted: true, mutedUntil: true }
+    });
+    const muting = new Map(rows.map((row) => [row.userId, row]));
+    return reading.map((userId) => ({
+        userId,
+        muted: muting.get(userId)?.muted ?? false,
+        mutedUntil: muting.get(userId)?.mutedUntil ?? null
+    }));
 }
 
 /**

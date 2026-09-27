@@ -1,9 +1,10 @@
 /**
  * A Chat message shown to one player in a Minecraft server's chat.
  *
- * What is pinned: only a player an operator linked to the account, and only on a
- * Java server where they are on right now, gets it - nobody else, and no other
- * server; it is a `tellraw` to that one player; the words are sent as written,
+ * What is pinned: only a player an operator linked to the account, and that the
+ * account itself says is theirs (its connected Minecraft name, or a server it
+ * owns), and only on a Java server where they are on right now, gets it - nobody
+ * else, and no other server; it is a `tellraw` to that one player; the words are sent as written,
  * so nothing in a message can restyle it, add a click action or break out of the
  * command; and one server refusing does not stop the next.
  */
@@ -16,6 +17,7 @@ const fake = vi.hoisted(() => ({
     links: [] as { installedAppId: string; player: string; userId: string }[],
     installs: [] as { id: string; ownerId: string; catalogId: string; status: string }[],
     sessions: [] as { installedAppId: string; name: string }[],
+    connections: [] as { userId: string; label: string }[],
     said: [] as { installedAppId: string; line: string }[],
     failing: new Set<string>()
 }));
@@ -29,6 +31,12 @@ vi.mock("@polaris/db", () => ({
         installedApp: {
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
                 fake.installs.filter((install) => where.id.in.includes(install.id) && install.status !== "removed")
+        },
+        userConnection: {
+            findMany: async ({ where }: { where: { userId: string; provider: string } }) =>
+                where.provider === "minecraft"
+                    ? fake.connections.filter((connection) => connection.userId === where.userId)
+                    : []
         },
         gamePlayerSession: {
             findMany: async ({ where }: { where: { installedAppId: { in: string[] } } }) =>
@@ -71,6 +79,7 @@ beforeEach(() => {
         { installedAppId: "survival", name: "ben_mc" },
         { installedAppId: "bedrock", name: "ana_mc" }
     ];
+    fake.connections = [{ userId: ANA, label: "Ana_MC" }];
     fake.said = [];
     fake.failing = new Set();
 });
@@ -118,6 +127,21 @@ describe("who it is shown to", () => {
     it("is nobody for an account that no operator linked", async () => {
         await relay.relayChatToMinecraft({ ...MESSAGE, userId: "33333333-3333-4333-8333-333333333333" });
         expect(fake.said).toEqual([]);
+    });
+
+    it("is nobody for a player an operator linked to an account that never said the name is theirs", async () => {
+        fake.connections = [{ userId: ANA, label: "someone_else" }];
+        await relay.relayChatToMinecraft(MESSAGE);
+        expect(fake.said).toEqual([]);
+    });
+
+    it("is the linked player on a server the account owns, whatever it connected", async () => {
+        fake.connections = [];
+        fake.installs = fake.installs.map((install) =>
+            install.id === "survival" ? { ...install, ownerId: ANA } : install
+        );
+        await relay.relayChatToMinecraft(MESSAGE);
+        expect(fake.said.map((one) => one.installedAppId)).toEqual(["survival"]);
     });
 
     it("carries on to the next server when one will not take it", async () => {

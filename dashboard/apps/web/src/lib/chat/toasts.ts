@@ -137,7 +137,6 @@ export function describeFiles(files: readonly ToastFile[]): string {
     return `Sent ${first.name}`;
 }
 
-/** The picture to show for these files, when the first one has one to show. */
 /** What a conversation is called from one reader's side: a channel's name, or
  *  whoever else is in the direct message or group. */
 export function conversationName(
@@ -155,6 +154,7 @@ export function conversationName(
     return channel.name || others.join(", ") || "Direct message";
 }
 
+/** The picture to show for these files, when the first one has one to show. */
 export function previewOf(files: readonly ToastFile[]): MessageToastMedia | null {
     const [first] = files;
     if (!first || first.spoiler) return null;
