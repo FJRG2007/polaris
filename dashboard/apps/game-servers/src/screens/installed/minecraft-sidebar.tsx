@@ -14,13 +14,14 @@
 
 import * as mc from "../../lib/minecraft/motd";
 import { McLine } from "../../components/mc-text";
-import { GripVertical, Loader2, Plus, Trash2, Trophy } from "lucide-react";
-import { SIDEBAR_BLOCKS, withBlock, withRotatingBlocks } from "../../lib/minecraft/sidebar-blocks";
+import { insertsFor } from "./minecraft-announce";
 import { SidebarLineEditor } from "./sidebar-line-editor";
+import { previewText } from "../../lib/minecraft/text-vars";
 import { renderSidebar } from "../../lib/minecraft/sidebar-render";
 import { moved, useListOrder } from "../../components/use-list-order";
-import { previewText } from "../../lib/minecraft/text-vars";
-import { insertsFor } from "./minecraft-announce";
+import { WholeNumberInput } from "../../components/whole-number-input";
+import { GripVertical, Loader2, Plus, Trash2, Trophy } from "lucide-react";
+import { SIDEBAR_BLOCKS, withBlock, withRotatingBlocks } from "../../lib/minecraft/sidebar-blocks";
 import {
     Button,
     Card,
@@ -36,14 +37,13 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    Input,
     Select,
     Switch,
     cn
 } from "@polaris/ui";
+import * as side from "../../lib/minecraft/sidebar";
 import { VariablesHelp } from "../../components/variables-help";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import * as side from "../../lib/minecraft/sidebar";
 import {
     readLiveDisplayAction,
     saveLiveDisplayAction,
@@ -422,23 +422,11 @@ export function MinecraftSidebar({
                         </ul>
                         <label className="flex items-center gap-2 text-sm">
                             Each for
-                            <Input
-                                type="number"
-                                inputMode="numeric"
+                            <WholeNumberInput
                                 min={side.SIDEBAR_EVERY_MIN}
                                 max={side.SIDEBAR_EVERY_MAX}
                                 value={rotating.every}
-                                onChange={(event) => {
-                                    const seconds = Math.round(Number(event.target.value));
-                                    if (!Number.isFinite(seconds)) return;
-                                    setRotating({
-                                        ...rotating,
-                                        every: Math.min(
-                                            side.SIDEBAR_EVERY_MAX,
-                                            Math.max(side.SIDEBAR_EVERY_MIN, seconds)
-                                        )
-                                    });
-                                }}
+                                onValueChange={(every) => setRotating({ ...rotating, every })}
                                 className="h-8 w-20"
                                 aria-label="Seconds each leaderboard shows"
                             />

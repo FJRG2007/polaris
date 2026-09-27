@@ -12,7 +12,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const fake = vi.hoisted(() => ({
     sidebar: {} as Record<string, unknown>,
     said: [] as string[],
-    batches: [] as string[][]
+    batches: [] as string[][],
+    opened: 0,
+    closed: 0
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -39,28 +41,36 @@ vi.mock("@polaris/app-host", () => ({
         }
     }
 }));
-vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
-    editionOf: () => "java",
-    onlinePlayers: async () => null,
-    withServerContainer: async (_owner: string, _id: string, work: (server: unknown) => unknown) =>
-        work({
-            running: true,
-            edition: "java",
-            say: async (argv: string[]) => {
-                fake.said.push(argv[0] ?? "");
-            },
-            run: async (argv: string[]) => {
-                const encoded = /^printf %s (\S+) \| base64 -d \| rcon-cli$/.exec(
-                    argv[2] ?? ""
-                )?.[1];
-                if (!encoded) return { code: 1, output: "" };
-                fake.batches.push(
-                    Buffer.from(encoded, "base64").toString("utf8").trim().split("\n")
-                );
-                return { code: 0, output: "" };
-            }
-        })
-}));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => {
+    const server = {
+        running: true,
+        edition: "java",
+        say: async (argv: string[]) => {
+            fake.said.push(argv[0] ?? "");
+        },
+        sayAll: async (lines: string[]) => {
+            fake.batches.push([...lines]);
+        }
+    };
+    return {
+        editionOf: () => "java",
+        onlinePlayers: async () => null,
+        withServerContainer: async (
+            _owner: string,
+            _id: string,
+            work: (server: unknown) => unknown
+        ) => work(server),
+        openServerContainer: async () => {
+            fake.opened += 1;
+            return {
+                server,
+                close: async () => {
+                    fake.closed += 1;
+                }
+            };
+        }
+    };
+});
 
 const live = await import("@polaris-app/game-servers/src/lib/minecraft/live-display-service");
 
@@ -77,6 +87,8 @@ beforeEach(() => {
     vi.setSystemTime(1_700_000_000_000);
     fake.said = [];
     fake.batches = [];
+    fake.opened = 0;
+    fake.closed = 0;
 });
 
 afterEach(() => {
@@ -115,6 +127,31 @@ describe("a panel that moves", () => {
         // The shine moved, and the turning line turned.
         expect(fake.batches.flat().some((line) => line.includes("polaris.line.03"))).toBe(true);
         expect(fake.batches.flat().some((line) => line.includes('"Kills"'))).toBe(true);
+    });
+
+    it("keeps the server open between frames, and opens it again once a period", async () => {
+        fake.sidebar = {
+            enabled: true,
+            title: plain("Polaris"),
+            lines: [
+                {
+                    ...plain("&6Shiny line"),
+                    effect: { kind: "shine", speed: 500, colors: ["#ffffff"], width: 20 }
+                }
+            ]
+        };
+        live.startLiveDisplay("owner", "leased");
+        await vi.advanceTimersByTimeAsync(2_100);
+        await vi.advanceTimersByTimeAsync(5_000);
+        expect(fake.batches.length).toBeGreaterThan(3);
+        expect(fake.opened).toBe(1);
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(fake.opened).toBe(2);
+        expect(fake.closed).toBe(1);
+
+        fake.sidebar = { enabled: true, title: "Polaris", lines: ["Still"] };
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(fake.closed).toBe(2);
     });
 
     it("is not drawn between ticks when nothing on it moves", async () => {

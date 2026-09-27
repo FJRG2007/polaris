@@ -15,7 +15,8 @@ import { FieldNote } from "./minecraft-announce";
 import { Plus, Sparkles, Trash2 } from "lucide-react";
 import { FormattedTextField } from "../../components/formatted-text-field";
 import { EFFECT_DEFAULT_COLORS } from "../../lib/minecraft/sidebar-effects";
-import { Button, ColorPicker, Input, Select, SegmentedControl, cn } from "@polaris/ui";
+import { Button, ColorPicker, Select, SegmentedControl, cn } from "@polaris/ui";
+import { WholeNumberInput } from "../../components/whole-number-input";
 import * as side from "../../lib/minecraft/sidebar";
 
 /** What each effect is called, and what it does, in a few words. */
@@ -125,7 +126,10 @@ export function SidebarLineEditor({
             />
 
             {open ? (
-                <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+                <fieldset
+                    disabled={disabled}
+                    className="flex min-w-0 flex-col gap-3 rounded-md border border-border p-3"
+                >
                     <div className="flex flex-col gap-2">
                         <span className="text-xs font-medium">Take turns with</span>
                         {line.frames.slice(1).map((frame, offset) => {
@@ -185,24 +189,11 @@ export function SidebarLineEditor({
                             {line.frames.length > 1 ? (
                                 <label className="flex items-center gap-2 text-xs">
                                     Each for
-                                    <Input
-                                        type="number"
-                                        inputMode="numeric"
+                                    <WholeNumberInput
                                         min={side.SIDEBAR_EVERY_MIN}
                                         max={side.SIDEBAR_EVERY_MAX}
                                         value={line.every}
-                                        disabled={disabled}
-                                        onChange={(event) => {
-                                            const seconds = Math.round(Number(event.target.value));
-                                            if (!Number.isFinite(seconds)) return;
-                                            onChange({
-                                                ...line,
-                                                every: Math.min(
-                                                    side.SIDEBAR_EVERY_MAX,
-                                                    Math.max(side.SIDEBAR_EVERY_MIN, seconds)
-                                                )
-                                            });
-                                        }}
+                                        onValueChange={(every) => onChange({ ...line, every })}
                                         className="h-8 w-20"
                                         aria-label={`Seconds each text of ${label.toLowerCase()} shows`}
                                     />
@@ -264,20 +255,11 @@ export function SidebarLineEditor({
                         {line.effect.kind === "scroll" ? (
                             <label className="flex items-center gap-2 text-xs">
                                 Shows
-                                <Input
-                                    type="number"
-                                    inputMode="numeric"
+                                <WholeNumberInput
                                     min={8}
                                     max={fits}
                                     value={line.effect.width}
-                                    disabled={disabled}
-                                    onChange={(event) => {
-                                        const width = Math.round(Number(event.target.value));
-                                        if (Number.isFinite(width))
-                                            setEffect({
-                                                width: Math.min(fits, Math.max(8, width))
-                                            });
-                                    }}
+                                    onValueChange={(width) => setEffect({ width })}
                                     className="h-8 w-20"
                                     aria-label={`Characters the scrolling ${label.toLowerCase()} shows at once`}
                                 />
@@ -316,7 +298,7 @@ export function SidebarLineEditor({
                             </div>
                         ) : null}
                     </div>
-                </div>
+                </fieldset>
             ) : null}
         </div>
     );

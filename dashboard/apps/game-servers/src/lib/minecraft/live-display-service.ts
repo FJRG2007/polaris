@@ -20,7 +20,14 @@ import { host } from "@polaris/app-host";
 import { liveContext } from "./live-values";
 import { renderSidebar } from "./sidebar-render";
 import { fillValues, readsPlayerList, readsServer, variablesIn } from "./text-vars";
-import { editionOf, onlinePlayers, onlineRoster, withServerContainer } from "./service";
+import {
+    editionOf,
+    onlinePlayers,
+    onlineRoster,
+    openServerContainer,
+    withServerContainer,
+    type ServerContainer
+} from "./service";
 import { audienceNames, namedByPolaris, parseTarget, type Roster } from "./announce-target";
 import {
     ACTIONBAR_EVERY_MS,
@@ -77,7 +84,12 @@ interface Loop {
     moving: { sidebar: SidebarConfig; context: SendContext } | null;
     /** The timer that draws it, while there is one. */
     frames: ReturnType<typeof setInterval> | null;
-    framing: boolean;
+    /** The frame being drawn, which a tick waits for rather than racing it. */
+    frame: Promise<void> | null;
+    /** The server the frames are sent to, kept open while the panel moves and
+     *  opened again once a period, so a change of machine or container is
+     *  picked up. */
+    lease: { server: ServerContainer; close: () => Promise<void>; at: number } | null;
 }
 
 const loops = new Map<string, Loop>();
@@ -203,6 +215,7 @@ async function rosterFor(installedAppId: string, loop: Loop, now: number): Promi
 }
 
 async function tick(installedAppId: string, loop: Loop): Promise<void> {
+    if (loop.frame) await loop.frame;
     const version = loop.pinVersion;
     const settings = await settingsOf(installedAppId);
     if (!settings) return stopLoop(installedAppId);
@@ -356,16 +369,10 @@ function stopLoop(installedAppId: string): void {
 function startFrames(installedAppId: string, loop: Loop): void {
     if (loop.frames) return;
     loop.frames = setInterval(() => {
-        if (loop.busy || loop.framing) return;
-        loop.framing = true;
-        void drawFrame(installedAppId, loop)
-            .catch(() => {
-                // Written from scratch on the next tick.
-                loop.panel = null;
-            })
-            .finally(() => {
-                loop.framing = false;
-            });
+        if (loop.busy || loop.frame) return;
+        loop.frame = drawFrame(installedAppId, loop).finally(() => {
+            loop.frame = null;
+        });
     }, FRAME_EVERY_MS);
     loop.frames.unref?.();
 }
@@ -373,6 +380,23 @@ function startFrames(installedAppId: string, loop: Loop): void {
 function stopFrames(loop: Loop): void {
     if (loop.frames) clearInterval(loop.frames);
     loop.frames = null;
+    releaseLease(loop);
+}
+
+function releaseLease(loop: Loop): void {
+    const lease = loop.lease;
+    loop.lease = null;
+    void lease?.close().catch(() => undefined);
+}
+
+/** The server a frame is sent to, opened once a period rather than every frame. */
+async function leaseFor(installedAppId: string, loop: Loop, now: number): Promise<ServerContainer> {
+    const held = loop.lease;
+    if (held && now - held.at < PANEL_EVERY_MS) return held.server;
+    releaseLease(loop);
+    const opened = await openServerContainer(loop.ownerId, installedAppId);
+    loop.lease = { ...opened, at: now };
+    return opened.server;
 }
 
 /**
@@ -384,58 +408,27 @@ async function drawFrame(installedAppId: string, loop: Loop): Promise<void> {
     const moving = loop.moving;
     const before = loop.panel;
     if (!moving || !before) return;
+    const now = Date.now();
     const shown = renderSidebar(
         moving.sidebar,
-        Date.now(),
+        now,
         (text) => fillValues(text, moving.context.values),
         moving.context.lists ?? {}
     );
     const commands = sidebarCommands(shown.title, shown.lines, before);
     if (commands.length === 0) return;
-    const sent = await sayAll(loop.ownerId, installedAppId, commands);
-    // A tick that ran meanwhile wrote the panel itself; this frame is then stale.
+    let sent = false;
+    try {
+        const server = await leaseFor(installedAppId, loop, now);
+        if (server.running) {
+            await server.sayAll(commands);
+            sent = true;
+        }
+    } catch {
+        // Opened again, and the panel written from scratch, on the next tick.
+        releaseLease(loop);
+    }
     if (loop.panel === before) loop.panel = sent ? shown : null;
-}
-
-/** Room for one batch in a command's arguments, in base64 characters. */
-const BATCH_MAX = 12_000;
-
-/**
- * Send lines to the game as one command to the container rather than one each:
- * the console tool reads them one per line from its input. A frame that
- * changes three lines is then one round trip instead of three. False when the
- * server is not running. Falls back to one at a time if the batch is refused.
- */
-async function sayAll(
-    ownerId: string,
-    installedAppId: string,
-    lines: readonly string[]
-): Promise<boolean> {
-    if (lines.length === 0) return true;
-    return withServerContainer(ownerId, installedAppId, async (server) => {
-        if (!server.running) return false;
-        if (server.edition !== "java" || lines.some((line) => /[\r\n]/.test(line))) {
-            for (const line of lines) await server.say([line]);
-            return true;
-        }
-        const batches: string[][] = [[]];
-        for (const line of lines) {
-            const current = batches[batches.length - 1]!;
-            const size = Buffer.byteLength([...current, line].join("\n")) * 1.4;
-            if (current.length > 0 && size > BATCH_MAX) batches.push([line]);
-            else current.push(line);
-        }
-        for (const batch of batches) {
-            const encoded = Buffer.from(`${batch.join("\n")}\n`, "utf8").toString("base64");
-            const result = await server.run([
-                "sh",
-                "-c",
-                `printf %s ${encoded} | base64 -d | rcon-cli`
-            ]);
-            if (result.code !== 0) for (const line of batch) await server.say([line]);
-        }
-        return true;
-    });
 }
 
 /**
@@ -479,7 +472,8 @@ function loopFor(ownerId: string, installedAppId: string): Loop {
         roster: null,
         moving: null,
         frames: null,
-        framing: false
+        frame: null,
+        lease: null
     };
     listenForCalls();
     // A loop must never keep the process alive on its own.
