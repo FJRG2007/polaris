@@ -663,6 +663,18 @@ export function CallRoom({
                 `call-diagnosis`. */}
                 <CallDiagnosisPanel audio={call.audio} />
 
+                {call.shareStill && (
+                    <p
+                        role="status"
+                        className="shrink-0 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
+                    >
+                        What you are sharing has stopped sending new pictures, so everybody sees the
+                        last one. If it is a minimised window - a game in full screen minimises when
+                        you switch away - bring it back, run the game in a window, or share your
+                        whole screen.
+                    </p>
+                )}
+
                 {/* A microphone that opened but is picking nothing up looks exactly
                 like somebody who is not talking, and the person it is happening
                 to has no way of telling. See `no-audio-notice`.
