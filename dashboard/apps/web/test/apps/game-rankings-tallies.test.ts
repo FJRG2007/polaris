@@ -11,11 +11,14 @@
 
 import { describe, expect, it } from "vitest";
 
-const { addTallies, countText, distanceText, readTallies, statsRanking, STATS_RANKINGS } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/rankings"
+const { addTallies, countText, distanceText, readTallies, statsRanking, STATS_RANKINGS } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/rankings");
+const { VARIABLES, RANK_VARIABLES } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/text-vars"
 );
-const { VARIABLES, RANK_VARIABLES } = await import("@polaris-app/game-servers/src/lib/minecraft/text-vars");
-const { SIDEBAR_BLOCKS } = await import("@polaris-app/game-servers/src/lib/minecraft/sidebar-blocks");
+const { SIDEBAR_BLOCKS } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/sidebar-blocks"
+);
 
 const file = JSON.stringify({
     stats: {
@@ -45,7 +48,11 @@ const file = JSON.stringify({
             "minecraft:deepslate_diamond_ore": 3
         },
         "minecraft:crafted": { "minecraft:stick": 40, "minecraft:torch": 60 },
-        "minecraft:killed": { "minecraft:ender_dragon": 1, "minecraft:wither": 2, "minecraft:zombie": 50 }
+        "minecraft:killed": {
+            "minecraft:ender_dragon": 1,
+            "minecraft:wither": 2,
+            "minecraft:zombie": 50
+        }
     },
     DataVersion: 4189
 });
@@ -89,7 +96,11 @@ describe("the counters in a stats file", () => {
 
 describe("the new leaderboards", () => {
     const players = [
-        { name: "Steve", stats: { playedMs: 1, deaths: 0, mobKills: 0, playerKills: 0 }, tallies: readTallies(file)! },
+        {
+            name: "Steve",
+            stats: { playedMs: 1, deaths: 0, mobKills: 0, playerKills: 0 },
+            tallies: readTallies(file)!
+        },
         { name: "Alex", stats: { playedMs: 1, deaths: 0, mobKills: 0, playerKills: 0 } }
     ];
 
