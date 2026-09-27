@@ -8,12 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { isViewable } from "@/app/(app)/drive/viewer/kind";
-import {
-    conversationFiles,
-    openableAttachments,
-    positionOf,
-    stepFrom
-} from "@/app/(app)/mail/attachment-steps";
+import { openableAttachments, positionOf, stepFrom } from "@/app/(app)/mail/attachment-steps";
 
 const files = [
     { id: "a", name: "invoice.pdf", inline: false },
@@ -74,62 +69,13 @@ describe("the viewer the steps are drawn in", () => {
     });
 });
 
-describe("the files of a whole conversation", () => {
-    const message = (
-        id: string,
-        sentAt: string,
-        from: string,
-        attachments: { id: string; name: string; size: number; inline?: boolean }[]
-    ) => ({
-        id,
-        sentAt,
-        from: [{ name: from, address: `${from.toLowerCase()}@example.com` }],
-        attachments: attachments.map((file) => ({ inline: false, ...file }))
-    });
-
-    it("lists every file in the thread, newest first", () => {
-        const files = conversationFiles([
-            message("m1", "2026-09-01T10:00:00Z", "Ana", [
-                { id: "a", name: "contract.pdf", size: 10 }
-            ]),
-            message("m2", "2026-09-02T10:00:00Z", "Me", []),
-            message("m3", "2026-09-03T10:00:00Z", "Me", [
-                { id: "b", name: "invoice.pdf", size: 20 }
-            ])
-        ]);
-        expect(files.map((file) => [file.id, file.from, file.messageId])).toEqual([
-            ["b", "Me", "m3"],
-            ["a", "Ana", "m1"]
-        ]);
-    });
-
-    it("counts the copy in Sent and the one quoted back as one file", () => {
-        const files = conversationFiles([
-            message("sent", "2026-09-23T16:53:00Z", "Me", [
-                { id: "a", name: "Adenda.pdf", size: 900 }
-            ]),
-            message("back", "2026-09-24T05:36:00Z", "Ana", [
-                { id: "b", name: "adenda.pdf", size: 900 }
-            ])
-        ]);
-        expect(files.map((file) => file.id)).toEqual(["b"]);
-    });
-
-    it("keeps two different files that share a name", () => {
-        const files = conversationFiles([
-            message("m1", "2026-09-01T10:00:00Z", "Ana", [{ id: "a", name: "scan.pdf", size: 10 }]),
-            message("m2", "2026-09-02T10:00:00Z", "Ana", [{ id: "b", name: "scan.pdf", size: 11 }])
-        ]);
-        expect(files).toHaveLength(2);
-    });
-
-    it("leaves out the pictures a message draws itself", () => {
-        const files = conversationFiles([
-            message("m1", "2026-09-01T10:00:00Z", "Ana", [
-                { id: "logo", name: "firma.jpg", size: 5, inline: true },
-                { id: "a", name: "contract.pdf", size: 10 }
-            ])
-        ]);
-        expect(files.map((file) => file.id)).toEqual(["a"]);
+describe("where a conversation's files are shown", () => {
+    it("is under each message they came with, never gathered above the thread", async () => {
+        const { readFile } = await import("node:fs/promises");
+        const { fileURLToPath } = await import("node:url");
+        const src = fileURLToPath(new URL("../../src/", import.meta.url));
+        const thread = await readFile(`${src}app/(app)/mail/thread-view.tsx`, "utf8");
+        expect(thread).not.toContain("in this conversation");
+        expect(thread).toContain("message.attachments.filter((file) => !file.inline)");
     });
 });
