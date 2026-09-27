@@ -20,6 +20,10 @@ export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly er
 export interface NoticeInput {
     readonly title: string;
     readonly body?: string;
+    /** A field on the notice to answer in, with this placeholder: a message
+     *  answered where it arrived. The answer comes back through
+     *  `onNoticeReply`. */
+    readonly reply?: { readonly placeholder: string; };
     /** Notices sharing a tag replace each other. */
     readonly tag: string;
     /** A path on the Polaris to open when the notice is pressed. */
@@ -51,6 +55,8 @@ export interface PolarisDesktop {
     notify(input: NoticeInput): Promise<boolean>;
     /** Take back the notice with this tag. */
     closeNotice(tag: string): Promise<void>;
+    /** Hear what is written in a notice's answer field. Answers the way to stop. */
+    onNoticeReply(listener: (reply: NoticeReply) => void): () => void;
     /** A folder picked with the system's own dialog, zipped for "Upload a folder".
      *  Null when the dialog was dismissed. */
     pickFolder(): Promise<PickedFolder>;
@@ -100,8 +106,15 @@ export interface PolarisLocal {
     };
 }
 
+/** An answer written on a notice, handed back to the page that raised it. */
+export interface NoticeReply {
+    readonly tag: string;
+    readonly text: string;
+}
+
 export const CHANNELS = {
     notify: "desktop:notify",
+    noticeReply: "desktop:notice-reply",
     closeNotice: "desktop:close-notice",
     pickFolder: "desktop:pick-folder",
     pushLocal: "desktop:push-local",

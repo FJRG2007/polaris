@@ -29,6 +29,8 @@ export interface Notice {
      *  words a moment ago (see `notice-once`). */
     readonly once?: boolean;
     readonly onClick?: () => void;
+    /** A field on the notice to answer in, and what the answer is handed to. */
+    readonly reply?: { readonly placeholder: string; readonly onReply: (text: string) => void; };
 }
 
 /** Show one. Answers false where the system has no notifications. */
@@ -41,8 +43,16 @@ export function showNotice(notice: Notice): boolean {
         body: notice.body ?? "",
         silent: notice.silent ?? false,
         timeoutType: notice.insistent ? "never" : "default",
-        urgency: notice.insistent ? "critical" : "normal"
+        urgency: notice.insistent ? "critical" : "normal",
+        ...(notice.reply ? { hasReply: true, replyPlaceholder: notice.reply.placeholder } : {})
     });
+    if (notice.reply) {
+        const { onReply } = notice.reply;
+        shown.on("reply", (_event, text) => {
+            onReply(text);
+            closeNotice(notice.tag);
+        });
+    }
     shown.on("click", () => {
         notice.onClick?.();
         closeNotice(notice.tag);

@@ -30,7 +30,8 @@ const noticeSchema = z.object({
     tag: z.string().min(1).max(200),
     href: z.string().max(2048).optional(),
     insistent: z.boolean().optional(),
-    sound: z.boolean().optional()
+    sound: z.boolean().optional(),
+    reply: z.object({ placeholder: z.string().trim().min(1).max(120) }).optional()
 });
 
 const windowSchema = z.object({
@@ -78,6 +79,20 @@ export function registerIpc(host: IpcHost): void {
             // An alert from the dashboard's feed - a finished deploy - may already
             // have been announced by the push window that started it.
             once: input.data.tag.startsWith("notification:"),
+            // Handed back to the page that raised the notice, which is the one
+            // that knows where the answer goes.
+            ...(input.data.reply
+                ? {
+                      reply: {
+                          placeholder: input.data.reply.placeholder,
+                          onReply: (text: string) => {
+                              if (!event.sender.isDestroyed()) {
+                                  event.sender.send(CHANNELS.noticeReply, { tag: input.data.tag, text });
+                              }
+                          }
+                      }
+                  }
+                : {}),
             onClick: () => {
                 const origin = host.server();
                 const url = href && origin ? serverPath(href, origin) : null;

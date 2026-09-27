@@ -224,6 +224,46 @@ export async function sendAction(input: unknown): Promise<{ id?: string; error?:
     return result.error ? { error: result.error } : { id: result.value };
 }
 
+/**
+ * Answer a message from its notice, without opening the conversation: the
+ * conversation is read up to the message the notice announced, and the answer is
+ * sent - somebody who answered has seen what they were answering, and the
+ * notice, the card and the unread count go with it, as they do on every
+ * messenger.
+ *
+ * Read first, because sending moves the sender's own mark past everything
+ * without stamping or announcing it, which would leave nothing to read after.
+ * Without the announced message there is nothing to read up to, and the answer
+ * is only sent.
+ */
+export async function replyFromNoticeAction(
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatSendSchema
+        .pick({ channelId: true, body: true })
+        .extend({ messageId: core.chatMarkReadSchema.shape.messageId.optional() })
+        .safeParse(input);
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "That could not be sent" };
+
+    const { channelId, body, messageId } = parsed.data;
+    // Not a reason to hold the answer back: the next visit reads it.
+    if (messageId) {
+        await messages
+            .markRead(me, { channelId, messageId })
+            .catch((caught: unknown) =>
+                console.error(
+                    "polaris: a conversation answered from a notice was not read:",
+                    caught
+                )
+            );
+    }
+    const sent = await guard(() => messages.send(me, { channelId, body }, [], null));
+    if (sent.error || !sent.value) return { error: sent.error ?? "That could not be sent" };
+    return { id: sent.value };
+}
+
 /** Send a message on to another conversation. */
 export async function forwardAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const me = await actor();
