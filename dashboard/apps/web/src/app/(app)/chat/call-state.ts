@@ -84,6 +84,9 @@ export interface CallState {
     readonly hasCamera: boolean;
     /** Whether a screen is going out. */
     readonly sharing: boolean;
+    /** Whether what this browser shares has stopped sending pictures - a
+     *  minimised window. Optional so a hand-made state need not say. */
+    readonly shareStill?: boolean;
     /** Whether everybody else is silenced here. Nobody else is told: it is a
      *  decision about this pair of ears. */
     readonly deafened: boolean;

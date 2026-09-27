@@ -338,3 +338,26 @@ describe("how loud the voices are", () => {
         );
     });
 });
+
+describe("sharing a window that stopped sending pictures", () => {
+    it("tells the person sharing, and only while it is frozen", () => {
+        const { rerender } = render(
+            <CallRoom
+                meetingId="m1"
+                place="direct"
+                call={call({ sharing: true, shareStill: true })}
+                onLeave={() => undefined}
+            />
+        );
+        expect(screen.getByText(/everybody sees it frozen/).getAttribute("role")).toBe("status");
+        rerender(
+            <CallRoom
+                meetingId="m1"
+                place="direct"
+                call={call({ sharing: true, shareStill: false })}
+                onLeave={() => undefined}
+            />
+        );
+        expect(screen.queryByText(/everybody sees it frozen/)).toBeNull();
+    });
+});

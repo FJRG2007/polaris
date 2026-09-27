@@ -49,6 +49,20 @@ beforeEach(() => {
 });
 
 describe("asking for a screen", () => {
+    it("never offers the tab Polaris is in, which would film the call inside itself", async () => {
+        await openScreen({});
+        answer = pictureOnly;
+        store.clear();
+        await openScreen({});
+        for (const one of asked) {
+            expect(one).toMatchObject({
+                selfBrowserSurface: "exclude",
+                surfaceSwitching: "include",
+                monitorTypeSurfaces: "include"
+            });
+        }
+    });
+
     it("asks for its sound as well, where nothing says otherwise", async () => {
         await expect(openScreen({})).resolves.toBe(screen);
         expect(asked).toHaveLength(1);

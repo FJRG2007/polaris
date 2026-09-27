@@ -650,6 +650,17 @@ export function CallRoom({
                 </p>
             )}
 
+            {call.shareStill && (
+                <p
+                    role="status"
+                    className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
+                >
+                    What you are sharing is not sending pictures, so everybody sees it frozen. The
+                    window is probably minimised - a game in full screen does that when you switch
+                    away. Bring it back, run the game in a window, or share your whole screen.
+                </p>
+            )}
+
             {/* What the call says about itself, in a strip of its own that
                 shrinks and scrolls before anything else gives way. On a square
                 or short screen these notices used to take their full height

@@ -131,6 +131,7 @@ export async function openScreen(video: MediaTrackConstraints): Promise<MediaStr
         navigator.mediaDevices.getDisplayMedia(
             withSound
                 ? {
+                      ...PICKER,
                       video,
                       // Offered, never forced: the browser's picker has the box
                       // that says whether a tab's or the system's sound goes
@@ -145,7 +146,7 @@ export async function openScreen(video: MediaTrackConstraints): Promise<MediaStr
                       // and "keep playing the tab here while it is shared".
                       ...({ systemAudio: "include", suppressLocalAudioPlayback: false } as object)
                   }
-                : { video }
+                : { ...PICKER, video }
         );
 
     if (!screenSoundWorthAsking()) return ask(false);
@@ -165,6 +166,24 @@ export async function openScreen(video: MediaTrackConstraints): Promise<MediaStr
         return await ask(false);
     }
 }
+
+/**
+ * What the browser's picker offers, in Chrome's names; any other browser ignores
+ * them.
+ *
+ * - The tab Polaris is in is left out. Chosen, it filmed itself filming itself:
+ *   a picture of the call inside the call inside the call, which on the other
+ *   side reads as the share being broken.
+ * - The bar the browser shows while sharing offers "share this tab instead", so
+ *   the wrong window can be swapped without stopping and starting again.
+ * - Whole screens are offered beside windows and tabs, because a game or anything
+ *   that takes the whole screen is often only capturable that way.
+ */
+const PICKER = {
+    selfBrowserSurface: "exclude",
+    surfaceSwitching: "include",
+    monitorTypeSurfaces: "include"
+} as object;
 
 /**
  * Whether the browser refused rather than failed.

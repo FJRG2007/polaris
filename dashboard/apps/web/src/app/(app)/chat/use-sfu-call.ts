@@ -353,6 +353,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [cameraOn, setCameraOn] = useState(withVideo);
     const [hasCamera, setHasCamera] = useState(false);
     const [sharing, setSharing] = useState(false);
+    /**
+     * Whether what is being shared has stopped sending pictures: the browser
+     * mutes the track while the window it films is minimised or covered - a
+     * game in full screen minimises itself the moment somebody switches away.
+     * Everybody else then sees the last picture, frozen, and only the person
+     * sharing can do anything about it, so they are the one told.
+     */
+    const [shareStill, setShareStill] = useState(false);
     const [deafened, setDeafened] = useState(false);
     /** What the seat is told on every beat. A ref, because the beat is set up
      *  once per room and would otherwise keep reporting the state it started
@@ -1341,6 +1349,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // button offering to stop a share nobody was making.
         setLocalScreen(null);
         setSharing(false);
+        setShareStill(false);
         sharingRef.current = false;
         // Nothing about the last room is true of this one: the seats it named
         // are gone, and a browser that walked into a new call still pointing at
@@ -2502,6 +2511,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             void publish(SCREEN_AUDIO, null);
             publishLocalPreview();
             setSharing(false);
+            setShareStill(false);
             sharingRef.current = false;
             sound("shareOff");
         };
@@ -2532,6 +2542,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 track.onended = () => {
                     if (screen.current === track) stopSharing();
                 };
+                track.onmute = () => {
+                    if (screen.current === track) setShareStill(true);
+                };
+                track.onunmute = () => {
+                    if (screen.current === track) setShareStill(false);
+                };
+                setShareStill(track.muted);
                 screen.current = track;
                 screenAudio.current = audio;
                 await publish(SCREEN, track);
@@ -3510,6 +3527,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         cameraOn,
         hasCamera,
         sharing,
+        /** Whether what is shared has stopped sending pictures - see `shareStill`. */
+        shareStill: sharing && shareStill,
         deafened,
         moderation,
         ended,
