@@ -124,11 +124,12 @@ export function sinceCommand(objective: string): string {
  *  reset is still there at the next look. A name the game would not take
  *  written out falls back to everybody counted. */
 export function resetCommands(objective: string, names: Iterable<string>): string[] {
-    return [...names].map((name) =>
+    const lines = [...names].map((name) =>
         /^[A-Za-z0-9_]{1,16}$/.test(name)
             ? `scoreboard players reset ${name} ${objective}`
             : `scoreboard players reset @a[scores={${objective}=1..}] ${objective}`
     );
+    return [...new Set(lines)];
 }
 
 /** Whether the game writes operators' commands to its log. */
@@ -249,14 +250,19 @@ const TELEPORT_VERBS =
 export function explainedByLog(log: string, name: string): boolean {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     // The game writes the display name, which a team can wrap in a prefix or a
-    // suffix, and a selector that moved several players as a count.
-    const teleported = new RegExp(`Teleported (?:.*\\b${escaped}\\b.*|\\d+ entities) to `, "i");
+    // suffix, and a selector that moved several players as a count. A count a
+    // command block wrote is left out: a clock sweeping items or mobs writes one
+    // on every run, whoever it moved.
+    const teleported = new RegExp(`Teleported .*\\b${escaped}\\b.* to `, "i");
+    const several = /Teleported \d+ entities to /i;
+    const commandBlock = /\[@: /;
     const came = new RegExp(`\\b${escaped} (?:joined|left) the game`, "i");
     return stripFormatting(log)
         .split("\n")
         .some(
             (line) =>
                 teleported.test(line) ||
+                (several.test(line) && !commandBlock.test(line)) ||
                 came.test(line) ||
                 TELEPORT_VERBS.test(line) ||
                 /Spread \d+ /.test(line)

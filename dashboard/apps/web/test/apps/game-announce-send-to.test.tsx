@@ -202,6 +202,20 @@ describe("the lines it becomes", () => {
         expect(chat[1]).toMatch(/^execute as @a\[gamemode=adventure,name=Alex\] run tellraw @s /);
     });
 
+    it("reaches a Bedrock gamertag with a space in a game mode", () => {
+        const lines = announcementCommands(
+            "bedrock",
+            draft({ target: "@a[gamemode=survival]", chat: "Hi {polaris.name}" }),
+            {
+                values: {},
+                recipients: [{ name: "Foo Bar", values: { "polaris.name": "Foo" } }]
+            }
+        );
+        const chat = lines.filter((line) => line.includes("tellraw"));
+        expect(chat).toHaveLength(1);
+        expect(chat[0]).toMatch(/^execute as @a\[m=survival,name="Foo Bar"\] run tellraw @s /);
+    });
+
     it("says so under Send to, and refuses operators on Bedrock", () => {
         expect(announcementProblems(draft({ target: "", chat: "Hi" }), "java").target).toBe(
             "Choose who it goes to"

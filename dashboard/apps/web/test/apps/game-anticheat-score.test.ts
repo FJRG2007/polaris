@@ -270,6 +270,21 @@ describe("teleporting", () => {
         ).toBe(true);
     });
 
+    it("is not explained by a count a command block wrote", () => {
+        expect(
+            explainedByLog(
+                "[12:00:01] [Server thread/INFO]: [@: Teleported 12 entities to 0.0, 64.0, 0.0]",
+                "Steve"
+            )
+        ).toBe(false);
+        expect(
+            explainedByLog(
+                "[12:00:01] [Server thread/INFO]: [@: Teleported Steve to 0.0, 64.0, 0.0]",
+                "Steve"
+            )
+        ).toBe(true);
+    });
+
     it("reads whether the game logs operators' commands", () => {
         expect(readLogAdmin("Gamerule logAdminCommands is currently set to: true")).toBe(true);
         expect(readLogAdmin("Gamerule logAdminCommands is currently set to: false")).toBe(false);
@@ -341,6 +356,9 @@ describe("respawning and joining", () => {
     it("resets only the players whose counts were read", () => {
         expect(resetCommands("polaris_mv_death", ["Steve", "odd name"])).toEqual([
             "scoreboard players reset Steve polaris_mv_death",
+            "scoreboard players reset @a[scores={polaris_mv_death=1..}] polaris_mv_death"
+        ]);
+        expect(resetCommands("polaris_mv_death", ["odd name", "other one"])).toEqual([
             "scoreboard players reset @a[scores={polaris_mv_death=1..}] polaris_mv_death"
         ]);
         expect(resetCommands("polaris_mv_death", [])).toEqual([]);

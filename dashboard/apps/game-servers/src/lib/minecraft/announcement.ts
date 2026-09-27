@@ -22,7 +22,6 @@ import {
     EVERYBODY,
     LONGEST_NAME,
     concreteTargets,
-    isPickableName,
     namedByPolaris,
     parseTarget
 } from "./announce-target";
@@ -407,13 +406,7 @@ function commandsFor(
                 if (wanted !== null && recipient.name.toLowerCase() !== wanted) return [];
                 const own = playerSelector(recipient.name);
                 if (!own) return [];
-                const who =
-                    selector && isPickableName(recipient.name)
-                        ? `${selector.slice(0, -1)},name=${recipient.name}]`
-                        : selector
-                          ? null
-                          : own;
-                if (!who) return [];
+                const who = selector ? `${selector.slice(0, -1)},name=${own}]` : own;
                 const filled = fillValues(text, { ...context.values, ...recipient.values });
                 return [`execute as ${who} run ${command} @s ${write(filled)}`];
             });
