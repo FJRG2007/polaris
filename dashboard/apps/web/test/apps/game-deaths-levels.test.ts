@@ -36,6 +36,7 @@ vi.mock("@polaris/app-host", () => ({
 }));
 
 const events = await import("@polaris-app/game-servers/src/lib/minecraft/player-events");
+const { spreadListLines } = await import("@polaris-app/game-servers/src/lib/minecraft/rankings");
 const { liveContext } = await import("@polaris-app/game-servers/src/lib/minecraft/live-values");
 const { fillValues, variableProblem } = await import("@polaris-app/game-servers/src/lib/minecraft/text-vars");
 const { sidebarProblems, DEFAULT_SIDEBAR } = await import("@polaris-app/game-servers/src/lib/minecraft/sidebar");
@@ -100,7 +101,7 @@ describe("levels", () => {
 
     it("spread a side panel line into a line a player, in the room left", () => {
         const lines = ["Online: {server.online}", "&e{server.levels}", "", "{death.message}"];
-        expect(events.spreadLevelLines(lines, ["Steve Lv 12", "Alex Lv 5"], 15)).toEqual([
+        expect(spreadListLines(lines, { "server.levels": ["Steve Lv 12", "Alex Lv 5"] }, 15)).toEqual([
             "Online: {server.online}",
             "&eSteve Lv 12",
             "&eAlex Lv 5",
@@ -108,7 +109,7 @@ describe("levels", () => {
             "{death.message}"
         ]);
         // Three other lines on a panel of five leave two: one player and the rest counted.
-        expect(events.spreadLevelLines(lines, ["A Lv 3", "B Lv 2", "C Lv 1"], 5)).toEqual([
+        expect(spreadListLines(lines, { "server.levels": ["A Lv 3", "B Lv 2", "C Lv 1"] }, 5)).toEqual([
             "Online: {server.online}",
             "&eA Lv 3",
             "&e+2 more",
@@ -116,7 +117,7 @@ describe("levels", () => {
             "{death.message}"
         ]);
         // Nobody online: left for its fallback.
-        expect(events.spreadLevelLines(['{server.levels | "Nobody"}'], [], 15)).toEqual(['{server.levels | "Nobody"}']);
+        expect(spreadListLines(['{server.levels | "Nobody"}'], {}, 15)).toEqual(['{server.levels | "Nobody"}']);
     });
 });
 

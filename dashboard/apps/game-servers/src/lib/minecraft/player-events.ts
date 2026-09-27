@@ -113,34 +113,3 @@ export function readLevels(output: string): PlayerLevel[] {
 export function levelText(player: PlayerLevel): string {
     return `${player.name} Lv ${player.level}`;
 }
-
-/**
- * The panel's lines with the one that shows `{server.levels}` written out once
- * per player, highest first, in whatever colours that line has around it.
- *
- * Only the first such line is spread out; the panel has one list of players,
- * not two. It takes the room the other lines leave, and past that the last row
- * says how many more there are rather than dropping them without a word.
- */
-export function spreadLevelLines(
-    lines: readonly string[],
-    rows: readonly string[],
-    max: number
-): string[] {
-    const token = /\{\s*server\.levels\s*(?:\|\s*"[^"{}]*"\s*)?\}/i;
-    const at = lines.findIndex((line) => token.test(line));
-    if (at < 0) return [...lines];
-    const room = Math.max(1, max - (lines.length - 1));
-    const shown =
-        rows.length > room
-            ? [...rows.slice(0, room - 1), `+${rows.length - (room - 1)} more`]
-            : rows;
-    // Nobody online: the line stays as it is, and its fallback says so.
-    if (shown.length === 0) return [...lines];
-    const line = lines[at] as string;
-    return [
-        ...lines.slice(0, at),
-        ...shown.map((row) => line.replace(token, row)),
-        ...lines.slice(at + 1)
-    ];
-}
