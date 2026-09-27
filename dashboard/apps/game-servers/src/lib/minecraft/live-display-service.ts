@@ -18,7 +18,8 @@
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { liveContext } from "./live-values";
-import { fillValues, readsPlayerList, variablesIn } from "./text-vars";
+import { fillValues, LEVELS_VARIABLE, readsPlayerList, readsServer, variablesIn } from "./text-vars";
+import { spreadLevelLines } from "./player-events";
 import { editionOf, onlinePlayers, withServerContainer } from "./service";
 import {
     ACTIONBAR_EVERY_MS,
@@ -30,6 +31,7 @@ import {
     type SendContext
 } from "./announcement";
 import {
+    SIDEBAR_LINES_MAX,
     readSidebar,
     sidebarCommands,
     sidebarOffCommands,
@@ -215,7 +217,14 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     let panel: Loop["panel"] = null;
     if (duePanel) {
         const title = fillValues(sidebar.title, context.values);
-        const shownLines = sidebar.lines.map((line) => fillValues(line, context.values));
+        // Everybody's level is a line a player here, in the room the other
+        // lines leave.
+        const spread = spreadLevelLines(
+            sidebar.lines,
+            context.lists?.[LEVELS_VARIABLE] ?? [],
+            SIDEBAR_LINES_MAX
+        );
+        const shownLines = spread.map((line) => fillValues(line, context.values));
         lines.push(...sidebarCommands(title, shownLines, loop.panel));
         panel = { title, lines: shownLines };
         loop.lastPanel = now;
@@ -253,7 +262,13 @@ async function contextFor(
     const players = needsList
         ? await onlinePlayers(loop.ownerId, installedAppId).catch(() => null)
         : null;
-    const value = await liveContext(installedAppId, texts, players);
+    // Asked of the running server only when a text reads its log or everybody's
+    // level; the rest is Polaris's own and costs the server nothing.
+    const value = texts.some((text) => readsServer(text))
+        ? await withServerContainer(loop.ownerId, installedAppId, (server) =>
+              liveContext(installedAppId, texts, players, server.running ? server : null)
+          ).catch(() => liveContext(installedAppId, texts, players))
+        : await liveContext(installedAppId, texts, players);
     loop.context = { key, at: now, value };
     return value;
 }

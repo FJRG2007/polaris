@@ -315,6 +315,9 @@ export interface Recipient {
 export interface SendContext {
     readonly values: VariableValues;
     readonly recipients: readonly Recipient[] | null;
+    /** A value that is also a list, a line an item where a line can be one:
+     *  everybody's level, for the side panel. */
+    readonly lists?: Readonly<Record<string, readonly string[]>>;
 }
 
 export const NO_CONTEXT: SendContext = { values: {}, recipients: null };

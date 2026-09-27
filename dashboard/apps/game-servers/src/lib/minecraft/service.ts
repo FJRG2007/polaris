@@ -26,7 +26,7 @@ import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
 import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
 import { liveContext } from "./live-values";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
-import { readsPlayerList } from "./text-vars";
+import { readsPlayerList, readsServer } from "./text-vars";
 import { announcementCommands, announcementProblems, type Announcement } from "./announcement";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
@@ -296,7 +296,12 @@ export async function sendAnnouncement(
     const players = texts.some((text) => readsPlayerList(text))
         ? await readPlayerList(install, ownerId).catch(() => null)
         : null;
-    const context = await liveContext(installedAppId, texts, players);
+    // The log and everybody's level only for a text that reads them.
+    const context = texts.some((text) => readsServer(text))
+        ? await withServerContainer(ownerId, installedAppId, (server) =>
+              liveContext(installedAppId, texts, players, server.running ? server : null)
+          ).catch(() => liveContext(installedAppId, texts, players))
+        : await liveContext(installedAppId, texts, players);
     const lines = announcementCommands(install.edition, announcement, context);
     if (lines.length === 0) throw new Error("There is nothing to send yet");
     for (const line of lines) {

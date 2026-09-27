@@ -15,6 +15,7 @@ import { McLine } from "../../components/mc-text";
 import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
 import { moved, useListOrder } from "../../components/use-list-order";
 import { previewText } from "../../lib/minecraft/text-vars";
+import { spreadLevelLines } from "../../lib/minecraft/player-events";
 import { FieldNote, insertsFor } from "./minecraft-announce";
 import { Button, Card, CardBody, Select, Switch, cn } from "@polaris/ui";
 import { FormattedTextField } from "../../components/formatted-text-field";
@@ -320,6 +321,9 @@ export function MinecraftSidebar({
     );
 }
 
+/** Two players, for how a line of `{server.levels}` spreads out. */
+const SAMPLE_LEVELS = ["Steve Lv 12", "Alex Lv 5"];
+
 /** The panel as it will read, every value at a sample. */
 function SidebarPreview({ sidebar }: { sidebar: SidebarConfig }) {
     const title = mc.motdSpans(previewText(sidebar.title))[0] ?? [];
@@ -335,7 +339,7 @@ function SidebarPreview({ sidebar }: { sidebar: SidebarConfig }) {
                         <div className="text-center">
                             <McLine spans={title} />
                         </div>
-                        {sidebar.lines.map((line, index) => (
+                        {spreadLevelLines(sidebar.lines, SAMPLE_LEVELS, SIDEBAR_LINES_MAX).map((line, index) => (
                             <div key={index} className="min-h-5 whitespace-pre">
                                 <McLine spans={mc.motdSpans(previewText(line))[0] ?? []} />
                             </div>
