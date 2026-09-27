@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { filesAnswer } from "./container-fake";
 
 const LIMIT = 16 * 1024;
 
@@ -50,15 +51,8 @@ const server = {
                 ? { code: 1, output: "No such file or directory" }
                 : { code: 0, output: cut(file) };
         }
-        // Every file as one answer, the way they used to be read.
-        if ((argv[2] ?? "").startsWith("for f in")) {
-            const all = Object.keys(files)
-                .filter((path) => path.startsWith(`${DIR}/`))
-                .sort()
-                .map((path) => `\n@@${path.slice(DIR.length + 1, -".json".length)}\n${files[path]}`)
-                .join("");
-            return { code: 0, output: cut(all) };
-        }
+        const batch = filesAnswer(argv, files, LIMIT);
+        if (batch) return batch;
         const page = /sed -n '(\d+),(\d+)p'$/.exec(argv[2] ?? "");
         if (page) {
             const names = Object.keys(files)

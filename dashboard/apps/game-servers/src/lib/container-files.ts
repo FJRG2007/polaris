@@ -106,22 +106,70 @@ export async function readContainerFile(server: FileReader, path: string): Promi
     return read.state === "read" ? read.content : null;
 }
 
+/** Files per command of `readContainerFiles`, however short they are. */
+const FILES_PER_RUN = 64;
+
+/**
+ * Several of the server's files as text, by path, in as few commands as their
+ * length allows: a command reads files, as base64, until its answer is full, and
+ * the next one takes up at the first file that did not arrive whole. A file
+ * longer than a whole answer is read on its own, as a stream. A file that is not
+ * there or cannot be read is left out.
+ */
+export async function readContainerFiles(server: FileReader, paths: readonly string[]): Promise<Map<string, string>> {
+    paths.forEach(assertSafePath);
+    const read = new Map<string, string>();
+    for (let next = 0; next < paths.length; ) {
+        const batch = paths.slice(next, next + FILES_PER_RUN);
+        const result = await server.run([
+            "sh",
+            "-c",
+            `for f in ${batch.join(" ")}; do printf '@@%s\\n' "$f"; if [ -r "$f" ] && base64 < "$f"; then printf '@@.\\n'; else printf '@@!\\n'; fi; done`
+        ]);
+        if (result.code !== 0) break;
+        const settled = new Set<string>();
+        let current: string | null = null;
+        let body: string[] = [];
+        for (const line of result.output.split("\n")) {
+            if (!line.startsWith("@@")) {
+                if (current !== null) body.push(line);
+                continue;
+            }
+            const tag = line.slice(2);
+            if (current !== null && (tag === "." || tag === "!")) {
+                if (tag === ".") read.set(current, Buffer.from(body.join(""), "base64").toString("utf8"));
+                settled.add(current);
+                current = null;
+            } else {
+                current = tag;
+                body = [];
+            }
+        }
+        const done = batch.findIndex((path) => !settled.has(path));
+        const count = done < 0 ? batch.length : done;
+        if (count > 0 || !mayBeCut(result.output)) {
+            next += mayBeCut(result.output) ? count : batch.length;
+            continue;
+        }
+        const whole = await readContainerBytes(server, batch[0]!).catch(() => null);
+        if (whole) read.set(batch[0]!, whole.toString("utf8"));
+        next += 1;
+    }
+    return read;
+}
+
 /** Bytes of a file per piece of `readContainerRange`: base64 of it, with its line
  *  breaks, stays under `RUN_OUTPUT_MAX`. */
 const RANGE_PIECE = 11 * 1024;
 
-/**
- * Part of a file - bytes `from` up to `to` - for the ones that are only ever
- * read in part, like a log that is hundreds of megabytes long. In pieces a
- * `run` can carry, each as base64 so a character split between two pieces is
- * put back together rather than lost. Null when it cannot be read.
- */
-export async function readContainerRange(
+/** Bytes `from` up to `to` of a file, in pieces a `run` can carry, or null when
+ *  it cannot be read. */
+async function readRangeBytes(
     server: Pick<ServerContainer, "run">,
     path: string,
     from: number,
     to: number
-): Promise<string | null> {
+): Promise<Buffer | null> {
     assertSafePath(path);
     const parts: Buffer[] = [];
     for (let at = Math.max(0, Math.floor(from)); at < to; ) {
@@ -137,7 +185,23 @@ export async function readContainerRange(
         parts.push(piece);
         at += piece.length;
     }
-    return Buffer.concat(parts).toString("utf8");
+    return Buffer.concat(parts);
+}
+
+/**
+ * Part of a file - bytes `from` up to `to` - for the ones that are only ever
+ * read in part, like a log that is hundreds of megabytes long. In pieces a
+ * `run` can carry, each as base64 so a character split between two pieces is
+ * put back together rather than lost. Null when it cannot be read.
+ */
+export async function readContainerRange(
+    server: Pick<ServerContainer, "run">,
+    path: string,
+    from: number,
+    to: number
+): Promise<string | null> {
+    const bytes = await readRangeBytes(server, path, from, to);
+    return bytes === null ? null : bytes.toString("utf8");
 }
 
 /** How big a file is, in bytes, or null when it cannot be told. */
@@ -159,8 +223,41 @@ export async function readContainerTail(
     return readContainerRange(server, path, Math.max(0, size - bytes), size);
 }
 
-/** Lines per page of `readLinesPaged`, so a page of paths stays under
- *  `RUN_OUTPUT_MAX` however long they are. */
+/**
+ * The newest thing `find` sees in the last `bytes` of a file, read backward a
+ * piece at a time and stopping at the first piece that has it - what is looked
+ * for is usually near the end. Null when nothing matches or it cannot be read.
+ */
+export async function searchContainerTail<T>(
+    server: Pick<ServerContainer, "run">,
+    path: string,
+    bytes: number,
+    find: (text: string) => T | null
+): Promise<T | null> {
+    const size = await containerFileSize(server, path);
+    if (size === null) return null;
+    const floor = Math.max(0, size - bytes);
+    const parts: Buffer[] = [];
+    for (let start = size; start > floor; ) {
+        const from = Math.max(floor, start - RANGE_PIECE);
+        const piece = await readRangeBytes(server, path, from, start);
+        if (piece === null) return null;
+        if (piece.length === 0) break;
+        parts.unshift(piece);
+        start = from;
+        let text = Buffer.concat(parts).toString("utf8");
+        if (start > floor) {
+            const newline = text.indexOf("\n");
+            text = newline < 0 ? "" : text.slice(newline + 1);
+        }
+        const found = find(text);
+        if (found !== null) return found;
+    }
+    return null;
+}
+
+/** Lines per page of `readLinesPaged` to begin with. A page that comes back as
+ *  long as a `run` carries is read again as a smaller one. */
 const LINES_PAGE = 150;
 
 /**
@@ -170,16 +267,22 @@ const LINES_PAGE = 150;
  */
 export async function readLinesPaged(server: Pick<ServerContainer, "run">, listing: string): Promise<string[]> {
     const lines: string[] = [];
-    for (let first = 1; ; first += LINES_PAGE) {
+    let size = LINES_PAGE;
+    for (let first = 1; ; ) {
         const result = await server.run([
             "sh",
             "-c",
-            `{ ${listing}; } | LC_ALL=C sort | sed -n '${first},${first + LINES_PAGE - 1}p'`
+            `{ ${listing}; } | LC_ALL=C sort | sed -n '${first},${first + size - 1}p'`
         ]);
         if (result.code !== 0) break;
+        if (mayBeCut(result.output) && size > 1) {
+            size = Math.max(1, Math.floor(size / 2));
+            continue;
+        }
         const page = result.output.split("\n").filter((line) => line.length > 0);
         lines.push(...page);
-        if (page.length < LINES_PAGE) break;
+        if (page.length < size) break;
+        first += size;
     }
     return lines;
 }

@@ -15,11 +15,11 @@
 
 import * as world from "./world";
 import { host } from "@polaris/app-host";
-import { withServerContainer, type ServerContainer } from "./service";
-import { listContainerDir, readContainerFile } from "../container-files";
-import { miningFigures, type MiningFigures } from "./xray";
-import { readPlayerStats, type PlayerStats } from "../games-activity";
 import type { PlayerFigures } from "./rankings";
+import { miningFigures, type MiningFigures } from "./xray";
+import { withServerContainer, type ServerContainer } from "./service";
+import { readPlayerStats, type PlayerStats } from "../games-activity";
+import { listContainerDir, readContainerFile, readContainerFiles } from "../container-files";
 
 const { listEnvVars } = host.envVarService;
 
@@ -121,9 +121,10 @@ export interface PlayerMining {
 }
 
 /**
- * Every stats file the world has, by the name of the player it belongs to. One
- * read per file: together they are longer than one command can answer, and
- * reading them as one left all but the first few out. Empty for Bedrock and for
+ * Every stats file the world has, by the name of the player it belongs to. In as
+ * many commands as their length needs: together they are longer than one command
+ * can answer, and reading them as one left all but the first few out. Empty for
+ * Bedrock and for
  * a server that cannot be reached.
  */
 async function readAllStatsFiles(
@@ -137,14 +138,16 @@ async function readAllStatsFiles(
             const cache = await readContainerFile(server, `${world.DATA_DIR}/usercache.json`);
             // No names: the uuids are shown instead.
             const names = namesByUuid(cache ?? "");
-            const files: { name: string; json: string }[] = [];
+            const uuids = new Map<string, string>();
             for (const entry of await listContainerDir(server, dir)) {
                 const uuid = entry.replace(/\.json$/, "").toLowerCase();
-                if (!entry.endsWith(".json") || !UUID.test(uuid)) continue;
-                const json = await readContainerFile(server, `${dir}/${entry}`);
-                if (json !== null) files.push({ name: names.get(uuid) ?? uuid, json });
+                if (entry.endsWith(".json") && UUID.test(uuid)) uuids.set(`${dir}/${entry}`, uuid);
             }
-            return files;
+            const read = await readContainerFiles(server, [...uuids.keys()]);
+            return [...read].map(([path, json]) => {
+                const uuid = uuids.get(path)!;
+                return { name: names.get(uuid) ?? uuid, json };
+            });
         });
     } catch {
         return [];

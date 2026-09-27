@@ -13,10 +13,13 @@ import {
     RUN_OUTPUT_MAX,
     listContainerDir,
     readContainerFile,
+    readContainerFiles,
     readContainerRange,
     readContainerTail,
-    readLinesPaged
+    readLinesPaged,
+    searchContainerTail
 } from "@polaris-app/game-servers/src/lib/container-files";
+import { filesAnswer } from "./container-fake";
 
 /** Cut the way the daemon cuts: at the limit, back to a character boundary. */
 function cut(text: string): string {
@@ -45,6 +48,8 @@ function fakeServer(files: Record<string, string>, listing: string[] = []) {
                     ? { code: 1, output: "" }
                     : { code: 0, output: `${Buffer.byteLength(file)}\n` };
             }
+            const batch = filesAnswer(argv, files, RUN_OUTPUT_MAX);
+            if (batch) return batch;
             const script = argv[2] ?? "";
             const range = /^tail -c \+(\d+) -- (\S+) \| head -c (\d+) \| base64$/.exec(script);
             if (range) {
@@ -103,6 +108,23 @@ describe("reading a whole file", () => {
     });
 });
 
+describe("reading several files", () => {
+    it("reads short files together and a long one on its own, every one whole", async () => {
+        const files: Record<string, string> = {};
+        for (let index = 0; index < 40; index += 1) {
+            files[`/data/world/stats/${String(index).padStart(2, "0")}.json`] = big(300 + index);
+        }
+        files["/data/world/stats/20.json"] = big(40_000);
+        const server = fakeServer(files);
+        const read = await readContainerFiles(server as never, [
+            ...Object.keys(files).sort(),
+            "/data/world/stats/gone.json"
+        ]);
+        expect(Object.fromEntries(read)).toEqual(files);
+        expect(server.runs.length).toBeLessThan(10);
+    });
+});
+
 describe("reading part of a file", () => {
     it("reads a stretch longer than one command answers, byte for byte, characters split between pieces included", async () => {
         const log = Array.from(
@@ -126,6 +148,39 @@ describe("reading part of a file", () => {
     });
 });
 
+describe("searching the end of a file", () => {
+    it("stops at the newest piece that has what it looks for", async () => {
+        const log = `${"old line\n".repeat(8000)}Steve was slain by Zombie\nlater\n`;
+        const server = fakeServer({ "/data/logs/latest.log": log });
+        const found = await searchContainerTail(
+            server as never,
+            "/data/logs/latest.log",
+            65_536,
+            (text) => (text.includes("slain") ? "found" : null)
+        );
+        expect(found).toBe("found");
+        expect(server.runs).toHaveLength(2);
+    });
+
+    it("looks back as far as it is allowed and no further", async () => {
+        const log = `Steve was slain by Zombie\n${"old line\n".repeat(8000)}`;
+        const server = fakeServer({ "/data/logs/latest.log": log });
+        const seen: string[] = [];
+        const found = await searchContainerTail(
+            server as never,
+            "/data/logs/latest.log",
+            65_536,
+            (text) => {
+                seen.push(text);
+                return text.includes("slain") ? "found" : null;
+            }
+        );
+        expect(found).toBeNull();
+        expect(Buffer.byteLength(seen.at(-1)!)).toBe(65_536);
+        expect(seen.slice(0, -1).every((text) => text.startsWith("old line\n"))).toBe(true);
+    });
+});
+
 describe("listing", () => {
     it("lists every entry of a folder with more than one answer holds", async () => {
         const names = Array.from(
@@ -145,5 +200,17 @@ describe("listing", () => {
         );
         const server = fakeServer({}, paths);
         expect(await readLinesPaged(server as never, "find /opt/resources")).toHaveLength(400);
+    });
+
+    it("pages lines too long for a full page to fit, without cutting any", async () => {
+        const paths = Array.from(
+            { length: 400 },
+            (_, index) =>
+                `/opt/resources/[category]/[sub-${"x".repeat(100)}]/r${index}/fxmanifest.lua`
+        );
+        const server = fakeServer({}, paths);
+        expect(await readLinesPaged(server as never, "find /opt/resources")).toEqual(
+            [...paths].sort()
+        );
     });
 });

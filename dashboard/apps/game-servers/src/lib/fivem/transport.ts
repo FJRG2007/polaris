@@ -24,10 +24,11 @@
 
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
+import { randomBytes } from "node:crypto";
 import { withTimeout } from "@polaris/core";
 import { FIVEM_CONTAINER_PORT } from "./config";
-import { withServerContainer, type ServerContainer } from "../minecraft/service";
 import { mayBeCut, readContainerFile } from "../container-files";
+import { withServerContainer, type ServerContainer } from "../minecraft/service";
 import { isRconRefusal, isSafeCommand, parseRconReply, rconRequest } from "./rcon";
 
 /** The documents the server publishes about itself. A closed set: each is a path
@@ -102,22 +103,25 @@ export async function withFivemServer<T>(
 /**
  * A document longer than one command can answer - a full server's player list,
  * the resource list of a big one - fetched into a file inside the container and
- * read from there whole. Only the name, one of three fixed ones, is part of the
- * path.
+ * read from there whole. Only the name, one of three fixed ones, and a random
+ * suffix, so two reads at once never share a file, are part of the path.
  */
 async function readWholeDocument(container: ServerContainer, url: string, name: FivemDocument): Promise<string> {
-    const path = `/tmp/polaris-${name}`;
+    const path = `/tmp/polaris-${name}-${randomBytes(6).toString("hex")}`;
     const script = [
         `if command -v wget >/dev/null 2>&1; then wget -q -O ${path} -T ${HTTP_TIMEOUT_SECONDS} "${url}" && exit 0; fi`,
         `if command -v curl >/dev/null 2>&1; then curl -fsS --max-time ${HTTP_TIMEOUT_SECONDS} -o ${path} "${url}" && exit 0; fi`,
         "exit 1"
     ].join("\n");
-    const fetched = await withTimeout(container.run(["sh", "-c", script]), COMMAND_TIMEOUT_MS, "The server did not answer in time");
-    if (fetched.code !== 0) throw new Error("The server is not answering yet");
-    const text = await readContainerFile(container, path);
-    await container.run(["rm", "-f", "--", path]).catch(() => undefined);
-    if (text === null) throw new Error("The server is not answering yet");
-    return text;
+    try {
+        const fetched = await withTimeout(container.run(["sh", "-c", script]), COMMAND_TIMEOUT_MS, "The server did not answer in time");
+        if (fetched.code !== 0) throw new Error("The server is not answering yet");
+        const text = await readContainerFile(container, path);
+        if (text === null) throw new Error("The server is not answering yet");
+        return text;
+    } finally {
+        await container.run(["rm", "-f", "--", path]).catch(() => undefined);
+    }
 }
 
 /** One of the server's own documents, read from inside the container. */
