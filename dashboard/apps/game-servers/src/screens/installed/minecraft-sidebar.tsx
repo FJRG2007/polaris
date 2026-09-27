@@ -47,6 +47,7 @@ import {
     DropdownMenuTrigger,
     Select,
     Switch,
+    allChosen,
     cn,
     useRangeSelection
 } from "@polaris/ui";
@@ -514,12 +515,7 @@ function RotatingDialog({
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() =>
-                                setIds([
-                                    ...rotating.ids,
-                                    ...everyId.filter((id) => !rotating.ids.includes(id))
-                                ])
-                            }
+                            onClick={() => setIds(allChosen(everyId, rotating.ids))}
                         >
                             Choose all
                         </Button>
