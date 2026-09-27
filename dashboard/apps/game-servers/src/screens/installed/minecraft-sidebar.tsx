@@ -12,12 +12,24 @@
 
 import * as mc from "../../lib/minecraft/motd";
 import { McLine } from "../../components/mc-text";
-import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
+import { GripVertical, Loader2, Plus, Trash2, Trophy } from "lucide-react";
+import { SIDEBAR_BLOCKS, withBlock } from "../../lib/minecraft/sidebar-blocks";
 import { moved, useListOrder } from "../../components/use-list-order";
 import { previewText } from "../../lib/minecraft/text-vars";
 import { spreadListLines } from "../../lib/minecraft/rankings";
 import { FieldNote, insertsFor } from "./minecraft-announce";
-import { Button, Card, CardBody, Select, Switch, cn } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    Select,
+    Switch,
+    cn
+} from "@polaris/ui";
 import { FormattedTextField } from "../../components/formatted-text-field";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
@@ -245,21 +257,52 @@ export function MinecraftSidebar({
                                 {problems.count}
                             </p>
                         )}
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            className="self-start"
-                            disabled={draft.lines.length >= SIDEBAR_LINES_MAX}
-                            onClick={() => {
-                                order.added();
-                                change({ lines: [...draft.lines, ""] });
-                            }}
-                        >
-                            <Plus className="size-4" /> Add a line
-                        </Button>
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                disabled={draft.lines.length >= SIDEBAR_LINES_MAX}
+                                onClick={() => {
+                                    order.added();
+                                    change({ lines: [...draft.lines, ""] });
+                                }}
+                            >
+                                <Plus className="size-4" /> Add a line
+                            </Button>
+                            {/* The rankings and the last death, a heading and the
+                                list under it, for somebody who does not know the
+                                variables by name. */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        disabled={draft.lines.length + 2 > SIDEBAR_LINES_MAX}
+                                    >
+                                        <Trophy className="size-4" /> Add a leaderboard
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start">
+                                    {SIDEBAR_BLOCKS.map((block) => (
+                                        <DropdownMenuItem
+                                            key={block.id}
+                                            onSelect={() => {
+                                                const next = withBlock(draft.lines, block, SIDEBAR_LINES_MAX);
+                                                if (!next) return;
+                                                for (let added = 0; added < block.lines.length; added += 1) order.added();
+                                                change({ lines: next });
+                                            }}
+                                        >
+                                            {block.label}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
                         <p className="text-xs text-muted-foreground">
                             An empty line is a gap. Drag one under the title to space it from the
-                            lines below.
+                            lines below. Type {"{"} in a line for any value: players online, the
+                            call, the last death, a leaderboard.
                         </p>
                     </div>
 
