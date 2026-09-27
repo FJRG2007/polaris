@@ -507,6 +507,11 @@ export async function send(
     // Not awaited, and never allowed to fail the send: a message going out
     // matters more than the notification about it.
     void announceRoomMention(input.channelId, actor.id, input.body, id).catch(() => undefined);
+    // Into the game, for whoever is playing and asked for it - see `game-relay`.
+    // Loaded when it runs, so a Polaris with no game running pays nothing for it.
+    void import("./game-relay")
+        .then((relay) => relay.relayToGames(id))
+        .catch((error: unknown) => console.error("polaris: a message could not be relayed:", error));
 
     return id;
 }

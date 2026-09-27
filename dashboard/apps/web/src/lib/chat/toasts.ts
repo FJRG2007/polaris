@@ -138,6 +138,23 @@ export function describeFiles(files: readonly ToastFile[]): string {
 }
 
 /** The picture to show for these files, when the first one has one to show. */
+/** What a conversation is called from one reader's side: a channel's name, or
+ *  whoever else is in the direct message or group. */
+export function conversationName(
+    channel: {
+        readonly spaceId: string | null;
+        readonly name: string;
+        readonly members: readonly { readonly userId: string; readonly user: { readonly name: string } }[];
+    },
+    readerId: string
+): string {
+    if (channel.spaceId) return channel.name;
+    const others = channel.members
+        .filter((member) => member.userId !== readerId)
+        .map((member) => member.user.name);
+    return channel.name || others.join(", ") || "Direct message";
+}
+
 export function previewOf(files: readonly ToastFile[]): MessageToastMedia | null {
     const [first] = files;
     if (!first || first.spoiler) return null;
@@ -241,15 +258,10 @@ export async function messageToasts(
         }
         seen.add(row.channelId);
 
-        const others = row.channel.members
-            .filter((member) => member.userId !== actor.id)
-            .map((member) => member.user.name);
         toasts.push({
             channelId: row.channelId,
             messageId: row.id,
-            conversation: row.channel.spaceId
-                ? row.channel.name
-                : row.channel.name || others.join(", ") || "Direct message",
+            conversation: conversationName(row.channel, actor.id),
             inChannel: row.channel.spaceId !== null,
             authorId: row.authorId,
             authorName: (row.authorId && names.get(row.authorId)) || "Somebody",

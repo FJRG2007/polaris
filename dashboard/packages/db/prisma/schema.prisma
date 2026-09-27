@@ -125,6 +125,10 @@ model User {
     // order, as a stringified JSON array of app ids. Null is none pinned, which
     // fills that row with recent and suggested apps instead.
     favoriteApps  String?
+    // Whether the messages this account receives in Chat are also shown to it,
+    // and only to it, inside the game server it is playing on right now. Off
+    // until the account turns it on; an app that can deliver one decides how.
+    messagesInGame Boolean @default(false)
     // Owned by the better-auth two-factor plugin; flipped on once the user has
     // verified their authenticator, and back off when they disable it.
     twoFactorEnabled Boolean @default(false)

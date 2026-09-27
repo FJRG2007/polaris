@@ -20,12 +20,15 @@ export function NotificationsPageView({
     rules,
     destinations,
     senders,
-    deliveries
+    deliveries,
+    messagesInGame
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
     destinations: DestinationView[];
     senders: SmsSenderView[];
     deliveries: DeliveryView[];
+    /** Whether Chat messages are shown inside a game, or null where no app can. */
+    messagesInGame: boolean | null;
 }) {
     const [tab, setTab] = useState<"history" | "settings">("history");
 
@@ -62,6 +65,7 @@ export function NotificationsPageView({
                     destinations={destinations}
                     senders={senders}
                     deliveries={deliveries}
+                    messagesInGame={messagesInGame}
                 />
             ) : null}
         </div>

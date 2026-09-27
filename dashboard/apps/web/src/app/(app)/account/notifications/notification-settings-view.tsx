@@ -13,7 +13,7 @@
 
 import { DeliveryLog } from "./delivery-log";
 import { DestinationsCard } from "./destinations-card";
-import { saveNotificationRuleAction, saveSoundVolumeAction } from "./actions";
+import { saveNotificationRuleAction, saveSoundVolumeAction, setMessagesInGameAction } from "./actions";
 import { DEFAULT_SOUND_VOLUME } from "@/lib/notifications/sound-volume";
 import {
     useCallback,
@@ -77,12 +77,15 @@ export function NotificationSettingsView({
     rules,
     destinations,
     senders,
-    deliveries
+    deliveries,
+    messagesInGame = null
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
     destinations: DestinationView[];
     senders: SmsSenderView[];
     deliveries: DeliveryView[];
+    /** Whether Chat messages are shown inside a game, or null where no app can. */
+    messagesInGame?: boolean | null;
 }) {
     const [state, setState] = useState(() => new Map(rules.map((entry) => [entry.event, entry.rule])));
     const [error, setError] = useState<string | null>(null);
@@ -118,6 +121,7 @@ export function NotificationSettingsView({
             <BrowserNoticesCard />
             <SoundCard />
             <TabIconCard />
+            {messagesInGame !== null ? <InGameCard initial={messagesInGame} /> : null}
 
             {groups.map((group) => (
                 <EventGroup
@@ -132,6 +136,55 @@ export function NotificationSettingsView({
             <DestinationsCard destinations={destinations} smsReady={senders.some((s) => s.status === "connected")} />
             <DeliveryLog deliveries={deliveries} />
         </div>
+    );
+}
+
+/**
+ * Chat messages in the game somebody is playing.
+ *
+ * On the account rather than the device, unlike the chime: it is about where
+ * this person is, not which machine they are at. Optimistic, and put back with
+ * the reason if the save is refused.
+ */
+function InGameCard({ initial }: { initial: boolean }) {
+    const [on, setOn] = useState(initial);
+    const [problem, setProblem] = useState<string | null>(null);
+    const [, startSaving] = useTransition();
+
+    function toggle(next: boolean) {
+        setOn(next);
+        setProblem(null);
+        startSaving(async () => {
+            const result = await setMessagesInGameAction(next).catch(() => ({
+                error: "That could not be saved. Try again."
+            }));
+            if ("error" in result && result.error) {
+                setOn(!next);
+                setProblem(result.error);
+            }
+        });
+    }
+
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                        <p className="text-sm font-medium">Messages in Minecraft</p>
+                        <p className="text-xs text-muted-foreground">
+                            While you play on a server here, your Chat messages also appear in
+                            its game chat. Only you see them.
+                        </p>
+                    </div>
+                    <Switch
+                        checked={on}
+                        onChange={toggle}
+                        aria-label="Show my Chat messages in Minecraft while I play"
+                    />
+                </div>
+                {problem ? <p className="text-xs text-danger">{problem}</p> : null}
+            </CardBody>
+        </Card>
     );
 }
 
