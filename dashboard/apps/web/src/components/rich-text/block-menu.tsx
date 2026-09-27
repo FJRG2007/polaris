@@ -154,7 +154,7 @@ const Menu = forwardRef<SuggestionHandle, SuggestionProps<BlockCommand>>(functio
                         onMouseEnter={() => setActive(index)}
                         className={cn(
                             POPUP_ITEM_CLASS,
-                            index === active ? "bg-muted" : "hover:bg-muted/60"
+                            index === active ? "bg-option-hover" : "hover:bg-option-hover/60"
                         )}
                     >
                         <item.icon className="size-4 shrink-0 text-muted-foreground" />

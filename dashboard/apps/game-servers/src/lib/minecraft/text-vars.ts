@@ -53,7 +53,17 @@ export interface VariableSpec {
     /** For a game variable: the text component that draws it for `@s`. */
     readonly component?: Readonly<Record<string, unknown>>;
     /** For a score: the objective and the criterion that keeps it current. */
-    readonly objective?: { readonly name: string; readonly criterion: string };
+    readonly objective?: {
+        readonly name: string;
+        readonly criterion: string;
+        /**
+         * The command that writes every player's current value into it. The
+         * game only writes a score when the value changes, so a new objective
+         * holds nothing for somebody whose level never moves - and the variable
+         * drew as nothing at all.
+         */
+        readonly seed: string;
+    };
     /** Whether Bedrock can draw it: its scoreboard has no criteria but `dummy`. */
     readonly bedrock: boolean;
     /**
@@ -64,8 +74,16 @@ export interface VariableSpec {
     readonly width: number;
 }
 
-const LEVEL = { name: "polaris_level", criterion: "level" } as const;
-const HEALTH = { name: "polaris_health", criterion: "health" } as const;
+const LEVEL = {
+    name: "polaris_level",
+    criterion: "level",
+    seed: "execute as @a store result score @s polaris_level run xp query @s levels"
+} as const;
+const HEALTH = {
+    name: "polaris_health",
+    criterion: "health",
+    seed: "execute as @a store result score @s polaris_health run data get entity @s Health"
+} as const;
 
 export const VARIABLES: readonly VariableSpec[] = [
     {
@@ -302,8 +320,10 @@ export function usesAccount(text: string): boolean {
 }
 
 /** The scores a text reads, so the objectives behind them exist before it goes. */
-export function objectivesIn(text: string): { name: string; criterion: string }[] {
-    const found = new Map<string, { name: string; criterion: string }>();
+export function objectivesIn(
+    text: string
+): { name: string; criterion: string; seed: string }[] {
+    const found = new Map<string, { name: string; criterion: string; seed: string }>();
     for (const use of variablesIn(text)) {
         const objective = use.spec?.objective;
         if (objective) found.set(objective.name, objective);

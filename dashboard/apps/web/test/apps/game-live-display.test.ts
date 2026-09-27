@@ -169,6 +169,25 @@ describe("writing it once per player when it reads their account", () => {
         expect(lines[0]).toBe("scoreboard objectives add polaris_level level");
         expect(lines.at(-1)).toMatch(/^execute as @a run title @s title /);
     });
+
+    it("fills in everybody's level first, since the game only writes one when it changes", () => {
+        const lines = announcementCommands(
+            "java",
+            draft({ title: "Level {player.level}", subtitle: "Health {player.health}" })
+        );
+        const seedLevel =
+            "execute as @a store result score @s polaris_level run xp query @s levels";
+        const seedHealth =
+            "execute as @a store result score @s polaris_health run data get entity @s Health";
+        expect(lines.filter((line) => line === seedLevel)).toHaveLength(1);
+        expect(lines.indexOf(seedLevel)).toBeGreaterThan(
+            lines.indexOf("scoreboard objectives add polaris_level level")
+        );
+        expect(lines.indexOf(seedLevel)).toBeLessThan(
+            lines.findIndex((line) => line.includes("title @s"))
+        );
+        expect(lines).toContain(seedHealth);
+    });
 });
 
 describe("keeping it on screen", () => {
@@ -207,6 +226,10 @@ describe("keeping it on screen", () => {
                 line.startsWith("scoreboard")
             )
         ).toBe(false);
+        // Filled again on every repeat, for whoever has joined since.
+        expect(announcementCommands("java", held, undefined, "actionbar")[0]).toBe(
+            "execute as @a store result score @s polaris_level run xp query @s levels"
+        );
     });
 
     it("takes it down in each edition's own words", () => {

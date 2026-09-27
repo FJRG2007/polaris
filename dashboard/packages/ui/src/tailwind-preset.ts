@@ -38,6 +38,8 @@ const preset: Omit<Config, "content"> = {
                 surface: withAlpha("surface"),
                 card: { DEFAULT: withAlpha("card"), hover: withAlpha("card-hover") },
                 elevated: withAlpha("elevated"),
+                // The highlighted item of a list opened over the page.
+                option: { hover: withAlpha("option-hover") },
                 // Text, brightest to faintest. `muted.foreground` is the second
                 // step and `foreground.subtle` the third.
                 foreground: {

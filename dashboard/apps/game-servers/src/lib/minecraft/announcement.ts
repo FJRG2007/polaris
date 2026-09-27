@@ -378,9 +378,13 @@ export function announcementCommands(
     );
     return lines.filter(
         (line, index) =>
-            !line.startsWith("scoreboard objectives add ") || lines.indexOf(line) === index
+            !(line.startsWith("scoreboard objectives add ") || line.startsWith(SEED)) ||
+            lines.indexOf(line) === index
     );
 }
+
+/** How the command that fills a score for everybody begins. */
+const SEED = "execute as @a store result score @s ";
 
 /** The lines for one target: a selector, or one player's name. */
 function commandsFor(
@@ -424,16 +428,21 @@ function commandsFor(
     const held = announcement.hold !== "timed";
     const fields = [announcement.title, announcement.subtitle, announcement.actionbar];
     if (part === "all") fields.push(announcement.chat);
-    const lines: string[] =
-        java && part === "all"
-            ? fields
-                  .flatMap((text) => objectivesIn(text))
-                  .filter(
-                      (one, index, all) =>
-                          all.findIndex((other) => other.name === one.name) === index
-                  )
-                  .map((one) => `scoreboard objectives add ${one.name} ${one.criterion}`)
-            : [];
+    const objectives = java
+        ? fields
+              .flatMap((text) => objectivesIn(text))
+              .filter(
+                  (one, index, all) => all.findIndex((other) => other.name === one.name) === index
+              )
+        : [];
+    // Made once, and filled with everybody's value every time: a line kept on
+    // screen is sent again, and reaches whoever has joined since.
+    const lines: string[] = [
+        ...(part === "all"
+            ? objectives.map((one) => `scoreboard objectives add ${one.name} ${one.criterion}`)
+            : []),
+        ...objectives.map((one) => one.seed)
+    ];
 
     const title = hasText(announcement.title);
     const subtitle = hasText(announcement.subtitle);

@@ -77,7 +77,7 @@ export interface SidebarConfig {
 }
 
 /** The most texts one line takes turns between. */
-export const SIDEBAR_FRAMES_MAX = 8;
+export const SIDEBAR_FRAMES_MAX = 32;
 /** How long a turn lasts, in seconds, at least and at most. */
 export const SIDEBAR_EVERY_MIN = 2;
 export const SIDEBAR_EVERY_MAX = 600;

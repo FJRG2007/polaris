@@ -159,7 +159,9 @@ export function GamePicker({
                                     onClick={() => choose(game)}
                                     className={cn(
                                         "flex w-full items-center gap-3 rounded-md p-2 text-left text-sm transition-colors",
-                                        game.id === value ? "bg-muted" : "hover:bg-muted/60"
+                                        game.id === value
+                                            ? "bg-option-hover"
+                                            : "hover:bg-option-hover/60"
                                     )}
                                 >
                                     <GameLogo game={game} className="size-8" />
