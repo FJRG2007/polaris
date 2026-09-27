@@ -349,7 +349,9 @@ describe("sharing a window that stopped sending pictures", () => {
                 onLeave={() => undefined}
             />
         );
-        expect(screen.getByText(/stopped sending new pictures/).getAttribute("role")).toBe("status");
+        expect(screen.getByText(/stopped sending new pictures/).getAttribute("role")).toBe(
+            "status"
+        );
         rerender(
             <CallRoom
                 meetingId="m1"
