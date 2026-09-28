@@ -68,6 +68,10 @@ let config: Record<string, unknown> = {};
 const held: string[] = [];
 const released: string[] = [];
 
+/** Bumped on every look, so a player who is not still has always moved - a
+ *  block and a turn, well past the threshold for standing still. */
+let step = 0;
+
 function answer(line: string): string {
     world.sent.push(line);
     if (line === "difficulty") return `The difficulty is ${world.difficulty}`;
@@ -90,15 +94,16 @@ function answer(line: string): string {
     if (line.includes("as @a[distance=0..] run data get entity @s Pos")) {
         return world.online
             .filter((name) => (world.dims[name] ?? "minecraft:overworld") === "minecraft:overworld")
-            .map((name, index) => `${name} has the following entity data: [${index * 10 + Math.random()}d, 64.0d, 0.0d]`)
+            .map((name, index) => `${name} has the following entity data: [${index * 10 + step}d, 64.0d, 0.0d]`)
             .join("\n");
     }
     if (line === "execute as @a run data get entity @s Pos") {
+        step += 1;
         return world.online
             .map((name, index) =>
                 world.still.includes(name)
                     ? `${name} has the following entity data: [100.0d, 64.0d, 100.0d]`
-                    : `${name} has the following entity data: [${index * 10 + Math.random()}d, 64.0d, 0.0d]`
+                    : `${name} has the following entity data: [${index * 10 + step}d, 64.0d, 0.0d]`
             )
             .join("\n");
     }
@@ -107,7 +112,7 @@ function answer(line: string): string {
             .map((name) =>
                 world.still.includes(name)
                     ? `${name} has the following entity data: [10.0f, 0.0f]`
-                    : `${name} has the following entity data: [${Math.random() * 360}f, 0.0f]`
+                    : `${name} has the following entity data: [${(step * 37) % 360}f, 0.0f]`
             )
             .join("\n");
     }
