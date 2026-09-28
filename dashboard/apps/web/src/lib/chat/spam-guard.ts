@@ -17,8 +17,12 @@ import { ChatRuleError } from "./access";
 import { channelMentions, extractReferences } from "@/components/rich-text/markdown";
 
 /** How many people's mentions are checked against the recent ones, at most.
- *  The per-message limit already bounds a message; this bounds the queries. */
+ *  The per-message limit already bounds a message; this bounds the check. */
 const CHECKED_PEOPLE = 10;
+
+/** How many of the author's recent messages are read for mentions of the same
+ *  person. Far above what anyone sends in the window at the default rate. */
+const RECENT_BODIES = 500;
 
 /**
  * Refuse a message the spam limits do not allow.
@@ -68,17 +72,25 @@ export async function requireNotSpam(input: {
         await requireRoomMentionAllowed({ rules, channelId, authorId, now });
     }
 
-    if (rules.maxSamePersonMentions !== core.CHAT_NO_LIMIT && people.length > 0) {
-        const since = new Date(now - core.CHAT_SPAM_WINDOWS.samePersonMs);
-        for (const person of people.filter((ref) => ref.kind === "user").slice(0, CHECKED_PEOPLE)) {
-            const times = await prisma.chatMessage.count({
-                where: { ...mine, createdAt: { gte: since }, body: { contains: `polaris:user/${person.id}` } }
-            });
-            if (times >= rules.maxSamePersonMentions) {
-                throw new ChatRuleError(
-                    "You have mentioned the same person a lot in the last few minutes. They have been told - give them a moment."
-                );
+    const mentioned = people.filter((ref) => ref.kind === "user").slice(0, CHECKED_PEOPLE);
+    if (rules.maxSamePersonMentions !== core.CHAT_NO_LIMIT && mentioned.length > 0) {
+        const recent = await prisma.chatMessage.findMany({
+            where: { ...mine, createdAt: { gte: new Date(now - core.CHAT_SPAM_WINDOWS.samePersonMs) } },
+            orderBy: { createdAt: "desc" },
+            select: { body: true },
+            take: RECENT_BODIES
+        });
+        const times = new Map<string, number>();
+        for (const message of recent) {
+            if (!message.body.toLowerCase().includes("polaris:user/")) continue;
+            for (const ref of extractReferences(message.body)) {
+                if (ref.kind === "user") times.set(ref.id, (times.get(ref.id) ?? 0) + 1);
             }
+        }
+        if (mentioned.some((person) => (times.get(person.id) ?? 0) >= rules.maxSamePersonMentions)) {
+            throw new ChatRuleError(
+                "You have mentioned the same person a lot in the last few minutes. They have been told - give them a moment."
+            );
         }
     }
 }

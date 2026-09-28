@@ -340,6 +340,14 @@ describe("how fast somebody may talk", () => {
         ).rejects.toBeInstanceOf(ChatRuleError);
     });
 
+    it("does not hold an edit, which sends nothing new", async () => {
+        const { edit } = await import("@/lib/chat/messages");
+        rules = { ...DEFAULT_CHAT_RULES, maxPerMinute: 3 };
+        recent = 3;
+        await edit(actor, { messageId: "message-1", body: "after" });
+        expect(written.updates.at(-1)?.data.body).toBe("after");
+    });
+
     it("allows the one that reaches it", async () => {
         const { send } = await import("@/lib/chat/messages");
         rules = { ...DEFAULT_CHAT_RULES, maxPerMinute: 3 };

@@ -116,6 +116,17 @@ describe("mentioning people", () => {
         for (let index = 0; index < 5; index += 1) said(`${mention(ANA)} ping ${index}`, 11 + index);
         await expect(send(`${mention(ANA)} hi`)).resolves.toBeUndefined();
     });
+
+    it("counts a mention however its address is cased", async () => {
+        for (let index = 0; index < 5; index += 1) said(`[@Ana](POLARIS:user/${ANA.toUpperCase()}) ping ${index}`, index);
+        await expect(send(`${mention(ANA)} again`)).rejects.toThrow("mentioned the same person a lot");
+        await expect(send(`[@Ana](polaris:USER/${ANA.toUpperCase()}) again`)).rejects.toThrow("mentioned the same person a lot");
+    });
+
+    it("does not count an address inside code", async () => {
+        for (let index = 0; index < 5; index += 1) said(`\`polaris:user/${ANA}\` ${index}`, index);
+        await expect(send(`${mention(ANA)} hi`)).resolves.toBeUndefined();
+    });
 });
 
 describe("the same message again", () => {

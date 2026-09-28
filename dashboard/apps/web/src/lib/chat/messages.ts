@@ -587,7 +587,7 @@ async function requireSendable(
         );
     }
 
-    if (rules.maxPerMinute !== core.CHAT_NO_LIMIT) {
+    if (rules.maxPerMinute !== core.CHAT_NO_LIMIT && options.wait !== false) {
         const recent = await prisma.chatMessage.count({
             where: {
                 channelId,
