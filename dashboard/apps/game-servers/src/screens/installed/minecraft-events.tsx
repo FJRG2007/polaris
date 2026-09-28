@@ -529,7 +529,7 @@ export function MinecraftEvents({
             <Card>
                 <CardBody className="flex flex-col gap-4">
                     <div>
-                        <p className="text-sm font-medium">On their own</p>
+                        <p className="text-sm font-medium">Automatic events</p>
                         <p className="text-xs text-muted-foreground">
                             An automatic event only starts while enough players are actually playing
                             - somebody who has not moved or turned for a while does not count.
@@ -627,7 +627,7 @@ export function MinecraftEvents({
                             <div className="flex flex-col gap-3 border-t border-border pt-4">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
-                                        <p className="text-sm font-medium">Drawn at random</p>
+                                        <p className="text-sm font-medium">Random events</p>
                                         <p className="text-xs text-muted-foreground">
                                             In the hours below, an event is drawn from the ones
                                             ticked every so often, weighted, and never the same kind
@@ -672,7 +672,7 @@ export function MinecraftEvents({
                                             </label>
                                             <label className="flex flex-col gap-1 text-sm">
                                                 <span className="font-medium">
-                                                    Wait at least (min)
+                                                    Time between events: at least (min)
                                                 </span>
                                                 <Input
                                                     type="number"
@@ -693,7 +693,7 @@ export function MinecraftEvents({
                                                 />
                                             </label>
                                             <label className="flex flex-col gap-1 text-sm">
-                                                <span className="font-medium">At most (min)</span>
+                                                <span className="font-medium">and at most (min)</span>
                                                 <Input
                                                     type="number"
                                                     min={15}

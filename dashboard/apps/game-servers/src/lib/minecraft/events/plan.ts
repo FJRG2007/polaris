@@ -255,10 +255,12 @@ export interface Placed {
  */
 export function podium(
     scores: ReadonlyMap<string, number>,
-    disqualified: ReadonlySet<string>
+    disqualified: ReadonlySet<string>,
+    /** The least that ranks at all - see `minScoreOf`. */
+    minScore = 1
 ): Placed[] {
     const ranked = [...scores.entries()]
-        .filter(([name, score]) => score > 0 && !disqualified.has(name.toLowerCase()))
+        .filter(([name, score]) => score >= Math.max(1, minScore) && !disqualified.has(name.toLowerCase()))
         .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
     const placed: Placed[] = [];
     ranked.forEach(([name, score], index) => {

@@ -86,7 +86,7 @@ describe("the Events tab", () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         expect(screen.getByText("Now")).toBeTruthy();
         expect(screen.getByText("Events")).toBeTruthy();
-        expect(screen.getByText("On their own")).toBeTruthy();
+        expect(screen.getByText("Automatic events")).toBeTruthy();
         expect(screen.getByText("History")).toBeTruthy();
         expect(screen.queryByText("Fishing contest")).toBeNull();
     });

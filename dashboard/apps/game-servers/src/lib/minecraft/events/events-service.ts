@@ -1061,8 +1061,13 @@ async function finish(
         if (server && outcome === "finished" && run.phase === "running" && info.competitive) {
             disqualified = await disqualifiedSince(installedAppId, run.startsAt);
             const { scores, took } = await results(server, run);
-            placed = plan.podium(scores, disqualified);
-            const owed = plan.prizes(placed, took, preset.rewards, disqualified);
+            const minimum = catalog.minScoreOf(preset);
+            placed = plan.podium(scores, disqualified, minimum);
+            // Taking part is reaching the minimum too - one zombie is not taking part
+            // in a hunt. A blood moon's is surviving it, which is its own bar.
+            const counted =
+                preset.kind === "blood-moon" ? took : took.filter((name) => (scores.get(name) ?? 0) >= minimum);
+            const owed = plan.prizes(placed, counted, preset.rewards, disqualified);
             const online = new Set(
                 commands
                     .readWhere(await server.say([commands.WHERE]))

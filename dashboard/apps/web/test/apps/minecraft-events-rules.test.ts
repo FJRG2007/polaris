@@ -419,3 +419,25 @@ describe("a competition with prizes, on its own", () => {
         expect(decided.waiting).toBe("Waiting for 2 active players (1 now)");
     });
 });
+
+describe("the least to be ranked", () => {
+    it("has a sensible default for every kind, and a stored one wins", () => {
+        expect(catalog.minScoreOf(catalog.newPreset("mob-hunt", "a"))).toBe(5);
+        expect(catalog.minScoreOf(catalog.newPreset("explorer", "b"))).toBe(250);
+        expect(catalog.minScoreOf({ ...catalog.newPreset("fishing", "c"), minScore: 10 })).toBe(10);
+        // Saved before the setting existed: the kind's default.
+        const { minScore: _dropped, ...older } = catalog.newPreset("king-of-the-hill", "d");
+        expect(catalog.minScoreOf(older as catalog.EventPreset)).toBe(30);
+    });
+
+    it("is not asked of a supply drop or a race, which have one winner", () => {
+        expect(catalog.hasMinScore(catalog.newPreset("supply-drop", "e"))).toBe(false);
+        const race = { ...catalog.newPreset("explorer", "f"), options: { mode: "race" as const, distance: 500, place: { mode: "players" as const } } };
+        expect(catalog.hasMinScore(race)).toBe(false);
+        expect(catalog.minScoreOf(race)).toBe(1);
+    });
+
+    it("keeps anybody under it off the podium", () => {
+        expect(plan.podium(new Map([["Ana", 6], ["Ben", 4]]), new Set(), 5)).toEqual([{ place: 1, name: "Ana", score: 6 }]);
+    });
+});

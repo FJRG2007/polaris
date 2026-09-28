@@ -716,6 +716,28 @@ export function EventEditor({
                         )}
                     </div>
 
+                    {catalog.hasMinScore(draft) && (
+                        <Field
+                            label={`Least to be ranked (${catalog.KIND_INFO[draft.kind].unit})`}
+                            hint="Below this a player is not on the podium and gets no prize for taking part. Nobody reaching it means nobody wins."
+                            problem={problemAt(issues, "minScore")}
+                        >
+                            <Input
+                                type="number"
+                                min={1}
+                                className="w-32"
+                                value={
+                                    Number.isFinite(catalog.minScoreOf(draft))
+                                        ? catalog.minScoreOf(draft)
+                                        : ""
+                                }
+                                onChange={(event) =>
+                                    change({ minScore: numberOf(event.target.value) })
+                                }
+                            />
+                        </Field>
+                    )}
+
                     <OptionsFields
                         preset={draft}
                         issues={issues}

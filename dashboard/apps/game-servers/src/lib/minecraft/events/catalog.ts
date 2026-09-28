@@ -165,6 +165,8 @@ export interface EventPreset<K extends EventKind = EventKind> {
     readonly name: string;
     readonly enabled: boolean;
     readonly minutes: number;
+    /** The least to be ranked; absent reads the kind's default (`minScoreOf`). */
+    readonly minScore?: number;
     readonly options: EventOptions<K>;
     readonly rewards: Rewards;
 }
@@ -176,6 +178,10 @@ const presetBase = z.object({
     name: z.string().trim().min(1, "Give it a name").max(40, "At most 40 characters"),
     enabled: z.boolean().default(true),
     minutes: z.number().int().min(DURATION.min).max(DURATION.max).default(10),
+    /** The least a player must score to be ranked at all, and to get the prize
+     *  for taking part. Absent on an event saved before it existed, which then
+     *  reads its kind's default (`minScoreOf`). */
+    minScore: z.number().int().min(1, "At least 1").max(1_000_000).optional(),
     rewards: rewardsSchema
 });
 
@@ -401,6 +407,7 @@ export function newPreset(kind: EventKind, id: string): EventPreset {
         name: KIND_INFO[kind].label,
         enabled: true,
         minutes: kind === "happy-hour" ? 20 : kind === "trivia" ? 5 : 10,
+        minScore: DEFAULT_MIN_SCORE[kind],
         options,
         rewards: KIND_INFO[kind].competitive
             ? DEFAULT_REWARDS
@@ -480,6 +487,36 @@ export const PRIZE_COMPETITION_FLOOR = 2;
 
 export function activeNeeded(preset: EventPreset, settings: EventSettings): number {
     return awardsPrizes(preset) ? Math.max(settings.minActive, PRIZE_COMPETITION_FLOOR) : settings.minActive;
+}
+
+/**
+ * What each kind asks for before somebody is ranked, in its own unit: enough to
+ * say they took part rather than happened to be there. Two players who each
+ * kill one zombie are not a podium; nobody reaching it means nobody wins.
+ */
+export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
+    "mining-rush": 10,
+    "mob-hunt": 5,
+    "supply-drop": 1,
+    "blood-moon": 3,
+    "world-boss": 20,
+    fishing: 3,
+    trivia: 1,
+    explorer: 250,
+    "happy-hour": 1,
+    "king-of-the-hill": 30
+};
+
+/** Whether the minimum is something an operator can set for this event. A
+ *  supply drop and a race have one winner and nothing to count. */
+export function hasMinScore(preset: EventPreset): boolean {
+    if (!KIND_INFO[preset.kind].competitive || preset.kind === "supply-drop") return false;
+    return !(preset.kind === "explorer" && (preset.options as EventOptions<"explorer">).mode === "race");
+}
+
+export function minScoreOf(preset: EventPreset): number {
+    if (!hasMinScore(preset)) return 1;
+    return preset.minScore ?? DEFAULT_MIN_SCORE[preset.kind];
 }
 
 export function runMinutes(preset: EventPreset): number {

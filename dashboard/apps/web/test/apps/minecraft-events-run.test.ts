@@ -285,7 +285,7 @@ describe("a mining rush, from start to podium", () => {
             )
         ).toBe(true);
 
-        world.scores = { Ana: 12, Ben: 4 };
+        world.scores = { Ana: 30, Ben: 12 };
         // Ben leaves before the end; his score is still read, by name.
         await play(60_000);
         world.online = ["Ana"];
@@ -295,8 +295,8 @@ describe("a mining rush, from start to podium", () => {
         expect(after.run).toBeNull();
         expect(after.history[0]).toMatchObject({ outcome: "finished", presetId: "rush" });
         expect(after.history[0]?.podium).toEqual([
-            { place: 1, name: "Ana", score: 12 },
-            { place: 2, name: "Ben", score: 4 }
+            { place: 1, name: "Ana", score: 30 },
+            { place: 2, name: "Ben", score: 12 }
         ]);
         expect(world.sent).toContain("give Ana minecraft:diamond 5");
         expect(world.sent).toContain("xp add Ana 15 levels");
@@ -323,11 +323,11 @@ describe("a mining rush, from start to podium", () => {
             startedBy: null
         });
         await play(2_100);
-        world.scores = { Ana: 50, Ben: 4 };
+        world.scores = { Ana: 50, Ben: 14 };
         world.flagged = ["ana"];
         await play(3 * 60_000);
         const entry = state().history[0];
-        expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 4 }]);
+        expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 14 }]);
         expect(entry?.disqualified).toEqual(["Ana"]);
         expect(world.sent.some((line) => line.startsWith("give Ana"))).toBe(false);
     });
@@ -833,10 +833,10 @@ describe("when things go wrong", () => {
         await events.sweepEvents();
         expect(events.runningEvents()).toContain(SERVER);
         expect(held).toContain(SERVER);
-        world.scores = { Ana: 3 };
+        world.scores = { Ana: 13 };
         await play(62_000);
         expect(state().history[0]).toMatchObject({ id: "resumed", outcome: "finished" });
-        expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 3 }]);
+        expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 13 }]);
     });
 
     it("never plays a run again whose end had already begun", async () => {
@@ -878,7 +878,7 @@ describe("when things go wrong", () => {
             startedBy: null
         });
         await play(2_100);
-        world.scores = { Ana: 4 };
+        world.scores = { Ana: 14 };
         const say = server.say;
         let swept = false;
         server.say = async (argv) => {
@@ -903,5 +903,30 @@ describe("when things go wrong", () => {
         expect(state().history.filter((one) => one.id === id)).toHaveLength(1);
         expect(state().run).toBeNull();
         expect(events.runningEvents()).not.toContain(SERVER);
+    });
+});
+
+describe("the least to be ranked", () => {
+    it("keeps a token score off the podium and out of the prizes", async () => {
+        const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 3 };
+        expect(catalog.minScoreOf(hunt)).toBe(5);
+        setUp([hunt]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hunt", trigger: "manual", startedBy: null });
+        await play(2_100);
+        world.scores = { Ana: 7, Ben: 1 };
+        await play(3 * 60_000);
+        expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 7 }]);
+        expect(world.sent.some((line) => line.startsWith("give Ben"))).toBe(false);
+    });
+
+    it("means nobody wins when nobody reaches it", async () => {
+        const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 3 };
+        setUp([hunt]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hunt", trigger: "manual", startedBy: null });
+        await play(2_100);
+        world.scores = { Ana: 2, Ben: 1 };
+        await play(3 * 60_000);
+        expect(state().history[0]?.podium).toEqual([]);
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
     });
 });
