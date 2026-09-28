@@ -105,6 +105,11 @@ describe("a server on an older build", () => {
         expect(login.modOutdated({ ...base, on: false })).toBe(false);
         expect(login.modOutdated({ ...base, health: "silent" })).toBe(false);
         expect(login.modOutdated({ ...base, health: "waiting" })).toBe(false);
+        // The check-in is from before the restart that is running the new build.
+        const before = new Date("2026-09-28T10:00:00Z");
+        const restarted = new Date("2026-09-28T10:01:00Z");
+        expect(login.modOutdated({ ...base, seenAt: before, upSince: restarted })).toBe(false);
+        expect(login.modOutdated({ ...base, seenAt: restarted, upSince: before })).toBe(true);
     });
 });
 

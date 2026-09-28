@@ -14,14 +14,27 @@
  *
  * Shown by every screen whose changes need a restart, so a server never learns two
  * different vocabularies for the same act.
+ *
+ * Once a restart is under way - pressed now, or a booked one that has just run -
+ * the card says so until the screen that drew it hides it. Whatever it was about
+ * (an update, a setting) is only in force once the server is back and has said
+ * so, and until then the card used to offer the same three buttons again, which
+ * read exactly like the press had been ignored.
  */
 
 import * as actions from "./restart-actions";
-import { useCallback, useEffect, useState } from "react";
+import { hostUi } from "@polaris/app-host/client";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import type { PendingRestart } from "../../lib/games-restart";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarClock, Loader2, RotateCcw, Users, X } from "lucide-react";
-import { hostUi } from "@polaris/app-host/client";
+
+/** How long "restarting" is said for before the buttons come back: a server that
+ *  is not back by then has a problem the card cannot describe, and somebody may
+ *  want to press again. */
+const RESTARTING_FOR_MS = 10 * 60_000;
+/** How often a booked restart is asked about, to notice it has run. */
+const WATCH_BOOKED_MS = 15_000;
 
 const { RelativeTime } = hostUi.relativeTime;
 
@@ -50,13 +63,28 @@ export function RestartPlanner({
     onRestarted?: () => void;
 }) {
     const [pending, setPending] = useState<PendingRestart | null>(null);
-    const [busy, setBusy] = useState(false);
+    const [busy, setBusy] = useState<"empty" | "at" | "now" | "cancel" | null>(null);
+    /** When a restart began, as far as this screen knows. */
+    const [restartingSince, setRestartingSince] = useState<number | null>(null);
+    /** Whether a booking was last seen, so one that disappears can be told apart. */
+    const booked = useRef(false);
+    /** Whether the server has been seen down since the restart began. */
+    const wentDown = useRef(false);
+    const wasChanged = useRef(changed);
+    const restarted = useRef(onRestarted);
+    restarted.current = onRestarted;
     const [error, setError] = useState<string | null>(null);
     /** The time somebody is typing, while they are typing it. */
     const [at, setAt] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         const answer = await actions.readGameRestartAction(installedAppId);
+        // A booking that is gone without anybody calling it off here is one that ran.
+        if (booked.current && !answer.pending) {
+            setRestartingSince(Date.now());
+            restarted.current?.();
+        }
+        booked.current = answer.pending !== null;
         setPending(answer.pending);
     }, [installedAppId]);
 
@@ -64,8 +92,36 @@ export function RestartPlanner({
         void load();
     }, [load]);
 
+    // Only while something is booked: that is the one state that changes on its
+    // own, when the server empties or the time comes.
+    useEffect(() => {
+        if (!pending) return;
+        const timer = setInterval(() => void load(), WATCH_BOOKED_MS);
+        return () => clearInterval(timer);
+    }, [pending, load]);
+
+    useEffect(() => {
+        if (restartingSince === null) return;
+        const left = restartingSince + RESTARTING_FOR_MS - Date.now();
+        const timer = setTimeout(() => setRestartingSince(null), Math.max(0, left));
+        return () => clearTimeout(timer);
+    }, [restartingSince]);
+
+    // Back up after going down is the restart finished, and a change saved since
+    // is a new one that needs its own answer.
+    useEffect(() => {
+        const newChange = changed && !wasChanged.current;
+        wasChanged.current = changed;
+        if (restartingSince === null) {
+            wentDown.current = false;
+            return;
+        }
+        if (!running) wentDown.current = true;
+        else if (wentDown.current || newChange) setRestartingSince(null);
+    }, [running, changed, restartingSince]);
+
     async function book(when: "empty" | "at", moment?: string): Promise<void> {
-        setBusy(true);
+        setBusy(when);
         setError(null);
         const answer = await actions.scheduleGameRestartAction({
             installedAppId,
@@ -75,38 +131,59 @@ export function RestartPlanner({
             at: moment ? new Date(moment).toISOString() : null,
             reason
         });
-        setBusy(false);
+        setBusy(null);
         if (answer.error || !answer.pending) {
             setError(answer.error ?? "That restart could not be booked");
             return;
         }
+        booked.current = true;
         setPending(answer.pending);
         setAt(null);
     }
 
     async function now(): Promise<void> {
-        setBusy(true);
+        setBusy("now");
         setError(null);
         const answer = await actions.restartGameNowAction(installedAppId);
-        setBusy(false);
+        setBusy(null);
         if (answer.error) {
             setError(answer.error);
             return;
         }
+        booked.current = false;
         setPending(null);
+        setRestartingSince(Date.now());
         onRestarted?.();
     }
 
     async function cancel(): Promise<void> {
-        setBusy(true);
+        setBusy("cancel");
         setError(null);
         const answer = await actions.cancelGameRestartAction(installedAppId);
-        setBusy(false);
+        setBusy(null);
         if (answer.error) {
             setError(answer.error);
             return;
         }
+        booked.current = false;
         setPending(null);
+    }
+
+    if (restartingSince !== null) {
+        return (
+            <Card>
+                <CardBody className="flex items-center gap-2 py-3 text-sm" role="status">
+                    <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+                    <span>
+                        <span className="font-medium">Restarting.</span>{" "}
+                        <span className="text-muted-foreground">
+                            Anybody playing is disconnected for a moment; the change is in force
+                            once the server is back.
+                        </span>
+                    </span>
+                </CardBody>
+            </Card>
+        );
     }
 
     if (!changed && !pending) return null;
@@ -147,27 +224,41 @@ export function RestartPlanner({
                         </p>
                     </div>
                     {pending ? (
-                        <Button variant="ghost" disabled={busy} onClick={() => void cancel()}>
-                            <X className="size-4" /> Call it off
+                        <Button
+                            variant="ghost"
+                            disabled={busy !== null}
+                            onClick={() => void cancel()}
+                        >
+                            {busy === "cancel" ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <X className="size-4" />
+                            )}{" "}
+                            Call it off
                         </Button>
                     ) : (
                         <div className="flex flex-wrap items-center gap-2">
                             <Button
                                 variant="secondary"
-                                disabled={busy}
+                                disabled={busy !== null}
                                 onClick={() => void book("empty")}
                             >
-                                <Users className="size-4" /> When nobody is playing
+                                {busy === "empty" ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    <Users className="size-4" />
+                                )}{" "}
+                                When nobody is playing
                             </Button>
                             <Button
                                 variant="secondary"
-                                disabled={busy}
+                                disabled={busy !== null}
                                 onClick={() => setAt((current) => (current === null ? "" : null))}
                             >
                                 <CalendarClock className="size-4" /> At a time
                             </Button>
-                            <Button disabled={busy} onClick={() => void now()}>
-                                {busy ? (
+                            <Button disabled={busy !== null} onClick={() => void now()}>
+                                {busy === "now" ? (
                                     <Loader2 className="size-4 animate-spin" />
                                 ) : (
                                     <RotateCcw className="size-4" />
@@ -189,9 +280,10 @@ export function RestartPlanner({
                         />
                         <Button
                             size="sm"
-                            disabled={busy || at.length === 0}
+                            disabled={busy !== null || at.length === 0}
                             onClick={() => void book("at", at)}
                         >
+                            {busy === "at" && <Loader2 className="size-4 animate-spin" />}
                             Book it
                         </Button>
                         <span className="text-xs text-muted-foreground">Your own clock.</span>

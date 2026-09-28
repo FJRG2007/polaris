@@ -279,6 +279,10 @@ export function loginHealth(input: {
  * The jar is only fetched when the server boots, so an update to it waits for a
  * restart. Only said of a server whose mod is on and has checked in: a silent one
  * has a louder problem, and one with no check-in has not said what it runs.
+ *
+ * And only from a check-in of the run that is up now. The last one from before a
+ * restart is still recent for a few minutes, and read as current it told the
+ * person who had just pressed Restart that the old build was still running.
  */
 export function modOutdated(input: {
     readonly on: boolean;
@@ -287,8 +291,12 @@ export function modOutdated(input: {
     readonly running: string | null;
     /** What this dashboard serves it, or null when the image did not say. */
     readonly current: string | null;
+    /** When that was said, and when the server's current run began. */
+    readonly seenAt?: Date | null;
+    readonly upSince?: Date | null;
 }): boolean {
-    const { on, health, running, current } = input;
+    const { on, health, running, current, seenAt, upSince } = input;
+    if (seenAt && upSince && seenAt.getTime() < upSince.getTime()) return false;
     return on && health === "ok" && running !== null && current !== null && running !== current;
 }
 
