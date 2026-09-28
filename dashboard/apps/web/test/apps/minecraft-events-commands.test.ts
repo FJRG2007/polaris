@@ -9,7 +9,10 @@ import * as catalog from "@polaris-app/game-servers/src/lib/minecraft/events/cat
 import * as commands from "@polaris-app/game-servers/src/lib/minecraft/events/commands";
 import * as messages from "@polaris-app/game-servers/src/lib/minecraft/events/messages";
 import * as trivia from "@polaris-app/game-servers/src/lib/minecraft/events/trivia-bank";
-import { COMMAND_BYTES_MAX, commandBytes } from "@polaris-app/game-servers/src/lib/minecraft/command-size";
+import {
+    COMMAND_BYTES_MAX,
+    commandBytes
+} from "@polaris-app/game-servers/src/lib/minecraft/command-size";
 import {
     atLeast,
     firstRight
@@ -362,7 +365,7 @@ describe("where an event may go", () => {
     it("keeps clear of every home, going further out when it has to", () => {
         const home = [{ x: 0, z: 0 }];
         let turn = 0;
-        const random = () => ((turn += 0.37) % 1);
+        const random = () => (turn += 0.37) % 1;
         const point = commands.clearPoint({ x: 0, z: 0 }, 24, home, random);
         expect(point).not.toBeNull();
         expect(Math.hypot(point!.x, point!.z)).toBeGreaterThanOrEqual(commands.HOME_CLEARANCE);
@@ -378,7 +381,11 @@ describe("where an event may go", () => {
             }
         }
         const modern = commands.builtUnder({ x: 1, y: 70, z: 2 }, "modern").join(" ");
-        expect(modern.startsWith("execute in minecraft:overworld unless block 1 69 2 minecraft:grass_block")).toBe(true);
+        expect(
+            modern.startsWith(
+                "execute in minecraft:overworld unless block 1 69 2 minecraft:grass_block"
+            )
+        ).toBe(true);
         expect(modern).toContain("minecraft:short_grass");
         expect(modern).toContain("#minecraft:small_flowers");
         expect(modern).not.toContain("#minecraft:flowers");
@@ -393,7 +400,11 @@ describe("where an event may go", () => {
     });
 
     it("tells a refused block name apart from a column that could not be read", () => {
-        expect(commands.nameRefused("Unknown block type 'minecraft:leaf_litter'...ck 1 69 2 minecraft:leaf_litter<--[HERE]")).toBe(true);
+        expect(
+            commands.nameRefused(
+                "Unknown block type 'minecraft:leaf_litter'...ck 1 69 2 minecraft:leaf_litter<--[HERE]"
+            )
+        ).toBe(true);
         expect(commands.nameRefused("That position is not loaded")).toBe(false);
         expect(commands.nameRefused("")).toBe(false);
     });

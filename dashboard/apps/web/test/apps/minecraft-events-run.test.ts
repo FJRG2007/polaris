@@ -90,7 +90,9 @@ let step = 0;
 function answer(line: string): string {
     world.sent.push(line);
     if (line.startsWith("execute in minecraft:overworld unless block")) {
-        const refused = world.refusedGround.find((id) => line.includes(`minecraft:${id} `) || line.endsWith(`minecraft:${id}`));
+        const refused = world.refusedGround.find(
+            (id) => line.includes(`minecraft:${id} `) || line.endsWith(`minecraft:${id}`)
+        );
         if (refused) return `Unknown block type 'minecraft:${refused}'`;
         if (world.unsureGround > 0) {
             world.unsureGround -= 1;
@@ -98,7 +100,10 @@ function answer(line: string): string {
         }
         return world.built ? "Test passed" : "Test failed";
     }
-    if (line === "execute as @a run data get entity @s SpawnX" || line === "execute as @a run data get entity @s SpawnZ") {
+    if (
+        line === "execute as @a run data get entity @s SpawnX" ||
+        line === "execute as @a run data get entity @s SpawnZ"
+    ) {
         const axis = line.endsWith("SpawnX") ? 0 : 1;
         return Object.entries(world.homes)
             .map(([name, home]) => `${name} has the following entity data: ${home[axis]}`)
@@ -716,13 +721,24 @@ describe("trivia", () => {
             )
         ).toBe(true);
         // On screen too: the title as it is asked, and above the hotbar with the time left.
-        expect(world.sent.some((line) => line.startsWith("title @a title") && line.includes("Question 1/3"))).toBe(true);
         expect(
-            world.sent.some((line) => line.startsWith("title @a subtitle") && line.includes("Which green mob explodes?"))
+            world.sent.some(
+                (line) => line.startsWith("title @a title") && line.includes("Question 1/3")
+            )
         ).toBe(true);
         expect(
             world.sent.some(
-                (line) => line.startsWith("title @a actionbar") && line.includes("Which green mob explodes?") && line.includes(" s)")
+                (line) =>
+                    line.startsWith("title @a subtitle") &&
+                    line.includes("Which green mob explodes?")
+            )
+        ).toBe(true);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("title @a actionbar") &&
+                    line.includes("Which green mob explodes?") &&
+                    line.includes(" s)")
             )
         ).toBe(true);
         world.log +=
@@ -730,7 +746,11 @@ describe("trivia", () => {
         await play(2_100);
         expect(state().run?.points).toEqual({ Ben: 1 });
         expect(world.sent).toContain("scoreboard players set Ben pe_score 1");
-        expect(world.sent.some((line) => line.startsWith("title @a title") && line.includes("Ben got it"))).toBe(true);
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("title @a title") && line.includes("Ben got it")
+            )
+        ).toBe(true);
         // The other two rounds nobody answers, and the game ends on its own.
         await play(2 * (15_000 + 6_000) + 10_000);
         const after = state();
@@ -910,21 +930,44 @@ describe("the others", () => {
         world.online = ["Ana"];
         const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(8_100);
-        expect(world.sent.filter((line) => line.includes("particle minecraft:flame")).length).toBeGreaterThanOrEqual(24);
+        expect(
+            world.sent.filter((line) => line.includes("particle minecraft:flame")).length
+        ).toBeGreaterThanOrEqual(24);
         expect(world.sent.some((line) => line.includes("particle minecraft:end_rod"))).toBe(true);
         // Ana is a little way west of the circle, which is at X 300.
-        expect(world.sent.some((line) => line.startsWith("title Ana actionbar") && /"\d+ m "/.test(line) && line.includes('"east"'))).toBe(true);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("title Ana actionbar") &&
+                    /"\d+ m "/.test(line) &&
+                    line.includes('"east"')
+            )
+        ).toBe(true);
     });
 
     it("gives up a place on somebody's build and says it could not find one", async () => {
         world.built = true;
         const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(60_000);
-        expect(world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))).toBe(false);
+        expect(
+            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))
+        ).toBe(false);
         expect(state().history[0]?.outcome).toBe("failed");
     });
 
@@ -933,9 +976,17 @@ describe("the others", () => {
         world.refusedGround = ["leaf_litter"];
         const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(60_000);
-        expect(world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))).toBe(false);
+        expect(
+            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))
+        ).toBe(false);
         expect(state().history[0]?.outcome).toBe("failed");
     });
 
@@ -944,9 +995,17 @@ describe("the others", () => {
         world.unsureGround = 2;
         const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(60_000);
-        expect(world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))).toBe(false);
+        expect(
+            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))
+        ).toBe(false);
         expect(state().history[0]?.outcome).toBe("failed");
     });
 
@@ -958,16 +1017,30 @@ describe("the others", () => {
             options: { place: { mode: "fixed" as const, x: 300, z: 0 }, radius: 6 }
         };
         setUp([hill]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(8_100);
-        expect(world.sent.some((line) => line.includes("run scoreboard players add @s pe_score 2"))).toBe(true);
+        expect(
+            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score 2"))
+        ).toBe(true);
     });
 
     it("looks past a player's bed for somewhere to put it", async () => {
         world.homes = { Ana: [0, 0], Ben: [0, 0] };
         const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(8_100);
         const loaded = world.sent
             .filter((line) => /run forceload add -?\d+ -?\d+$/.test(line))

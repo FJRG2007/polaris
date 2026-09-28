@@ -841,7 +841,8 @@ async function siteIsOpen(
     try {
         for (const sample of commands.siteSamples(centre, radius)) {
             let output = "";
-            for (const line of commands.markSurface(sample.x, sample.z)) output = await server.say([line]);
+            for (const line of commands.markSurface(sample.x, sample.z))
+                output = await server.say([line]);
             const ground = commands.spreadWorked(output)
                 ? commands.readPoint(await server.say([commands.READ_MARK]))
                 : null;

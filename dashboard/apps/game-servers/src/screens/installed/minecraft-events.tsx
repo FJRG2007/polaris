@@ -439,11 +439,7 @@ export function MinecraftEvents({
                         {view?.run && canManage && !view.run.cancelling && (
                             <div className="flex flex-wrap gap-2">
                                 {view.run.phase === "countdown" && (
-                                    <ui.Button
-                                        size="sm"
-                                        disabled={pending}
-                                        onClick={startNow}
-                                    >
+                                    <ui.Button size="sm" disabled={pending} onClick={startNow}>
                                         <FastForward className="size-4" />
                                         Start now
                                     </ui.Button>

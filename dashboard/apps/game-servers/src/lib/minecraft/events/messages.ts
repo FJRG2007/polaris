@@ -278,11 +278,18 @@ export const SUBTITLE_MAX = 48;
 export function roundSubtitle(asked: string, scramble: boolean, language: Language): string {
     if (scramble) return language === "es" ? `&fOrdena: &e${asked}` : `&fUnscramble: &e${asked}`;
     if (asked.length <= SUBTITLE_MAX) return `&f${asked}`;
-    return language === "es" ? "&7La pregunta, sobre tu barra" : "&7The question is above your hotbar";
+    return language === "es"
+        ? "&7La pregunta, sobre tu barra"
+        : "&7The question is above your hotbar";
 }
 
 /** Above the hotbar for as long as the round is open, with the time left. */
-export function roundBar(asked: string, scramble: boolean, secondsLeft: number, language: Language): string {
+export function roundBar(
+    asked: string,
+    scramble: boolean,
+    secondsLeft: number,
+    language: Language
+): string {
     const prompt = scramble
         ? language === "es"
             ? `&fOrdena: &e${asked}`
@@ -348,7 +355,9 @@ export function hillGuide(metres: number, heading: Heading, language: Language):
 }
 
 export function hillInside(language: Language): string {
-    return language === "es" ? "&aEstás en el círculo: aguanta" : "&aYou are in the circle - hold it";
+    return language === "es"
+        ? "&aEstás en el círculo: aguanta"
+        : "&aYou are in the circle - hold it";
 }
 
 export function happyHourOver(language: Language): string {

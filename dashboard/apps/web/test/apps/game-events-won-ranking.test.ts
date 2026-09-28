@@ -27,7 +27,9 @@ vi.mock("@polaris/app-host", () => ({
 
 const state = await import("@polaris-app/game-servers/src/lib/minecraft/events/state");
 const { liveContext } = await import("@polaris-app/game-servers/src/lib/minecraft/live-values");
-const { SIDEBAR_BLOCKS } = await import("@polaris-app/game-servers/src/lib/minecraft/sidebar-blocks");
+const { SIDEBAR_BLOCKS } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/sidebar-blocks"
+);
 
 let next = 0;
 const ended = (
@@ -55,9 +57,21 @@ beforeEach(() => {
 describe("events won", () => {
     it("counts each first place, a tie for each, and nothing for second or a cancelled one", () => {
         let kept = state.EMPTY_EVENT_STATE;
-        kept = state.withHistory(kept, ended([{ place: 1, name: "Steve" }, { place: 2, name: "Alex" }]));
+        kept = state.withHistory(
+            kept,
+            ended([
+                { place: 1, name: "Steve" },
+                { place: 2, name: "Alex" }
+            ])
+        );
         kept = state.withHistory(kept, ended([{ place: 1, name: "steve" }]));
-        kept = state.withHistory(kept, ended([{ place: 1, name: "Alex" }, { place: 1, name: "Ben" }]));
+        kept = state.withHistory(
+            kept,
+            ended([
+                { place: 1, name: "Alex" },
+                { place: 1, name: "Ben" }
+            ])
+        );
         kept = state.withHistory(kept, ended([{ place: 1, name: "Alex" }], "cancelled"));
         expect(state.eventWins(kept)).toEqual(
             expect.arrayContaining([
