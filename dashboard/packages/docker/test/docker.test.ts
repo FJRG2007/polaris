@@ -54,7 +54,9 @@ function frame(stream: 1 | 2, payload: string): Buffer {
 
 function rawResponse(status: string, body: Buffer): Buffer {
     return Buffer.concat([
-        Buffer.from(`HTTP/1.1 ${status}\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n`),
+        Buffer.from(
+            `HTTP/1.1 ${status}\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n`
+        ),
         body
     ]);
 }
@@ -82,7 +84,13 @@ describe("docker driver", () => {
     it("maps container listings and strips the leading slash from names", async () => {
         const driver = driverReturning(
             httpResponse("200 OK", [
-                { Id: "abc123", Names: ["/web"], Image: "nginx", State: "running", Status: "Up 2 hours" }
+                {
+                    Id: "abc123",
+                    Names: ["/web"],
+                    Image: "nginx",
+                    State: "running",
+                    Status: "Up 2 hours"
+                }
             ])
         );
         const [container] = await driver.listContainers();
@@ -114,14 +122,51 @@ describe("docker driver", () => {
         expect(stats.memPercent).toBe(10);
     });
 
+    it("leaves the reclaimable page cache out of memory on cgroup v2, as docker stats does", async () => {
+        const driver = driverReturning(
+            httpResponse("200 OK", {
+                cpu_stats: { cpu_usage: { total_usage: 0 }, system_cpu_usage: 0 },
+                precpu_stats: { cpu_usage: { total_usage: 0 }, system_cpu_usage: 0 },
+                // lirio-0's Minecraft server: 7094 MiB counted, 1741 MiB of it world
+                // files in the page cache.
+                memory_stats: {
+                    usage: 7094,
+                    limit: 32000,
+                    stats: { anon: 5292, file: 1750, inactive_file: 1741, active_file: 9 }
+                }
+            })
+        );
+        expect((await driver.stats("abc")).memUsage).toBe(5353);
+    });
+
+    it("uses the cgroup v1 name for the same thing", async () => {
+        const driver = driverReturning(
+            httpResponse("200 OK", {
+                cpu_stats: { cpu_usage: { total_usage: 0 }, system_cpu_usage: 0 },
+                precpu_stats: { cpu_usage: { total_usage: 0 }, system_cpu_usage: 0 },
+                memory_stats: {
+                    usage: 150,
+                    limit: 1000,
+                    stats: { total_inactive_file: 40, cache: 50 }
+                }
+            })
+        );
+        expect((await driver.stats("abc")).memUsage).toBe(110);
+    });
+
     it("treats 304 on lifecycle actions as success", async () => {
-        const driver = driverReturning(Buffer.from("HTTP/1.1 304 Not Modified\r\nConnection: close\r\n\r\n"));
+        const driver = driverReturning(
+            Buffer.from("HTTP/1.1 304 Not Modified\r\nConnection: close\r\n\r\n")
+        );
         await expect(driver.start("abc")).resolves.toBeUndefined();
     });
 
     it("de-multiplexes framed logs into what the container printed", async () => {
         const driver = driverReturning(
-            rawResponse("200 OK", Buffer.concat([frame(1, "first\n"), frame(2, "warning\n"), frame(1, "second\n")]))
+            rawResponse(
+                "200 OK",
+                Buffer.concat([frame(1, "first\n"), frame(2, "warning\n"), frame(1, "second\n")])
+            )
         );
         expect(await driver.logs("abc")).toBe("first\nwarning\nsecond\n");
     });
@@ -163,12 +208,16 @@ describe("docker driver", () => {
     });
 
     it("refuses a removal the engine did not confirm", async () => {
-        const driver = driverReturning(httpResponse("409 Conflict", { message: "container is running" }));
+        const driver = driverReturning(
+            httpResponse("409 Conflict", { message: "container is running" })
+        );
         await expect(driver.remove("abc")).rejects.toThrow(/409/);
     });
 
     it("accepts a 204 removal", async () => {
-        const driver = driverReturning(Buffer.from("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n"));
+        const driver = driverReturning(
+            Buffer.from("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n")
+        );
         await expect(driver.remove("abc", { force: true })).resolves.toBeUndefined();
     });
 
@@ -216,7 +265,9 @@ describe("the stream a request was made on", () => {
     });
 
     it("is closed when the engine answers with an error", async () => {
-        const { driver, streams } = recordingDriver(httpResponse("500 Server Error", { message: "boom" }));
+        const { driver, streams } = recordingDriver(
+            httpResponse("500 Server Error", { message: "boom" })
+        );
         await expect(driver.listContainers()).rejects.toThrow(/500/);
         expect(streams[0]?.destroyed).toBe(true);
     });

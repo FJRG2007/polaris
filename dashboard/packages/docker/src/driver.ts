@@ -134,14 +134,20 @@ export class DockerDriver {
         return typeof this.rpc.hijack === "function";
     }
 
-    private async request(method: string, path: string, body?: string): Promise<{ status: number; bytes: Buffer; body: string }> {
+    private async request(
+        method: string,
+        path: string,
+        body?: string
+    ): Promise<{ status: number; bytes: Buffer; body: string }> {
         return this.rpc.request(method, path, body);
     }
 
     private async json<T>(method: string, path: string, body?: string): Promise<T> {
         const response = await this.request(method, path, body);
         if (response.status < 200 || response.status >= 300) {
-            throw new Error(`Docker API ${method} ${path} -> ${response.status}: ${response.body.slice(0, 200)}`);
+            throw new Error(
+                `Docker API ${method} ${path} -> ${response.status}: ${response.body.slice(0, 200)}`
+            );
         }
         return JSON.parse(response.body) as T;
     }
@@ -239,10 +245,15 @@ export class DockerDriver {
     }
 
     private async lifecycle(id: string, action: "start" | "stop" | "restart"): Promise<void> {
-        const response = await this.request("POST", `/containers/${encodeURIComponent(id)}/${action}`);
+        const response = await this.request(
+            "POST",
+            `/containers/${encodeURIComponent(id)}/${action}`
+        );
         // 204 = done, 304 = already in the desired state.
         if (response.status !== 204 && response.status !== 304) {
-            throw new Error(`Docker ${action} failed (${response.status}): ${response.body.slice(0, 200)}`);
+            throw new Error(
+                `Docker ${action} failed (${response.status}): ${response.body.slice(0, 200)}`
+            );
         }
     }
 
@@ -256,11 +267,17 @@ export class DockerDriver {
      */
     public async inspect(id: string, options: { size?: boolean } = {}): Promise<ContainerDetail> {
         const query = options.size ? "?size=true" : "";
-        const raw = await this.json<Record<string, any>>("GET", `/containers/${encodeURIComponent(id)}/json${query}`);
+        const raw = await this.json<Record<string, any>>(
+            "GET",
+            `/containers/${encodeURIComponent(id)}/json${query}`
+        );
         const state = (raw.State ?? {}) as Record<string, any>;
         const config = (raw.Config ?? {}) as Record<string, any>;
-        const networks = ((raw.NetworkSettings?.Networks ?? {}) as Record<string, unknown>);
-        const bindings = ((raw.NetworkSettings?.Ports ?? {}) as Record<string, Array<Record<string, string>> | null>);
+        const networks = (raw.NetworkSettings?.Networks ?? {}) as Record<string, unknown>;
+        const bindings = (raw.NetworkSettings?.Ports ?? {}) as Record<
+            string,
+            Array<Record<string, string>> | null
+        >;
         return {
             id: String(raw.Id ?? id),
             name: String(raw.Name ?? "").replace(/^\//, ""),
@@ -273,7 +290,9 @@ export class DockerDriver {
             command: [config.Entrypoint, config.Cmd].flat().filter(Boolean).join(" "),
             ports: Object.entries(bindings).map(([container, hostBindings]) => ({
                 container,
-                host: hostBindings?.[0] ? `${hostBindings[0].HostIp || "0.0.0.0"}:${hostBindings[0].HostPort}` : null
+                host: hostBindings?.[0]
+                    ? `${hostBindings[0].HostIp || "0.0.0.0"}:${hostBindings[0].HostPort}`
+                    : null
             })),
             mounts: ((raw.Mounts ?? []) as Array<Record<string, unknown>>).map((mount) => ({
                 source: String(mount.Source ?? mount.Name ?? ""),
@@ -305,17 +324,27 @@ export class DockerDriver {
         const path = `/containers/${encodeURIComponent(id)}/logs?stdout=1&stderr=1&timestamps=1&tail=${lines}`;
         const response = await this.request("GET", path);
         if (response.status < 200 || response.status >= 300) {
-            throw new Error(`Docker logs failed (${response.status}): ${response.body.slice(0, 200)}`);
+            throw new Error(
+                `Docker logs failed (${response.status}): ${response.body.slice(0, 200)}`
+            );
         }
         return demultiplex(response.bytes).toString("utf8");
     }
 
     /** Remove a container. Anonymous volumes go with it only when asked. */
-    public async remove(id: string, options: { force?: boolean; volumes?: boolean } = {}): Promise<void> {
+    public async remove(
+        id: string,
+        options: { force?: boolean; volumes?: boolean } = {}
+    ): Promise<void> {
         const query = `force=${options.force ? 1 : 0}&v=${options.volumes ? 1 : 0}`;
-        const response = await this.request("DELETE", `/containers/${encodeURIComponent(id)}?${query}`);
+        const response = await this.request(
+            "DELETE",
+            `/containers/${encodeURIComponent(id)}?${query}`
+        );
         if (response.status !== 204) {
-            throw new Error(`Docker remove failed (${response.status}): ${response.body.slice(0, 200)}`);
+            throw new Error(
+                `Docker remove failed (${response.status}): ${response.body.slice(0, 200)}`
+            );
         }
     }
 
@@ -328,7 +357,13 @@ export class DockerDriver {
         const created = await this.json<{ Id?: string }>(
             "POST",
             `/containers/${encodeURIComponent(id)}/exec`,
-            JSON.stringify({ AttachStdout: true, AttachStderr: true, AttachStdin: false, Tty: false, Cmd: argv })
+            JSON.stringify({
+                AttachStdout: true,
+                AttachStderr: true,
+                AttachStdin: false,
+                Tty: false,
+                Cmd: argv
+            })
         );
         if (!created.Id) throw new Error("Docker did not create the exec");
 
@@ -338,7 +373,9 @@ export class DockerDriver {
             JSON.stringify({ Detach: false, Tty: false })
         );
         if (started.status < 200 || started.status >= 300) {
-            throw new Error(`Docker exec failed (${started.status}): ${started.body.slice(0, 200)}`);
+            throw new Error(
+                `Docker exec failed (${started.status}): ${started.body.slice(0, 200)}`
+            );
         }
         const streams = demultiplexStreams(started.bytes.subarray(0, EXEC_MAX_OUTPUT));
         const inspected = await this.json<{ ExitCode?: number | null }>(
@@ -363,7 +400,13 @@ export class DockerDriver {
         const created = await this.json<{ Id?: string }>(
             "POST",
             `/containers/${encodeURIComponent(id)}/exec`,
-            JSON.stringify({ AttachStdin: true, AttachStdout: true, AttachStderr: true, Tty: true, Cmd: argv })
+            JSON.stringify({
+                AttachStdin: true,
+                AttachStdout: true,
+                AttachStderr: true,
+                Tty: true,
+                Cmd: argv
+            })
         );
         if (!created.Id) throw new Error("Docker did not create the exec");
 
@@ -403,7 +446,8 @@ function demultiplexStreams(buffer: Buffer): { stdout: Buffer; stderr: Buffer } 
     let offset = 0;
     while (offset + 8 <= buffer.length) {
         const kind = buffer[offset];
-        if (kind !== 0 && kind !== 1 && kind !== 2) return { stdout: buffer, stderr: Buffer.alloc(0) };
+        if (kind !== 0 && kind !== 1 && kind !== 2)
+            return { stdout: buffer, stderr: Buffer.alloc(0) };
         const size = buffer.readUInt32BE(offset + 4);
         const start = offset + 8;
         const payload = buffer.subarray(start, Math.min(start + size, buffer.length));
@@ -437,16 +481,28 @@ function computeStats(raw: Record<string, unknown>): ContainerStats {
     const cpu = (raw.cpu_stats ?? {}) as Record<string, Record<string, number>>;
     const precpu = (raw.precpu_stats ?? {}) as Record<string, Record<string, number>>;
     const cpuDelta = (cpu.cpu_usage?.total_usage ?? 0) - (precpu.cpu_usage?.total_usage ?? 0);
-    const systemDelta = (cpu.system_cpu_usage as unknown as number ?? 0) - (precpu.system_cpu_usage as unknown as number ?? 0);
+    const systemDelta =
+        ((cpu.system_cpu_usage as unknown as number) ?? 0) -
+        ((precpu.system_cpu_usage as unknown as number) ?? 0);
     // systemDelta already spans every core, so this ratio is the share of the whole
     // machine. Docker's own formula multiplies it back up by the core count, which is
     // where "121% CPU" comes from: a per-core reading printed under a per-machine
     // label, on a screen that shows the machine's own CPU right beside it.
     const cpuPercent = systemDelta > 0 && cpuDelta > 0 ? (cpuDelta / systemDelta) * 100 : 0;
 
-    const memory = (raw.memory_stats ?? {}) as Record<string, number> & { stats?: Record<string, number> };
-    const cache = memory.stats?.cache ?? 0;
-    const memUsage = Math.max(0, (memory.usage ?? 0) - cache);
+    const memory = (raw.memory_stats ?? {}) as Record<string, number> & {
+        stats?: Record<string, number>;
+    };
+    // What the kernel can take back the moment anything else needs it is not
+    // memory the container uses. Docker's own client leaves it out the same way,
+    // under the name each cgroup version gives it: `inactive_file` on v2 (every
+    // current distribution), `total_inactive_file` on v1. Reading `cache` alone,
+    // a v1-only name, subtracted nothing on v2 - a Minecraft server with a 4 GB
+    // heap was shown using 8 GB, the difference being its world files sitting in
+    // the page cache.
+    const stats = memory.stats ?? {};
+    const reclaimable = stats.inactive_file ?? stats.total_inactive_file ?? stats.cache ?? 0;
+    const memUsage = Math.max(0, (memory.usage ?? 0) - reclaimable);
     const memLimit = memory.limit ?? 0;
     const memPercent = memLimit > 0 ? (memUsage / memLimit) * 100 : 0;
 
@@ -460,7 +516,9 @@ function computeStats(raw: Record<string, unknown>): ContainerStats {
 
     // One entry per device and operation, so a machine with several disks reports
     // the same container more than once and the totals are the sum.
-    const blkio = (raw.blkio_stats ?? {}) as { io_service_bytes_recursive?: Array<Record<string, unknown>> | null };
+    const blkio = (raw.blkio_stats ?? {}) as {
+        io_service_bytes_recursive?: Array<Record<string, unknown>> | null;
+    };
     let blockRead = 0;
     let blockWrite = 0;
     for (const entry of blkio.io_service_bytes_recursive ?? []) {
