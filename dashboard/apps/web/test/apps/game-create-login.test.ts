@@ -22,10 +22,20 @@ vi.mock("@/lib/apps/install-config", () => ({ patchInstallConfig: vi.fn(async ()
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/player-access", () => ({
     grantPlayerAccess: vi.fn(async () => undefined)
 }));
-vi.mock("@polaris-app/game-servers/src/lib/minecraft/address", () => ({ setGameHostname: vi.fn(async () => null) }));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/address", () => ({
+    setGameHostname: vi.fn(async () => null)
+}));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/polaris-mod-files", async (original) => ({
+    ...(await original<
+        typeof import("@polaris-app/game-servers/src/lib/minecraft/polaris-mod-files")
+    >()),
+    anticheatBundled: vi.fn(async () => true)
+}));
 vi.mock("@/lib/apps/port-registry", () => ({ availableHostPort: vi.fn(async () => 19132) }));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/blueprint-version", async (original) => ({
-    ...(await original<typeof import("@polaris-app/game-servers/src/lib/minecraft/blueprint-version")>()),
+    ...(await original<
+        typeof import("@polaris-app/game-servers/src/lib/minecraft/blueprint-version")
+    >()),
     commonVersions: vi.fn(async () => [])
 }));
 
@@ -97,22 +107,30 @@ describe("a new server's login", () => {
         expect(env.get("MODRINTH_PROJECTS")).toMatch(/\bauth\?/);
     });
 
-    it("is Polaris login's plugin on a plugin server", async () => {
+    it("is Polaris login's plugin on a plugin server, with Polaris anti-cheat beside it", async () => {
         await createGameServer("owner", "actor", server("PAPER", "1.21.4"));
         const { env, seed } = created();
         expect(seed).toBeDefined();
         const written = new Map(seed!.env.map((entry) => [entry.key, entry.value]));
         expect(written.get("MODS")).toBe(
-            "https://polaris.example/api/minecraft/mod/polaris-paper.jar"
+            "https://polaris.example/api/minecraft/mod/polaris-paper.jar,https://polaris.example/api/minecraft/mod/polaris-anticheat-bukkit.jar"
         );
         expect(written.get("POLARIS_LOGIN")).toBe("on");
+        expect(written.get("POLARIS_ANTICHEAT")).toBe("on");
+        // One server, one token: the anti-cheat reports with the login's.
+        expect(seed!.env.filter((entry) => entry.key === "POLARIS_SERVER_TOKEN")).toHaveLength(1);
         expect(env.get("MODRINTH_PROJECTS") ?? "").not.toMatch(/simple-login/);
     });
 
-    it("is the Modrinth plugin on a release before Polaris login's", async () => {
+    it("is the Modrinth plugin on a release before Polaris login's, and Polaris anti-cheat still", async () => {
         await createGameServer("owner", "actor", server("PAPER", "1.20.4"));
         const { env, seed } = created();
-        expect(seed).toBeUndefined();
+        const written = new Map(seed!.env.map((entry) => [entry.key, entry.value]));
+        expect(written.has("POLARIS_LOGIN")).toBe(false);
+        expect(written.get("POLARIS_ANTICHEAT")).toBe("on");
+        expect(written.get("MODS")).toBe(
+            "https://polaris.example/api/minecraft/mod/polaris-anticheat-bukkit.jar"
+        );
         expect(env.get("MODRINTH_PROJECTS")).toMatch(/simple-login\?/);
     });
 

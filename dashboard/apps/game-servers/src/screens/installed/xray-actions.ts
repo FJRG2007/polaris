@@ -26,6 +26,11 @@ import {
     type XraySettings
 } from "../../lib/minecraft/xray";
 import { countingIncidents, type Incident } from "../../lib/minecraft/movement";
+import {
+    clearEngineFlags,
+    engineRecords,
+    type EngineRecord
+} from "../../lib/minecraft/polaris-anticheat-service";
 
 const { recordAudit } = host.auditService;
 const { requireGameServer } = host.appsInstallAccess;
@@ -58,6 +63,8 @@ export interface XrayView {
     readonly teleportCheck: string | null;
     /** Why this server cannot have honeypots, or null. */
     readonly refusal: string | null;
+    /** What Polaris's anti-cheat engine caught, per player, in the window. */
+    readonly engine: readonly EngineRecord[];
 }
 
 async function viewOf(
@@ -99,7 +106,8 @@ async function viewOf(
             }))
             .filter((player) => player.incidents.length > 0),
         teleportCheck: state.settings.movement ? state.teleportCheck : null,
-        refusal: bedrock ? "Bedrock keeps no per-player mining counters Polaris can watch" : null
+        refusal: bedrock ? "Bedrock keeps no per-player mining counters Polaris can watch" : null,
+        engine: bedrock ? [] : await engineRecords(installedAppId).catch(() => [])
     };
 }
 
@@ -162,8 +170,8 @@ const clearSchema = z.object({
     player: z.string().trim().min(1).max(40)
 });
 
-/** Forget a player's evidence, honeypots and movement alike: the moderator looked
- *  and decided it was not cheating. */
+/** Forget a player's evidence - honeypots, movement and the anti-cheat engine's
+ *  flags alike: the moderator looked and decided it was not cheating. */
 export async function clearXrayPlayerAction(
     input: z.input<typeof clearSchema>
 ): Promise<{ view?: XrayView; error?: string }> {
@@ -179,6 +187,7 @@ export async function clearXrayPlayerAction(
             return { ...state, evidence, movement };
         });
         if (!cleared) return { error: "That server is not here" };
+        await clearEngineFlags(installedAppId, player);
         await recordAudit({
             actorId: user.id,
             action: "games.xray.clear",

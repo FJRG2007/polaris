@@ -18,8 +18,15 @@ import {
     forgetModrinthAnswers,
     projectSlug
 } from "@polaris-app/game-servers/src/lib/minecraft/modrinth";
-import { commonVersions, knownUnsupported } from "@polaris-app/game-servers/src/lib/minecraft/blueprint-version";
-import { blueprintFor, minecraftShapeEnv, withoutBlueprintProjects } from "@polaris-app/game-servers/src/lib/games-create";
+import {
+    commonVersions,
+    knownUnsupported
+} from "@polaris-app/game-servers/src/lib/minecraft/blueprint-version";
+import {
+    blueprintFor,
+    minecraftShapeEnv,
+    withoutBlueprintProjects
+} from "@polaris-app/game-servers/src/lib/games-create";
 import {
     CROSSPLAY_PROJECTS,
     GAME_BLUEPRINTS,
@@ -138,27 +145,26 @@ describe("the protection a server is seeded with", () => {
      *  prompted field with its manifest default, and the mod list is a prompted
      *  field - so the seed is already in the map before software is chosen, and it
      *  is chosen in the same form. */
-    const SEED = "grimac?:alpha,coreprotect?,luckperms?";
+    const SEED = "coreprotect?,luckperms?";
 
     it("keeps it on a server that runs plugins", async () => {
         const env = await envFor("survival", { software: "PAPER" }, { MODRINTH_PROJECTS: SEED });
         const projects = env.get("MODRINTH_PROJECTS") ?? "";
-        expect(projects).toContain("grimac");
         expect(projects).toContain("coreprotect");
+        expect(projects).toContain("luckperms");
     });
 
     it("takes it off a server that runs mods", async () => {
-        // Grim, CoreProtect and LuckPerms are Bukkit plugins, and Modrinth has no
-        // build of any of them for a modded server. Seeded onto one anyway, two sit
-        // on the Mods screen as projects Modrinth has never heard of and the third
-        // installs a jar the server cannot boot on - which the manifest answers with
+        // CoreProtect and LuckPerms are Bukkit plugins, and Modrinth has no build of
+        // either for a modded server. Seeded onto one anyway, they sit on the Mods
+        // screen as projects Modrinth has never heard of or install a jar the
+        // server cannot boot on - which the manifest answers with
         // `pluginServersOnly`. That answer is applied where an install is assembled
         // from manifest defaults, and this path does not arrive there that way: it
         // builds the environment itself and passes the key explicitly, which reads
         // downstream as a value the operator typed, and a typed value is kept.
         const env = await envFor("survival", { software: "NEOFORGE" }, { MODRINTH_PROJECTS: SEED });
         const projects = env.get("MODRINTH_PROJECTS") ?? "";
-        expect(projects).not.toContain("grimac");
         expect(projects).not.toContain("coreprotect");
         expect(projects).not.toContain("luckperms");
     });
@@ -341,15 +347,21 @@ describe("the world a blueprint opens on", () => {
 
 describe("resetting a server onto another blueprint", () => {
     it("takes the previous blueprint's plugin back off the list", () => {
-        expect(withoutBlueprintProjects("grimac?,coreprotect?,bedwars1058,geyser,floodgate")).toBe(
-            "grimac?,coreprotect?"
-        );
+        expect(
+            withoutBlueprintProjects("coreprotect?,luckperms?,bedwars1058,geyser,floodgate")
+        ).toBe("coreprotect?,luckperms?");
+    });
+
+    it("takes off the anti-cheat plugin Polaris's own replaced", () => {
+        expect(withoutBlueprintProjects("grimac?:alpha,coreprotect?")).toBe("coreprotect?");
     });
 
     it("leaves alone what somebody installed themselves", () => {
         // A change of game is not a request to uninstall the map plugin they added
         // from the Mods screen.
-        expect(withoutBlueprintProjects("grimac?,dynmap,iridiumskyblock")).toBe("grimac?,dynmap");
+        expect(withoutBlueprintProjects("coreprotect?,dynmap,iridiumskyblock")).toBe(
+            "coreprotect?,dynmap"
+        );
     });
 
     it("survives a list that names a file rather than a project", () => {

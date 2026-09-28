@@ -8,7 +8,10 @@
  * a little and never on their own lift a player past "Unlikely": somebody who
  * explores caves finds diamonds for very little rock, and on a real server that
  * was the owner. Movement tops out at "Likely", because it is seen a sample
- * every few seconds rather than move by move.
+ * every few seconds rather than move by move. Polaris's anti-cheat engine sees
+ * every packet and compensates for latency, and it only reports a check once it
+ * has failed past its own alert threshold, so it is the one signal besides the
+ * honeypots that can reach "Confirmed" - on repeated alerts, never on one.
  *
  * Pure: the screen and the tests read the same answer.
  */
@@ -105,12 +108,90 @@ export function movementScore(flights: number, teleports: number): Score {
     return { value, level: levelOf(value), reasons };
 }
 
-/** One player as the screen lists them: both scores and what they rest on. */
+/** What the engine's checks catch, in words, by a part of the check's name (the
+ *  engine names variants with a letter, "BadPacketsA", and kinds with a word in
+ *  front, "FarPlace"). Tried in order, so the more specific come first. */
+const ENGINE_CHECKS: readonly { readonly part: string; readonly label: string }[] = [
+    { part: "Simulation", label: "moved in a way the game does not allow" },
+    { part: "Reach", label: "hit from further away than anybody can" },
+    { part: "Hitboxes", label: "hit something the cursor was not on" },
+    { part: "Aim", label: "aimed like a machine" },
+    { part: "Autoclicker", label: "clicked faster than a hand" },
+    { part: "Killaura", label: "attacked several targets at once" },
+    { part: "GroundSpoof", label: "claimed to stand on nothing" },
+    { part: "NoFall", label: "took no fall damage" },
+    { part: "Timer", label: "sped up the game clock" },
+    { part: "NoSlow", label: "did not slow down using an item" },
+    { part: "Sprint", label: "sprinted when it could not" },
+    { part: "AntiKB", label: "ignored knockback" },
+    { part: "Knockback", label: "ignored knockback" },
+    { part: "Explosion", label: "ignored an explosion" },
+    { part: "Elytra", label: "flew an elytra impossibly" },
+    { part: "Vehicle", label: "steered a mount impossibly" },
+    { part: "Phase", label: "went through a block" },
+    { part: "Baritone", label: "moved like a pathing bot" },
+    { part: "MultiActions", label: "did things at once the game does not allow" },
+    { part: "FarPlace", label: "placed a block it could not reach" },
+    { part: "Place", label: "placed a block in a way the game does not allow" },
+    { part: "FastBreak", label: "broke blocks faster than anybody can" },
+    { part: "FarBreak", label: "broke a block it could not reach" },
+    { part: "Break", label: "broke a block in a way the game does not allow" },
+    { part: "Interact", label: "interacted with what it could not see" },
+    { part: "BadPackets", label: "sent impossible packets" },
+    { part: "PacketOrder", label: "sent packets out of order" },
+    { part: "TransactionOrder", label: "sent packets out of order" },
+    { part: "Post", label: "sent packets out of order" },
+    { part: "Crash", label: "sent packets that crash servers" },
+    { part: "Exploit", label: "tried a known exploit" },
+    { part: "Chat", label: "sent chat packets the game would not send" }
+];
+
+/** A check's name in words, or the name itself for one not listed. */
+export function engineCheckLabel(check: string): string {
+    return ENGINE_CHECKS.find((one) => check.includes(one.part))?.label ?? check;
+}
+
+/** The score an alert count reaches: one could be a glitch the engine did not
+ *  model, a handful is a pattern, ten is "Confirmed". */
+function alertsWeight(alerts: number): number {
+    if (alerts <= 0) return 0;
+    if (alerts === 1) return 35;
+    if (alerts === 2) return 50;
+    if (alerts <= 4) return 65;
+    if (alerts <= 9) return 80;
+    return 92;
+}
+
+export function engineScore(
+    checks: readonly { readonly check: string; readonly alerts: number }[]
+): Score {
+    const alerts = checks.reduce((sum, one) => sum + one.alerts, 0);
+    if (alerts === 0) return { value: 0, level: "unlikely", reasons: [] };
+    // Different checks failing is stronger than one check failing more: a
+    // glitch the engine does not model trips the same check again.
+    const distinct = new Set(checks.filter((one) => one.alerts > 0).map((one) => one.check)).size;
+    const value = Math.min(98, alertsWeight(alerts) + Math.min(6, (distinct - 1) * 2));
+    const reasons = [...checks]
+        .filter((one) => one.alerts > 0)
+        .sort((left, right) => right.alerts - left.alerts)
+        .slice(0, 3)
+        .map(
+            (one) =>
+                `${engineCheckLabel(one.check)[0]!.toUpperCase()}${engineCheckLabel(one.check).slice(1)} - ${one.check}, ${one.alerts === 1 ? "once" : `${one.alerts} times`}`
+        );
+    return { value, level: levelOf(value), reasons };
+}
+
+/** One player as the screen lists them: every score and what they rest on. */
 export interface Suspect {
     readonly key: string;
     readonly name: string;
     readonly xray: Score;
     readonly movement: Score;
+    /** What Polaris's anti-cheat engine caught. */
+    readonly engine: Score;
+    /** The engine's checks that failed, most first. */
+    readonly engineChecks: readonly { readonly check: string; readonly alerts: number }[];
     readonly hits: number;
     readonly flights: number;
     readonly teleports: number;
@@ -161,6 +242,15 @@ export function buildSuspects(input: {
         })[];
     }[];
     readonly mining: readonly { readonly name: string; readonly figures: MiningFigures }[];
+    /** What Polaris's anti-cheat engine caught, per player. */
+    readonly engine?: readonly {
+        readonly name: string;
+        readonly checks: readonly {
+            readonly check: string;
+            readonly alerts: number;
+            readonly lastAt: number;
+        }[];
+    }[];
     /**
      * Everybody else to list, at nothing found: whoever is online now. A table
      * of only the players something was found against left out the one somebody
@@ -176,6 +266,7 @@ export function buildSuspects(input: {
             hits: PointAt[];
             moves: SuspectIncident[];
             mining: MiningFigures | null;
+            engine: { check: string; alerts: number; lastAt: number }[];
             warnedAt: number | null;
             bannedAt: number | null;
         }
@@ -187,6 +278,7 @@ export function buildSuspects(input: {
             hits: [],
             moves: [],
             mining: null,
+            engine: [],
             warnedAt: null,
             bannedAt: null
         };
@@ -218,6 +310,7 @@ export function buildSuspects(input: {
         const held = row(one.name);
         if (one.figures.deepRock + one.figures.netherRock > 0) held.mining = one.figures;
     }
+    for (const one of input.engine ?? []) row(one.name).engine.push(...one.checks);
     for (const name of input.players ?? []) row(name);
 
     const suspects: Suspect[] = [];
@@ -225,12 +318,21 @@ export function buildSuspects(input: {
     for (const [key, held] of rows) {
         const flights = held.moves.filter((one) => one.kind === "flying").length;
         const teleports = held.moves.length - flights;
-        const times = [...held.hits.map((one) => one.at), ...held.moves.map((one) => one.at)];
+        const times = [
+            ...held.hits.map((one) => one.at),
+            ...held.moves.map((one) => one.at),
+            ...held.engine.map((one) => one.lastAt)
+        ];
+        const engineChecks = [...held.engine]
+            .sort((left, right) => right.alerts - left.alerts)
+            .map(({ check, alerts }) => ({ check, alerts }));
         suspects.push({
             key,
             name: held.name,
             xray: xrayScore(held.hits.length, held.mining),
             movement: movementScore(flights, teleports),
+            engine: engineScore(engineChecks),
+            engineChecks,
             hits: held.hits.length,
             flights,
             teleports,
@@ -253,11 +355,9 @@ export function buildSuspects(input: {
             ...held.moves
         );
     }
+    const worst = (one: Suspect) => Math.max(one.xray.value, one.movement.value, one.engine.value);
     suspects.sort(
-        (left, right) =>
-            Math.max(right.xray.value, right.movement.value) -
-                Math.max(left.xray.value, left.movement.value) ||
-            left.name.localeCompare(right.name)
+        (left, right) => worst(right) - worst(left) || left.name.localeCompare(right.name)
     );
     incidents.sort((left, right) => right.at - left.at);
     return { suspects, incidents };

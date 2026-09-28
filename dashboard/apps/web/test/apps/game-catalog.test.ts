@@ -43,7 +43,9 @@ import {
  * had never heard of and the third installed a jar the server could not boot on.
  */
 describe("the mod list a server starts with", () => {
-    const field = (findApp("minecraft")?.template?.env ?? []).find((entry) => entry.key === "MODRINTH_PROJECTS");
+    const field = (findApp("minecraft")?.template?.env ?? []).find(
+        (entry) => entry.key === "MODRINTH_PROJECTS"
+    );
 
     it("is seeded only onto a server that runs plugins", () => {
         expect(field).toBeDefined();
@@ -51,10 +53,11 @@ describe("the mod list a server starts with", () => {
     });
 
     it("still carries the protection a plugin server is meant to get", () => {
-        // Dropping it for everybody would leave the servers it does fit without an
-        // anticheat or block history, which is what it exists to prevent.
-        expect(field!.default).toContain("grimac");
+        // Dropping it for everybody would leave the servers it does fit without
+        // block history, which is what it exists to prevent. The anti-cheat is
+        // Polaris's own and is installed apart from this list.
         expect(field!.default).toContain("coreprotect");
+        expect(field!.default).not.toContain("grimac");
     });
 });
 
@@ -95,7 +98,6 @@ describe("the app every game is created from", () => {
 });
 
 describe("every game", () => {
-
     it("names server manifests that declare themselves game servers", () => {
         for (const game of GAMES) {
             expect(game.serverCatalogIds.length).toBeGreaterThan(0);

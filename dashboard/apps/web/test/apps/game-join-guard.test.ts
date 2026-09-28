@@ -16,7 +16,10 @@
 import { findApp } from "@/lib/apps/catalog";
 import { describe, expect, it, vi } from "vitest";
 import { protectionFor } from "@polaris-app/game-servers/src/lib/games-create";
-import { parseProjectList, projectSlug } from "@polaris-app/game-servers/src/lib/minecraft/modrinth";
+import {
+    parseProjectList,
+    projectSlug
+} from "@polaris-app/game-servers/src/lib/minecraft/modrinth";
 import {
     defaultModFor,
     foreignLogin,
@@ -396,6 +399,21 @@ describe("a template made from a server running Polaris login", () => {
     it("leaves a server without it alone", () => {
         const plain = new Map([["MODRINTH_PROJECTS", "create?"]]);
         expect(guardAsTemplate(plain)).toEqual(plain);
+    });
+
+    it("does not carry Polaris anti-cheat's jar, with the login on or off", () => {
+        const jar = "https://polaris.example/api/minecraft/mod/polaris-anticheat-bukkit.jar";
+        const paper = new Map([
+            ["TYPE", "PAPER"],
+            ["MODS", `https://example.org/extra.jar,${jar}`]
+        ]);
+        expect(guardAsTemplate(paper).get("MODS")).toBe("https://example.org/extra.jar");
+        const both = new Map([
+            ["TYPE", "PAPER"],
+            ["MODS", `https://polaris.example/api/minecraft/mod/polaris-paper.jar,${jar}`],
+            ["POLARIS_LOGIN", "on"]
+        ]);
+        expect(guardAsTemplate(both).get("MODS")).toBe("");
     });
 });
 

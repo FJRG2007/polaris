@@ -11,8 +11,9 @@
  * `suspicion.ts`) - a player who explores caves finds diamonds for very little
  * rock.
  *
- * Nothing here needs the server restarted: it is all commands sent to the
- * running game, so a change is in effect at the next look.
+ * Nothing here needs the server restarted - it is all commands sent to the
+ * running game, so a change is in effect at the next look - except Polaris's
+ * anti-cheat engine at the top, which is a plugin (`anticheat-engine-card`).
  */
 
 import { Eraser, Loader2 } from "lucide-react";
@@ -43,6 +44,7 @@ import {
     saveXraySettingsAction,
     type XrayView
 } from "./xray-actions";
+import { AnticheatEngineCard } from "./anticheat-engine-card";
 
 const { useConfirm } = hostUi.confirmDialog;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -64,7 +66,8 @@ const FILTERS = [
     { value: "", label: "Every player" },
     { value: "suspicious", label: "Possible or worse" },
     { value: "xray", label: "X-Ray evidence" },
-    { value: "movement", label: "Flying or teleporting" }
+    { value: "movement", label: "Flying or teleporting" },
+    { value: "engine", label: "Caught by the anti-cheat" }
 ] as const;
 
 const KIND_LABEL: Readonly<Record<SuspectIncident["kind"], string>> = {
@@ -156,6 +159,7 @@ export function MinecraftXray({
                       honeypots: view.players,
                       movement: view.movement,
                       mining: view.mining,
+                      engine: view.engine,
                       players: view.online
                   })
                 : { suspects: [], incidents: [] },
@@ -166,7 +170,12 @@ export function MinecraftXray({
         return suspects.filter((one) => {
             if (needle && !one.key.includes(needle)) return false;
             if (filter === "suspicious")
-                return one.xray.level !== "unlikely" || one.movement.level !== "unlikely";
+                return (
+                    one.xray.level !== "unlikely" ||
+                    one.movement.level !== "unlikely" ||
+                    one.engine.level !== "unlikely"
+                );
+            if (filter === "engine") return one.engineChecks.length > 0;
             if (filter === "xray") return one.hits > 0;
             if (filter === "movement") return one.flights + one.teleports > 0;
             return true;
@@ -235,6 +244,7 @@ export function MinecraftXray({
 
     return (
         <div className="flex flex-col gap-4">
+            <AnticheatEngineCard installedAppId={installedAppId} canManage={canManage} />
             <Card>
                 <CardBody className="flex flex-col gap-4">
                     <div className="flex items-start justify-between gap-3">
@@ -407,8 +417,10 @@ export function MinecraftXray({
                         <p className="text-xs text-muted-foreground">
                             From what was found in the last 14 days. Only honeypots can confirm
                             X-Ray; the mining rate is context and on its own never goes past
-                            Unlikely. Everybody online is listed. Mining counts are the game&apos;s
-                            own and arrive when the server saves, a few minutes behind.
+                            Unlikely. The anti-cheat column is Polaris anti-cheat&apos;s alerts,
+                            which count once a check has failed past its own threshold. Everybody
+                            online is listed. Mining counts are the game&apos;s own and arrive when
+                            the server saves, a few minutes behind.
                         </p>
                     </div>
                     <PlayersTable
@@ -416,10 +428,11 @@ export function MinecraftXray({
                             { label: "Player" },
                             { label: "X-Ray" },
                             { label: "Flying and teleporting" },
+                            { label: "Anti-cheat" },
                             { label: "Mining rate", className: "hidden lg:table-cell" },
                             { label: "Last incident", className: "hidden md:table-cell" }
                         ]}
-                        minWidth="46rem"
+                        minWidth="58rem"
                         search={search}
                         onSearch={setSearch}
                         filter={filter}
@@ -451,6 +464,9 @@ export function MinecraftXray({
                                 </td>
                                 <td className="max-w-[16rem] px-3 py-2 align-top">
                                     <ScoreCell score={suspect.movement} />
+                                </td>
+                                <td className="max-w-[16rem] px-3 py-2 align-top">
+                                    <ScoreCell score={suspect.engine} />
                                 </td>
                                 <td
                                     className="hidden px-3 py-2 align-top text-xs tabular-nums text-muted-foreground lg:table-cell"

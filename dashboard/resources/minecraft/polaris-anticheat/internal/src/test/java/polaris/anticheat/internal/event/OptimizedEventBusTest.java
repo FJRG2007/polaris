@@ -1,0 +1,290 @@
+package polaris.anticheat.internal.event;
+
+import polaris.anticheat.api.event.EventChannel;
+import polaris.anticheat.api.event.PolarisEvent;
+import polaris.anticheat.api.event.PolarisEventHandler;
+import polaris.anticheat.api.event.PolarisEventListener;
+import polaris.anticheat.api.event.ListenerPriority;
+import polaris.anticheat.api.plugin.BasicPolarisPlugin;
+import polaris.anticheat.api.plugin.PolarisPlugin;
+import polaris.anticheat.internal.plugin.resolver.PolarisExtensionManager;
+import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Logger;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+
+class OptimizedEventBusTest {
+
+    // ── Fixtures ───────────────────────────────────────────────────────────
+
+    /** Test-only event to verify register/get paths for addon-defined events. */
+    public static class AddonEvent extends PolarisEvent<AddonEvent.Channel> {
+        private int value;
+
+        public AddonEvent() {}
+        public AddonEvent(int value) { this.value = value; }
+        public void init(int value) { resetForReuse(); this.value = value; }
+        public int getValue() { return value; }
+
+        @FunctionalInterface
+        public interface Handler {
+            void onAddon(int value);
+        }
+
+        public static final class Channel extends EventChannel<AddonEvent, Handler> {
+            private final ThreadLocal<AddonEvent> legacyPool = ThreadLocal.withInitial(AddonEvent::new);
+
+            public Channel() { super(AddonEvent.class, Handler.class); }
+
+            public void onAddon(@NotNull Handler h) { subscribe(h, ListenerPriority.NORMAL, false, null, null); }
+            public void onAddon(@NotNull Handler h, int priority) { subscribe(h, priority, false, null, null); }
+
+            public void fire(int value) {
+                Entry<Handler>[] entries = entries();
+                if (entries.length == 0) return;
+                if (!hasLegacy()) {
+                    for (Entry<Handler> e : entries) e.handler.onAddon(value);
+                    return;
+                }
+                AddonEvent pooled = legacyPool.get();
+                pooled.init(value);
+                for (Entry<Handler> e : entries) {
+                    if (e.legacyListener != null) {
+                        try { e.<AddonEvent>legacyListenerAs().handle(pooled); } catch (Throwable t) { t.printStackTrace(); }
+                    } else {
+                        e.handler.onAddon(value);
+                    }
+                }
+            }
+
+            @Override
+            protected boolean dispatchTypedFromLegacy(@NotNull AddonEvent event, @NotNull Handler handler, boolean cancelled) {
+                handler.onAddon(event.getValue());
+                return false;
+            }
+        }
+    }
+
+    /** Reflective-path listener with an annotated method. */
+    public static class ReflectiveListener {
+        final List<Integer> seen = new ArrayList<>();
+
+        @PolarisEventHandler(priority = 5)
+        public void onAddon(AddonEvent event) {
+            seen.add(event.getValue());
+        }
+    }
+
+    public static class OrderedReflectiveListener {
+        private final List<String> order;
+        private final String name;
+
+        OrderedReflectiveListener(List<String> order, String name) {
+            this.order = order;
+            this.name = name;
+        }
+
+        @PolarisEventHandler
+        public void onAddon(AddonEvent event) {
+            order.add(name);
+        }
+    }
+
+    public static class MaxPriorityReflectiveListener {
+        private final List<String> order;
+
+        MaxPriorityReflectiveListener(List<String> order) {
+            this.order = order;
+        }
+
+        @PolarisEventHandler(priority = Integer.MAX_VALUE)
+        public void onAddon(AddonEvent event) {
+            order.add("max");
+        }
+    }
+
+    private OptimizedEventBus bus;
+    private PolarisPlugin plugin;
+
+    @BeforeEach
+    void setUp() {
+        PolarisExtensionManager extensionManager = new PolarisExtensionManager();
+        bus = new OptimizedEventBus(extensionManager);
+        plugin = new BasicPolarisPlugin(Logger.getLogger("test"), new File("/tmp"), "0", "", Collections.emptyList());
+        // Addon events are NOT built-in; register before use.
+        bus.register(AddonEvent.class, new AddonEvent.Channel());
+    }
+
+    // ── get / register ─────────────────────────────────────────────────────
+
+    @Test
+    void getReturnsTheRegisteredChannel() {
+        AddonEvent.Channel first = bus.get(AddonEvent.class);
+        AddonEvent.Channel second = bus.get(AddonEvent.class);
+        assertSame(first, second, "bus.get must return the cached channel, not a new one per call");
+    }
+
+    // ── Typed subscribe + fire ────────────────────────────────────────────
+
+    @Test
+    void typedSubscribeAndFireWorks() {
+        AtomicInteger seen = new AtomicInteger();
+        bus.get(AddonEvent.class).onAddon(value -> seen.set(value));
+
+        bus.get(AddonEvent.class).fire(42);
+
+        assertEquals(42, seen.get());
+    }
+
+    // ── Legacy post() ──────────────────────────────────────────────────────
+
+    @Test
+    void postReachesBothLegacyAndTypedSubscribers() {
+        List<String> order = new ArrayList<>();
+        bus.get(AddonEvent.class).onAddon(value -> order.add("typed:" + value));
+        bus.subscribe(plugin, AddonEvent.class, e -> order.add("legacy:" + e.getValue()));
+
+        bus.post(new AddonEvent(7));
+
+        assertEquals(2, order.size(), "both subscribers should run");
+        assertEquals("typed:7", order.stream().filter(s -> s.startsWith("typed")).findFirst().orElseThrow());
+        assertEquals("legacy:7", order.stream().filter(s -> s.startsWith("legacy")).findFirst().orElseThrow());
+    }
+
+    @Test
+    void subscribeClassKeyedRoutesToLegacySlot() {
+        AtomicInteger seen = new AtomicInteger();
+        PolarisEventListener<AddonEvent> listener = e -> seen.set(e.getValue());
+        bus.subscribe(plugin, AddonEvent.class, listener);
+
+        bus.get(AddonEvent.class).fire(99);
+
+        assertEquals(99, seen.get());
+    }
+
+    @Test
+    void omittedLegacyPriorityDefaultsToNormal() {
+        AddonEvent.Channel channel = bus.get(AddonEvent.class);
+        List<String> order = new ArrayList<>();
+        channel.onAddon(value -> order.add("high"), ListenerPriority.HIGH);
+        bus.subscribe(plugin, AddonEvent.class, event -> order.add("default"));
+        channel.onAddon(value -> order.add("low"), ListenerPriority.LOW);
+
+        channel.fire(1);
+
+        assertEquals(List.of("low", "default", "high"), order);
+    }
+
+    @Test
+    void maxValueLegacyPriorityRunsBeforeMonitor() {
+        AddonEvent.Channel channel = bus.get(AddonEvent.class);
+        List<String> order = new ArrayList<>();
+        bus.subscribe(plugin, AddonEvent.class, event -> order.add("monitor"), ListenerPriority.MONITOR, false);
+        bus.subscribe(plugin, AddonEvent.class, event -> order.add("max"), Integer.MAX_VALUE, false);
+
+        channel.fire(1);
+
+        assertEquals(List.of("max", "monitor"), order);
+    }
+
+    // ── Reflective registration ───────────────────────────────────────────
+
+    @Test
+    void registerAnnotatedListenersReflectsAndFires() {
+        ReflectiveListener listener = new ReflectiveListener();
+        bus.registerAnnotatedListeners(plugin, listener);
+
+        bus.get(AddonEvent.class).fire(3);
+        bus.get(AddonEvent.class).fire(4);
+
+        assertEquals(List.of(3, 4), listener.seen);
+    }
+
+    @Test
+    void omittedAnnotatedPriorityDefaultsToNormal() {
+        AddonEvent.Channel channel = bus.get(AddonEvent.class);
+        List<String> order = new ArrayList<>();
+        channel.onAddon(value -> order.add("high"), ListenerPriority.HIGH);
+        bus.registerAnnotatedListeners(plugin, new OrderedReflectiveListener(order, "default"));
+        channel.onAddon(value -> order.add("low"), ListenerPriority.LOW);
+
+        channel.fire(1);
+
+        assertEquals(List.of("low", "default", "high"), order);
+    }
+
+    @Test
+    void maxValueAnnotatedPriorityRunsBeforeMonitor() {
+        AddonEvent.Channel channel = bus.get(AddonEvent.class);
+        List<String> order = new ArrayList<>();
+        channel.onAddon(value -> order.add("monitor"), ListenerPriority.MONITOR);
+        bus.registerAnnotatedListeners(plugin, new MaxPriorityReflectiveListener(order));
+
+        channel.fire(1);
+
+        assertEquals(List.of("max", "monitor"), order);
+    }
+
+    // ── Unregister ────────────────────────────────────────────────────────
+
+    @Test
+    void unregisterListenersRemovesOnlyTheMatchingInstance() {
+        ReflectiveListener a = new ReflectiveListener();
+        ReflectiveListener b = new ReflectiveListener();
+        bus.registerAnnotatedListeners(plugin, a);
+        bus.registerAnnotatedListeners(plugin, b);
+
+        bus.unregisterListeners(plugin, a);
+
+        bus.get(AddonEvent.class).fire(1);
+
+        assertEquals(Collections.emptyList(), a.seen);
+        assertEquals(List.of(1), b.seen);
+    }
+
+    @Test
+    void unregisterListenerByListenerObject() {
+        AtomicInteger seen = new AtomicInteger();
+        PolarisEventListener<AddonEvent> listener = e -> seen.incrementAndGet();
+        bus.subscribe(plugin, AddonEvent.class, listener);
+
+        bus.get(AddonEvent.class).fire(1);
+        assertEquals(1, seen.get());
+
+        bus.unregisterListener(plugin, listener);
+        bus.get(AddonEvent.class).fire(2);
+        assertEquals(1, seen.get(), "listener should not fire after unregistration");
+    }
+
+    @Test
+    void unregisterAllListenersSweepsPluginFromEveryChannel() {
+        AtomicInteger a = new AtomicInteger();
+        AtomicInteger b = new AtomicInteger();
+
+        // Subscribe legacy + via annotated method (separate channels not needed — same one suffices).
+        bus.subscribe(plugin, AddonEvent.class, e -> a.incrementAndGet());
+        bus.registerAnnotatedListeners(plugin, new Object() {
+            @PolarisEventHandler
+            public void onAddon(AddonEvent event) { b.incrementAndGet(); }
+        });
+
+        bus.get(AddonEvent.class).fire(0);
+        assertEquals(1, a.get());
+        assertEquals(1, b.get());
+
+        bus.unregisterAllListeners(plugin);
+        bus.get(AddonEvent.class).fire(0);
+        assertEquals(1, a.get(), "class-keyed subscribe should be swept");
+        assertEquals(1, b.get(), "reflective subscribe should be swept");
+    }
+
+}

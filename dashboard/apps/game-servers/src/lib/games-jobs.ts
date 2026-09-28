@@ -358,6 +358,16 @@ export function gameJobTable(): readonly AppJob[] {
             // Unleased: starting a loop that is already running does nothing.
             leaseMs: null,
             run: async () => (await import("./minecraft/xray-service")).sweepXrayTraps()
+        },
+        {
+            key: "game-anticheat-default",
+            // Polaris's anti-cheat on every server it runs on that nobody decided
+            // about - written for the next start, never forced into a running one.
+            // Once a server has it written this does nothing more there.
+            everyMs: Number(process.env.POLARIS_GAME_ANTICHEAT_DEFAULT_MS) || 10 * MINUTE,
+            leaseMs: 15 * MINUTE,
+            run: async () =>
+                (await import("./minecraft/polaris-anticheat-service")).adoptAnticheatDefaults()
         }
     ];
 }

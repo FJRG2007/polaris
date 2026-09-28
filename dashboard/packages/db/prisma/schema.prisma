@@ -3869,6 +3869,27 @@ model MinecraftLoginCheckIn {
     gameVersion    String
 }
 
+// What Polaris's anti-cheat plugin caught on a Minecraft server: one row per
+// alert it raised, at the plugin's own alert thresholds, kept for the evidence
+// window the Anti-cheat tab scores over and removed with the server.
+model MinecraftAnticheatFlag {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    installedAppId String   @db.Uuid
+    // The player's name lowercased, which is what rows are grouped by, and as
+    // the game wrote it, which is what is shown.
+    player         String
+    playerName     String
+    // The check that failed ("Simulation", "Reach", ...), how many violations it
+    // stood at, and the plugin's own line about it.
+    check          String
+    violations     Int
+    verbose        String
+    at             DateTime
+
+    @@index([installedAppId, at])
+    @@index([installedAppId, player])
+}
+
 // ---------------------------------------------------------------------------
 // Messaging (unified inbox across WhatsApp / Telegram / Discord / Slack)
 // ---------------------------------------------------------------------------
