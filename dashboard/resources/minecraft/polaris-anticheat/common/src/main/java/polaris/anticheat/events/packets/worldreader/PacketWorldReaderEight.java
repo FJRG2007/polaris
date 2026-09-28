@@ -43,6 +43,8 @@ public class PacketWorldReaderEight extends BasePacketWorldReader {
 
             addChunkToCache(event, player, chunkSections, true, x[column], z[column], null);
         }
+
+        event.setLastUsedWrapper(null);
     }
 
     @Override
@@ -61,7 +63,7 @@ public class PacketWorldReaderEight extends BasePacketWorldReader {
 
         this.addChunkToCache(event, player, chunks, groundUp, chunkX, chunkZ, null);
 
-        event.setLastUsedWrapper(null); // Make sure this incomplete packet isn't sent
+        event.setLastUsedWrapper(null);
     }
 
     private void readChunk(final ByteBuf buf, final Chunk_v1_9[] chunks, final BitSet set) {

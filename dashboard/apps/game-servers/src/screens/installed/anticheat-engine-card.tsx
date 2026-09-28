@@ -72,10 +72,11 @@ export function AnticheatEngineCard({
                             Checks every player&apos;s movement and combat against what the game
                             allows, packet by packet: flying, speed, reach, killaura, no-fall and
                             the rest. Runs on the server, compensating for each player&apos;s
-                            latency, so a laggy player is not taken for a cheater. On by default; a
-                            server made before it gets it on its next start. While it is on, the
-                            server downloads it from this Polaris each time it starts, and does not
-                            start if Polaris cannot be reached.
+                            latency, so a laggy player is not taken for a cheater. It also sends
+                            buried ore as plain rock, so X-Ray shows nothing but Polaris&apos;s
+                            honeypots. On by default; a server made before it gets it on its next
+                            start. While it is on, the server downloads it from this Polaris each
+                            time it starts, and does not start if Polaris cannot be reached.
                         </p>
                     </div>
                     <Switch

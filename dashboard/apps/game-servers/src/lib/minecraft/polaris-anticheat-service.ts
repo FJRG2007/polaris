@@ -11,7 +11,7 @@ import { host } from "@polaris/app-host";
 import { TOKEN_KEY } from "./polaris-login";
 import { SOFTWARE_KEY } from "./join-guard";
 import { anticheatBundled } from "./polaris-mod-files";
-import { EVIDENCE_WINDOW_MS } from "./xray";
+import { EVIDENCE_WINDOW_MS, readXray } from "./xray";
 import { engineScore } from "./suspicion";
 import * as anticheat from "./polaris-anticheat";
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
@@ -181,6 +181,25 @@ export async function authorizeReporter(
     const digest = (value: string) => createHash("sha256").update(value).digest();
     if (!token || !timingSafeEqual(digest(presented), digest(token))) return null;
     return { installedAppId, ownerId: install.ownerId };
+}
+
+/**
+ * Where the server's X-Ray honeypots are, as the plugin reads them: [dimension,
+ * x, y, z] with 0 for the Overworld and 1 for the Nether. Its anti-xray hides
+ * every buried ore but these, so the traps are what an X-Ray client still shows.
+ */
+export async function honeypotsFor(installedAppId: string): Promise<number[][]> {
+    const row = await prisma.installedApp.findUnique({
+        where: { id: installedAppId },
+        select: { config: true }
+    });
+    if (!row) return [];
+    return readXray(host.appsInstallConfig.readInstallConfig(row.config)).honeypots.map((trap) => [
+        trap.dimension === "minecraft:the_nether" ? 1 : 0,
+        trap.x,
+        trap.y,
+        trap.z
+    ]);
 }
 
 /** One flag as the plugin sends it, already validated by the route. */

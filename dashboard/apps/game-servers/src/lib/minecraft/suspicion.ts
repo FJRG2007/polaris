@@ -112,6 +112,7 @@ export function movementScore(flights: number, teleports: number): Score {
  *  engine names variants with a letter, "BadPacketsA", and kinds with a word in
  *  front, "FarPlace"). Tried in order, so the more specific come first. */
 const ENGINE_CHECKS: readonly { readonly part: string; readonly label: string }[] = [
+    { part: "XRayProbe", label: "dug at buried ore it could not see" },
     { part: "Simulation", label: "moved in a way the game does not allow" },
     { part: "Reach", label: "hit from further away than anybody can" },
     { part: "Hitboxes", label: "hit something the cursor was not on" },

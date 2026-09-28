@@ -1,5 +1,7 @@
 package polaris.anticheat.manager.init.start;
 
+import polaris.anticheat.antixray.AntiXray;
+import polaris.anticheat.bridge.PolarisReporter;
 import polaris.anticheat.events.packets.*;
 import polaris.anticheat.events.packets.worldreader.BasePacketWorldReader;
 import polaris.anticheat.events.packets.worldreader.PacketWorldReaderEight;
@@ -42,6 +44,14 @@ public class PacketManager implements StartableInitable {
         } else {
             PacketEvents.getAPI().getEventManager().registerListener(new BasePacketWorldReader());
         }
+
+        // After the world readers: the replica reads the real blocks, the client gets the hidden ones.
+        if (AntiXray.wanted()) {
+            PacketEvents.getAPI().getEventManager().registerListener(AntiXray.start());
+            LogUtil.info("Anti-xray on");
+        }
+        // Start the link to Polaris now, so the honeypot list is there before anybody digs.
+        PolarisReporter.get();
 
         PacketEvents.getAPI().getEventManager().registerListener(new ProxyAlertMessenger());
         PacketEvents.getAPI().getEventManager().registerListener(new PacketHidePlayerInfo());
