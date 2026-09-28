@@ -198,7 +198,8 @@ export interface ChatGameLink {
 /** One message said in a conversation, on its way to everybody in a game. */
 export interface RelayedChannelMessage {
     readonly channelId: string;
-    readonly author: string;
+    /** Who wrote it, named by the app only once it has somewhere to show it. */
+    readonly authorId: string;
     /** What the conversation is called. */
     readonly conversation: string;
     readonly text: string;

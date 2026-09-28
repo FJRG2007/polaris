@@ -18,6 +18,7 @@ import {
     onlineAnswer,
     readChatLink,
     sameTarget,
+    widensLink,
     statusAnswer,
     type ChatLink,
     type Linkable
@@ -45,7 +46,7 @@ describe("reading the link", () => {
         expect(link).toEqual({
             kind: "group",
             groupId: GROUP,
-            commands: true,
+            commands: false,
             announcements: false,
             relay: false
         });
@@ -136,6 +137,16 @@ describe("who may link to what", () => {
         expect(sameTarget(groupLink(GROUP), groupLink(GROUP))).toBe(true);
         expect(sameTarget(groupLink(GROUP), null)).toBe(false);
     });
+    it("asks again for a new conversation, or one newly shown in the game or written into", () => {
+        const quiet = { ...spaceLink, relay: false, announcements: false };
+        expect(widensLink(quiet, null)).toBe(true);
+        expect(widensLink({ ...quiet, textChannelId: null }, quiet)).toBe(true);
+        expect(widensLink({ ...quiet, relay: true }, quiet)).toBe(true);
+        expect(widensLink({ ...quiet, announcements: true }, quiet)).toBe(true);
+        expect(widensLink({ ...quiet, commands: !quiet.commands }, quiet)).toBe(false);
+        expect(widensLink(quiet, spaceLink)).toBe(false);
+        expect(widensLink(spaceLink, spaceLink)).toBe(false);
+    });
 });
 
 describe("answering /online and /status", () => {
@@ -174,6 +185,13 @@ describe("answering /online and /status", () => {
         );
         expect(statusAnswer({ ...up, players: null })).toBe(
             "Survival is starting, or not answering right now."
+        );
+    });
+
+    it("keeps a player's name as it is, but never as a mention of an account", () => {
+        const players = ["_Ada_", "[x](polaris:user/abc)"];
+        expect(onlineAnswer({ ...up, players: { online: 2, max: 20, players } })).toBe(
+            "2 of 20 playing on Survival: _Ada_, xpolaris:user/abc"
         );
     });
 

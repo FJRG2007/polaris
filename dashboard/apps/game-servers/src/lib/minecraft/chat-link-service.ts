@@ -41,6 +41,18 @@ interface LinkedServer {
     readonly config: Record<string, unknown>;
 }
 
+/** How long one reading of the linked servers is answered from. A message sent,
+ *  its copy to each reader in a game, and every rail that refetches on it all
+ *  ask within moments of each other; almost none of them about a linked one. */
+const LINKED_TTL_MS = 5_000;
+
+let linkedCache: { at: number; servers: Promise<LinkedServer[]> } | null = null;
+
+/** Forget the linked servers read, so a link just saved is used at once. */
+export function forgetLinkedServers(): void {
+    linkedCache = null;
+}
+
 /**
  * Every Minecraft server that is linked to a chat.
  *
@@ -49,7 +61,18 @@ interface LinkedServer {
  * second copy of the link where a query could reach it by channel would be a
  * second record to keep in step with the first.
  */
-async function linkedServers(): Promise<LinkedServer[]> {
+function linkedServers(): Promise<LinkedServer[]> {
+    if (linkedCache && Date.now() - linkedCache.at < LINKED_TTL_MS) return linkedCache.servers;
+    const servers = readLinkedServers();
+    const entry = { at: Date.now(), servers };
+    linkedCache = entry;
+    servers.catch(() => {
+        if (linkedCache === entry) linkedCache = null;
+    });
+    return servers;
+}
+
+async function readLinkedServers(): Promise<LinkedServer[]> {
     if (!MINECRAFT) return [];
     const rows = await prisma.installedApp.findMany({
         where: { catalogId: { in: [...MINECRAFT.serverCatalogIds] }, status: { not: "removed" } },
@@ -160,15 +183,23 @@ export async function serversShowing(channelId: string): Promise<Set<string>> {
  * next, and a stopped one is not asked.
  */
 export async function relayChannelMessage(
-    message: Omit<ChatRelayInput, "userId" | "inChannel"> & { readonly channelId: string }
+    message: Omit<ChatRelayInput, "userId" | "inChannel" | "author"> & {
+        readonly channelId: string;
+        readonly authorId: string;
+    }
 ): Promise<void> {
     const servers = await serversRelaying(message.channelId);
     if (servers.length === 0) return;
-    const [{ relayLine }, { withServerContainer }] = await Promise.all([
+    const [{ relayLine }, { withServerContainer }, author] = await Promise.all([
         import("./chat-relay"),
-        import("./service")
+        import("./service"),
+        prisma.user.findUnique({ where: { id: message.authorId }, select: { name: true } })
     ]);
-    const line = relayLine("@a", { ...message, inChannel: true });
+    const line = relayLine("@a", {
+        ...message,
+        author: author?.name || "Somebody",
+        inChannel: true
+    });
     if (!line) return;
     for (const server of servers) {
         await withServerContainer(server.ownerId, server.installedAppId, async (container) => {

@@ -49,7 +49,8 @@ vi.mock("@polaris/db", () => ({
             },
             findUnique: async ({ where }: { where: { id: string } }) =>
                 fake.installs.find((install) => install.id === where.id) ?? null
-        }
+        },
+        user: { findUnique: async () => ({ name: "Grace" }) }
     }
 }));
 vi.mock("@polaris/app-host", () => ({
@@ -125,8 +126,13 @@ const spaceLink = {
     relay: true
 };
 
+function installed(...installs: ReturnType<typeof server>[]): void {
+    fake.installs = installs;
+    service.forgetLinkedServers();
+}
+
 beforeEach(() => {
-    fake.installs = [server({ chatLink: spaceLink })];
+    installed(server({ chatLink: spaceLink }));
     fake.queried = [];
     fake.reading = { running: true, players: { online: 1, max: 10, players: ["Ada"] } };
     fake.said = [];
@@ -155,11 +161,24 @@ describe("the badge on a linked conversation", () => {
         });
     });
 
-    it("marks a group chosen for {call.*} before the link existed", async () => {
-        fake.installs = [server({ callGroupId: GROUP })];
+    it("marks a group chosen for {call.*} before the link existed, without answering in it", async () => {
+        installed(server({ callGroupId: GROUP }));
         const links = await service.chatGameLinks([GROUP]);
         expect(links).toHaveLength(1);
-        expect(links[0]?.commands.map((one) => one.name)).toEqual(["online", "status"]);
+        expect(links[0]?.commands).toEqual([]);
+    });
+
+    it("reads the servers once for a burst of questions, and again once a link is saved", async () => {
+        await service.chatGameLinks([TEXT]);
+        await service.answerChatCommand({ channelId: TEXT, command: "online" });
+        await service.serversShowing(TEXT);
+        expect(fake.queried).toHaveLength(1);
+        await actions.saveChatLinkAction({
+            installedAppId: SERVER,
+            link: { ...spaceLink, commands: false }
+        });
+        await service.chatGameLinks([TEXT]);
+        expect(fake.queried).toHaveLength(2);
     });
 
     it("asks only about Minecraft servers that have not been removed", async () => {
@@ -188,7 +207,7 @@ describe("a command in the linked channel", () => {
             []
         );
         expect(await service.answerChatCommand({ channelId: TEXT, command: "op" })).toEqual([]);
-        fake.installs = [server({ chatLink: { ...spaceLink, commands: false } })];
+        installed(server({ chatLink: { ...spaceLink, commands: false } }));
         expect(await service.answerChatCommand({ channelId: TEXT, command: "status" })).toEqual([]);
     });
 
@@ -203,7 +222,7 @@ describe("a command in the linked channel", () => {
 describe("the channel shown in the game", () => {
     const message = {
         channelId: TEXT,
-        author: "Grace",
+        authorId: "grace",
         conversation: "general",
         text: "raid at eight",
         files: null,
@@ -217,12 +236,13 @@ describe("the channel shown in the game", () => {
         expect(fake.said[0]?.line.startsWith("tellraw @a [")).toBe(true);
         expect(fake.said[0]?.line).toContain('"text":"raid at eight"');
         expect(fake.said[0]?.line).toContain('"text":" in #general"');
+        expect(fake.said[0]?.line).toContain("Grace");
     });
 
     it("is not shown when the link does not ask for it, or on Bedrock", async () => {
-        fake.installs = [server({ chatLink: { ...spaceLink, relay: false } })];
+        installed(server({ chatLink: { ...spaceLink, relay: false } }));
         await service.relayChannelMessage(message);
-        fake.installs = [server({ chatLink: spaceLink }, "minecraft-bedrock")];
+        installed(server({ chatLink: spaceLink }, "minecraft-bedrock"));
         await service.relayChannelMessage(message);
         expect(fake.said).toEqual([]);
         expect([...(await service.serversShowing(TEXT))]).toEqual([]);
@@ -287,7 +307,7 @@ describe("linking a server", () => {
     };
 
     it("is the manager's, and saves one record, clearing the older value", async () => {
-        fake.installs = [server({ callGroupId: OTHER_GROUP })];
+        installed(server({ callGroupId: OTHER_GROUP }));
         fake.linkable = { groups: [{ id: GROUP, name: "Builders" }], spaces: [] };
         const result = await actions.saveChatLinkAction({ installedAppId: SERVER, link: group });
         expect(result.error).toBeUndefined();
@@ -303,19 +323,42 @@ describe("linking a server", () => {
         expect(fake.patched).toEqual([]);
     });
 
-    it("lets another manager change what an existing link is used for", async () => {
-        fake.installs = [server({ callGroupId: GROUP })];
+    it("lets another manager turn its commands on, or a use off, without being in it", async () => {
+        installed(server({ chatLink: { ...group, commands: false, relay: true } }));
         fake.linkable = { groups: [], spaces: [] };
         const result = await actions.saveChatLinkAction({
             installedAppId: SERVER,
-            link: { ...group, announcements: true }
+            link: { ...group, commands: true, relay: false }
         });
         expect(result.error).toBeUndefined();
         expect(fake.patched).toHaveLength(1);
     });
 
+    it("refuses showing it in the game, or writing into it, to somebody not in it", async () => {
+        installed(server({ callGroupId: GROUP }));
+        fake.linkable = { groups: [], spaces: [] };
+        for (const use of [{ relay: true }, { announcements: true }]) {
+            const result = await actions.saveChatLinkAction({
+                installedAppId: SERVER,
+                link: { ...group, ...use }
+            });
+            expect(result.error).toBe("Choose a group you are in");
+        }
+        expect(fake.patched).toEqual([]);
+    });
+
+    it("keeps a use somebody else turned on when a manager outside it saves again", async () => {
+        installed(server({ chatLink: { ...group, relay: true } }));
+        fake.linkable = { groups: [], spaces: [] };
+        const result = await actions.saveChatLinkAction({
+            installedAppId: SERVER,
+            link: { ...group, relay: true, commands: false }
+        });
+        expect(result.error).toBeUndefined();
+    });
+
     it("refuses to show a channel on a Bedrock server", async () => {
-        fake.installs = [server({ callGroupId: GROUP }, "minecraft-bedrock")];
+        installed(server({ callGroupId: GROUP }, "minecraft-bedrock"));
         const result = await actions.saveChatLinkAction({
             installedAppId: SERVER,
             link: { ...group, relay: true }

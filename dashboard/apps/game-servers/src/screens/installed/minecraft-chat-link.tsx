@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import {
     CHAT_COMMANDS,
     chatLinkSchema,
+    linkRefusal,
     linkedChannels,
     type ChatLink
 } from "../../lib/minecraft/chat-link";
@@ -21,6 +22,9 @@ import { readChatLinkAction, saveChatLinkAction, type ChatLinkState } from "./ch
 
 /** A select value for "nothing chosen": an empty value reads as unset. */
 const NONE = "none";
+
+/** Why a use that reads or writes the conversation cannot be turned on here. */
+const OUTSIDER = "Only somebody who could link this conversation can turn this on.";
 
 type Kind = "none" | "group" | "space";
 
@@ -185,6 +189,8 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
             ? [{ value: chosen, label: "A channel you cannot see" }]
             : [])
     ];
+    const outsider = link ? linkRefusal(link, state.linkable) !== null : false;
+    const locked = (use: "announcements" | "relay") => outsider && !draft[use] && !saved?.[use];
     const incomplete =
         draft.kind === "group"
             ? !draft.groupId
@@ -315,21 +321,31 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
                         />
                         <Use
                             label="Repeat announcements"
-                            detail="An announcement sent to everybody also appears there."
+                            detail={
+                                locked("announcements")
+                                    ? OUTSIDER
+                                    : "An announcement sent to everybody also appears there."
+                            }
                             checked={draft.announcements}
-                            disabled={draft.kind === "space" && !draft.textChannelId}
+                            disabled={
+                                locked("announcements") ||
+                                (draft.kind === "space" && !draft.textChannelId)
+                            }
                             onChange={(announcements) => change({ announcements })}
                         />
                         <Use
                             label="Show its messages in the game"
                             detail={
-                                state.java
-                                    ? "Everybody playing sees them in their chat, whether or not they are in the conversation."
-                                    : "Only a Java server can show them."
+                                !state.java
+                                    ? "Only a Java server can show them."
+                                    : locked("relay")
+                                      ? OUTSIDER
+                                      : "Everybody playing sees them in their chat, whether or not they are in the conversation."
                             }
                             checked={draft.relay}
                             disabled={
                                 (!state.java && !draft.relay) ||
+                                locked("relay") ||
                                 (draft.kind === "space" && !draft.textChannelId)
                             }
                             onChange={(relay) => change({ relay })}

@@ -71,13 +71,17 @@ export function groupLink(groupId: string): ChatLink {
  *
  * A stored link wins. With none, the group chosen for `{call.*}` before the
  * link existed, read as a link to that group - the call it fed is kept, and the
- * group is what its members already knew the server by.
+ * group is what its members already knew the server by. Only the call: nobody
+ * there asked for the server to start answering in it, so everything else stays
+ * off until somebody turns it on.
  */
 export function readChatLink(config: Record<string, unknown>): ChatLink | null {
     const stored = chatLinkSchema.safeParse(config[CHAT_LINK_KEY]);
     if (stored.success) return stored.data;
     const legacy = config[CALL_GROUP_KEY];
-    return typeof legacy === "string" && id.safeParse(legacy).success ? groupLink(legacy) : null;
+    return typeof legacy === "string" && id.safeParse(legacy).success
+        ? { ...groupLink(legacy), commands: false }
+        : null;
 }
 
 /** The two channels a link resolves to. A group is both. */
@@ -113,6 +117,17 @@ export interface Linkable {
             readonly kind: "text" | "voice";
         }[];
     }[];
+}
+
+/**
+ * Whether saving `next` over `current` needs the person saving it to be allowed
+ * to link that conversation: a different conversation, or one that now shows
+ * its messages in the game or has announcements written into it. Answering
+ * commands, or turning a use off, is any manager's to change.
+ */
+export function widensLink(next: ChatLink, current: ChatLink | null): boolean {
+    if (!sameTarget(next, current)) return true;
+    return (next.relay && !current?.relay) || (next.announcements && !current?.announcements);
 }
 
 /** Whether two links name the same conversation, whatever they are used for. */
@@ -186,8 +201,14 @@ function named(name: string): string {
     return name.replace(/[[\]()*_`~<>\\]/g, "").trim() || "The server";
 }
 
+/** A player's name as a line of chat writes it: nothing that could pass for a
+ *  mention of somebody's account. */
+function playerName(name: string): string {
+    return name.replace(/[[\]()<>\\]/g, "").trim() || "?";
+}
+
 function names(players: readonly string[]): string {
-    const shown = players.slice(0, MOST_NAMES).join(", ");
+    const shown = players.slice(0, MOST_NAMES).map(playerName).join(", ");
     const more = players.length - MOST_NAMES;
     return more > 0 ? `${shown} and ${more} more` : shown;
 }

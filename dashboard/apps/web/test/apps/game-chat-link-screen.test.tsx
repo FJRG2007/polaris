@@ -16,7 +16,8 @@ const GROUP = "01a09cdd-7a10-7811-833d-8b014c82de02";
 
 const fake = vi.hoisted(() => ({
     saved: [] as unknown[],
-    callLinked: true
+    callLinked: true,
+    groups: [] as { id: string; name: string }[]
 }));
 
 vi.mock("@polaris-app/game-servers/src/screens/installed/chat-link-actions", () => ({
@@ -30,10 +31,7 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/chat-link-actions", () 
                 announcements: false,
                 relay: false
             },
-            linkable: {
-                groups: [{ id: "01a09cdd-7a10-7811-833d-8b014c82de02", name: "Builders" }],
-                spaces: []
-            },
+            linkable: { groups: fake.groups, spaces: [] },
             java: true
         }
     }),
@@ -71,6 +69,7 @@ const { MinecraftSidebar } = await import(
 beforeEach(() => {
     fake.saved = [];
     fake.callLinked = true;
+    fake.groups = [{ id: GROUP, name: "Builders" }];
 });
 afterEach(cleanup);
 
@@ -108,6 +107,17 @@ describe("Linked chat", () => {
             }
         });
         await screen.findByText("Linked.");
+    });
+
+    it("lets a manager outside the group change its commands, but not show or write into it", async () => {
+        fake.groups = [];
+        render(<MinecraftChatLink installedAppId="s1" />);
+        await screen.findByText("A group you are not in");
+        const locked = (name: string) =>
+            screen.getByRole("switch", { name }).hasAttribute("disabled");
+        expect(locked("Answer commands")).toBe(false);
+        expect(locked("Repeat announcements")).toBe(true);
+        expect(locked("Show its messages in the game")).toBe(true);
     });
 });
 

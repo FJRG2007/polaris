@@ -69,7 +69,7 @@ export async function relayToGames(messageId: string): Promise<void> {
             poll: {
                 select: { options: { orderBy: { position: "asc" }, select: { text: true } } }
             },
-            channel: { select: { spaceId: true, name: true } }
+            channel: { select: { spaceId: true, name: true, kind: true } }
         }
     });
     if (!message || message.deletedAt || !message.authorId) return;
@@ -86,14 +86,10 @@ export async function relayToGames(messageId: string): Promise<void> {
     // operator who linked it decided that, not each reader. Named by the
     // conversation's own name - a group without one is not called after its
     // members in front of people who are not in it.
-    if (shown) {
-        const author = await prisma.user.findUnique({
-            where: { id: authorId },
-            select: { name: true }
-        });
+    if (shown && channel.kind !== "dm") {
         await shown({
             channelId,
-            author: author?.name || "Somebody",
+            authorId,
             conversation: channel.name || "Group",
             text,
             files,

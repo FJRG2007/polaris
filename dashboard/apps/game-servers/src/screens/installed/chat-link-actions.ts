@@ -8,8 +8,9 @@
  * person choosing it may link: a group they are in, or the rooms of a space they
  * run - otherwise this would be a way to read who is in a call nobody let them
  * see, and to write into a channel nobody let them write in. The link already
- * saved is left as it is, so another manager can still change what it is used
- * for without being in it.
+ * saved is left as it is, so another manager can still turn its commands on or
+ * off, or turn a use off, without being in it - but showing its messages in the
+ * game, or writing announcements into it, is asked of whoever turns that on.
  */
 
 import { z } from "zod";
@@ -18,12 +19,13 @@ import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 import { editionOf } from "../../lib/minecraft/service";
 import { applySidebar } from "../../lib/minecraft/live-display-service";
+import { forgetLinkedServers } from "../../lib/minecraft/chat-link-service";
 import {
     chatLinkPatch,
     chatLinkSchema,
     linkRefusal,
     readChatLink,
-    sameTarget,
+    widensLink,
     type ChatLink
 } from "../../lib/minecraft/chat-link";
 
@@ -88,7 +90,7 @@ export async function saveChatLinkAction(
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         const current = await stateOf(installedAppId, user.id);
-        if (link && !sameTarget(link, current.link)) {
+        if (link && widensLink(link, current.link)) {
             const refused = linkRefusal(link, current.linkable);
             if (refused) return { error: refused };
         }
@@ -96,6 +98,7 @@ export async function saveChatLinkAction(
             return { error: "Only a Java server can show a channel's messages in the game" };
         }
         await patchInstallConfig(installedAppId, chatLinkPatch(link));
+        forgetLinkedServers();
         // `{call.*}` on the side panel reads the call this names: redrawn now
         // rather than on the panel's next turn.
         await applySidebar(access.ownerId, installedAppId).catch(() => undefined);
