@@ -10,9 +10,9 @@
  */
 
 import path from "node:path";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { MOD_FILES } from "./polaris-login";
-import { ANTICHEAT_FILES } from "./polaris-anticheat";
+import { ANTICHEAT_FILE, ANTICHEAT_FILES } from "./polaris-anticheat";
 
 /** Where the bundle carries the builds: beside its server half, which is where
  *  `__dirname` points when the dashboard loads it. Overridable for a development
@@ -47,4 +47,16 @@ export function bundledModVersion(file: string): Promise<string | null> {
         versions.set(file, version);
     }
     return version;
+}
+
+/**
+ * Whether this image carries the anti-cheat's jar. A server with it on the list
+ * downloads it on every boot and does not start when the answer is not the jar,
+ * so nothing switches it on while the image has none to serve.
+ */
+export async function anticheatBundled(): Promise<boolean> {
+    const location = modPath(ANTICHEAT_FILE);
+    if (location === null) return false;
+    const info = await stat(location).catch(() => null);
+    return info?.isFile() ?? false;
 }

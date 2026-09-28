@@ -30,7 +30,7 @@
  */
 
 import * as polarisLogin from "./polaris-login";
-import { anticheatMovedTo, anticheatRunsOn } from "./polaris-anticheat";
+import { anticheatMovedTo, anticheatRunsOn, withoutAnticheat } from "./polaris-anticheat";
 import {
     formatProjectList,
     isPluginLoader,
@@ -382,12 +382,19 @@ async function loginGuardForSave(
  * are that server's, and a template never copies them - so a template made from
  * such a server would otherwise hand the next one the jar and a project list with
  * no guard on it. What it remembers instead is the project guard the software
- * would have been given, so a server built from it starts closed.
+ * would have been given, so a server built from it starts closed. Polaris's
+ * anti-cheat is the same: its switch and token are that server's, so its jar is
+ * not carried either, and a server built from the template gets it the way any
+ * new one does.
  */
 export function guardAsTemplate(env: ReadonlyMap<string, string>): Map<string, string> {
     const copy = new Map(env);
+    const mods = env.get(polarisLogin.MODS_KEY);
+    if (mods !== undefined && withoutAnticheat(mods) !== mods) {
+        copy.set(polarisLogin.MODS_KEY, withoutAnticheat(mods));
+    }
     if (!polarisLogin.loginOn(env)) return copy;
-    copy.set(polarisLogin.MODS_KEY, polarisLogin.withoutMod(env.get(polarisLogin.MODS_KEY) ?? ""));
+    copy.set(polarisLogin.MODS_KEY, polarisLogin.withoutMod(copy.get(polarisLogin.MODS_KEY) ?? ""));
     copy.set(PROJECTS_KEY, withJoinGuard(env.get(PROJECTS_KEY) ?? "", env.get(SOFTWARE_KEY) ?? ""));
     return copy;
 }

@@ -22,10 +22,20 @@ vi.mock("@/lib/apps/install-config", () => ({ patchInstallConfig: vi.fn(async ()
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/player-access", () => ({
     grantPlayerAccess: vi.fn(async () => undefined)
 }));
-vi.mock("@polaris-app/game-servers/src/lib/minecraft/address", () => ({ setGameHostname: vi.fn(async () => null) }));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/address", () => ({
+    setGameHostname: vi.fn(async () => null)
+}));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/polaris-mod-files", async (original) => ({
+    ...(await original<
+        typeof import("@polaris-app/game-servers/src/lib/minecraft/polaris-mod-files")
+    >()),
+    anticheatBundled: vi.fn(async () => true)
+}));
 vi.mock("@/lib/apps/port-registry", () => ({ availableHostPort: vi.fn(async () => 19132) }));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/blueprint-version", async (original) => ({
-    ...(await original<typeof import("@polaris-app/game-servers/src/lib/minecraft/blueprint-version")>()),
+    ...(await original<
+        typeof import("@polaris-app/game-servers/src/lib/minecraft/blueprint-version")
+    >()),
     commonVersions: vi.fn(async () => [])
 }));
 

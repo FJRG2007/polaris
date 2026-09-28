@@ -10,6 +10,7 @@ import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { TOKEN_KEY } from "./polaris-login";
 import { SOFTWARE_KEY } from "./join-guard";
+import { anticheatBundled } from "./polaris-mod-files";
 import { EVIDENCE_WINDOW_MS } from "./xray";
 import { engineScore } from "./suspicion";
 import * as anticheat from "./polaris-anticheat";
@@ -69,6 +70,11 @@ export async function setAnticheat(
                 "Polaris anti-cheat needs this Polaris to have a public address: the server downloads the plugin from it when it starts."
             );
         }
+        if (!(await anticheatBundled())) {
+            throw new Error(
+                "This Polaris was installed without the anti-cheat plugin. Update Polaris from Settings to get it."
+            );
+        }
         // The token the server already has, when the login plugin gave it one:
         // one secret per server, so neither switch strands the other.
         const token =
@@ -94,13 +100,32 @@ export async function setAnticheat(
  */
 export async function adoptAnticheatDefaults(): Promise<{ adopted: number }> {
     const baseUrl = await publicAppUrl().catch(() => null);
-    if (baseUrl === null) return { adopted: 0 };
+    if (baseUrl === null || !(await anticheatBundled())) return { adopted: 0 };
     const installs = await prisma.installedApp.findMany({
         where: { catalogId: "minecraft", status: { not: "removed" }, applicationId: { not: null } },
         select: { id: true, ownerId: true, applicationId: true }
     });
+    // The two keys the decision rests on, for every server in one read, so only
+    // the servers still waiting for it are read in full.
+    const rows = await prisma.envVar.findMany({
+        where: {
+            scopeType: "application",
+            scopeId: { in: installs.map((install) => install.applicationId!) },
+            key: { in: [anticheat.ANTICHEAT_KEY, SOFTWARE_KEY] }
+        },
+        select: { scopeId: true, key: true, value: true }
+    });
+    const deciding = new Map<string, Map<string, string>>();
+    for (const row of rows) {
+        const env = deciding.get(row.scopeId) ?? new Map<string, string>();
+        env.set(row.key, row.value ?? "");
+        deciding.set(row.scopeId, env);
+    }
+    const waiting = installs.filter((install) =>
+        anticheat.wantsDefaultAnticheat(deciding.get(install.applicationId!) ?? new Map())
+    );
     let adopted = 0;
-    for (const install of installs) {
+    for (const install of waiting) {
         const applicationId = install.applicationId!;
         try {
             const vars = await listEnvVars("application", applicationId, install.ownerId);

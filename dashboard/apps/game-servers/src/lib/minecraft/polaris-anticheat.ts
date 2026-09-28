@@ -117,11 +117,19 @@ export function anticheatEnableEnv(
     ]);
 }
 
+/** A `MODS` list without the engine on it, whichever address it was written with. */
+export function withoutAnticheat(mods: string): string {
+    return entries(mods)
+        .filter((entry) => !isEntry(entry))
+        .join(",");
+}
+
 /**
  * What a move to other software has to write for the engine, or null: it comes
  * off a server moving to software it cannot run on, since a plugin copied into a
  * mod loader's folder is at best dead weight. `mods` is the list as the rest of
- * the same save leaves it.
+ * the same save leaves it. Nobody decided against it, so the switch is left
+ * undecided rather than off, and a move back to software it runs on gets it again.
  */
 export function anticheatMovedTo(
     env: ReadonlyMap<string, string>,
@@ -129,19 +137,17 @@ export function anticheatMovedTo(
     mods: string = env.get(MODS_KEY) ?? ""
 ): Map<string, string> | null {
     if (!anticheatOn(env) || anticheatRunsOn(software)) return null;
-    return anticheatDisableEnv(new Map([[MODS_KEY, mods]]));
+    return new Map([
+        [MODS_KEY, withoutAnticheat(mods)],
+        [ANTICHEAT_KEY, ""]
+    ]);
 }
 
 /** What turning it off writes. Empty is a real value: the image only removes
  *  what the list dropped when the list is set. */
 export function anticheatDisableEnv(current: ReadonlyMap<string, string>): Map<string, string> {
     return new Map([
-        [
-            MODS_KEY,
-            entries(current.get(MODS_KEY) ?? "")
-                .filter((entry) => !isEntry(entry))
-                .join(",")
-        ],
+        [MODS_KEY, withoutAnticheat(current.get(MODS_KEY) ?? "")],
         [ANTICHEAT_KEY, "off"]
     ]);
 }

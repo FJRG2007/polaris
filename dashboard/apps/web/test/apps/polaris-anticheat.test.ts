@@ -6,8 +6,8 @@
  * entry on `MODS` beside everything else there - the login's jar included - and
  * off takes only that entry away, writing the list even when that empties it; a
  * settings save that moves the server to software it cannot run on takes it off,
- * without disturbing what the login's own rules write; and the image builds and
- * serves the file.
+ * without disturbing what the login's own rules write and without deciding against
+ * it; and the image builds and serves the file.
  */
 
 import { join } from "node:path";
@@ -96,7 +96,9 @@ describe("a settings save that moves the server", () => {
             ])
         );
         expect(writes.get("MODS")).toBe("");
-        expect(writes.get("POLARIS_ANTICHEAT")).toBe("off");
+        // Nobody turned it off: a move back gets it on again by default.
+        expect(writes.get("POLARIS_ANTICHEAT")).toBe("");
+        expect(anticheat.wantsDefaultAnticheat(new Map([...writes, ["TYPE", "PAPER"]]))).toBe(true);
     });
 
     it("leaves it on software it runs on, without reading the environment for it", async () => {

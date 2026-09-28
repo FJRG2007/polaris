@@ -73,7 +73,9 @@ export function AnticheatEngineCard({
                             allows, packet by packet: flying, speed, reach, killaura, no-fall and
                             the rest. Runs on the server, compensating for each player&apos;s
                             latency, so a laggy player is not taken for a cheater. On by default; a
-                            server made before it gets it on its next start.
+                            server made before it gets it on its next start. While it is on, the
+                            server downloads it from this Polaris each time it starts, and does not
+                            start if Polaris cannot be reached.
                         </p>
                     </div>
                     <Switch

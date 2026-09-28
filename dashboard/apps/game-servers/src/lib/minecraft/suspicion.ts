@@ -108,40 +108,47 @@ export function movementScore(flights: number, teleports: number): Score {
     return { value, level: levelOf(value), reasons };
 }
 
-/** What the engine's checks catch, in words, by the start of the check's name
- *  (the engine names variants with a letter: "BadPacketsA"). */
-const ENGINE_CHECKS: readonly { readonly prefix: string; readonly label: string }[] = [
-    { prefix: "Simulation", label: "moved in a way the game does not allow" },
-    { prefix: "Reach", label: "hit from further away than anybody can" },
-    { prefix: "Hitboxes", label: "hit something the cursor was not on" },
-    { prefix: "Aim", label: "aimed like a machine" },
-    { prefix: "Interact", label: "interacted with what it could not see" },
-    { prefix: "Autoclicker", label: "clicked faster than a hand" },
-    { prefix: "Killaura", label: "attacked several targets at once" },
-    { prefix: "GroundSpoof", label: "claimed to stand on nothing" },
-    { prefix: "NoFall", label: "took no fall damage" },
-    { prefix: "TickTimer", label: "sped up the game clock" },
-    { prefix: "Timer", label: "sped up the game clock" },
-    { prefix: "NoSlow", label: "did not slow down using an item" },
-    { prefix: "Sprint", label: "sprinted when it could not" },
-    { prefix: "Knockback", label: "ignored knockback" },
-    { prefix: "Explosion", label: "ignored an explosion" },
-    { prefix: "Elytra", label: "flew an elytra impossibly" },
-    { prefix: "Vehicle", label: "steered a mount impossibly" },
-    { prefix: "Phase", label: "went through a block" },
-    { prefix: "Baritone", label: "moved like a pathing bot" },
-    { prefix: "Place", label: "placed a block it could not reach" },
-    { prefix: "Break", label: "broke a block it could not reach" },
-    { prefix: "MultiActions", label: "did things at once the game does not allow" },
-    { prefix: "BadPackets", label: "sent impossible packets" },
-    { prefix: "PacketOrder", label: "sent packets out of order" },
-    { prefix: "Crash", label: "sent packets that crash servers" },
-    { prefix: "Exploit", label: "tried a known exploit" }
+/** What the engine's checks catch, in words, by a part of the check's name (the
+ *  engine names variants with a letter, "BadPacketsA", and kinds with a word in
+ *  front, "FarPlace"). Tried in order, so the more specific come first. */
+const ENGINE_CHECKS: readonly { readonly part: string; readonly label: string }[] = [
+    { part: "Simulation", label: "moved in a way the game does not allow" },
+    { part: "Reach", label: "hit from further away than anybody can" },
+    { part: "Hitboxes", label: "hit something the cursor was not on" },
+    { part: "Aim", label: "aimed like a machine" },
+    { part: "Autoclicker", label: "clicked faster than a hand" },
+    { part: "Killaura", label: "attacked several targets at once" },
+    { part: "GroundSpoof", label: "claimed to stand on nothing" },
+    { part: "NoFall", label: "took no fall damage" },
+    { part: "Timer", label: "sped up the game clock" },
+    { part: "NoSlow", label: "did not slow down using an item" },
+    { part: "Sprint", label: "sprinted when it could not" },
+    { part: "AntiKB", label: "ignored knockback" },
+    { part: "Knockback", label: "ignored knockback" },
+    { part: "Explosion", label: "ignored an explosion" },
+    { part: "Elytra", label: "flew an elytra impossibly" },
+    { part: "Vehicle", label: "steered a mount impossibly" },
+    { part: "Phase", label: "went through a block" },
+    { part: "Baritone", label: "moved like a pathing bot" },
+    { part: "MultiActions", label: "did things at once the game does not allow" },
+    { part: "FarPlace", label: "placed a block it could not reach" },
+    { part: "Place", label: "placed a block in a way the game does not allow" },
+    { part: "FastBreak", label: "broke blocks faster than anybody can" },
+    { part: "FarBreak", label: "broke a block it could not reach" },
+    { part: "Break", label: "broke a block in a way the game does not allow" },
+    { part: "Interact", label: "interacted with what it could not see" },
+    { part: "BadPackets", label: "sent impossible packets" },
+    { part: "PacketOrder", label: "sent packets out of order" },
+    { part: "TransactionOrder", label: "sent packets out of order" },
+    { part: "Post", label: "sent packets out of order" },
+    { part: "Crash", label: "sent packets that crash servers" },
+    { part: "Exploit", label: "tried a known exploit" },
+    { part: "Chat", label: "sent chat packets the game would not send" }
 ];
 
 /** A check's name in words, or the name itself for one not listed. */
 export function engineCheckLabel(check: string): string {
-    return ENGINE_CHECKS.find((one) => check.startsWith(one.prefix))?.label ?? check;
+    return ENGINE_CHECKS.find((one) => check.includes(one.part))?.label ?? check;
 }
 
 /** The score an alert count reaches: one could be a glitch the engine did not

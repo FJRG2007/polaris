@@ -30,6 +30,7 @@ import { normalizeIdentifier } from "./fivem/players";
 import { randomBytes, randomUUID } from "node:crypto";
 import { ALLOW_LIST_KEY, withPlayer } from "./ark/access";
 import * as polarisLogin from "./minecraft/polaris-login";
+import { anticheatBundled } from "./minecraft/polaris-mod-files";
 import {
     anticheatEnableEnv,
     anticheatEnvWrites,
@@ -661,7 +662,7 @@ async function anticheatSeed(
     ]);
     if (!wantsDefaultAnticheat(seeded)) return seed;
     const baseUrl = await publicAppUrl().catch(() => null);
-    if (baseUrl === null) return seed;
+    if (baseUrl === null || !(await anticheatBundled())) return seed;
     const installedAppId = seed?.installedAppId ?? randomUUID();
     const token = seeded.get(polarisLogin.TOKEN_KEY) || randomBytes(32).toString("hex");
     const written = anticheatEnableEnv(seeded, { baseUrl, installedAppId, token });

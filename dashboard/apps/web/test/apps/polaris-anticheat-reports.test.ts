@@ -10,6 +10,8 @@
  * confirmed, and different checks failing weighs more than the same one again.
  */
 
+import { join } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const SERVER = "01a0a00b-35c5-7932-861e-1b2161a9b298";
@@ -90,7 +92,9 @@ vi.mock("@polaris/app-host", () => ({
 const { POST } = await import(
     "@polaris-app/game-servers/src/routes/api/minecraft/anticheat/[id]/route"
 );
-const { engineScore } = await import("@polaris-app/game-servers/src/lib/minecraft/suspicion");
+const { engineCheckLabel, engineScore } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/suspicion"
+);
 
 function report(body: unknown, token = "the-token", id = SERVER) {
     return POST(
@@ -205,5 +209,32 @@ describe("scoring the engine's alerts", () => {
         expect(engineScore([{ check: "Reach", alerts: 2 }]).reasons).toEqual([
             "Hit from further away than anybody can - Reach, 2 times"
         ]);
+    });
+
+    it("has words for every check the engine has", () => {
+        const engine = join(
+            __dirname,
+            "..",
+            "..",
+            "..",
+            "..",
+            "resources",
+            "minecraft",
+            "polaris-anticheat"
+        );
+        const names = readdirSync(engine, { recursive: true, encoding: "utf8" })
+            .filter((file) => file.endsWith(".java"))
+            .flatMap((file) =>
+                [
+                    ...readFileSync(join(engine, file), "utf8").matchAll(
+                        /@CheckData\(name = "([^"]+)"/g
+                    )
+                ].map((match) => match[1]!)
+            );
+        expect(names.length).toBeGreaterThan(50);
+        expect(names.filter((name) => engineCheckLabel(name) === name)).toEqual([]);
+        expect(engineCheckLabel("AntiKB")).toBe("ignored knockback");
+        expect(engineCheckLabel("FarPlace")).toBe("placed a block it could not reach");
+        expect(engineCheckLabel("NegativeTimer")).toBe("sped up the game clock");
     });
 });
