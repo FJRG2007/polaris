@@ -495,6 +495,36 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp: "The OAuth2 tab's client secret, shown once when it is reset."
     },
     {
+        slug: "spotify",
+        name: "Spotify",
+        category: "Chat",
+        summary: "Let people show what they are listening to, and listen along with each other.",
+        description:
+            "Create an app in Spotify's developer dashboard and everyone here gets a Connect button for their own Spotify. Beside their name, people who share it then see the song they are playing, and can press Listen along to hear it on their own Spotify. Spotify only lets an app control playback for a Premium account, so Listen along says so to anybody without one; showing the song works for everybody. Spotify also requires a secure (https) address for this Polaris, and keeps an app in development mode unless it is approved: in that mode the app's owner needs Premium and only the accounts added under User Management - five at most - can link.",
+        docsUrl: "https://developer.spotify.com/documentation/web-api/concepts/apps",
+        setupLinks: [
+            {
+                label: "Create an app",
+                url: "https://developer.spotify.com/dashboard/create",
+                help: "Any name and description. Paste the redirect URI below into Redirect URIs, and tick Web API where it asks which APIs the app uses.",
+                values: ["redirectUri", "homeUrl"]
+            },
+            {
+                label: "Add the people who will link",
+                url: "https://developer.spotify.com/dashboard",
+                help: "The app -> Settings -> User Management: each person's name and the address of their Spotify account. In development mode nobody else can link, and they are told so by Spotify rather than by Polaris."
+            },
+            {
+                label: "Copy the client id and secret",
+                url: "https://developer.spotify.com/dashboard",
+                help: "The app -> Settings -> Basic Information. View client secret shows it."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "Client secret",
+        apiKeyHelp: "On the app's Basic Information page, under View client secret."
+    },
+    {
         slug: "krisp",
         name: "Krisp",
         category: "Chat",

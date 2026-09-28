@@ -1110,7 +1110,9 @@ const OAUTH_APPS: Record<string, { name: string; idLabel: string; idPlaceholder:
     },
     // Discord's client id is the application id: a snowflake, so the placeholder
     // is digits rather than the hex an operator might otherwise go looking for.
-    discord: { name: "Discord", idLabel: "Client ID", idPlaceholder: "123456789012345678" }
+    discord: { name: "Discord", idLabel: "Client ID", idPlaceholder: "123456789012345678" },
+    // Spotify's client id is 32 hexadecimal characters.
+    spotify: { name: "Spotify", idLabel: "Client ID", idPlaceholder: "0123456789abcdef0123456789abcdef" }
 };
 
 function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {

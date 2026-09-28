@@ -40,6 +40,13 @@ import {
     identifyDiscordAccount
 } from "./discord";
 import {
+    exchangeSpotifyCode,
+    getSpotifyOAuthClient,
+    identifySpotifyAccount,
+    SPOTIFY_REQUIRED_SCOPES,
+    spotifyAuthorizeUrl
+} from "./spotify";
+import {
     dropboxAuthorizeUrl,
     exchangeDropboxCode,
     getDropboxOAuthClient,
@@ -248,6 +255,16 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
         exchange: exchangeDiscordCode,
         identify: identifyDiscordAccount,
         scopes: DISCORD_REQUIRED_SCOPES
+    },
+    spotify: {
+        callbackUrl: (baseUrl) => `${baseUrl}/api/connections/spotify/callback`,
+        client: getSpotifyOAuthClient,
+        authorizeUrl: (client, redirectUri, state) =>
+            spotifyAuthorizeUrl(client, redirectUri, state),
+        // Nothing about an address: Spotify no longer hands one over.
+        exchange: exchangeSpotifyCode,
+        identify: identifySpotifyAccount,
+        scopes: SPOTIFY_REQUIRED_SCOPES
     },
     dropbox: {
         callbackUrl: (baseUrl) => `${baseUrl}/api/connections/dropbox/callback`,

@@ -53,7 +53,16 @@ describe("which section a service is listed under", () => {
         const general = CONNECTION_PROVIDERS.filter((provider) => provider.category === "general")
             .map((provider) => provider.slug)
             .sort();
-        expect(general).toEqual(["discord", "dropbox", "epic", "google", "microsoft", "minecraft", "steam"]);
+        expect(general).toEqual([
+            "discord",
+            "dropbox",
+            "epic",
+            "google",
+            "microsoft",
+            "minecraft",
+            "spotify",
+            "steam"
+        ]);
     });
 
     it("lists the general section first and keeps each provider's place in its own", () => {
@@ -66,6 +75,7 @@ describe("which section a service is listed under", () => {
             "epic",
             "minecraft",
             "discord",
+            "spotify",
             "dropbox"
         ]);
         expect(sections[1]?.providers.map((provider) => provider.slug)).toEqual(["github", "vercel", "railway", "aws"]);

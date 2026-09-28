@@ -20,14 +20,17 @@
 
 import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { useNow } from "@/components/presence";
-import { Gamepad2, Music, Pickaxe } from "lucide-react";
+import { useSessionScope } from "@/components/session-scope";
+import { ListenAlongButton } from "@/components/listen-along-button";
+import { Gamepad2, Pickaxe } from "lucide-react";
+import { SpotifyMark } from "@/components/brand-icons";
 import { usePresence, type PresenceOf } from "@/components/presence-store";
 
 /** The icon a source is drawn with where there is no art. */
-const SOURCE_ICONS: Record<core.ActivitySource, typeof Gamepad2> = {
-    spotify: Music,
+const SOURCE_ICONS: Record<core.ActivitySource, ComponentType<{ className?: string; "aria-hidden"?: boolean }>> = {
+    spotify: SpotifyMark,
     game: Gamepad2,
     minecraft: Pickaxe
 };
@@ -79,8 +82,9 @@ export function ActivityLine({
  * Every activity one person has, as cards. Nothing at all when there are none,
  * so a profile never grows an empty box.
  *
- * `actions` draws under a card - the "Listen along" button under a track. It is
- * handed the activity so the caller decides which ones get what.
+ * A track somebody else is playing gets "Listen along" under it, here rather than
+ * at each screen, so no screen that shows a song can forget it. `actions` draws
+ * anything else a caller wants under a card.
  */
 export function ActivityCards({
     personId,
@@ -92,11 +96,22 @@ export function ActivityCards({
     actions?: (activity: core.ActivityView) => ReactNode;
 }) {
     const activity = usePresence(personId)?.activity ?? [];
+    const viewer = useSessionScope();
     if (activity.length === 0) return null;
     return (
         <div className={cn("flex w-full flex-col gap-2", className)}>
             {activity.map((one) => (
-                <ActivityCard key={`${one.source}:${one.key}`} activity={one} actions={actions?.(one)} />
+                <ActivityCard
+                    key={`${one.source}:${one.key}`}
+                    activity={one}
+                    actions={
+                        one.source === "spotify" && personId && personId !== viewer ? (
+                            <ListenAlongButton hostId={personId} />
+                        ) : (
+                            actions?.(one)
+                        )
+                    }
+                />
             ))}
         </div>
     );

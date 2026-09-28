@@ -51,6 +51,7 @@ export type ConnectionProviderSlug =
     | "epic"
     | "minecraft"
     | "discord"
+    | "spotify"
     | "vercel"
     | "railway"
     | "aws";
@@ -338,6 +339,23 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         // over, and taking its word for who somebody is would be doing quietly
         // what that switch exists to make deliberate.
         emailTrustDefault: false
+    },
+    {
+        slug: "spotify",
+        name: "Spotify",
+        category: "general",
+        summary: "Show what you are listening to, and listen along with your friends.",
+        description:
+            "Polaris reads what your Spotify is playing, while you are here and have sharing switched on, and shows it beside your name to the people your privacy settings allow. It also lets you listen along with somebody else: your Spotify plays what theirs is playing, which Spotify only allows on a Premium account. Polaris reads nothing else - not your library, your playlists or your address.",
+        acceptsToken: false,
+        defaultLimit: 1,
+        requires: "a Spotify app",
+        // A music account proves nothing about who somebody is to anybody here,
+        // and it is linked to show a song. Never a way in unless an operator
+        // decides otherwise, having read why.
+        signInDefault: false,
+        signInWarning:
+            "This account is linked to show what you are listening to. Letting it sign in makes it a way into Polaris as well."
     },
     {
         slug: "dropbox",
