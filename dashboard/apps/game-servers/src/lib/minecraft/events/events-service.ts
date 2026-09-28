@@ -714,6 +714,19 @@ async function countdown(
             );
             if (left > 5) lines.push(arenaService.joinBar(loop.run, language));
         }
+        // Who has joined, on the side panel for everybody to see.
+        if (catalog.takesJoiners(preset)) {
+            holdSidebar(installedAppId);
+            const names = catalog.playsOnStage(preset)
+                ? (loop.run.stage?.joined ?? [])
+                : loop.run.joined;
+            lines.push(
+                ...commands.joinListLines(
+                    messages.joinListTitle(preset.name, names.length, language),
+                    names.filter((name) => catalog.PLAYER_NAME.test(name))
+                )
+            );
+        }
         await server.sayAll(lines);
         const max = Math.max(1, loop.countdown, catalog.takesJoiners(preset) ? catalog.JOIN_SECONDS : 0);
         betweenTicks(loop, server, "countdown", () => {
@@ -788,6 +801,12 @@ async function begin(
     const language = loop.language;
     const seconds = (loop.run.endsAt - now) / 1000;
     if (commands.hasScoreboard(preset)) holdSidebar(installedAppId);
+    // The list of who joined gives the panel back: to the event's own scoreboard,
+    // or to the live panel when this event has none.
+    if (catalog.takesJoiners(preset)) {
+        await server.sayAll([commands.JOIN_LIST_OFF]);
+        if (!commands.hasScoreboard(preset)) releaseSidebar(loop.ownerId, installedAppId);
+    }
     const lines: string[] = [
         ...commands.barCreate(
             messages.barName(preset.name, seconds),

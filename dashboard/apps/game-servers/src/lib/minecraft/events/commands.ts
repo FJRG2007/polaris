@@ -1201,6 +1201,27 @@ export const JOIN_TRIGGER = "pe_join";
 export const JOIN_VALUE = 1;
 export const LEAVE_VALUE = 2;
 
+/** The side panel through the countdown: who has joined so far. */
+export const JOIN_LIST = "pe_joined";
+
+/**
+ * The side panel listing who has joined, rewritten each tick: the objective made
+ * (again, harmlessly, once it exists), shown, emptied and filled. Numbers are
+ * hidden where the game can (1.20.3 on); an older one shows a 1 beside each name.
+ */
+export function joinListLines(title: string, names: readonly string[]): string[] {
+    return [
+        `scoreboard objectives add ${JOIN_LIST} dummy ${text(title)}`,
+        `scoreboard objectives modify ${JOIN_LIST} numberformat blank`,
+        `scoreboard objectives setdisplay sidebar ${JOIN_LIST}`,
+        `scoreboard players reset * ${JOIN_LIST}`,
+        ...names.map((name) => `scoreboard players set ${name} ${JOIN_LIST} 1`)
+    ];
+}
+
+/** The list taken down when the event itself starts. */
+export const JOIN_LIST_OFF = `scoreboard objectives remove ${JOIN_LIST}`;
+
 /** The objective made, and everybody allowed to use it - again every tick, since
  *  the game takes the permission away each time it is used and a player who
  *  joins the server later has none yet. */
@@ -1286,6 +1307,7 @@ export function cleanup(
         `scoreboard objectives remove ${RAW_DAMAGE}`,
         `scoreboard objectives remove ${DAMAGE}`,
         `scoreboard objectives remove ${JOIN_TRIGGER}`,
+        `scoreboard objectives remove ${JOIN_LIST}`,
         CLEAR_MARK
     ];
     for (const one of components(preset))

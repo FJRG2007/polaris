@@ -743,6 +743,13 @@ export function boostOver(language: Language): string {
 
 // ------------------------------------------------------------------ parkour, spleef
 
+/** The side panel's title while players join. */
+export function joinListTitle(name: string, count: number, language: Language): string {
+    return language === "es"
+        ? `&6&l${name} &7(${count} apuntados)`
+        : `&6&l${name} &7(${count} joined)`;
+}
+
 /** The line with the buttons: what to press, and what each does. */
 export function joinButtonsText(language: Language): {
     lead: string;
