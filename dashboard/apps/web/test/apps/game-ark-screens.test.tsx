@@ -29,7 +29,11 @@ vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
         liveRead: { useKeptSnapshot: () => undefined },
         relativeTime: { RelativeTime: () => null },
-        snapshotCache: { readSnapshot: () => null, writeSnapshot: () => undefined, dropSnapshots: () => undefined },
+        snapshotCache: {
+            readSnapshot: () => null,
+            writeSnapshot: () => undefined,
+            dropSnapshots: () => undefined
+        },
         structuralMerge: { mergeUnchanged: <T,>(_previous: T, next: T) => next }
     }
 }));
@@ -38,9 +42,7 @@ const { ArkRules } = await import("@polaris-app/game-servers/src/screens/install
 const { ArkMods } = await import("@polaris-app/game-servers/src/screens/installed/ark-mods");
 
 describe("the ARK rules screen", () => {
-    const markup = renderToStaticMarkup(
-        <ArkRules installedAppId={INSTALL} canManage running />
-    );
+    const markup = renderToStaticMarkup(<ArkRules installedAppId={INSTALL} canManage running />);
 
     it("says when a change takes effect before it has read anything", () => {
         // The one thing somebody has to know before they touch a switch: ARK reads
@@ -54,7 +56,9 @@ describe("the ARK rules screen", () => {
 
     it("renders for somebody who may only look", () => {
         expect(() =>
-            renderToStaticMarkup(<ArkRules installedAppId={INSTALL} canManage={false} running={false} />)
+            renderToStaticMarkup(
+                <ArkRules installedAppId={INSTALL} canManage={false} running={false} />
+            )
         ).not.toThrow();
     });
 });

@@ -74,7 +74,9 @@ const metrics: ServerMetrics = {
     memoryTotalBytes: 31_000_000_000,
     diskUsedBytes: 67_000_000_000,
     diskTotalBytes: 98_000_000_000,
-    consumers: [{ kind: "container", name: "polaris-web-110", cpuPercent: 8.6, memoryBytes: 309_000_000 }]
+    consumers: [
+        { kind: "container", name: "polaris-web-110", cpuPercent: 8.6, memoryBytes: 309_000_000 }
+    ]
 };
 
 describe("A server's usage panel", () => {
@@ -149,11 +151,16 @@ describe("A server's usage panel", () => {
     it("prefers what the tab holds over the server's copy, being the newer of the two", () => {
         writeSnapshot("personal:servers.usage.host-a", {
             ...metrics,
-            consumers: [{ kind: "process", name: "postgres", cpuPercent: 1.2, memoryBytes: 174_000_000 }]
+            consumers: [
+                { kind: "process", name: "postgres", cpuPercent: 1.2, memoryBytes: 174_000_000 }
+            ]
         });
 
         const markup = paint(
-            <ServerUsage hostId="host-a" initial={{ at: Date.now() - 5 * 60_000, value: metrics }} />
+            <ServerUsage
+                hostId="host-a"
+                initial={{ at: Date.now() - 5 * 60_000, value: metrics }}
+            />
         );
 
         expect(markup).toContain("postgres");

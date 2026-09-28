@@ -65,7 +65,10 @@ export function ArchiveView({
      *  starting - and kept per scope, so coming back paints the last count. */
     const scopeAccount = account?.id ?? "";
     const countExport = useCallback(async (): Promise<number> => {
-        const answer = await exportSizeAction({ accountId: scopeAccount, folderId: folderId || null });
+        const answer = await exportSizeAction({
+            accountId: scopeAccount,
+            folderId: folderId || null
+        });
         if (!("count" in answer)) throw new Error(answer.error);
         return answer.count;
     }, [scopeAccount, folderId]);

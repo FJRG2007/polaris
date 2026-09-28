@@ -242,7 +242,8 @@ export function MinecraftPanel({
     const [kept, setKept] = useState<KeptReading | null>(null);
     useKeptSnapshot<KeptReading>(readingKey, KEPT_READING_MS, (value) => setKept(value.value));
     useEffect(() => {
-        if (reading.status) writeSnapshot(readingKey, { status: reading.status, reach: reading.reach });
+        if (reading.status)
+            writeSnapshot(readingKey, { status: reading.status, reach: reading.reach });
     }, [readingKey, reading.status, reading.reach]);
     const [error, setError] = useState<string | null>(null);
     /** What Polaris last said it intends the server to do, so the page can re-read
@@ -281,72 +282,74 @@ export function MinecraftPanel({
                 return;
             }
             setError(null);
-            setReading((current) => mergeUnchanged(current, {
-                status: data.status ?? null,
-                // Kept when a poll could not work it out, rather than dropped back
-                // to the page's: the warning would flicker on every failed read.
-                reach: data.reach ?? current.reach,
-                // Kept rather than dropped on a screen that did not ask: it is
-                // what the next visit to the players tab paints with.
-                roster: data.roster ?? current.roster,
-                // Taken as it was sent rather than defaulted against what is
-                // held: null is a real answer here - it means the roster above
-                // came from the server just now - and `??` would read it as
-                // "nothing said" and leave yesterday's date under today's
-                // roster.
-                //
-                // A poll that carried no roster at all is the exception, because
-                // what is drawn then is the one kept from the poll before and is
-                // old by definition. Polaris's own note dates it when there is
-                // one; when there is not - the note is written best effort, and
-                // a failed write is silent - this falls back to when this screen
-                // last saw a live one. A stale roster with no date under it is
-                // the whole failure this set out to remove.
-                // A screen that did not ask keeps the roster it holds, dated, so
-                // the players tab paints with it when it is opened.
-                rosterAsOf: !wantsRoster
-                    ? (current.rosterAsOf ?? current.rosterSeenAt)
-                    : data.roster
-                      ? (data.rosterAsOf ?? null)
-                      : (data.rosterAsOf ?? current.rosterAsOf ?? current.rosterSeenAt),
-                rosterSeenAt: !wantsRoster
-                    ? current.rosterSeenAt
-                    : data.roster && !data.rosterAsOf
-                      ? (data.now ?? new Date().toISOString())
-                      : current.rosterSeenAt,
-                firewall: data.firewall ?? (wantsRoster ? current.firewall : null),
-                // Read on every poll, not only the moderation screen's, because the
-                // overview says whether anybody can join at all.
-                access: data.access ?? current.access,
-                // Checked rather than taken: these two are read by walking them,
-                // and a payload that answered with the wrong shape took the whole
-                // screen down instead of one panel.
-                sessions: Array.isArray(data.sessions)
-                    ? data.sessions
-                    : wantsRoster
-                      ? current.sessions
-                      : [],
-                // Kept between polls of the same screen, like the levels beside
-                // it: a read the server was too busy to answer would otherwise
-                // blank the line under every row.
-                seen: data.seen ?? (wantsRoster ? current.seen : {}),
-                timeouts: Array.isArray(data.timeouts)
-                    ? data.timeouts
-                    : wantsRoster
-                      ? current.timeouts
-                      : [],
-                pending: Array.isArray(data.pending)
-                    ? data.pending
-                    : wantsRoster
-                      ? current.pending
-                      : [],
-                // Kept between polls of the same screen so the column does not
-                // blink empty on a read the server was too busy to answer.
-                levels: data.levels ?? (wantsRoster ? current.levels : {}),
-                idle: data.idle ?? (wantsRoster ? current.idle : {}),
-                lastLevels: data.lastLevels ?? current.lastLevels,
-                now: data.now ? Date.parse(data.now) : current.now
-            }));
+            setReading((current) =>
+                mergeUnchanged(current, {
+                    status: data.status ?? null,
+                    // Kept when a poll could not work it out, rather than dropped back
+                    // to the page's: the warning would flicker on every failed read.
+                    reach: data.reach ?? current.reach,
+                    // Kept rather than dropped on a screen that did not ask: it is
+                    // what the next visit to the players tab paints with.
+                    roster: data.roster ?? current.roster,
+                    // Taken as it was sent rather than defaulted against what is
+                    // held: null is a real answer here - it means the roster above
+                    // came from the server just now - and `??` would read it as
+                    // "nothing said" and leave yesterday's date under today's
+                    // roster.
+                    //
+                    // A poll that carried no roster at all is the exception, because
+                    // what is drawn then is the one kept from the poll before and is
+                    // old by definition. Polaris's own note dates it when there is
+                    // one; when there is not - the note is written best effort, and
+                    // a failed write is silent - this falls back to when this screen
+                    // last saw a live one. A stale roster with no date under it is
+                    // the whole failure this set out to remove.
+                    // A screen that did not ask keeps the roster it holds, dated, so
+                    // the players tab paints with it when it is opened.
+                    rosterAsOf: !wantsRoster
+                        ? (current.rosterAsOf ?? current.rosterSeenAt)
+                        : data.roster
+                          ? (data.rosterAsOf ?? null)
+                          : (data.rosterAsOf ?? current.rosterAsOf ?? current.rosterSeenAt),
+                    rosterSeenAt: !wantsRoster
+                        ? current.rosterSeenAt
+                        : data.roster && !data.rosterAsOf
+                          ? (data.now ?? new Date().toISOString())
+                          : current.rosterSeenAt,
+                    firewall: data.firewall ?? (wantsRoster ? current.firewall : null),
+                    // Read on every poll, not only the moderation screen's, because the
+                    // overview says whether anybody can join at all.
+                    access: data.access ?? current.access,
+                    // Checked rather than taken: these two are read by walking them,
+                    // and a payload that answered with the wrong shape took the whole
+                    // screen down instead of one panel.
+                    sessions: Array.isArray(data.sessions)
+                        ? data.sessions
+                        : wantsRoster
+                          ? current.sessions
+                          : [],
+                    // Kept between polls of the same screen, like the levels beside
+                    // it: a read the server was too busy to answer would otherwise
+                    // blank the line under every row.
+                    seen: data.seen ?? (wantsRoster ? current.seen : {}),
+                    timeouts: Array.isArray(data.timeouts)
+                        ? data.timeouts
+                        : wantsRoster
+                          ? current.timeouts
+                          : [],
+                    pending: Array.isArray(data.pending)
+                        ? data.pending
+                        : wantsRoster
+                          ? current.pending
+                          : [],
+                    // Kept between polls of the same screen so the column does not
+                    // blink empty on a read the server was too busy to answer.
+                    levels: data.levels ?? (wantsRoster ? current.levels : {}),
+                    idle: data.idle ?? (wantsRoster ? current.idle : {}),
+                    lastLevels: data.lastLevels ?? current.lastLevels,
+                    now: data.now ? Date.parse(data.now) : current.now
+                })
+            );
             // The header's Start and Stop, and everything else the page rendered on
             // the server, come from the install row. A poll that finds the server in
             // the other state is that row having gone stale - after a start, a stop,

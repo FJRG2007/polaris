@@ -115,7 +115,10 @@ const LIVE_KEY = "games-live";
  * its reference, and a table where nothing moved keeps the whole map, so a poll
  * that brings the same answer re-renders nothing.
  */
-function foldRows<T extends { id: string }>(current: Map<string, T>, rows: readonly T[]): Map<string, T> {
+function foldRows<T extends { id: string }>(
+    current: Map<string, T>,
+    rows: readonly T[]
+): Map<string, T> {
     let same = current.size === rows.length;
     const next = new Map(
         rows.map((row) => {

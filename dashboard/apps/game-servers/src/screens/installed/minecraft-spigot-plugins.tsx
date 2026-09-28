@@ -118,9 +118,9 @@ export function SpigotPluginsCard({
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    Most plugins are published here rather than on Modrinth. They are installed on the next
-                    restart, by number, and SpigotMC says which releases each one was tested on - which is its
-                    author saying so, not a build this can check.
+                    Most plugins are published here rather than on Modrinth. They are installed on
+                    the next restart, by number, and SpigotMC says which releases each one was
+                    tested on - which is its author saying so, not a build this can check.
                 </p>
 
                 <div className="relative">
@@ -141,7 +141,8 @@ export function SpigotPluginsCard({
                         </>
                     ) : results.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                            Nothing came back. SpigotMC may be unreachable from here rather than empty.
+                            Nothing came back. SpigotMC may be unreachable from here rather than
+                            empty.
                         </p>
                     ) : (
                         results.map((plugin) => (
@@ -150,7 +151,9 @@ export function SpigotPluginsCard({
                                 plugin={plugin}
                                 installed={ids.includes(plugin.id)}
                                 onAdd={() => setIds((current) => [...current, plugin.id])}
-                                onRemove={() => setIds((current) => current.filter((id) => id !== plugin.id))}
+                                onRemove={() =>
+                                    setIds((current) => current.filter((id) => id !== plugin.id))
+                                }
                             />
                         ))
                     )}
@@ -165,7 +168,9 @@ export function SpigotPluginsCard({
                                 plugin={plugin}
                                 installed={ids.includes(plugin.id)}
                                 onAdd={() => setIds((current) => [...current, plugin.id])}
-                                onRemove={() => setIds((current) => current.filter((id) => id !== plugin.id))}
+                                onRemove={() =>
+                                    setIds((current) => current.filter((id) => id !== plugin.id))
+                                }
                             />
                         ))}
                     </div>
@@ -226,11 +231,21 @@ function PluginRow({
                 <p className="line-clamp-2 text-xs text-muted-foreground">{plugin.summary}</p>
             </div>
             {plugin.blocked ? null : installed ? (
-                <Button size="sm" variant="ghost" onClick={onRemove} aria-label={`Remove ${plugin.name}`}>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={onRemove}
+                    aria-label={`Remove ${plugin.name}`}
+                >
                     <Trash2 className="size-4" />
                 </Button>
             ) : (
-                <Button size="sm" variant="secondary" onClick={onAdd} aria-label={`Add ${plugin.name}`}>
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={onAdd}
+                    aria-label={`Add ${plugin.name}`}
+                >
                     <Plus className="size-4" />
                 </Button>
             )}

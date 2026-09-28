@@ -118,7 +118,6 @@ export const DEFAULT_SHAPE: BlueprintShape = {
     biome: world.DEFAULT_BIOME
 };
 
-
 export function BlueprintFields({
     edition,
     crossplay,
@@ -184,7 +183,9 @@ export function BlueprintFields({
         // wait invented rather than reported. One answered while this page was
         // open is taken as it is; one kept from an earlier visit is painted and
         // then asked again, since Modrinth may have moved since.
-        setOffered(known ?? readSnapshot<BlueprintVersions>(keptKey, KEPT_VERSIONS_MS)?.value ?? null);
+        setOffered(
+            known ?? readSnapshot<BlueprintVersions>(keptKey, KEPT_VERSIONS_MS)?.value ?? null
+        );
         setOfferedFresh(known !== undefined);
         if (known) return;
         void blueprintVersionsAction(value.blueprintId, crossplay, value.mapId || undefined)
@@ -201,16 +202,18 @@ export function BlueprintFields({
         };
     }, [value.blueprintId, crossplay, value.mapId]);
 
-    const isLatest = value.version.trim().length === 0 || value.version.trim().toUpperCase() === LATEST;
+    const isLatest =
+        value.version.trim().length === 0 || value.version.trim().toUpperCase() === LATEST;
     // A channel is not a release: it names whatever is newest on a line that has
     // no release number yet. Checking one against the list of releases a plugin
     // supports would mark every snapshot unsupported, which is true of the
     // plugins and not what the field is being asked.
     const channels = edition === "bedrock" ? BEDROCK_CHANNELS : JAVA_CHANNELS;
-    const channel = channels.find((entry) => entry.value === value.version.trim().toUpperCase()) ?? null;
+    const channel =
+        channels.find((entry) => entry.value === value.version.trim().toUpperCase()) ?? null;
     // A pinned map settles the release on its own, without waiting on Modrinth:
     // it is a property of the map rather than of anything that has to be asked.
-    const running = pinned ?? (isLatest ? offered?.latest ?? null : value.version.trim());
+    const running = pinned ?? (isLatest ? (offered?.latest ?? null) : value.version.trim());
     // Only ever said when the answer is known. A list that came back empty is a
     // Modrinth nobody could reach, not a release nothing supports.
     const unsupported =
@@ -275,7 +278,8 @@ export function BlueprintFields({
                     {/* What is left to do is the map's when there is one: it is
                         the thing that decides, and the blueprint's note is about
                         the plugin the map replaced. */}
-                    {(map ? map.setup : blueprint?.setup) && ` ${map ? map.setup : blueprint?.setup}`}
+                    {(map ? map.setup : blueprint?.setup) &&
+                        ` ${map ? map.setup : blueprint?.setup}`}
                 </p>
             </div>
 
@@ -324,7 +328,9 @@ export function BlueprintFields({
                     aria-expanded={advanced}
                     className="flex items-center gap-1 self-start text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
                 >
-                    <ChevronDown className={cn("size-4 transition-transform", advanced && "rotate-180")} />
+                    <ChevronDown
+                        className={cn("size-4 transition-transform", advanced && "rotate-180")}
+                    />
                     Advanced
                 </button>
 
@@ -352,34 +358,46 @@ export function BlueprintFields({
                                     <Skeleton className="h-9 w-full" />
                                 ) : (
                                     <Select
-                                        value={isLatest ? LATEST : (channel?.value ?? value.version.trim())}
+                                        value={
+                                            isLatest
+                                                ? LATEST
+                                                : (channel?.value ?? value.version.trim())
+                                        }
                                         onValueChange={(version) => set({ version })}
                                         disabled={!offeredFresh}
                                         options={[
                                             {
                                                 value: LATEST,
-                                                label: offered.latest ? `Latest (${offered.latest})` : "Latest"
+                                                label: offered.latest
+                                                    ? `Latest (${offered.latest})`
+                                                    : "Latest"
                                             },
                                             ...channels.map((entry) => ({
                                                 value: entry.value,
                                                 label: entry.label
                                             })),
-                                            ...offered.versions.map((entry) => ({ value: entry, label: entry }))
+                                            ...offered.versions.map((entry) => ({
+                                                value: entry,
+                                                label: entry
+                                            }))
                                         ]}
                                     />
                                 )}
                                 <span
-                                    className={cn("text-xs", unsupported ? "text-danger" : "text-muted-foreground")}
+                                    className={cn(
+                                        "text-xs",
+                                        unsupported ? "text-danger" : "text-muted-foreground"
+                                    )}
                                 >
                                     {pinned
                                         ? `${map?.name} was built for this release and its game does not run on later ones.`
                                         : channel
                                           ? channel.detail
                                           : unsupported
-                                          ? `${blueprint?.name} has nothing built for ${value.version.trim()}.`
-                                          : offered?.pinned
-                                            ? "Only the releases this blueprint's plugins have a build for."
-                                            : "Players have to be on the same release to join."}
+                                            ? `${blueprint?.name} has nothing built for ${value.version.trim()}.`
+                                            : offered?.pinned
+                                              ? "Only the releases this blueprint's plugins have a build for."
+                                              : "Players have to be on the same release to join."}
                                 </span>
                             </label>
                         </div>
@@ -387,35 +405,45 @@ export function BlueprintFields({
                         {/* A map brings its own terrain, so the questions about
                             generating one have no answer that changes anything. */}
                         {!map && (
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">World seed</span>
-                                <Input
-                                    value={value.seed}
-                                    onChange={(event) => set({ seed: event.target.value })}
-                                    placeholder="Leave blank for a random world"
-                                />
-                                <span className={cn("text-xs", seedError ? "text-danger" : "text-muted-foreground")}>
-                                    {seedError ?? "A number or any words. The same seed always generates the same map."}
-                                </span>
-                            </label>
-                            {edition === "java" && (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">World type</span>
-                                    <Select
-                                        value={value.levelType}
-                                        onValueChange={(levelType) => set({ levelType })}
-                                        options={world.LEVEL_TYPES.map((entry) => ({
-                                            value: entry.value,
-                                            label: entry.label
-                                        }))}
+                                    <span className="font-medium">World seed</span>
+                                    <Input
+                                        value={value.seed}
+                                        onChange={(event) => set({ seed: event.target.value })}
+                                        placeholder="Leave blank for a random world"
                                     />
-                                    <span className="text-xs text-muted-foreground">
-                                        {world.LEVEL_TYPES.find((entry) => entry.value === value.levelType)?.detail}
+                                    <span
+                                        className={cn(
+                                            "text-xs",
+                                            seedError ? "text-danger" : "text-muted-foreground"
+                                        )}
+                                    >
+                                        {seedError ??
+                                            "A number or any words. The same seed always generates the same map."}
                                     </span>
                                 </label>
-                            )}
-                        </div>
+                                {edition === "java" && (
+                                    <label className="flex flex-col gap-1 text-sm">
+                                        <span className="font-medium">World type</span>
+                                        <Select
+                                            value={value.levelType}
+                                            onValueChange={(levelType) => set({ levelType })}
+                                            options={world.LEVEL_TYPES.map((entry) => ({
+                                                value: entry.value,
+                                                label: entry.label
+                                            }))}
+                                        />
+                                        <span className="text-xs text-muted-foreground">
+                                            {
+                                                world.LEVEL_TYPES.find(
+                                                    (entry) => entry.value === value.levelType
+                                                )?.detail
+                                            }
+                                        </span>
+                                    </label>
+                                )}
+                            </div>
                         )}
 
                         {!map && edition === "java" && world.usesBiome(value.levelType) && (
@@ -424,10 +452,14 @@ export function BlueprintFields({
                                 <Select
                                     value={value.biome}
                                     onValueChange={(biome) => set({ biome })}
-                                    options={world.BIOMES.map((entry) => ({ value: entry.value, label: entry.label }))}
+                                    options={world.BIOMES.map((entry) => ({
+                                        value: entry.value,
+                                        label: entry.label
+                                    }))}
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    The whole overworld is this one biome. The Nether and the End are unchanged.
+                                    The whole overworld is this one biome. The Nether and the End
+                                    are unchanged.
                                 </span>
                             </label>
                         )}
@@ -453,7 +485,9 @@ export function sourceError(software: string, source: string): string | null {
     if (!asks) return null;
     const value = source.trim();
     if (value.length === 0)
-        return asks === "modpack" ? "Name the modpack to install" : "Give the URL of the server jar";
+        return asks === "modpack"
+            ? "Name the modpack to install"
+            : "Give the URL of the server jar";
     if (asks === "modpack" && !isModpackReference(value))
         return "That is a modpack short name, or the link to its page";
     if (asks === "jar" && !isServerJarUrl(value)) return "That is an https link ending in .jar";
@@ -522,12 +556,16 @@ function SoftwarePicker({
                         ? `${pinnedBy} loads its plugins into this, so it is what the server runs.`
                         : (chosen?.summary ?? "Installed exactly as it is written here.")}
                 </p>
-                {chosen?.caveat && !pinnedBy && <p className="mt-1 text-xs text-warning">{chosen.caveat}</p>}
+                {chosen?.caveat && !pinnedBy && (
+                    <p className="mt-1 text-xs text-warning">{chosen.caveat}</p>
+                )}
             </div>
 
             {chosen?.asks && !pinnedBy && (
                 <label className="flex flex-col gap-1">
-                    <span className="font-medium">{chosen.asks === "modpack" ? "Modpack" : "Server jar"}</span>
+                    <span className="font-medium">
+                        {chosen.asks === "modpack" ? "Modpack" : "Server jar"}
+                    </span>
                     <Input
                         value={source}
                         onChange={(event) => onChange(value, event.target.value)}
@@ -537,7 +575,9 @@ function SoftwarePicker({
                                 : "https://example.com/server.jar"
                         }
                     />
-                    <span className={cn("text-xs", wrong ? "text-danger" : "text-muted-foreground")}>
+                    <span
+                        className={cn("text-xs", wrong ? "text-danger" : "text-muted-foreground")}
+                    >
                         {wrong ??
                             (chosen.asks === "modpack"
                                 ? "The pack brings its own mod loader and its own mods."
@@ -560,7 +600,9 @@ function SoftwarePicker({
                     <div className="flex max-h-72 flex-col gap-3 overflow-y-auto pr-1">
                         {shelves.map((shelf) => (
                             <div key={shelf.id} className="flex flex-col gap-2">
-                                <span className="text-xs font-medium text-muted-foreground">{shelf.label}</span>
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    {shelf.label}
+                                </span>
                                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                     {shelf.entries.map((entry: MinecraftSoftware) => (
                                         <Choice
@@ -572,7 +614,10 @@ function SoftwarePicker({
                                                 // modpack left in the box is a
                                                 // create refused over a field
                                                 // nobody can see any more.
-                                                onChange(entry.id, entry.id === value ? source : "");
+                                                onChange(
+                                                    entry.id,
+                                                    entry.id === value ? source : ""
+                                                );
                                                 setOpen(false);
                                             }}
                                             title={entry.name}
@@ -585,8 +630,8 @@ function SoftwarePicker({
                         ))}
                         {shelves.length === 0 && (
                             <p className="text-xs text-muted-foreground">
-                                Nothing here is called that. Anything this list is missing can be run as a custom
-                                server jar.
+                                Nothing here is called that. Anything this list is missing can be
+                                run as a custom server jar.
                             </p>
                         )}
                     </div>

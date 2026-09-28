@@ -15,7 +15,13 @@
 
 import { Crown, Loader2, Trash2, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { PERMISSION_META, RESOURCE_PRESETS, expandPermissions, presetFor, type Permission } from "@polaris/core";
+import {
+    PERMISSION_META,
+    RESOURCE_PRESETS,
+    expandPermissions,
+    presetFor,
+    type Permission
+} from "@polaris/core";
 import {
     Badge,
     Button,
@@ -38,7 +44,8 @@ import type { AppHostTypes } from "@polaris/app-host";
 const { CopyButton } = hostUi.copyButton;
 const { AccountInput } = hostUi.accountInput;
 const { useDisplayFormat } = hostUi.displayFormat;
-const { installAccessAction, revokeInstallAccessAction, shareInstallAction } = hostUi.appAppsInstalledIdAccessActions;
+const { installAccessAction, revokeInstallAccessAction, shareInstallAction } =
+    hostUi.appAppsInstalledIdAccessActions;
 type InstallAccessEntry = AppHostTypes["InstallAccessEntry"];
 type InstallAccessView = AppHostTypes["InstallAccessView"];
 const { writeSnapshot } = hostUi.snapshotCache;
@@ -97,7 +104,8 @@ export function MinecraftAccess({ installedAppId }: { installedAppId: string }) 
                     <div className="flex flex-col gap-1">
                         <h2 className="text-sm font-medium">Who can reach this server</h2>
                         <p className="max-w-xl text-sm text-muted-foreground">
-                            Access given here applies to this server only. It does not open anything else in Polaris.
+                            Access given here applies to this server only. It does not open anything
+                            else in Polaris.
                         </p>
                     </div>
                     {heard && view?.canShare && (
@@ -129,7 +137,8 @@ export function MinecraftAccess({ installedAppId }: { installedAppId: string }) 
                         ))}
                         {view.entries.length === 1 && (
                             <p className="pt-3 text-sm text-muted-foreground">
-                                Nobody else has access. Give somebody access to let them help run this server.
+                                Nobody else has access. Give somebody access to let them help run
+                                this server.
                             </p>
                         )}
                     </div>
@@ -163,7 +172,10 @@ export function MinecraftAccess({ installedAppId }: { installedAppId: string }) 
                 onConfirm={() =>
                     startTransition(async () => {
                         if (!removing?.grantId) return;
-                        const result = await revokeInstallAccessAction(installedAppId, removing.grantId);
+                        const result = await revokeInstallAccessAction(
+                            installedAppId,
+                            removing.grantId
+                        );
                         if (result.error) {
                             setRemoveError(result.error);
                             return;
@@ -200,10 +212,14 @@ function AccessRow({
             <div className="flex min-w-0 flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                     {isOwner && <Crown className="size-4 shrink-0 text-muted-foreground" />}
-                    <span className="truncate text-sm" title={entry.label}>{entry.label}</span>
+                    <span className="truncate text-sm" title={entry.label}>
+                        {entry.label}
+                    </span>
                     {isOwner && <Badge>owner</Badge>}
                     {entry.canShare && !isOwner && <Badge>can invite others</Badge>}
-                    {entry.expired && <Badge className="border-danger-edge text-danger">ended</Badge>}
+                    {entry.expired && (
+                        <Badge className="border-danger-edge text-danger">ended</Badge>
+                    )}
                 </div>
                 <span className="text-xs text-muted-foreground">
                     {isOwner ? "Everything on this server" : summarize(entry.actions)}
@@ -322,7 +338,12 @@ function ShareDialog({
                             Send them this link. It is shown once, and it expires if it is not used.
                         </p>
                         <div className="flex items-center gap-2 rounded-md border border-border/60 bg-surface px-3 py-2">
-                            <code className="min-w-0 flex-1 truncate font-mono text-xs" title={issued}>{issued}</code>
+                            <code
+                                className="min-w-0 flex-1 truncate font-mono text-xs"
+                                title={issued}
+                            >
+                                {issued}
+                            </code>
                             <CopyButton value={issued} label="Copy the invite link" />
                         </div>
                         <Button
@@ -364,7 +385,9 @@ function ShareDialog({
                                                 ? "primary"
                                                 : "secondary"
                                         }
-                                        onClick={() => setActions(expandPermissions([...preset.actions]))}
+                                        onClick={() =>
+                                            setActions(expandPermissions([...preset.actions]))
+                                        }
                                         title={preset.hint}
                                     >
                                         {preset.label}
@@ -389,7 +412,10 @@ function ShareDialog({
                             <Select
                                 value={duration}
                                 onValueChange={setDuration}
-                                options={DURATIONS.map((entry) => ({ value: entry.value, label: entry.label }))}
+                                options={DURATIONS.map((entry) => ({
+                                    value: entry.value,
+                                    label: entry.label
+                                }))}
                                 aria-label="When their access ends"
                             />
                         </label>
@@ -418,7 +444,9 @@ function ShareDialog({
                                 Cancel
                             </Button>
                             <Button
-                                disabled={pending || identifier.trim() === "" || actions.length === 0}
+                                disabled={
+                                    pending || identifier.trim() === "" || actions.length === 0
+                                }
                                 onClick={submit}
                             >
                                 {pending && <Loader2 className="size-4 animate-spin" />}

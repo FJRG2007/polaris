@@ -54,7 +54,15 @@ import {
 } from "@polaris/ui";
 import * as side from "../../lib/minecraft/sidebar";
 import { VariablesHelp } from "../../components/variables-help";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition,
+    type ReactNode
+} from "react";
 import {
     readLiveDisplayAction,
     saveLiveDisplayAction,
@@ -263,10 +271,7 @@ export function MinecraftSidebar({
                             />
                         </div>
 
-                        <div
-                            className="flex flex-col gap-3"
-                            {...(editable ? order.listProps : {})}
-                        >
+                        <div className="flex flex-col gap-3" {...(editable ? order.listProps : {})}>
                             <span className="flex items-baseline gap-2">
                                 <span className="text-sm font-medium">Lines</span>
                                 <span className="text-xs text-muted-foreground">

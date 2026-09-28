@@ -55,7 +55,10 @@ describe("folding a fresh reading into the one on screen", () => {
 
     it("takes a new disk without re-creating the existing ones", () => {
         const previous = snapshot();
-        const next = { ...snapshot(), disks: [...snapshot().disks, { slot: 3, present: true, temperature: 39 }] };
+        const next = {
+            ...snapshot(),
+            disks: [...snapshot().disks, { slot: 3, present: true, temperature: 39 }]
+        };
 
         const merged = mergeUnchanged(previous, next);
 

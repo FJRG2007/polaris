@@ -78,7 +78,10 @@ export function MinecraftRules({
     useKeptSnapshot<WorldRules>(rulesKey, KEPT_RULES_MS, (kept) => {
         setRules(
             (current) =>
-                current ?? { ...kept.value, asOf: kept.value.asOf ?? new Date(kept.at).toISOString() }
+                current ?? {
+                    ...kept.value,
+                    asOf: kept.value.asOf ?? new Date(kept.at).toISOString()
+                }
         );
         setLoading(false);
     });

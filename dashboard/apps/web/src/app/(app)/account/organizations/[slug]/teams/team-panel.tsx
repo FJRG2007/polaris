@@ -180,10 +180,7 @@ export function TeamPanel({
                                     >
                                         <div className="min-w-0 flex-1">
                                             <p className="truncate text-sm">
-                                                <PersonName
-                                                    id={member.userId}
-                                                    name={member.name}
-                                                >
+                                                <PersonName id={member.userId} name={member.name}>
                                                     {member.userId === currentUserId ? (
                                                         <span className="text-muted-foreground">
                                                             {" "}
@@ -224,36 +221,37 @@ export function TeamPanel({
                                                 {core.TEAM_ROLE_LABELS[member.role]}
                                             </span>
                                         )}
-                                        {heard && (canManage || member.userId === currentUserId) && (
-                                            <button
-                                                type="button"
-                                                aria-label={
-                                                    member.userId === currentUserId
-                                                        ? "Leave this team"
-                                                        : `Remove ${member.name}`
-                                                }
-                                                title={
-                                                    member.userId === currentUserId
-                                                        ? "Leave"
-                                                        : "Remove"
-                                                }
-                                                className="text-muted-foreground hover:bg-danger-soft hover:text-danger rounded p-1 transition-colors"
-                                                onClick={async () => {
-                                                    if (!teamId) return;
-                                                    await runAction(
-                                                        () =>
-                                                            removeTeamMemberAction(
-                                                                teamId,
-                                                                member.userId
-                                                            ),
-                                                        setError
-                                                    );
-                                                    await reload();
-                                                }}
-                                            >
-                                                <Trash2 className="size-4 shrink-0" />
-                                            </button>
-                                        )}
+                                        {heard &&
+                                            (canManage || member.userId === currentUserId) && (
+                                                <button
+                                                    type="button"
+                                                    aria-label={
+                                                        member.userId === currentUserId
+                                                            ? "Leave this team"
+                                                            : `Remove ${member.name}`
+                                                    }
+                                                    title={
+                                                        member.userId === currentUserId
+                                                            ? "Leave"
+                                                            : "Remove"
+                                                    }
+                                                    className="text-muted-foreground hover:bg-danger-soft hover:text-danger rounded p-1 transition-colors"
+                                                    onClick={async () => {
+                                                        if (!teamId) return;
+                                                        await runAction(
+                                                            () =>
+                                                                removeTeamMemberAction(
+                                                                    teamId,
+                                                                    member.userId
+                                                                ),
+                                                            setError
+                                                        );
+                                                        await reload();
+                                                    }}
+                                                >
+                                                    <Trash2 className="size-4 shrink-0" />
+                                                </button>
+                                            )}
                                     </PersonRow>
                                 ))
                             )}

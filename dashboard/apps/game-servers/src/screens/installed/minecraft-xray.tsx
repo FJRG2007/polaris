@@ -478,9 +478,7 @@ export function MinecraftXray({
                                       : "Only somebody who manages this server can change it.")}
                         </span>
                         <Button
-                            disabled={
-                                !loaded || !editable || pending || !dirty || problem !== null
-                            }
+                            disabled={!loaded || !editable || pending || !dirty || problem !== null}
                             onClick={save}
                         >
                             {pending && <Loader2 className="size-4 animate-spin" />}

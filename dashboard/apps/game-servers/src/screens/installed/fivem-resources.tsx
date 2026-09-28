@@ -110,7 +110,9 @@ export function FivemResources({
             if (rescan && canManage) await actions.refreshFivemResourcesAction(installedAppId);
             const result = await actions.listFivemResourcesAction(installedAppId);
             const found = result.resources ?? null;
-            setResources((current) => mergeUnchanged<readonly FivemResource[] | null>(current, found));
+            setResources((current) =>
+                mergeUnchanged<readonly FivemResource[] | null>(current, found)
+            );
             if (found) writeSnapshot(resourcesKey, found);
             setFresh(true);
             setError(result.error ?? null);
@@ -259,9 +261,7 @@ export function FivemResources({
                                         <PlayerIconAction
                                             label={`Stop ${resource.name}`}
                                             icon={<Square className="size-4" />}
-                                            disabled={
-                                                !canManage || locked || resource.managed
-                                            }
+                                            disabled={!canManage || locked || resource.managed}
                                             danger
                                             onClick={() => void act(resource, "stop")}
                                         />

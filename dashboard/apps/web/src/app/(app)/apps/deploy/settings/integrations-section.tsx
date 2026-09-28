@@ -16,7 +16,11 @@ import { SettingsCard } from "../project-settings";
 import { useLiveRead } from "@/components/use-live-resource";
 import { CheckCircle2, CircleDashed, ExternalLink, Loader2 } from "lucide-react";
 import { CloudflareMark, DockerMark, GitHubMark } from "@/components/brand-icons";
-import { cloudflareAccountStatusAction, githubReposAction, listRegistryCredentialsAction } from "../actions";
+import {
+    cloudflareAccountStatusAction,
+    githubReposAction,
+    listRegistryCredentialsAction
+} from "../actions";
 
 interface IntegrationState {
     github: { connected: boolean; login: string | null; repos: number };
@@ -36,20 +40,30 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                 listRegistryCredentialsAction().catch(() => [])
             ]);
             return {
-                github: { connected: github.connected, login: github.login, repos: github.repos.length },
+                github: {
+                    connected: github.connected,
+                    login: github.login,
+                    repos: github.repos.length
+                },
                 cloudflare: {
                     connected: cloudflare?.connected ?? false,
                     account: cloudflare?.accountName ?? null,
                     dnsReady: cloudflare?.dnsReady ?? false
                 },
-                registries: registries.map((entry) => ({ registry: entry.registry, username: entry.username }))
+                registries: registries.map((entry) => ({
+                    registry: entry.registry,
+                    username: entry.username
+                }))
             };
         },
         // Asked again when the project changes, as it always was.
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [projectId]
     );
-    const { data: state } = useLiveRead<IntegrationState>({ load, cacheKey: "deploy.integrations" });
+    const { data: state } = useLiveRead<IntegrationState>({
+        load,
+        cacheKey: "deploy.integrations"
+    });
 
     if (!state) {
         return (
@@ -98,7 +112,9 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                         connected={state.registries.length > 0}
                         detail={
                             state.registries.length > 0
-                                ? state.registries.map((entry) => `${entry.registry} (${entry.username})`).join(", ")
+                                ? state.registries
+                                      .map((entry) => `${entry.registry} (${entry.username})`)
+                                      .join(", ")
                                 : "Sign in to a registry so this project can pull private images."
                         }
                         href="/apps/deploy"

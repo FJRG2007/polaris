@@ -98,7 +98,8 @@ function readKept(): {
     const strings = (from: unknown): Map<string, string> =>
         new Map(
             Object.entries(typeof from === "object" && from !== null ? from : {}).filter(
-                (entry): entry is [string, string] => typeof entry[1] === "string" && entry[1] !== ""
+                (entry): entry is [string, string] =>
+                    typeof entry[1] === "string" && entry[1] !== ""
             )
         );
     const people = new Map<string, core.ProfileStyle>();
@@ -262,7 +263,8 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
             const answered = Object.entries(body.people ?? {});
             const cleared = body.cleared ?? [];
             const named = Object.entries(body.names ?? {}).filter(
-                (entry): entry is [string, string] => typeof entry[1] === "string" && entry[1] !== ""
+                (entry): entry is [string, string] =>
+                    typeof entry[1] === "string" && entry[1] !== ""
             );
             if (named.length > 0) {
                 setNames((current) => {

@@ -174,7 +174,9 @@ export function HytalePanel({
 function FileRow({ name, there }: { name: string; there: boolean }) {
     return (
         <li className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
-            <code className="truncate font-mono text-xs" title={name}>{name}</code>
+            <code className="truncate font-mono text-xs" title={name}>
+                {name}
+            </code>
             {there ? (
                 <Badge variant="success">
                     <CheckCircle2 className="size-3" /> here

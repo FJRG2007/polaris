@@ -209,7 +209,9 @@ export function GameConsole({
 
     useEffect(() => {
         void listConsoleCommandsAction(installedAppId).then((answer) => {
-            setSaved((current) => mergeUnchanged<readonly SavedCommand[]>(current, answer.commands));
+            setSaved((current) =>
+                mergeUnchanged<readonly SavedCommand[]>(current, answer.commands)
+            );
             setHeard(true);
         });
     }, [installedAppId]);

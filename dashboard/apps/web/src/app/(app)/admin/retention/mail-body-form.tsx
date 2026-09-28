@@ -54,7 +54,10 @@ export function MailBodyForm({ kept }: { kept: number }) {
     );
 
     useEffect(() => {
-        void runAction(() => mailBodyHeldAction(), () => setCountFailed(true)).then((result) => {
+        void runAction(
+            () => mailBodyHeldAction(),
+            () => setCountFailed(true)
+        ).then((result) => {
             if (!result) return;
             setHeld(result.held);
             writeSnapshot(HELD_KEY, result.held);

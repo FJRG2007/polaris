@@ -346,12 +346,10 @@ function ModShelves({
     const [open, setOpen] = useState(true);
 
     useEffect(() => {
-        void actions
-            .readArkModShelvesAction(installedAppId)
-            .then((answer) => {
-                setShelves((current) => mergeUnchanged<ModShelves>(current, answer.shelves));
-                writeSnapshot(shelvesKey, answer.shelves);
-            });
+        void actions.readArkModShelvesAction(installedAppId).then((answer) => {
+            setShelves((current) => mergeUnchanged<ModShelves>(current, answer.shelves));
+            writeSnapshot(shelvesKey, answer.shelves);
+        });
     }, [installedAppId, shelvesKey]);
 
     const shown = shelves

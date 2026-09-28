@@ -53,8 +53,7 @@ export function AnticheatEngineCard({
             if (found) {
                 setState((current) => mergeUnchanged(current, found));
                 setHeard(true);
-            }
-            else {
+            } else {
                 setState(null);
                 setError(answer.error ?? "Could not read the anti-cheat");
             }

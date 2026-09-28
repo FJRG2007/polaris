@@ -133,7 +133,9 @@ export function MinecraftClientMods({
                 if (!response.ok) throw new Error("unread");
                 const data = (await response.json()) as { projects?: modrinth.InstalledProject[] };
                 const projects = data.projects ?? [];
-                setRows((current) => (current === null ? projects : mergeUnchanged(current, projects)));
+                setRows((current) =>
+                    current === null ? projects : mergeUnchanged(current, projects)
+                );
                 writeSnapshot(rowsKey(subject, wanted), projects);
             } catch {
                 if (signal.aborted) return;

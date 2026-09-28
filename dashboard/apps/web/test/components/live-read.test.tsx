@@ -174,7 +174,10 @@ describe("Whether a live read is still showing the kept copy", () => {
 
     /** The hook over reads the test answers, or refuses, by hand. */
     function mountReads(subject: string) {
-        const answers: Array<{ resolve: (value: number) => void; reject: (reason: Error) => void }> = [];
+        const answers: Array<{
+            resolve: (value: number) => void;
+            reject: (reason: Error) => void;
+        }> = [];
         const load = () =>
             new Promise<number>((resolve, reject) => {
                 answers.push({ resolve, reject });
