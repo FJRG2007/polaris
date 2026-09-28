@@ -120,6 +120,8 @@ function answer(line: string): string {
             ? `${world.online[1]} has the following entity data: [1.0d, 64.0d, 1.0d]`
             : "";
     }
+    const rule = /^gamerule (doDaylightCycle|doWeatherCycle)$/.exec(line);
+    if (rule) return `Gamerule ${rule[1]} is currently set to: true`;
     if (line.startsWith("attribute "))
         return "Set base value of attribute Max Health for entity Boss to 400.0";
     if (line === "execute as @a run scoreboard players get @s pe_death") {
@@ -681,6 +683,9 @@ describe("a blood moon", () => {
         });
         await play(4_100);
         expect(world.sent).toContain("time set 13000");
+        // The night is held still, so it neither runs out nor is slept through.
+        expect(world.sent).toContain("gamerule doDaylightCycle false");
+        expect(world.sent).toContain("gamerule doWeatherCycle false");
         expect(
             world.sent.filter((line) => line.includes("run summon minecraft:")).length
         ).toBeGreaterThan(0);
@@ -690,6 +695,9 @@ describe("a blood moon", () => {
         const after = state();
         expect(after.history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 7 }]);
         expect(world.sent).toContain("time set 23500");
+        // And the server gets back what it had.
+        expect(world.sent).toContain("gamerule doDaylightCycle true");
+        expect(world.sent).toContain("gamerule doWeatherCycle true");
         expect(world.sent).toContain("kill @e[tag=pe_mob]");
     });
 });

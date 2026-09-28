@@ -57,6 +57,9 @@ export const runSchema = z.object({
     closedAt: z.number().default(0),
     /** Somebody pressed Cancel; the loop ends it on its next tick. */
     cancelled: z.boolean().default(false),
+    /** Game rules the event changed, and what each was before, so they are put
+     *  back even after a restart. */
+    gamerules: z.record(z.string()).default({}),
     /** Its results are being handed out; never played again from here. */
     finishing: z.boolean().default(false)
 });

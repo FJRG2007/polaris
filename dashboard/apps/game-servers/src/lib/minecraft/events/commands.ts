@@ -517,6 +517,29 @@ export function nightfall(seconds: number): string[] {
     return ["time set 13000", `weather thunder ${Math.max(60, Math.round(seconds))}`];
 }
 
+/**
+ * The game rules a blood moon holds still while it lasts: the clock, so the
+ * night neither runs out before the event does (a Minecraft night is about eight
+ * minutes) nor is slept through in a bed, and the weather, so the storm stays.
+ * Put back to whatever the server had when it ends.
+ */
+export const FROZEN_RULES = ["doDaylightCycle", "doWeatherCycle"] as const;
+
+export function readRule(name: string): string {
+    return `gamerule ${name}`;
+}
+
+/** `Gamerule doDaylightCycle is currently set to: true`, or null when the game
+ *  does not know the rule (a version that renamed it) or did not answer. */
+export function readRuleValue(output: string): "true" | "false" | null {
+    const match = /currently set to:?\s*(true|false)/i.exec(output);
+    return match ? (match[1]!.toLowerCase() as "true" | "false") : null;
+}
+
+export function setRule(name: string, value: string): string {
+    return `gamerule ${name} ${value}`;
+}
+
 export function daybreak(): string[] {
     return ["time set 23500", "weather clear", `kill @e[tag=${MOB_TAG}]`];
 }
@@ -763,9 +786,14 @@ export function release(
 export function cleanup(
     preset: EventPreset,
     place: { x: number; y: number; z: number } | null,
-    target: { x: number; z: number } | null = null
+    target: { x: number; z: number } | null = null,
+    /** Game rules the event changed, and what they were before. */
+    rules: Readonly<Record<string, string>> = {}
 ): string[] {
     const lines = [
+        ...Object.entries(rules)
+            .filter(([name, value]) => /^[A-Za-z:_]+$/.test(name) && (value === "true" || value === "false"))
+            .map(([name, value]) => setRule(name, value)),
         `bossbar remove ${BAR}`,
         `scoreboard objectives remove ${SCORE}`,
         `scoreboard objectives remove ${SUM}`,

@@ -317,7 +317,8 @@ export async function startEvent(input: {
         lastWaveAt: 0,
         closedAt: 0,
         cancelled: false,
-        finishing: false
+        finishing: false,
+        gamerules: {}
     } satisfies stored.EventRun;
 
     const stored = await updateEventState(input.installedAppId, (state) => {
@@ -564,7 +565,20 @@ async function begin(
             ...commands.bossScoreboard((preset.options as catalog.EventOptions<"world-boss">).boss)
         );
     }
-    if (preset.kind === "blood-moon") lines.push(...commands.nightfall(seconds));
+    if (preset.kind === "blood-moon") {
+        // Held still until dawn: the clock, or the night runs out before the
+        // event does or is slept through; the weather, or the storm clears.
+        // What each was is kept, and put back when it ends.
+        const before: Record<string, string> = {};
+        for (const rule of commands.FROZEN_RULES) {
+            const value = commands.readRuleValue(await server.say([commands.readRule(rule)]));
+            if (value === null) continue;
+            before[rule] = value;
+            lines.push(commands.setRule(rule, "false"));
+        }
+        loop.run = { ...loop.run, gamerules: { ...before, ...loop.run.gamerules } };
+        lines.push(...commands.nightfall(seconds));
+    }
     if (preset.kind === "happy-hour") {
         lines.push(
             ...commands.happyEffects(preset.options as catalog.EventOptions<"happy-hour">, seconds)
@@ -1152,7 +1166,7 @@ async function finish(
                     commands.say(messages.tag(language) + messages.dawn(survivors.length, language))
                 );
             }
-            await server.sayAll([...lines, ...commands.cleanup(preset, run.place, run.target)]);
+            await server.sayAll([...lines, ...commands.cleanup(preset, run.place, run.target, run.gamerules)]);
         } else {
             // The server was not answering: clean up when it is back, so a
             // chest, a boss or a loaded chunk is not left in the world for good.
@@ -1162,7 +1176,7 @@ async function finish(
         console.warn("polaris: finishing an event failed", installedAppId, String(error));
         if (server)
             await server
-                .sayAll(commands.cleanup(preset, run.place, run.target))
+                .sayAll(commands.cleanup(preset, run.place, run.target, run.gamerules))
                 .catch(() => undefined);
     } finally {
         releaseSidebar(loop.ownerId, installedAppId);
@@ -1202,7 +1216,7 @@ async function cleanUpLater(
     run: stored.EventRun
 ): Promise<void> {
     await withServerContainer(ownerId, installedAppId, async (later) => {
-        if (later.running) await later.sayAll(commands.cleanup(run.preset, run.place, run.target));
+        if (later.running) await later.sayAll(commands.cleanup(run.preset, run.place, run.target, run.gamerules));
     }).catch(() => undefined);
 }
 
