@@ -56,7 +56,10 @@ export async function POST(request: Request): Promise<Response> {
     if (!throttle.ok) {
         return Response.json(
             { error: "That is a lot of songs at once. Try again in a minute." },
-            { status: 429, headers: { "Retry-After": String(Math.ceil(throttle.retryAfterMs / 1000)) } }
+            {
+                status: 429,
+                headers: { "Retry-After": String(Math.ceil(throttle.retryAfterMs / 1000)) }
+            }
         );
     }
 
@@ -67,7 +70,10 @@ export async function POST(request: Request): Promise<Response> {
             return Response.json({ error: caught.message, kind: caught.kind }, { status: 409 });
         }
         console.error("polaris: listen along could not start:", caught);
-        return Response.json({ error: "Listening along could not start. Try again in a moment." }, { status: 500 });
+        return Response.json(
+            { error: "Listening along could not start. Try again in a moment." },
+            { status: 500 }
+        );
     }
     return Response.json({ hostId: asked.data.hostId }, { headers: NO_STORE });
 }

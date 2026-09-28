@@ -126,11 +126,22 @@ const SERVICE_IMAGES: Record<string, string> = {
  */
 export function providerInitials(name: string): string {
     const words = name.split(/[^A-Za-z0-9]+/).filter(Boolean);
-    const letters = words.length > 1 ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}` : (words[0] ?? "").slice(0, 2);
+    const letters =
+        words.length > 1
+            ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}`
+            : (words[0] ?? "").slice(0, 2);
     return letters.toUpperCase() || "??";
 }
 
-function ProviderMonogram({ slug, name, className }: { slug: string; name: string; className?: string }) {
+function ProviderMonogram({
+    slug,
+    name,
+    className
+}: {
+    slug: string;
+    name: string;
+    className?: string;
+}) {
     return (
         <span
             aria-hidden="true"
@@ -175,7 +186,8 @@ export function IntegrationLogo({ slug, className }: { slug: string; className?:
     const image = SERVICE_IMAGES[slug];
     // object-contain: these are the vendors' own files, and they are not all
     // square. A logo stretched to fill a box is a logo nobody signed off on.
-    if (image) return <img src={image} alt="" className={cn("shrink-0 object-contain", className)} />;
+    if (image)
+        return <img src={image} alt="" className={cn("shrink-0 object-contain", className)} />;
     const Mark = SERVICE_MARKS[slug] ?? MODEL_MARKS[slug];
     if (Mark) return <Mark className={className} />;
     const seeded = MODEL_PROVIDER_SEEDS.find((seed) => seed.slug === slug);
@@ -203,7 +215,15 @@ const AGENT_MARKS: Record<string, ComponentType<{ className?: string }>> = {
 /** The logo for a coding agent, by its catalogue id. `custom` is a tool Polaris
  *  knows nothing about, including what it looks like, so it draws the same
  *  neutral block an unknown integration does. */
-export function AgentLogo({ id, label, className }: { id: string; label: string; className?: string }) {
+export function AgentLogo({
+    id,
+    label,
+    className
+}: {
+    id: string;
+    label: string;
+    className?: string;
+}) {
     const Mark = AGENT_MARKS[id];
     if (Mark) return <Mark className={className} />;
     if (id === "custom") return <Blocks className={className} />;

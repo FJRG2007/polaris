@@ -174,7 +174,7 @@ function isConnected(card: IntegrationCard): boolean {
     return card.hasSecret || card.enabled;
 }
 
-export function IntegrationsView({ cards }: { cards: IntegrationCard[]; }) {
+export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
     const router = useRouter();
     const [configuring, setConfiguring] = useState<IntegrationCard | null>(null);
     const [query, setQuery] = useState("");
@@ -195,7 +195,8 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[]; }) {
      * under one of them makes them find it twice.
      */
     const sections = useMemo(() => {
-        if (needle) return [{ name: null as string | null, hint: null as string | null, cards: matches }];
+        if (needle)
+            return [{ name: null as string | null, hint: null as string | null, cards: matches }];
         return INTEGRATION_CATEGORIES.map(({ name, hint }) => ({
             name: name as string | null,
             hint: hint as string | null,
@@ -1112,7 +1113,11 @@ const OAUTH_APPS: Record<string, { name: string; idLabel: string; idPlaceholder:
     // is digits rather than the hex an operator might otherwise go looking for.
     discord: { name: "Discord", idLabel: "Client ID", idPlaceholder: "123456789012345678" },
     // Spotify's client id is 32 hexadecimal characters.
-    spotify: { name: "Spotify", idLabel: "Client ID", idPlaceholder: "0123456789abcdef0123456789abcdef" }
+    spotify: {
+        name: "Spotify",
+        idLabel: "Client ID",
+        idPlaceholder: "0123456789abcdef0123456789abcdef"
+    }
 };
 
 function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {

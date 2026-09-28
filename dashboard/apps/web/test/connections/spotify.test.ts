@@ -22,7 +22,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = {
     responses: [] as Array<{ status: number; body?: unknown; headers?: Record<string, string> }>,
-    requests: [] as Array<{ url: string; method: string; body?: string; headers: Record<string, string> }>
+    requests: [] as Array<{
+        url: string;
+        method: string;
+        body?: string;
+        headers: Record<string, string>;
+    }>
 };
 
 vi.mock("@/lib/integration-service", () => ({
@@ -44,7 +49,8 @@ vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
         ok: next.status >= 200 && next.status < 300,
         status: next.status,
         headers: new Headers(next.headers ?? {}),
-        json: async () => (next.body === undefined ? Promise.reject(new Error("empty")) : next.body),
+        json: async () =>
+            next.body === undefined ? Promise.reject(new Error("empty")) : next.body,
         text: async () => text
     } as Response;
 });
@@ -86,7 +92,9 @@ beforeEach(() => {
 
 describe("linking an account", () => {
     it("asks for playback and nothing else, and always shows the consent screen", () => {
-        const url = new URL(spotify.spotifyAuthorizeUrl(CLIENT, "https://polaris.example/cb", "state1"));
+        const url = new URL(
+            spotify.spotifyAuthorizeUrl(CLIENT, "https://polaris.example/cb", "state1")
+        );
         expect(url.origin + url.pathname).toBe("https://accounts.spotify.com/authorize");
         expect(url.searchParams.get("scope")?.split(" ").sort()).toEqual([
             "user-modify-playback-state",
@@ -107,20 +115,45 @@ describe("linking an account", () => {
 
     it("spends the code with the application's own credentials and reads the name", async () => {
         state.responses.push(
-            { status: 200, body: { access_token: "a1", refresh_token: "r1", expires_in: 3600, scope: "x y" } },
-            { status: 200, body: { id: "ana-id", display_name: "Ana", images: [{ url: "https://i.scdn.co/me" }] } }
+            {
+                status: 200,
+                body: { access_token: "a1", refresh_token: "r1", expires_in: 3600, scope: "x y" }
+            },
+            {
+                status: 200,
+                body: {
+                    id: "ana-id",
+                    display_name: "Ana",
+                    images: [{ url: "https://i.scdn.co/me" }]
+                }
+            }
         );
-        const linked = await spotify.exchangeSpotifyCode(CLIENT, "code1", "https://polaris.example/cb");
-        expect(linked).toMatchObject({ accountId: "ana-id", label: "Ana", avatarUrl: "https://i.scdn.co/me", email: null });
+        const linked = await spotify.exchangeSpotifyCode(
+            CLIENT,
+            "code1",
+            "https://polaris.example/cb"
+        );
+        expect(linked).toMatchObject({
+            accountId: "ana-id",
+            label: "Ana",
+            avatarUrl: "https://i.scdn.co/me",
+            email: null
+        });
         expect(linked.credential).toMatchObject({ accessToken: "a1", refreshToken: "r1" });
         const token = state.requests[0]!;
-        expect(token.headers.authorization).toBe(`Basic ${Buffer.from("client-id:client-secret").toString("base64")}`);
+        expect(token.headers.authorization).toBe(
+            `Basic ${Buffer.from("client-id:client-secret").toString("base64")}`
+        );
         expect(token.body).toContain("grant_type=authorization_code");
     });
 
     it("keeps the old refresh token when a refresh hands back none", async () => {
         state.responses.push({ status: 200, body: { access_token: "a2", expires_in: 3600 } });
-        const got = await spotify.spotifyAccessToken(CLIENT, { accessToken: "old", refreshToken: "r1", expiresAt: 0 });
+        const got = await spotify.spotifyAccessToken(CLIENT, {
+            accessToken: "old",
+            refreshToken: "r1",
+            expiresAt: 0
+        });
         expect(got?.accessToken).toBe("a2");
         expect(got?.refreshed).toMatchObject({ accessToken: "a2", refreshToken: "r1" });
     });
@@ -128,11 +161,17 @@ describe("linking an account", () => {
     it("tells a refused refresh apart from a busy or broken Spotify", async () => {
         const stale = { accessToken: "old", refreshToken: "r1", expiresAt: 0 };
         state.responses.push({ status: 400, body: { error: "invalid_grant" } });
-        await expect(spotify.spotifyAccessToken(CLIENT, stale)).rejects.toBeInstanceOf(spotify.SpotifyUnauthorized);
+        await expect(spotify.spotifyAccessToken(CLIENT, stale)).rejects.toBeInstanceOf(
+            spotify.SpotifyUnauthorized
+        );
         state.responses.push({ status: 429, body: {}, headers: { "retry-after": "7" } });
-        await expect(spotify.spotifyAccessToken(CLIENT, stale)).rejects.toMatchObject({ retryAfterMs: 7_000 });
+        await expect(spotify.spotifyAccessToken(CLIENT, stale)).rejects.toMatchObject({
+            retryAfterMs: 7_000
+        });
         state.responses.push({ status: 503, body: {} });
-        const blip = await spotify.spotifyAccessToken(CLIENT, stale).catch((caught: unknown) => caught);
+        const blip = await spotify
+            .spotifyAccessToken(CLIENT, stale)
+            .catch((caught: unknown) => caught);
         expect(blip).toBeInstanceOf(Error);
         expect(blip).not.toBeInstanceOf(spotify.SpotifyUnauthorized);
         expect(blip).not.toBeInstanceOf(spotify.SpotifyRateLimited);
@@ -173,17 +212,22 @@ describe("what is playing", () => {
             { status: 200, body: track({ currently_playing_type: "ad", item: null }) },
             { status: 200, body: track({ item: { ...track().item, id: null, is_local: true } }) }
         );
-        for (let index = 0; index < 5; index += 1) expect(await spotify.readSpotifyPlaying("t")).toBeNull();
+        for (let index = 0; index < 5; index += 1)
+            expect(await spotify.readSpotifyPlaying("t")).toBeNull();
     });
 
     it("says how long Spotify asked to be left alone", async () => {
         state.responses.push({ status: 429, headers: { "retry-after": "12" } });
-        await expect(spotify.readSpotifyPlaying("t")).rejects.toMatchObject({ retryAfterMs: 12_000 });
+        await expect(spotify.readSpotifyPlaying("t")).rejects.toMatchObject({
+            retryAfterMs: 12_000
+        });
     });
 
     it("tells a revoked link apart from any other failure", async () => {
         state.responses.push({ status: 401 });
-        await expect(spotify.readSpotifyPlaying("t")).rejects.toBeInstanceOf(spotify.SpotifyUnauthorized);
+        await expect(spotify.readSpotifyPlaying("t")).rejects.toBeInstanceOf(
+            spotify.SpotifyUnauthorized
+        );
     });
 });
 
@@ -191,12 +235,21 @@ describe("playing something", () => {
     it("puts the one track on at the position asked", async () => {
         state.responses.push({ status: 204 });
         await spotify.spotifyPlay("t", "spotify:track:x", 12_345.6);
-        expect(state.requests[0]).toMatchObject({ method: "PUT", url: "https://api.spotify.com/v1/me/player/play" });
-        expect(JSON.parse(state.requests[0]!.body!)).toEqual({ uris: ["spotify:track:x"], position_ms: 12_346 });
+        expect(state.requests[0]).toMatchObject({
+            method: "PUT",
+            url: "https://api.spotify.com/v1/me/player/play"
+        });
+        expect(JSON.parse(state.requests[0]!.body!)).toEqual({
+            uris: ["spotify:track:x"],
+            position_ms: 12_346
+        });
     });
 
     it("says Premium when Spotify refuses a free account", async () => {
-        state.responses.push({ status: 403, body: { error: { status: 403, reason: "PREMIUM_REQUIRED" } } });
+        state.responses.push({
+            status: 403,
+            body: { error: { status: 403, reason: "PREMIUM_REQUIRED" } }
+        });
         await expect(spotify.spotifyPlay("t", "u", 0)).rejects.toMatchObject({ kind: "premium" });
         state.responses.push({ status: 403 });
         await expect(spotify.spotifyPlay("t", "u", 0)).rejects.toMatchObject({
@@ -205,7 +258,10 @@ describe("playing something", () => {
     });
 
     it("says to open Spotify somewhere when no device is on", async () => {
-        state.responses.push({ status: 404, body: { error: { status: 404, reason: "NO_ACTIVE_DEVICE" } } });
+        state.responses.push({
+            status: 404,
+            body: { error: { status: 404, reason: "NO_ACTIVE_DEVICE" } }
+        });
         await expect(spotify.spotifyPlay("t", "u", 0)).rejects.toMatchObject({
             kind: "device",
             message: expect.stringContaining("Open Spotify")

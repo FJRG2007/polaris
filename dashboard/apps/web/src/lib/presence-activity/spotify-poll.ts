@@ -162,7 +162,8 @@ export async function pollSpotify(now: number = Date.now()): Promise<SpotifyPass
             settings.get(userId) ?? core.DEFAULT_ACTIVITY_SETTINGS,
             "spotify"
         );
-        const wanted = (shares && present.has(userId)) || hosts.has(userId) || listeners.has(userId);
+        const wanted =
+            (shares && present.has(userId)) || hosts.has(userId) || listeners.has(userId);
         if (!wanted) {
             // Gone, or switched off: what was showing goes with them.
             if (held.due.has(connectionId)) {
@@ -187,7 +188,10 @@ export async function pollSpotify(now: number = Date.now()): Promise<SpotifyPass
         asked += 1;
         const shares =
             present.has(entry.userId) &&
-            core.activitySourceOn(settings.get(entry.userId) ?? core.DEFAULT_ACTIVITY_SETTINGS, "spotify");
+            core.activitySourceOn(
+                settings.get(entry.userId) ?? core.DEFAULT_ACTIVITY_SETTINGS,
+                "spotify"
+            );
         try {
             await askOne(client, entry, {
                 shares,
