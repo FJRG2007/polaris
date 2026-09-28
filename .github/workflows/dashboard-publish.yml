@@ -110,8 +110,14 @@ jobs:
           # everything since the one before it. A re-run of a commit that already
           # published finds itself here, and keeps the push base so it rebuilds
           # what that push changed instead of nothing.
-          LAST=$(gh api "repos/$REPO/actions/workflows/dashboard-publish.yml/runs?branch=main&status=success&per_page=1" \
-            --jq '.workflow_runs[0].head_sha // empty' 2>/dev/null || true)
+          #
+          # The newest by its own date, out of a page of them, rather than the
+          # first the API hands back: filtered by status and cut to one, it
+          # answered with a run from two weeks earlier, and every push was
+          # measured from there - thousands of files "changed", and every image,
+          # the vision and face workers included, rebuilt for a one-line change.
+          LAST=$(gh api "repos/$REPO/actions/workflows/dashboard-publish.yml/runs?branch=main&status=success&per_page=30" \
+            --jq '[.workflow_runs[]] | sort_by(.created_at) | last | .head_sha // empty' 2>/dev/null || true)
           if [ -n "$LAST" ] && [ "$LAST" != "$SHA" ] && git cat-file -e "${LAST}^{commit}" 2>/dev/null \
              && git merge-base --is-ancestor "$LAST" "$SHA"; then
             echo "Measuring from the last published commit $LAST (push base was ${BEFORE:-none})."
