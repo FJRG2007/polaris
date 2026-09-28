@@ -10,7 +10,11 @@
 import { getDomainConfig } from "./domain-service";
 import { zoneReachable } from "./domain-zones";
 import { getNetworkStatus } from "./network-service";
-import { ensurePolarisTunnel, polarisTunnelPresence, stopPolarisTunnel } from "./polaris-tunnel-service";
+import {
+    ensurePolarisTunnel,
+    polarisTunnelPresence,
+    stopPolarisTunnel
+} from "./polaris-tunnel-service";
 
 /** Whether public links on this box need the Polaris tunnel at all. */
 async function needsShareTunnel(): Promise<boolean> {

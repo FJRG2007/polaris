@@ -182,7 +182,12 @@ export async function polarisTunnelPresence(): Promise<"none" | "serving" | "sta
     const ports = new HostdPorts();
     try {
         if (await isServing(ports)) return "serving";
-        return (await ports.inspect(SERVICE).then(() => true, () => false)) ? "stale" : "none";
+        return (await ports.inspect(SERVICE).then(
+            () => true,
+            () => false
+        ))
+            ? "stale"
+            : "none";
     } finally {
         await ports.dispose();
     }
