@@ -91,12 +91,10 @@ vi.mock("@polaris/app-host", () => ({
     }
 }));
 
-const { GET, POST } = await import(
-    "@polaris-app/game-servers/src/routes/api/minecraft/anticheat/[id]/route"
-);
-const { engineCheckLabel, engineScore } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/suspicion"
-);
+const { GET, POST } =
+    await import("@polaris-app/game-servers/src/routes/api/minecraft/anticheat/[id]/route");
+const { engineCheckLabel, engineScore } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/suspicion");
 
 function report(body: unknown, token = "the-token", id = SERVER) {
     return POST(
