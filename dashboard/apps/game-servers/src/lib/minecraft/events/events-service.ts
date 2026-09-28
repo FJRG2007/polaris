@@ -50,6 +50,8 @@ import {
 const { readInstallConfig } = host.appsInstallConfig;
 
 const TICK_MS = 2_000;
+/** How often the boss bar's clock moves: every second, on its own timer. */
+const CLOCK_MS = 1_000;
 /** How often the loop looks at who is where, to know who took part. */
 const SAMPLE_EVERY_MS = 15_000;
 /** How often the participants are written down, so a restart knows them. */
@@ -67,6 +69,8 @@ const SERVER_PROPERTIES = "/data/server.properties";
 interface Loop {
     readonly ownerId: string;
     readonly timer: ReturnType<typeof setInterval>;
+    /** The boss bar's clock, a second at a time, apart from the tick. */
+    clock: ReturnType<typeof setInterval> | null;
     busy: boolean;
     run: stored.EventRun;
     link: { server: ServerContainer; close: () => Promise<void> } | null;
@@ -540,6 +544,7 @@ function startLoop(
                     loop.busy = false;
                 });
         }, TICK_MS),
+        clock: null,
         busy: false,
         run,
         link: null,
@@ -559,6 +564,8 @@ function startLoop(
         flavour: null
     };
     loop.timer.unref?.();
+    loop.clock = setInterval(() => void showClock(loop), CLOCK_MS);
+    loop.clock.unref?.();
     loops.set(installedAppId, loop);
     // Picked up again after a restart: the side of the screen is the event's
     // again, or the live panel would be drawn over its scoreboard.
@@ -694,17 +701,7 @@ async function countdown(
         ]);
     }
     if (now < loop.run.startsAt) {
-        const lines = commands.barUpdate(
-            messages.startsInBar(title, left, language),
-            left,
-            Math.max(1, loop.countdown, catalog.takesJoiners(preset) ? catalog.JOIN_SECONDS : 0)
-        );
-        const mark = Math.ceil(left);
-        if ([30, 10, 5, 4, 3, 2, 1].includes(mark) && !loop.sounded.has(mark)) {
-            loop.sounded.add(mark);
-            lines.push(commands.sound(commands.SOUNDS.tick));
-            if (mark <= 5) lines.push(`title @a actionbar ${commands.text(`&e${mark}`)}`);
-        }
+        const lines: string[] = [];
         // Who has typed `join` so far, read off the chat.
         if (catalog.playsOnStage(preset))
             await stageService.countdownTick(loop, stageTools(installedAppId, loop, server), lines);
@@ -728,42 +725,50 @@ async function countdown(
             );
         }
         await server.sayAll(lines);
-        const max = Math.max(1, loop.countdown, catalog.takesJoiners(preset) ? catalog.JOIN_SECONDS : 0);
-        betweenTicks(loop, server, "countdown", () => {
-            const next = (loop.run.startsAt - Date.now()) / 1000;
-            if (next <= 0) return [];
-            const mark = Math.ceil(next);
-            const extra: string[] = [];
-            if (mark <= 5 && !loop.sounded.has(mark)) {
-                loop.sounded.add(mark);
-                extra.push(commands.sound(commands.SOUNDS.tick), `title @a actionbar ${commands.text(`&e${mark}`)}`);
-            }
-            return [...commands.barUpdate(messages.startsInBar(title, next, language), next, max), ...extra];
-        });
         return;
     }
     await begin(installedAppId, loop, server, now);
 }
 
 /**
- * The boss bar moved on once more halfway to the next tick, so its clock counts
- * down a second at a time rather than two: the loop runs every two seconds,
- * which is right for everything else it does. Skipped if the event has moved on
- * or ended by then.
+ * The boss bar's clock, moved on every second on a timer of its own.
+ *
+ * Worked out as it is sent rather than when a tick began: a tick that spends
+ * seconds looking for ground, or asking about many players, sent the time it
+ * started with at its end - after a newer one - and the clock froze or went
+ * back. The marks of the last seconds are sounded here too, so they are on time.
+ * The boss's and a horde's bars show health and waves, and are left to them.
  */
-function betweenTicks(
-    loop: Loop,
-    server: ServerContainer,
-    phase: stored.EventRun["phase"],
-    lines: () => string[]
-): void {
-    const run = loop.run;
-    const timer = setTimeout(() => {
-        if (loop.finishing || loop.run.phase !== phase || loop.run.startsAt !== run.startsAt) return;
-        const said = lines();
-        if (said.length > 0) void server.sayAll(said).catch(() => undefined);
-    }, TICK_MS / 2);
-    timer.unref?.();
+async function showClock(loop: Loop): Promise<void> {
+    const server = loop.link?.server;
+    if (!server || loop.finishing || !loop.announced) return;
+    const { preset } = loop.run;
+    const now = Date.now();
+    const lines: string[] = [];
+    if (loop.run.phase === "countdown") {
+        const left = (loop.run.startsAt - now) / 1000;
+        if (left <= 0) return;
+        const max = Math.max(
+            1,
+            loop.countdown,
+            catalog.takesJoiners(preset) ? catalog.JOIN_SECONDS : 0
+        );
+        lines.push(
+            ...commands.barUpdate(messages.startsInBar(preset.name, left, loop.language), left, max)
+        );
+        const mark = Math.ceil(left);
+        if ([30, 10, 5, 4, 3, 2, 1].includes(mark) && !loop.sounded.has(mark)) {
+            loop.sounded.add(mark);
+            lines.push(commands.sound(commands.SOUNDS.tick));
+            if (mark <= 5) lines.push(`title @a actionbar ${commands.text(`&e${mark}`)}`);
+        }
+    } else if (preset.kind !== "world-boss" && preset.kind !== "waves") {
+        const left = (loop.run.endsAt - now) / 1000;
+        if (left <= 0) return;
+        const total = (loop.run.endsAt - loop.run.startsAt) / 1000;
+        lines.push(...commands.barUpdate(messages.barName(preset.name, left), left, total));
+    }
+    if (lines.length > 0) await server.sayAll(lines).catch(() => undefined);
 }
 
 /** What a gathering or a rare catch is for, said with the rules. */
@@ -934,19 +939,10 @@ async function play(
 ): Promise<string | null> {
     const { preset } = loop.run;
     const left = (loop.run.endsAt - now) / 1000;
-    const total = (loop.run.endsAt - loop.run.startsAt) / 1000;
     const lines: string[] = [];
 
-    // The boss's bar shows its health, and a horde defence's the wave.
-    if (preset.kind !== "world-boss" && preset.kind !== "waves") {
-        lines.push(...commands.barUpdate(messages.barName(preset.name, left), left, total));
-        betweenTicks(loop, server, "running", () => {
-            const next = (loop.run.endsAt - Date.now()) / 1000;
-            return next > 0
-                ? commands.barUpdate(messages.barName(preset.name, next), next, total)
-                : [];
-        });
-    }
+    // The boss bar's clock is `showClock`'s, a second at a time; the boss's
+    // shows its health and a horde defence's the wave.
     // Every other tick: the game adds the statistics up faster than anybody
     // reads a leaderboard, and it keeps the batch sent to the server small.
     if (loop.ticks % 2 === 0) lines.push(...commands.scoreTick(preset));
@@ -2369,6 +2365,7 @@ async function finish(
     if (loop.finishing) return;
     loop.finishing = true;
     clearInterval(loop.timer);
+    if (loop.clock) clearInterval(loop.clock);
     const run = loop.run;
     await updateEventState(installedAppId, (state) =>
         state.run?.id === run.id ? { ...state, run: { ...state.run, finishing: true } } : state
