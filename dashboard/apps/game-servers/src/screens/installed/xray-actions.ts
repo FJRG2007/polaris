@@ -79,6 +79,15 @@ async function viewOf(
     const state = readXray(readInstallConfig(row?.config));
     const now = Date.now();
     const bedrock = editionOf(row?.catalogId ?? "minecraft") === "bedrock";
+    // Three trips - the stats files and the player list into the container, the
+    // engine's alerts to the database - that do not wait on each other.
+    const [mining, online, engine] = await Promise.all([
+        withMining && !bedrock ? readAllMining(ownerId, installedAppId) : [],
+        onlinePlayers(ownerId, installedAppId)
+            .then((answer) => answer?.players ?? [])
+            .catch(() => []),
+        bedrock ? [] : engineRecords(installedAppId).catch(() => [])
+    ]);
     return {
         settings: state.settings,
         traps: {
@@ -97,8 +106,8 @@ async function viewOf(
             }))
             .filter((player) => player.hits.length > 0)
             .sort((left, right) => right.hits.length - left.hits.length),
-        mining: withMining && !bedrock ? await readAllMining(ownerId, installedAppId) : [],
-        online: (await onlinePlayers(ownerId, installedAppId).catch(() => null))?.players ?? [],
+        mining,
+        online,
         movement: Object.values(state.movement)
             .map((evidence) => ({
                 name: evidence.name,
@@ -107,7 +116,7 @@ async function viewOf(
             .filter((player) => player.incidents.length > 0),
         teleportCheck: state.settings.movement ? state.teleportCheck : null,
         refusal: bedrock ? "Bedrock keeps no per-player mining counters Polaris can watch" : null,
-        engine: bedrock ? [] : await engineRecords(installedAppId).catch(() => [])
+        engine
     };
 }
 

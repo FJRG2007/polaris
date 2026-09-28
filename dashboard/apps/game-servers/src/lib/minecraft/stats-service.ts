@@ -147,10 +147,9 @@ export interface PlayerMining {
  * Bedrock and for
  * a server that cannot be reached.
  */
-async function readAllStatsFiles(
-    ownerId: string,
-    installedAppId: string
-): Promise<{ readonly name: string; readonly json: string; readonly seen: number }[]> {
+type StatsFile = { readonly name: string; readonly json: string; readonly seen: number };
+
+async function readAllStatsFiles(ownerId: string, installedAppId: string): Promise<StatsFile[]> {
     try {
         return await withServerContainer(ownerId, installedAppId, async (server) => {
             const dir = await statsDir(server, ownerId);
@@ -175,6 +174,26 @@ async function readAllStatsFiles(
     }
 }
 
+/** How long a reading of every player's figures stands. The game only writes
+ *  them when it saves, every few minutes, so reading them more often than this
+ *  would only read the same files again. */
+const FIGURES_TTL_MS = 60_000;
+
+const filesRead = new Map<string, { at: number; value: Promise<StatsFile[]> }>();
+
+/**
+ * Every player's stats file, read from the container at most once a minute per
+ * server. The rankings and the anti-cheat's mining rates read the same files, so
+ * opening one after the other is one trip into the container, not two.
+ */
+function statsFiles(ownerId: string, installedAppId: string): Promise<StatsFile[]> {
+    const held = filesRead.get(installedAppId);
+    if (held && Date.now() - held.at < FIGURES_TTL_MS) return held.value;
+    const value = readAllStatsFiles(ownerId, installedAppId);
+    filesRead.set(installedAppId, { at: Date.now(), value });
+    return value;
+}
+
 /** The mining figures of every player the world has stats for, a player's files
  *  added together. */
 export async function readAllMining(
@@ -182,7 +201,7 @@ export async function readAllMining(
     installedAppId: string
 ): Promise<PlayerMining[]> {
     const byName = new Map<string, PlayerMining>();
-    for (const file of await readAllStatsFiles(ownerId, installedAppId)) {
+    for (const file of await statsFiles(ownerId, installedAppId)) {
         const figures = miningFigures(file.json);
         if (!figures) continue;
         const key = file.name.toLowerCase();
@@ -202,11 +221,6 @@ export async function readAllMining(
     return [...byName.values()];
 }
 
-/** How long a reading of every player's figures stands. The game only writes
- *  them when it saves, every few minutes, so reading them more often than this
- *  would only read the same files again. */
-const FIGURES_TTL_MS = 60_000;
-
 const figuresRead = new Map<string, { at: number; value: Promise<PlayerFigures[]> }>();
 
 /** Playtime, deaths, kills and the rest of the rankings' counters for every
@@ -218,7 +232,7 @@ export async function readAllPlayerStats(
     const held = figuresRead.get(installedAppId);
     if (held && Date.now() - held.at < FIGURES_TTL_MS) return held.value;
     // A player filed under two uuids is one row with the time of both.
-    const value = readAllStatsFiles(ownerId, installedAppId).then((files) => {
+    const value = statsFiles(ownerId, installedAppId).then((files) => {
         const byName = new Map<
             string,
             { name: string; all: PlayerStats[]; tallies: { seen: number; of: PlayerTallies }[] }
