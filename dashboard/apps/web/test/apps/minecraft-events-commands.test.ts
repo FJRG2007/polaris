@@ -10,22 +10,22 @@ import * as commands from "@polaris-app/game-servers/src/lib/minecraft/events/co
 import * as messages from "@polaris-app/game-servers/src/lib/minecraft/events/messages";
 import * as arena from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena";
 import * as trivia from "@polaris-app/game-servers/src/lib/minecraft/events/trivia-bank";
-import * as hunt from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/treasure-hunt";
-import * as gather from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/gathering";
-import * as rareCatch from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/rare-catch";
 import * as boost from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/xp-boost";
 import * as duel from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel";
+import * as gather from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/gathering";
+import * as hunt from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/treasure-hunt";
 import * as build from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/build-battle";
+import * as rareCatch from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/rare-catch";
 import {
     COMMAND_BYTES_MAX,
     commandBytes
 } from "@polaris-app/game-servers/src/lib/minecraft/command-size";
 import * as waves from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/waves";
-import * as chunks from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/chunks";
-import * as meteors from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/meteor-shower";
 import * as stage from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage";
-import * as parkour from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour";
+import * as chunks from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/chunks";
 import * as spleef from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/spleef";
+import * as parkour from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour";
+import * as meteors from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/meteor-shower";
 import {
     atLeast,
     chatLines,
@@ -66,20 +66,72 @@ describe("the scoreboard", () => {
         ]);
     });
 
-    it("gives every player a zero before adding up, and weights what is worth more", () => {
+    it("weights what is worth more", () => {
         const lines = commands.scoreTick(preset("mining-rush"));
-        const first = lines.findIndex((line) =>
-            line.startsWith("scoreboard players add @a pe_c0 0")
-        );
-        const firstSum = lines.findIndex((line) => line.includes("pe_sum += @s pe_tmp"));
-        expect(first).toBeGreaterThanOrEqual(0);
-        expect(first).toBeLessThan(firstSum);
         expect(lines).toContain(
             "execute as @a run scoreboard players operation @s pe_tmp *= #w8 pe_const"
         );
         expect(lines.at(-1)).toBe(
             "execute as @a[scores={pe_sum=1..}] run scoreboard players operation @s pe_score = @s pe_sum"
         );
+    });
+
+    it("counts a statistic the server does not have as nothing, not as the one before it", () => {
+        // A 1.16 server: no deepslate or copper ores, so their objectives were
+        // never made. Played through a scoreboard that fails the way the game
+        // does - a command naming a missing objective changes nothing - with one
+        // player who mined five coal ore.
+        const missing = /deepslate|copper/;
+        const made = new Set(
+            commands
+                .components(preset("mining-rush"))
+                .filter((one) => !missing.test(one.criterion))
+                .map((one) => one.objective)
+        );
+        const scores = new Map<string, number | undefined>([["pe_c0", 5]]);
+        for (const line of commands.setupScoreboard(preset("mining-rush"), "&6Mining")) {
+            const constant = /^scoreboard players set (#w-?\d+) pe_const (-?\d+)$/.exec(line);
+            if (constant) scores.set(constant[1]!, Number(constant[2]));
+        }
+        for (const extra of ["pe_sum", "pe_tmp", "pe_const", "pe_score"]) made.add(extra);
+        const get = (objective: string) =>
+            made.has(objective) ? scores.get(objective) : undefined;
+        for (const line of commands.scoreTick(preset("mining-rush"))) {
+            let match = /^scoreboard players (set|add) @a (\S+) (-?\d+)$/.exec(line);
+            if (match) {
+                const [, verb, objective, amount] = match;
+                if (made.has(objective!))
+                    scores.set(
+                        objective!,
+                        (verb === "add" ? (scores.get(objective!) ?? 0) : 0) + Number(amount)
+                    );
+                continue;
+            }
+            match = /store result score @s (\S+) run scoreboard players get @s (\S+)$/.exec(line);
+            if (match) {
+                scores.set(match[1]!, get(match[2]!) ?? 0);
+                continue;
+            }
+            match = /operation @s (\S+) (\S+) (?:@s|(#w-?\d+)) (\S+)$/.exec(line);
+            if (match) {
+                const [, target, op, constant, source] = match;
+                const right = constant ? scores.get(constant) : get(source!);
+                const left = get(target!);
+                if (right === undefined || !made.has(target!)) continue;
+                const value =
+                    op === "="
+                        ? right
+                        : op === "+="
+                          ? (left ?? 0) + right
+                          : op === "-="
+                            ? (left ?? 0) - right
+                            : op === "*="
+                              ? (left ?? 0) * right
+                              : Math.trunc((left ?? 0) / right);
+                scores.set(target!, value);
+            }
+        }
+        expect(scores.get("pe_score")).toBe(5);
     });
 
     it("sets up a constant for every weight the tick multiplies by", () => {

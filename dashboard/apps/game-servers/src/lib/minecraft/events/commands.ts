@@ -315,19 +315,21 @@ export function setupScoreboard(preset: EventPreset, title: string): string[] {
  * added up, divided where the unit asks for it, and shown only once somebody
  * has scored - a column of zeroes is not a leaderboard.
  *
- * `add @a <objective> 0` first gives a player who has not counted anything yet
- * a zero, because an operation on a score nobody has set does nothing at all -
- * and the running total would carry the previous statistic's value over.
+ * Each statistic is read into the scratch score with `store result`, which
+ * writes a zero when the read fails. A read fails for a player who has not
+ * counted anything yet, and for a statistic this version of the game does not
+ * have - no deepslate or copper ores before 1.17 - whose objective was never
+ * made. Copied with `operation` instead, the copy failed and left the previous
+ * statistic's value in the scratch score, counted again under this one's
+ * weight: a coal ore mined on 1.16 scored four times over.
  */
 export function scoreTick(preset: EventPreset): string[] {
     const counted = components(preset);
     if (counted.length === 0 || !hasScoreboard(preset)) return [];
-    const lines: string[] = [];
-    for (const one of counted) lines.push(`scoreboard players add @a ${one.objective} 0`);
-    lines.push(`scoreboard players set @a ${SUM} 0`);
+    const lines: string[] = [`scoreboard players set @a ${SUM} 0`];
     for (const one of counted) {
         lines.push(
-            `execute as @a run scoreboard players operation @s ${TMP} = @s ${one.objective}`
+            `execute as @a store result score @s ${TMP} run scoreboard players get @s ${one.objective}`
         );
         if (one.weight !== 1) {
             lines.push(
