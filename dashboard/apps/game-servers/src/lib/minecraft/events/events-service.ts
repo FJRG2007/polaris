@@ -46,6 +46,8 @@ const SAVE_EVERY_MS = 60_000;
 const GIVE_UP_AFTER_MS = 2 * 60_000;
 /** How many places are tried before an event that needs one gives up. */
 const PLACE_TRIES = 6;
+/** How much ground a chest or a boss is judged by around where it goes. */
+const SPOT_RADIUS = 3;
 const WRITE_TRIES = 5;
 const LOG_FILE = "/data/logs/latest.log";
 
@@ -66,6 +68,9 @@ interface Loop {
     modern: { text: boolean; ids: boolean } | null;
     /** Trivia: how long the log was when the round was asked. */
     logFrom: number | null;
+    /** Which names this server knows its ground blocks by, once asked; `none`
+     *  when it answers to neither list and the ground cannot be judged. */
+    ground: commands.GroundNames | "none" | null;
     /** The countdown marks already sounded, in seconds before the start. */
     sounded: Set<number>;
     announced: boolean;
@@ -473,6 +478,7 @@ function startLoop(
         bossAt: null,
         modern: null,
         logFrom: null,
+        ground: null,
         sounded: new Set(),
         // Resumed after a restart: the countdown was already said.
         announced: run.phase === "running",
@@ -758,23 +764,40 @@ async function play(
 
 /**
  * Somewhere for the event to happen, found over a few ticks: a point chosen,
- * its chunk loaded, a marker dropped onto the surface there. A point in water
- * is given up and another tried. Answers the point once it is found.
+ * its chunk loaded, a marker dropped onto the surface there. Answers the point
+ * once it is found.
+ *
+ * Nowhere that is somebody's, and nowhere nobody can get to: not near where any
+ * player online sleeps, not in water, and - over the whole of `radius` - only on
+ * ground the world made, flat enough to walk across. A place that fails any of
+ * it is given up and another tried. The one exception is the fixed point an
+ * operator chose, taken as given on the first try.
  */
 async function findPlace(
     installedAppId: string,
     loop: Loop,
     server: ServerContainer,
     place: catalog.EventPlace,
-    distance: number
+    distance: number,
+    radius: number
 ): Promise<stored.Point | "failed" | null> {
+    const chosen = place.mode === "fixed" && loop.run.placeTries === 0;
     if (!loop.run.target) {
         const centre = await centreFor(server, place);
         if (!centre) return "failed";
-        const point =
-            place.mode === "fixed" && loop.run.placeTries === 0
-                ? centre
-                : commands.pointAway(centre, distance, Math.random);
+        let point: { x: number; z: number } | null = centre;
+        if (!chosen) {
+            const [spawnX, spawnZ, respawn] = await Promise.all(
+                commands.HOMES.map((line) => server.say([line]).catch(() => ""))
+            );
+            const homes = commands.readHomes(spawnX ?? "", spawnZ ?? "", respawn ?? "");
+            point = commands.clearPoint(centre, distance, homes, Math.random);
+        }
+        if (!point) {
+            loop.run = { ...loop.run, placeTries: loop.run.placeTries + 1 };
+            await persist(installedAppId, loop);
+            return loop.run.placeTries >= PLACE_TRIES ? "failed" : null;
+        }
         // Written down before the chunk is loaded, so whatever ends the event
         // knows which one to let go of.
         loop.run = { ...loop.run, target: { x: point.x, z: point.z } };
@@ -787,7 +810,7 @@ async function findPlace(
     for (const line of commands.markSurface(x, z)) output = await server.say([line]);
     if (commands.spreadWorked(output)) {
         const point = commands.readPoint(await server.say([commands.READ_MARK]));
-        if (point) {
+        if (point && (chosen || (await siteIsOpen(loop, server, point, radius)))) {
             loop.run = { ...loop.run, place: point };
             await persist(installedAppId, loop);
             return point;
@@ -797,6 +820,71 @@ async function findPlace(
     loop.run = { ...loop.run, target: null, placeTries: loop.run.placeTries + 1 };
     await persist(installedAppId, loop);
     return loop.run.placeTries >= PLACE_TRIES ? "failed" : null;
+}
+
+/**
+ * Whether the ground over the whole of a place is the world's own and walkable:
+ * every sampled column dry, within a few blocks of the centre's height, and on
+ * nothing anybody built. Leaves the marker back on the centre, where whatever
+ * the event puts down is put.
+ */
+async function siteIsOpen(
+    loop: Loop,
+    server: ServerContainer,
+    centre: stored.Point,
+    radius: number
+): Promise<boolean> {
+    const reach = radius + 1;
+    const area = `${centre.x - reach} ${centre.z - reach} ${centre.x + reach} ${centre.z + reach}`;
+    await server.sayAll([`execute in minecraft:overworld run forceload add ${area}`]);
+    let open = true;
+    try {
+        for (const sample of commands.siteSamples(centre, radius)) {
+            let output = "";
+            for (const line of commands.markSurface(sample.x, sample.z)) output = await server.say([line]);
+            const ground = commands.spreadWorked(output)
+                ? commands.readPoint(await server.say([commands.READ_MARK]))
+                : null;
+            if (!ground || Math.abs(ground.y - centre.y) > commands.SITE_STEP) {
+                open = false;
+                break;
+            }
+            if ((await builtOn(loop, server, ground)) === true) {
+                open = false;
+                break;
+            }
+        }
+    } finally {
+        // The area let go, and the centre's own chunk held again as before.
+        await server.sayAll([
+            `execute in minecraft:overworld run forceload remove ${area}`,
+            commands.forceload(centre.x, centre.z),
+            ...commands.markSurface(centre.x, centre.z)
+        ]);
+    }
+    return open;
+}
+
+/** Whether a column stands on something somebody built. Null when the server
+ *  answers to neither list of ground names, and so cannot be asked. */
+async function builtOn(
+    loop: Loop,
+    server: ServerContainer,
+    point: stored.Point
+): Promise<boolean | null> {
+    const ask = async (names: commands.GroundNames) =>
+        commands.readTest(await server.say([commands.builtUnder(point, names)]));
+    if (loop.ground === "none") return null;
+    if (loop.ground) return (await ask(loop.ground)) === "passed";
+    for (const names of ["modern", "legacy"] as const) {
+        const answer = await ask(names);
+        if (answer === "passed" || answer === "failed") {
+            loop.ground = names;
+            return answer === "passed";
+        }
+    }
+    loop.ground = "none";
+    return null;
 }
 
 /** A place that was found and then would not take what was put there: undone,
@@ -843,7 +931,8 @@ async function supplyDrop(
             loop,
             server,
             options.place,
-            options.distance
+            options.distance,
+            SPOT_RADIUS
         );
         if (found === "failed") throw new PlaceNotFound();
         if (!found) return null;
@@ -899,7 +988,7 @@ async function worldBoss(
     const language = loop.language;
     const name = messages.bossName(options.boss, language);
     if (!loop.run.place) {
-        const found = await findPlace(installedAppId, loop, server, options.place, 24);
+        const found = await findPlace(installedAppId, loop, server, options.place, 24, SPOT_RADIUS);
         if (found === "failed") throw new PlaceNotFound();
         if (!found) return null;
         const modern = loop.modern ?? (loop.modern = await modernity(server));
@@ -964,7 +1053,14 @@ async function kingOfTheHill(
 ): Promise<string | null> {
     const options = loop.run.preset.options as catalog.EventOptions<"king-of-the-hill">;
     if (!loop.run.place) {
-        const found = await findPlace(installedAppId, loop, server, options.place, 32);
+        const found = await findPlace(
+            installedAppId,
+            loop,
+            server,
+            options.place,
+            32,
+            options.radius
+        );
         if (found === "failed") throw new PlaceNotFound();
         if (!found) return null;
         await server.sayAll([
@@ -976,7 +1072,25 @@ async function kingOfTheHill(
         ]);
         return null;
     }
-    lines.push(...commands.hillTick(loop.run.place, options.radius, TICK_MS / 1000));
+    const place = loop.run.place;
+    lines.push(...commands.hillTick(place, options.radius, TICK_MS / 1000));
+    // Each player told how far it is and which way, in their own action bar:
+    // coordinates in the chat scroll away, and a circle is small from far off.
+    for (const one of commands.readWhere(await server.say([commands.IN_OVERWORLD]))) {
+        const away = Math.hypot(one.x - (place.x + 0.5), one.z - (place.z + 0.5));
+        lines.push(
+            commands.actionbarFor(
+                one.name,
+                away <= options.radius
+                    ? messages.hillInside(loop.language)
+                    : messages.hillGuide(
+                          Math.round(away),
+                          commands.headingTo(one, { x: place.x + 0.5, z: place.z + 0.5 }),
+                          loop.language
+                      )
+            )
+        );
+    }
     return null;
 }
 

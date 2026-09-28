@@ -43,6 +43,10 @@ interface World {
     daylightCycle: "true" | "false";
     /** A version that knows the game rules by their new names only. */
     renamedRules: boolean;
+    /** Whether the ground under a place is somebody's build. */
+    built: boolean;
+    /** Where players online sleep: `Name: [x, z]`. */
+    homes: Record<string, [number, number]>;
 }
 
 const world: World = {
@@ -65,7 +69,9 @@ const world: World = {
     creative: [],
     difficulty: "Normal",
     daylightCycle: "true",
-    renamedRules: false
+    renamedRules: false,
+    built: false,
+    homes: {}
 };
 let config: Record<string, unknown> = {};
 const held: string[] = [];
@@ -77,6 +83,15 @@ let step = 0;
 
 function answer(line: string): string {
     world.sent.push(line);
+    if (line.startsWith("execute in minecraft:overworld unless block")) {
+        return world.built ? "Test passed" : "Test failed";
+    }
+    if (line === "execute as @a run data get entity @s SpawnX" || line === "execute as @a run data get entity @s SpawnZ") {
+        const axis = line.endsWith("SpawnX") ? 0 : 1;
+        return Object.entries(world.homes)
+            .map(([name, home]) => `${name} has the following entity data: ${home[axis]}`)
+            .join("\n");
+    }
     if (line === "difficulty") return `The difficulty is ${world.difficulty}`;
     if (line === "time query daytime") return "The time is 6000";
     if (world.renamedRules && /^gamerule do\w+$/.test(line))
@@ -327,6 +342,8 @@ beforeEach(() => {
     world.difficulty = "Normal";
     world.daylightCycle = "true";
     world.renamedRules = false;
+    world.built = false;
+    world.homes = {};
     events.forgetPlayers();
     held.length = 0;
     released.length = 0;
@@ -862,6 +879,54 @@ describe("the others", () => {
         world.scores = { Ana: 95 };
         await play(3 * 60_000);
         expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 95 }]);
+    });
+
+    it("draws the circle's edge and a column of light, and tells each player the way", async () => {
+        world.online = ["Ana"];
+        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        setUp([hill]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await play(8_100);
+        expect(world.sent.filter((line) => line.includes("particle minecraft:flame")).length).toBeGreaterThanOrEqual(24);
+        expect(world.sent.some((line) => line.includes("particle minecraft:end_rod"))).toBe(true);
+        // Ana is a little way west of the circle, which is at X 300.
+        expect(world.sent.some((line) => line.startsWith("title Ana actionbar") && /"\d+ m "/.test(line) && line.includes('"east"'))).toBe(true);
+    });
+
+    it("gives up a place on somebody's build and says it could not find one", async () => {
+        world.built = true;
+        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        setUp([hill]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await play(60_000);
+        expect(world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))).toBe(false);
+        expect(state().history[0]?.outcome).toBe("failed");
+    });
+
+    it("takes the fixed point an operator chose as it is", async () => {
+        world.built = true;
+        const hill = {
+            ...catalog.newPreset("king-of-the-hill", "hill"),
+            minutes: 3,
+            options: { place: { mode: "fixed" as const, x: 300, z: 0 }, radius: 6 }
+        };
+        setUp([hill]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await play(8_100);
+        expect(world.sent.some((line) => line.includes("run scoreboard players add @s pe_score 2"))).toBe(true);
+    });
+
+    it("looks past a player's bed for somewhere to put it", async () => {
+        world.homes = { Ana: [0, 0], Ben: [0, 0] };
+        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        setUp([hill]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await play(8_100);
+        const loaded = world.sent
+            .filter((line) => /run forceload add -?\d+ -?\d+$/.test(line))
+            .map((line) => line.split(" ").slice(-2).map(Number) as [number, number]);
+        expect(loaded.length).toBeGreaterThan(0);
+        for (const [x, z] of loaded) expect(Math.hypot(x, z)).toBeGreaterThanOrEqual(48);
     });
 
     it("a happy hour gives its effects for exactly as long as it lasts, and no prizes", async () => {

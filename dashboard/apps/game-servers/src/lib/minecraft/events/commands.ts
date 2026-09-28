@@ -485,6 +485,171 @@ export function spreadWorked(output: string): boolean {
     return /spread 1 (entity|player)/i.test(output) && !/could not spread/i.test(output);
 }
 
+// ------------------------------------------------------------------ nobody's home
+
+/**
+ * Where each player online would respawn - their bed or anchor, which is where
+ * they live. Written two ways over the game's life: `SpawnX`/`SpawnZ` up to
+ * 1.21.4, a `respawn` compound from 1.21.5. Both are asked; whichever the
+ * server does not have answers with an error that reads as nothing.
+ */
+export const HOMES = [
+    "execute as @a run data get entity @s SpawnX",
+    "execute as @a run data get entity @s SpawnZ",
+    "execute as @a run data get entity @s respawn.pos"
+] as const;
+
+/** The homes out of the answers to `HOMES`, in the same order. */
+export function readHomes(
+    spawnX: string,
+    spawnZ: string,
+    respawn: string
+): { x: number; z: number }[] {
+    const each = (output: string) => {
+        const found = new Map<string, number>();
+        const pattern = /([A-Za-z0-9_]{1,16}) has the following entity data: (-?\d+)(?![\d.])/g;
+        for (const match of stripFormatting(output).matchAll(pattern)) {
+            found.set(match[1] as string, Number(match[2]));
+        }
+        return found;
+    };
+    const xs = each(spawnX);
+    const zs = each(spawnZ);
+    const homes: { x: number; z: number }[] = [];
+    for (const [name, x] of xs) {
+        const z = zs.get(name);
+        if (z !== undefined) homes.push({ x, z });
+    }
+    const modern = /has the following entity data: \[I;\s*(-?\d+),\s*-?\d+,\s*(-?\d+)\]/g;
+    for (const match of stripFormatting(respawn).matchAll(modern)) {
+        homes.push({ x: Number(match[1]), z: Number(match[2]) });
+    }
+    return homes;
+}
+
+/** How far from anybody's bed an event may put anything. */
+export const HOME_CLEARANCE = 48;
+
+/**
+ * A point about `distance` from the centre that is clear of every home. The
+ * bearing is tried all the way round first, then further out, so somebody
+ * standing at their own door still gets an event - just past their land.
+ */
+export function clearPoint(
+    centre: { x: number; z: number },
+    distance: number,
+    homes: readonly { x: number; z: number }[],
+    random: () => number,
+    clearance = HOME_CLEARANCE
+): { x: number; z: number } | null {
+    const clear = (point: { x: number; z: number }) =>
+        homes.every((home) => Math.hypot(point.x - home.x, point.z - home.z) >= clearance);
+    for (let ring = 0; ring < 4; ring += 1) {
+        const reach = distance + ring * (clearance / 2);
+        for (let turn = 0; turn < 12; turn += 1) {
+            const point = pointAway(centre, reach, random);
+            if (clear(point)) return point;
+        }
+    }
+    return null;
+}
+
+/**
+ * Ground nobody built: what the world generates on its surface, the plants that
+ * grow on it, and snow. Anything else under an event - planks, bricks, glass, a
+ * farm, a path, a roof - is somebody's, and the place is given up. So are leaves:
+ * the top of a tree is not somewhere anybody walks to.
+ *
+ * Two lists, because the names moved: `short_grass` was `grass` before 1.20.3,
+ * and a name a server does not know fails the whole check. The newer list is
+ * tried first and the older one where that fails.
+ */
+const GROUND_LEGACY = [
+    "grass_block",
+    "dirt",
+    "coarse_dirt",
+    "podzol",
+    "mycelium",
+    "sand",
+    "red_sand",
+    "gravel",
+    "stone",
+    "granite",
+    "diorite",
+    "andesite",
+    "snow",
+    "snow_block",
+    "clay",
+    "sandstone",
+    "red_sandstone",
+    "terracotta",
+    "white_terracotta",
+    "orange_terracotta",
+    "yellow_terracotta",
+    "brown_terracotta",
+    "red_terracotta",
+    "light_gray_terracotta",
+    "ice",
+    "packed_ice",
+    "tall_grass",
+    "fern",
+    "large_fern",
+    "dead_bush",
+    "grass",
+    "dandelion",
+    "poppy"
+];
+const GROUND_MODERN = [
+    ...GROUND_LEGACY.filter((id) => !["grass", "dandelion", "poppy"].includes(id)),
+    "short_grass",
+    "#minecraft:flowers",
+    "sweet_berry_bush",
+    "moss_block",
+    "moss_carpet",
+    "rooted_dirt",
+    "mud",
+    "calcite",
+    "tuff",
+    "powder_snow"
+];
+
+export type GroundNames = "modern" | "legacy";
+
+/**
+ * Whether what is under a point is somebody's rather than the world's:
+ * `Test passed` when it is none of the ground above.
+ */
+export function builtUnder(point: { x: number; y: number; z: number }, names: GroundNames): string {
+    const at = `${point.x} ${point.y - 1} ${point.z}`;
+    const ids = names === "modern" ? GROUND_MODERN : GROUND_LEGACY;
+    const checks = ids
+        .map((id) => `unless block ${at} ${id.startsWith("#") ? id : `minecraft:${id}`}`)
+        .join(" ");
+    return `execute in minecraft:overworld ${checks}`;
+}
+
+/** The columns a place is judged by: its centre, and rings at its edge and halfway in. */
+export function siteSamples(
+    centre: { x: number; z: number },
+    radius: number
+): { x: number; z: number }[] {
+    const samples = [{ x: centre.x, z: centre.z }];
+    const rings = radius >= 4 ? [radius, Math.round(radius / 2)] : [radius];
+    for (const reach of rings) {
+        for (let index = 0; index < 8; index += 1) {
+            const angle = (index / 8) * Math.PI * 2;
+            samples.push({
+                x: Math.round(centre.x + Math.cos(angle) * reach),
+                z: Math.round(centre.z + Math.sin(angle) * reach)
+            });
+        }
+    }
+    return samples;
+}
+
+/** How far above or below the centre any of those may be and still be walked to. */
+export const SITE_STEP = 4;
+
 /** A point `distance` away from a centre, at a random bearing, whole blocks. */
 export function pointAway(
     centre: { x: number; z: number },
@@ -777,16 +942,57 @@ export function arrived(x: number, z: number): string {
     return `execute in minecraft:overworld as @a[x=${x - 6},y=-64,z=${z - 6},dx=12,dy=384,dz=12] run data get entity @s Pos`;
 }
 
-/** The circle drawn in the air, and everybody inside it given the time. */
+/** How many points the circle's edge is drawn with. */
+const RING_POINTS = 24;
+
+/**
+ * The circle drawn where it is - its edge in flame at the height of the ground,
+ * and a tall column of light in the middle that shows from far off - and
+ * everybody inside it given the time.
+ */
 export function hillTick(
     point: { x: number; y: number; z: number },
     radius: number,
     seconds: number
 ): string[] {
+    const cx = point.x + 0.5;
+    const cz = point.z + 0.5;
+    const edge = Array.from({ length: RING_POINTS }, (_, index) => {
+        const angle = (index / RING_POINTS) * Math.PI * 2;
+        const x = (cx + Math.cos(angle) * radius).toFixed(2);
+        const z = (cz + Math.sin(angle) * radius).toFixed(2);
+        return `execute in minecraft:overworld run particle minecraft:flame ${x} ${point.y + 0.3} ${z} 0 0.3 0 0 3 force`;
+    });
     return [
-        `execute in minecraft:overworld run particle minecraft:happy_villager ${point.x + 0.5} ${point.y + 1} ${point.z + 0.5} ${radius / 2} 0.2 ${radius / 2} 0 ${Math.min(80, radius * 8)} force`,
-        `execute in minecraft:overworld positioned ${point.x + 0.5} ${point.y} ${point.z + 0.5} as @a[distance=..${radius},gamemode=!spectator] run scoreboard players add @s ${SCORE} ${seconds}`
+        ...edge,
+        `execute in minecraft:overworld run particle minecraft:end_rod ${cx} ${point.y + 16} ${cz} 0 16 0 0.01 120 force`,
+        `execute in minecraft:overworld positioned ${cx} ${point.y} ${cz} as @a[distance=..${radius},gamemode=!spectator] run scoreboard players add @s ${SCORE} ${seconds}`
     ];
+}
+
+/** The eight ways a player can be told to go. North is -Z in this game. */
+export const HEADINGS = [
+    "north",
+    "north-east",
+    "east",
+    "south-east",
+    "south",
+    "south-west",
+    "west",
+    "north-west"
+] as const;
+
+export type Heading = (typeof HEADINGS)[number];
+
+/** Which way a point is from somebody, to the nearest eighth. */
+export function headingTo(from: { x: number; z: number }, to: { x: number; z: number }): Heading {
+    const degrees = (Math.atan2(to.x - from.x, -(to.z - from.z)) * 180) / Math.PI;
+    return HEADINGS[Math.round((((degrees % 360) + 360) % 360) / 45) % 8] as Heading;
+}
+
+/** One line in one player's action bar. */
+export function actionbarFor(name: string, line: string): string {
+    return `title ${name} actionbar ${text(line)}`;
 }
 
 // ------------------------------------------------------------------ happy hour

@@ -8,6 +8,7 @@
  */
 
 import type { EventKind, Language } from "./catalog";
+import type { Heading } from "./commands";
 
 type Text = Readonly<Record<Language, string>>;
 
@@ -288,8 +289,30 @@ export function raceWon(name: string, language: Language): string {
 
 export function circleAt(x: number, y: number, z: number, language: Language): string {
     return language === "es"
-        ? `&eEl círculo está en &fX ${x} Y ${y} Z ${z}&e.`
-        : `&eThe circle is at &fX ${x} Y ${y} Z ${z}&e.`;
+        ? `&eEl círculo está en &fX ${x} Y ${y} Z ${z}&e: busca la columna de luz. Tu barra de acción te dice hacia dónde ir.`
+        : `&eThe circle is at &fX ${x} Y ${y} Z ${z}&e: look for the column of light. Your action bar shows the way.`;
+}
+
+const HEADING_ES: Readonly<Record<Heading, string>> = {
+    north: "norte",
+    "north-east": "noreste",
+    east: "este",
+    "south-east": "sureste",
+    south: "sur",
+    "south-west": "suroeste",
+    west: "oeste",
+    "north-west": "noroeste"
+};
+
+/** How far the circle is from a player, and which way. */
+export function hillGuide(metres: number, heading: Heading, language: Language): string {
+    return language === "es"
+        ? `&eCírculo: &f${metres} m &eal &f${HEADING_ES[heading]}`
+        : `&eCircle: &f${metres} m &e${heading}`;
+}
+
+export function hillInside(language: Language): string {
+    return language === "es" ? "&aEstás en el círculo: aguanta" : "&aYou are in the circle - hold it";
 }
 
 export function happyHourOver(language: Language): string {

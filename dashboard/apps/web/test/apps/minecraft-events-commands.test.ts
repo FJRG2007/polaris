@@ -341,3 +341,52 @@ describe("a mining rush cannot be farmed", () => {
         );
     });
 });
+
+describe("where an event may go", () => {
+    it("reads where players sleep, the old way and the new", () => {
+        expect(
+            commands.readHomes(
+                "Ana has the following entity data: 120\nBen has the following entity data: -40",
+                "Ana has the following entity data: -7\nBen has the following entity data: 900",
+                "Cam has the following entity data: [I; 5, 64, -3]"
+            )
+        ).toEqual([
+            { x: 120, z: -7 },
+            { x: -40, z: 900 },
+            { x: 5, z: -3 }
+        ]);
+        expect(commands.readHomes("Found no elements matching SpawnX", "", "")).toEqual([]);
+    });
+
+    it("keeps clear of every home, going further out when it has to", () => {
+        const home = [{ x: 0, z: 0 }];
+        let turn = 0;
+        const random = () => ((turn += 0.37) % 1);
+        const point = commands.clearPoint({ x: 0, z: 0 }, 24, home, random);
+        expect(point).not.toBeNull();
+        expect(Math.hypot(point!.x, point!.z)).toBeGreaterThanOrEqual(commands.HOME_CLEARANCE);
+        expect(commands.clearPoint({ x: 0, z: 0 }, 24, [], random)).not.toBeNull();
+    });
+
+    it("asks about the ground under a point by the names the server knows", () => {
+        const modern = commands.builtUnder({ x: 1, y: 70, z: 2 }, "modern");
+        expect(modern.startsWith("execute in minecraft:overworld unless block 1 69 2 minecraft:grass_block")).toBe(true);
+        expect(modern).toContain("minecraft:short_grass");
+        expect(modern).toContain("#minecraft:flowers");
+        expect(modern).not.toContain("leaves");
+        const legacy = commands.builtUnder({ x: 1, y: 70, z: 2 }, "legacy");
+        expect(legacy).toContain("unless block 1 69 2 minecraft:grass ");
+        expect(legacy).not.toContain("short_grass");
+    });
+
+    it("judges a place by its centre and two rings", () => {
+        expect(commands.siteSamples({ x: 0, z: 0 }, 6)).toHaveLength(17);
+        expect(commands.siteSamples({ x: 0, z: 0 }, 3)).toHaveLength(9);
+    });
+
+    it("names the way to go, north being -Z", () => {
+        expect(commands.headingTo({ x: 0, z: 0 }, { x: 0, z: -50 })).toBe("north");
+        expect(commands.headingTo({ x: 0, z: 0 }, { x: 50, z: 0 })).toBe("east");
+        expect(commands.headingTo({ x: 0, z: 0 }, { x: -50, z: 50 })).toBe("south-west");
+    });
+});
