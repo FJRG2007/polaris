@@ -5,8 +5,9 @@
  * its own and puts one object on the page, `window.polarisDesktop`, for the
  * things a browser tab cannot do: notices drawn by the operating system, a
  * folder zipped straight from the disk, a build pushed from the computer's own
- * Docker, a page opened in a window of its own. In a browser there is no such
- * object, and every caller here falls back to what the browser does.
+ * Docker, a page opened in a window of its own, and the game running on the
+ * computer. In a browser there is no such object, and every caller here falls
+ * back to what the browser does.
  *
  * The shape is kept here as well as in `desktop/src/shared/bridge.ts` - the two
  * projects share no code. Detection checks the members it uses rather than

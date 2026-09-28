@@ -164,9 +164,9 @@ export interface GameReportOutcome {
  * A game is remembered while games are shared at all - shown or hidden - so it
  * can be hidden (or shown again) by name from the settings screen after it has
  * been closed. With sharing off nothing is kept: somebody who said "do not share
- * my games" did not ask for a list of them either. What
- * the switches say is applied here as well as on read: a game that is hidden is
- * never stored, so it cannot surface through anything that forgets to check.
+ * my games" did not ask for a list of them either. What the switches say is
+ * applied here as well as on read: a game that is hidden is never stored, so it
+ * cannot surface through anything that forgets to check.
  */
 export async function reportGame(
     userId: string,

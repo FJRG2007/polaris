@@ -1,21 +1,22 @@
 "use client";
 
 /**
- * Whether this account shows what it is doing, from where, and which games
- * never.
+ * Whether this account shows what it is doing, from where, which games never,
+ * and which programs beyond the desktop app's own list count as one.
  *
  * Who sees it is not here: that is the "What you are playing or listening to"
  * row above, in the same vocabulary as every other "who". This card is only the
- * what - one switch for all of it, one per source, and one per game.
+ * what - one switch for all of it, one per source, one per game, and the list
+ * of programs this account calls a game on its own (`OwnGames` below).
  *
  * Every switch saves as it is flipped, drawn at once and put back if the save
  * is refused: these are on/off answers with nothing to review, and a Save button
  * under a column of switches is a step people forget.
  */
 
-import { useRef, useState } from "react";
 import * as core from "@polaris/core";
 import { Plus, X } from "lucide-react";
+import { useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { saveActivitySettingsAction } from "./actions";
 import { useDesktopBridge } from "@/components/desktop-app";
