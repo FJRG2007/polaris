@@ -309,9 +309,23 @@ describe("deleting", () => {
 });
 
 describe("how fast somebody may talk", () => {
-    it("is unlimited by default", async () => {
+    it("stops a flood by default, at thirty a minute", async () => {
+        const { send } = await import("@/lib/chat/messages");
+        recent = 29;
+        rules = { ...DEFAULT_CHAT_RULES, spamGuard: false };
+        await expect(
+            send(actor, { channelId: "channel-1", body: "hello", parentId: null })
+        ).resolves.toBeDefined();
+        recent = 30;
+        await expect(
+            send(actor, { channelId: "channel-1", body: "hello", parentId: null })
+        ).rejects.toBeInstanceOf(ChatRuleError);
+    });
+
+    it("is unlimited when the operator takes the limits off", async () => {
         const { send } = await import("@/lib/chat/messages");
         recent = 5000;
+        rules = { ...DEFAULT_CHAT_RULES, maxPerMinute: 0, spamGuard: false };
         await expect(
             send(actor, { channelId: "channel-1", body: "hello", parentId: null })
         ).resolves.toBeDefined();

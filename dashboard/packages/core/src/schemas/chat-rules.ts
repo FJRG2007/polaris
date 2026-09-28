@@ -112,6 +112,23 @@ export const CHAT_EDIT_WINDOW_CEILING_MINUTES = 60 * 24 * 7;
  *  typist with something to say never meets it. */
 export const CHAT_RATE_CEILING = 600;
 
+/** The ceilings on the spam limits: past these a limit no longer limits anything
+ *  a person could do by hand. */
+export const CHAT_SPAM_CEILINGS = {
+    roomMentionsPerHour: 60,
+    mentionsPerMessage: 100,
+    samePersonMentions: 60,
+    repeatedMessages: 60
+} as const;
+
+/** The windows the spam limits count over. Fixed rather than configurable: the
+ *  number is the knob, and two knobs per rule is a form nobody fills in. */
+export const CHAT_SPAM_WINDOWS = {
+    roomMentionsMs: 60 * 60_000,
+    samePersonMs: 10 * 60_000,
+    repeatedMs: 2 * 60_000
+} as const;
+
 /**
  * One scope's rules.
  *
@@ -128,9 +145,55 @@ export const chatRulesSchema = z.object({
         .min(1)
         .max(MAX_CHAT_MESSAGE)
         .default(MAX_CHAT_MESSAGE),
-    /** How many messages one account may send a minute in one conversation, or
-     *  zero for as many as they can type. */
-    maxPerMinute: z.coerce.number().int().min(0).max(CHAT_RATE_CEILING).default(CHAT_NO_LIMIT),
+    /**
+     * How many messages one account may send a minute in one conversation, or
+     * zero for as many as they can type.
+     *
+     * Thirty by default: a message every two seconds for a whole minute is more
+     * than anybody types, and far less than a script or a held-down key sends.
+     */
+    maxPerMinute: z.coerce.number().int().min(0).max(CHAT_RATE_CEILING).default(30),
+    /**
+     * The spam limits below, on or off together.
+     *
+     * On by default, and set loose enough that nobody talking normally ever
+     * meets one: they are there for the clear abuse - the room pinged every few
+     * minutes, one person mentioned over and over, the same line pasted ten
+     * times - not to police a lively conversation. An operator can loosen any
+     * of them, or switch the lot off.
+     */
+    spamGuard: z.boolean().default(true),
+    /** Messages carrying @everyone or @here one person may send in an hour, per
+     *  conversation. Whoever moderates the room is not held by it. */
+    maxRoomMentionsPerHour: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(CHAT_SPAM_CEILINGS.roomMentionsPerHour)
+        .default(3),
+    /** Different people or teams one message may mention. */
+    maxMentionsPerMessage: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(CHAT_SPAM_CEILINGS.mentionsPerMessage)
+        .default(20),
+    /** Messages mentioning the same person one account may send in ten minutes,
+     *  per conversation. */
+    maxSamePersonMentions: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(CHAT_SPAM_CEILINGS.samePersonMentions)
+        .default(5),
+    /** How many times the same message may be sent in two minutes, per
+     *  conversation. */
+    maxRepeatedMessages: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(CHAT_SPAM_CEILINGS.repeatedMessages)
+        .default(3),
     /** How many files ride on one message. Zero turns attachments off for this
      *  scope, which is a real answer for an instance that does not want files in
      *  private conversations at all. */
