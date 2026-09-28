@@ -1170,10 +1170,18 @@ async function triviaTick(
         loop.run = { ...loop.run, round, roundEndsAt: now + options.seconds * 1000 };
         loop.logFrom = await containerFileSize(server, LOG_FILE);
         const asked = roundOf(loop.run, language);
+        const scramble = asked.kind === "scramble";
+        // On screen as well as in the chat, where a line scrolls away under the
+        // answers: a title as it is asked, then the action bar until it closes.
         lines.push(
+            ...commands.titleCommands(
+                messages.roundTitle(round + 1, options.rounds, language),
+                messages.roundSubtitle(asked.asked, scramble, language)
+            ),
+            `title @a actionbar ${commands.text(messages.roundBar(asked.asked, scramble, options.seconds, language))}`,
             commands.say(
                 messages.tag(language) +
-                    (asked.kind === "scramble"
+                    (scramble
                         ? messages.scrambleLine(round + 1, options.rounds, asked.asked, language)
                         : messages.questionLine(round + 1, options.rounds, asked.asked, language))
             ),
@@ -1207,6 +1215,10 @@ async function triviaTick(
         loop.run = { ...loop.run, points, roundEndsAt: null, closedAt: now };
         lines.push(
             commands.setScore(winner, points[winner] ?? 1),
+            ...commands.titleCommands(
+                messages.roundWonTitle(winner, language),
+                `&f${asked.accepted[0] ?? ""}`
+            ),
             commands.say(
                 messages.tag(language) +
                     messages.roundWon(winner, asked.accepted[0] ?? "", language)
@@ -1219,12 +1231,28 @@ async function triviaTick(
     if (now >= (loop.run.roundEndsAt ?? now)) {
         loop.run = { ...loop.run, roundEndsAt: null, closedAt: now };
         lines.push(
+            ...commands.titleCommands(
+                messages.roundMissedTitle(language),
+                `&f${asked.accepted[0] ?? ""}`
+            ),
             commands.say(
                 messages.tag(language) + messages.roundMissed(asked.accepted[0] ?? "", language)
             )
         );
         await persist(installedAppId, loop);
+        return null;
     }
+    // Still open: the question stays above the hotbar, the time counting down.
+    lines.push(
+        `title @a actionbar ${commands.text(
+            messages.roundBar(
+                asked.asked,
+                asked.kind === "scramble",
+                ((loop.run.roundEndsAt ?? now) - now) / 1000,
+                language
+            )
+        )}`
+    );
     return null;
 }
 

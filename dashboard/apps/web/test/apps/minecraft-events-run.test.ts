@@ -701,11 +701,22 @@ describe("trivia", () => {
                     line.startsWith("tellraw @a") && line.includes("Which green mob explodes?")
             )
         ).toBe(true);
+        // On screen too: the title as it is asked, and above the hotbar with the time left.
+        expect(world.sent.some((line) => line.startsWith("title @a title") && line.includes("Question 1/3"))).toBe(true);
+        expect(
+            world.sent.some((line) => line.startsWith("title @a subtitle") && line.includes("Which green mob explodes?"))
+        ).toBe(true);
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("title @a actionbar") && line.includes("Which green mob explodes?") && line.includes(" s)")
+            )
+        ).toBe(true);
         world.log +=
             "[20:00:05] [Server thread/INFO]: <Ana> zombie\n[20:00:06] [Server thread/INFO]: <Ben> Creeper!\n";
         await play(2_100);
         expect(state().run?.points).toEqual({ Ben: 1 });
         expect(world.sent).toContain("scoreboard players set Ben pe_score 1");
+        expect(world.sent.some((line) => line.startsWith("title @a title") && line.includes("Ben got it"))).toBe(true);
         // The other two rounds nobody answers, and the game ends on its own.
         await play(2 * (15_000 + 6_000) + 10_000);
         const after = state();
