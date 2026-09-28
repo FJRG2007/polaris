@@ -30,6 +30,13 @@ import { normalizeIdentifier } from "./fivem/players";
 import { randomBytes, randomUUID } from "node:crypto";
 import { ALLOW_LIST_KEY, withPlayer } from "./ark/access";
 import * as polarisLogin from "./minecraft/polaris-login";
+import {
+    anticheatEnableEnv,
+    anticheatEnvWrites,
+    anticheatMovedTo,
+    REPLACED_PROJECTS,
+    wantsDefaultAnticheat
+} from "./minecraft/polaris-anticheat";
 import { findGame, findSoftware, softwareSourceEnv, type GameDefinition } from "@polaris/core";
 import { grantPlayerAccess } from "./minecraft/player-access";
 import { arkServerEnv, expectedArkMemoryMb } from "./ark/config";
@@ -46,11 +53,7 @@ import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "./ark/service"
 import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "./ark/settings";
 import { isMapResourcePack, mapFor, pinnedRelease, type WorldMap } from "./minecraft/maps";
 import { formatSpigetList, parseSpigetList, SPIGET_KEY } from "./minecraft/spiget";
-import {
-    commonVersions,
-    knownUnsupported,
-    wantsLatest
-} from "./minecraft/blueprint-version";
+import { commonVersions, knownUnsupported, wantsLatest } from "./minecraft/blueprint-version";
 import {
     expectedFivemMemoryMb,
     fivemServerEnv,
@@ -342,7 +345,8 @@ function javaSoftwareEnv(
     // value the operator was asked for. Both are written every time, blank
     // included: a server moved off a modpack keeps fetching it otherwise.
     for (const [key, value] of Object.entries(SOFTWARE_EXTRA_KEYS)) env.set(key, value);
-    for (const [key, value] of Object.entries(findSoftware(software)?.env ?? {})) env.set(key, value);
+    for (const [key, value] of Object.entries(findSoftware(software)?.env ?? {}))
+        env.set(key, value);
     for (const [key, value] of Object.entries(
         softwareSourceEnv(software, shape.softwareSource ?? "")
     ))
@@ -352,6 +356,8 @@ function javaSoftwareEnv(
     // does not - and then the project guard below takes its place.
     const mod = polarisLogin.modMovedTo(env, software, env.get("VERSION") ?? "");
     for (const [key, value] of mod ?? []) env.set(key, value);
+    // Polaris's anti-cheat, the same way: off software it cannot run on.
+    for (const [key, value] of anticheatMovedTo(env, software) ?? []) env.set(key, value);
     // What its plugins need from SpigotMC, which is where several of the
     // libraries they depend on are published and Modrinth is not. Written every
     // time, blank included, so a server reset onto a blueprint that needs none
@@ -378,9 +384,7 @@ function javaSoftwareEnv(
  * stops carrying Vault - the same rule the Modrinth list follows.
  */
 function spigetList(blueprint: GameBlueprint, current: string | undefined): string {
-    const theirs = new Set(
-        GAME_BLUEPRINTS.flatMap((entry) => [...(entry.spigot ?? [])])
-    );
+    const theirs = new Set(GAME_BLUEPRINTS.flatMap((entry) => [...(entry.spigot ?? [])]));
     const kept = parseSpigetList(current ?? "").filter((id) => !theirs.has(id));
     return formatSpigetList([...kept, ...(blueprint.spigot ?? [])]);
 }
@@ -553,7 +557,7 @@ async function createMinecraftServer(
     // the template for the same reason as the access above: a login is not a
     // preference a saved server passes on, and the template may carry the project
     // guard this replaces.
-    const seed = await loginSeed(env);
+    const seed = await anticheatSeed(env, await loginSeed(env));
 
     // Crossplay is Geyser listening on the Bedrock port inside the same container,
     // so that port has to be published as well - one service, two doors. Geyser's
@@ -638,6 +642,38 @@ async function loginSeed(env: Map<string, string>): Promise<InstallSeed | undefi
     });
     env.set(PROJECTS_KEY, written.get(PROJECTS_KEY) ?? "");
     return { installedAppId, env: polarisLogin.envWrites(written) };
+}
+
+/**
+ * Polaris's anti-cheat on a new server wherever it runs, on top of the login's
+ * seed when there is one: the same install id and the same token, since the two
+ * plugins speak for the same server. Only where Polaris has a public address, which
+ * the server downloads the plugin from; elsewhere the sweep that switches it on for
+ * older servers does it once an address is set.
+ */
+async function anticheatSeed(
+    env: Map<string, string>,
+    seed: InstallSeed | undefined
+): Promise<InstallSeed | undefined> {
+    const seeded = new Map([
+        ...env,
+        ...(seed?.env ?? []).map((entry) => [entry.key, entry.value] as const)
+    ]);
+    if (!wantsDefaultAnticheat(seeded)) return seed;
+    const baseUrl = await publicAppUrl().catch(() => null);
+    if (baseUrl === null) return seed;
+    const installedAppId = seed?.installedAppId ?? randomUUID();
+    const token = seeded.get(polarisLogin.TOKEN_KEY) || randomBytes(32).toString("hex");
+    const written = anticheatEnableEnv(seeded, { baseUrl, installedAppId, token });
+    // The Modrinth list lives in the install's own settings, not the seed.
+    const projects = written.get(PROJECTS_KEY);
+    if (projects !== undefined) {
+        env.set(PROJECTS_KEY, projects);
+        written.delete(PROJECTS_KEY);
+    }
+    const merged = new Map((seed?.env ?? []).map((entry) => [entry.key, entry]));
+    for (const entry of anticheatEnvWrites(written)) merged.set(entry.key, entry);
+    return { installedAppId, env: [...merged.values()] };
 }
 
 /**
@@ -991,7 +1027,9 @@ export function protectionFor(
     // ignores or refuses to boot past. What is already on the list is left alone:
     // it is somebody else's decision, not this one.
     if (!loader) return current;
-    const seeded = seededPlugins(edition);
+    // What the manifest seeds now and what Polaris used to: a modded server
+    // carrying either was given a Bukkit plugin it cannot load.
+    const seeded = new Set([...seededPlugins(edition), ...RETIRED_PROJECTS]);
     const modded = new Set(MODDED_PROTECTION.map((entry) => projectSlug(entry)?.toLowerCase()));
     const kept = parseProjectList(current).filter((entry) => {
         const slug = projectSlug(entry)?.toLowerCase();
@@ -1011,7 +1049,7 @@ export function protectionFor(
  * it off, so this is not just history - it is what stops the previous answer
  * outliving the correction.
  */
-const RETIRED_PROJECTS = ["floodgate"] as const;
+const RETIRED_PROJECTS: readonly string[] = ["floodgate", ...REPLACED_PROJECTS];
 
 /**
  * A plugin list with every blueprint's own plugins taken back out of it.

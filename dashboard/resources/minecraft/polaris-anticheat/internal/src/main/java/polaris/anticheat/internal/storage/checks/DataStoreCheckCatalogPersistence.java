@@ -1,0 +1,137 @@
+package polaris.anticheat.internal.storage.checks;
+
+import polaris.anticheat.api.storage.DataStore;
+import polaris.anticheat.api.storage.category.Categories;
+import polaris.anticheat.api.storage.check.CheckCatalogPersistence;
+import polaris.anticheat.api.storage.check.CheckCatalogRow;
+import polaris.anticheat.api.storage.kind.ops.EntityOps;
+import polaris.anticheat.api.storage.model.CheckCatalogRecord;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/**
+ * Check-catalog persistence backed by the normal datastore write path.
+ * <p>
+ * The existing catalog is loaded before construction. Subsequent inserts and
+ * metadata updates update the local view synchronously, then persist an
+ * idempotent {@link Categories#CHECK_CATALOG} write through the v2 operation
+ * path. This keeps check / verbose metadata registration out of backend-specific
+ * JDBC writers and on the same routed storage plane as other v2 metadata.
+ */
+@ApiStatus.Internal
+public final class DataStoreCheckCatalogPersistence implements CheckCatalogPersistence {
+
+    private final @NotNull DataStore store;
+    private final @NotNull Logger logger;
+    private final Map<String, CheckCatalogRow> byStableKey = new LinkedHashMap<>();
+    private final Map<Integer, CheckCatalogRow> byId = new LinkedHashMap<>();
+    private int nextCheckId = 1;
+
+    public DataStoreCheckCatalogPersistence(
+            @NotNull Iterable<CheckCatalogRow> initialRows,
+            @NotNull DataStore store,
+            @NotNull Logger logger) {
+        this.store = store;
+        this.logger = logger;
+        for (CheckCatalogRow row : initialRows) {
+            putLocal(row);
+            nextCheckId = Math.max(nextCheckId, row.checkId() + 1);
+        }
+    }
+
+    @Override
+    public synchronized Iterable<CheckCatalogRow> loadAll() {
+        return List.copyOf(byStableKey.values());
+    }
+
+    @Override
+    public synchronized int insert(
+            String stableKey,
+            @Nullable String display,
+            @Nullable String description,
+            @Nullable String introducedVersion,
+            long introducedAt) {
+        CheckCatalogRow existing = byStableKey.get(stableKey);
+        if (existing != null) return existing.checkId();
+
+        int checkId = nextAvailableId();
+        CheckCatalogRow row = new CheckCatalogRow(
+                checkId, stableKey, display, description, introducedVersion, introducedAt);
+        putLocal(row);
+        persist(row);
+        return checkId;
+    }
+
+    @Override
+    public synchronized void upsert(CheckCatalogRow row) {
+        CheckCatalogRow existingByKey = byStableKey.get(row.stableKey());
+        if (existingByKey != null && existingByKey.checkId() != row.checkId()) {
+            throw new IllegalStateException("stable key " + row.stableKey()
+                    + " already maps to check_id " + existingByKey.checkId());
+        }
+        CheckCatalogRow existingById = byId.get(row.checkId());
+        if (existingById != null && !existingById.stableKey().equals(row.stableKey())) {
+            throw new IllegalStateException("check_id " + row.checkId()
+                    + " already maps to stable key " + existingById.stableKey());
+        }
+        putLocal(row);
+        persist(row);
+    }
+
+    @Override
+    public synchronized void updateDisplayAndDescription(
+            int checkId,
+            @Nullable String display,
+            @Nullable String description) {
+        CheckCatalogRow existing = byId.get(checkId);
+        if (existing == null) {
+            logger.warning("[polarisac-datastore] attempted check-catalog metadata update for unknown check_id "
+                    + checkId);
+            return;
+        }
+        CheckCatalogRow updated = new CheckCatalogRow(
+                existing.checkId(),
+                existing.stableKey(),
+                display,
+                description,
+                existing.introducedVersion(),
+                existing.introducedAt());
+        putLocal(updated);
+        persist(updated);
+    }
+
+    private int nextAvailableId() {
+        while (byId.containsKey(nextCheckId)) nextCheckId++;
+        return nextCheckId++;
+    }
+
+    private void putLocal(@NotNull CheckCatalogRow row) {
+        byStableKey.put(row.stableKey(), row);
+        byId.put(row.checkId(), row);
+    }
+
+    private void persist(@NotNull CheckCatalogRow row) {
+        CheckCatalogRecord record = new CheckCatalogRecord(
+                row.stableKey(),
+                row.checkId(),
+                row.display(),
+                row.description(),
+                row.introducedVersion(),
+                row.introducedAt());
+        try {
+            store.execute(new EntityOps.UpsertOp<>(Categories.CHECK_CATALOG, record))
+                    .toCompletableFuture()
+                    .join();
+        } catch (RuntimeException e) {
+            logger.log(Level.WARNING,
+                    "[polarisac-datastore] failed to persist check-catalog row for " + row.stableKey(), e);
+        }
+    }
+}

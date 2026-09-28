@@ -1,0 +1,91 @@
+package polaris.anticheat.api.storage.event;
+
+import polaris.anticheat.api.storage.model.VerboseFormat;
+import polaris.anticheat.api.storage.model.ViolationRecord;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+
+/**
+ * Mutable write-path slot for the {@code VIOLATION} category. Instances are
+ * pre-allocated inside the Disruptor ring and recycled across publishes; producers
+ * get a slot, populate fields, and publish. Never retain references past publish.
+ * <p>
+ * The immutable read-side counterpart is {@link ViolationRecord}, which backends
+ * materialise on read from their native storage — never from an event.
+ * <p>
+ * Callers may pre-set {@code id()} to preserve an imported record id. Otherwise
+ * the default {@code DataStore.submit} path fills it before publishing. Backends
+ * expect a populated id when they receive the event.
+ */
+@ApiStatus.Experimental
+public final class ViolationEvent {
+
+    private @Nullable UUID id;
+    private UUID sessionId;
+    private UUID playerUuid;
+    private int checkId;
+    private double vl;
+    private long occurredEpochMs;
+    private @Nullable byte[] verboseData;
+    private VerboseFormat verboseFormat = VerboseFormat.TEXT;
+
+    public @Nullable UUID id() { return id; }
+    public @NotNull ViolationEvent id(@Nullable UUID v) { this.id = v; return this; }
+
+    public @NotNull UUID sessionId() { return sessionId; }
+    public @NotNull ViolationEvent sessionId(@NotNull UUID v) { this.sessionId = v; return this; }
+
+    public @NotNull UUID playerUuid() { return playerUuid; }
+    public @NotNull ViolationEvent playerUuid(@NotNull UUID v) { this.playerUuid = v; return this; }
+
+    public int checkId() { return checkId; }
+    public @NotNull ViolationEvent checkId(int v) { this.checkId = v; return this; }
+
+    public double vl() { return vl; }
+    public @NotNull ViolationEvent vl(double v) { this.vl = v; return this; }
+
+    public long occurredEpochMs() { return occurredEpochMs; }
+    public @NotNull ViolationEvent occurredEpochMs(long v) { this.occurredEpochMs = v; return this; }
+
+    /**
+     * Legacy text view used by existing event listeners and callers that have not
+     * been ported to binary verbose payloads yet. New storage writers should use
+     * {@link #verboseData()} to avoid decoding on the write path.
+     */
+    public @Nullable String verbose() {
+        return verboseData == null ? null : new String(verboseData, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Legacy text setter. Encodes as UTF-8 into the opaque stored payload.
+     */
+    public @NotNull ViolationEvent verbose(@Nullable String v) {
+        this.verboseData = v == null ? null : v.getBytes(StandardCharsets.UTF_8);
+        return this;
+    }
+
+    public @Nullable byte[] verboseData() { return verboseData; }
+    public @NotNull ViolationEvent verboseData(@Nullable byte[] v) { this.verboseData = v; return this; }
+
+    public @NotNull VerboseFormat verboseFormat() { return verboseFormat; }
+    public @NotNull ViolationEvent verboseFormat(@NotNull VerboseFormat v) { this.verboseFormat = v; return this; }
+
+    /**
+     * Reset to neutral state so the Disruptor can hand the slot to the next producer
+     * without leaking fields from the previous publish.
+     */
+    public void reset() {
+        id = null;
+        sessionId = null;
+        playerUuid = null;
+        checkId = 0;
+        vl = 0.0;
+        occurredEpochMs = 0L;
+        verboseData = null;
+        verboseFormat = VerboseFormat.TEXT;
+    }
+}

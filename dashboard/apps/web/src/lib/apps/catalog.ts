@@ -456,25 +456,22 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     //
                     // The default set is the protection a server exposed to the
                     // internet needs on day one and that nobody installs before the
-                    // first griefing: an anticheat, block history to roll a raid back
-                    // with, and the permission plugin both are administered through.
-                    // Each carries "?" so a Minecraft release they have no build for
-                    // yet warns instead of stopping the server from booting.
+                    // first griefing: block history to roll a raid back with, and the
+                    // permission plugin it is administered through. The anti-cheat is
+                    // Polaris's own, installed apart from this list (see
+                    // `polaris-anticheat` in the Game servers app). Each carries "?" so
+                    // a Minecraft release they have no build for yet warns instead of
+                    // stopping the server from booting.
                     //
-                    // GrimAC also says which builds count, because it publishes
-                    // nothing else: every one of its Modrinth builds is tagged
-                    // alpha, and the image takes finished releases by default - so
-                    // the anticheat every server was supposed to get was quietly
-                    // never installed on any of them.
-                    // All three are Bukkit plugins, so they are seeded only onto a
-                    // server that runs plugins. A modded server got them too, and
-                    // no build of any of them exists for one: two were drawn on the
-                    // Mods screen as projects Modrinth had never heard of, and the
-                    // third installed a jar that brought the server down.
+                    // Both are Bukkit plugins, so they are seeded only onto a server
+                    // that runs plugins. A modded server got them too, and no build of
+                    // either exists for one: they were drawn on the Mods screen as
+                    // projects Modrinth had never heard of, or installed a jar that
+                    // brought the server down.
                     key: "MODRINTH_PROJECTS",
                     label: "Mods and plugins",
                     help: "Modrinth projects to install, comma separated. Managed from the Mods tab.",
-                    default: "grimac?:alpha,coreprotect?,luckperms?",
+                    default: "coreprotect?,luckperms?",
                     pluginServersOnly: true,
                     tunable: true,
                     group: "Mods"

@@ -12,17 +12,24 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { MOD_FILES } from "./polaris-login";
+import { ANTICHEAT_FILES } from "./polaris-anticheat";
 
 /** Where the bundle carries the builds: beside its server half, which is where
  *  `__dirname` points when the dashboard loads it. Overridable for a development
  *  checkout that built them somewhere else. */
 export function modDir(): string {
-    return process.env.POLARIS_MINECRAFT_MODS_DIR || path.join(__dirname, "..", "assets", "minecraft-mods");
+    return (
+        process.env.POLARIS_MINECRAFT_MODS_DIR ||
+        path.join(__dirname, "..", "assets", "minecraft-mods")
+    );
 }
+
+/** Every jar the bundle carries: the login's builds and the anti-cheat's. */
+const SERVED: readonly string[] = [...MOD_FILES, ...ANTICHEAT_FILES];
 
 /** Where one build lives, or null for a name that is not one. */
 export function modPath(file: string): string | null {
-    return MOD_FILES.includes(file) ? path.join(modDir(), file) : null;
+    return SERVED.includes(file) ? path.join(modDir(), file) : null;
 }
 
 /** The version a build reports, or null when the image has no record of it. The

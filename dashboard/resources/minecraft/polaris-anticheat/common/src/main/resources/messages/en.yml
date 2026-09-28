@@ -1,0 +1,134 @@
+# \u00BB is » (double >>), ANSI and UTF-8 interpret this differently... you may even see ? due to this
+prefix: "&bPolaris &8\u00BB"
+
+alerts-enabled: "%prefix% &fAlerts enabled"
+alerts-disabled: "%prefix% &fAlerts disabled"
+verbose-enabled: "%prefix% &fVerbose enabled"
+verbose-disabled: "%prefix% &fVerbose disabled"
+brands-enabled: "%prefix% &fBrands enabled"
+brands-disabled: "%prefix% &fBrands disabled"
+client-brand-format: "%prefix% &f%player% joined using %brand%"
+console-specify-target: "%prefix% &cYou must specify a target as the console!"
+reloading: "%prefix% &7Reloading config..."
+reloaded: "%prefix% &fConfig has been reloaded."
+reload-failed: "%prefix% &cFailed to reload config."
+player-not-found: "%prefix% &cPlayer is exempt or offline!"
+player-not-this-server: "%prefix% &cPlayer is not on this server!"
+sender-not-found: "%prefix% &cYou cannot be exempt to use this command!"
+spectate-return: "<click:run_command:/polarisac stopspectating><hover:show_text:\"/polarisac stopspectating\">\n%prefix% &fClick here to return to previous location\n</hover></click>"
+cannot-spectate-return: "%prefix% &cYou can only do this after spectating a player"
+cannot-run-on-self: "%prefix% &cYou cannot use this command on yourself!"
+upload-log: "%prefix% &fUploaded debug to: %url%"
+upload-log-start: "%prefix% &fUploading log... please wait"
+upload-log-not-found: "%prefix% &cUnable to find that log"
+upload-log-upload-failure: "%prefix% &cSomething went wrong while uploading this log, see console for more info"
+disconnect:
+    timeout: "<lang:disconnect.timeout>"
+    closed: "<lang:disconnect.closed>"
+    error: "<red>An error occurred whilst processing packets. Please contact the administrators."
+    blacklisted-forge: "<red>Your forge version is blacklisted due to inbuilt reach hacks.<newline><gold>Versions affected: 1.18.2-1.19.3<newline><newline><red>Please see https://github.com/MinecraftForge/MinecraftForge/issues/9309."
+run-as-player: "%prefix% &cThis command can only be used by players!"
+run-as-player-or-console: "%prefix% &cThis command can only be used by players or the console!"
+webhook-not-enabled: "Discord webhooks are not enabled!"
+webhook-test-message: "test message"
+webhook-test-succeeded: "Discord webhook test succeeded!"
+webhook-test-failed: "Discord webhook test failed!"
+
+# Valid placeholders:
+# %prefix%
+# %player%
+# %check_name%
+# %description%
+# %experimental%
+# %vl% - violations
+# %verbose% - extra information from the check such as offsets, not all checks will add information
+alerts-format: "%prefix% &f%player% &bfailed <hover:show_text:\"&b%check_name%%experimental%\n&8Description: &f%description%\">&f%check_name%%experimental%</hover> &f(x&c%vl%&f) &7%verbose%"
+alerts-format-proxy: "%prefix% &f[&cproxy&f] &f%player% &bfailed &f%check_name%%experimental% &f(x&c%vl%&f) &7%verbose%"
+experimental-symbol: "*"
+
+profile:
+    - "&7======================"
+    - "%prefix% &bProfile for &f%player%"
+    - "&bPing: &f%ping%"
+    - "&bVersion: &f%version%"
+    - "&bClient Brand: &f%brand%"
+    - "&bHorizontal Sensitivity: &f%h_sensitivity%%"
+    - "&bVertical Sensitivity: &f%v_sensitivity%%"
+    - "&bFastMath Enabled: &f%fast_math%"
+    - "&7======================"
+help:
+    - "&7======================"
+    - "/polarisac alerts &f- &7Toggle alerts"
+    - "/polarisac brands &f- &7Toggle brands"
+    - "/polarisac profile <player> &f- &7View player info"
+    - "/polarisac help &f- &7View this help message"
+    - "/polarisac debug <player> &f- &7Developer Prediction output"
+    - "/polarisac perf &f- &7Developer ms/prediction"
+    - "/polarisac reload &f- &7Reloads the config"
+    - "/polarisac spectate <player> &f- &7Spectate a player"
+    - "/polarisac verbose &f- &7Shows every flag to you, without buffers"
+    - "/polarisac log [0-255] &f- &7Uploads a debug log for prediction flags"
+    - "/polarisac history <player> &f- &7Session list (newest first)"
+    - "/polarisac history <player> page <N> &f- &7Jump to page N of the session list"
+    - "/polarisac history <player> session <N|latest> [-d] [-v] &f- &7Session detail (most recent violations first)"
+    - "/polarisac history <player> session <N|latest> page <N> [-d] [-v] &f- &7Session detail, violation page N"
+    - "&7======================"
+
+# === /polarisac history ===
+# Session-based history UI. All lines below are configurable MiniMessage templates.
+# Default row hovers live in inline <hover:show_text:'...'> tags and the hover
+# fragment keys below; remove the inline hover to use the renderer fallback.
+
+polarisac-history-load-failure: "%prefix% &cHistory subsystem failed to load! Check server console for errors."
+polarisac-history-disabled: "%prefix% &cHistory subsystem is disabled!"
+polarisac-history-failed: "%prefix% &cFailed to load history: &7%error%"
+polarisac-history-unknown-player: "%prefix% &cUnknown player: &f%player%"
+polarisac-history-no-sessions: "%prefix% &7No session history for &f%player%&7."
+polarisac-history-session-not-found: "%prefix% &cSession &f%ordinal%&c not found for &f%player%&c."
+
+# Session list — valid placeholders: %prefix% %player% %page% %max_pages%
+polarisac-history-header: "%prefix% &bShowing session history for &f%player% &8[&f%page%&7/&f%max_pages%&8]"
+# Single session summary line — valid placeholders:
+#   %prefix% %player% %ordinal% %polarisac_version% %server_name%
+#   %client_version% %client_brand% %duration% %timeago%
+#   %violations% %unique_checks% %crashed_marker% %session_uuid% %detail_command%
+# %crashed_marker% expands to polarisac-history-crashed-marker for sessions
+# whose connection went away without a graceful close (server crash,
+# kill -9, channel RST that didn't fire UserDisconnectEvent). Empty
+# string for ongoing or gracefully-closed sessions.
+polarisac-history-session: "<hover:show_text:'&bSession &7%session_uuid%<newline>&7Click or run &e%detail_command%<newline>&7to view session details.'>%prefix% &8[&b%polarisac_version%&8] &8[&b%server_name%&8] &8[&b%client_version%&8] &bSession &f%ordinal%&b duration &f%duration%&b with &c%violations%&b violations &8[&c%unique_checks%&8]%crashed_marker% &8(&7%timeago% ago&8)</hover>"
+
+# Inline marker substituted into %crashed_marker% on session lines whose
+# closed_at == last_activity (i.e. stamped by the next-boot crash sweep
+# rather than the disconnect path). Includes a leading space so the
+# marker reads naturally when present and disappears when empty.
+polarisac-history-crashed-marker: " &8(&ccrashed&8)"
+
+# Session detail — valid placeholders:
+#   %prefix% %player% %ordinal% %polarisac_version% %server_name%
+#   %client_version% %client_brand% %duration% %timeago%
+#   %violations% %unique_checks% %bucket_size%
+polarisac-history-detail-header: "%prefix% &bShowing &f%player%&b's session &f%ordinal%&b details:"
+polarisac-history-detail-meta1: "%prefix% &bPolaris: &f%polarisac_version%&b, Server: &f%server_name%&b, Duration: &f%duration%&b, Date: &7%timeago% ago"
+polarisac-history-detail-meta2: "%prefix% &bClient: &f%client_version%&b, Brand: &f%client_brand%"
+polarisac-history-detail-violations-header: "%prefix% &bViolations: &8(%violations% total, %unique_checks% unique)"
+polarisac-history-detail-empty: "%prefix% &7- (none)"
+# A grouped row (default) — valid placeholders: %prefix% %offset% %checks_list%
+#   %bucket_start% %bucket_end% %bucket_hover_entries%
+#   %checks_list% is built by joining polarisac-history-check-count entries with ", "
+polarisac-history-detail-group: "<hover:show_text:'&bViolations in &f%bucket_start%–%bucket_end%&b:%bucket_hover_entries%'>%prefix% &7- %checks_list% &8(&b%offset%&8)</hover>"
+polarisac-history-detail-group-hover: "&bViolations in &f%bucket_start%–%bucket_end%&b:%bucket_hover_entries%"
+polarisac-history-detail-group-hover-entry: "<newline>&8  %offset% &b%check%%description%%verbose%"
+polarisac-history-hover-description: " — &f%description%"
+polarisac-history-detail-group-hover-verbose: " — &7%verbose%"
+# A single raw violation row (--detailed) — valid placeholders:
+#   %prefix% %offset% %check% %description% %vl% %verbose%
+polarisac-history-detail-entry: "%prefix% &7- &f%check% &8(&b%offset%&8)&7 %verbose%"
+polarisac-history-detail-entry-hover: "&b%check%%description%<newline>&8@ %offset% — vl %vl%%verbose%"
+polarisac-history-detail-entry-hover-verbose: "<newline>&7%verbose%"
+# Inner format for each check in a group's %checks_list% — valid placeholders: %check_name% %count%
+polarisac-history-check-count: "&f%check_name%&7 x&c%count%"
+
+# Schema markers — see header comment in config.yml.
+config-flavor: V2
+config-version: 2

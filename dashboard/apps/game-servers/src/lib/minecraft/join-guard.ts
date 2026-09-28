@@ -30,6 +30,7 @@
  */
 
 import * as polarisLogin from "./polaris-login";
+import { anticheatMovedTo, anticheatRunsOn } from "./polaris-anticheat";
 import {
     formatProjectList,
     isPluginLoader,
@@ -314,6 +315,39 @@ export function enableLogin(
  * closed and the save did not ask to open it.
  */
 export async function guardForSave(
+    vars: readonly { key: string; value: string }[],
+    readEnv: () => Promise<ReadonlyMap<string, string>>
+): Promise<{ key: string; value: string }[]> {
+    // Read once for both questions, and only if one of them asks.
+    let held: Promise<ReadonlyMap<string, string>> | null = null;
+    const once = () => (held ??= readEnv());
+    const writes = await loginGuardForSave(vars, once);
+    const software = vars.find((entry) => entry.key === SOFTWARE_KEY)?.value;
+    // Polaris's anti-cheat comes off software it cannot run on, from the list
+    // as the login's own writes above leave it. Only a move to such software is
+    // worth reading the environment for, and never the card's own write.
+    if (
+        !software ||
+        anticheatRunsOn(software) ||
+        vars.some((entry) => entry.key === PROJECTS_KEY)
+    ) {
+        return writes;
+    }
+    const current = await once();
+    const listed = writes.find((entry) => entry.key === polarisLogin.MODS_KEY)?.value;
+    const off = anticheatMovedTo(
+        current,
+        software,
+        listed ?? current.get(polarisLogin.MODS_KEY) ?? ""
+    );
+    if (off === null) return writes;
+    return [
+        ...writes.filter((entry) => !off.has(entry.key)),
+        ...[...off].map(([key, value]) => ({ key, value }))
+    ];
+}
+
+async function loginGuardForSave(
     vars: readonly { key: string; value: string }[],
     readEnv: () => Promise<ReadonlyMap<string, string>>
 ): Promise<{ key: string; value: string }[]> {

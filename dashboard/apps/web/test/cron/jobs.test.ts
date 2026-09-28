@@ -99,6 +99,9 @@ describe("the work Polaris runs on a schedule", () => {
             // One Polaris has no reason to dial the same deployment twice a
             // minute, and this is the pass the alarm above reads.
             "domain-health",
+            // Two passes would each write the same server's switch, and read
+            // the token the other was about to write.
+            "game-anticheat-default",
             "game-health",
             "game-schedules",
             // Two runners would each archive the same world with `tar`, inside

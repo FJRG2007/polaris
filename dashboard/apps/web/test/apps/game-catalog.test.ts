@@ -51,10 +51,11 @@ describe("the mod list a server starts with", () => {
     });
 
     it("still carries the protection a plugin server is meant to get", () => {
-        // Dropping it for everybody would leave the servers it does fit without an
-        // anticheat or block history, which is what it exists to prevent.
-        expect(field!.default).toContain("grimac");
+        // Dropping it for everybody would leave the servers it does fit without
+        // block history, which is what it exists to prevent. The anti-cheat is
+        // Polaris's own and is installed apart from this list.
         expect(field!.default).toContain("coreprotect");
+        expect(field!.default).not.toContain("grimac");
     });
 });
 

@@ -1,0 +1,56 @@
+package polaris.anticheat.internal.storage.backend.mysql;
+
+import polaris.anticheat.api.storage.backend.Backend;
+import polaris.anticheat.api.storage.backend.BackendConfig;
+import polaris.anticheat.api.storage.backend.BackendConfigSource;
+import polaris.anticheat.api.storage.backend.BackendProvider;
+import polaris.anticheat.api.storage.config.TableNames;
+import polaris.anticheat.internal.storage.backend.sql.HikariPoolSettings;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
+
+@ApiStatus.Internal
+public final class MysqlBackendProvider implements BackendProvider {
+
+    @Override
+    public @NotNull String id() {
+        return MysqlBackend.ID;
+    }
+
+    @Override
+    public @NotNull Class<? extends BackendConfig> configType() {
+        return MysqlBackendConfig.class;
+    }
+
+    @Override
+    public @NotNull BackendConfig readConfig(@NotNull BackendConfigSource src) {
+        String pw = src.getString("password", "");
+        int wtDefault = src.getInt("writer-threads.default", 1);
+        java.util.Map<String, Integer> wtPerCat = new java.util.LinkedHashMap<>();
+        for (String cat : new String[]{"violation", "session", "player-identity", "setting", "blob"}) {
+            int v = src.getInt("writer-threads." + cat, -1);
+            if (v > 0) wtPerCat.put(cat, v);
+        }
+        return new MysqlBackendConfig(
+                src.getString("host", "localhost"),
+                src.getInt("port", 3306),
+                src.getString("database", "polarisac"),
+                src.getString("user", "root"),
+                pw.isEmpty() ? null : pw,
+                src.getString("extra-jdbc-params", ""),
+                src.getInt("batch-flush-cap", 256),
+                wtDefault, wtPerCat,
+                HikariPoolSettings.readFrom(src, MysqlBackendConfig.DEFAULT_MAXIMUM_POOL_SIZE),
+                TableNames.readFrom(src));
+    }
+
+    @Override
+    public @NotNull Backend create(@NotNull BackendConfig config) {
+        if (!(config instanceof MysqlBackendConfig c)) {
+            throw new IllegalArgumentException(
+                    "MysqlBackendProvider requires MysqlBackendConfig, got "
+                            + (config == null ? "null" : config.getClass().getName()));
+        }
+        return new MysqlBackend(c);
+    }
+}

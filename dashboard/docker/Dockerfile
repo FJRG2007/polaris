@@ -153,6 +153,21 @@ RUN cd /mods/polaris-paper \
     && cp "build/libs/polaris-$version.jar" /out/polaris-paper.jar \
     && printf '%s\n' "$version" > /out/polaris-paper.jar.version
 
+# The anti-cheat, for Paper, Purpur, Spigot, Folia and the servers that load
+# their plugins, 1.8 to the latest. The directory is GPL-3.0
+# (resources/minecraft/polaris-anticheat/README.md), so it is its own jar and
+# never part of the dashboard. It asks for a newer Gradle than the stages above.
+# The version carries a fingerprint of its sources, like theirs.
+FROM gradle:9.4.1-jdk21 AS minecraft-anticheat
+
+WORKDIR /ac
+COPY resources/minecraft/polaris-anticheat/ ./
+RUN fingerprint="$(find . -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)" \
+    && POLARIS_AC_COMMIT="$fingerprint" POLARIS_AC_BRANCH=polaris gradle --no-daemon -q :bukkit:build -x test \
+    && mkdir -p /out \
+    && cp bukkit/build/libs/polarisac-bukkit-*.jar /out/polaris-anticheat-bukkit.jar \
+    && printf '%s\n' "$fingerprint" > /out/polaris-anticheat-bukkit.jar.version
+
 # ---------------------------------------------------------------------------
 # App bundles - every installable app built into the bundle a server that
 # installs it downloads (packages/app-host/bundler), including what an app ships
@@ -169,6 +184,7 @@ FROM builder AS app-bundles-build
 
 COPY --from=minecraft-mods /out ./apps/game-servers/.assets/minecraft-mods
 COPY --from=minecraft-plugins /out ./apps/game-servers/.assets/minecraft-mods
+COPY --from=minecraft-anticheat /out ./apps/game-servers/.assets/minecraft-mods
 ARG POLARIS_APP_BUNDLES=embed
 RUN node packages/app-host/bundler/build.mjs /build/app-bundles \
     && mkdir -p /build/app-bundles-image \
