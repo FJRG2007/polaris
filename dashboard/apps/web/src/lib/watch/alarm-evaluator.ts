@@ -295,9 +295,15 @@ export async function evaluateAlarms(): Promise<void> {
         }
     }
     if (unchanged.length > 0) {
-        await prisma.alarm.updateMany({
-            where: { id: { in: unchanged } },
-            data: { lastEvaluatedAt: new Date() }
-        });
+        // Failing on its own, like each alarm above: a stamp that did not move
+        // must not turn a pass whose transitions were all written into an error.
+        try {
+            await prisma.alarm.updateMany({
+                where: { id: { in: unchanged } },
+                data: { lastEvaluatedAt: new Date() }
+            });
+        } catch (error) {
+            console.error("polaris: alarm evaluation failed:", error);
+        }
     }
 }

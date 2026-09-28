@@ -293,6 +293,8 @@ export interface EngineRecord {
 
 /** Flags listed per player on the tab. */
 const RECENT_PER_PLAYER = 20;
+/** How many players' lists are read at the same time. */
+const PLAYERS_AT_ONCE = 6;
 
 export async function engineRecords(installedAppId: string): Promise<EngineRecord[]> {
     const since = new Date(Date.now() - EVIDENCE_WINDOW_MS);
@@ -309,10 +311,21 @@ export async function engineRecords(installedAppId: string): Promise<EngineRecor
     // rather than a window function, because a raw query here would have to
     // compare a uuid column to a text parameter, which Postgres refuses without
     // a cast that SQLite does not have.
+    //
+    // A few at a time: a server with a hundred flagged players would otherwise
+    // ask for a hundred queries at once, which is the whole connection pool and
+    // every other request on the instance waiting behind this tab.
     const players = [...new Set(groups.map((group) => group.player))];
-    const rows = (
-        await Promise.all(
-            players.map((player) =>
+    const rows: {
+        player: string;
+        check: string;
+        violations: number;
+        verbose: string;
+        at: Date;
+    }[] = [];
+    for (let start = 0; start < players.length; start += PLAYERS_AT_ONCE) {
+        const batch = await Promise.all(
+            players.slice(start, start + PLAYERS_AT_ONCE).map((player) =>
                 prisma.minecraftAnticheatFlag.findMany({
                     where: { installedAppId, player, at: { gte: since } },
                     orderBy: { at: "desc" },
@@ -320,8 +333,9 @@ export async function engineRecords(installedAppId: string): Promise<EngineRecor
                     select: { player: true, check: true, violations: true, verbose: true, at: true }
                 })
             )
-        )
-    ).flat();
+        );
+        rows.push(...batch.flat());
+    }
     const records = new Map<
         string,
         {
