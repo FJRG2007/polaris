@@ -161,17 +161,12 @@ export function ProfileDetails({
                     {/* Their name, when it is not already what they are called
                         here and they allow this reader to see it. */}
                     {profile?.fullName && profile.fullName !== name && (
-                        <p
-                            className="truncate text-xs text-muted-foreground"
-                            title={profile.fullName}
-                        >
+                        <p className="truncate text-xs text-muted-foreground" title={profile.fullName}>
                             {profile.fullName}
                         </p>
                     )}
                     {profile?.headline ? (
-                        <p className="mt-1 break-words text-xs text-foreground/90">
-                            {profile.headline}
-                        </p>
+                        <p className="mt-1 break-words text-xs text-foreground/90">{profile.headline}</p>
                     ) : null}
                     {role ? (
                         <span className="mt-1.5">

@@ -138,10 +138,7 @@ export async function sweepGameActivity(
         // findable by anything but a name the list may not hold.
         for (const row of change.adopted) {
             await prisma.gamePlayerSession
-                .updateMany({
-                    where: { id: row.id, playerId: null },
-                    data: { playerId: row.playerId }
-                })
+                .updateMany({ where: { id: row.id, playerId: null }, data: { playerId: row.playerId } })
                 .catch(() => undefined);
         }
 
@@ -233,9 +230,7 @@ const VISIT_LIMIT = 50;
  * opens, can afford the other comparison and does.
  */
 function visitsOf(players: readonly RosterPlayer[]): Prisma.GamePlayerSessionWhereInput[] {
-    const ids = [
-        ...new Set(players.map((player) => player.id?.trim()).filter((id): id is string => !!id))
-    ];
+    const ids = [...new Set(players.map((player) => player.id?.trim()).filter((id): id is string => !!id))];
     const names = [
         ...new Set(players.map((player) => player.name.trim()).filter((name) => name.length > 0))
     ];
@@ -369,10 +364,7 @@ export async function closeGameSessions(
     await prisma.gamePlayerSession
         .updateMany({ where: { id: { in: open.map((row) => row.id) } }, data: { leftAt: at } })
         .catch(() => undefined);
-    await announcePlayers(
-        installedAppId,
-        open.map((row) => row.name)
-    );
+    await announcePlayers(installedAppId, open.map((row) => row.name));
 }
 
 /** What every one of these servers was last seen doing, in one read. */

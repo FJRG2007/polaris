@@ -285,9 +285,7 @@ export async function activitiesFor(
         // computer, and one person playing one game is one card - the one that
         // knows which server.
         const onServer = new Set(
-            list
-                .filter((view) => view.source === "minecraft")
-                .map((view) => view.name.toLowerCase())
+            list.filter((view) => view.source === "minecraft").map((view) => view.name.toLowerCase())
         );
         const kept = list.filter(
             (view) => view.source !== "game" || !onServer.has(view.name.toLowerCase())
@@ -298,11 +296,7 @@ export async function activitiesFor(
     return answer;
 }
 
-function push(
-    into: Map<string, core.ActivityView[]>,
-    userId: string,
-    view: core.ActivityView
-): void {
+function push(into: Map<string, core.ActivityView[]>, userId: string, view: core.ActivityView): void {
     const list = into.get(userId);
     if (list) list.push(view);
     else into.set(userId, [view]);

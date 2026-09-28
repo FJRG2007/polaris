@@ -190,7 +190,7 @@ load those into a core path that never uses them.
      components as references) may register its copies after an app has loaded.
      In the browser each module is handed over as CommonJS marked `__esModule`
      with its real default on `default` (`asCommonJs`), so `import Image from
-"next/image"` in an app is the component, not the module namespace.
+     "next/image"` in an app is the component, not the module namespace.
    - **Screens.** An app page is a server component drawn by a catch-all route
      per surface (`/places/[[...path]]`, `/apps/games/[[...path]]`; API routes
      under `/api/home`, `/api/minecraft`, `/api/apps/games`,
@@ -242,5 +242,4 @@ load those into a core path that never uses them.
    An app's jobs are read on every scheduler tick (`scheduledJobs()`), since
    they arrive with its code. `npm run dev:up` builds the bundles into
    `dashboard/.app-bundles` for a local dashboard.
-
 5. **Places** went through the same phases with Game servers.

@@ -32,10 +32,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!throttle.ok) {
         return Response.json(
             { error: "Too many reports, try again in a moment" },
-            {
-                status: 429,
-                headers: { "Retry-After": String(Math.ceil(throttle.retryAfterMs / 1000)) }
-            }
+            { status: 429, headers: { "Retry-After": String(Math.ceil(throttle.retryAfterMs / 1000)) } }
         );
     }
 

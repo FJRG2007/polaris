@@ -50,10 +50,7 @@ export function settingsFromRow(row: Row | null | undefined): core.ActivitySetti
 }
 
 export async function activitySettingsOf(userId: string): Promise<ActivitySettingsView> {
-    const row = await prisma.userActivitySettings.findUnique({
-        where: { userId },
-        select: COLUMNS
-    });
+    const row = await prisma.userActivitySettings.findUnique({ where: { userId }, select: COLUMNS });
     return {
         settings: settingsFromRow(row),
         seenGames: core.readStoredList(row?.seenGames, core.seenGameSchema)

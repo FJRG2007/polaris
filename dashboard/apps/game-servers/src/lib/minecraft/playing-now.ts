@@ -28,7 +28,9 @@ export interface MinecraftVisit {
     readonly since: Date;
 }
 
-export async function playingMinecraftNow(userIds: readonly string[]): Promise<MinecraftVisit[]> {
+export async function playingMinecraftNow(
+    userIds: readonly string[]
+): Promise<MinecraftVisit[]> {
     const wanted = [...new Set(userIds)];
     if (wanted.length === 0) return [];
     const links = await prisma.gamePlayerLink.findMany({
@@ -46,10 +48,7 @@ export async function playingMinecraftNow(userIds: readonly string[]): Promise<M
             select: { id: true, ownerId: true, catalogId: true, name: true }
         }),
         prisma.userConnection.findMany({
-            where: {
-                userId: { in: [...new Set(links.map((link) => link.userId))] },
-                provider: "minecraft"
-            },
+            where: { userId: { in: [...new Set(links.map((link) => link.userId))] }, provider: "minecraft" },
             select: { userId: true, label: true }
         })
     ]);

@@ -27,9 +27,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function listen(): Promise<{ frames: () => unknown[]; close: () => void }> {
     const controller = new AbortController();
-    const response = await GET(
-        new Request("http://polaris.test/api/chat/stream", { signal: controller.signal })
-    );
+    const response = await GET(new Request("http://polaris.test/api/chat/stream", { signal: controller.signal }));
     const reader = (response.body as ReadableStream<Uint8Array>).getReader();
     const decoder = new TextDecoder();
     const seen: string[] = [];
