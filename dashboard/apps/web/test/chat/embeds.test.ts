@@ -280,6 +280,7 @@ describe("Twitch", () => {
         expect(embed?.provider).toBe("Twitch");
         expect(embed?.url).toBe("https://player.twitch.tv/?channel=somestreamer");
         expect(embed?.needsParent).toBe(true);
+        expect(embed?.shape).toBe("stream");
         expect(embedFor("https://m.twitch.tv/somestreamer")?.url).toBe(
             "https://player.twitch.tv/?channel=somestreamer"
         );
@@ -525,5 +526,6 @@ describe("asking a site about its link", () => {
         expect(oembedFor("https://www.twitch.tv/somestreamer")).toBeNull();
         expect(oembedFor("https://example.com/")).toBeNull();
         expect(oembedFor("https://reddit.com.evil.example/r/x")).toBeNull();
+        expect(oembedFor("https://notyoutube.com/watch?v=dQw4w9WgXcQ")).toBeNull();
     });
 });

@@ -32,11 +32,13 @@
  *
  * - `video`: a landscape rectangle, 16:9.
  * - `portrait`: a phone-shaped 9:16 player - a TikTok, a Short.
+ * - `stream`: a 16:9 player that is never shorter than 300px - Twitch's, which
+ *   will not start on its own any smaller than 400x300.
  * - `post`: a tall panel for something that is a post rather than a player, and
  *   whose height is decided by the post - X, Reddit, Instagram, a playlist.
  * - `audio`: a strip, for one track or one episode.
  */
-export type EmbedShape = "video" | "portrait" | "post" | "audio";
+export type EmbedShape = "video" | "stream" | "portrait" | "post" | "audio";
 
 /** A player Polaris knows how to build. */
 export interface Embed {
@@ -57,6 +59,9 @@ export interface Embed {
      *  Polaris reached by a LAN address over plain HTTP shows the card instead
      *  of a player that could only ever say no. */
     readonly needsParent: boolean;
+    /** The video's own page, for a site whose player addresses oEmbed does not
+     *  understand. Built from the same checked id as the frame. */
+    readonly page?: string;
 }
 
 /** Youtube's no-cookie host. It still sees the request - a frame is a request -
@@ -292,6 +297,25 @@ export function playerAddress(embed: Embed, pageHost: string): string {
     return `${embed.url}${embed.url.includes("?") ? "&" : "?"}${extra.join("&")}`;
 }
 
+/** Each site's oEmbed endpoint, by the host its links are posted on. */
+const OEMBED: ReadonlyMap<string, string> = new Map([
+    ["youtube.com", "https://www.youtube.com/oembed"],
+    ["youtu.be", "https://www.youtube.com/oembed"],
+    ["youtube-nocookie.com", "https://www.youtube.com/oembed"],
+    ["vimeo.com", "https://vimeo.com/api/oembed.json"],
+    ["player.vimeo.com", "https://vimeo.com/api/oembed.json"],
+    ["open.spotify.com", "https://open.spotify.com/oembed"],
+    ["tiktok.com", "https://www.tiktok.com/oembed"],
+    ["m.tiktok.com", "https://www.tiktok.com/oembed"],
+    ["soundcloud.com", "https://soundcloud.com/oembed"],
+    ["m.soundcloud.com", "https://soundcloud.com/oembed"],
+    ["reddit.com", "https://www.reddit.com/oembed"],
+    ["streamable.com", "https://api.streamable.com/oembed.json"],
+    ["dailymotion.com", "https://www.dailymotion.com/services/oembed"],
+    ["dai.ly", "https://www.dailymotion.com/services/oembed"],
+    ["geo.dailymotion.com", "https://www.dailymotion.com/services/oembed"]
+]);
+
 /**
  * Where to ask a site what one of its links is, when the page itself will not
  * say.
@@ -312,25 +336,9 @@ export function oembedFor(address: string): string | null {
     const host = hostOf(url);
 
     const endpoint =
-        host === "youtu.be" || host === "youtube-nocookie.com" || host.endsWith("youtube.com")
-            ? "https://www.youtube.com/oembed"
-            : host === "vimeo.com" || host === "player.vimeo.com"
-              ? "https://vimeo.com/api/oembed.json"
-              : host === "open.spotify.com"
-                ? "https://open.spotify.com/oembed"
-                : host === "tiktok.com" || host === "m.tiktok.com"
-                  ? "https://www.tiktok.com/oembed"
-                  : host === "soundcloud.com" || host === "m.soundcloud.com"
-                    ? "https://soundcloud.com/oembed"
-                    : host === "reddit.com" || host.endsWith(".reddit.com")
-                      ? "https://www.reddit.com/oembed"
-                      : host === "streamable.com"
-                        ? "https://api.streamable.com/oembed.json"
-                        : host === "dailymotion.com" ||
-                            host === "dai.ly" ||
-                            host === "geo.dailymotion.com"
-                          ? "https://www.dailymotion.com/services/oembed"
-                          : null;
+        OEMBED.get(host) ??
+        (host.endsWith(".youtube.com") ? OEMBED.get("youtube.com") : null) ??
+        (host.endsWith(".reddit.com") ? OEMBED.get("reddit.com") : null);
     if (!endpoint) return null;
 
     const asked = new URL(endpoint);
@@ -348,10 +356,10 @@ export function oembedFor(address: string): string | null {
  */
 function pageOf(url: URL, host: string): string {
     const embed = embedFor(url.href);
-    const id = embed?.url.split("?")[0]!.split("/").pop();
-    if (id && host === "youtube-nocookie.com") return `https://www.youtube.com/watch?v=${id}`;
-    if (id && embed?.provider === "Dailymotion") return `https://www.dailymotion.com/video/${id}`;
-    return url.href;
+    if (!embed?.page) return url.href;
+    return host === "youtube-nocookie.com" || embed.provider === "Dailymotion"
+        ? embed.page
+        : url.href;
 }
 
 /** A web address, or null for anything else - a scheme that is not the web is
@@ -393,7 +401,8 @@ function youtube(id: string, url: URL, short: boolean): Embed | null {
         url: seconds ? `${YOUTUBE}${id}?start=${seconds}` : `${YOUTUBE}${id}`,
         shape: short ? "portrait" : "video",
         start: "autoplay=1",
-        needsParent: false
+        needsParent: false,
+        page: `https://www.youtube.com/watch?v=${id}`
     };
 }
 
@@ -555,7 +564,7 @@ function twitchPlayer(query: string): Embed {
     return {
         provider: "Twitch",
         url: `https://player.twitch.tv/?${query}`,
-        shape: "video",
+        shape: "stream",
         start: "autoplay=true",
         needsParent: true
     };
@@ -566,7 +575,7 @@ function twitchClip(slug: string): Embed | null {
     return {
         provider: "Twitch",
         url: `https://clips.twitch.tv/embed?clip=${slug}`,
-        shape: "video",
+        shape: "stream",
         start: "autoplay=true",
         needsParent: true
     };
@@ -657,6 +666,7 @@ function dailymotionVideo(id: string): Embed | null {
         url: `https://www.dailymotion.com/embed/video/${id}`,
         shape: "video",
         start: "autoplay=1",
-        needsParent: false
+        needsParent: false,
+        page: `https://www.dailymotion.com/video/${id}`
     };
 }

@@ -26,6 +26,7 @@ import { embedFor, playerAddress, type EmbedShape } from "@/lib/chat/embeds";
  */
 const SHAPES: Readonly<Record<EmbedShape, string>> = {
     video: "aspect-video w-full",
+    stream: "aspect-video min-h-[300px] w-full",
     portrait: "aspect-[9/16] w-full max-w-[20rem]",
     post: "h-[32rem] max-h-[70vh] w-full",
     audio: "h-[166px] w-full"

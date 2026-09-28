@@ -68,6 +68,7 @@ describe("a link Polaris can play", () => {
     it("gives each kind of player its own room", () => {
         const shapes: Array<[string, string]> = [
             ["https://www.youtube.com/watch?v=dQw4w9WgXcQ", "aspect-video"],
+            ["https://www.twitch.tv/somestreamer", "min-h-[300px]"],
             ["https://www.instagram.com/reel/CxYz123AbC_/", "h-[32rem]"],
             ["https://x.com/someone/status/1700000000000000000", "h-[32rem]"],
             ["https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT", "h-[166px]"]
