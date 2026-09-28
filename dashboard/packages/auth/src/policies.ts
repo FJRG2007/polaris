@@ -8,6 +8,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { perRequest } from "./request-cache.js";
 import { getUserGroupIds } from "./groups.js";
 import { policyDocumentSchema, type PolicyStatement } from "@polaris/core";
 
@@ -141,7 +142,7 @@ export async function detachPolicy(
  * one of these?", and it has to be the same set of three every time or the same
  * grant would mean different things in different places.
  */
-export async function principalsOfUser(
+export const principalsOfUser = perRequest(async function principalsOfUser(
     userId: string
 ): Promise<{ principalType: PrincipalType; principalId: string }[]> {
     const [groupIds, roleRows] = await Promise.all([
@@ -153,7 +154,7 @@ export async function principalsOfUser(
         ...groupIds.map((id) => ({ principalType: "group" as const, principalId: id })),
         ...roleRows.map((row) => ({ principalType: "role" as const, principalId: row.roleId }))
     ];
-}
+});
 
 /**
  * Every policy statement that applies to a user, gathered across the principals
@@ -181,7 +182,7 @@ export interface SourcedPolicyStatements {
  * this" but "they may do this because of that". Split rather than written twice,
  * so the explanation can never disagree with the decision.
  */
-export async function resolvePrincipalPolicyStatementsBySource(
+export const resolvePrincipalPolicyStatementsBySource = perRequest(async function resolvePrincipalPolicyStatementsBySource(
     userId: string
 ): Promise<SourcedPolicyStatements[]> {
     const principals = await principalsOfUser(userId);
@@ -211,4 +212,4 @@ export async function resolvePrincipalPolicyStatementsBySource(
             }
         ];
     });
-}
+});

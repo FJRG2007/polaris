@@ -203,8 +203,10 @@ export async function setUsersMayChooseTheme(allowed: boolean): Promise<void> {
  */
 export async function resolveTextSize(userId: string | null): Promise<number> {
     try {
-        const platform = await getPlatformDisplayPreferences();
-        const mine = userId ? await getUserDisplayPreferences(userId) : {};
+        const [platform, mine] = await Promise.all([
+            getPlatformDisplayPreferences(),
+            userId ? getUserDisplayPreferences(userId) : ({} as UserDisplayPreferences)
+        ]);
         const chosen = mine.textSize ?? platform.textSize;
         return isTextSize(chosen) ? chosen : DISPLAY_DEFAULTS.textSize;
     } catch {

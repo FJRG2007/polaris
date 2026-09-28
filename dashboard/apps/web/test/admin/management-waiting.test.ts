@@ -79,7 +79,7 @@ describe("the count reaching every badge in Polaris", () => {
         // cannot appear is two queries for nothing. Matched with the whitespace
         // folded, so the formatter wrapping a line does not read as a change.
         const flat = chrome.replace(/\s+/g, " ");
-        expect(flat).toContain("user.isAdmin ? await countAdminWaiting()");
+        expect(flat).toContain("user.isAdmin ? countAdminWaiting()");
         expect(flat).toMatch(
             /<AdminWaitingProvider initial=\{adminWaiting\} enabled=\{user\.isAdmin\} ?>/
         );
