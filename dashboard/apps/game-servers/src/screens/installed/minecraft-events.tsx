@@ -16,7 +16,7 @@ import { hostUi } from "@polaris/app-host/client";
 import * as catalog from "../../lib/minecraft/events/catalog";
 import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
 import type { EventsView } from "../../lib/minecraft/events/events-service";
-import { Copy, Loader2, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
+import { Copy, Info, Loader2, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import * as ui from "@polaris/ui";
 
@@ -111,6 +111,70 @@ function DayPicker({
     );
 }
 
+/**
+ * What one event is, said in full: what it is, and what this one is set to -
+ * how long, where it happens, what it takes to be ranked, when it will start on
+ * its own and what it gives away.
+ */
+function EventExplained({
+    preset,
+    settings
+}: {
+    preset: catalog.EventPreset;
+    settings: catalog.EventSettings | null;
+}) {
+    const info = catalog.KIND_INFO[preset.kind];
+    const facts: string[] = [
+        preset.kind === "trivia"
+            ? `${(preset.options as catalog.EventOptions<"trivia">).rounds} rounds of ${(preset.options as catalog.EventOptions<"trivia">).seconds} seconds.`
+            : `Lasts ${preset.minutes} minutes.`
+    ];
+    if (preset.kind === "happy-hour") {
+        const options = preset.options as catalog.EventOptions<"happy-hour">;
+        const effects = [
+            options.haste && "Haste II (mining and digging faster)",
+            options.luck && "Luck (better fishing and chest loot)",
+            options.speed && "Speed (moving faster)",
+            options.regeneration && "Regeneration (health comes back on its own)"
+        ].filter(Boolean);
+        facts.push(`Everybody on gets ${effects.join(", ")} until it ends, including whoever joins meanwhile.`);
+    }
+    if (catalog.needsOverworld(preset)) facts.push("Happens in the Overworld; only players there take part.");
+    if (catalog.hasMinScore(preset)) {
+        facts.push(`Ranked from ${catalog.minScoreOf(preset)} ${info.unit}; below that, no podium and no prize.`);
+    }
+    if (settings) {
+        const needed = catalog.activeNeeded(preset, settings);
+        facts.push(
+            `Starts on its own only with ${needed} ${needed === 1 ? "player" : "players"} actually playing, and not while somebody is in a fight.`
+        );
+    }
+    if (info.competitive) {
+        const prizes = [
+            ["1st", preset.rewards.first],
+            ["2nd", preset.rewards.second],
+            ["3rd", preset.rewards.third],
+            ["taking part", preset.rewards.everyone]
+        ] as const;
+        const given = prizes.filter(([, reward]) => reward.items.length > 0 || reward.levels > 0);
+        facts.push(
+            given.length > 0
+                ? `Prizes - ${given.map(([place, reward]) => `${place}: ${rewardText(reward)}`).join("; ")}.`
+                : "No prizes set."
+        );
+    }
+    return (
+        <div className="mt-2 flex flex-col gap-1 rounded-md bg-muted/40 px-3 py-2 text-xs">
+            <p className="text-foreground">{info.summary}</p>
+            {facts.map((fact) => (
+                <p key={fact} className="text-muted-foreground">
+                    {fact}
+                </p>
+            ))}
+        </div>
+    );
+}
+
 export function MinecraftEvents({
     installedAppId,
     canManage
@@ -125,6 +189,15 @@ export function MinecraftEvents({
     const [draft, setDraft] = useState<catalog.EventsConfig | null>(() => view?.config ?? null);
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
+    /** The events whose explanation is open under their row. */
+    const [explained, setExplained] = useState<ReadonlySet<string>>(() => new Set());
+    const explain = (id: string) =>
+        setExplained((current) => {
+            const next = new Set(current);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
     const [editing, setEditing] = useState<{ preset: catalog.EventPreset; isNew: boolean } | null>(
         null
     );
@@ -435,10 +508,8 @@ export function MinecraftEvents({
                     ) : (
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                             {presets.map((preset) => (
-                                <li
-                                    key={preset.id}
-                                    className="flex flex-wrap items-center gap-3 px-3 py-2"
-                                >
+                                <li key={preset.id} className="flex flex-col px-3 py-2">
+                                <div className="flex flex-wrap items-center gap-3">
                                     <div className="min-w-0 flex-1">
                                         <p
                                             className="truncate text-sm font-medium"
@@ -470,6 +541,16 @@ export function MinecraftEvents({
                                         }
                                     />
                                     <div className="flex items-center gap-1">
+                                        <ui.Button
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label={`What ${preset.name} is`}
+                                            title={`What ${preset.name} is`}
+                                            aria-expanded={explained.has(preset.id)}
+                                            onClick={() => explain(preset.id)}
+                                        >
+                                            <Info className="size-4" />
+                                        </ui.Button>
                                         <ui.Button
                                             variant="ghost"
                                             size="icon-sm"
@@ -528,6 +609,10 @@ export function MinecraftEvents({
                                             <Trash2 className="size-4" />
                                         </ui.Button>
                                     </div>
+                                </div>
+                                {explained.has(preset.id) && (
+                                    <EventExplained preset={preset} settings={settings ?? null} />
+                                )}
                                 </li>
                             ))}
                         </ul>

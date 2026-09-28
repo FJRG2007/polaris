@@ -82,6 +82,17 @@ afterEach(() => {
 });
 
 describe("the Events tab", () => {
+    it("explains an event from its row", async () => {
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({ view });
+        await waitFor(() => expect(screen.getByLabelText("What Fishing contest is")).toBeTruthy());
+        expect(screen.queryByText(/Most catches with a fishing rod wins/)).toBeNull();
+        fireEvent.click(screen.getByLabelText("What Fishing contest is"));
+        expect(screen.getByText(/Most catches with a fishing rod wins/)).toBeTruthy();
+        expect(screen.getByText(/Ranked from 3 catches/)).toBeTruthy();
+        expect(screen.getByText(/Prizes - 1st: 5 diamond, 15 levels/)).toBeTruthy();
+    });
+
     it("draws its sections before the server answers", () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         expect(screen.getByText("Now")).toBeTruthy();
