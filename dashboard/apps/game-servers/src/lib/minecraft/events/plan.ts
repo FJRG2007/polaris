@@ -9,6 +9,7 @@
 
 import { parseTime, zonedMoment } from "../schedule";
 import {
+    activeNeeded,
     runMinutes,
     type EventPreset,
     type EventSettings,
@@ -209,15 +210,20 @@ export function decideRandom(input: {
     if (input.running) {
         return { start: null, nextRandomAt: input.nextRandomAt, waiting: "Another event is on" };
     }
-    if (input.active < settings.minActive) {
+    // Only what this many players can start: a competition with prizes needs
+    // two at least, so one player alone can still get a happy hour but never a
+    // podium to themselves.
+    const startable = pool.filter((entry) => input.active >= activeNeeded(entry.preset, settings));
+    if (startable.length === 0) {
+        const needed = Math.min(...pool.map((entry) => activeNeeded(entry.preset, settings)));
         return {
             start: null,
             nextRandomAt: input.nextRandomAt,
-            waiting: `Waiting for ${settings.minActive} active ${settings.minActive === 1 ? "player" : "players"} (${input.active} now)`
+            waiting: `Waiting for ${needed} active ${needed === 1 ? "player" : "players"} (${input.active} now)`
         };
     }
-    const fresh = pool.filter((entry) => entry.preset.kind !== input.lastKind);
-    const choices = fresh.length > 0 ? fresh : pool;
+    const fresh = startable.filter((entry) => entry.preset.kind !== input.lastKind);
+    const choices = fresh.length > 0 ? fresh : startable;
     const total = choices.reduce((sum, entry) => sum + entry.weight, 0);
     let roll = random() * total;
     let chosen = choices[choices.length - 1]!.preset;

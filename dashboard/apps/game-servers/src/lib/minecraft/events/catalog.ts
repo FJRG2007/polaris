@@ -457,6 +457,31 @@ export function readEventsConfig(config: Record<string, unknown>, timezone = "UT
 
 /** How long an event of this preset really runs: a trivia game runs for its
  *  rounds, whatever the minutes say. */
+/**
+ * Whether an event hands out anything: a competition with at least one prize
+ * that is not empty.
+ */
+export function awardsPrizes(preset: EventPreset): boolean {
+    if (!KIND_INFO[preset.kind].competitive) return false;
+    const { first, second, third, everyone } = preset.rewards;
+    return [first, second, third, everyone].some((reward) => reward.items.length > 0 || reward.levels > 0);
+}
+
+/**
+ * The fewest players who must actually be playing for an event to start on its
+ * own.
+ *
+ * Never fewer than two for a competition with prizes, whatever the setting says:
+ * one player alone, or one playing beside a row of idle ones, would win it
+ * uncontested - a prize for being the only one there, handed out again at every
+ * draw, which is what farming a server's events looks like.
+ */
+export const PRIZE_COMPETITION_FLOOR = 2;
+
+export function activeNeeded(preset: EventPreset, settings: EventSettings): number {
+    return awardsPrizes(preset) ? Math.max(settings.minActive, PRIZE_COMPETITION_FLOOR) : settings.minActive;
+}
+
 export function runMinutes(preset: EventPreset): number {
     if (preset.kind === "trivia") {
         const options = preset.options as EventOptions<"trivia">;

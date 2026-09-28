@@ -362,3 +362,60 @@ describe("the podium and the prizes", () => {
         ]);
     });
 });
+
+describe("a competition with prizes, on its own", () => {
+    const fishing = { ...catalog.newPreset("fishing", "fish"), minutes: 10 };
+    const happy = { ...catalog.newPreset("happy-hour", "happy"), minutes: 10 };
+    const unrewarded = {
+        ...catalog.newPreset("mining-rush", "free"),
+        rewards: { first: catalog.NO_REWARD, second: catalog.NO_REWARD, third: catalog.NO_REWARD, everyone: catalog.NO_REWARD }
+    };
+    const loose = settings({ minActive: 1 });
+
+    it("needs two players playing, whatever the minimum says", () => {
+        expect(catalog.awardsPrizes(fishing)).toBe(true);
+        expect(catalog.activeNeeded(fishing, loose)).toBe(2);
+        expect(catalog.activeNeeded(fishing, settings({ minActive: 4 }))).toBe(4);
+    });
+
+    it("does not hold back what hands nothing out", () => {
+        expect(catalog.awardsPrizes(happy)).toBe(false);
+        expect(catalog.awardsPrizes(unrewarded)).toBe(false);
+        expect(catalog.activeNeeded(happy, loose)).toBe(1);
+        expect(catalog.activeNeeded(unrewarded, loose)).toBe(1);
+    });
+
+    it("is left out of the draw for one player alone, who still gets the rest", () => {
+        const draw = {
+            ...loose,
+            random: { ...loose.random, enabled: true, from: "00:00", to: "00:00", pool: [{ presetId: "fish", weight: 9 }, { presetId: "happy", weight: 1 }] }
+        };
+        const decided = plan.decideRandom({
+            settings: draw,
+            presets: [fishing, happy],
+            nextRandomAt: at("20:00"),
+            lastKind: null,
+            running: false,
+            active: 1,
+            now: at("20:00"),
+            random: always(0)
+        });
+        expect(decided.start?.id).toBe("happy");
+    });
+
+    it("waits, and says for how many, when it is all the draw has", () => {
+        const draw = { ...loose, random: { ...loose.random, enabled: true, from: "00:00", to: "00:00", pool: [{ presetId: "fish", weight: 1 }] } };
+        const decided = plan.decideRandom({
+            settings: draw,
+            presets: [fishing],
+            nextRandomAt: at("20:00"),
+            lastKind: null,
+            running: false,
+            active: 1,
+            now: at("20:00"),
+            random: always(0)
+        });
+        expect(decided.start).toBeNull();
+        expect(decided.waiting).toBe("Waiting for 2 active players (1 now)");
+    });
+});

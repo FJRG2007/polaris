@@ -289,10 +289,9 @@ export async function startEvent(input: {
     // The minimum is for events that start on their own. An operator who
     // presses Run has looked at who is on and decided.
     const active = plan.activePlayers(seen, config.settings.afkMinutes, Date.now()).length;
-    if (input.trigger !== "manual" && active < config.settings.minActive) {
-        throw new Error(
-            `Only ${active} of the ${seen.size} players on are active; this event waits for ${config.settings.minActive}`
-        );
+    const needed = catalog.activeNeeded(preset, config.settings);
+    if (input.trigger !== "manual" && active < needed) {
+        throw new Error(`Only ${active} of the ${seen.size} players on are active; this event waits for ${needed}`);
     }
 
     const now = Date.now();
@@ -1458,13 +1457,9 @@ async function sweepOne(
         }));
         const preset = settings.presets.find((one) => one.id === entry.presetId);
         if (!preset) continue;
-        if (active < settings.settings.minActive) {
-            await skip(
-                installedAppId,
-                preset,
-                "scheduled",
-                `Skipped: ${active} active of the ${settings.settings.minActive} it waits for`
-            );
+        const needed = catalog.activeNeeded(preset, settings.settings);
+        if (active < needed) {
+            await skip(installedAppId, preset, "scheduled", `Skipped: ${active} active of the ${needed} it waits for`);
             continue;
         }
         try {
