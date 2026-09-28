@@ -9,16 +9,28 @@
  */
 
 import { z } from "zod";
+import { runningPrograms } from "./game-detect";
 import { closeNotice, showNotice } from "./notices";
 import { isServerUrl, serverPath } from "./navigation";
 import { FolderRefusal, zipFolder } from "./folder-zip";
 import { cancelApiKey, keyFormState, submitApiKey } from "./key-flow";
 import { kindOf, openPolarisWindow, type WindowKind } from "./windows";
-import { CHANNELS, type Outcome, type PickedFolder } from "@/shared/bridge";
+import {
+    CHANNELS,
+    type CustomGameInput,
+    type GameActivity,
+    type Outcome,
+    type PickedFolder
+} from "@/shared/bridge";
 import { openPush, pushOf, pushTargetSchema, type PushHost } from "./push-local";
-import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from "electron";
+import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebContents } from "electron";
 
 export interface IpcHost extends PushHost {
+    /** The game running now, as the watcher last saw it. */
+    readonly runningGame: () => GameActivity | null;
+    /** Whether this page is the main window's, which is the one that reports. */
+    readonly isReporter: (sender: WebContents) => boolean;
+    readonly setCustomGames: (games: readonly CustomGameInput[]) => void;
     /** The address form's state: the address in use and why it failed to open. */
     readonly connectState: () => { address: string | null; error: string | null; };
     readonly connectSubmit: (raw: unknown) => Promise<Outcome>;
@@ -37,6 +49,20 @@ const noticeSchema = z.object({
         .max(2)
         .optional()
 });
+
+/** A control character, or a character a path is built from. */
+const UNPRINTABLE = /[\u0000-\u001f\u007f/\\]/;
+
+/** The programs a page may say are games. The same limits the dashboard keeps,
+ *  so a page cannot hand this more than it would ever store. */
+const customGamesSchema = z
+    .array(
+        z.object({
+            executable: z.string().trim().min(1).max(120).refine((value) => !UNPRINTABLE.test(value)),
+            name: z.string().trim().min(1).max(100)
+        })
+    )
+    .max(100);
 
 const windowSchema = z.object({
     path: z.string().min(1).max(2048),
@@ -168,6 +194,27 @@ export function registerIpc(host: IpcHost): void {
         opened.set(url, window);
         window.on("closed", () => opened.delete(url));
         return { ok: true };
+    });
+
+    ipcMain.handle(CHANNELS.gameCurrent, (event) => {
+        if (!fromPolaris(event)) return { game: null, reporter: false };
+        return { game: host.runningGame(), reporter: host.isReporter(event.sender) };
+    });
+
+    ipcMain.handle(CHANNELS.gameCustom, (event, raw: unknown): boolean => {
+        if (!fromPolaris(event)) return false;
+        const games = customGamesSchema.safeParse(raw);
+        if (!games.success) return false;
+        host.setCustomGames(games.data);
+        return true;
+    });
+
+    // The names only, deduplicated and sorted, and only to the page that asked:
+    // somebody pressed "choose from what is running" to add a game.
+    ipcMain.handle(CHANNELS.gamePrograms, async (event): Promise<string[]> => {
+        if (!fromPolaris(event)) return [];
+        const names = await runningPrograms().catch(() => [] as string[]);
+        return [...new Set(names)].sort((a, b) => a.localeCompare(b)).slice(0, 2000);
     });
 
     ipcMain.handle(CHANNELS.connectState, (event) => (from(event, "connect") ? host.connectState() : null));

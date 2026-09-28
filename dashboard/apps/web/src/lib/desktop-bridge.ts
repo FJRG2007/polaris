@@ -56,6 +56,26 @@ export interface PolarisDesktop {
         readonly href?: string;
     }): Promise<DesktopOutcome>;
     openWindow(input: { readonly path: string; readonly title: string }): Promise<DesktopOutcome>;
+    /** The game running on the computer, and whether this window is the one that
+     *  reports it. Absent from an app older than game detection, which then
+     *  reports nothing. */
+    gameActivity?(): Promise<{ readonly game: DesktopGame | null; readonly reporter: boolean }>;
+    /** Hear a game start, stop, or still run (every minute). Only the app's main
+     *  window hears it. */
+    onGameActivity?(listener: (game: DesktopGame | null) => void): () => void;
+    /** Hand the app the programs this account added as games. */
+    setCustomGames?(
+        games: readonly { readonly executable: string; readonly name: string }[]
+    ): Promise<boolean>;
+    /** The programs running now, for picking one to add as a game. */
+    runningPrograms?(): Promise<readonly string[]>;
+}
+
+/** A game the desktop app saw running, as it reports it. */
+export interface DesktopGame {
+    readonly key: string;
+    readonly name: string;
+    readonly startedAt: string;
 }
 
 const METHODS = ["notify", "closeNotice", "pickFolder", "pushLocal", "openWindow"] as const;

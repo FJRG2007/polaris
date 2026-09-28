@@ -15,6 +15,7 @@ import * as core from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { reportGame } from "@/lib/presence-activity/service";
+import { activitySettingsOf } from "@/lib/presence-activity/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,20 @@ export const dynamic = "force-dynamic";
  *  minute is already far past anybody switching games. */
 const REPORT_LIMIT = 20;
 const REPORT_WINDOW_MS = 60_000;
+
+/**
+ * The programs this account said are games, for the desktop app to look for.
+ * Only the account's own list, and only its own account's.
+ */
+export async function GET(): Promise<Response> {
+    const user = await apiUser();
+    if (user instanceof Response) return user;
+    const { settings } = await activitySettingsOf(user.id);
+    return Response.json(
+        { customGames: settings.customGames },
+        { headers: { "Cache-Control": "private, no-store" } }
+    );
+}
 
 export async function POST(request: Request): Promise<Response> {
     const user = await apiUser();

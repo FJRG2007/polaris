@@ -11,6 +11,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import {
     CHANNELS,
     VERSION_ARGUMENT,
+    type GameActivity,
     type NoticeAction,
     type NoticeReply,
     type PolarisDesktop
@@ -39,7 +40,17 @@ const bridge: PolarisDesktop = {
     },
     pickFolder: () => ipcRenderer.invoke(CHANNELS.pickFolder),
     pushLocal: (input) => ipcRenderer.invoke(CHANNELS.pushLocal, input),
-    openWindow: (input) => ipcRenderer.invoke(CHANNELS.openWindow, input)
+    openWindow: (input) => ipcRenderer.invoke(CHANNELS.openWindow, input),
+    gameActivity: () => ipcRenderer.invoke(CHANNELS.gameCurrent),
+    onGameActivity: (listener) => {
+        const heard = (_event: unknown, game: GameActivity | null) => listener(game);
+        ipcRenderer.on(CHANNELS.gameActivity, heard);
+        return () => {
+            ipcRenderer.removeListener(CHANNELS.gameActivity, heard);
+        };
+    },
+    setCustomGames: (games) => ipcRenderer.invoke(CHANNELS.gameCustom, games),
+    runningPrograms: () => ipcRenderer.invoke(CHANNELS.gamePrograms)
 };
 
 contextBridge.exposeInMainWorld("polarisDesktop", bridge);

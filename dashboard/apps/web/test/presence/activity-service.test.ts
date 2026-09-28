@@ -176,10 +176,11 @@ describe("a report from the desktop app", () => {
         });
     });
 
-    it("stores nothing with games switched off", async () => {
+    it("stores nothing with games switched off, not even that it was seen", async () => {
         fake.settings.set("ada", { ...defaults(), games: false });
         expect((await reportGame("ada", game("celeste.exe", "Celeste"), NOW)).reason).toBe("off");
         expect(fake.rows).toHaveLength(0);
+        expect(fake.settings.get("ada")?.seenGames).toBe("[]");
     });
 
     it("takes the card down when nothing is running, and says so", async () => {

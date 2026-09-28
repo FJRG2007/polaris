@@ -15,9 +15,11 @@
 
 import { useRef, useState } from "react";
 import * as core from "@polaris/core";
+import { Plus, X } from "lucide-react";
 import { runAction } from "@/lib/run-action";
-import { Card, CardBody, Switch } from "@polaris/ui";
 import { saveActivitySettingsAction } from "./actions";
+import { useDesktopBridge } from "@/components/desktop-app";
+import { Button, Card, CardBody, Input, Switch } from "@polaris/ui";
 
 /** A source's row: what it is and what it needs to work. */
 const SOURCES: readonly { id: "games" | "minecraft"; label: string; hint: string }[] = [
@@ -54,6 +56,7 @@ export function ActivitySharingCard({
     const savedRef = useRef(settings);
     const queue = useRef<Promise<void>>(Promise.resolve());
     const nextId = useRef(0);
+    const bridge = useDesktopBridge();
     const draft = pending.reduce((state, entry) => entry.change(state), saved);
 
     /** Draw it now, save it after any earlier switch, and drop only this one if the save is refused. */
@@ -67,6 +70,11 @@ export function ActivitySharingCard({
             if (!same(next, savedRef.current)) {
                 const result = await runAction(() => saveActivitySettingsAction(next), setError);
                 if (result && !result.error) {
+                    // The desktop app this page is open in looks for a changed
+                    // list at once, rather than the next time it is started.
+                    if (!same({ ...next, customGames: savedRef.current.customGames }, next)) {
+                        void bridge?.setCustomGames?.(next.customGames);
+                    }
                     savedRef.current = next;
                     setSaved(next);
                 } else if (result?.error) setError(result.error);
@@ -176,6 +184,27 @@ export function ActivitySharingCard({
                     )}
                 </section>
 
+                <OwnGames
+                    games={draft.customGames}
+                    disabled={off || !draft.games}
+                    runningPrograms={bridge?.runningPrograms ? () => bridge.runningPrograms!() : null}
+                    onAdd={(game) =>
+                        commit((state) => ({
+                            ...state,
+                            customGames: [
+                                ...state.customGames.filter((entry) => entry.executable !== game.executable),
+                                game
+                            ]
+                        }))
+                    }
+                    onRemove={(executable) =>
+                        commit((state) => ({
+                            ...state,
+                            customGames: state.customGames.filter((entry) => entry.executable !== executable)
+                        }))
+                    }
+                />
+
                 {error && (
                     <p role="alert" className="text-sm text-danger">
                         {error}
@@ -183,5 +212,157 @@ export function ActivitySharingCard({
                 )}
             </CardBody>
         </Card>
+    );
+}
+
+/**
+ * Programs this account says are games, beyond the ones the desktop app knows.
+ *
+ * Keyed by the program's own name, the way the app sees it. Inside the desktop
+ * app the running programs can be listed to pick from, since the name of the
+ * program behind a game is rarely what anybody would guess; in a browser there
+ * is no such list and the name is typed.
+ */
+function OwnGames({
+    games,
+    disabled,
+    runningPrograms,
+    onAdd,
+    onRemove
+}: {
+    games: readonly core.CustomGame[];
+    disabled: boolean;
+    /** Lists what is running, inside the desktop app; null in a browser. */
+    runningPrograms: (() => Promise<readonly string[]>) | null;
+    onAdd: (game: core.CustomGame) => void;
+    onRemove: (executable: string) => void;
+}) {
+    const [program, setProgram] = useState("");
+    const [name, setName] = useState("");
+    const [running, setRunning] = useState<readonly string[] | null>(null);
+
+    // Checked as it is typed, against the same rules the server keeps. An empty
+    // field is not wrong yet, only unfinished.
+    const candidate = core.customGameSchema.safeParse({ executable: program, name });
+    const taken = candidate.success && games.some((game) => game.executable === candidate.data.executable);
+    const problem =
+        program.trim() && name.trim()
+            ? taken
+                ? "That program is already on the list."
+                : candidate.success
+                  ? ""
+                  : (candidate.error.issues[0]?.message ?? "Check the program and the name.")
+            : "";
+    const ready = candidate.success && !taken && games.length < core.MOST_CUSTOM_GAMES;
+
+    // Drawn on the list at once, like every switch on this card; a refused save
+    // takes it off again and says why under the card.
+    const add = () => {
+        if (!candidate.success || !ready) return;
+        onAdd(candidate.data);
+        setProgram("");
+        setName("");
+    };
+
+    return (
+        <section className="flex flex-col gap-1.5">
+            <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                Your own games
+            </h3>
+            <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+                A game the desktop app does not know yet: the program that runs it, and what to
+                call it.
+            </p>
+            {games.length > 0 && (
+                <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
+                    {games.map((game) => (
+                        <li key={game.executable} className="flex items-center gap-3 px-3 py-2">
+                            <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[0.8125rem]" title={game.name}>
+                                    {game.name}
+                                </span>
+                                <span
+                                    className="block truncate text-[0.6875rem] text-foreground-subtle"
+                                    title={game.executable}
+                                >
+                                    {game.executable}
+                                </span>
+                            </span>
+                            <button
+                                type="button"
+                                disabled={disabled}
+                                aria-label={`Remove ${game.name}`}
+                                title={`Remove ${game.name}`}
+                                onClick={() => onRemove(game.executable)}
+                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                            >
+                                <X className="size-3.5 shrink-0" />
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            <div className="flex flex-wrap items-end gap-2">
+                <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[0.6875rem] text-muted-foreground">
+                    Program
+                    <Input
+                        value={program}
+                        onChange={(event) => setProgram(event.target.value)}
+                        placeholder="mygame.exe"
+                        disabled={disabled}
+                        className="h-8 text-xs"
+                    />
+                </label>
+                <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[0.6875rem] text-muted-foreground">
+                    Name
+                    <Input
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        placeholder="My game"
+                        disabled={disabled}
+                        className="h-8 text-xs"
+                    />
+                </label>
+                <Button size="sm" onClick={add} disabled={disabled || !ready}>
+                    <Plus className="size-4 shrink-0" />
+                    Add
+                </Button>
+            </div>
+            {problem ? <p className="text-[0.6875rem] text-danger">{problem}</p> : null}
+            {runningPrograms ? (
+                running ? (
+                    <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
+                        {running.length === 0 ? (
+                            <span className="text-[0.6875rem] text-muted-foreground">Nothing could be listed.</span>
+                        ) : (
+                            running.map((entry) => (
+                                <button
+                                    key={entry}
+                                    type="button"
+                                    onClick={() => setProgram(entry)}
+                                    className="max-w-[14rem] truncate rounded-full bg-muted px-2 py-0.5 text-[0.6875rem] transition-colors hover:bg-card-hover"
+                                    title={entry}
+                                >
+                                    {entry}
+                                </button>
+                            ))
+                        )}
+                    </div>
+                ) : (
+                    <button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() =>
+                            void runningPrograms()
+                                .then(setRunning)
+                                .catch(() => setRunning([]))
+                        }
+                        className="self-start rounded text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:opacity-50"
+                    >
+                        Choose from what is running on this computer
+                    </button>
+                )
+            ) : null}
+        </section>
     );
 }
