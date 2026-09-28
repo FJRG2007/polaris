@@ -45,6 +45,10 @@ interface World {
     renamedRules: boolean;
     /** Whether the ground under a place is somebody's build. */
     built: boolean;
+    /** Ground names the server does not know. */
+    refusedGround: string[];
+    /** How many ground checks answer that the column is not loaded before any answers. */
+    unsureGround: number;
     /** Where players online sleep: `Name: [x, z]`. */
     homes: Record<string, [number, number]>;
 }
@@ -71,6 +75,8 @@ const world: World = {
     daylightCycle: "true",
     renamedRules: false,
     built: false,
+    refusedGround: [],
+    unsureGround: 0,
     homes: {}
 };
 let config: Record<string, unknown> = {};
@@ -84,6 +90,12 @@ let step = 0;
 function answer(line: string): string {
     world.sent.push(line);
     if (line.startsWith("execute in minecraft:overworld unless block")) {
+        const refused = world.refusedGround.find((id) => line.includes(`minecraft:${id} `) || line.endsWith(`minecraft:${id}`));
+        if (refused) return `Unknown block type 'minecraft:${refused}'`;
+        if (world.unsureGround > 0) {
+            world.unsureGround -= 1;
+            return "That position is not loaded";
+        }
         return world.built ? "Test passed" : "Test failed";
     }
     if (line === "execute as @a run data get entity @s SpawnX" || line === "execute as @a run data get entity @s SpawnZ") {
@@ -343,6 +355,8 @@ beforeEach(() => {
     world.daylightCycle = "true";
     world.renamedRules = false;
     world.built = false;
+    world.refusedGround = [];
+    world.unsureGround = 0;
     world.homes = {};
     events.forgetPlayers();
     held.length = 0;
@@ -906,6 +920,28 @@ describe("the others", () => {
 
     it("gives up a place on somebody's build and says it could not find one", async () => {
         world.built = true;
+        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        setUp([hill]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await play(60_000);
+        expect(world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))).toBe(false);
+        expect(state().history[0]?.outcome).toBe("failed");
+    });
+
+    it("judges the ground by older names on a server that refuses the newest", async () => {
+        world.built = true;
+        world.refusedGround = ["leaf_litter"];
+        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        setUp([hill]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await play(60_000);
+        expect(world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))).toBe(false);
+        expect(state().history[0]?.outcome).toBe("failed");
+    });
+
+    it("keeps judging the ground after a column that could not be read", async () => {
+        world.built = true;
+        world.unsureGround = 2;
         const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
         await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });

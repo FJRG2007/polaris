@@ -9,6 +9,7 @@ import * as catalog from "@polaris-app/game-servers/src/lib/minecraft/events/cat
 import * as commands from "@polaris-app/game-servers/src/lib/minecraft/events/commands";
 import * as messages from "@polaris-app/game-servers/src/lib/minecraft/events/messages";
 import * as trivia from "@polaris-app/game-servers/src/lib/minecraft/events/trivia-bank";
+import { COMMAND_BYTES_MAX, commandBytes } from "@polaris-app/game-servers/src/lib/minecraft/command-size";
 import {
     atLeast,
     firstRight
@@ -369,14 +370,39 @@ describe("where an event may go", () => {
     });
 
     it("asks about the ground under a point by the names the server knows", () => {
-        const modern = commands.builtUnder({ x: 1, y: 70, z: 2 }, "modern");
+        const far = { x: -29999999, y: -63, z: -29999999 };
+        for (const names of commands.GROUND_NAMES) {
+            for (const line of commands.builtUnder(far, names)) {
+                expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
+                expect(line.startsWith("execute in minecraft:overworld unless block ")).toBe(true);
+            }
+        }
+        const modern = commands.builtUnder({ x: 1, y: 70, z: 2 }, "modern").join(" ");
         expect(modern.startsWith("execute in minecraft:overworld unless block 1 69 2 minecraft:grass_block")).toBe(true);
         expect(modern).toContain("minecraft:short_grass");
-        expect(modern).toContain("#minecraft:flowers");
+        expect(modern).toContain("#minecraft:small_flowers");
+        expect(modern).not.toContain("#minecraft:flowers");
         expect(modern).not.toContain("leaves");
-        const legacy = commands.builtUnder({ x: 1, y: 70, z: 2 }, "legacy");
+        expect(modern).not.toContain("leaf_litter");
+        const latest = commands.builtUnder({ x: 1, y: 70, z: 2 }, "latest").join(" ");
+        expect(latest).toContain("minecraft:leaf_litter");
+        expect(latest).toContain("minecraft:short_dry_grass");
+        const legacy = commands.builtUnder({ x: 1, y: 70, z: 2 }, "legacy").join(" ");
         expect(legacy).toContain("unless block 1 69 2 minecraft:grass ");
         expect(legacy).not.toContain("short_grass");
+    });
+
+    it("tells a refused block name apart from a column that could not be read", () => {
+        expect(commands.nameRefused("Unknown block type 'minecraft:leaf_litter'...ck 1 69 2 minecraft:leaf_litter<--[HERE]")).toBe(true);
+        expect(commands.nameRefused("That position is not loaded")).toBe(false);
+        expect(commands.nameRefused("")).toBe(false);
+    });
+
+    it("counts somebody in the circle only where the circle scores them", () => {
+        const centre = { x: 0, y: 64, z: 0 };
+        expect(commands.inHill({ x: 3.5, y: 64, z: 0.5 }, centre, 4)).toBe(true);
+        expect(commands.inHill({ x: 3.5, y: 68, z: 0.5 }, centre, 4)).toBe(false);
+        expect(commands.inHill({ x: 5.5, y: 64, z: 0.5 }, centre, 4)).toBe(false);
     });
 
     it("judges a place by its centre and two rings", () => {

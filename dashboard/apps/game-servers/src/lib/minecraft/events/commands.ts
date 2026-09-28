@@ -14,6 +14,7 @@
 
 import { stripFormatting } from "../parse";
 import { javaComponent } from "../announcement";
+import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 import type { EventKind, EventOptions, EventPreset } from "./catalog";
 
 export const SCORE = "pe_score";
@@ -558,11 +559,14 @@ export function clearPoint(
  * Ground nobody built: what the world generates on its surface, the plants that
  * grow on it, and snow. Anything else under an event - planks, bricks, glass, a
  * farm, a path, a roof - is somebody's, and the place is given up. So are leaves:
- * the top of a tree is not somewhere anybody walks to.
+ * the top of a tree is not somewhere anybody walks to, which is why the flowers
+ * are the small ones and the tall ones by name - `#minecraft:flowers` counts
+ * cherry and flowering azalea leaves among them.
  *
- * Two lists, because the names moved: `short_grass` was `grass` before 1.20.3,
- * and a name a server does not know fails the whole check. The newer list is
- * tried first and the older one where that fails.
+ * Three lists, because the names moved: `short_grass` was `grass` before 1.20.3,
+ * the dry grasses and leaf litter only grow from 1.21.5, and a name a server does
+ * not know fails the whole check. The newest list is tried first, and the next
+ * older one wherever a name is refused.
  */
 const GROUND_LEGACY = [
     "grass_block",
@@ -591,10 +595,17 @@ const GROUND_LEGACY = [
     "light_gray_terracotta",
     "ice",
     "packed_ice",
+    "blue_ice",
     "tall_grass",
     "fern",
     "large_fern",
     "dead_bush",
+    "cactus",
+    "sugar_cane",
+    "pumpkin",
+    "melon",
+    "brown_mushroom",
+    "red_mushroom",
     "grass",
     "dandelion",
     "poppy"
@@ -602,30 +613,78 @@ const GROUND_LEGACY = [
 const GROUND_MODERN = [
     ...GROUND_LEGACY.filter((id) => !["grass", "dandelion", "poppy"].includes(id)),
     "short_grass",
-    "#minecraft:flowers",
+    "#minecraft:small_flowers",
+    "sunflower",
+    "lilac",
+    "rose_bush",
+    "peony",
+    "pink_petals",
     "sweet_berry_bush",
+    "bamboo",
+    "azalea",
+    "flowering_azalea",
     "moss_block",
     "moss_carpet",
     "rooted_dirt",
     "mud",
+    "mangrove_roots",
+    "muddy_mangrove_roots",
+    "pointed_dripstone",
     "calcite",
     "tuff",
     "powder_snow"
 ];
+const GROUND_LATEST = [
+    ...GROUND_MODERN,
+    "leaf_litter",
+    "short_dry_grass",
+    "tall_dry_grass",
+    "bush",
+    "firefly_bush",
+    "wildflowers",
+    "cactus_flower"
+];
 
-export type GroundNames = "modern" | "legacy";
+/** The lists of ground names, newest first: the order they are tried in. */
+export const GROUND_NAMES = ["latest", "modern", "legacy"] as const;
+
+export type GroundNames = (typeof GROUND_NAMES)[number];
+
+const GROUND: Readonly<Record<GroundNames, readonly string[]>> = {
+    latest: GROUND_LATEST,
+    modern: GROUND_MODERN,
+    legacy: GROUND_LEGACY
+};
 
 /**
- * Whether what is under a point is somebody's rather than the world's:
- * `Test passed` when it is none of the ground above.
+ * Whether what is under a point is somebody's rather than the world's, asked in
+ * as many commands as it takes to keep each one short enough to arrive: it is
+ * somebody's when every one of them answers `Test passed`, and the world's as
+ * soon as one answers `Test failed`.
  */
-export function builtUnder(point: { x: number; y: number; z: number }, names: GroundNames): string {
+export function builtUnder(
+    point: { x: number; y: number; z: number },
+    names: GroundNames
+): string[] {
     const at = `${point.x} ${point.y - 1} ${point.z}`;
-    const ids = names === "modern" ? GROUND_MODERN : GROUND_LEGACY;
-    const checks = ids
-        .map((id) => `unless block ${at} ${id.startsWith("#") ? id : `minecraft:${id}`}`)
-        .join(" ");
-    return `execute in minecraft:overworld ${checks}`;
+    const prefix = "execute in minecraft:overworld";
+    const lines: string[] = [];
+    let line = prefix;
+    for (const id of GROUND[names]) {
+        const check = ` unless block ${at} ${id.startsWith("#") ? id : `minecraft:${id}`}`;
+        if (line !== prefix && commandBytes(line + check) > COMMAND_BYTES_MAX) {
+            lines.push(line);
+            line = prefix;
+        }
+        line += check;
+    }
+    lines.push(line);
+    return lines;
+}
+
+/** Whether the game refused a block name it does not know, rather than answering. */
+export function nameRefused(output: string): boolean {
+    return /unknown block|<--\[HERE\]/i.test(output);
 }
 
 /** The columns a place is judged by: its centre, and rings at its edge and halfway in. */
@@ -968,6 +1027,18 @@ export function hillTick(
         `execute in minecraft:overworld run particle minecraft:end_rod ${cx} ${point.y + 16} ${cz} 0 16 0 0.01 120 force`,
         `execute in minecraft:overworld positioned ${cx} ${point.y} ${cz} as @a[distance=..${radius},gamemode=!spectator] run scoreboard players add @s ${SCORE} ${seconds}`
     ];
+}
+
+/** Whether somebody stands inside the circle, measured as `hillTick` scores it. */
+export function inHill(
+    where: { x: number; y: number; z: number },
+    point: { x: number; y: number; z: number },
+    radius: number
+): boolean {
+    return (
+        Math.hypot(where.x - (point.x + 0.5), where.y - point.y, where.z - (point.z + 0.5)) <=
+        radius
+    );
 }
 
 /** The eight ways a player can be told to go. North is -Z in this game. */

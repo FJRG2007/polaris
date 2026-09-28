@@ -69,7 +69,7 @@ interface Loop {
     /** Trivia: how long the log was when the round was asked. */
     logFrom: number | null;
     /** Which names this server knows its ground blocks by, once asked; `none`
-     *  when it answers to neither list and the ground cannot be judged. */
+     *  when it refuses a name in every list and the ground cannot be judged. */
     ground: commands.GroundNames | "none" | null;
     /** The countdown marks already sounded, in seconds before the start. */
     sounded: Set<number>;
@@ -865,26 +865,45 @@ async function siteIsOpen(
     return open;
 }
 
-/** Whether a column stands on something somebody built. Null when the server
- *  answers to neither list of ground names, and so cannot be asked. */
+/**
+ * Whether a column stands on something somebody built. Null when the server
+ * refuses a name in every list of ground names, and so cannot be asked. An
+ * answer that is neither - a column not loaded yet, a reply that never came -
+ * counts as built, so the place is given up rather than guessed at, and nothing
+ * about the server's names is taken from it.
+ */
 async function builtOn(
     loop: Loop,
     server: ServerContainer,
     point: stored.Point
 ): Promise<boolean | null> {
-    const ask = async (names: commands.GroundNames) =>
-        commands.readTest(await server.say([commands.builtUnder(point, names)]));
-    if (loop.ground === "none") return null;
-    if (loop.ground) return (await ask(loop.ground)) === "passed";
-    for (const names of ["modern", "legacy"] as const) {
-        const answer = await ask(names);
-        if (answer === "passed" || answer === "failed") {
-            loop.ground = names;
-            return answer === "passed";
+    while (loop.ground !== "none") {
+        const names = loop.ground ?? commands.GROUND_NAMES[0];
+        const answer = await groundAnswer(server, point, names);
+        if (answer === "refused") {
+            loop.ground = commands.GROUND_NAMES[commands.GROUND_NAMES.indexOf(names) + 1] ?? "none";
+            continue;
         }
+        if (answer !== "passed" && answer !== "failed") return true;
+        loop.ground = names;
+        return answer === "passed";
     }
-    loop.ground = "none";
     return null;
+}
+
+/** One list of ground names asked about a column, a command at a time. */
+async function groundAnswer(
+    server: ServerContainer,
+    point: stored.Point,
+    names: commands.GroundNames
+): Promise<"passed" | "failed" | "refused" | "unsure"> {
+    for (const line of commands.builtUnder(point, names)) {
+        const output = await server.say([line]);
+        const answer = commands.readTest(output);
+        if (answer === "failed") return "failed";
+        if (answer !== "passed") return commands.nameRefused(output) ? "refused" : "unsure";
+    }
+    return "passed";
 }
 
 /** A place that was found and then would not take what was put there: undone,
@@ -1081,7 +1100,7 @@ async function kingOfTheHill(
         lines.push(
             commands.actionbarFor(
                 one.name,
-                away <= options.radius
+                commands.inHill(one, place, options.radius)
                     ? messages.hillInside(loop.language)
                     : messages.hillGuide(
                           Math.round(away),
