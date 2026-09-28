@@ -208,13 +208,41 @@ export function DevicesView({
         setReconnecting(null);
     };
 
+    // One dialog, in the same place in every branch below: it can be opened
+    // while the list is still being read, and a dialog that moved when the list
+    // arrived would be a new one - with whatever had been typed into it gone.
+    const connectDialog = (
+        <ConnectDialog
+            open={connecting || reconnecting !== null}
+            reconnect={reconnecting}
+            onClose={closeConnect}
+            onConnected={settleConnection}
+        />
+    );
+
+    // Still reading: the bar's own frame, with the button that connects
+    // something already live. Only the accounts and the devices wait, since they
+    // are what the read decides. "Check again" waits too - there is nothing yet
+    // to check again.
     if (devices === null) {
         return (
-            <div className="flex flex-col gap-3">
-                <Skeleton className="h-9 w-48" />
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-            </div>
+            <>
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Skeleton className="h-8 w-48" />
+                        <span className="flex-1" />
+                        {canManage && (
+                            <Button size="sm" onClick={() => setConnecting(true)}>
+                                <Plus className="size-4 shrink-0" />
+                                Connect a device
+                            </Button>
+                        )}
+                    </div>
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                </div>
+                {connectDialog}
+            </>
         );
     }
 
@@ -237,17 +265,14 @@ export function DevicesView({
                         ) : undefined
                     }
                 />
-                <ConnectDialog
-                    open={connecting}
-                    reconnect={null}
-                    onClose={closeConnect}
-                    onConnected={settleConnection}
-                />
+                {connectDialog}
             </>
         );
     }
 
-    return (
+    // Held as a value so the dialog can sit beside it, where the two branches
+    // above put theirs.
+    const view = (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
                 {accounts.map((account) => (
@@ -456,13 +481,6 @@ export function DevicesView({
                 }}
             />
 
-            <ConnectDialog
-                open={connecting || reconnecting !== null}
-                reconnect={reconnecting}
-                onClose={closeConnect}
-                onConnected={settleConnection}
-            />
-
             <ConfirmDeleteDialog
                 open={disconnecting !== null}
                 onOpenChange={(open) => (open ? undefined : setDisconnecting(null))}
@@ -474,5 +492,12 @@ export function DevicesView({
                 onConfirm={disconnect}
             />
         </div>
+    );
+
+    return (
+        <>
+            {view}
+            {connectDialog}
+        </>
     );
 }

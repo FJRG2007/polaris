@@ -168,8 +168,9 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
         }
     };
 
-    if (people === null) return <Skeleton className="h-48 w-full" />;
-
+    // The button to add somebody is drawn at once; only the list waits for the
+    // read. The banner below starts hidden (`ready` is true until the read says
+    // otherwise), so nothing appears only to be taken back.
     return (
         <div className="flex flex-col gap-4">
             {!ready ? (
@@ -193,7 +194,9 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
 
             {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
 
-            {people.length === 0 ? (
+            {people === null ? (
+                <Skeleton className="h-48 w-full" />
+            ) : people.length === 0 ? (
                 <EmptyState
                     icon={<ScanFace />}
                     title="Nobody yet"

@@ -10,11 +10,12 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { log, findMany, serving, scaleService, recordDeployAudit, record, readEdgeLogWindow, cpu } = vi.hoisted(() => {
+const { log, findMany, inFlight, serving, scaleService, recordDeployAudit, record, readEdgeLogWindow, cpu } = vi.hoisted(() => {
     const log = { text: "", truncated: false };
     return {
         log,
         findMany: vi.fn(),
+        inFlight: vi.fn(async (): Promise<{ deployableId: string }[]> => []),
         serving: vi.fn(async (): Promise<{ id: string; replicas: number | null }[]> => []),
         scaleService: vi.fn(async () => undefined),
         recordDeployAudit: vi.fn(async () => undefined),
@@ -25,7 +26,7 @@ const { log, findMany, serving, scaleService, recordDeployAudit, record, readEdg
 });
 
 vi.mock("@polaris/db", () => ({
-    prisma: { application: { findMany }, deployment: { count: async () => 0, findMany: serving } }
+    prisma: { application: { findMany }, deployment: { groupBy: inFlight, findMany: serving } }
 }));
 vi.mock("@/lib/deploy/releases", () => ({
     servingContainerNames: async (apps: { id: string }[]) => new Map(apps.map((app) => [app.id, `${app.id}-web`]))
@@ -92,6 +93,7 @@ beforeEach(() => {
     cpu.percent = 5;
     log.truncated = false;
     serving.mockResolvedValue([]);
+    inFlight.mockResolvedValue([]);
 });
 
 describe("the autoscaler on traffic", () => {
@@ -191,5 +193,25 @@ describe("the autoscaler on traffic", () => {
         expect(recordDeployAudit).toHaveBeenCalledWith(
             expect.objectContaining({ metadata: expect.objectContaining({ from: 2, to: 3 }) })
         );
+    });
+});
+
+describe("a deploy on its way", () => {
+    it("leaves that service to it and still scales the others, from one read", async () => {
+        findMany.mockResolvedValue([
+            service("app-others", { min: 1, max: 4, cpuPercent: 50, requestsPerCopy: 100 }),
+            service("app-deploying", { min: 1, max: 4, cpuPercent: 50, requestsPerCopy: 100 })
+        ]);
+        inFlight.mockResolvedValue([{ deployableId: "app-deploying" }]);
+        let checked = 0;
+        for (let tick = 0; tick < 3; tick++) {
+            const at = NOW + tick * 60_000;
+            log.text = traffic(at, 250);
+            checked = (await runAutoscale(at)).checked;
+        }
+        expect(checked).toBe(1);
+        expect(inFlight).toHaveBeenCalledTimes(3);
+        expect(scaleService).toHaveBeenCalledWith("app-others", "owner-1", 3);
+        expect(scaleService).not.toHaveBeenCalledWith("app-deploying", expect.anything(), expect.anything());
     });
 });

@@ -10,8 +10,9 @@
  * have to wait on a round trip to find out where they moved a card to.
  *
  * The figures are the other way round: the grid draws its frames first and asks
- * for the numbers once it is on screen, in one request covering every card that
- * needs one. A card whose data has not landed shows the shape of its own
+ * for the numbers once it is on screen - the quick cards in one request and the
+ * slow ones in another, so a monitoring read never holds a task count back (see
+ * `request-groups`). A card whose data has not landed shows the shape of its own
  * contents, so the page does not move under the reader when it does.
  */
 
@@ -23,6 +24,7 @@ import { saveOverviewPreferencesAction } from "./actions";
 import { packOverviewSpans } from "@/lib/overview/pack";
 import { useShelfScope } from "@/components/shelf-scope";
 import { clearRecentPlaces } from "@/lib/overview/recent-places";
+import { overviewRequestGroups } from "@/lib/overview/request-groups";
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
 import type { OverviewData } from "@/lib/overview/overview-service";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -58,8 +60,9 @@ const DATA_TTL_MS = 30_000;
 const SAVE_DEBOUNCE_MS = 600;
 
 // Held outside the component so returning to the Overview paints the figures the
-// last visit already fetched.
-let dataCache: { at: number; key: string; data: OverviewData } | null = null;
+// last visit already fetched. One entry per request sent, keyed by the shelf and
+// the cards it asked for.
+const dataCache = new Map<string, { at: number; data: OverviewData }>();
 
 /**
  * How wide each stored size is drawn before the grid has been measured - the
@@ -105,7 +108,10 @@ export function OverviewGrid({
     const [widgets, setWidgets] = useState(layout);
     const [shortcuts, setShortcuts] = useState<OverviewShortcut[]>(preferences.shortcuts);
     const [greeting, setGreeting] = useState(preferences.greeting);
-    const [data, setData] = useState<OverviewData | undefined>(undefined);
+    const [data, setData] = useState<OverviewData>({});
+    // The cards whose figures are still on their way. Null before the first ask,
+    // which is every card.
+    const [pending, setPending] = useState<ReadonlySet<string> | null>(null);
     const [customizing, setCustomizing] = useState(false);
     const [picking, setPicking] = useState(false);
     // The card being dragged, and the one it is currently over. Dragging is the
@@ -233,7 +239,7 @@ export function OverviewGrid({
         persist({ widgets: resolveOverviewLayout({ ...preferences, widgets: [] }, available), shortcuts, greeting: true });
     }
 
-    // One request for every card that needs the server, re-run when the set of
+    // The requests for every card that needs the server, re-run when the set of
     // those cards changes rather than on every rearrangement.
     const wanted = useMemo(
         () =>
@@ -255,33 +261,55 @@ export function OverviewGrid({
     useEffect(() => {
         if (!asked) {
             setData({});
-            return;
-        }
-        if (nonce === 0 && dataCache && dataCache.key === key && Date.now() - dataCache.at < DATA_TTL_MS) {
-            setData(dataCache.data);
+            setPending(new Set());
             return;
         }
         const controller = new AbortController();
-        setData(undefined);
-        void fetch(`/api/overview?widgets=${encodeURIComponent(asked)}`, {
-            cache: "no-store",
-            signal: controller.signal
-        })
-            .then((response) => (response.ok ? response.json() : Promise.reject(new Error("read failed"))))
-            .then((body: OverviewData) => {
-                dataCache = { at: Date.now(), key, data: body };
-                setData(body);
-            })
-            .catch((caught: unknown) => {
-                if (caught instanceof DOMException && caught.name === "AbortError") return;
-                // Every card then says it could not be read, which is the truth.
-                setData({});
+        const kept: OverviewData = {};
+        const waiting = new Set<string>();
+        const sends: string[][] = [];
+        for (const group of overviewRequestGroups(asked.split(","))) {
+            const held = dataCache.get(`${on}|${group.join(",")}`);
+            if (nonce === 0 && held && Date.now() - held.at < DATA_TTL_MS) {
+                Object.assign(kept, held.data);
+            } else {
+                sends.push(group);
+                for (const id of group) waiting.add(id);
+            }
+        }
+        setData(kept);
+        setPending(waiting);
+        const landed = (group: readonly string[], body: OverviewData): void => {
+            setData((previous) => ({ ...previous, ...body }));
+            setPending((previous) => {
+                const next = new Set(previous);
+                for (const id of group) next.delete(id);
+                return next;
             });
+        };
+        for (const group of sends) {
+            const groupKey = `${on}|${group.join(",")}`;
+            void fetch(`/api/overview?widgets=${encodeURIComponent(group.join(","))}`, {
+                cache: "no-store",
+                signal: controller.signal
+            })
+                .then((response) => (response.ok ? response.json() : Promise.reject(new Error("read failed"))))
+                .then((body: OverviewData) => {
+                    dataCache.set(groupKey, { at: Date.now(), data: body });
+                    landed(group, body);
+                })
+                .catch((caught: unknown) => {
+                    if (caught instanceof DOMException && caught.name === "AbortError") return;
+                    // Every card in the request then says it could not be read,
+                    // which is the truth; the other request's cards are unaffected.
+                    landed(group, Object.fromEntries(group.map((id) => [id, null])));
+                });
+        }
         return () => controller.abort();
-    }, [key, asked, nonce]);
+    }, [key, asked, on, nonce]);
 
     function refresh(): void {
-        dataCache = null;
+        dataCache.clear();
         setNonce((value) => value + 1);
     }
 
@@ -347,7 +375,7 @@ export function OverviewGrid({
                         aria-label="Refresh the figures"
                         className="grid size-9 place-items-center rounded-md border border-border bg-surface text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
-                        <RefreshCw className={cn("size-4", data === undefined && "animate-spin")} aria-hidden="true" />
+                        <RefreshCw className={cn("size-4", (pending === null || pending.size > 0) && "animate-spin")} aria-hidden="true" />
                     </button>
                     <Button variant="outline" size="sm" onClick={() => setCustomizing(true)}>
                         <Settings2 className="size-4" aria-hidden="true" />
@@ -438,7 +466,7 @@ export function OverviewGrid({
                                 >
                                     <WidgetBody
                                         id={widget.id}
-                                        data={data}
+                                        data={pending === null || pending.has(widget.id) ? undefined : data}
                                         apps={apps}
                                         shortcuts={shortcuts}
                                         historyNonce={historyNonce}

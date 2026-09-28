@@ -108,13 +108,13 @@ export async function presenceFor(
                 deviceTimeZone: true
             }
         }),
-        // The freshest session per account, from one query rather than one each:
-        // ordering and taking the first per id in memory is cheaper than a
-        // correlated subquery for a page of thirty faces.
-        prisma.sessionState.findMany({
+        // The freshest session per account, from one query rather than one each,
+        // and one row per account rather than every session they ever opened:
+        // the database takes the latest itself, off (userId, lastSeenAt).
+        prisma.sessionState.groupBy({
+            by: ["userId"],
             where: { userId: { in: wanted } },
-            orderBy: { lastSeenAt: "desc" },
-            select: { userId: true, lastSeenAt: true }
+            _max: { lastSeenAt: true }
         }),
         callsFor(viewer, wanted),
         // Asked about the whole page at once rather than once per face: the
@@ -132,7 +132,7 @@ export async function presenceFor(
 
     const seen = new Map<string, Date>();
     for (const session of sessions) {
-        if (!seen.has(session.userId)) seen.set(session.userId, session.lastSeenAt);
+        if (session._max.lastSeenAt) seen.set(session.userId, session._max.lastSeenAt);
     }
 
     const now = Date.now();

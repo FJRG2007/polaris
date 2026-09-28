@@ -218,13 +218,44 @@ export interface ServingRelease extends ReleaseRef {
  * nothing answers on.
  */
 export async function currentReleaseRef(app: ReleaseSubject): Promise<ServingRelease> {
-    const base = serviceRef(app.environment.project.slug, app.slug, app.id);
     const current = app.currentDeploymentId
         ? await prisma.deployment.findUnique({
               where: { id: app.currentDeploymentId },
               select: { id: true, commitSha: true, isolated: true, cutover: true }
           })
         : null;
+    return servedBy(app, current);
+}
+
+/**
+ * `currentReleaseRef` for many services at once: one query for all of them, for a
+ * screen that lists every service of a project.
+ */
+export async function servingReleases(apps: readonly ReleaseSubject[]): Promise<Map<string, ServingRelease>> {
+    const ids = apps.map((app) => app.currentDeploymentId).filter((id): id is string => id !== null);
+    const deployments = new Map(
+        (ids.length > 0
+            ? await prisma.deployment.findMany({
+                  where: { id: { in: ids } },
+                  select: { id: true, commitSha: true, isolated: true, cutover: true }
+              })
+            : []
+        ).map((row) => [row.id, row])
+    );
+    return new Map(
+        apps.map((app) => [
+            app.id,
+            servedBy(app, app.currentDeploymentId ? (deployments.get(app.currentDeploymentId) ?? null) : null)
+        ])
+    );
+}
+
+/** Which release serves a service, given the deployment it currently points at. */
+function servedBy(
+    app: ReleaseSubject,
+    current: { id: string; commitSha: string | null; isolated: boolean; cutover: boolean } | null
+): ServingRelease {
+    const base = serviceRef(app.environment.project.slug, app.slug, app.id);
     if (!current?.isolated) return { ...base, portSubject: app.id, address: base.name };
     const release = releaseRef(base, markerOf(current));
     // A change-over release publishes nothing, so the service's own port is the one

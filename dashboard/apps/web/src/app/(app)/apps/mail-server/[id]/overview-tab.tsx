@@ -28,7 +28,15 @@ import {
 
 type Health = Extract<Awaited<ReturnType<typeof healthAction>>, { health: unknown }>["health"];
 
-export function OverviewTab({ serverId }: { serverId: string }) {
+/** The part of the server the page read before it drew, to stand in for the
+ *  detail until that arrives. */
+export interface OverviewSeed {
+    readonly hostname: string;
+    readonly primaryDomain: string;
+    readonly status: string;
+}
+
+export function OverviewTab({ serverId, seed }: { serverId: string; seed: OverviewSeed }) {
     const router = useRouter();
     const [detail, setDetail] = useState<MailServerDetail | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -78,26 +86,23 @@ export function OverviewTab({ serverId }: { serverId: string }) {
     }
 
     if (error && !detail) return <PanelError message={error} />;
-    if (!detail) {
-        return (
-            <div className="flex flex-col gap-3">
-                <Skeleton className="h-6 w-48" />
-                <Skeleton className="h-32 w-full" />
-            </div>
-        );
-    }
 
-    const settingUp = detail.running || detail.status === "setting-up";
+    // Until the detail arrives the header, the health check and the way out are
+    // drawn from what the page already read; only the steps, the log and the
+    // name of the machine wait. Removing waits too, since whether setup is
+    // running is not known until then.
+    const status = detail?.status ?? seed.status;
+    const settingUp = detail ? detail.running || detail.status === "setting-up" : status === "setting-up";
     return (
         <div className="flex flex-col gap-6">
             <section className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge status={detail.status} />
-                    <span className="text-[0.8125rem] text-muted-foreground">
-                        {detail.primaryDomain} on {detail.placementName}
+                    <StatusBadge status={status} />
+                    <span className="flex items-center gap-1 text-[0.8125rem] text-muted-foreground">
+                        {detail?.primaryDomain ?? seed.primaryDomain} on {detail ? detail.placementName : <Skeleton className="h-3.5 w-24" />}
                     </span>
                     <div className="ml-auto flex items-center gap-2">
-                        {detail.projectId ? (
+                        {detail?.projectId ? (
                             <Button asChild size="sm" variant="outline">
                                 <Link href={`/apps/deploy/${detail.projectId}`}>
                                     <ExternalLink />
@@ -108,7 +113,8 @@ export function OverviewTab({ serverId }: { serverId: string }) {
                     </div>
                 </div>
                 {error ? <PanelError message={error} /> : null}
-                {detail.status === "failed" && detail.error ? (
+                {!detail ? <Skeleton className="h-32 w-full" /> : null}
+                {detail && detail.status === "failed" && detail.error ? (
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger-edge bg-danger-soft px-3 py-2">
                         <span className="text-[0.8125rem] text-danger">{detail.error}</span>
                         <Button size="sm" onClick={() => void resume(null)} disabled={busy}>
@@ -116,29 +122,31 @@ export function OverviewTab({ serverId }: { serverId: string }) {
                         </Button>
                     </div>
                 ) : null}
-                <ol className="flex flex-col gap-1.5">
-                    {detail.steps.map((entry, index) => {
-                        const current = settingUp && !entry.done && (index === 0 || detail.steps[index - 1]?.done);
-                        return (
-                            <li key={entry.step} className="flex items-center gap-2 text-[0.8125rem]">
-                                {entry.done ? (
-                                    <Check className="size-4 text-success" />
-                                ) : current ? (
-                                    <Loader2 className="size-4 animate-spin text-primary" />
-                                ) : (
-                                    <Circle className="size-4 text-foreground-subtle" />
-                                )}
-                                <span className={entry.done ? "text-foreground" : "text-muted-foreground"}>{entry.label}</span>
-                            </li>
-                        );
-                    })}
-                </ol>
-                {detail.log ? (
+                {detail ? (
+                    <ol className="flex flex-col gap-1.5">
+                        {detail.steps.map((entry, index) => {
+                            const current = settingUp && !entry.done && (index === 0 || detail.steps[index - 1]?.done);
+                            return (
+                                <li key={entry.step} className="flex items-center gap-2 text-[0.8125rem]">
+                                    {entry.done ? (
+                                        <Check className="size-4 text-success" />
+                                    ) : current ? (
+                                        <Loader2 className="size-4 animate-spin text-primary" />
+                                    ) : (
+                                        <Circle className="size-4 text-foreground-subtle" />
+                                    )}
+                                    <span className={entry.done ? "text-foreground" : "text-muted-foreground"}>{entry.label}</span>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                ) : null}
+                {detail?.log ? (
                     <pre className="max-h-64 overflow-auto overscroll-contain whitespace-pre-wrap rounded-md border border-border bg-surface p-3 font-mono text-xs text-muted-foreground">
                         {detail.log}
                     </pre>
                 ) : null}
-                {!settingUp ? (
+                {detail && !settingUp ? (
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs text-muted-foreground">Repair by running setup again from</span>
                         <div className="w-64">
@@ -157,21 +165,21 @@ export function OverviewTab({ serverId }: { serverId: string }) {
                 ) : null}
             </section>
 
-            {detail.status === "ready" || detail.status === "down" ? <HealthSection serverId={serverId} /> : null}
+            {status === "ready" || status === "down" ? <HealthSection serverId={serverId} /> : null}
 
             <section className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                 <p className="max-w-xl text-xs text-muted-foreground">
                     Removing it here stops Polaris managing it. The service, its volumes and the mail in them stay in Deploy until you
                     delete them there.
                 </p>
-                <Button size="sm" variant="outline" onClick={() => setRemoving(true)} disabled={detail.running}>
+                <Button size="sm" variant="outline" onClick={() => setRemoving(true)} disabled={!detail || detail.running}>
                     Remove from Polaris
                 </Button>
             </section>
             <ConfirmDeleteDialog
                 open={removing}
                 onOpenChange={setRemoving}
-                name={detail.hostname}
+                name={detail?.hostname ?? seed.hostname}
                 kind="mail server"
                 title="Stop managing this mail server?"
                 confirmLabel="Remove"

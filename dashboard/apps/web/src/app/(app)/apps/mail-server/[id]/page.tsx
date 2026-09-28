@@ -35,5 +35,11 @@ export default async function MailServerDetailPage({ params }: { params: Promise
     if (!z.string().uuid().safeParse(id).success) notFound();
     const server = await requireServer({ id: user.id, isAdmin: user.isAdmin }, id).catch(() => null);
     if (!server) notFound();
-    return <ServerView serverId={server.id} hostname={server.hostname} />;
+    return (
+        <ServerView
+            serverId={server.id}
+            hostname={server.hostname}
+            seed={{ hostname: server.hostname, primaryDomain: server.primaryDomain, status: server.status }}
+        />
+    );
 }

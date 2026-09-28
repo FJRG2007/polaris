@@ -70,6 +70,15 @@ vi.mock("@polaris/db", () => ({
                 const alarm = alarms.find((row) => row.id === where.id);
                 if (alarm) Object.assign(alarm, data);
                 return alarm;
+            }),
+            // Only the check time moves on these; their state is recorded as it
+            // stands, so a test reads the last state either way.
+            updateMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) => {
+                for (const id of where.id.in) {
+                    const alarm = alarms.find((row) => row.id === id);
+                    updates.push({ id, state: String(alarm?.state) });
+                }
+                return { count: where.id.in.length };
             })
         },
         alarmEvent: {
@@ -79,8 +88,8 @@ vi.mock("@polaris/db", () => ({
             })
         },
         host: {
-            findFirst: vi.fn(async ({ where }: { where: { id: string } }) =>
-                where.id === HOST ? { id: HOST, dockerId: "docker-local", address: "10.0.0.2" } : null
+            findMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) =>
+                where.id.in.includes(HOST) ? [{ id: HOST, dockerId: "docker-local", address: "10.0.0.2" }] : []
             )
         },
         volume: {
@@ -164,5 +173,25 @@ describe("disk and network alarms", () => {
         await evaluateAlarms();
         expect(updates.at(-1)?.state).toBe("insufficient");
         expect(events).toEqual([]);
+    });
+});
+
+describe("the pass's writes", () => {
+    it("moves only the check time of an alarm whose state stands, in one statement", async () => {
+        const { prisma } = await import("@polaris/db");
+        samples = [sample("host", LOCAL, 30_000, { diskUsedBytes: 10n, diskTotalBytes: 100n })];
+        alarms = [
+            alarm({ id: "steady-1", targetType: "host", targetId: LOCAL, metric: "disk", threshold: 90, state: "ok" }),
+            alarm({ id: "steady-2", targetType: "host", targetId: LOCAL, metric: "disk", threshold: 90, state: "ok" })
+        ];
+        vi.mocked(prisma.alarm.update).mockClear();
+        vi.mocked(prisma.alarm.updateMany).mockClear();
+        await evaluateAlarms();
+        expect(prisma.alarm.update).not.toHaveBeenCalled();
+        expect(prisma.alarm.updateMany).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(prisma.alarm.updateMany).mock.calls[0]?.[0]).toMatchObject({
+            where: { id: { in: ["steady-1", "steady-2"] } },
+            data: { lastEvaluatedAt: expect.any(Date) }
+        });
     });
 });

@@ -3,8 +3,8 @@ import type { AppDomain } from "../domain-rank";
 import { ProjectDetail } from "../project-detail";
 import { getPublicIp } from "@/lib/domain-service";
 import type { ProjectSummary } from "../deploy-view";
-import { currentReleaseRef } from "@/lib/deploy/releases";
-import { refreshCapabilities } from "@polaris/hostd-client";
+import { servingReleases } from "@/lib/deploy/releases";
+import { capabilitiesFor } from "@/lib/host-capabilities";
 import { projectAccess } from "@/lib/deploy-project-access";
 import { serviceAttention } from "@/lib/deploy/project-glance";
 import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
@@ -54,19 +54,23 @@ export default async function DeployProjectPage({
     params: Promise<{ projectId: string }>;
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const { projectId } = await params;
-    const query = await searchParams;
-    const user = await requirePermission("deploy.read");
-    const canManage = await userHasManage(user, "deploy.manage");
-
-    const project = await getProjectFull(projectId, user.id);
+    const [{ projectId }, query, user] = await Promise.all([
+        params,
+        searchParams,
+        requirePermission("deploy.read")
+    ]);
+    // Three reads that need nothing from one another, taken together.
+    const [canManage, project, access] = await Promise.all([
+        userHasManage(user, "deploy.manage"),
+        getProjectFull(projectId, user.id),
+        projectAccess(projectId, user.id)
+    ]);
     if (!project) notFound();
 
     // An entry may be written for some of the project's environments only, which
     // is how somebody works in development and not in production. Filtered here
     // rather than in the view: what is not theirs to reach should never have been
     // sent to their browser in the first place.
-    const access = await projectAccess(projectId, user.id);
     if (!access) notFound();
     if (access.environmentIds !== null) {
         const reachable = new Set(access.environmentIds);
@@ -75,37 +79,24 @@ export default async function DeployProjectPage({
         );
     }
 
-    const caps = canManage ? await refreshCapabilities() : null;
-    const localReady = Boolean(caps?.deploy);
-
-    const statuses = await getApplicationDeployStatuses(
-        project.environments.flatMap((environment) =>
-            environment.applications.map((app) => ({
-                id: app.id,
-                currentDeploymentId: app.currentDeploymentId
-            }))
-        )
-    );
-    const serverIp = await getPublicIp();
-    const appIds = project.environments.flatMap((environment) =>
-        environment.applications.map((app) => app.id)
-    );
-    const [tunnelDomains, attention] = await Promise.all([
-        listActiveTunnelDomains(appIds),
-        serviceAttention(appIds)
-    ]);
-    // A service that keeps its history is served by the release it currently points
-    // at, which has a container name and a published port of its own - so the
-    // terminal, the file browser and the direct IP:port link all have to follow it.
     const allApps = project.environments.flatMap((environment) => environment.applications);
-    const serving = new Map(
-        await Promise.all(
-            allApps.map(
-                async (app) =>
-                    [app.id, await currentReleaseRef({ ...app, environment: { project } })] as const
-            )
-        )
-    );
+    const appIds = allApps.map((app) => app.id);
+    // Everything below reads only the (filtered) project, so none of it waits on
+    // another. A service that keeps its history is served by the release it
+    // currently points at, which has a container name and a published port of its
+    // own - so the terminal, the file browser and the direct IP:port link all have
+    // to follow it.
+    const [caps, statuses, serverIp, tunnelDomains, attention, serving] = await Promise.all([
+        canManage ? capabilitiesFor("deploy") : null,
+        getApplicationDeployStatuses(
+            allApps.map((app) => ({ id: app.id, currentDeploymentId: app.currentDeploymentId }))
+        ),
+        getPublicIp(),
+        listActiveTunnelDomains(appIds),
+        serviceAttention(appIds),
+        servingReleases(allApps.map((app) => ({ ...app, environment: { project } })))
+    ]);
+    const localReady = Boolean(caps?.deploy);
 
     const summary: ProjectSummary = {
         id: project.id,

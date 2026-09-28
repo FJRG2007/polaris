@@ -50,7 +50,7 @@ vi.mock("@polaris/db", () => ({
                 fake.links.find((link) => link.userId === where.userId) ?? null
         },
         sessionState: {
-            findMany: async () => [...fake.here].map((userId) => ({ userId }))
+            groupBy: async () => [...fake.here].map((userId) => ({ userId }))
         },
         userActivitySettings: {
             findMany: async ({ where }: { where: { userId: { in: string[] } } }) =>

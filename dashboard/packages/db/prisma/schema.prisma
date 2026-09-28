@@ -1482,6 +1482,9 @@ model SessionState {
     user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId])
+    // The freshest session per account - presence and the Spotify pass ask it for
+    // a page of accounts at a time.
+    @@index([userId, lastSeenAt])
     // The other half of the same question: a session that moved to the address
     // is recorded here rather than on the session row.
     @@index([ip])
@@ -4710,6 +4713,10 @@ model Deployment {
     target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
     @@index([deployableType, deployableId])
+    // Whether a service has a deploy on its way (the autoscaler, once a minute),
+    // and a service's deploys newest first.
+    @@index([deployableType, deployableId, status])
+    @@index([deployableType, deployableId, createdAt])
     @@index([targetId])
 }
 
@@ -8114,6 +8121,9 @@ model ChatMessage {
     reports     ChatReport[]
 
     @@index([channelId, createdAt])
+    // One channel's main conversation or one of its threads, in time order,
+    // without stepping over the other's lines.
+    @@index([channelId, parentId, createdAt])
     @@index([parentId, createdAt])
     @@index([replyToId])
 }
@@ -10747,6 +10757,12 @@ model MailMessage {
     @@index([categoryVersion, sentAt])
     @@index([accountId, seen])
     @@index([accountId, snoozedUntil])
+    // The sweep of expired sign-in codes: one mailbox's security mail older than
+    // its keep time.
+    @@index([accountId, category, receivedAt])
+    // Not declared here, because Prisma cannot say it: a partial index on
+    // (accountId, folderId) WHERE seen = false, which the unread counts read.
+    // It lives in migration 20261128003000_performance_indexes.
 }
 
 // One part of a message that is a file.

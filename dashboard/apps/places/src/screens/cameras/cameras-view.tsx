@@ -112,32 +112,46 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
     // takes several cameras, so a multi-selection would only be decoration.
     const [focused, setFocused] = useState<string | null>(null);
 
+    /** Whether what only the dialogs read - the machines, the disks, the
+     *  detection defaults - has arrived. */
+    const [extras, setExtras] = useState(false);
+
+    // The list and what the dialogs need, read side by side rather than as one
+    // batch: the list used to wait for the slowest of four reads, three of which
+    // nothing on the page shows until a dialog opens.
     useEffect(() => {
         let cancelled = false;
-        void (async () => {
-            const [list, machines, disks, tuning] = await Promise.all([
-                actions.listCamerasAction(),
-                actions.listServersAction(),
-                actions.listStorageOptionsAction(),
-                actions.detectionDefaultsAction()
-            ]);
+        void actions.listCamerasAction().then((list) => {
             if (cancelled) return;
             if (list.error) setError(list.error);
             setCameras(list.cameras ?? []);
-            setServers(machines.servers ?? []);
-            setStorage(disks.options ?? []);
-            setDefaults(tuning.defaults ?? null);
             // A link from the wall names the camera to open, so pressing a name
             // there lands on its settings rather than on a list to find it in.
             if (openId) {
                 const wanted = list.cameras?.find((camera) => camera.id === openId);
                 if (wanted) setEditing(wanted);
             }
-        })();
+        });
+        void Promise.all([
+            actions.listServersAction(),
+            actions.listStorageOptionsAction(),
+            actions.detectionDefaultsAction()
+        ]).then(([machines, disks, tuning]) => {
+            if (cancelled) return;
+            setServers(machines.servers ?? []);
+            setStorage(disks.options ?? []);
+            setDefaults(tuning.defaults ?? null);
+            setExtras(true);
+        });
         return () => {
             cancelled = true;
         };
     }, [openId]);
+
+    /** A dialog opens once what it is built from has arrived. Pressed before
+     *  that, it appears the moment it has, rather than opening on an empty
+     *  list of machines it would not correct once the list came in. */
+    const ready = cameras !== null && extras;
 
     const saved = (camera: CameraView) => {
         setCameras((current) => {
@@ -187,15 +201,15 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
         }
     };
 
-    if (cameras === null) return <ListSkeleton />;
-
+    // The buttons and the error are drawn at once; only the list waits.
+    const loaded = cameras ?? [];
     /** The areas in use, for the picker. Built from the whole list rather than
      *  from what is shown, or choosing one area would empty the picker of every
      *  other and there would be no way back. */
-    const areas = zonesOf(cameras);
-    const shown = filterCameras(cameras, { query, zone });
+    const areas = zonesOf(loaded);
+    const shown = filterCameras(loaded, { query, zone });
     /** Worth offering at all only once there is more than one answer to give. */
-    const narrowing = cameras.length > 4 || areas.length > 1;
+    const narrowing = loaded.length > 4 || areas.length > 1;
 
     return (
         <div className="flex flex-col gap-4">
@@ -216,7 +230,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
 
             {/* A house of four cameras needs none of this and a house of thirty
                 needs all of it, so it appears when there is something to narrow. */}
-            {cameras.length > 0 && narrowing ? (
+            {loaded.length > 0 && narrowing ? (
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="relative min-w-0 flex-1 sm:max-w-xs">
                         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
@@ -235,7 +249,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                             aria-label="Area"
                             className="w-48"
                             options={[
-                                { value: ALL_AREAS, label: `Every area - ${cameras.length}` },
+                                { value: ALL_AREAS, label: `Every area - ${loaded.length}` },
                                 ...areas.map((area) => ({
                                     value: area.zone,
                                     label: `${area.zone || "No area"} - ${area.count}`
@@ -246,7 +260,9 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                 </div>
             ) : null}
 
-            {cameras.length === 0 ? (
+            {cameras === null ? (
+                <ListSkeleton />
+            ) : cameras.length === 0 ? (
                 <EmptyState
                     icon={<Cctv />}
                     title="No cameras yet"
@@ -413,7 +429,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
 
             {drawing ? <ZonesDialog camera={drawing} onClose={() => setDrawing(null)} /> : null}
 
-            {editing || adding ? (
+            {ready && (editing || adding) ? (
                 <CameraDialog
                     camera={editing}
                     prefill={adding}
@@ -434,9 +450,9 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                 />
             ) : null}
 
-            {discovering ? (
+            {ready && discovering ? (
                 <DiscoverDialog
-                    known={new Set(cameras.map((camera) => camera.address))}
+                    known={new Set(loaded.map((camera) => camera.address))}
                     servers={servers.filter((server) => server.id !== "local")}
                     onClose={() => setDiscovering(false)}
                     onPick={(found: DiscoveredCamera) => {
@@ -476,10 +492,5 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
 }
 
 function ListSkeleton() {
-    return (
-        <div className="flex flex-col gap-2">
-            <Skeleton className="h-8 w-40" />
-            <Skeleton className="h-40 w-full" />
-        </div>
-    );
+    return <Skeleton className="h-40 w-full" />;
 }

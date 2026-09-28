@@ -138,17 +138,21 @@ export async function pollSpotify(now: number = Date.now()): Promise<SpotifyPass
     const byUser = new Map<string, string>();
     for (const link of links) if (!byUser.has(link.userId)) byUser.set(link.userId, link.id);
     // A host who unlinked is never read again, so nothing else would end
-    // following them.
-    for (const row of along) {
-        if (!byUser.has(row.hostId)) await stopListenAlong(row.listenerId).catch(() => undefined);
-    }
+    // following them. Each ending is its own row, so they go together rather
+    // than one after another.
+    await Promise.all(
+        along
+            .filter((row) => !byUser.has(row.hostId))
+            .map((row) => stopListenAlong(row.listenerId).catch(() => undefined))
+    );
     if (byUser.size === 0) return { asked: 0 };
     const userIds = [...byUser.keys()];
 
     const [here, settings] = await Promise.all([
-        prisma.sessionState.findMany({
-            where: { userId: { in: userIds }, lastSeenAt: { gt: new Date(now - HERE_MS) } },
-            select: { userId: true }
+        // One row per account that is here, not one per session they have open.
+        prisma.sessionState.groupBy({
+            by: ["userId"],
+            where: { userId: { in: userIds }, lastSeenAt: { gt: new Date(now - HERE_MS) } }
         }),
         activitySettingsFor(userIds)
     ]);

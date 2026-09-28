@@ -17,7 +17,16 @@ import * as integrationActions from "./actions";
 import { IntegrationLogo } from "@/components/logos";
 import { CopyButton } from "@/components/copy-button";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
-import { useMemo, useState, useTransition, type ComponentType } from "react";
+import {
+    use,
+    useMemo,
+    useState,
+    Suspense,
+    useContext,
+    createContext,
+    useTransition,
+    type ComponentType
+} from "react";
 import type { ConnectionFailure } from "@/lib/connections/attention";
 import {
     isTunnelToken,
@@ -64,6 +73,7 @@ import {
     DialogTitle,
     DialogHeader,
     DialogContent,
+    Skeleton,
     SegmentedControl,
     DialogDescription
 } from "@polaris/ui";
@@ -108,10 +118,6 @@ export interface IntegrationCard {
     githubInstallations?: string[];
     /** GitHub App: the app's GitHub page, for the Install button. */
     githubHtmlUrl?: string;
-    /** GitHub: whether this connection can also register self-hosted runners. */
-    githubRunnersReady?: boolean;
-    /** GitHub: what to change so it can, when it cannot. */
-    githubRunnersAdvice?: string;
     /** GitHub: the address GitHub's own servers can reach this instance at, unset
      *  when there is none - then a new App gets no webhook. */
     githubPublicUrl?: string;
@@ -174,7 +180,29 @@ function isConnected(card: IntegrationCard): boolean {
     return card.hasSecret || card.enabled;
 }
 
-export function IntegrationsView({ cards }: { cards: IntegrationCard[]; }) {
+/** Whether the GitHub connection can also register self-hosted runners, and what
+ *  to change so it can when it cannot. */
+export interface RunnerAccessNoteData {
+    ready: boolean;
+    advice: string | null;
+}
+
+/**
+ * The runner check, still in flight. It asks GitHub itself, so the page does not
+ * wait for it: the grid paints at once and the one note that needs the answer
+ * waits for it inside the dialog. Carried in context rather than through every
+ * dialog's props, since only the GitHub one reads it.
+ */
+const RunnerAccessContext = createContext<Promise<RunnerAccessNoteData | null> | null>(null);
+
+export function IntegrationsView({
+    cards,
+    runnerAccess
+}: {
+    cards: IntegrationCard[];
+    /** Null when GitHub is not connected, so there is nothing to check. */
+    runnerAccess?: Promise<RunnerAccessNoteData | null>;
+}) {
     const router = useRouter();
     const [configuring, setConfiguring] = useState<IntegrationCard | null>(null);
     const [query, setQuery] = useState("");
@@ -327,7 +355,9 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[]; }) {
             </div>
 
             {configuring && ConfigureDialog ? (
-                <ConfigureDialog card={configuring} onClose={closeDialog} />
+                <RunnerAccessContext.Provider value={runnerAccess ?? null}>
+                    <ConfigureDialog card={configuring} onClose={closeDialog} />
+                </RunnerAccessContext.Provider>
             ) : null}
         </>
     );
@@ -1974,9 +2004,20 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
  * for the permission by default, so saying nothing would leave the operator to
  * discover it as a 403 after they have already set a machine up.
  */
-function RunnerAccessNote({ card }: { card: IntegrationCard }) {
-    if (card.githubRunnersReady === undefined) return null;
-    if (card.githubRunnersReady && !card.githubRunnersAdvice) {
+function RunnerAccessNote() {
+    const pending = useContext(RunnerAccessContext);
+    if (!pending) return null;
+    return (
+        <Suspense fallback={<Skeleton className="h-4 w-2/3" />}>
+            <RunnerAccessAnswer pending={pending} />
+        </Suspense>
+    );
+}
+
+function RunnerAccessAnswer({ pending }: { pending: Promise<RunnerAccessNoteData | null> }) {
+    const access = use(pending);
+    if (!access) return null;
+    if (access.ready && !access.advice) {
         return (
             <p className="flex items-start gap-2 text-xs text-muted-foreground">
                 <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-success" />
@@ -1989,7 +2030,7 @@ function RunnerAccessNote({ card }: { card: IntegrationCard }) {
             <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-warning" />
             <span>
                 <span className="block font-medium text-foreground">Self-hosted runners</span>
-                {card.githubRunnersAdvice}
+                {access.advice}
             </span>
         </p>
     );
@@ -2031,7 +2072,7 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                         <span className="font-medium">{card.githubLogin}</span>
                     </div>
 
-                    <RunnerAccessNote card={card} />
+                    <RunnerAccessNote />
 
                     <AccountLimitField slug="github" current={card.accountLimit ?? 1} />
 

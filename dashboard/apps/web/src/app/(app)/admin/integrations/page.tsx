@@ -125,9 +125,19 @@ export default async function IntegrationsPage() {
 
     // Whether that connection can also register self-hosted runners. Neither
     // method asks for the permission by default, so this is where the operator
-    // finds out - before provisioning a machine, not after. It needs the status
-    // above, so it is the one call that cannot join the batch.
-    const runners = github.connected ? await getRunnerAccess() : null;
+    // finds out - before provisioning a machine, not after. It asks GitHub and
+    // needs the status above, so it is not awaited here: the promise goes to the
+    // view and only the note in the GitHub dialog waits for it. A failed check
+    // leaves the note out rather than taking the whole page down.
+    const runners = github.connected
+        ? getRunnerAccess().then(
+              (access) => ({ ready: access.ready, advice: access.advice }),
+              (error: unknown) => {
+                  console.error("[integrations] runner access check failed", error);
+                  return null;
+              }
+          )
+        : undefined;
 
     const cards: IntegrationCard[] = SERVICE_INTEGRATIONS.map((entry) => {
         const state = states.get(entry.slug);
@@ -181,9 +191,6 @@ export default async function IntegrationsPage() {
             githubLogin: entry.slug === "github" ? (github.login ?? undefined) : undefined,
             githubInstallations: entry.slug === "github" ? github.installations : undefined,
             githubHtmlUrl: entry.slug === "github" ? (github.htmlUrl ?? undefined) : undefined,
-            githubRunnersReady: entry.slug === "github" ? runners?.ready : undefined,
-            githubRunnersAdvice:
-                entry.slug === "github" ? (runners?.advice ?? undefined) : undefined,
             githubPublicUrl: entry.slug === "github" ? (publicUrl ?? undefined) : undefined,
             cloudflareApiConnected: entry.slug === "cloudflare" ? cloudflare.connected : undefined,
             cloudflareDnsConnected: entry.slug === "cloudflare" ? cloudflare.dnsReady : undefined,
@@ -232,7 +239,7 @@ export default async function IntegrationsPage() {
                     .
                 </p>
             </div>
-            <IntegrationsView cards={cards} />
+            <IntegrationsView cards={cards} runnerAccess={runners} />
         </div>
     );
 }

@@ -498,17 +498,23 @@ async function latestSamples(
         { diskUsedBytes: bigint | null; diskTotalBytes: bigint | null }
     >();
     if (subjectIds.length === 0) return found;
-    const rows = await prisma.metricSample.findMany({
-        where: { subjectType, subjectId: { in: [...subjectIds] } },
-        orderBy: { ts: "desc" },
-        // One row per subject is what is wanted, and Prisma has no "latest per
-        // group": a bounded window of the newest rows across all of them, then
-        // first-seen wins, costs one indexed read instead of one query each.
-        take: subjectIds.length * 4,
-        select: { subjectId: true, diskUsedBytes: true, diskTotalBytes: true }
-    });
+    // One newest-first read per subject, each a single step down the primary key
+    // (subjectType, subjectId, ts). The one query for all of them it replaces
+    // took a window of the newest rows across every subject, which both walked
+    // the whole table by time and missed a device that reports rarely whenever
+    // the others had filled the window. Portable SQL rather than a DISTINCT ON,
+    // because the schema also runs on SQLite.
+    const rows = await Promise.all(
+        [...new Set(subjectIds)].map((subjectId) =>
+            prisma.metricSample.findFirst({
+                where: { subjectType, subjectId },
+                orderBy: { ts: "desc" },
+                select: { subjectId: true, diskUsedBytes: true, diskTotalBytes: true }
+            })
+        )
+    );
     for (const row of rows) {
-        if (found.has(row.subjectId)) continue;
+        if (!row) continue;
         found.set(row.subjectId, {
             diskUsedBytes: row.diskUsedBytes,
             diskTotalBytes: row.diskTotalBytes

@@ -196,7 +196,13 @@ export async function pruneRuntimeLogs(now = new Date()): Promise<number> {
     const cutoff = new Date(now.getTime() - RUNTIME_LOG_RETENTION_DAYS * 24 * 3_600_000);
     let removed = (await prisma.runtimeLogLine.deleteMany({ where: { at: { lt: cutoff } } })).count;
 
-    const counts = await prisma.runtimeLogLine.groupBy({ by: ["applicationId"], _count: { _all: true } });
+    // Only the services over their cap come back: the rest have nothing to trim,
+    // and are almost every service on almost every pass.
+    const counts = await prisma.runtimeLogLine.groupBy({
+        by: ["applicationId"],
+        _count: { _all: true },
+        having: { applicationId: { _count: { gt: RUNTIME_LOG_MAX_LINES } } }
+    });
     for (const row of counts) {
         if (row._count._all <= RUNTIME_LOG_MAX_LINES) continue;
         const edge = await prisma.runtimeLogLine.findFirst({

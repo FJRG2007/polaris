@@ -169,19 +169,30 @@ export async function sweepExpiredCodes(): Promise<number> {
     });
     if (accounts.length === 0) return 0;
 
+    // Read for every mailbox at once, then acted on one mailbox at a time. The
+    // reads stay one per mailbox rather than one for all: each has its own
+    // cut-off and its own cap, and one shared cap would let a mailbox full of
+    // alerts - which are never swept - crowd every other mailbox out of it.
+    // Each is a range on (accountId, category, receivedAt).
+    const now = Date.now();
+    const candidates = await Promise.all(
+        accounts.map((account) =>
+            prisma.mailMessage.findMany({
+                where: {
+                    accountId: account.id,
+                    category: "security",
+                    receivedAt: { lt: new Date(now - account.securityKeepMinutes * 60_000) },
+                    folder: { role: "inbox" }
+                },
+                select: { id: true, subject: true, snippet: true },
+                take: 200
+            })
+        )
+    );
+
     let done = 0;
-    for (const account of accounts) {
-        const before = new Date(Date.now() - account.securityKeepMinutes * 60_000);
-        const stale = await prisma.mailMessage.findMany({
-            where: {
-                accountId: account.id,
-                category: "security",
-                receivedAt: { lt: before },
-                folder: { role: "inbox" }
-            },
-            select: { id: true, subject: true, snippet: true },
-            take: 200
-        });
+    for (const [index, account] of accounts.entries()) {
+        const stale = candidates[index] ?? [];
         // The codes, not the alerts. Read from what the message says rather than
         // from a second column, so a mailbox categorised before this existed is
         // swept correctly without a backfill.

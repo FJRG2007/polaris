@@ -147,6 +147,15 @@ export interface MailIdentityView {
     readonly isDefault: boolean;
 }
 
+const IDENTITY_FIELDS = {
+    id: true,
+    address: true,
+    displayName: true,
+    replyTo: true,
+    signature: true,
+    isDefault: true
+} as const;
+
 export async function listIdentities(
     userId: string,
     accountId: string
@@ -155,15 +164,31 @@ export async function listIdentities(
     return prisma.mailIdentity.findMany({
         where: { accountId },
         orderBy: [{ isDefault: "desc" }, { address: "asc" }],
-        select: {
-            id: true,
-            address: true,
-            displayName: true,
-            replyTo: true,
-            signature: true,
-            isDefault: true
-        }
+        select: IDENTITY_FIELDS
     });
+}
+
+/**
+ * The identities of several mailboxes at once, keyed by mailbox, in one query
+ * rather than one per mailbox. Scoped to the owner in the query itself, so an
+ * id that is not theirs simply comes back with nothing; every id asked for has
+ * an entry, empty where the mailbox has no identities.
+ */
+export async function listIdentitiesByAccount(
+    userId: string,
+    accountIds: readonly string[]
+): Promise<Record<string, MailIdentityView[]>> {
+    const byAccount: Record<string, MailIdentityView[]> = Object.fromEntries(
+        accountIds.map((id) => [id, [] as MailIdentityView[]])
+    );
+    if (accountIds.length === 0) return byAccount;
+    const rows = await prisma.mailIdentity.findMany({
+        where: { accountId: { in: [...accountIds] }, account: { userId } },
+        orderBy: [{ isDefault: "desc" }, { address: "asc" }],
+        select: { ...IDENTITY_FIELDS, accountId: true }
+    });
+    for (const { accountId, ...identity } of rows) byAccount[accountId]?.push(identity);
+    return byAccount;
 }
 
 /**

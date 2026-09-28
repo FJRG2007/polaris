@@ -24,6 +24,7 @@ import { CopyButton } from "@/components/copy-button";
 import { RelativeTime } from "@/components/relative-time";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { EventPanel } from "./event-detail";
+import { useDebounced } from "./use-debounced";
 import type { IssueDetail, IssueRow } from "@/lib/telemetry/report-service";
 import {
     ArrowLeft,
@@ -81,6 +82,7 @@ export function TelemetryView({
     const [data, setData] = useState<Overview | null>(null);
     const [issue, setIssue] = useState<IssueDetail | null>(null);
     const [query, setQuery] = useState("");
+    const search = useDebounced(query, 250);
     const on = useShelfScope();
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
@@ -91,7 +93,7 @@ export function TelemetryView({
     // skeleton with nothing said and nothing to press.
     const load = useCallback(async () => {
         const result = await runAction(
-            () => actions.telemetryOverviewAction({ projectId, status, query }),
+            () => actions.telemetryOverviewAction({ projectId, status, query: search }),
             setError
         );
         if (!result) return;
@@ -105,7 +107,7 @@ export function TelemetryView({
         // what re-runs this when somebody switches shelves - without it the
         // switch changed what the server rendered and this screen went on
         // showing the other shelf's projects.
-    }, [on, projectId, status, query]);
+    }, [on, projectId, status, search]);
 
     useEffect(() => {
         void load();
@@ -172,17 +174,35 @@ export function TelemetryView({
         return result;
     };
 
-    if (!data) {
+    const failure = error && (
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+            {error}
+        </p>
+    );
+
+    // Still reading, and no project named: the shelf's own frame, with the
+    // button that makes a project already there. Only the count and the cards
+    // wait, since they are the only part of it the read decides.
+    if (!data && !projectId) {
         return (
-            <div className="flex flex-col gap-3">
-                <Skeleton className="h-9 w-72" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-64 w-full" />
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-2">
+                        <Skeleton className="h-4 w-24" />
+                        <NewProject onDone={load} />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Skeleton className="h-24 w-full" />
+                        <Skeleton className="h-24 w-full" />
+                        <Skeleton className="h-24 w-full" />
+                    </div>
+                </div>
+                {failure}
             </div>
         );
     }
 
-    if (data.projects.length === 0) {
+    if (data && data.projects.length === 0) {
         return (
             <>
                 <EmptyState
@@ -199,7 +219,7 @@ export function TelemetryView({
     // Nothing chosen: the shelf. A project is a thing you go into, so the app
     // opens on the list of them with the state of each on its face, rather than
     // on one of them picked arbitrarily by a dropdown.
-    if (!project) {
+    if (data && !project) {
         return (
             <div className="flex flex-col gap-4">
                 <ProjectsGrid
@@ -207,15 +227,14 @@ export function TelemetryView({
                     hrefFor={hrefFor}
                     action={<NewProject onDone={load} />}
                 />
-                {error && (
-                    <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
-                        {error}
-                    </p>
-                )}
+                {failure}
             </div>
         );
     }
 
+    // From here a project is named. Until the read answers, `project` is null
+    // and only its name and its content wait: the way back, the search box and
+    // the rail are the same whichever project it turns out to be.
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -224,7 +243,11 @@ export function TelemetryView({
                     Projects
                 </Button>
                 <span className="text-muted-foreground/40">/</span>
-                <h2 className="min-w-0 truncate text-sm font-medium">{project.name}</h2>
+                {project ? (
+                    <h2 className="min-w-0 truncate text-sm font-medium">{project.name}</h2>
+                ) : (
+                    <Skeleton className="h-4 w-32" />
+                )}
                 {open === "issues" && (
                     <div className="relative ml-auto">
                         <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -239,54 +262,59 @@ export function TelemetryView({
                 )}
             </div>
 
-            {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
-                    {error}
-                </p>
-            )}
+            {failure}
 
             <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
                 <SectionNav open={open} onOpen={(key) => go({ section: key, issue: null })} />
                 <div className="min-w-0 flex-1">
-                    {open === "client" && <ProjectAddress project={project} onDone={load} />}
-                    {open === "reporters" && <ReporterRules project={project} onDone={load} />}
-                    {open === "settings" && <ProjectSettings project={project} onDone={load} />}
-                    {open === "issues" &&
-                        (issue ? (
-                            <IssuePanel
-                                issue={issue}
-                                busy={busy}
-                                onBack={() => go({ issue: null })}
-                                onStatus={(next) =>
-                                    act(() => actions.setIssueStatusAction(project.id, issue.id, next))
-                                }
-                                onDelete={async () => {
-                                    const result = await act(() =>
-                                        actions.deleteIssueAction(project.id, issue.id)
-                                    );
-                                    if (!result?.error) go({ issue: null });
-                                }}
-                            />
-                        ) : (
-                            <div className="flex flex-col gap-3">
-                                <SegmentedControl
-                                    value={status}
-                                    onValueChange={(value) => go({ status: value, issue: null })}
-                                    options={STATUS_TABS.map((tab) => ({
-                                        value: tab.value,
-                                        label:
-                                            data.counts[tab.value] === undefined
-                                                ? tab.label
-                                                : `${tab.label} ${data.counts[tab.value]}`
-                                    }))}
-                                />
-                                <IssueList
-                                    issues={data.issues}
-                                    windowDays={data.windowDays}
-                                    onOpen={(id) => go({ issue: id })}
-                                />
-                            </div>
-                        ))}
+                    {!data || !project ? (
+                        <div className="flex flex-col gap-3">
+                            <Skeleton className="h-8 w-72 max-w-full" />
+                            <Skeleton className="h-64 w-full" />
+                        </div>
+                    ) : (
+                        <>
+                            {open === "client" && <ProjectAddress project={project} onDone={load} />}
+                            {open === "reporters" && <ReporterRules project={project} onDone={load} />}
+                            {open === "settings" && <ProjectSettings project={project} onDone={load} />}
+                            {open === "issues" &&
+                                (issue ? (
+                                    <IssuePanel
+                                        issue={issue}
+                                        busy={busy}
+                                        onBack={() => go({ issue: null })}
+                                        onStatus={(next) =>
+                                            act(() => actions.setIssueStatusAction(project.id, issue.id, next))
+                                        }
+                                        onDelete={async () => {
+                                            const result = await act(() =>
+                                                actions.deleteIssueAction(project.id, issue.id)
+                                            );
+                                            if (!result?.error) go({ issue: null });
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="flex flex-col gap-3">
+                                        <SegmentedControl
+                                            value={status}
+                                            onValueChange={(value) => go({ status: value, issue: null })}
+                                            options={STATUS_TABS.map((tab) => ({
+                                                value: tab.value,
+                                                label:
+                                                    data.counts[tab.value] === undefined
+                                                        ? tab.label
+                                                        : `${tab.label} ${data.counts[tab.value]}`
+                                            }))}
+                                        />
+                                        <IssueList
+                                            issues={data.issues}
+                                            windowDays={data.windowDays}
+                                            onOpen={(id) => go({ issue: id })}
+                                        />
+                                    </div>
+                                ))}
+                        </>
+                    )}
                 </div>
             </div>
         </div>

@@ -12,7 +12,7 @@ import { ArrowLeft } from "lucide-react";
 import { BackupsTab } from "./backups-tab";
 import { ReportsTab } from "./reports-tab";
 import { SendingTab } from "./sending-tab";
-import { OverviewTab } from "./overview-tab";
+import { OverviewTab, type OverviewSeed } from "./overview-tab";
 import { ForwardsTab } from "./forwards-tab";
 import { MailboxesTab } from "./mailboxes-tab";
 import { Card, CardBody, cn, ScrollRow } from "@polaris/ui";
@@ -31,7 +31,17 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-export function ServerView({ serverId, hostname }: { serverId: string; hostname: string }) {
+export function ServerView({
+    serverId,
+    hostname,
+    seed
+}: {
+    serverId: string;
+    hostname: string;
+    /** What the page already read to check access, so the overview's header is
+     *  drawn at once. */
+    seed: OverviewSeed;
+}) {
     const router = useRouter();
     const params = useSearchParams();
     const asked = params.get("tab");
@@ -79,7 +89,7 @@ export function ServerView({ serverId, hostname }: { serverId: string; hostname:
                     ))}
                 </ScrollRow>
                 <CardBody className="min-h-[24rem]">
-                    {tab === "overview" ? <OverviewTab serverId={serverId} /> : null}
+                    {tab === "overview" ? <OverviewTab serverId={serverId} seed={seed} /> : null}
                     {tab === "domains" ? <DnsTab serverId={serverId} /> : null}
                     {tab === "mailboxes" ? <MailboxesTab serverId={serverId} /> : null}
                     {tab === "forwards" ? <ForwardsTab serverId={serverId} /> : null}

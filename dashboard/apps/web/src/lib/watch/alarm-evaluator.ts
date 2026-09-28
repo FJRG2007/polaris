@@ -60,10 +60,7 @@ interface Evaluation {
 async function evaluateCondition(alarm: AlarmRow, context: PassContext): Promise<Evaluation> {
     // Domain reachability (or an app's http metric pointed at a domain id).
     if (alarm.targetType === "domain" || alarm.metric === "http") {
-        const domain = await prisma.domain.findFirst({
-            where: { id: alarm.targetId },
-            select: { healthStatus: true, healthDetail: true }
-        });
+        const domain = context.domains.get(alarm.targetId);
         if (!domain) return { breach: false, value: null, detail: "Domain not found", insufficient: true };
         if (domain.healthStatus !== "up" && domain.healthStatus !== "down") {
             return { breach: false, value: null, detail: "Not checked yet", insufficient: true };
@@ -74,10 +71,7 @@ async function evaluateCondition(alarm: AlarmRow, context: PassContext): Promise
 
     // App service liveness: down if it should be up but has no recent metrics.
     if (alarm.metric === "service") {
-        const app = await prisma.application.findFirst({
-            where: { id: alarm.targetId },
-            select: { desiredState: true, asleepSince: true }
-        });
+        const app = context.apps.get(alarm.targetId);
         if (!app) return { breach: false, value: null, detail: "App not found", insufficient: true };
         if (app.desiredState !== "running") {
             return { breach: false, value: null, detail: "stopped (not expected up)", insufficient: false };
@@ -115,9 +109,53 @@ async function evaluateCondition(alarm: AlarmRow, context: PassContext): Promise
     };
 }
 
-/** What one pass knows once rather than per alarm. */
+/**
+ * What one pass knows once rather than per alarm: the domains, services and
+ * servers the alarms name, each read in one query for the whole pass rather
+ * than one per alarm.
+ */
 interface PassContext {
     identity: LocalMachineIdentity | null;
+    domains: Map<string, { healthStatus: string | null; healthDetail: string | null }>;
+    apps: Map<string, { desiredState: string; asleepSince: Date | null }>;
+    hosts: Map<string, { id: string; dockerId: string | null; address: string | null }>;
+}
+
+async function passContext(alarms: readonly AlarmRow[]): Promise<PassContext> {
+    const domainIds = new Set<string>();
+    const appIds = new Set<string>();
+    const hostIds = new Set<string>();
+    for (const alarm of alarms) {
+        if (alarm.targetType === "domain" || alarm.metric === "http") domainIds.add(alarm.targetId);
+        else if (alarm.metric === "service") appIds.add(alarm.targetId);
+        else if (alarm.targetType === "host" && alarm.targetId !== LOCAL_HOST_SUBJECT) hostIds.add(alarm.targetId);
+    }
+    const [domains, apps, hosts] = await Promise.all([
+        domainIds.size > 0
+            ? prisma.domain.findMany({
+                  where: { id: { in: [...domainIds] } },
+                  select: { id: true, healthStatus: true, healthDetail: true }
+              })
+            : [],
+        appIds.size > 0
+            ? prisma.application.findMany({
+                  where: { id: { in: [...appIds] } },
+                  select: { id: true, desiredState: true, asleepSince: true }
+              })
+            : [],
+        hostIds.size > 0
+            ? prisma.host.findMany({
+                  where: { id: { in: [...hostIds] } },
+                  select: { id: true, dockerId: true, address: true }
+              })
+            : []
+    ]);
+    return {
+        identity: null,
+        domains: new Map(domains.map((row) => [row.id, row])),
+        apps: new Map(apps.map((row) => [row.id, row])),
+        hosts: new Map(hosts.map((row) => [row.id, row]))
+    };
 }
 
 /**
@@ -128,10 +166,7 @@ interface PassContext {
 async function subjectOf(alarm: AlarmRow, context: PassContext): Promise<{ type: "app" | "host"; id: string }> {
     if (alarm.targetType !== "host") return { type: "app", id: alarm.targetId };
     if (alarm.targetId === LOCAL_HOST_SUBJECT) return { type: "host", id: LOCAL_HOST_SUBJECT };
-    const host = await prisma.host.findFirst({
-        where: { id: alarm.targetId },
-        select: { id: true, dockerId: true, address: true }
-    });
+    const host = context.hosts.get(alarm.targetId) ?? null;
     context.identity ??= await localMachineIdentity().catch(() => null);
     const local = host && context.identity ? isLocalMachine(host, context.identity) : false;
     return { type: "host", id: local ? LOCAL_HOST_SUBJECT : alarm.targetId };
@@ -204,7 +239,9 @@ async function notifyTransition(alarm: AlarmRow, kind: "triggered" | "resolved",
     }
 }
 
-async function evaluateOne(alarm: AlarmRow, context: PassContext): Promise<void> {
+/** Evaluate one alarm. Says whether it only needs its check time moving - no
+ *  state or streak to write - so the pass can stamp all of those at once. */
+async function evaluateOne(alarm: AlarmRow, context: PassContext): Promise<"unchanged" | "written"> {
     const result = await evaluateCondition(alarm, context);
     let state = alarm.state;
     let streak = alarm.breachStreak;
@@ -226,6 +263,8 @@ async function evaluateOne(alarm: AlarmRow, context: PassContext): Promise<void>
         state = "ok";
     }
 
+    if (state === alarm.state && streak === alarm.breachStreak) return "unchanged";
+
     await prisma.alarm.update({
         where: { id: alarm.id },
         data: { state, breachStreak: streak, lastEvaluatedAt: new Date() }
@@ -237,16 +276,28 @@ async function evaluateOne(alarm: AlarmRow, context: PassContext): Promise<void>
         });
         await notifyTransition(alarm, transition, result.detail);
     }
+    return "written";
 }
 
 export async function evaluateAlarms(): Promise<void> {
     const alarms = await prisma.alarm.findMany({ where: { enabled: true } });
-    const context: PassContext = { identity: null };
+    if (alarms.length === 0) return;
+    const context = await passContext(alarms);
+    // Most alarms, most passes, are exactly where they were. They still show
+    // when they were last checked, so their stamp moves too - in one statement
+    // at the end rather than one write each.
+    const unchanged: string[] = [];
     for (const alarm of alarms) {
         try {
-            await evaluateOne(alarm, context);
+            if ((await evaluateOne(alarm, context)) === "unchanged") unchanged.push(alarm.id);
         } catch (error) {
             console.error("polaris: alarm evaluation failed:", error);
         }
+    }
+    if (unchanged.length > 0) {
+        await prisma.alarm.updateMany({
+            where: { id: { in: unchanged } },
+            data: { lastEvaluatedAt: new Date() }
+        });
     }
 }

@@ -18,7 +18,7 @@ import "server-only";
 
 import { listHosts } from "@/lib/host-service";
 import type { DockerTransport } from "@polaris/docker";
-import { refreshCapabilities } from "@polaris/hostd-client";
+import { capabilitiesFor } from "@/lib/host-capabilities";
 import { userHasManage, type SessionUser } from "@/lib/session";
 import { isLocalMachine, localMachineIdentity } from "@/lib/local-machine";
 import type { DockerConnectionSummary, LocalHostDiagnostic } from "./types";
@@ -40,11 +40,20 @@ export interface ContainerHosts {
 export async function containerHosts(user: SessionUser): Promise<ContainerHosts> {
     // The local host is host-wide, so it is only offered to operators who may
     // manage the system, and only in the full edition (hostd reports docker).
-    // Probe the daemon directly here rather than trusting the cached snapshot, so
-    // the local host shows the moment hostd reports Docker - no dependence on the
-    // background refresh having run, and no up-to-30s blind spot after a restart.
+    // The daemon is probed directly whenever the cached snapshot says there is no
+    // Docker, so the local host shows the moment hostd reports it - no dependence
+    // on the background refresh having run, and no up-to-30s blind spot after a
+    // restart. When the snapshot already says Docker is there, it is trusted, so
+    // the ordinary visit does not wait on the daemon before it paints.
     const canManage = await userHasManage(user, "system.manage");
-    const caps = canManage ? await refreshCapabilities() : null;
+    // Four independent reads, taken together: this runs before the page paints,
+    // and they have no reason to queue behind one another.
+    const [caps, connections, hosts, identity] = await Promise.all([
+        canManage ? capabilitiesFor("docker") : null,
+        listDockerConnections(user.id),
+        listHosts(user.id),
+        localMachineIdentity()
+    ]);
     const localAvailable = Boolean(caps?.docker);
 
     // When an admin has no local host, explain WHY (edition / hostd / socket) so
@@ -61,14 +70,6 @@ export async function containerHosts(user: SessionUser): Promise<ContainerHosts>
                       : "The host daemon is running but reports no Docker socket. Make sure /var/run/docker.sock is mounted into the polaris-hostd container (it is by default in docker/docker-compose.yml)."
               }
             : null;
-
-    // Three independent reads, taken together: this runs before the page paints,
-    // and they have no reason to queue behind one another.
-    const [connections, hosts, identity] = await Promise.all([
-        listDockerConnections(user.id),
-        listHosts(user.id),
-        localMachineIdentity()
-    ]);
 
     const stored: DockerConnectionSummary[] = connections.map((row) => ({
         id: row.id,

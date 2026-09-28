@@ -284,8 +284,8 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
         }
     };
 
-    if (clips === null) return <Skeleton className="h-64 w-full" />;
-
+    // Only the list waits. The camera picker used to wait with it, so choosing a
+    // camera took the picker off the screen until that camera's footage came in.
     const allKept = chosen.length > 0 && chosen.every((clip) => clip.pinned);
 
     return (
@@ -345,7 +345,9 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
 
             {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
 
-            {rows.length === 0 ? (
+            {clips === null ? (
+                <Skeleton className="h-64 w-full" />
+            ) : rows.length === 0 ? (
                 <EmptyState
                     icon={<Video />}
                     title="No footage yet"

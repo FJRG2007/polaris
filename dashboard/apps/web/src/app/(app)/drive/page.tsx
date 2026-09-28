@@ -35,7 +35,6 @@ export default async function DrivePage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     const user = await requirePermission("drive.read");
-    const params = await searchParams;
 
     // Everybody has their own drive, and this is where it starts existing. It is
     // one upsert on a row that is already there for everybody who has opened
@@ -51,22 +50,28 @@ export default async function DrivePage({
     // Only that refusal is passed on. Anything else that fails in there is a
     // storage or a query, and its message names tables and paths - it goes to
     // the log, and the reader is told the one thing that is true and useful.
-    let driveNotice: string | undefined;
-    try {
-        await ensurePersonalDrive(user.id);
-    } catch (caught) {
-        if (caught instanceof Error && caught.message === PERSONAL_DRIVE_TAKEN) {
-            driveNotice = PERSONAL_DRIVE_TAKEN;
-        } else {
-            console.error("polaris: a personal drive could not be opened:", caught);
-            driveNotice = "Your own drive could not be opened";
-        }
-    }
+    //
+    // The open shelf does not depend on it, so the two are read together; the
+    // listing below does, since it has to include the drive this may have made.
+    const [params, orgId, driveNotice] = await Promise.all([
+        searchParams,
+        scopeOrgIdFor(user.id),
+        ensurePersonalDrive(user.id).then(
+            (): string | undefined => undefined,
+            (caught: unknown) => {
+                if (caught instanceof Error && caught.message === PERSONAL_DRIVE_TAKEN) {
+                    return PERSONAL_DRIVE_TAKEN;
+                }
+                console.error("polaris: a personal drive could not be opened:", caught);
+                return "Your own drive could not be opened";
+            }
+        )
+    ]);
 
     // Only the fast, local query runs on the server so the page paints instantly.
     // The actual listing / device metrics load client-side (skeletons + cache),
     // which is what removes the multi-second delay a slow NAS used to add here.
-    const connections: ConnectionSummary[] = (await listAccessibleConnections(user.id, await scopeOrgIdFor(user.id))).map(
+    const connections: ConnectionSummary[] = (await listAccessibleConnections(user.id, orgId)).map(
         (row) => ({
             id: row.id,
             name: row.name,

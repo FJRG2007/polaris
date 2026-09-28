@@ -72,20 +72,47 @@ async function servingCopies(apps: readonly { currentDeploymentId: string | null
     return new Map(rows.flatMap((row) => (row.replicas !== null ? [[row.id, row.replicas] as const] : [])));
 }
 
+/** Which of these services have a deploy on its way, in one query for the pass
+ *  rather than a count per service. */
+async function deployingNow(ids: readonly string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const rows = await prisma.deployment.groupBy({
+        by: ["deployableId"],
+        where: {
+            deployableType: "application",
+            deployableId: { in: [...ids] },
+            status: { in: ["queued", "building", "deploying"] }
+        }
+    });
+    return new Set(rows.map((row) => row.deployableId));
+}
+
 export async function runAutoscale(now = Date.now()): Promise<{ checked: number; scaled: number }> {
     const apps = await prisma.application.findMany({
         where: { autoscale: { not: null }, currentDeploymentId: { not: null }, desiredState: "running" },
-        include: {
-            environment: { include: { project: true } },
-            target: true,
+        // Only what a pass reads: the whole project and target rows were loaded
+        // for every service once a minute to use three of their columns.
+        select: {
+            id: true,
+            slug: true,
+            autoscale: true,
+            currentDeploymentId: true,
+            replicas: true,
+            keepReleases: true,
+            sourceType: true,
+            environment: { select: { project: { select: { slug: true, ownerId: true } } } },
+            target: { select: { kind: true, hostId: true, runtime: true } },
             domains: { where: { enabled: true }, select: { hostname: true } },
             _count: { select: { volumes: true } }
         }
     });
     let checked = 0;
     let scaled = 0;
-    const names = await servingContainerNames(apps);
-    const copies = await servingCopies(apps);
+    const [names, copies, busy] = await Promise.all([
+        servingContainerNames(apps),
+        servingCopies(apps),
+        deployingNow(apps.map((app) => app.id))
+    ]);
     // Read on the first service that needs it, and not at all when none does.
     let log: Promise<EdgeVisits> | null = null;
     for (const app of apps) {
@@ -93,14 +120,7 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
         if (!config || app.target.runtime === "swarm" || singleCopyReason(app)) continue;
         // A deploy already on its way decides the count for itself; a second one
         // queued behind it would only undo or repeat it.
-        const inFlight = await prisma.deployment.count({
-            where: {
-                deployableType: "application",
-                deployableId: app.id,
-                status: { in: ["queued", "building", "deploying"] }
-            }
-        });
-        if (inFlight > 0) continue;
+        if (busy.has(app.id)) continue;
         checked += 1;
         const running = copies.get(app.currentDeploymentId ?? "") ?? app.replicas;
         const primary = names.get(app.id);

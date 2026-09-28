@@ -24,19 +24,27 @@ export default async function WatchSubjectPage({
 }: {
     params: Promise<{ kind: string; id: string }>;
 }) {
-    const { kind, id } = await params;
-    const user = await requirePermission("deploy.read");
+    const [{ kind, id }, user] = await Promise.all([params, requirePermission("deploy.read")]);
     if (kind !== "server" && kind !== "service") notFound();
 
-    const owned = await listAlarms(user.id);
-    const watching = (targetId: string) => owned.filter((alarm) => alarm.targetId === targetId);
     // Whether a card may be opened to see what is behind it depends on what is
     // deployed here and on how much of the machine this reader is allowed to see,
-    // so it is settled here rather than guessed at in the browser.
-    const viewer = { id: user.id, canReadMachine: await userHasManage(user, MACHINE_PERMISSION) };
+    // so it is settled here rather than guessed at in the browser. It is asked
+    // alongside everything else rather than after it: both are a count or two, and
+    // scoped to this reader, so the answer is only discarded when the page turns
+    // out to be a redirect or a 404.
+    const breakdowns = userHasManage(user, MACHINE_PERMISSION).then((canReadMachine) =>
+        offeredBreakdowns({ id: user.id, canReadMachine }, { kind, id })
+    );
 
     if (kind === "server") {
-        const [hosts, identity] = await Promise.all([listHosts(user.id), localMachineIdentity()]);
+        const [owned, offered, hosts, identity] = await Promise.all([
+            listAlarms(user.id),
+            breakdowns,
+            listHosts(user.id),
+            localMachineIdentity()
+        ]);
+        const watching = (targetId: string) => owned.filter((alarm) => alarm.targetId === targetId);
         const localHost = hosts.find((entry) => isLocalMachine(entry, identity)) ?? null;
 
         // The reserved subject id is how the samples are filed, not how the
@@ -62,7 +70,7 @@ export default async function WatchSubjectPage({
                         ...(localHost ? watching(localHost.id) : []),
                         ...watching(LOCAL_HOST_SUBJECT)
                     ]}
-                    breakdowns={await offeredBreakdowns(viewer, { kind: "server", id })}
+                    breakdowns={offered}
                 />
             );
         }
@@ -79,20 +87,25 @@ export default async function WatchSubjectPage({
                 name={host.name}
                 detail={`${host.username}@${host.address}`}
                 alarms={watching(host.id)}
-                breakdowns={await offeredBreakdowns(viewer, { kind: "server", id })}
+                breakdowns={offered}
             />
         );
     }
 
-    const app = await prisma.application.findFirst({
-        where: { id, environment: { project: { ownerId: user.id } } },
-        select: {
-            id: true,
-            name: true,
-            environment: { select: { name: true, projectId: true, project: { select: { name: true } } } }
-        }
-    });
+    const [owned, offered, app] = await Promise.all([
+        listAlarms(user.id),
+        breakdowns,
+        prisma.application.findFirst({
+            where: { id, environment: { project: { ownerId: user.id } } },
+            select: {
+                id: true,
+                name: true,
+                environment: { select: { name: true, projectId: true, project: { select: { name: true } } } }
+            }
+        })
+    ]);
     if (!app) notFound();
+    const watching = (targetId: string) => owned.filter((alarm) => alarm.targetId === targetId);
 
     return (
         <WatchSubjectDetail
@@ -103,7 +116,7 @@ export default async function WatchSubjectPage({
             projectId={app.environment.projectId}
             serviceHref={`/apps/deploy/${app.environment.projectId}?service=${app.id}`}
             alarms={watching(app.id)}
-            breakdowns={await offeredBreakdowns(viewer, { kind: "service", id: app.id })}
+            breakdowns={offered}
         />
     );
 }

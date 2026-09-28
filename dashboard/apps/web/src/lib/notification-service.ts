@@ -9,8 +9,8 @@
  */
 
 import { prisma } from "@polaris/db";
-import type { NotificationLevel } from "@polaris/core";
 import { shelfFilter } from "@/lib/shelf";
+import type { NotificationLevel } from "@polaris/core";
 
 export type { NotificationLevel };
 
@@ -200,6 +200,31 @@ export async function listNotifications(
     });
     const names = await namesFor(rows);
     return rows.map((row) => toView(row, names));
+}
+
+/**
+ * A fingerprint of a user's feed on one shelf that moves whenever the list
+ * `listNotifications` would return could have moved - one aggregate, no rows.
+ *
+ * Every write to the table is one of: a row created (the newest `createdAt`
+ * and the count move), a row deleted (the count moves), or a row marked read,
+ * which is always stamped with the time it happened - including the clearing
+ * of "Action needed", which sets `readAt` alongside it - so the latest
+ * `readAt` moves. Nothing edits a row's text in place. What this cannot see is
+ * a name changing on the person an alert is about; the stream re-reads the list
+ * on a slower clock for that.
+ */
+export async function notificationFeedVersion(userId: string, shelf: string): Promise<string> {
+    const probe = await prisma.notification.aggregate({
+        where: { userId, ...shelfFilter(shelf) },
+        _count: { _all: true },
+        _max: { createdAt: true, readAt: true }
+    });
+    return [
+        probe._count._all,
+        probe._max.createdAt?.getTime() ?? 0,
+        probe._max.readAt?.getTime() ?? 0
+    ].join(":");
 }
 
 /** How many rows one page of the history holds. */

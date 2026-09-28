@@ -7,8 +7,8 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-const { findUnique } = vi.hoisted(() => ({ findUnique: vi.fn() }));
-vi.mock("@polaris/db", () => ({ prisma: { deployment: { findUnique } } }));
+const { findUnique, findMany } = vi.hoisted(() => ({ findUnique: vi.fn(), findMany: vi.fn() }));
+vi.mock("@polaris/db", () => ({ prisma: { deployment: { findUnique, findMany } } }));
 
 const releases = await import("../../src/lib/deploy/releases");
 const { keepsReleases, portSubject, releaseMarker, releaseRef, serviceRef } = releases;
@@ -171,5 +171,44 @@ describe("currentReleaseRef", () => {
     it("keeps the service's own names for a release deployed in place", async () => {
         findUnique.mockResolvedValueOnce({ id: DEPLOYMENT, commitSha: null, isolated: false, cutover: false });
         expect(await releases.currentReleaseRef(app)).toEqual({ ...base, portSubject: APP, address: base.name });
+    });
+});
+
+describe("servingReleases", () => {
+    const OTHER = "019f8506-683f-7dd0-9c13-1e9ee9237fe4";
+    const KEPT = "019f9000-1111-7000-8000-222233334445";
+    const subject = (id: string, slug: string, currentDeploymentId: string | null) => ({
+        id,
+        slug,
+        currentDeploymentId,
+        environment: { project: { slug: "acme" } }
+    });
+    const rows = [
+        { id: DEPLOYMENT, commitSha: "9f8e7d6c5b4a3928", isolated: true, cutover: true },
+        { id: KEPT, commitSha: "1a2b3c4d5e6f7a8b", isolated: true, cutover: false }
+    ];
+
+    it("answers every service exactly as currentReleaseRef does, in one query", async () => {
+        const apps = [
+            subject(APP, "invoices", DEPLOYMENT),
+            subject(OTHER, "billing", KEPT),
+            subject("019f8506-683f-7dd0-9c13-1e9ee9237fe5", "never", null)
+        ];
+        findMany.mockReset();
+        findMany.mockResolvedValueOnce(rows);
+        const serving = await releases.servingReleases(apps);
+        expect(findMany).toHaveBeenCalledTimes(1);
+
+        for (const app of apps) {
+            findUnique.mockResolvedValueOnce(rows.find((row) => row.id === app.currentDeploymentId) ?? null);
+            expect(serving.get(app.id)).toEqual(await releases.currentReleaseRef(app));
+        }
+    });
+
+    it("does not query when nothing has been deployed", async () => {
+        findMany.mockReset();
+        const serving = await releases.servingReleases([subject(APP, "invoices", null)]);
+        expect(findMany).not.toHaveBeenCalled();
+        expect(serving.get(APP)?.portSubject).toBe(APP);
     });
 });
