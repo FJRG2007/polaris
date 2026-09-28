@@ -126,7 +126,18 @@ async function postToken(
     if (!response.ok) {
         if (grant.grant_type === "refresh_token") {
             if (response.status === 429) throw new SpotifyRateLimited(retryAfter(response));
-            if (response.status === 400 || response.status === 401) throw new SpotifyUnauthorized();
+            // Only a refresh token Spotify no longer honours is this link's
+            // problem. `invalid_client` is the operator's - a secret rotated on
+            // the Integrations screen - and shelving every account and telling
+            // each person to link again would send them to fix the wrong thing.
+            if (response.status === 400 || response.status === 401) {
+                const said = await response
+                    .clone()
+                    .json()
+                    .then((body: unknown) => (body as { error?: unknown } | null)?.error)
+                    .catch(() => undefined);
+                if (said === "invalid_grant") throw new SpotifyUnauthorized();
+            }
         }
         throw new Error(await refusalMessage(response, "Spotify refused the token request"));
     }

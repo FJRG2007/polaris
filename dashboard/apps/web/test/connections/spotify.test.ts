@@ -45,14 +45,16 @@ vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
         headers: (init?.headers as Record<string, string>) ?? {}
     });
     const text = next.body === undefined ? "" : JSON.stringify(next.body);
-    return {
+    const reply = {
         ok: next.status >= 200 && next.status < 300,
         status: next.status,
         headers: new Headers(next.headers ?? {}),
         json: async () =>
             next.body === undefined ? Promise.reject(new Error("empty")) : next.body,
-        text: async () => text
-    } as Response;
+        text: async () => text,
+        clone: () => reply
+    };
+    return reply as unknown as Response;
 });
 
 const spotify = await import("@/lib/connections/spotify");
@@ -175,6 +177,18 @@ describe("linking an account", () => {
         expect(blip).toBeInstanceOf(Error);
         expect(blip).not.toBeInstanceOf(spotify.SpotifyUnauthorized);
         expect(blip).not.toBeInstanceOf(spotify.SpotifyRateLimited);
+    });
+
+    it("does not blame the link when the application's own secret is refused", async () => {
+        // An operator who rotated the secret has not revoked anybody's link, and
+        // telling everybody to link again would send them to fix the wrong thing.
+        const stale = { accessToken: "old", refreshToken: "r1", expiresAt: 0 };
+        state.responses.push({ status: 400, body: { error: "invalid_client" } });
+        const refused = await spotify
+            .spotifyAccessToken(CLIENT, stale)
+            .catch((caught: unknown) => caught);
+        expect(refused).toBeInstanceOf(Error);
+        expect(refused).not.toBeInstanceOf(spotify.SpotifyUnauthorized);
     });
 
     it("does not refresh a token that is still good", async () => {
