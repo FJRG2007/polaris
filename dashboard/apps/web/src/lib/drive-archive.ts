@@ -62,7 +62,13 @@ async function* walk(
         return; // A vanished/unreadable item is skipped rather than failing the bundle.
     }
     if (stat.kind === "file") {
-        yield { name: rootName, kind: "file", size: stat.size, mtime: stat.modifiedAt, body: () => driver.readStream(root) };
+        yield {
+            name: rootName,
+            kind: "file",
+            size: stat.size,
+            mtime: stat.modifiedAt,
+            body: () => driver.readStream(root)
+        };
         return;
     }
 
@@ -90,7 +96,13 @@ async function* walk(
                 queue.push({ path: entry.path, archive: archivePath });
             } else if (entry.kind === "file") {
                 const filePath = entry.path;
-                yield { name: archivePath, kind: "file", size: entry.size, mtime: entry.modifiedAt, body: () => driver.readStream(filePath) };
+                yield {
+                    name: archivePath,
+                    kind: "file",
+                    size: entry.size,
+                    mtime: entry.modifiedAt,
+                    body: () => driver.readStream(filePath)
+                };
             }
         }
     }
@@ -138,7 +150,9 @@ export async function writeArchiveToDriver(
         for await (const source of sources) {
             if (source.kind === "file" && source.body) {
                 const web = await source.body();
-                archive.append(Readable.fromWeb(web as unknown as NodeWebReadableStream), { name: source.name });
+                archive.append(Readable.fromWeb(web as unknown as NodeWebReadableStream), {
+                    name: source.name
+                });
             }
             // Empty directories are implied by file paths; store-only preserves
             // them explicitly, encrypted archives omit empty dirs (acceptable).

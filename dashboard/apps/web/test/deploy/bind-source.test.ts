@@ -11,11 +11,19 @@ const findFirst = vi.fn();
 vi.mock("@polaris/db", () => ({ prisma: { volume: { findFirst } } }));
 vi.mock("@/lib/storage-service", () => ({ getDriver: async () => null }));
 
-const { bindSourceAllowed, bindSourceClaimed, isReservedBindSource } = await import("@/lib/deploy-volume-service");
+const { bindSourceAllowed, bindSourceClaimed, isReservedBindSource } = await import(
+    "@/lib/deploy-volume-service"
+);
 
 describe("bind sources", () => {
     it("refuses the folders Polaris keeps for itself", () => {
-        for (const source of ["agent-homes", "agent-homes/shared", "agent-homes/u-someone", "pitr", "pitr/db-1/wal"]) {
+        for (const source of [
+            "agent-homes",
+            "agent-homes/shared",
+            "agent-homes/u-someone",
+            "pitr",
+            "pitr/db-1/wal"
+        ]) {
             expect(isReservedBindSource(source)).toBe(true);
             expect(bindSourceAllowed(source, "blog")).toBe(false);
         }
@@ -47,14 +55,25 @@ describe("bind sources other accounts hold", () => {
         expect(where.OR).toEqual([
             { source: "polaris/deploy/shop/web/data" },
             { source: { startsWith: "polaris/deploy/shop/web/data/" } },
-            { source: { in: ["polaris", "polaris/deploy", "polaris/deploy/shop", "polaris/deploy/shop/web"] } }
+            {
+                source: {
+                    in: [
+                        "polaris",
+                        "polaris/deploy",
+                        "polaris/deploy/shop",
+                        "polaris/deploy/shop/web"
+                    ]
+                }
+            }
         ]);
     });
 
     it("lets a folder nobody else holds through, and limits a deploy-time check to earlier claims", async () => {
         findFirst.mockResolvedValueOnce(null);
         const before = new Date("2026-01-01T00:00:00Z");
-        expect(await bindSourceClaimed("owner-a", "host-1", "data/uploads", "v1", before)).toBe(false);
+        expect(await bindSourceClaimed("owner-a", "host-1", "data/uploads", "v1", before)).toBe(
+            false
+        );
         const where = findFirst.mock.calls.at(-1)![0].where;
         expect(where.id).toEqual({ not: "v1" });
         expect(where.createdAt).toEqual({ lt: before });

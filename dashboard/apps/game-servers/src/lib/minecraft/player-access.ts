@@ -31,16 +31,8 @@
 
 import { prisma } from "@polaris/db";
 import { noteReachedFrom } from "./reach";
-import {
-    parseJoinAddresses,
-    parseProperties,
-    parseWhitelistRefusal
-} from "./parse";
-import {
-    readContainerFile,
-    readContainerFileState,
-    writeContainerFile
-} from "../container-files";
+import { parseJoinAddresses, parseProperties, parseWhitelistRefusal } from "./parse";
+import { readContainerFile, readContainerFileState, writeContainerFile } from "../container-files";
 import {
     isReadableRoster,
     asSeenSpelling,
@@ -680,7 +672,10 @@ export async function reconcileWhitelist(
     // stored: a rule typed in the wrong case before this existed is a player
     // refused at the door, and the pass that writes the list is the one place
     // that can put it right without anybody having to know why.
-    const names = asSeenSpellings(missingWhitelistNames(rules, []), await spellingsSeen(installedAppId));
+    const names = asSeenSpellings(
+        missingWhitelistNames(rules, []),
+        await spellingsSeen(installedAppId)
+    );
     return withServerContainer(ownerId, installedAppId, async (server) => {
         if (await inventsIdentities(server)) {
             const current = await readRoster(server, WHITELIST_FILE);

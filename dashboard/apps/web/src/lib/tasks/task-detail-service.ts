@@ -94,7 +94,12 @@ export async function deleteComment(
     commentId: string,
     canModerate: boolean
 ): Promise<void> {
-    await comments.remove(actorId, { subjectType: "task", subjectId: taskId }, commentId, canModerate);
+    await comments.remove(
+        actorId,
+        { subjectType: "task", subjectId: taskId },
+        commentId,
+        canModerate
+    );
 }
 
 /** Mark a comment dealt with, or reopen it. */
@@ -104,7 +109,12 @@ export async function setCommentResolved(
     commentId: string,
     resolved: boolean
 ): Promise<void> {
-    await comments.setResolved(actorId, { subjectType: "task", subjectId: taskId }, commentId, resolved);
+    await comments.setResolved(
+        actorId,
+        { subjectType: "task", subjectId: taskId },
+        commentId,
+        resolved
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +172,9 @@ export async function moveChecklist(
     move: { beforeId: string | null; afterId: string | null }
 ): Promise<void> {
     const order = await orderForDrop(
-        async (id) => (await prisma.taskChecklist.findUnique({ where: { id }, select: { order: true } }))?.order ?? null,
+        async (id) =>
+            (await prisma.taskChecklist.findUnique({ where: { id }, select: { order: true } }))
+                ?.order ?? null,
         async () => {
             const siblings = await prisma.taskChecklist.findMany({
                 where: { taskId },
@@ -172,14 +184,20 @@ export async function moveChecklist(
             const orders = core.rebalanceOrders(siblings.length);
             await prisma.$transaction(
                 siblings.map((row, index) =>
-                    prisma.taskChecklist.update({ where: { id: row.id }, data: { order: orders[index] } })
+                    prisma.taskChecklist.update({
+                        where: { id: row.id },
+                        data: { order: orders[index] }
+                    })
                 )
             );
         },
         move
     );
     if (order === null) throw new Error("That spot has moved. Try again");
-    const { count } = await prisma.taskChecklist.updateMany({ where: { id: checklistId, taskId }, data: { order } });
+    const { count } = await prisma.taskChecklist.updateMany({
+        where: { id: checklistId, taskId },
+        data: { order }
+    });
     if (count === 0) throw new Error("That checklist no longer exists");
 }
 
@@ -198,16 +216,21 @@ export async function moveChecklistItem(
             where: { id: itemId },
             select: { checklist: { select: { taskId: true } } }
         }),
-        prisma.taskChecklist.findUnique({ where: { id: move.checklistId }, select: { taskId: true } })
+        prisma.taskChecklist.findUnique({
+            where: { id: move.checklistId },
+            select: { taskId: true }
+        })
     ]);
     // Both ends have to be on the task the caller was authorized for, or a drag
     // would be a way to write into a checklist on somebody else's task.
     if (!item || item.checklist.taskId !== taskId) throw new Error("That step no longer exists");
-    if (!destination || destination.taskId !== taskId) throw new Error("That checklist no longer exists");
+    if (!destination || destination.taskId !== taskId)
+        throw new Error("That checklist no longer exists");
 
     const order = await orderForDrop(
         async (id) =>
-            (await prisma.taskChecklistItem.findUnique({ where: { id }, select: { order: true } }))?.order ?? null,
+            (await prisma.taskChecklistItem.findUnique({ where: { id }, select: { order: true } }))
+                ?.order ?? null,
         async () => {
             const siblings = await prisma.taskChecklistItem.findMany({
                 where: { checklistId: move.checklistId },
@@ -217,7 +240,10 @@ export async function moveChecklistItem(
             const orders = core.rebalanceOrders(siblings.length);
             await prisma.$transaction(
                 siblings.map((row, index) =>
-                    prisma.taskChecklistItem.update({ where: { id: row.id }, data: { order: orders[index] } })
+                    prisma.taskChecklistItem.update({
+                        where: { id: row.id },
+                        data: { order: orders[index] }
+                    })
                 )
             );
         },
@@ -241,8 +267,15 @@ export async function deleteChecklist(taskId: string, checklistId: string): Prom
     if (count === 0) throw new Error("That checklist no longer exists");
 }
 
-export async function addChecklistItem(taskId: string, checklistId: string, name: string): Promise<string> {
-    const checklist = await prisma.taskChecklist.findFirst({ where: { id: checklistId, taskId }, select: { id: true } });
+export async function addChecklistItem(
+    taskId: string,
+    checklistId: string,
+    name: string
+): Promise<string> {
+    const checklist = await prisma.taskChecklist.findFirst({
+        where: { id: checklistId, taskId },
+        select: { id: true }
+    });
     if (!checklist) throw new Error("That checklist no longer exists");
     const last = await prisma.taskChecklistItem.findFirst({
         where: { checklistId },
@@ -256,7 +289,11 @@ export async function addChecklistItem(taskId: string, checklistId: string, name
     return item.id;
 }
 
-export async function setChecklistItemDone(taskId: string, itemId: string, done: boolean): Promise<void> {
+export async function setChecklistItemDone(
+    taskId: string,
+    itemId: string,
+    done: boolean
+): Promise<void> {
     const { count } = await prisma.taskChecklistItem.updateMany({
         where: { id: itemId, checklist: { taskId } },
         data: { done: done === true, doneAt: done === true ? new Date() : null }
@@ -279,7 +316,9 @@ export async function updateChecklistItem(
 }
 
 export async function deleteChecklistItem(taskId: string, itemId: string): Promise<void> {
-    const { count } = await prisma.taskChecklistItem.deleteMany({ where: { id: itemId, checklist: { taskId } } });
+    const { count } = await prisma.taskChecklistItem.deleteMany({
+        where: { id: itemId, checklist: { taskId } }
+    });
     if (count === 0) throw new Error("That step no longer exists");
 }
 
@@ -350,7 +389,11 @@ export async function removeDependency(taskId: string, dependencyId: string): Pr
 // Watchers
 // ---------------------------------------------------------------------------
 
-export async function setWatching(taskId: string, userId: string, watching: boolean): Promise<void> {
+export async function setWatching(
+    taskId: string,
+    userId: string,
+    watching: boolean
+): Promise<void> {
     if (watching) await follow.follow("task", taskId, userId, "explicit");
     else await follow.unfollow("task", taskId, userId);
 }
@@ -390,8 +433,15 @@ export async function setCustomValue(
 // Reminders
 // ---------------------------------------------------------------------------
 
-export async function addReminder(userId: string, taskId: string, remindAt: string, note: string): Promise<void> {
-    await prisma.taskReminder.create({ data: { userId, taskId, remindAt: new Date(remindAt), note } });
+export async function addReminder(
+    userId: string,
+    taskId: string,
+    remindAt: string,
+    note: string
+): Promise<void> {
+    await prisma.taskReminder.create({
+        data: { userId, taskId, remindAt: new Date(remindAt), note }
+    });
 }
 
 export async function deleteReminder(userId: string, reminderId: string): Promise<void> {
@@ -456,7 +506,10 @@ export async function dispatchDueReminders(now = new Date()): Promise<number> {
         await prisma.taskReminder
             .update({ where: { id: reminder.id }, data: { sentAt: now } })
             .catch((error: unknown) =>
-                console.error("polaris: a sent reminder could not be marked, so it will be retried:", error)
+                console.error(
+                    "polaris: a sent reminder could not be marked, so it will be retried:",
+                    error
+                )
             );
     }
     return sent;

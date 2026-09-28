@@ -910,8 +910,8 @@ export function PlayerAccessDialog({
                     )}
                     {addressesHidden && (
                         <p className="pt-1 text-xs text-muted-foreground">
-                            This Polaris does not show where other people sign in from. Ask them for the
-                            address they play from.
+                            This Polaris does not show where other people sign in from. Ask them for
+                            the address they play from.
                         </p>
                     )}
                     {inviteError && <p className="pt-1 text-xs text-danger">{inviteError}</p>}

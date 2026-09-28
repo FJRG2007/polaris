@@ -243,7 +243,9 @@ export async function grantSpaceAction(input: unknown): Promise<{ error?: string
             // actually part of the organization the shelf belongs to.
             const eligible = await shelves.teamsForSpace(parsed.data.spaceId);
             if (!eligible.some((team) => team.id === parsed.data.teamId)) {
-                return { error: "That team is not part of the organization this notebook belongs to" };
+                return {
+                    error: "That team is not part of the organization this notebook belongs to"
+                };
             }
             await shelves.grantTeam(parsed.data.spaceId, parsed.data.teamId, parsed.data.role);
         } else if (parsed.data.userId) {
@@ -266,7 +268,8 @@ export async function revokeSpaceAction(input: unknown): Promise<{ error?: strin
     try {
         await access.requireSpace(caller, parsed.data.spaceId, "admin");
         if (parsed.data.teamId) await shelves.revokeTeam(parsed.data.spaceId, parsed.data.teamId);
-        else if (parsed.data.userId) await shelves.revokePerson(parsed.data.spaceId, parsed.data.userId);
+        else if (parsed.data.userId)
+            await shelves.revokePerson(parsed.data.spaceId, parsed.data.userId);
         else return { error: "Say who this is for" };
         refresh();
         return {};
@@ -422,7 +425,8 @@ export async function importNotesAction(form: FormData): Promise<{
 async function readUploads(uploaded: readonly File[]): Promise<core.ImportFile[]> {
     const files: core.ImportFile[] = [];
     for (const file of uploaded) {
-        const name = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+        const name =
+            (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
         if (/\.zip$/i.test(file.name)) {
             const JSZip = (await import("jszip")).default;
             const zip = await JSZip.loadAsync(await file.arrayBuffer());
@@ -460,7 +464,7 @@ export async function searchNotePeopleAction(
 /** The link on a note, for the dialog that opens over it. */
 export async function noteShareAction(
     noteId: string
-): Promise<{ share?: share.NoteShareView | null; error?: string; }> {
+): Promise<{ share?: share.NoteShareView | null; error?: string }> {
     const caller = await actor();
     try {
         return { share: await share.getNoteShare(caller, noteId) };
@@ -479,7 +483,7 @@ export async function noteShareAction(
 export async function publishNoteAction(
     noteId: string,
     input: unknown
-): Promise<{ url?: string; share?: share.NoteShareView; error?: string; }> {
+): Promise<{ url?: string; share?: share.NoteShareView; error?: string }> {
     const caller = await actor();
     const parsed = core.noteShareSchema.safeParse(input);
     if (!parsed.success) {
@@ -497,7 +501,7 @@ export async function publishNoteAction(
 /** The link again, for somebody who closed the dialog. */
 export async function revealNoteShareAction(
     noteId: string
-): Promise<{ url?: string; error?: string; }> {
+): Promise<{ url?: string; error?: string }> {
     const caller = await actor();
     try {
         return { url: await share.revealNoteShare(caller, noteId) };
@@ -508,7 +512,7 @@ export async function revealNoteShareAction(
 
 /** Take it down. What goes back up later is a new address, which is the honest
  *  behaviour: a link that was revoked and restored is not the same link. */
-export async function unpublishNoteAction(noteId: string): Promise<{ error?: string; }> {
+export async function unpublishNoteAction(noteId: string): Promise<{ error?: string }> {
     const caller = await actor();
     try {
         await share.unpublishNote(caller, noteId);
@@ -530,7 +534,7 @@ export async function unpublishNoteAction(noteId: string): Promise<{ error?: str
 export async function unlockNoteShareAction(
     token: string,
     password: string
-): Promise<{ error?: string; }> {
+): Promise<{ error?: string }> {
     const link = await share.resolveNoteShareByToken(token);
     if (!link) return { error: "This link is not available." };
     if (!share.noteShareUsability(link).ok) return { error: "This link is no longer available." };
@@ -547,11 +551,7 @@ export async function unlockNoteShareAction(
     const env = loadEnv();
     (await cookies()).set(
         share.noteUnlockCookie(link.id),
-        share.signNoteUnlock(
-            link.id,
-            link.passwordHash,
-            env.POLARIS_AUTH_SECRET
-        ),
+        share.signNoteUnlock(link.id, link.passwordHash, env.POLARIS_AUTH_SECRET),
         {
             httpOnly: true,
             sameSite: "lax",

@@ -12,11 +12,20 @@ import { normalizeRelPath } from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
 import { sessionCan } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
-import { authorizeDrive, drivePathFilter, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import {
+    authorizeDrive,
+    drivePathFilter,
+    DriveAccessError,
+    DriveLockedError
+} from "@/lib/drive-authz";
 import { listLocks } from "@/lib/access-lock-service";
 import { getMetaMap } from "@/lib/drive-meta-service";
 import { isReservedRootPath } from "@/lib/system-paths";
-import { parseSearch, matchesStructured, normalizePathTarget } from "@/app/(app)/drive/search-query";
+import {
+    parseSearch,
+    matchesStructured,
+    normalizePathTarget
+} from "@/app/(app)/drive/search-query";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,16 +57,22 @@ export async function GET(request: Request): Promise<Response> {
     const parsed = parseSearch(rawQuery);
     if (parsed.error) return Response.json({ error: parsed.error }, { status: 400 });
     const fuzzyWords = parsed.fuzzy ? parsed.fuzzy.toLowerCase().split(/\s+/).filter(Boolean) : [];
-    const hasCriteria = parsed.extensions.length > 0 || parsed.patterns.length > 0 || fuzzyWords.length > 0;
+    const hasCriteria =
+        parsed.extensions.length > 0 || parsed.patterns.length > 0 || fuzzyWords.length > 0;
     if (!hasCriteria) return Response.json({ entries: [], truncated: false });
 
     try {
         await authorizeDrive(user.id, connectionId, base, "read");
     } catch (caught) {
         if (caught instanceof DriveLockedError) {
-            return Response.json({ locked: true, lockId: caught.lockId, lockPath: caught.lockPath });
+            return Response.json({
+                locked: true,
+                lockId: caught.lockId,
+                lockPath: caught.lockPath
+            });
         }
-        if (caught instanceof DriveAccessError) return Response.json({ error: "Forbidden" }, { status: 403 });
+        if (caught instanceof DriveAccessError)
+            return Response.json({ error: "Forbidden" }, { status: 403 });
         throw caught;
     }
 
@@ -73,7 +88,9 @@ export async function GET(request: Request): Promise<Response> {
     // Never descend into locked subtrees or the trash; a search must not surface
     // gated content. Skip any folder that is a lock root (and, since we do not
     // recurse into it, everything beneath it).
-    const lockedRoots = new Set((await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean));
+    const lockedRoots = new Set(
+        (await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean)
+    );
     // The base was authorized; a denied folder under it is neither searched nor named.
     const mayRead = await drivePathFilter(user.id, connectionId, "read");
 

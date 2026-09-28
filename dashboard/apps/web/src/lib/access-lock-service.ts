@@ -122,7 +122,10 @@ export async function removeLock(connectionId: string, lockId: string): Promise<
  * Answers with that hash when the password opens the lock, so the unlock is
  * signed against exactly the password it was checked against, or null.
  */
-export async function verifyLockPassword(lockId: string, presented: string): Promise<string | null> {
+export async function verifyLockPassword(
+    lockId: string,
+    presented: string
+): Promise<string | null> {
     const lock = await prisma.accessLock.findUnique({
         where: { id: lockId },
         select: { passwordHash: true }
@@ -147,7 +150,12 @@ export function signLockUnlock(
     userId: string,
     secret: string
 ): string {
-    return signUnlock(LOCK_LINK_SCOPE, lock.id, { passwordHash: lock.passwordHash, userId }, secret);
+    return signUnlock(
+        LOCK_LINK_SCOPE,
+        lock.id,
+        { passwordHash: lock.passwordHash, userId },
+        secret
+    );
 }
 
 /** Constant-time check of an unlock cookie: this lock, its current password,

@@ -28,8 +28,22 @@ type View = Parameters<typeof forViewer>[0];
 
 const view = {
     rules: [
-        { id: "1", username: "ada", address: "203.0.113.7", note: null, createdAt: "", source: "session" },
-        { id: "2", username: "bob", address: "198.51.100.4", note: null, createdAt: "", source: "manual" }
+        {
+            id: "1",
+            username: "ada",
+            address: "203.0.113.7",
+            note: null,
+            createdAt: "",
+            source: "session"
+        },
+        {
+            id: "2",
+            username: "bob",
+            address: "198.51.100.4",
+            note: null,
+            createdAt: "",
+            source: "manual"
+        }
     ],
     refusals: [],
     links: [],
@@ -46,13 +60,19 @@ describe("sign-in addresses on the player list", () => {
     });
 
     it("shows them while the instance has never been told otherwise", async () => {
-        expect((await forViewer(view)).rules.map((rule) => rule.address)).toEqual(["203.0.113.7", "198.51.100.4"]);
+        expect((await forViewer(view)).rules.map((rule) => rule.address)).toEqual([
+            "203.0.113.7",
+            "198.51.100.4"
+        ]);
     });
 
     it("hides the ones copied from a sign-in once an administrator turns sharing off", async () => {
         state.shared = "false";
         const shown = await forViewer(view);
-        expect(shown.rules.map((rule) => rule.address)).toEqual([HIDDEN_SIGN_IN_ADDRESS, "198.51.100.4"]);
+        expect(shown.rules.map((rule) => rule.address)).toEqual([
+            HIDDEN_SIGN_IN_ADDRESS,
+            "198.51.100.4"
+        ]);
         expect(view.rules[0]!.address).toBe("203.0.113.7");
     });
 

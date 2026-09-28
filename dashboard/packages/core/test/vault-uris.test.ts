@@ -24,7 +24,13 @@ describe("baseDomain", () => {
 
 describe("uriMatches under the site match", () => {
     it("still covers a subdomain of a saved name", () => {
-        expect(uriMatches("https://example.com", URI_MATCH_DOMAIN, "https://accounts.example.com/login")).toBe(true);
+        expect(
+            uriMatches(
+                "https://example.com",
+                URI_MATCH_DOMAIN,
+                "https://accounts.example.com/login"
+            )
+        ).toBe(true);
         expect(uriMatches("https://example.com", null, "https://evil-example.com/")).toBe(false);
     });
 

@@ -21,7 +21,13 @@ const stat = vi.fn(async (): Promise<unknown> => {
 });
 const dispose = vi.fn(async () => undefined);
 
-const requireDriveDriver = vi.fn(async (..._args: unknown[]) => ({ writeStream, mkdir, move, stat, dispose }));
+const requireDriveDriver = vi.fn(async (..._args: unknown[]) => ({
+    writeStream,
+    mkdir,
+    move,
+    stat,
+    dispose
+}));
 const authorizeDrive = vi.fn(async (..._args: unknown[]) => undefined);
 
 vi.mock("@/lib/session", () => ({
@@ -73,7 +79,11 @@ describe("creating", () => {
 
     it("writes nothing when the folder it lands in is refused", async () => {
         requireDriveDriver.mockRejectedValueOnce(new Error("You cannot write here"));
-        const result = await actions.createFileAction(CONNECTION, "shared", "../private/payroll.xlsx");
+        const result = await actions.createFileAction(
+            CONNECTION,
+            "shared",
+            "../private/payroll.xlsx"
+        );
         expect(result.error).toBeTruthy();
         expect(writeStream).not.toHaveBeenCalled();
     });

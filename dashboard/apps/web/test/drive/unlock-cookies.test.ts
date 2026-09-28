@@ -19,7 +19,9 @@ vi.mock("@polaris/db", () => ({ prisma: { accessLock: { findUnique } } }));
 
 // Imported by the services for things these tests never reach.
 vi.mock("@/lib/geo-service", () => ({ geoAllowedForIp: vi.fn(async () => true) }));
-vi.mock("@/lib/domain-service", () => ({ sharingBaseUrl: vi.fn(async () => "https://example.test") }));
+vi.mock("@/lib/domain-service", () => ({
+    sharingBaseUrl: vi.fn(async () => "https://example.test")
+}));
 vi.mock("@/lib/storage-service", () => ({ getDriverForConnection: vi.fn() }));
 vi.mock("@/lib/drive-folder-size", () => ({ invalidateFolderSizes: vi.fn() }));
 
@@ -71,7 +73,9 @@ describe("an access lock's unlock", () => {
 
     it("opens the lock for the user who solved it", () => {
         const value = locks.signLockUnlock({ id: ID, passwordHash: original }, USER, SECRET);
-        expect(locks.verifyLockUnlock({ id: ID, passwordHash: original }, USER, value, SECRET)).toBe(true);
+        expect(
+            locks.verifyLockUnlock({ id: ID, passwordHash: original }, USER, value, SECRET)
+        ).toBe(true);
     });
 
     it("is refused once tampered with", () => {
@@ -88,12 +92,16 @@ describe("an access lock's unlock", () => {
 
     it("is refused once the lock's password changes", () => {
         const value = locks.signLockUnlock({ id: ID, passwordHash: original }, USER, SECRET);
-        expect(locks.verifyLockUnlock({ id: ID, passwordHash: changed }, USER, value, SECRET)).toBe(false);
+        expect(locks.verifyLockUnlock({ id: ID, passwordHash: changed }, USER, value, SECRET)).toBe(
+            false
+        );
     });
 
     it("does not open another lock", () => {
         const value = locks.signLockUnlock({ id: ID, passwordHash: original }, USER, SECRET);
-        expect(locks.verifyLockUnlock({ id: OTHER_ID, passwordHash: original }, USER, value, SECRET)).toBe(false);
+        expect(
+            locks.verifyLockUnlock({ id: OTHER_ID, passwordHash: original }, USER, value, SECRET)
+        ).toBe(false);
     });
 
     it("does not open the lock for somebody it was copied to", () => {
@@ -165,6 +173,8 @@ describe("unlocks of different kinds", () => {
         const share = shares.signShareUnlock(ID, original, SECRET);
         expect(drops.verifyFileRequestUnlock(ID, share, original, SECRET)).toBe(false);
         expect(textDrops.verifyTextRequestUnlock(ID, share, original, SECRET)).toBe(false);
-        expect(locks.verifyLockUnlock({ id: ID, passwordHash: original }, USER, share, SECRET)).toBe(false);
+        expect(
+            locks.verifyLockUnlock({ id: ID, passwordHash: original }, USER, share, SECRET)
+        ).toBe(false);
     });
 });

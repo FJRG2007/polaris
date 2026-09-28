@@ -35,9 +35,15 @@ const OTHER_LINK = "01a081bf-94a6-76c1-9907-ab70aa5f6464";
 
 describe("the pass a link hands a browser", () => {
     it("reads back as the role and link it was signed for", () => {
-        expect(links.readLinkPass(DOC, links.signLinkPass(DOC, LINK, "viewer", null), null)).toEqual({ role: "viewer", linkId: LINK });
-        expect(links.readLinkPass(DOC, links.signLinkPass(DOC, LINK, "editor", null), null)?.role).toBe("editor");
-        expect(links.readLinkPass(DOC, links.signLinkPass(DOC, LINK, "commenter", null), null)?.role).toBe("commenter");
+        expect(
+            links.readLinkPass(DOC, links.signLinkPass(DOC, LINK, "viewer", null), null)
+        ).toEqual({ role: "viewer", linkId: LINK });
+        expect(
+            links.readLinkPass(DOC, links.signLinkPass(DOC, LINK, "editor", null), null)?.role
+        ).toBe("editor");
+        expect(
+            links.readLinkPass(DOC, links.signLinkPass(DOC, LINK, "commenter", null), null)?.role
+        ).toBe("commenter");
     });
 
     it("cannot be promoted by editing the half in front of the dot", () => {
@@ -50,9 +56,19 @@ describe("the pass a link hands a browser", () => {
     });
 
     it("cannot be moved to another link or have its life stretched", () => {
-        const [role, , expiry, signature] = links.signLinkPass(DOC, LINK, "editor", null).split(".");
-        expect(links.readLinkPass(DOC, [role, OTHER_LINK, expiry, signature].join("."), null)).toBeNull();
-        expect(links.readLinkPass(DOC, [role, LINK, String(Number(expiry) + 86_400), signature].join("."), null)).toBeNull();
+        const [role, , expiry, signature] = links
+            .signLinkPass(DOC, LINK, "editor", null)
+            .split(".");
+        expect(
+            links.readLinkPass(DOC, [role, OTHER_LINK, expiry, signature].join("."), null)
+        ).toBeNull();
+        expect(
+            links.readLinkPass(
+                DOC,
+                [role, LINK, String(Number(expiry) + 86_400), signature].join("."),
+                null
+            )
+        ).toBeNull();
     });
 
     it("stops being honoured once it expires, whatever the cookie says", () => {
@@ -63,7 +79,9 @@ describe("the pass a link hands a browser", () => {
     });
 
     it("opens the document it was signed for and no other", () => {
-        expect(links.readLinkPass(OTHER, links.signLinkPass(DOC, LINK, "editor", null), null)).toBeNull();
+        expect(
+            links.readLinkPass(OTHER, links.signLinkPass(DOC, LINK, "editor", null), null)
+        ).toBeNull();
     });
 
     it("refuses anything that is not one, rather than guessing", () => {
@@ -79,32 +97,72 @@ describe("the pass a link hands a browser", () => {
 
 describe("a pass against the link that issued it", () => {
     it("is worth its role while the link stands", async () => {
-        findFirst.mockResolvedValueOnce({ role: "editor", revokedAt: null, expiresAt: null, passwordHash: null });
-        expect(await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))).toBe("editor");
+        findFirst.mockResolvedValueOnce({
+            role: "editor",
+            revokedAt: null,
+            expiresAt: null,
+            passwordHash: null
+        });
+        expect(
+            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))
+        ).toBe("editor");
     });
 
     it("is worth nothing once the link is revoked", async () => {
-        findFirst.mockResolvedValueOnce({ role: "editor", revokedAt: new Date(), expiresAt: null, passwordHash: null });
-        expect(await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))).toBeNull();
+        findFirst.mockResolvedValueOnce({
+            role: "editor",
+            revokedAt: new Date(),
+            expiresAt: null,
+            passwordHash: null
+        });
+        expect(
+            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))
+        ).toBeNull();
     });
 
     it("is worth nothing once the link has expired", async () => {
-        findFirst.mockResolvedValueOnce({ role: "editor", revokedAt: null, expiresAt: new Date(Date.now() - 1000), passwordHash: null });
-        expect(await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))).toBeNull();
+        findFirst.mockResolvedValueOnce({
+            role: "editor",
+            revokedAt: null,
+            expiresAt: new Date(Date.now() - 1000),
+            passwordHash: null
+        });
+        expect(
+            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))
+        ).toBeNull();
     });
 
     it("is worth nothing when the link is gone or names another role", async () => {
         findFirst.mockResolvedValueOnce(null);
-        expect(await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))).toBeNull();
-        findFirst.mockResolvedValueOnce({ role: "viewer", revokedAt: null, expiresAt: null, passwordHash: null });
-        expect(await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))).toBeNull();
+        expect(
+            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))
+        ).toBeNull();
+        findFirst.mockResolvedValueOnce({
+            role: "viewer",
+            revokedAt: null,
+            expiresAt: null,
+            passwordHash: null
+        });
+        expect(
+            await links.linkPassStanding(DOC, links.signLinkPass(DOC, LINK, "editor", null))
+        ).toBeNull();
     });
 
     it("is worth nothing once the link's password has changed", async () => {
         const pass = links.signLinkPass(DOC, LINK, "editor", "scrypt$salt-one$hash-one");
-        findFirst.mockResolvedValueOnce({ role: "editor", revokedAt: null, expiresAt: null, passwordHash: "scrypt$salt-one$hash-one" });
+        findFirst.mockResolvedValueOnce({
+            role: "editor",
+            revokedAt: null,
+            expiresAt: null,
+            passwordHash: "scrypt$salt-one$hash-one"
+        });
         expect(await links.linkPassStanding(DOC, pass)).toBe("editor");
-        findFirst.mockResolvedValueOnce({ role: "editor", revokedAt: null, expiresAt: null, passwordHash: "scrypt$salt-two$hash-two" });
+        findFirst.mockResolvedValueOnce({
+            role: "editor",
+            revokedAt: null,
+            expiresAt: null,
+            passwordHash: "scrypt$salt-two$hash-two"
+        });
         expect(await links.linkPassStanding(DOC, pass)).toBeNull();
     });
 });
@@ -131,7 +189,9 @@ describe("the cookie a solved password writes", () => {
         // from being read as permission to write is the namespace, not the
         // value.
         expect(links.readLinkPass(DOC, links.signLinkUnlock(DOC, HASH), null)).toBeNull();
-        expect(links.linkUnlocked(DOC, HASH, links.signLinkPass(DOC, LINK, "editor", null))).toBe(false);
+        expect(links.linkUnlocked(DOC, HASH, links.signLinkPass(DOC, LINK, "editor", null))).toBe(
+            false
+        );
     });
 });
 

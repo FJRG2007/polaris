@@ -66,7 +66,11 @@ describe("posting", () => {
     });
 
     it("accepts nobody as the author, for a note a rule left", async () => {
-        await comments.post(null, { subjectType: "task", subjectId: "t1", body: "A rule closed this" });
+        await comments.post(null, {
+            subjectType: "task",
+            subjectId: "t1",
+            body: "A rule closed this"
+        });
 
         const call = commentCreate.mock.calls[0]?.[0] as { data: { userId: string | null } };
         expect(call.data.userId).toBeNull();
@@ -159,7 +163,8 @@ describe("changing what was said", () => {
         // Moderating one task's thread is not a licence over every comment on
         // the instance: the subject is always part of the match.
         await comments.remove("u1", { subjectType: "host", subjectId: "h1" }, "c9", true);
-        const where = (commentDeleteMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
+        const where = (commentDeleteMany.mock.calls[0]?.[0] as { where: Record<string, unknown> })
+            .where;
         expect(where).toMatchObject({ subjectType: "host", subjectId: "h1" });
     });
 
@@ -198,7 +203,9 @@ describe("changing what was said", () => {
     it("refuses to resolve a comment from another thread", async () => {
         commentUpdateMany.mockResolvedValueOnce({ count: 0 });
 
-        await expect(comments.setResolved("u1", TASK, "c-elsewhere", true)).rejects.toThrow("not here");
+        await expect(comments.setResolved("u1", TASK, "c-elsewhere", true)).rejects.toThrow(
+            "not here"
+        );
     });
 });
 

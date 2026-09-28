@@ -85,7 +85,10 @@ export function imageTypeOfBytes(bytes: Uint8Array): string | undefined {
     if (starts(0xff, 0xd8, 0xff)) return "image/jpeg";
     if (starts(0x47, 0x49, 0x46, 0x38)) return "image/gif";
     // WebP is a RIFF container with WEBP four bytes into its payload.
-    if (starts(0x52, 0x49, 0x46, 0x46) && [0x57, 0x45, 0x42, 0x50].every((byte, index) => bytes[8 + index] === byte)) {
+    if (
+        starts(0x52, 0x49, 0x46, 0x46) &&
+        [0x57, 0x45, 0x42, 0x50].every((byte, index) => bytes[8 + index] === byte)
+    ) {
         return "image/webp";
     }
     return undefined;

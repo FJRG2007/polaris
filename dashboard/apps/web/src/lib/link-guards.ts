@@ -135,7 +135,9 @@ export interface UnlockGrant {
 /** A fingerprint of the password an unlock was granted against. Only ever
  *  signed over, never sent: the cookie carries the expiry and the signature. */
 export function passwordVersion(passwordHash: string | null): string {
-    return createHash("sha256").update(passwordHash ?? "").digest("base64url");
+    return createHash("sha256")
+        .update(passwordHash ?? "")
+        .digest("base64url");
 }
 
 /**

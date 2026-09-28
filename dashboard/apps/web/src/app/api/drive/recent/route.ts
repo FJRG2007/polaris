@@ -15,7 +15,12 @@ import { apiUser } from "@/lib/api-session";
 import { prisma } from "@polaris/db";
 import { sessionCan } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
-import { authorizeDrive, drivePathFilter, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import {
+    authorizeDrive,
+    drivePathFilter,
+    DriveAccessError,
+    DriveLockedError
+} from "@/lib/drive-authz";
 import { listLocks } from "@/lib/access-lock-service";
 import { getMetaMap } from "@/lib/drive-meta-service";
 import { isReservedRootPath } from "@/lib/system-paths";
@@ -64,15 +69,21 @@ export async function GET(request: Request): Promise<Response> {
     const connectionId = url.searchParams.get("c");
     if (!connectionId) return Response.json({ error: "Missing connection" }, { status: 400 });
     const byParam = url.searchParams.get("by");
-    const by: RecentSort = byParam === "created" ? "created" : byParam === "opened" ? "opened" : "modified";
+    const by: RecentSort =
+        byParam === "created" ? "created" : byParam === "opened" ? "opened" : "modified";
 
     try {
         await authorizeDrive(user.id, connectionId, "", "read");
     } catch (caught) {
         if (caught instanceof DriveLockedError) {
-            return Response.json({ locked: true, lockId: caught.lockId, lockPath: caught.lockPath });
+            return Response.json({
+                locked: true,
+                lockId: caught.lockId,
+                lockPath: caught.lockPath
+            });
         }
-        if (caught instanceof DriveAccessError) return Response.json({ error: "Forbidden" }, { status: 403 });
+        if (caught instanceof DriveAccessError)
+            return Response.json({ error: "Forbidden" }, { status: 403 });
         throw caught;
     }
 
@@ -85,7 +96,9 @@ export async function GET(request: Request): Promise<Response> {
         return Response.json({ error: message }, { status: 502 });
     }
 
-    const lockedRoots = new Set((await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean));
+    const lockedRoots = new Set(
+        (await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean)
+    );
     const underLockedRoot = (path: string): boolean => {
         for (const root of lockedRoots) {
             if (path === root || path.startsWith(`${root}/`)) return true;
@@ -98,7 +111,12 @@ export async function GET(request: Request): Promise<Response> {
         if (by === "opened") {
             entries = await recentlyOpened(driver, user.id, connectionId, underLockedRoot);
         } else {
-            entries = await recentlyTouched(driver, by, lockedRoots, await drivePathFilter(user.id, connectionId, "read"));
+            entries = await recentlyTouched(
+                driver,
+                by,
+                lockedRoots,
+                await drivePathFilter(user.id, connectionId, "read")
+            );
         }
 
         const meta = await getMetaMap(
@@ -171,7 +189,11 @@ async function recentlyOpened(
     underLockedRoot: (path: string) => boolean
 ): Promise<RecentEntry[]> {
     const rows = await prisma.auditLog.findMany({
-        where: { actorId: userId, targetId: connectionId, action: { in: ["drive.download", "drive.upload"] } },
+        where: {
+            actorId: userId,
+            targetId: connectionId,
+            action: { in: ["drive.download", "drive.upload"] }
+        },
         orderBy: { at: "desc" },
         take: OPENED_SCAN,
         select: { metadata: true, at: true }

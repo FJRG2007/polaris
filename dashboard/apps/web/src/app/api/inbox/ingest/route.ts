@@ -33,7 +33,10 @@ export async function POST(request: Request): Promise<Response> {
     }
     const parsed = inboundEventSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) {
-        return NextResponse.json({ error: parsed.error?.issues[0]?.message ?? "Invalid event" }, { status: 400 });
+        return NextResponse.json(
+            { error: parsed.error?.issues[0]?.message ?? "Invalid event" },
+            { status: 400 }
+        );
     }
     try {
         await ingestInbound(parsed.data);

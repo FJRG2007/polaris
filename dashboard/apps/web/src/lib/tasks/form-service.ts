@@ -77,7 +77,11 @@ async function requireListInSpace(spaceId: string, listId: string): Promise<void
     }
 }
 
-export async function createForm(spaceId: string, actorId: string, input: core.FormInput): Promise<string> {
+export async function createForm(
+    spaceId: string,
+    actorId: string,
+    input: core.FormInput
+): Promise<string> {
     await requireListInSpace(spaceId, input.listId);
     const form = await prisma.taskForm.create({
         data: {
@@ -98,7 +102,11 @@ export async function createForm(spaceId: string, actorId: string, input: core.F
     return form.id;
 }
 
-export async function updateForm(spaceId: string, formId: string, input: core.FormInput): Promise<void> {
+export async function updateForm(
+    spaceId: string,
+    formId: string,
+    input: core.FormInput
+): Promise<void> {
     await requireListInSpace(spaceId, input.listId);
     const { count } = await prisma.taskForm.updateMany({
         where: { id: formId, spaceId },
@@ -179,8 +187,10 @@ export async function submitForm(
             createdById: true
         }
     });
-    if (!form || !form.enabled) return { ok: false, error: "This form is no longer accepting responses" };
-    if (form.requireLogin && !submittedById) return { ok: false, error: "Sign in to send this form" };
+    if (!form || !form.enabled)
+        return { ok: false, error: "This form is no longer accepting responses" };
+    if (form.requireLogin && !submittedById)
+        return { ok: false, error: "Sign in to send this form" };
 
     const fields = parseFields(form.fields);
     const clean: Record<string, string> = {};
@@ -225,7 +235,10 @@ export async function submitForm(
         }
     }
 
-    if (!name) name = fields[0] ? (clean[fields[0].id] ?? "Form submission").slice(0, 255) : "Form submission";
+    if (!name)
+        name = fields[0]
+            ? (clean[fields[0].id] ?? "Form submission").slice(0, 255)
+            : "Form submission";
     const body = [description, ...spare].filter(Boolean).join("\n\n");
 
     // The task has no author: a form submission is not something an account did,

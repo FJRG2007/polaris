@@ -199,14 +199,22 @@ export function requireWithinOwn(access: OrgMembership, permissions: readonly st
 }
 
 /** The same, for a role named by its slug. */
-export async function requireRoleWithinOwn(access: OrgMembership, orgId: string, slug: string): Promise<void> {
+export async function requireRoleWithinOwn(
+    access: OrgMembership,
+    orgId: string,
+    slug: string
+): Promise<void> {
     if (access.isOwner) return;
     requireWithinOwn(access, (await roleFor(orgId, slug)).permissions);
 }
 
 /** The same, for whatever role somebody on the roster holds now: a member whose
  *  role reaches further than the actor's is not the actor's to move or remove. */
-export async function requireMemberWithinOwn(access: OrgMembership, orgId: string, userId: string): Promise<void> {
+export async function requireMemberWithinOwn(
+    access: OrgMembership,
+    orgId: string,
+    userId: string
+): Promise<void> {
     if (access.isOwner) return;
     const member = await prisma.organizationMember.findUnique({
         where: { orgId_userId: { orgId, userId } },
@@ -342,7 +350,10 @@ export async function orgIdsWhere(
  * asking. Each role is resolved once however many people hold it, and exactly as
  * access is resolved, so the people told are the people who could act on it.
  */
-export async function orgPeopleHolding(orgId: string, permission: core.OrgPermission): Promise<string[]> {
+export async function orgPeopleHolding(
+    orgId: string,
+    permission: core.OrgPermission
+): Promise<string[]> {
     const org = await prisma.organization.findUnique({
         where: { id: orgId },
         select: { ownerId: true, members: { select: { userId: true, role: true } } }

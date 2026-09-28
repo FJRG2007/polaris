@@ -70,7 +70,7 @@ const mayAdminister = vi.fn(() => false);
  *  somebody's own - the narrowing itself is pinned in `vault-shelf.test.ts`. */
 const shelfOrgId = vi.fn(async () => null as string | null);
 vi.mock("@/lib/workspace-scope", () => ({
-    scopeOrgIdFor: (...args: unknown[]) => shelfOrgId(...(args as [])),
+    scopeOrgIdFor: (...args: unknown[]) => shelfOrgId(...(args as []))
 }));
 
 vi.mock("@/lib/vault/orgs", () => ({
@@ -186,9 +186,9 @@ describe("the administered() gate, exercised through saveVaultCollectionAction",
         expect((await actions.saveVaultCollectionAction(VAULT_ID, null, ENC)).error).toBe(REFUSED);
 
         mayAdminister.mockReturnValue(true);
-        expect(
-            (await actions.saveVaultCollectionAction(VAULT_ID, null, "plaintext")).error
-        ).toBe("A collection name must be encrypted.");
+        expect((await actions.saveVaultCollectionAction(VAULT_ID, null, "plaintext")).error).toBe(
+            "A collection name must be encrypted."
+        );
     });
 });
 
@@ -442,7 +442,9 @@ describe("member scope", () => {
         vaultById.mockResolvedValue(ownVault);
         const filter = { not: MEMBER_ID } as unknown as string;
         expect((await actions.setMemberScopeAction(VAULT_ID, filter, scope)).error).toBeTruthy();
-        expect((await actions.confirmVaultMemberAction(VAULT_ID, filter, ENC, scope)).error).toBeTruthy();
+        expect(
+            (await actions.confirmVaultMemberAction(VAULT_ID, filter, ENC, scope)).error
+        ).toBeTruthy();
         expect((await actions.removeVaultMemberAction(VAULT_ID, filter)).error).toBeTruthy();
         expect(setMemberScope).not.toHaveBeenCalled();
         expect(confirmMember).not.toHaveBeenCalled();

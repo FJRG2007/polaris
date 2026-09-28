@@ -55,7 +55,8 @@ export function bindSourceAllowed(source: string, projectSlug: string): boolean 
     if (isReservedBindSource(source)) return false;
     const own = `${DEPLOY_BIND_ROOT}/${projectSlug}`;
     if (source === "polaris" || source === DEPLOY_BIND_ROOT) return false;
-    if (source.startsWith(`${DEPLOY_BIND_ROOT}/`)) return source === own || source.startsWith(`${own}/`);
+    if (source.startsWith(`${DEPLOY_BIND_ROOT}/`))
+        return source === own || source.startsWith(`${own}/`);
     return true;
 }
 
@@ -85,7 +86,11 @@ export async function bindSourceClaimed(
             target: { ownerId: { not: ownerId }, hostId },
             ...(exceptId ? { id: { not: exceptId } } : {}),
             ...(claimedBefore ? { createdAt: { lt: claimedBefore } } : {}),
-            OR: [{ source }, { source: { startsWith: `${source}/` } }, { source: { in: bindAncestors(source) } }]
+            OR: [
+                { source },
+                { source: { startsWith: `${source}/` } },
+                { source: { in: bindAncestors(source) } }
+            ]
         },
         select: { id: true }
     });
@@ -116,16 +121,28 @@ export interface VolumeView {
  * Bounded, because this is a self-heal on a path the user is waiting on: a NAS
  * that has gone quiet must cost the folder check, not the screen.
  */
-async function ensureNasFolders(connectionId: string, sources: readonly string[], ownerId: string): Promise<void> {
+async function ensureNasFolders(
+    connectionId: string,
+    sources: readonly string[],
+    ownerId: string
+): Promise<void> {
     // Held separately from the timeout: giving up on waiting does not cancel the
     // connect, so the session it opens still has to be closed when it lands - or
     // the timeout leaks the very socket this function exists to not leak. Closed
     // without waiting, for the same reason: the deadline is the point.
     const opening = getDriver(connectionId, ownerId);
     try {
-        const driver = await withTimeout(opening, NAS_FOLDER_TIMEOUT_MS, "the storage connection did not answer");
+        const driver = await withTimeout(
+            opening,
+            NAS_FOLDER_TIMEOUT_MS,
+            "the storage connection did not answer"
+        );
         for (const source of sources) {
-            await withTimeout(driver.mkdir(source), NAS_FOLDER_TIMEOUT_MS, "the storage connection did not answer");
+            await withTimeout(
+                driver.mkdir(source),
+                NAS_FOLDER_TIMEOUT_MS,
+                "the storage connection did not answer"
+            );
         }
     } catch (error) {
         console.error(`volume: could not ensure NAS folders on ${connectionId}:`, error);
@@ -138,7 +155,9 @@ async function ensureNasFolders(connectionId: string, sources: readonly string[]
 const NAS_FOLDER_TIMEOUT_MS = 10_000;
 
 /** Group nas volumes by connection, so one session covers all of their folders. */
-function nasFoldersByConnection(rows: readonly { kind: string; connectionId: string | null; source: string | null }[]): Map<string, string[]> {
+function nasFoldersByConnection(
+    rows: readonly { kind: string; connectionId: string | null; source: string | null }[]
+): Map<string, string[]> {
     const byConnection = new Map<string, string[]>();
     for (const row of rows) {
         if (row.kind !== "nas" || !row.connectionId || !row.source) continue;
@@ -164,7 +183,9 @@ export async function listVolumes(applicationId: string, ownerId: string): Promi
         include: { connection: { select: { name: true } } }
     });
     await Promise.all(
-        [...nasFoldersByConnection(rows)].map(([connectionId, sources]) => ensureNasFolders(connectionId, sources, ownerId))
+        [...nasFoldersByConnection(rows)].map(([connectionId, sources]) =>
+            ensureNasFolders(connectionId, sources, ownerId)
+        )
     );
     return rows.map((row) => ({
         id: row.id,
@@ -206,7 +227,9 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
         });
         if (!connection) throw new Error("Storage connection not found");
         if (!canHostMount(connection.kind as StorageProviderKind))
-            throw new Error("This storage connection cannot be host-mounted, so it cannot back a NAS volume");
+            throw new Error(
+                "This storage connection cannot be host-mounted, so it cannot back a NAS volume"
+            );
         if (connection.status !== "active") throw new Error("The storage connection is not active");
     }
 
@@ -224,14 +247,21 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
         throw error;
     }
     if (parsed.kind === "bind" && !bindSourceAllowed(source, app.environment.project.slug))
-        throw new Error("That server folder belongs to Polaris or to another project. Choose a different path.");
+        throw new Error(
+            "That server folder belongs to Polaris or to another project. Choose a different path."
+        );
     if (parsed.kind === "bind" && (await bindSourceClaimed(ownerId, app.target.hostId, source))) {
         // Another account's project shares this slug. A generated path steps
         // aside into a folder of its own; a typed one is that account's data.
-        if (explicit) throw new Error("That server folder is in use by another account. Choose a different path.");
+        if (explicit)
+            throw new Error(
+                "That server folder is in use by another account. Choose a different path."
+            );
         source = normalizeVolumeSource("bind", `${generated}-${app.id.slice(-8).toLowerCase()}`);
         if (await bindSourceClaimed(ownerId, app.target.hostId, source))
-            throw new Error("That server folder is in use by another account. Choose a different path.");
+            throw new Error(
+                "That server folder is in use by another account. Choose a different path."
+            );
     }
 
     const duplicate = await prisma.volume.findFirst({
@@ -275,7 +305,10 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
 /** Update an existing volume (paths, size cap, and for nas the backing connection).
  *  `kind` is fixed at create. Ownership-checked via the target. Re-normalizes the
  *  source and, for nas, ensures the (possibly new) folder exists on the connection. */
-export async function updateVolume(ownerId: string, input: DeployVolumeUpdateInput): Promise<VolumeView> {
+export async function updateVolume(
+    ownerId: string,
+    input: DeployVolumeUpdateInput
+): Promise<VolumeView> {
     const result = deployVolumeUpdateSchema.safeParse(input);
     if (!result.success) throw new Error(result.error.issues[0]?.message ?? "Invalid volume");
     const patch = result.data;
@@ -290,7 +323,9 @@ export async function updateVolume(ownerId: string, input: DeployVolumeUpdateInp
             connectionId: true,
             mountPath: true,
             target: { select: { hostId: true } },
-            application: { select: { environment: { select: { project: { select: { slug: true } } } } } }
+            application: {
+                select: { environment: { select: { project: { select: { slug: true } } } } }
+            }
         }
     });
     if (!existing) throw new Error("Volume not found");
@@ -306,31 +341,48 @@ export async function updateVolume(ownerId: string, input: DeployVolumeUpdateInp
         });
         if (!connection) throw new Error("Storage connection not found");
         if (!canHostMount(connection.kind as StorageProviderKind))
-            throw new Error("This storage connection cannot be host-mounted, so it cannot back a NAS volume");
+            throw new Error(
+                "This storage connection cannot be host-mounted, so it cannot back a NAS volume"
+            );
         if (connection.status !== "active") throw new Error("The storage connection is not active");
     }
 
     // Re-normalize the source when the path changed (named volumes track the name).
     let source = existing.source ?? "";
     if (patch.source !== undefined || (kind === "volume" && patch.name !== undefined)) {
-        const raw = kind === "volume" ? (patch.name ?? existing.source ?? "") : (patch.source ?? existing.source ?? "");
+        const raw =
+            kind === "volume"
+                ? (patch.name ?? existing.source ?? "")
+                : (patch.source ?? existing.source ?? "");
         try {
             source = normalizeVolumeSource(kind, raw);
         } catch (error) {
-            if (error instanceof UnsafePathError) throw new Error("The volume source path is invalid");
+            if (error instanceof UnsafePathError)
+                throw new Error("The volume source path is invalid");
             throw error;
         }
         const projectSlug = existing.application?.environment.project.slug ?? "";
         if (kind === "bind" && (!projectSlug || !bindSourceAllowed(source, projectSlug)))
-            throw new Error("That server folder belongs to Polaris or to another project. Choose a different path.");
-        if (kind === "bind" && (await bindSourceClaimed(ownerId, existing.target.hostId, source, existing.id)))
-            throw new Error("That server folder is in use by another account. Choose a different path.");
+            throw new Error(
+                "That server folder belongs to Polaris or to another project. Choose a different path."
+            );
+        if (
+            kind === "bind" &&
+            (await bindSourceClaimed(ownerId, existing.target.hostId, source, existing.id))
+        )
+            throw new Error(
+                "That server folder is in use by another account. Choose a different path."
+            );
     }
 
     // A moved mount path must not collide with another volume on the same service.
     if (patch.mountPath && patch.mountPath !== existing.mountPath) {
         const clash = await prisma.volume.findFirst({
-            where: { applicationId: existing.applicationId, mountPath: patch.mountPath, id: { not: existing.id } },
+            where: {
+                applicationId: existing.applicationId,
+                mountPath: patch.mountPath,
+                id: { not: existing.id }
+            },
             select: { id: true }
         });
         if (clash) throw new Error("A volume is already mounted at that path");
@@ -344,7 +396,12 @@ export async function updateVolume(ownerId: string, input: DeployVolumeUpdateInp
             source,
             connectionId,
             // "" clears the cap; a value sets it; undefined leaves it unchanged.
-            sizeLimit: patch.sizeLimit === undefined ? undefined : patch.sizeLimit === "" ? null : patch.sizeLimit
+            sizeLimit:
+                patch.sizeLimit === undefined
+                    ? undefined
+                    : patch.sizeLimit === ""
+                      ? null
+                      : patch.sizeLimit
         },
         include: { connection: { select: { name: true } } }
     });
@@ -370,7 +427,11 @@ export async function updateVolume(ownerId: string, input: DeployVolumeUpdateInp
  * removing a volume from a service and destroying what is inside it are two
  * different intentions, and only one of them is recoverable.
  */
-export async function deleteVolume(id: string, ownerId: string, options?: { wipe?: boolean }): Promise<void> {
+export async function deleteVolume(
+    id: string,
+    ownerId: string,
+    options?: { wipe?: boolean }
+): Promise<void> {
     const volume = await prisma.volume.findFirst({
         where: { id, target: { ownerId } },
         select: { id: true }
@@ -442,7 +503,11 @@ export async function volumeRuntime(id: string, ownerId: string) {
         include: {
             target: true,
             application: {
-                include: { environment: { include: { project: true } }, target: true, volumes: { select: { id: true } } }
+                include: {
+                    environment: { include: { project: true } },
+                    target: true,
+                    volumes: { select: { id: true } }
+                }
             }
         }
     });
@@ -508,7 +573,10 @@ export async function wipeVolume(id: string, ownerId: string): Promise<void> {
     if (runtime.volume.kind === "nas" && runtime.volume.connectionId && runtime.volume.source) {
         await prisma.driveFolderSize
             .deleteMany({
-                where: { connectionId: runtime.volume.connectionId, path: { startsWith: runtime.volume.source } }
+                where: {
+                    connectionId: runtime.volume.connectionId,
+                    path: { startsWith: runtime.volume.source }
+                }
             })
             .catch(() => undefined);
     }

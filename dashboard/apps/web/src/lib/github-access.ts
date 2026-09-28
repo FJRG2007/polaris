@@ -53,7 +53,8 @@ export async function githubCredentialsForUser(userId: string): Promise<GithubCr
         // A typed name carries no credential to act with.
         if (link.method === "manual") continue;
         const token = await usableToken(link.id).catch(() => null);
-        if (token) usable.push({ connectionId: link.id, login: link.label, method: link.method, token });
+        if (token)
+            usable.push({ connectionId: link.id, login: link.label, method: link.method, token });
     }
     return usable;
 }
@@ -72,7 +73,9 @@ export async function githubTokenForUser(userId: string, owner?: string): Promis
 async function credentialForUser(userId: string, owner?: string): Promise<GithubCredential | null> {
     const credentials = await githubCredentialsForUser(userId);
     const wanted = owner?.toLowerCase();
-    const match = wanted ? credentials.find((entry) => entry.login.toLowerCase() === wanted) : undefined;
+    const match = wanted
+        ? credentials.find((entry) => entry.login.toLowerCase() === wanted)
+        : undefined;
     return match ?? credentials[0] ?? null;
 }
 
@@ -81,14 +84,17 @@ export async function listReposForUser(userId: string): Promise<GithubRepo[]> {
     const credentials = await githubCredentialsForUser(userId);
     const repos: GithubRepo[] = [];
     for (const credential of credentials) {
-        const listed = await (credential.method === "token"
-            ? listReposForPat(credential.token)
-            : listReposForUserToken(credential.token)
+        const listed = await (
+            credential.method === "token"
+                ? listReposForPat(credential.token)
+                : listReposForUserToken(credential.token)
         ).catch(() => []);
         repos.push(...listed);
     }
     const seen = new Set<string>();
-    return repos.filter((repo) => (seen.has(repo.fullName) ? false : (seen.add(repo.fullName), true)));
+    return repos.filter((repo) =>
+        seen.has(repo.fullName) ? false : (seen.add(repo.fullName), true)
+    );
 }
 
 /**
@@ -97,7 +103,10 @@ export async function listReposForUser(userId: string): Promise<GithubRepo[]> {
  * repository read or nothing at all - the same answer as before any account was
  * linked.
  */
-export async function githubTokenForOwner(userId: string | null, owner?: string): Promise<string | null> {
+export async function githubTokenForOwner(
+    userId: string | null,
+    owner?: string
+): Promise<string | null> {
     if (userId) {
         const personal = await githubTokenForUser(userId, owner).catch(() => null);
         if (personal) return personal;
@@ -178,7 +187,8 @@ export async function githubRepoChoiceRefusal(
     const wanted = repo.owner.toLowerCase();
     if (mine.some((credential) => credential.login.toLowerCase() === wanted)) return null;
     for (const credential of mine) {
-        if ((await repoAccessFor(repo.owner, repo.repo, credential.token)) === "reachable") return null;
+        if ((await repoAccessFor(repo.owner, repo.repo, credential.token)) === "reachable")
+            return null;
     }
     if (await resolveGithubRepo(repo.owner, repo.repo, null).catch(() => null)) return null;
 
@@ -235,7 +245,10 @@ export async function githubCloneProblem(
  * connect one for, and refusing it because nothing is linked would break every
  * deploy that has ever worked without a link.
  */
-export async function githubRepoReach(userId: string | null, repoUrl: string): Promise<string | null> {
+export async function githubRepoReach(
+    userId: string | null,
+    repoUrl: string
+): Promise<string | null> {
     const repo = parseGithubRepo(repoUrl);
     if (!repo) return null;
 
@@ -290,7 +303,9 @@ async function usableToken(connectionId: string): Promise<string | null> {
     const renewed = await refreshGithubUserToken(credential.refreshToken);
     await updateCredential(connectionId, {
         accessToken: renewed.accessToken,
-        ...(renewed.refreshToken ? { refreshToken: renewed.refreshToken } : { refreshToken: credential.refreshToken }),
+        ...(renewed.refreshToken
+            ? { refreshToken: renewed.refreshToken }
+            : { refreshToken: credential.refreshToken }),
         ...(renewed.expiresAt ? { expiresAt: renewed.expiresAt } : {})
     });
     return renewed.accessToken;

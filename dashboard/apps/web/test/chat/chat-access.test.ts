@@ -163,7 +163,9 @@ vi.mock("@polaris/db", () => ({
                     .map((row) => ({
                         channelId: row.channelId,
                         channel: {
-                            spaceId: channels.find((entry) => entry.id === row.channelId)?.spaceId ?? null
+                            spaceId:
+                                channels.find((entry) => entry.id === row.channelId)?.spaceId ??
+                                null
                         }
                     }))
         }
@@ -362,7 +364,9 @@ describe("what the live stream is allowed to tell somebody", () => {
         // this set - search, toasts, the live stream - may keep serving it.
         spaces = [{ id: "org-space", ownerId: "other", orgId: "o1", visibility: "internal" }];
         orgIds = [];
-        channels = [{ id: "general", spaceId: "org-space", kind: "text", private: false, archived: false }];
+        channels = [
+            { id: "general", spaceId: "org-space", kind: "text", private: false, archived: false }
+        ];
         channelMembers = [{ channelId: "general", userId: "me", role: "member" }];
 
         expect(await access.channelAccess(me, "general")).toBeNull();

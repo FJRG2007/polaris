@@ -40,11 +40,13 @@ export function PlayerAddressesCard({ shared }: { shared: boolean }) {
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-4">
                     <div>
-                        <h2 className="text-sm font-medium">Show player addresses to game server managers</h2>
+                        <h2 className="text-sm font-medium">
+                            Show player addresses to game server managers
+                        </h2>
                         <p className="text-xs text-muted-foreground">
-                            When someone managing a game server looks up a Polaris account to add it as a
-                            player, they see the addresses that account signs in from. Turned off, only
-                            administrators see them.
+                            When someone managing a game server looks up a Polaris account to add it
+                            as a player, they see the addresses that account signs in from. Turned
+                            off, only administrators see them.
                         </p>
                     </div>
                     <Switch

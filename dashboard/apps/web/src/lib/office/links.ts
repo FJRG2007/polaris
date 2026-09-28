@@ -368,7 +368,8 @@ function passParts(
     const parts = value.split(".");
     if (parts.length !== 4) return null;
     const [role, linkId, expiry, signature] = parts as [string, string, string, string];
-    if (!core.isOfficeRole(role) || !LINK_ID_PATTERN.test(linkId) || !/^\d{1,12}$/.test(expiry)) return null;
+    if (!core.isOfficeRole(role) || !LINK_ID_PATTERN.test(linkId) || !/^\d{1,12}$/.test(expiry))
+        return null;
     const expiresAt = Number(expiry);
     if (expiresAt * 1000 <= now) return null;
     return { role, linkId, expiresAt, signature };

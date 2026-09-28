@@ -210,7 +210,8 @@ async function resolveReader(
         if (!app) throw new DriveAccessError();
         if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
             if (app.environment.project.ownerId !== userId) throw new DriveAccessError();
-            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action])))
+                throw new DriveAccessError();
         }
         return { kind: "settled" };
     }
@@ -228,7 +229,8 @@ async function resolveReader(
         if (!host) throw new DriveAccessError();
         if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
             if (host.ownerId !== userId) throw new DriveAccessError();
-            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action])))
+                throw new DriveAccessError();
         }
         return { kind: "settled" };
     }

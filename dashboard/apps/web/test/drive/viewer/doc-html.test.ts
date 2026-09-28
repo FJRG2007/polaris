@@ -30,13 +30,19 @@ async function docxWithLinks(links: Record<string, string>): Promise<Buffer> {
     zip.file(
         "word/_rels/document.xml.rels",
         `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${ids
-            .map((id) => `<Relationship Id="${id}" Type="${LINK}" Target="${links[id]}" TargetMode="External"/>`)
+            .map(
+                (id) =>
+                    `<Relationship Id="${id}" Type="${LINK}" Target="${links[id]}" TargetMode="External"/>`
+            )
             .join("")}</Relationships>`
     );
     zip.file(
         "word/document.xml",
         `<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="${W}" xmlns:r="${R}"><w:body>${ids
-            .map((id) => `<w:p><w:hyperlink r:id="${id}"><w:r><w:t>link ${id}</w:t></w:r></w:hyperlink></w:p>`)
+            .map(
+                (id) =>
+                    `<w:p><w:hyperlink r:id="${id}"><w:r><w:t>link ${id}</w:t></w:r></w:hyperlink></w:p>`
+            )
             .join("")}</w:body></w:document>`
     );
     return zip.generateAsync({ type: "nodebuffer" });
@@ -57,7 +63,9 @@ describe("sanitizeDocHtml", () => {
     it("keeps web links and embedded pictures", async () => {
         const buffer = await docxWithLinks({ rId6: "https://example.com/page" });
         const raw = (await mammoth.convertToHtml({ buffer })).value;
-        const safe = await sanitizeDocHtml(`${raw}<img src="data:image/png;base64,iVBORw0KGgo=" alt="">`);
+        const safe = await sanitizeDocHtml(
+            `${raw}<img src="data:image/png;base64,iVBORw0KGgo=" alt="">`
+        );
         expect(safe).toContain('href="https://example.com/page"');
         expect(safe).toContain('src="data:image/png;base64,iVBORw0KGgo="');
     });

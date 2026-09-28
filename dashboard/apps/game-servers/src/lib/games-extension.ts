@@ -153,7 +153,11 @@ export const gameServersExtension: AppExtension = {
         const access =
             game.game === "minecraft"
                 ? await import("./minecraft/player-access")
-                      .then((access) => access.listPlayerAccess(ownerId, game.installedAppId).then(access.forViewer))
+                      .then((access) =>
+                          access
+                              .listPlayerAccess(ownerId, game.installedAppId)
+                              .then(access.forViewer)
+                      )
                       .catch(() => null)
                 : null;
         return {

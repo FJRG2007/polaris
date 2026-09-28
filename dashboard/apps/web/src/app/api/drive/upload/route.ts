@@ -77,7 +77,9 @@ export async function PUT(request: Request): Promise<Response> {
         });
         return Response.json({ ok: true, path: stat.path, size: stat.size.toString() });
     } catch (error) {
-        return new Response(error instanceof Error ? error.message : "Upload failed", { status: 500 });
+        return new Response(error instanceof Error ? error.message : "Upload failed", {
+            status: 500
+        });
     } finally {
         await driver.dispose();
     }

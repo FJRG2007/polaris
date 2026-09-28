@@ -132,8 +132,9 @@ describe("walking a folder of an organization's Drive", () => {
         // from and then walk it. The folder only Legal opens is a rule on that
         // folder, and a walk that never asked would hand its files over.
         resolveOrgAccess.mockResolvedValue({ isOwner: false, permissions: ["org.read"] });
-        resolveDriveDecision.mockImplementation(async (_user: string, _conn: string, path: string) =>
-            path === "legal" || path.startsWith("legal/") ? "deny" : "implicit-deny"
+        resolveDriveDecision.mockImplementation(
+            async (_user: string, _conn: string, path: string) =>
+                path === "legal" || path.startsWith("legal/") ? "deny" : "implicit-deny"
         );
         const mayRead = await drivePathFilter(PERSON, ORG, "download");
         expect(await mayRead("contracts/a.pdf")).toBe(true);

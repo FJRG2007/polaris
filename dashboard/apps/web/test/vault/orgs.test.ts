@@ -392,9 +392,7 @@ describe("setCollectionMembers", () => {
             { id: "m-elsewhere", readOnly: false, hidePasswords: false }
         ]);
         expect(vaultCollectionAccessCreateMany).toHaveBeenCalledWith({
-            data: [
-                { collectionId: "col-1", orgUserId: "m1", readOnly: true, hidePasswords: true }
-            ]
+            data: [{ collectionId: "col-1", orgUserId: "m1", readOnly: true, hidePasswords: true }]
         });
         expect(bumpRevision).toHaveBeenCalledWith("u2");
     });

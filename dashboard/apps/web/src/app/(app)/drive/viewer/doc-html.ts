@@ -13,7 +13,19 @@
 export async function sanitizeDocHtml(html: string): Promise<string> {
     const DOMPurify = (await import("dompurify")).default;
     return DOMPurify.sanitize(html, {
-        FORBID_TAGS: ["style", "link", "iframe", "script", "form", "input", "button", "meta", "base", "object", "embed"],
+        FORBID_TAGS: [
+            "style",
+            "link",
+            "iframe",
+            "script",
+            "form",
+            "input",
+            "button",
+            "meta",
+            "base",
+            "object",
+            "embed"
+        ],
         FORBID_ATTR: ["style", "srcset"]
     });
 }

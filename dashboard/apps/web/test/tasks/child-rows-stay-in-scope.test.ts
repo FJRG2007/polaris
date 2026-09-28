@@ -103,15 +103,23 @@ describe("an automation", () => {
         await automations.updateAutomation(SPACE, "a1", rule);
         await automations.setAutomationEnabled(SPACE, "a1", false);
         await automations.deleteAutomation(SPACE, "a1");
-        expect(taskAutomation.updateMany.mock.calls.every(([args]) => args.where.spaceId === SPACE)).toBe(true);
-        expect(taskAutomation.deleteMany).toHaveBeenCalledWith({ where: { id: "a1", spaceId: SPACE } });
+        expect(
+            taskAutomation.updateMany.mock.calls.every(([args]) => args.where.spaceId === SPACE)
+        ).toBe(true);
+        expect(taskAutomation.deleteMany).toHaveBeenCalledWith({
+            where: { id: "a1", spaceId: SPACE }
+        });
     });
 
     it("refuses a rule from another space", async () => {
         taskAutomation.updateMany.mockResolvedValue({ count: 0 });
         taskAutomation.deleteMany.mockResolvedValue({ count: 0 });
-        await expect(automations.updateAutomation(SPACE, "elsewhere", rule)).rejects.toThrow(/not in this space/);
-        await expect(automations.deleteAutomation(SPACE, "elsewhere")).rejects.toThrow(/not in this space/);
+        await expect(automations.updateAutomation(SPACE, "elsewhere", rule)).rejects.toThrow(
+            /not in this space/
+        );
+        await expect(automations.deleteAutomation(SPACE, "elsewhere")).rejects.toThrow(
+            /not in this space/
+        );
     });
 });
 
@@ -119,7 +127,9 @@ describe("a form", () => {
     it("is kept to its space, and files only into one of that space's lists", async () => {
         await forms.updateForm(SPACE, "f1", form);
         expect(taskList.count).toHaveBeenCalledWith({ where: { id: "list-1", spaceId: SPACE } });
-        expect(taskForm.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "f1", spaceId: SPACE } }));
+        expect(taskForm.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: "f1", spaceId: SPACE } })
+        );
 
         await forms.deleteForm(SPACE, "f1");
         expect(taskForm.deleteMany).toHaveBeenCalledWith({ where: { id: "f1", spaceId: SPACE } });
@@ -142,7 +152,9 @@ describe("a sprint", () => {
             startDate: "2026-09-01",
             endDate: "2026-09-14"
         } as Parameters<typeof planning.updateSprint>[2]);
-        expect(taskSprint.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "s1", spaceId: SPACE } }));
+        expect(taskSprint.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: "s1", spaceId: SPACE } })
+        );
 
         await planning.deleteSprint(SPACE, "s1");
         expect(taskSprint.deleteMany).toHaveBeenCalledWith({ where: { id: "s1", spaceId: SPACE } });
@@ -151,9 +163,15 @@ describe("a sprint", () => {
     it("refuses another space's sprint, and a task moved into one", async () => {
         taskSprint.findFirst.mockResolvedValue(null);
         taskSprint.deleteMany.mockResolvedValue({ count: 0 });
-        await expect(planning.setSprintStatus(SPACE, "elsewhere", "completed")).rejects.toThrow(/not in this space/);
-        await expect(planning.deleteSprint(SPACE, "elsewhere")).rejects.toThrow(/not in this space/);
-        await expect(planning.setTaskSprint(SPACE, TASK, "elsewhere")).rejects.toThrow(/not in this space/);
+        await expect(planning.setSprintStatus(SPACE, "elsewhere", "completed")).rejects.toThrow(
+            /not in this space/
+        );
+        await expect(planning.deleteSprint(SPACE, "elsewhere")).rejects.toThrow(
+            /not in this space/
+        );
+        await expect(planning.setTaskSprint(SPACE, TASK, "elsewhere")).rejects.toThrow(
+            /not in this space/
+        );
         expect(taskSprint.update).not.toHaveBeenCalled();
         expect(task.update).not.toHaveBeenCalled();
     });
@@ -162,14 +180,18 @@ describe("a sprint", () => {
 describe("a time entry", () => {
     it("is removed by a moderator only on the task they moderate", async () => {
         await time.deleteTimeEntry("u1", TASK, "e1", true);
-        expect(taskTimeEntry.deleteMany).toHaveBeenCalledWith({ where: { id: "e1", taskId: TASK } });
+        expect(taskTimeEntry.deleteMany).toHaveBeenCalledWith({
+            where: { id: "e1", taskId: TASK }
+        });
     });
 });
 
 describe("a checklist, its steps and a link", () => {
     it("keeps every write to the authorized task", async () => {
         await details.deleteChecklist(TASK, "c1");
-        expect(taskChecklist.deleteMany).toHaveBeenCalledWith({ where: { id: "c1", taskId: TASK } });
+        expect(taskChecklist.deleteMany).toHaveBeenCalledWith({
+            where: { id: "c1", taskId: TASK }
+        });
 
         await details.setChecklistItemDone(TASK, "i1", true);
         expect(taskChecklistItem.updateMany).toHaveBeenCalledWith(
@@ -177,7 +199,9 @@ describe("a checklist, its steps and a link", () => {
         );
 
         await details.deleteChecklistItem(TASK, "i1");
-        expect(taskChecklistItem.deleteMany).toHaveBeenCalledWith({ where: { id: "i1", checklist: { taskId: TASK } } });
+        expect(taskChecklistItem.deleteMany).toHaveBeenCalledWith({
+            where: { id: "i1", checklist: { taskId: TASK } }
+        });
 
         await details.removeDependency(TASK, "d1");
         expect(taskDependency.deleteMany).toHaveBeenCalledWith({
@@ -187,10 +211,15 @@ describe("a checklist, its steps and a link", () => {
 
     it("refuses a step on another task, and never promotes it", async () => {
         taskChecklist.findFirst.mockResolvedValue(null);
-        await expect(details.addChecklistItem(TASK, "elsewhere", "Step")).rejects.toThrow(/no longer exists/);
+        await expect(details.addChecklistItem(TASK, "elsewhere", "Step")).rejects.toThrow(
+            /no longer exists/
+        );
         expect(taskChecklistItem.create).not.toHaveBeenCalled();
 
-        taskChecklistItem.findUnique.mockResolvedValue({ name: "Theirs", checklist: { taskId: "task-2" } });
+        taskChecklistItem.findUnique.mockResolvedValue({
+            name: "Theirs",
+            checklist: { taskId: "task-2" }
+        });
         const create = vi.fn(async () => ({ id: "new" }));
         expect(await details.promoteChecklistItem(TASK, "i-elsewhere", create)).toBeNull();
         expect(create).not.toHaveBeenCalled();

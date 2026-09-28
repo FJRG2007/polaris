@@ -50,9 +50,12 @@ export async function GET(
     // something that is not going to start working.
     const reader = await officeReader(id, session?.id ?? null);
     if (!reader) {
-        return Response.json({ error: session ? "Forbidden" : "Unauthorized" }, {
-            status: session ? 403 : 401
-        });
+        return Response.json(
+            { error: session ? "Forbidden" : "Unauthorized" },
+            {
+                status: session ? 403 : 401
+            }
+        );
     }
 
     // The tab that opened this. Named by the browser so two tabs of one account

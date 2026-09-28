@@ -277,11 +277,7 @@ export async function unlockFileRequestAction(
     const store = await cookies();
     store.set(
         dropPoints.fileRequestUnlockCookie(request.id),
-        dropPoints.signFileRequestUnlock(
-            request.id,
-            request.passwordHash,
-            env.POLARIS_AUTH_SECRET
-        ),
+        dropPoints.signFileRequestUnlock(request.id, request.passwordHash, env.POLARIS_AUTH_SECRET),
         {
             httpOnly: true,
             sameSite: "lax",

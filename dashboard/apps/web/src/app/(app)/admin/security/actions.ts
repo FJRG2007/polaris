@@ -15,7 +15,9 @@ import { instanceSecuritySchema } from "@polaris/core";
 import { setInstanceSecurity } from "@/lib/instance-security";
 import { setPlayerAddressesShared } from "@/lib/player-address-policy";
 
-export async function saveInstanceSecurityAction(input: unknown): Promise<{ error?: string; ok?: string }> {
+export async function saveInstanceSecurityAction(
+    input: unknown
+): Promise<{ error?: string; ok?: string }> {
     const admin = await requireAdmin();
     const parsed = instanceSecuritySchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };

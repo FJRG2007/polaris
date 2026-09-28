@@ -32,7 +32,9 @@ beforeEach(() => {
 
 describe("fetchSiteIcon", () => {
     it("refuses an SVG favicon", async () => {
-        fetchMock.mockResolvedValue(answer("image/svg+xml", "<svg><script>alert(1)</script></svg>"));
+        fetchMock.mockResolvedValue(
+            answer("image/svg+xml", "<svg><script>alert(1)</script></svg>")
+        );
         expect(await fetchSiteIcon("svg-icon.example")).toBeNull();
     });
 

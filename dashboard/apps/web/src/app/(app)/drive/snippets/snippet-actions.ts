@@ -246,11 +246,7 @@ export async function unlockSnippetAction(
     const store = await cookies();
     store.set(
         snippetService.snippetUnlockCookie(snippet.id),
-        snippetService.signSnippetUnlock(
-            snippet.id,
-            snippet.passwordHash,
-            env.POLARIS_AUTH_SECRET
-        ),
+        snippetService.signSnippetUnlock(snippet.id, snippet.passwordHash, env.POLARIS_AUTH_SECRET),
         {
             httpOnly: true,
             sameSite: "lax",

@@ -27,7 +27,9 @@ const route = await import("../../src/app/api/drive/upload/route");
 
 function upload(p: string, name: string): Promise<Response> {
     const query = new URLSearchParams({ c: "conn-1", p, name });
-    return route.PUT(new Request(`https://polaris.test/api/drive/upload?${query}`, { method: "PUT", body: "x" }));
+    return route.PUT(
+        new Request(`https://polaris.test/api/drive/upload?${query}`, { method: "PUT", body: "x" })
+    );
 }
 
 beforeEach(() => {
@@ -49,7 +51,12 @@ describe("a drive upload", () => {
 
     it("is checked against the deepest folder of a nested folder upload", async () => {
         await upload("team/inbox", "album/2026/photo.jpg");
-        expect(requireDriveDriver).toHaveBeenCalledWith("writer-1", "conn-1", "team/inbox/album/2026", "write");
+        expect(requireDriveDriver).toHaveBeenCalledWith(
+            "writer-1",
+            "conn-1",
+            "team/inbox/album/2026",
+            "write"
+        );
     });
 
     it("writes nothing when that folder is refused", async () => {

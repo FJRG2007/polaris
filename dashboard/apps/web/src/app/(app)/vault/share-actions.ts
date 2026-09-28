@@ -409,7 +409,8 @@ export async function memberPublicKeyAction(
 ): Promise<{ publicKey?: string; error?: string }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
-    if (!idSchema.safeParse(memberId).success) return { error: "That member is not in this vault." };
+    if (!idSchema.safeParse(memberId).success)
+        return { error: "That member is not in this vault." };
     const member = await prisma.vaultOrgUser.findFirst({
         where: { id: memberId, orgId: gate.vaultId },
         select: { userId: true }
@@ -421,7 +422,9 @@ export async function memberPublicKeyAction(
           })
         : null;
     if (!account?.publicKey) {
-        return { error: "They have not set up a vault of their own yet, so there is no key to wrap this to." };
+        return {
+            error: "They have not set up a vault of their own yet, so there is no key to wrap this to."
+        };
     }
     return { publicKey: account.publicKey };
 }
@@ -436,7 +439,8 @@ export async function confirmVaultMemberAction(
 ): Promise<{ error?: string }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
-    if (!idSchema.safeParse(memberId).success) return { error: "That member could not be confirmed." };
+    if (!idSchema.safeParse(memberId).success)
+        return { error: "That member could not be confirmed." };
     const parsed = core.vaultScopeSchema.safeParse(scope);
     if (!parsed.success) return { error: "Say what they should reach." };
     // Handing the key over while granting nothing is strictly worse than not
@@ -459,7 +463,8 @@ export async function setMemberScopeAction(
 ): Promise<{ error?: string }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
-    if (!idSchema.safeParse(memberId).success) return { error: "That member is not in this vault." };
+    if (!idSchema.safeParse(memberId).success)
+        return { error: "That member is not in this vault." };
     const parsed = core.vaultScopeSchema.safeParse(scope);
     if (!parsed.success) return { error: "Say what they should reach." };
     if (!(await vaultOrgs.setMemberScope(gate.vaultId, memberId, parsed.data))) {
@@ -475,7 +480,8 @@ export async function removeVaultMemberAction(
 ): Promise<{ error?: string }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
-    if (!idSchema.safeParse(memberId).success) return { error: "That member is not in this vault." };
+    if (!idSchema.safeParse(memberId).success)
+        return { error: "That member is not in this vault." };
     if (!(await vaultOrgs.removeMember(gate.vaultId, memberId))) {
         return { error: "That member is not in this vault." };
     }
@@ -524,7 +530,8 @@ export async function deleteVaultCollectionAction(
 ): Promise<{ error?: string }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
-    if (!idSchema.safeParse(collectionId).success) return { error: "That collection is not in this vault." };
+    if (!idSchema.safeParse(collectionId).success)
+        return { error: "That collection is not in this vault." };
     if (!(await vaultOrgs.deleteCollection(gate.vaultId, collectionId))) {
         return { error: "That collection is not in this vault." };
     }

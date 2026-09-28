@@ -31,7 +31,9 @@ const route = await import("../../src/app/api/drive/download/route");
 
 function open(path: string): Promise<Response> {
     return route.GET(
-        new Request(`https://polaris.test/api/drive/download?c=conn-1&p=${encodeURIComponent(path)}&disposition=inline`)
+        new Request(
+            `https://polaris.test/api/drive/download?c=conn-1&p=${encodeURIComponent(path)}&disposition=inline`
+        )
     );
 }
 

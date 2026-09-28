@@ -19,7 +19,12 @@ const TREE: Record<string, Array<{ name: string; path: string; kind: "file" | "d
 };
 
 const driver = {
-    stat: async (path: string) => ({ path, kind: path in TREE ? "dir" : "file", size: 1n, modifiedAt: AT }),
+    stat: async (path: string) => ({
+        path,
+        kind: path in TREE ? "dir" : "file",
+        size: 1n,
+        modifiedAt: AT
+    }),
     list: async (path: string) => ({
         entries: (TREE[path] ?? []).map((entry) => ({ ...entry, size: 1n, modifiedAt: AT }))
     }),
@@ -28,13 +33,19 @@ const driver = {
 
 async function names(filter?: (path: string) => Promise<boolean>): Promise<string[]> {
     const out: string[] = [];
-    for await (const source of zipSourcesFor(driver, ["team"], new Set(), filter)) out.push(source.name);
+    for await (const source of zipSourcesFor(driver, ["team"], new Set(), filter))
+        out.push(source.name);
     return out;
 }
 
 describe("zipSourcesFor", () => {
     it("walks everything when nothing is filtered", async () => {
-        expect(await names()).toEqual(["team/", "team/notes.txt", "team/hr/", "team/hr/payroll.xlsx"]);
+        expect(await names()).toEqual([
+            "team/",
+            "team/notes.txt",
+            "team/hr/",
+            "team/hr/payroll.xlsx"
+        ]);
     });
 
     it("leaves a refused subfolder and its files out", async () => {

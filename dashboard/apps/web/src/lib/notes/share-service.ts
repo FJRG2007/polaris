@@ -83,7 +83,9 @@ type ShareRow = {
 function list(json: string): string[] {
     try {
         const parsed: unknown = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }
@@ -286,7 +288,10 @@ export async function registerNoteShareView(shareId: string): Promise<boolean> {
     });
     if (!capped) return false;
     if (capped.maxViews === null) {
-        await prisma.noteShare.update({ where: { id: shareId }, data: { viewCount: { increment: 1 } } });
+        await prisma.noteShare.update({
+            where: { id: shareId },
+            data: { viewCount: { increment: 1 } }
+        });
         return true;
     }
     const taken = await prisma.noteShare.updateMany({
@@ -334,7 +339,7 @@ export async function verifyNoteSharePassword(shareId: string, password: string)
 export interface PublishedNote {
     readonly title: string;
     readonly body: string;
-    readonly children: readonly { readonly title: string; readonly body: string; }[];
+    readonly children: readonly { readonly title: string; readonly body: string }[];
     readonly updatedAt: string;
 }
 

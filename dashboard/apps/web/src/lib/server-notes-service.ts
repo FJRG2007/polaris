@@ -17,12 +17,18 @@ import * as comments from "./comments/comments";
 import * as activity from "./activity/activity";
 
 async function requireOwnedHost(hostId: string, ownerId: string): Promise<void> {
-    const host = await prisma.host.findFirst({ where: { id: hostId, ownerId }, select: { id: true } });
+    const host = await prisma.host.findFirst({
+        where: { id: hostId, ownerId },
+        select: { id: true }
+    });
     if (!host) throw new Error("Server not found");
 }
 
 /** What has happened to this server. */
-export async function serverHistory(hostId: string, ownerId: string): Promise<activity.ActivityLine[]> {
+export async function serverHistory(
+    hostId: string,
+    ownerId: string
+): Promise<activity.ActivityLine[]> {
     await requireOwnedHost(hostId, ownerId);
     return activity.history("host", hostId, 60);
 }
@@ -44,7 +50,10 @@ export async function recordServerEvent(
     });
 }
 
-export async function serverNotes(hostId: string, ownerId: string): Promise<comments.CommentView[]> {
+export async function serverNotes(
+    hostId: string,
+    ownerId: string
+): Promise<comments.CommentView[]> {
     await requireOwnedHost(hostId, ownerId);
     return comments.thread("host", hostId);
 }
@@ -54,7 +63,11 @@ export async function postServerNote(hostId: string, ownerId: string, body: stri
     await comments.post(ownerId, { subjectType: "host", subjectId: hostId, body });
 }
 
-export async function deleteServerNote(hostId: string, ownerId: string, commentId: string): Promise<void> {
+export async function deleteServerNote(
+    hostId: string,
+    ownerId: string,
+    commentId: string
+): Promise<void> {
     await requireOwnedHost(hostId, ownerId);
     // Only the server's owner gets past the check above, and the owner moderates
     // their own server's notes.
@@ -66,7 +79,11 @@ export async function isFollowingServer(hostId: string, userId: string): Promise
     return follow.isFollowing("host", hostId, userId);
 }
 
-export async function setFollowingServer(hostId: string, userId: string, following: boolean): Promise<void> {
+export async function setFollowingServer(
+    hostId: string,
+    userId: string,
+    following: boolean
+): Promise<void> {
     await requireOwnedHost(hostId, userId);
     if (following) await follow.follow("host", hostId, userId);
     else await follow.unfollow("host", hostId, userId);

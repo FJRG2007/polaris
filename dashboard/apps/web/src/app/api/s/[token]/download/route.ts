@@ -65,7 +65,8 @@ export async function GET(
         await logShareAccess({ shareId: share.id, action: "download", ip, ipHash, userAgentHash });
 
         const headerStore = await headers();
-        const contentType = stat.mime ?? mimeForName(baseName(target)) ?? "application/octet-stream";
+        const contentType =
+            stat.mime ?? mimeForName(baseName(target)) ?? "application/octet-stream";
         const responseHeaders = new Headers({
             "content-type": contentType,
             // A visitor on an upload link chooses what lands here, and an SVG or

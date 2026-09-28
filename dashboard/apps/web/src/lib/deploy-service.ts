@@ -2463,8 +2463,18 @@ async function buildAppPlan(
     // the same folder as another account's; the one that came second yields.
     for (const volume of app.volumes) {
         if (volume.kind !== "bind" || !volume.source) continue;
-        if (await bindSourceClaimed(ownerId, app.target.hostId, volume.source, volume.id, volume.createdAt))
-            throw new Error(`The server folder of volume ${volume.name} is in use by another account. Choose a different path.`);
+        if (
+            await bindSourceClaimed(
+                ownerId,
+                app.target.hostId,
+                volume.source,
+                volume.id,
+                volume.createdAt
+            )
+        )
+            throw new Error(
+                `The server folder of volume ${volume.name} is in use by another account. Choose a different path.`
+            );
     }
     const nasConnectionIds = [
         ...new Set(
@@ -2560,7 +2570,9 @@ async function buildAppPlan(
             // A server folder Polaris keeps for itself (an agent home, a database
             // archive) is refused where it is written; this stops one stored before.
             if (kind === "bind" && isReservedBindSource(stored))
-                throw new Error(`The server folder of volume ${volume.name} belongs to Polaris. Choose a different path.`);
+                throw new Error(
+                    `The server folder of volume ${volume.name} belongs to Polaris. Choose a different path.`
+                );
             const source =
                 kind === "nas" && volume.connectionId ? `${volume.connectionId}/${stored}` : stored;
             return { mountPath: volume.mountPath, source, kind };
@@ -3508,7 +3520,12 @@ export async function deleteServiceComment(
     // Whoever got past the check above reaches this service's notes, and the
     // people who reach a service moderate its notes - including the ones a rule
     // left.
-    await comments.remove(actorId, { subjectType: "app", subjectId: applicationId }, commentId, true);
+    await comments.remove(
+        actorId,
+        { subjectType: "app", subjectId: applicationId },
+        commentId,
+        true
+    );
 }
 
 /**

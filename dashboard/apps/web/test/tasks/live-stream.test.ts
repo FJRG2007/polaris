@@ -38,7 +38,9 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Open a connection and collect what it writes until it is closed. */
 async function listen(): Promise<{ frames: () => string[]; close: () => void }> {
     const controller = new AbortController();
-    const response = await GET(new Request("http://polaris.test/api/tasks/stream", { signal: controller.signal }));
+    const response = await GET(
+        new Request("http://polaris.test/api/tasks/stream", { signal: controller.signal })
+    );
     const reader = (response.body as ReadableStream<Uint8Array>).getReader();
     const decoder = new TextDecoder();
     const seen: string[] = [];

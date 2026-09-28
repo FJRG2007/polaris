@@ -22,7 +22,9 @@ const route = await import("../../src/app/api/attachments/fetch/route");
 describe("a fetched attachment", () => {
     it("is a sandboxed download, not a page on this origin", async () => {
         const answer = await route.GET(
-            new Request("https://polaris.test/api/attachments/fetch?url=https%3A%2F%2Fexample.com%2Fpage.html")
+            new Request(
+                "https://polaris.test/api/attachments/fetch?url=https%3A%2F%2Fexample.com%2Fpage.html"
+            )
         );
         expect(answer.status).toBe(200);
         expect(answer.headers.get("content-disposition")).toBe("attachment");

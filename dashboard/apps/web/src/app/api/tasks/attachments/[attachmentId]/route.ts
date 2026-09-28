@@ -38,7 +38,10 @@ export async function GET(
     const file = await readAttachment(attachmentId);
     if (!file) return new Response("Not found", { status: 404 });
 
-    const inline = file.mime.startsWith("image/") || file.mime.startsWith("video/") || file.mime === "application/pdf";
+    const inline =
+        file.mime.startsWith("image/") ||
+        file.mime.startsWith("video/") ||
+        file.mime === "application/pdf";
     return new Response(file.body, {
         headers: {
             "Content-Type": file.mime,

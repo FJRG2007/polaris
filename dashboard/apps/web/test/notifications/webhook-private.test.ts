@@ -42,18 +42,21 @@ describe("a webhook pointed inside the network", () => {
         expect(hits).toBe(0);
     });
 
-    it.each(["https://10.0.0.5/hook", "https://169.254.169.254/latest/meta-data/", "https://[::1]/hook"])(
-        "refuses %s without telling its status",
-        async (address) => {
-            expect(await sendWebhook(address, "generic", PAYLOAD)).toEqual({
-                error: "The endpoint could not be reached."
-            });
-        }
-    );
-
-    it("refuses an address carrying credentials", async () => {
-        expect(await sendWebhook("https://user:pass@example.com/hook", "generic", PAYLOAD)).toEqual({
+    it.each([
+        "https://10.0.0.5/hook",
+        "https://169.254.169.254/latest/meta-data/",
+        "https://[::1]/hook"
+    ])("refuses %s without telling its status", async (address) => {
+        expect(await sendWebhook(address, "generic", PAYLOAD)).toEqual({
             error: "The endpoint could not be reached."
         });
+    });
+
+    it("refuses an address carrying credentials", async () => {
+        expect(await sendWebhook("https://user:pass@example.com/hook", "generic", PAYLOAD)).toEqual(
+            {
+                error: "The endpoint could not be reached."
+            }
+        );
     });
 });

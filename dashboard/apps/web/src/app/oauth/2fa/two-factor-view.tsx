@@ -18,7 +18,16 @@ import { KeyRound, Mail, Smartphone } from "lucide-react";
 import { WhatsAppLogo } from "@/app/(app)/admin/inbox/channel-logos";
 import type { ChallengeOptions } from "@/lib/two-factor-delivery";
 import { useEffect, useState, type ComponentType, type FormEvent } from "react";
-import { Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Input, PolarisMark } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Checkbox,
+    Input,
+    PolarisMark
+} from "@polaris/ui";
 import {
     TWO_FACTOR_METHOD_HEADER,
     TWO_FACTOR_METHOD_INFO,
@@ -145,8 +154,17 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
 
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         {needsSending ? (
-                            <Button type="button" variant="outline" disabled={pending || cooldown > 0} onClick={() => void send()}>
-                                {cooldown > 0 ? `Send again in ${cooldown}s` : sent ? "Send again" : "Send a code"}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={pending || cooldown > 0}
+                                onClick={() => void send()}
+                            >
+                                {cooldown > 0
+                                    ? `Send again in ${cooldown}s`
+                                    : sent
+                                      ? "Send again"
+                                      : "Send a code"}
                             </Button>
                         ) : null}
                         {sent ? <p className="text-sm text-success">{sent}</p> : null}
@@ -167,7 +185,13 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                                     required
                                 />
                             ) : (
-                                <CodeInput name="code" autoFocus value={code} onValueChange={setCode} required />
+                                <CodeInput
+                                    name="code"
+                                    autoFocus
+                                    value={code}
+                                    onValueChange={setCode}
+                                    required
+                                />
                             )}
                         </label>
                         {backup ? null : (

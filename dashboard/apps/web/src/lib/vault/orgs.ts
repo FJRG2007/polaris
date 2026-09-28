@@ -94,7 +94,9 @@ function keysUsable(input: NewVaultKeys): boolean {
  * holds the key. The owner is whichever of the two ids is set.
  */
 async function insertVault(
-    owner: { organizationId: string; name?: undefined } | { organizationId?: undefined; name: string },
+    owner:
+        | { organizationId: string; name?: undefined }
+        | { organizationId?: undefined; name: string },
     input: NewVaultKeys
 ): Promise<string> {
     const created = await prisma.vaultOrganization.create({
@@ -280,7 +282,9 @@ async function notTheOwner(orgId: string): Promise<Prisma.VaultOrgUserWhereInput
         where: { id: orgId },
         select: { ownerUserId: true }
     });
-    return vault?.ownerUserId ? { OR: [{ userId: null }, { userId: { not: vault.ownerUserId } }] } : {};
+    return vault?.ownerUserId
+        ? { OR: [{ userId: null }, { userId: { not: vault.ownerUserId } }] }
+        : {};
 }
 
 /** Invite somebody by address. They hold no key until they are confirmed. */
@@ -364,11 +368,7 @@ export async function setMemberScope(
 }
 
 /** The collection rows behind a scope, kept to collections of THIS vault. */
-async function writeScope(
-    orgId: string,
-    memberId: string,
-    scope: core.VaultScope
-): Promise<void> {
+async function writeScope(orgId: string, memberId: string, scope: core.VaultScope): Promise<void> {
     const wanted = scope.accessAll ? [] : scope.collections;
     const allowed = new Set(
         (
@@ -379,7 +379,9 @@ async function writeScope(
         ).map((row) => row.id)
     );
     await prisma.$transaction([
-        prisma.vaultCollectionAccess.deleteMany({ where: { orgUserId: memberId, member: { orgId } } }),
+        prisma.vaultCollectionAccess.deleteMany({
+            where: { orgUserId: memberId, member: { orgId } }
+        }),
         ...(allowed.size > 0
             ? [
                   prisma.vaultCollectionAccess.createMany({

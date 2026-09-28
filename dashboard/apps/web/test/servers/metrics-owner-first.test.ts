@@ -10,11 +10,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const hostCount = vi.fn(async (_args: unknown) => 1);
-const getHostConnection = vi.fn(async () => ({ address: "192.0.2.10", port: 22, username: "root", auth: {} }));
+const getHostConnection = vi.fn(async () => ({
+    address: "192.0.2.10",
+    port: 22,
+    username: "root",
+    auth: {}
+}));
 const borrowSsh = vi.fn(async () => ({ client: {}, release: () => undefined }));
-const execCommand = vi.fn(async (_client: unknown, _command: string, options: { onStdout: (chunk: Buffer) => void }) => {
-    options.onStdout(Buffer.from(""));
-});
+const execCommand = vi.fn(
+    async (_client: unknown, _command: string, options: { onStdout: (chunk: Buffer) => void }) => {
+        options.onStdout(Buffer.from(""));
+    }
+);
 
 vi.mock("@polaris/db", () => ({ prisma: { host: { count: hostCount } } }));
 vi.mock("@polaris/ssh", () => ({ execCommand }));
@@ -36,6 +43,8 @@ describe("getServerMetrics", () => {
 
         hostCount.mockResolvedValue(0);
         await expect(getServerMetrics("host-1", "somebody-else")).rejects.toThrow("Host not found");
-        expect(hostCount).toHaveBeenLastCalledWith({ where: { id: "host-1", ownerId: "somebody-else" } });
+        expect(hostCount).toHaveBeenLastCalledWith({
+            where: { id: "host-1", ownerId: "somebody-else" }
+        });
     });
 });

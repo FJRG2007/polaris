@@ -12,7 +12,12 @@ import { normalizeRelPath } from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
 import { sessionCan } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
-import { authorizeDrive, drivePathFilter, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import {
+    authorizeDrive,
+    drivePathFilter,
+    DriveAccessError,
+    DriveLockedError
+} from "@/lib/drive-authz";
 import { listLocks } from "@/lib/access-lock-service";
 import { recordAudit } from "@/lib/audit-service";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
@@ -56,7 +61,8 @@ export async function GET(request: Request): Promise<Response> {
             await authorizeDrive(user.id, connectionId, path, "download");
         } catch (caught) {
             if (caught instanceof DriveLockedError) return new Response("Locked", { status: 423 });
-            if (caught instanceof DriveAccessError) return new Response("Forbidden", { status: 403 });
+            if (caught instanceof DriveAccessError)
+                return new Response("Forbidden", { status: 403 });
             throw caught;
         }
     }
@@ -65,12 +71,15 @@ export async function GET(request: Request): Promise<Response> {
     try {
         driver = await getDriverForConnection(connectionId);
     } catch (caught) {
-        if (caught instanceof SmbShareRequiredError) return new Response("Share required", { status: 409 });
+        if (caught instanceof SmbShareRequiredError)
+            return new Response("Share required", { status: 409 });
         const message = caught instanceof Error ? caught.message : "Unable to connect";
         return new Response(message, { status: 502 });
     }
 
-    const lockedRoots = new Set((await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean));
+    const lockedRoots = new Set(
+        (await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean)
+    );
     // Each requested path was authorized above; what is inside them is asked
     // one by one, so a denied subfolder does not ride along in its parent's zip.
     const mayInclude = await drivePathFilter(user.id, connectionId, "download");
@@ -91,7 +100,8 @@ export async function GET(request: Request): Promise<Response> {
         metadata: { paths: paths.join(", ") }
     });
 
-    const archiveName = paths.length === 1 && paths[0] ? `${baseNameOf(paths[0])}.zip` : "polaris-files.zip";
+    const archiveName =
+        paths.length === 1 && paths[0] ? `${baseNameOf(paths[0])}.zip` : "polaris-files.zip";
     const headers = new Headers({
         "content-type": "application/zip",
         "content-disposition": `attachment; filename="${asciiFallback(archiveName)}"; filename*=UTF-8''${encodeURIComponent(archiveName)}`,

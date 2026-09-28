@@ -39,7 +39,10 @@ export interface SprintView {
  * not hold outright, so a contractor invited to one project sees that project's
  * sprints and none of the ones beside it.
  */
-export async function listSprints(reach: { spaceIds: string[]; folderIds?: string[] }): Promise<SprintView[]> {
+export async function listSprints(reach: {
+    spaceIds: string[];
+    folderIds?: string[];
+}): Promise<SprintView[]> {
     const folderIds = reach.folderIds ?? [];
     if (reach.spaceIds.length === 0 && folderIds.length === 0) return [];
 
@@ -151,7 +154,12 @@ export async function setSprintStatus(
     if (!starting) throw sprintNotInSpace();
     if (status === "active") {
         await prisma.taskSprint.updateMany({
-            where: { spaceId, folderId: starting.folderId, status: "active", id: { not: sprintId } },
+            where: {
+                spaceId,
+                folderId: starting.folderId,
+                status: "active",
+                id: { not: sprintId }
+            },
             data: { status: "completed" }
         });
     }
@@ -163,23 +171,35 @@ export async function deleteSprint(spaceId: string, sprintId: string): Promise<v
     if (count === 0) throw sprintNotInSpace();
 }
 
-export async function setTaskSprint(spaceId: string, taskId: string, sprintId: string | null): Promise<void> {
+export async function setTaskSprint(
+    spaceId: string,
+    taskId: string,
+    sprintId: string | null
+): Promise<void> {
     if (sprintId !== null) {
         if (typeof sprintId !== "string") throw sprintNotInSpace();
-        const sprint = await prisma.taskSprint.findFirst({ where: { id: sprintId, spaceId }, select: { id: true } });
+        const sprint = await prisma.taskSprint.findFirst({
+            where: { id: sprintId, spaceId },
+            select: { id: true }
+        });
         if (!sprint) throw sprintNotInSpace();
     }
     await prisma.task.update({ where: { id: taskId }, data: { sprintId } });
 }
 
 /** The burndown for one sprint, ready to chart. */
-export async function sprintBurndown(sprintId: string, now = new Date()): Promise<core.BurndownPoint[]> {
+export async function sprintBurndown(
+    sprintId: string,
+    now = new Date()
+): Promise<core.BurndownPoint[]> {
     const sprint = await prisma.taskSprint.findUnique({
         where: { id: sprintId },
         select: {
             startDate: true,
             endDate: true,
-            tasks: { select: { points: true, completedAt: true, status: { select: { type: true } } } }
+            tasks: {
+                select: { points: true, completedAt: true, status: { select: { type: true } } }
+            }
         }
     });
     if (!sprint) return [];
@@ -230,10 +250,17 @@ export interface GoalView {
 
 /** How far one target has come, clamped so a beaten target reads as done rather
  *  than as 140% of a ring. */
-function targetPercent(target: { startValue: number; targetValue: number; currentValue: number }): number {
+function targetPercent(target: {
+    startValue: number;
+    targetValue: number;
+    currentValue: number;
+}): number {
     const span = target.targetValue - target.startValue;
     if (span === 0) return target.currentValue >= target.targetValue ? 100 : 0;
-    return Math.max(0, Math.min(100, Math.round(((target.currentValue - target.startValue) / span) * 100)));
+    return Math.max(
+        0,
+        Math.min(100, Math.round(((target.currentValue - target.startValue) / span) * 100))
+    );
 }
 
 export async function listGoals(userId: string, spaceIds: string[]): Promise<GoalView[]> {
@@ -257,7 +284,9 @@ export async function listGoals(userId: string, spaceIds: string[]): Promise<Goa
     // A `tasks` target counts finished work in the list it watches, so it is
     // resolved at read time rather than kept current by a write somewhere else.
     const watchedLists = goals.flatMap((goal) =>
-        goal.targets.filter((target) => target.type === "tasks" && target.listId).map((target) => target.listId!)
+        goal.targets
+            .filter((target) => target.type === "tasks" && target.listId)
+            .map((target) => target.listId!)
     );
     const counts = new Map<string, { total: number; done: number }>();
     if (watchedLists.length > 0) {
@@ -284,7 +313,8 @@ export async function listGoals(userId: string, spaceIds: string[]): Promise<Goa
 
     return goals.map((goal) => {
         const targets = goal.targets.map((target): GoalTargetView => {
-            const counted = target.type === "tasks" && target.listId ? counts.get(target.listId) : undefined;
+            const counted =
+                target.type === "tasks" && target.listId ? counts.get(target.listId) : undefined;
             const resolved = {
                 startValue: target.startValue,
                 targetValue: counted ? counted.total : target.targetValue,
@@ -314,7 +344,9 @@ export async function listGoals(userId: string, spaceIds: string[]): Promise<Goa
             percent:
                 targets.length === 0
                     ? 0
-                    : Math.round(targets.reduce((sum, target) => sum + target.percent, 0) / targets.length)
+                    : Math.round(
+                          targets.reduce((sum, target) => sum + target.percent, 0) / targets.length
+                      )
         };
     });
 }
@@ -352,8 +384,13 @@ export async function updateGoal(goalId: string, input: core.GoalInput): Promise
  * it. An action handed nothing but a goal id has no other way to authorize the
  * write, and a goal with no space is somebody's own rather than a space's.
  */
-export async function goalOwner(goalId: string): Promise<{ ownerId: string; spaceId: string | null } | null> {
-    return prisma.taskGoal.findUnique({ where: { id: goalId }, select: { ownerId: true, spaceId: true } });
+export async function goalOwner(
+    goalId: string
+): Promise<{ ownerId: string; spaceId: string | null } | null> {
+    return prisma.taskGoal.findUnique({
+        where: { id: goalId },
+        select: { ownerId: true, spaceId: true }
+    });
 }
 
 /** The same answer for one of a goal's targets, since a target is only ever

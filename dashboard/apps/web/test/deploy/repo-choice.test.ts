@@ -33,7 +33,9 @@ const asked: string[] = [];
 
 vi.mock("@/lib/connections/store", () => ({
     listConnections: async (userId: string, provider?: string) =>
-        (links.get(userId) ?? []).filter((link) => provider === undefined || link.provider === provider),
+        (links.get(userId) ?? []).filter(
+            (link) => provider === undefined || link.provider === provider
+        ),
     readCredential: async (id: string) => credentials.get(id) ?? null,
     updateCredential: async () => undefined
 }));
@@ -49,7 +51,9 @@ vi.mock("@/lib/github-service", () => ({
         return reaching.has(token) ? "reachable" : "out-of-reach";
     },
     resolveGithubRepo: async (owner: string, repo: string, token: string | null) =>
-        !token && publicly ? { fullName: `${owner}/${repo}`, defaultBranch: "main", private: false } : null,
+        !token && publicly
+            ? { fullName: `${owner}/${repo}`, defaultBranch: "main", private: false }
+            : null,
     githubAppInstallationToken: async () => installationToken,
     listReposForPat: async () => [],
     listReposForUserToken: async () => [],
@@ -64,7 +68,10 @@ const PRIVATE = "https://github.com/acme/secret-service.git";
 
 function link(userId: string, login: string, token: string): void {
     const id = `${userId}-${login}`;
-    links.set(userId, [...(links.get(userId) ?? []), { id, provider: "github", label: login, method: "oauth" }]);
+    links.set(userId, [
+        ...(links.get(userId) ?? []),
+        { id, provider: "github", label: login, method: "oauth" }
+    ]);
     credentials.set(id, { accessToken: token });
 }
 
@@ -112,7 +119,9 @@ describe("choosing a private repository the App installation covers", () => {
     });
 
     it("allows an administrator whatever they have linked", async () => {
-        expect(await githubRepoChoiceRefusal({ id: "root", isAdmin: true }, "bruno", PRIVATE)).toBeNull();
+        expect(
+            await githubRepoChoiceRefusal({ id: "root", isAdmin: true }, "bruno", PRIVATE)
+        ).toBeNull();
         expect(asked).toEqual([]);
     });
 
@@ -134,8 +143,20 @@ describe("repositories nothing is lent for", () => {
     });
 
     it("says nothing about a repository that is not on GitHub", async () => {
-        expect(await githubRepoChoiceRefusal(member, "bruno", "https://gitlab.com/acme/secret-service.git")).toBeNull();
-        expect(await githubRepoChoiceRefusal(member, "bruno", "https://elsewhere.example/github.com/acme/r")).toBeNull();
+        expect(
+            await githubRepoChoiceRefusal(
+                member,
+                "bruno",
+                "https://gitlab.com/acme/secret-service.git"
+            )
+        ).toBeNull();
+        expect(
+            await githubRepoChoiceRefusal(
+                member,
+                "bruno",
+                "https://elsewhere.example/github.com/acme/r"
+            )
+        ).toBeNull();
     });
 });
 

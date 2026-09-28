@@ -52,7 +52,12 @@ async function resolveSite(
         if (!isOperator) return null;
         const { dashboardHosts } = await import("@/lib/domain-edge");
         const hosts = await dashboardHosts().catch(() => [] as string[]);
-        return ensureAnalyticsSite("polaris", "", "Polaris", hosts.map((host) => host.toLowerCase()));
+        return ensureAnalyticsSite(
+            "polaris",
+            "",
+            "Polaris",
+            hosts.map((host) => host.toLowerCase())
+        );
     }
     const application = await visibleApplication(scopeId, userId);
     if (!application) return null;
@@ -83,7 +88,11 @@ async function resolveWritableSite(
     scopeId: string
 ): Promise<AnalyticsSiteView | null> {
     if (scopeType === "application") {
-        const configurable = await requireApplicationAccess(scopeId, userId, "service.configure").then(
+        const configurable = await requireApplicationAccess(
+            scopeId,
+            userId,
+            "service.configure"
+        ).then(
             () => true,
             () => false
         );
@@ -160,7 +169,12 @@ export async function setTrackerEnabledAction(input: {
     const canOperate = await userHasManage(user, "system.manage");
     const scope = scopeSchema.safeParse(input);
     if (!scope.success) return { error: "That is not something Polaris measures." };
-    const site = await resolveWritableSite(user.id, canOperate, scope.data.scopeType, scope.data.scopeId);
+    const site = await resolveWritableSite(
+        user.id,
+        canOperate,
+        scope.data.scopeType,
+        scope.data.scopeId
+    );
     if (!site) return { error: "That is not yours to change." };
 
     await setTrackerEnabled(site.id, input.enabled === true);
@@ -182,7 +196,12 @@ export async function rotateTrackerKeyAction(input: {
     const canOperate = await userHasManage(user, "system.manage");
     const scope = scopeSchema.safeParse(input);
     if (!scope.success) return { error: "That is not something Polaris measures." };
-    const site = await resolveWritableSite(user.id, canOperate, scope.data.scopeType, scope.data.scopeId);
+    const site = await resolveWritableSite(
+        user.id,
+        canOperate,
+        scope.data.scopeType,
+        scope.data.scopeId
+    );
     if (!site) return { error: "That is not yours to change." };
 
     const publicKey = await rotateTrackerKey(site.id);
@@ -200,9 +219,15 @@ export async function rotateTrackerKeyAction(input: {
 export async function setAnalyticsSettingsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = analyticsSettingsSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Those settings are not valid." };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Those settings are not valid." };
     await setAnalyticsSettings(parsed.data);
-    await recordAudit({ actorId: user.id, action: "analytics.settings", targetType: "analytics", targetId: "global" });
+    await recordAudit({
+        actorId: user.id,
+        action: "analytics.settings",
+        targetType: "analytics",
+        targetId: "global"
+    });
     revalidatePath(ANALYTICS_PATH);
     return {};
 }

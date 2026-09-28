@@ -147,7 +147,10 @@ export async function thread(
 /** Only the author may rewrite what they said. */
 export async function edit(actorId: string, commentId: string, body: string): Promise<void> {
     if (typeof commentId !== "string") throw new Error("You can only edit your own comments");
-    const updated = await prisma.comment.updateMany({ where: { id: commentId, userId: actorId }, data: { body } });
+    const updated = await prisma.comment.updateMany({
+        where: { id: commentId, userId: actorId },
+        data: { body }
+    });
     if (updated.count === 0) throw new Error("You can only edit your own comments");
 }
 
@@ -167,7 +170,11 @@ export async function remove(
     canModerate: boolean
 ): Promise<void> {
     if (typeof commentId !== "string") throw new Error("You can only delete your own comments");
-    const inThread = { id: commentId, subjectType: thread.subjectType, subjectId: thread.subjectId };
+    const inThread = {
+        id: commentId,
+        subjectType: thread.subjectType,
+        subjectId: thread.subjectId
+    };
     const deleted = await prisma.comment.deleteMany({
         where: canModerate ? inThread : { ...inThread, userId: actorId }
     });

@@ -7,7 +7,11 @@ import { sweepInventorySnapshots } from "../../../../../../lib/minecraft/invento
 import { rememberRoster, rememberedRoster } from "../../../../../../lib/minecraft/roster-memory";
 import { rememberLevels, rememberedLevels } from "../../../../../../lib/minecraft/level-memory";
 import { readPlayerTimeouts, sweepTimeouts } from "../../../../../../lib/minecraft/timeout-service";
-import { enforcePlayerAddresses, forViewer, listPlayerAccess } from "../../../../../../lib/minecraft/player-access";
+import {
+    enforcePlayerAddresses,
+    forViewer,
+    listPlayerAccess
+} from "../../../../../../lib/minecraft/player-access";
 import {
     getPlayerLevels,
     getPlayerSessions,
@@ -55,7 +59,9 @@ export async function GET(
             // screen's. The overview needs it too: a server nobody is registered on
             // is one nobody can join, and that has to be said where the address is,
             // not on a tab somebody has to think to open.
-            listPlayerAccess(server.ownerId, id).then(forViewer).catch(() => null)
+            listPlayerAccess(server.ownerId, id)
+                .then(forViewer)
+                .catch(() => null)
         ]);
         // A server that is not answering has no roster to report, and asking for one
         // would only stack up failing execs behind a poll.

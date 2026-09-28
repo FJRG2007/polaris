@@ -40,7 +40,13 @@ describe("an attachment opened in a tab", () => {
 
 describe("the headers for bytes somebody else wrote", () => {
     it("sandbox every type that can render as a document", () => {
-        for (const type of ["image/svg+xml", "text/html; charset=utf-8", "application/xml", "image/png", "video/mp4"]) {
+        for (const type of [
+            "image/svg+xml",
+            "text/html; charset=utf-8",
+            "application/xml",
+            "image/png",
+            "video/mp4"
+        ]) {
             expect(untrustedFileHeaders(type)["content-security-policy"]).toBe("sandbox");
             expect(untrustedFileHeaders(type)["x-content-type-options"]).toBe("nosniff");
         }

@@ -51,8 +51,15 @@ describe("tracker writes", () => {
     it("are refused to somebody who can see the service but not configure it", async () => {
         requireApplicationAccess.mockRejectedValue(new Error("Service not found"));
 
-        const off = await actions.setTrackerEnabledAction({ scopeType: "application", scopeId: APP, enabled: false });
-        const rotated = await actions.rotateTrackerKeyAction({ scopeType: "application", scopeId: APP });
+        const off = await actions.setTrackerEnabledAction({
+            scopeType: "application",
+            scopeId: APP,
+            enabled: false
+        });
+        const rotated = await actions.rotateTrackerKeyAction({
+            scopeType: "application",
+            scopeId: APP
+        });
 
         expect(off.error).toBeTruthy();
         expect(rotated.error).toBeTruthy();

@@ -44,7 +44,9 @@ const removeExternalService = vi.fn(async () => undefined);
 const addExternalService = vi.fn(async () => ({ id: "row" }));
 
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
-vi.mock("@/lib/session", () => ({ requirePermission: async () => ({ id: "dev", isAdmin: false }) }));
+vi.mock("@/lib/session", () => ({
+    requirePermission: async () => ({ id: "dev", isAdmin: false })
+}));
 vi.mock("@/lib/deploy-audit", () => ({ recordDeployAudit: async () => undefined }));
 vi.mock("@/lib/connections/store", () => ({ listConnections: async () => [] }));
 vi.mock("@/lib/deploy-target-service", () => ({ listDeployTargets: async () => [] }));
@@ -67,7 +69,8 @@ vi.mock("@/lib/deploy-project-access", () => {
     const inEnvironment = (access: typeof devAccess, environmentId: string) =>
         access.environmentIds === null || access.environmentIds.includes(environmentId);
     return {
-        accessCan: (access: typeof devAccess, capability: string) => access.capabilities.includes(capability),
+        accessCan: (access: typeof devAccess, capability: string) =>
+            access.capabilities.includes(capability),
         accessInEnvironment: inEnvironment,
         requireProjectAccess: async () => devAccess,
         requireEnvironmentAccess: async (environmentId: string) => {
@@ -75,7 +78,8 @@ vi.mock("@/lib/deploy-project-access", () => {
             return devAccess;
         },
         requireApplicationAccess: async (applicationId: string) => {
-            if (!inEnvironment(devAccess, environmentOf[applicationId] ?? DEV)) throw new Error("Service not found");
+            if (!inEnvironment(devAccess, environmentOf[applicationId] ?? DEV))
+                throw new Error("Service not found");
             return { ...devAccess, environmentId: environmentOf[applicationId] ?? DEV };
         }
     };

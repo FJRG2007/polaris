@@ -178,7 +178,9 @@ describe("unlock markers", () => {
         const mine = { passwordHash: HASH, userId: "user-one" };
         const marker = signUnlock("lock", ID, mine, SECRET, T0);
         expect(verifyUnlock("lock", ID, marker, mine, SECRET, T0)).toBe(true);
-        expect(verifyUnlock("lock", ID, marker, { ...mine, userId: "user-two" }, SECRET, T0)).toBe(false);
+        expect(verifyUnlock("lock", ID, marker, { ...mine, userId: "user-two" }, SECRET, T0)).toBe(
+            false
+        );
         expect(verifyUnlock("lock", ID, marker, grant, SECRET, T0)).toBe(false);
         // And an anonymous one does not become a bound one.
         const anonymous = signUnlock("lock", ID, grant, SECRET, T0);
@@ -191,7 +193,9 @@ describe("unlock markers", () => {
         expect(verifyUnlock("share", ID, legacy(`unlock:${ID}`), grant, SECRET)).toBe(false);
         expect(verifyUnlock("drop", ID, legacy(`drop-unlock:${ID}`), grant, SECRET)).toBe(false);
         expect(verifyUnlock("lock", ID, legacy(`lock-unlock:${ID}`), grant, SECRET)).toBe(false);
-        expect(verifyUnlock("snippet", ID, legacy(`unlock:snippet:${ID}`), grant, SECRET)).toBe(false);
+        expect(verifyUnlock("snippet", ID, legacy(`unlock:snippet:${ID}`), grant, SECRET)).toBe(
+            false
+        );
     });
 });
 

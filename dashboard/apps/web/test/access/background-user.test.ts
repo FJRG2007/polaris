@@ -37,7 +37,12 @@ beforeEach(() => {
 });
 
 describe("a session the guard refuses", () => {
-    for (const redirect of ["/oauth/pending", "/oauth/lock", "/oauth/enroll", "/oauth/login?blocked=1"]) {
+    for (const redirect of [
+        "/oauth/pending",
+        "/oauth/lock",
+        "/oauth/enroll",
+        "/oauth/login?blocked=1"
+    ]) {
         it(`is nobody to a background route (${redirect})`, async () => {
             guardSession.mockResolvedValue({ ok: false, redirect });
             expect(await backgroundUser()).toBeNull();
@@ -59,7 +64,9 @@ describe("a session the guard clears", () => {
 
     it("does not count a background request as somebody being here", async () => {
         await backgroundUser();
-        expect(guardSession).toHaveBeenCalledWith(expect.objectContaining({ sessionId: "s1", touch: false }));
+        expect(guardSession).toHaveBeenCalledWith(
+            expect.objectContaining({ sessionId: "s1", touch: false })
+        );
     });
 
     it("still counts an ordinary guarded request", async () => {
