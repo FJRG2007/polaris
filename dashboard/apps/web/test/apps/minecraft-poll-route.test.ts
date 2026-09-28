@@ -73,6 +73,9 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     },
     getPlayerLevels: async () => ({})
 }));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/events/events-service", () => ({
+    afkMinutesFor: async () => 5
+}));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/reach", () => ({
     reachAdviceFor: async () => null
 }));

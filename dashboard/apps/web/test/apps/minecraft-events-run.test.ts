@@ -31,6 +31,18 @@ interface World {
     killerAt: [number, number, number];
     /** Item ids the server does not know. */
     unknownItems: string[];
+    /** Which world each player is in; the Overworld when not said. */
+    dims: Record<string, string>;
+    /** The game's running damage counts, per player. */
+    hurt: Record<string, number>;
+    /** Players standing perfectly still, looking the same way. */
+    still: string[];
+    /** Players in creative or spectator. */
+    creative: string[];
+    difficulty: string;
+    daylightCycle: "true" | "false";
+    /** A version that knows the game rules by their new names only. */
+    renamedRules: boolean;
 }
 
 const world: World = {
@@ -46,28 +58,84 @@ const world: World = {
     arrived: false,
     allWater: false,
     killerAt: [305, 70, 2],
-    unknownItems: []
+    unknownItems: [],
+    dims: {},
+    hurt: {},
+    still: [],
+    creative: [],
+    difficulty: "Normal",
+    daylightCycle: "true",
+    renamedRules: false
 };
 let config: Record<string, unknown> = {};
 const held: string[] = [];
 const released: string[] = [];
 
+/** Bumped on every look, so a player who is not still has always moved - a
+ *  block and a turn, well past the threshold for standing still. */
+let step = 0;
+
 function answer(line: string): string {
     world.sent.push(line);
-    if (
-        line === "execute as @a run data get entity @s Pos" ||
-        line.includes("as @a[distance=0..] run data get entity @s Pos")
-    ) {
+    if (line === "difficulty") return `The difficulty is ${world.difficulty}`;
+    if (line === "time query daytime") return "The time is 6000";
+    if (world.renamedRules && /^gamerule do\w+$/.test(line))
+        return "Unknown or incomplete command, see below for error";
+    if (line === "gamerule advance_time" || line === "gamerule advance_weather") {
+        return world.renamedRules
+            ? `Gamerule ${line.slice(9)} is currently set to: ${world.daylightCycle}`
+            : "Unknown or incomplete command, see below for error";
+    }
+    if (line === "gamerule doDaylightCycle")
+        return `Gamerule doDaylightCycle is currently set to: ${world.daylightCycle}`;
+    if (line.startsWith("execute as @a[gamemode=!survival,gamemode=!adventure]")) {
+        return world.creative
+            .map((name) => `${name} has the following entity data: [0.0d, 64.0d, 0.0d]`)
+            .join("\n");
+    }
+    if (line === "execute as @a run data get entity @s Dimension") {
         return world.online
             .map(
+                (name) =>
+                    `${name} has the following entity data: "${world.dims[name] ?? "minecraft:overworld"}"`
+            )
+            .join("\n");
+    }
+    const counted = /^execute as @a run scoreboard players get @s (pe_hurt|pe_hit)$/.exec(line);
+    if (counted) {
+        return world.online
+            .map(
+                (name) =>
+                    `${name} has ${counted[1] === "pe_hurt" ? (world.hurt[name] ?? 0) : 0} [${counted[1]}]`
+            )
+            .join("\n");
+    }
+    if (line.includes("as @a[distance=0..] run data get entity @s Pos")) {
+        return world.online
+            .filter((name) => (world.dims[name] ?? "minecraft:overworld") === "minecraft:overworld")
+            .map(
                 (name, index) =>
-                    `${name} has the following entity data: [${index * 10 + Math.random()}d, 64.0d, 0.0d]`
+                    `${name} has the following entity data: [${index * 10 + step}d, 64.0d, 0.0d]`
+            )
+            .join("\n");
+    }
+    if (line === "execute as @a run data get entity @s Pos") {
+        step += 1;
+        return world.online
+            .map((name, index) =>
+                world.still.includes(name)
+                    ? `${name} has the following entity data: [100.0d, 64.0d, 100.0d]`
+                    : `${name} has the following entity data: [${index * 10 + step}d, 64.0d, 0.0d]`
             )
             .join("\n");
     }
     if (line === "execute as @a run data get entity @s Rotation") {
         return world.online
-            .map((name) => `${name} has the following entity data: [${Math.random() * 360}f, 0.0f]`)
+            .map((name) =>
+                world.still.includes(name)
+                    ? `${name} has the following entity data: [10.0f, 0.0f]`
+                    : `${name} has the following entity data: [${(step * 37) % 360}f, 0.0f]`
+            )
             .join("\n");
     }
     if (line === "execute as @a run scoreboard players get @s pe_score") {
@@ -120,6 +188,8 @@ function answer(line: string): string {
             ? `${world.online[1]} has the following entity data: [1.0d, 64.0d, 1.0d]`
             : "";
     }
+    const rule = /^gamerule (doDaylightCycle|doWeatherCycle)$/.exec(line);
+    if (rule) return `Gamerule ${rule[1]} is currently set to: true`;
     if (line.startsWith("attribute "))
         return "Set base value of attribute Max Health for entity Boss to 400.0";
     if (line === "execute as @a run scoreboard players get @s pe_death") {
@@ -250,6 +320,14 @@ beforeEach(() => {
     world.allWater = false;
     world.killerAt = [305, 70, 2];
     world.unknownItems = [];
+    world.dims = {};
+    world.hurt = {};
+    world.still = [];
+    world.creative = [];
+    world.difficulty = "Normal";
+    world.daylightCycle = "true";
+    world.renamedRules = false;
+    events.forgetPlayers();
     held.length = 0;
     released.length = 0;
 });
@@ -285,7 +363,7 @@ describe("a mining rush, from start to podium", () => {
             )
         ).toBe(true);
 
-        world.scores = { Ana: 12, Ben: 4 };
+        world.scores = { Ana: 30, Ben: 12 };
         // Ben leaves before the end; his score is still read, by name.
         await play(60_000);
         world.online = ["Ana"];
@@ -295,8 +373,8 @@ describe("a mining rush, from start to podium", () => {
         expect(after.run).toBeNull();
         expect(after.history[0]).toMatchObject({ outcome: "finished", presetId: "rush" });
         expect(after.history[0]?.podium).toEqual([
-            { place: 1, name: "Ana", score: 12 },
-            { place: 2, name: "Ben", score: 4 }
+            { place: 1, name: "Ana", score: 30 },
+            { place: 2, name: "Ben", score: 12 }
         ]);
         expect(world.sent).toContain("give Ana minecraft:diamond 5");
         expect(world.sent).toContain("xp add Ana 15 levels");
@@ -323,11 +401,11 @@ describe("a mining rush, from start to podium", () => {
             startedBy: null
         });
         await play(2_100);
-        world.scores = { Ana: 50, Ben: 4 };
+        world.scores = { Ana: 50, Ben: 14 };
         world.flagged = ["ana"];
         await play(3 * 60_000);
         const entry = state().history[0];
-        expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 4 }]);
+        expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 14 }]);
         expect(entry?.disqualified).toEqual(["Ana"]);
         expect(world.sent.some((line) => line.startsWith("give Ana"))).toBe(false);
     });
@@ -681,6 +759,9 @@ describe("a blood moon", () => {
         });
         await play(4_100);
         expect(world.sent).toContain("time set 13000");
+        // The night is held still, so it neither runs out nor is slept through.
+        expect(world.sent).toContain("gamerule doDaylightCycle false");
+        expect(world.sent).toContain("gamerule doWeatherCycle false");
         expect(
             world.sent.filter((line) => line.includes("run summon minecraft:")).length
         ).toBeGreaterThan(0);
@@ -690,6 +771,9 @@ describe("a blood moon", () => {
         const after = state();
         expect(after.history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 7 }]);
         expect(world.sent).toContain("time set 23500");
+        // And the server gets back what it had.
+        expect(world.sent).toContain("gamerule doDaylightCycle true");
+        expect(world.sent).toContain("gamerule doWeatherCycle true");
         expect(world.sent).toContain("kill @e[tag=pe_mob]");
     });
 });
@@ -833,10 +917,10 @@ describe("when things go wrong", () => {
         await events.sweepEvents();
         expect(events.runningEvents()).toContain(SERVER);
         expect(held).toContain(SERVER);
-        world.scores = { Ana: 3 };
+        world.scores = { Ana: 13 };
         await play(62_000);
         expect(state().history[0]).toMatchObject({ id: "resumed", outcome: "finished" });
-        expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 3 }]);
+        expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 13 }]);
     });
 
     it("never plays a run again whose end had already begun", async () => {
@@ -878,7 +962,7 @@ describe("when things go wrong", () => {
             startedBy: null
         });
         await play(2_100);
-        world.scores = { Ana: 4 };
+        world.scores = { Ana: 14 };
         const say = server.say;
         let swept = false;
         server.say = async (argv) => {
@@ -903,5 +987,242 @@ describe("when things go wrong", () => {
         expect(state().history.filter((one) => one.id === id)).toHaveLength(1);
         expect(state().run).toBeNull();
         expect(events.runningEvents()).not.toContain(SERVER);
+    });
+});
+
+describe("the least to be ranked", () => {
+    it("keeps a token score off the podium and out of the prizes", async () => {
+        const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 3 };
+        expect(catalog.minScoreOf(hunt)).toBe(5);
+        setUp([hunt]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hunt",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        world.scores = { Ana: 7, Ben: 1 };
+        await play(3 * 60_000);
+        expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 7 }]);
+        expect(world.sent.some((line) => line.startsWith("give Ben"))).toBe(false);
+    });
+
+    it("means nobody wins when nobody reaches it", async () => {
+        const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 3 };
+        setUp([hunt]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hunt",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        world.scores = { Ana: 2, Ben: 1 };
+        await play(3 * 60_000);
+        expect(state().history[0]?.podium).toEqual([]);
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+    });
+});
+
+describe("where the players are, and what they are doing", () => {
+    const draw = (presetId: string) => ({
+        minActive: 1,
+        random: {
+            enabled: true,
+            days: [],
+            from: "00:00",
+            to: "23:59",
+            minGap: 15,
+            maxGap: 15,
+            pool: [{ presetId, weight: 1 }]
+        }
+    });
+
+    it("waits to draw an event while somebody is in a fight", async () => {
+        setUp([{ ...catalog.newPreset("fishing", "fish"), minutes: 5 }], draw("fish"));
+        await events.sweepEvents();
+        await play(15 * 60_000);
+        world.hurt = { Ana: 40 };
+        await events.sweepEvents();
+        world.hurt = { Ana: 55 };
+        const held = await events.sweepEvents();
+        expect(held.started).toBe(0);
+        expect(state().waiting).toBe("Waiting: Ana is in a fight or in the End");
+        // A minute and a half after the last blow, it goes ahead.
+        await play(100_000);
+        const started = await events.sweepEvents();
+        expect(started.started).toBe(1);
+    });
+
+    it("counts only the Overworld for an event that happens there", async () => {
+        world.dims = { Ana: "minecraft:the_nether", Ben: "minecraft:the_nether" };
+        setUp([{ ...catalog.newPreset("supply-drop", "drop"), minutes: 5 }], draw("drop"));
+        await events.sweepEvents();
+        await play(15 * 60_000);
+        await events.sweepEvents();
+        expect(state().run).toBeNull();
+        expect(state().waiting).toBe("Waiting for 2 active players in the Overworld (0 now)");
+    });
+
+    it("does not hold a mining rush back for players in the Nether", async () => {
+        world.dims = { Ana: "minecraft:the_nether", Ben: "minecraft:the_nether" };
+        setUp([{ ...catalog.newPreset("mining-rush", "rush"), minutes: 5 }], draw("rush"));
+        await events.sweepEvents();
+        await play(15 * 60_000);
+        const started = await events.sweepEvents();
+        expect(started.started).toBe(1);
+    });
+
+    it("does not count a night sat out in the Nether as surviving it", async () => {
+        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3, minScore: 1 };
+        setUp([moon]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "moon",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(4_100);
+        world.scores = { Ana: 4, Ben: 9 };
+        world.dims = { Ben: "minecraft:the_nether" };
+        await play(3 * 60_000);
+        expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 4 }]);
+    });
+});
+
+describe("what the audit found", () => {
+    it("refuses an event of hostile mobs on Peaceful, and says how to fix it", async () => {
+        world.difficulty = "Peaceful";
+        setUp([{ ...catalog.newPreset("blood-moon", "moon"), minutes: 5 }]);
+        await expect(
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "moon",
+                trigger: "manual",
+                startedBy: null
+            })
+        ).rejects.toThrow(/Peaceful.*Easy or harder under Rules/);
+    });
+
+    it("runs one that needs no hostile mobs on Peaceful", async () => {
+        world.difficulty = "Peaceful";
+        setUp([{ ...catalog.newPreset("fishing", "fish"), minutes: 5 }]);
+        await expect(
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "fish",
+                trigger: "manual",
+                startedBy: null
+            })
+        ).resolves.toBeDefined();
+    });
+
+    it("leaves somebody who played it in creative off the podium", async () => {
+        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
+        setUp([rush]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "rush",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        world.creative = ["Ana"];
+        await play(20_000);
+        world.creative = [];
+        world.scores = { Ana: 900, Ben: 15 };
+        await play(3 * 60_000);
+        const entry = state().history[0];
+        expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 15 }]);
+        expect(entry?.disqualified).toEqual(["Ana"]);
+    });
+
+    it("leaves somebody AFK the whole time off a fishing podium", async () => {
+        world.still = ["Ana"];
+        const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 3 };
+        setUp([fish]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "fish",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        world.scores = { Ana: 40, Ben: 6 };
+        await play(3 * 60_000);
+        const entry = state().history[0];
+        expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 6 }]);
+        expect(entry?.disqualified).toEqual(["Ana"]);
+    });
+
+    it("leaves somebody AFK at a mob farm off a blood moon podium, however much they are hit", async () => {
+        world.still = ["Ana"];
+        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+        setUp([moon]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "moon",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        for (let tick = 1; tick <= 8; tick += 1) {
+            world.hurt = { Ana: tick * 4 };
+            await play(15_000);
+        }
+        world.scores = { Ana: 30, Ben: 3 };
+        await play(3 * 60_000);
+        const entry = state().history[0];
+        expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 3 }]);
+        expect(entry?.disqualified).toEqual(["Ana"]);
+    });
+
+    it("holds the night on a version that renamed the game rules", async () => {
+        world.renamedRules = true;
+        world.daylightCycle = "false";
+        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+        setUp([moon]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "moon",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(4_100);
+        expect(world.sent).toContain("gamerule advance_time false");
+        expect(world.sent).toContain("gamerule advance_weather false");
+        expect(world.sent).not.toContain("gamerule doDaylightCycle false");
+        await play(3 * 60_000);
+        expect(world.sent).toContain("time set 6000");
+        expect(world.sent.filter((line) => line.startsWith("gamerule advance_time")).at(-1)).toBe(
+            "gamerule advance_time false"
+        );
+    });
+
+    it("gives a server whose clock stands still its own time back after a blood moon", async () => {
+        world.daylightCycle = "false";
+        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+        setUp([moon]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "moon",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(3 * 60_000 + 4_000);
+        expect(world.sent).toContain("time set 6000");
+        expect(world.sent).not.toContain("time set 23500");
+        expect(world.sent).toContain("gamerule doDaylightCycle false");
     });
 });

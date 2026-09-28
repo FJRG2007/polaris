@@ -83,6 +83,7 @@ export const playerStanding = {
  *  who has been added and has not turned up, the other is somebody who has. */
 export const playerPresence = {
     playing: "Playing",
+    afk: "AFK",
     connecting: "Connecting",
     offline: "Offline",
     never: "Never joined"

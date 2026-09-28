@@ -18,6 +18,7 @@ import * as plan from "./plan";
 import * as stored from "./state";
 import { readXray } from "../xray";
 import { prisma } from "@polaris/db";
+import { withTimeout } from "@polaris/core";
 import * as catalog from "./catalog";
 import * as commands from "./commands";
 import * as messages from "./messages";
@@ -25,6 +26,7 @@ import * as trivia from "./trivia-bank";
 import { host } from "@polaris/app-host";
 import { readSchedule } from "../schedule";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
+import * as playing from "../activity";
 import { containerFileSize, readContainerRange } from "../../container-files";
 import {
     editionOf,
@@ -72,8 +74,6 @@ interface Loop {
 }
 
 const loops = new Map<string, Loop>();
-/** What each server's players were last seen doing, to tell playing from idle. */
-const activity = new Map<string, Map<string, plan.Seen>>();
 
 // ------------------------------------------------------------------ storage
 
@@ -101,6 +101,12 @@ async function readRow(installedAppId: string): Promise<Row | null> {
 /** The settings as the screen sees them, with the schedule's zone as the default. */
 function settingsOf(config: Record<string, unknown>): catalog.EventsConfig {
     return catalog.readEventsConfig(config, readSchedule(config).timezone);
+}
+
+/** How long without moving before a player counts as AFK on this server. */
+export async function afkMinutesFor(installedAppId: string): Promise<number> {
+    const row = await readRow(installedAppId);
+    return settingsOf(row?.config ?? {}).settings.afkMinutes;
 }
 
 /**
@@ -198,9 +204,15 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
     const run = loops.get(installedAppId)?.run ?? state.run;
     let standings: { name: string; score: number }[] = [];
     if (run && run.phase === "running" && catalog.KIND_INFO[run.preset.kind].competitive) {
-        standings = await currentStandings(row.ownerId, installedAppId, run).catch(() => []);
+        // Bounded: the screen asks every few seconds, and a server slow to answer
+        // must not hold the rest of what it shows.
+        standings = await withTimeout(
+            sharedStandings(row.ownerId, installedAppId, run),
+            3_000,
+            "slow"
+        ).catch(() => []);
     }
-    const seen = activity.get(installedAppId);
+    const seen = playing.seenOn(installedAppId);
     return {
         config,
         run: run
@@ -231,6 +243,24 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
                 ? "Events run on Java servers; Bedrock has no scoreboard statistics or boss bars to play them with"
                 : null
     };
+}
+
+/** Reads of the standings still out, one per server: a read slower than the
+ *  screen's polling is joined, not stacked behind another. */
+const standingsReads = new Map<string, Promise<{ name: string; score: number }[]>>();
+
+function sharedStandings(
+    ownerId: string,
+    installedAppId: string,
+    run: stored.EventRun
+): Promise<{ name: string; score: number }[]> {
+    const pending = standingsReads.get(installedAppId);
+    if (pending) return pending;
+    const read = currentStandings(ownerId, installedAppId, run).finally(() =>
+        standingsReads.delete(installedAppId)
+    );
+    standingsReads.set(installedAppId, read);
+    return read;
 }
 
 async function currentStandings(
@@ -288,11 +318,31 @@ export async function startEvent(input: {
     if (seen.size === 0) throw new Error("Nobody is on the server");
     // The minimum is for events that start on their own. An operator who
     // presses Run has looked at who is on and decided.
-    const active = plan.activePlayers(seen, config.settings.afkMinutes, Date.now()).length;
-    if (input.trigger !== "manual" && active < config.settings.minActive) {
+    const active = plan.playersFor(preset, seen, config.settings.afkMinutes, Date.now()).length;
+    const needed = catalog.activeNeeded(preset, config.settings);
+    if (input.trigger !== "manual" && active < needed) {
+        const where = catalog.needsOverworld(preset) ? " in the Overworld" : "";
         throw new Error(
-            `Only ${active} of the ${seen.size} players on are active; this event waits for ${config.settings.minActive}`
+            `Only ${active} of the ${seen.size} players on are active${where}; this event waits for ${needed}`
         );
+    }
+    if (input.trigger !== "manual") {
+        const busy = plan.busyReason(seen, config.settings.afkMinutes, Date.now());
+        if (busy) throw new Error(`Not now: ${busy}`);
+    }
+    // Peaceful takes every hostile mob away the moment it appears: a blood moon
+    // with no mobs, a boss that is gone before anybody sees it.
+    if (catalog.needsHostileMobs(preset)) {
+        const peaceful = await withServerContainer(
+            row.ownerId,
+            input.installedAppId,
+            async (server) => commands.isPeaceful(await server.say([commands.READ_DIFFICULTY]))
+        ).catch(() => false);
+        if (peaceful) {
+            throw new Error(
+                "The server is on Peaceful, where hostile mobs vanish as soon as they appear. Set the difficulty to Easy or harder under Rules first."
+            );
+        }
     }
 
     const now = Date.now();
@@ -318,7 +368,10 @@ export async function startEvent(input: {
         lastWaveAt: 0,
         closedAt: 0,
         cancelled: false,
-        finishing: false
+        finishing: false,
+        gamerules: {},
+        timeBefore: null,
+        offMode: []
     } satisfies stored.EventRun;
 
     const stored = await updateEventState(input.installedAppId, (state) => {
@@ -458,7 +511,16 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
 
     if (now - loop.lastSample >= SAMPLE_EVERY_MS) {
         loop.lastSample = now;
-        const seen = await look(installedAppId, server);
+        const seen = await playing.lookAt(installedAppId, server);
+        // Creative and spectator are noted as they are seen, not only at the
+        // end: switching back for the last minute does not undo a rush mined
+        // in creative.
+        const offMode = commands
+            .readWhere(await server.say([commands.NOT_SURVIVAL]))
+            .map((one) => one.name);
+        const noted = new Set(loop.run.offMode.map((name) => name.toLowerCase()));
+        const fresh = offMode.filter((name) => !noted.has(name.toLowerCase()));
+        if (fresh.length > 0) loop.run = { ...loop.run, offMode: [...loop.run.offMode, ...fresh] };
         const known = new Set(loop.run.participants.map((name) => name.toLowerCase()));
         const joined = [...seen.values()].filter((one) => !known.has(one.name.toLowerCase()));
         if (joined.length > 0) {
@@ -565,7 +627,28 @@ async function begin(
             ...commands.bossScoreboard((preset.options as catalog.EventOptions<"world-boss">).boss)
         );
     }
-    if (preset.kind === "blood-moon") lines.push(...commands.nightfall(seconds));
+    if (preset.kind === "blood-moon") {
+        // Held still until dawn: the clock, or the night runs out before the
+        // event does or is slept through; the weather, or the storm clears.
+        // What each was is kept, and put back when it ends.
+        const before: Record<string, string> = {};
+        for (const names of commands.FROZEN_RULES) {
+            for (const rule of names) {
+                const value = commands.readRuleValue(await server.say([commands.readRule(rule)]));
+                if (value === null) continue;
+                before[rule] = value;
+                lines.push(commands.setRule(rule, "false"));
+                break;
+            }
+        }
+        const timeBefore = commands.readDaytime(await server.say([commands.READ_DAYTIME]));
+        loop.run = {
+            ...loop.run,
+            gamerules: { ...before, ...loop.run.gamerules },
+            timeBefore: loop.run.timeBefore ?? timeBefore
+        };
+        lines.push(...commands.nightfall(seconds));
+    }
     if (preset.kind === "happy-hour") {
         lines.push(
             ...commands.happyEffects(preset.options as catalog.EventOptions<"happy-hour">, seconds)
@@ -1061,9 +1144,28 @@ async function finish(
     try {
         if (server && outcome === "finished" && run.phase === "running" && info.competitive) {
             disqualified = await disqualifiedSince(installedAppId, run.startsAt);
+            // Also off the podium: whoever played it in creative or spectator,
+            // and - where standing still all the way through is a way to win -
+            // whoever was AFK from start to finish.
+            for (const name of run.offMode) disqualified.add(name.toLowerCase());
+            if (catalog.afkCounts(preset)) {
+                for (const name of plan.idleThroughout(
+                    playing.seenOn(installedAppId),
+                    run.startsAt
+                )) {
+                    disqualified.add(name.toLowerCase());
+                }
+            }
             const { scores, took } = await results(server, run);
-            placed = plan.podium(scores, disqualified);
-            const owed = plan.prizes(placed, took, preset.rewards, disqualified);
+            const minimum = catalog.minScoreOf(preset);
+            placed = plan.podium(scores, disqualified, minimum);
+            // Taking part is reaching the minimum too - one zombie is not taking part
+            // in a hunt. A blood moon's is surviving it, which is its own bar.
+            const counted =
+                preset.kind === "blood-moon"
+                    ? took
+                    : took.filter((name) => (scores.get(name) ?? 0) >= minimum);
+            const owed = plan.prizes(placed, counted, preset.rewards, disqualified);
             const online = new Set(
                 commands
                     .readWhere(await server.say([commands.WHERE]))
@@ -1148,7 +1250,10 @@ async function finish(
                     commands.say(messages.tag(language) + messages.dawn(survivors.length, language))
                 );
             }
-            await server.sayAll([...lines, ...commands.cleanup(preset, run.place, run.target)]);
+            await server.sayAll([
+                ...lines,
+                ...commands.cleanup(preset, run.place, run.target, run.gamerules, run.timeBefore)
+            ]);
         } else {
             // The server was not answering: clean up when it is back, so a
             // chest, a boss or a loaded chunk is not left in the world for good.
@@ -1158,7 +1263,9 @@ async function finish(
         console.warn("polaris: finishing an event failed", installedAppId, String(error));
         if (server)
             await server
-                .sayAll(commands.cleanup(preset, run.place, run.target))
+                .sayAll(
+                    commands.cleanup(preset, run.place, run.target, run.gamerules, run.timeBefore)
+                )
                 .catch(() => undefined);
     } finally {
         releaseSidebar(loop.ownerId, installedAppId);
@@ -1198,7 +1305,10 @@ async function cleanUpLater(
     run: stored.EventRun
 ): Promise<void> {
     await withServerContainer(ownerId, installedAppId, async (later) => {
-        if (later.running) await later.sayAll(commands.cleanup(run.preset, run.place, run.target));
+        if (later.running)
+            await later.sayAll(
+                commands.cleanup(run.preset, run.place, run.target, run.gamerules, run.timeBefore)
+            );
     }).catch(() => undefined);
 }
 
@@ -1294,7 +1404,9 @@ async function results(
 
 /** Everybody on at dawn who did not die during the night. */
 async function survivorsOf(server: ServerContainer, run: stored.EventRun): Promise<string[]> {
-    const on = commands.readWhere(await server.say([commands.WHERE])).map((one) => one.name);
+    // In the Overworld at dawn: sitting the night out in the Nether is not
+    // surviving it.
+    const on = commands.readWhere(await server.say([commands.IN_OVERWORLD])).map((one) => one.name);
     const deaths = commands.readDeaths(await server.say([commands.READ_DEATHS]));
     const took = new Set(run.participants.map((name) => name.toLowerCase()));
     return on.filter((name) => took.has(name.toLowerCase()) && (deaths.get(name) ?? 0) === 0);
@@ -1375,26 +1487,10 @@ async function sample(
     installedAppId: string
 ): Promise<Map<string, plan.Seen> | null> {
     const loop = loops.get(installedAppId);
-    if (loop?.link?.server.running) return look(installedAppId, loop.link.server);
+    if (loop?.link?.server.running) return playing.lookAt(installedAppId, loop.link.server);
     return withServerContainer(ownerId, installedAppId, async (server) =>
-        server.running ? look(installedAppId, server) : null
+        server.running ? playing.lookAt(installedAppId, server) : null
     );
-}
-
-async function look(
-    installedAppId: string,
-    server: ServerContainer
-): Promise<Map<string, plan.Seen>> {
-    const positions = commands.readWhere(await server.say([commands.WHERE]));
-    const facing = commands.readFacing(await server.say([commands.FACING]));
-    const seen = plan.observe(
-        activity.get(installedAppId) ?? new Map(),
-        positions,
-        facing,
-        Date.now()
-    );
-    activity.set(installedAppId, seen);
-    return seen;
 }
 
 // ------------------------------------------------------------------ the sweep
@@ -1448,22 +1544,47 @@ async function sweepOne(
     if (seen === null) return false;
     if (pending.length > 0 && seen.size > 0) await deliverPending(ownerId, installedAppId, seen);
     const active = plan.activePlayers(seen, settings.settings.afkMinutes, now).length;
+    const activeFor = (preset: catalog.EventPreset) =>
+        plan.playersFor(preset, seen, settings.settings.afkMinutes, now).length;
+    const busy = plan.busyReason(seen, settings.settings.afkMinutes, now);
 
     // A time on the schedule first: somebody chose it.
     const due = plan.schedulesDue(settings.settings, settings.schedules, state.scheduleRuns, now);
+    // Still due a minute from now: a fight can be waited out that long.
+    const stillDue = new Set(
+        plan
+            .schedulesDue(settings.settings, settings.schedules, state.scheduleRuns, now + 60_000)
+            .map((entry) => entry.id)
+    );
     for (const entry of due) {
+        const preset = settings.presets.find((one) => one.id === entry.presetId);
+        if (!preset) continue;
+        // Somebody fighting: the event waits a minute at a time within its
+        // few minutes' grace, and is skipped only if the fight outlasts them.
+        if (busy && stillDue.has(entry.id)) {
+            await updateEventState(installedAppId, (current) => ({
+                ...current,
+                waiting: `Waiting: ${busy}`
+            }));
+            continue;
+        }
         await updateEventState(installedAppId, (current) => ({
             ...current,
             scheduleRuns: { ...current.scheduleRuns, [entry.id]: now }
         }));
-        const preset = settings.presets.find((one) => one.id === entry.presetId);
-        if (!preset) continue;
-        if (active < settings.settings.minActive) {
+        if (busy) {
+            await skip(installedAppId, preset, "scheduled", `Skipped: ${busy}`);
+            continue;
+        }
+        const needed = catalog.activeNeeded(preset, settings.settings);
+        const ready = activeFor(preset);
+        if (ready < needed) {
+            const where = catalog.needsOverworld(preset) ? " in the Overworld" : "";
             await skip(
                 installedAppId,
                 preset,
                 "scheduled",
-                `Skipped: ${active} active of the ${settings.settings.minActive} it waits for`
+                `Skipped: ${ready} active${where} of the ${needed} it waits for`
             );
             continue;
         }
@@ -1493,6 +1614,8 @@ async function sweepOne(
         lastKind: state.lastKind,
         running: false,
         active,
+        activeFor,
+        busy,
         now,
         random: Math.random
     });
@@ -1587,6 +1710,13 @@ async function deliverPending(
             return rest ? [{ ...one, reward: rest }] : [];
         })
     }));
+}
+
+/** For a test: forget what was seen of every server's players, as a fresh
+ *  process has. A test clock that starts over would otherwise meet a fight
+ *  recorded "later" by the test before it. */
+export function forgetPlayers(): void {
+    playing.forgetActivity();
 }
 
 /** For a test: what the loops hold. */

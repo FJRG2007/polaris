@@ -134,7 +134,15 @@ export function components(preset: EventPreset): Component[] {
                     : target === "debris"
                       ? ([["ancient_debris", 1]] as const)
                       : ORES;
-            return list(ores, "minecraft.mined");
+            // Minus every one of them placed during the rush: with silk touch
+            // an ore block can be put down and mined again, over and over.
+            const mined = list(ores, "minecraft.mined");
+            const placed = ores.map(([id, weight], index) => ({
+                objective: numbered(ores.length + index),
+                criterion: `minecraft.used:minecraft.${id}`,
+                weight: -weight
+            }));
+            return [...mined, ...placed];
         }
         case "mob-hunt": {
             const target = (preset.options as EventOptions<"mob-hunt">).target;
@@ -367,6 +375,32 @@ export const FACING = "execute as @a run data get entity @s Rotation";
 export const IN_OVERWORLD =
     "execute in minecraft:overworld as @a[distance=0..] run data get entity @s Pos";
 
+/** Which world everybody is in: `Alice has the following entity data: "minecraft:the_nether"`. */
+export const DIMENSIONS = "execute as @a run data get entity @s Dimension";
+
+export function readDimensions(output: string): Map<string, string> {
+    const found = new Map<string, string>();
+    const pattern = /([A-Za-z0-9_]{1,16}) has the following entity data: "([a-z0-9_:./-]+)"/g;
+    for (const match of stripFormatting(output).matchAll(pattern)) {
+        found.set(match[1] as string, match[2] as string);
+    }
+    return found;
+}
+
+/**
+ * The two running counts that tell a fight from outside the game: damage taken
+ * and damage dealt. Kept on the server for good, under the same `pe_` prefix,
+ * so the next look can see whether either went up.
+ */
+export const HURT = "pe_hurt";
+export const HIT = "pe_hit";
+export const COMBAT_OBJECTIVES = [
+    `scoreboard objectives add ${HURT} minecraft.custom:minecraft.damage_taken`,
+    `scoreboard objectives add ${HIT} minecraft.custom:minecraft.damage_dealt`
+];
+export const READ_HURT = `execute as @a run scoreboard players get @s ${HURT}`;
+export const READ_HIT = `execute as @a run scoreboard players get @s ${HIT}`;
+
 /** Positions out of a `WHERE` answer. */
 export function readWhere(output: string): { name: string; x: number; y: number; z: number }[] {
     const found: { name: string; x: number; y: number; z: number }[] = [];
@@ -517,9 +551,67 @@ export function nightfall(seconds: number): string[] {
     return ["time set 13000", `weather thunder ${Math.max(60, Math.round(seconds))}`];
 }
 
-export function daybreak(): string[] {
-    return ["time set 23500", "weather clear", `kill @e[tag=${MOB_TAG}]`];
+/**
+ * The game rules a blood moon holds still while it lasts: the clock, so the
+ * night neither runs out before the event does (a Minecraft night is about eight
+ * minutes) nor is slept through in a bed, and the weather, so the storm stays.
+ * Put back to whatever the server had when it ends. Each is listed under every
+ * name it has had; the first one the server answers to is the one it uses.
+ */
+export const FROZEN_RULES = [
+    ["doDaylightCycle", "advance_time"],
+    ["doWeatherCycle", "advance_weather"]
+] as const;
+
+export function readRule(name: string): string {
+    return `gamerule ${name}`;
 }
+
+/** `Gamerule doDaylightCycle is currently set to: true`, or null when the game
+ *  does not know the rule (a version that renamed it) or did not answer. */
+export function readRuleValue(output: string): "true" | "false" | null {
+    const match = /currently set to:?\s*(true|false)/i.exec(output);
+    return match ? (match[1]!.toLowerCase() as "true" | "false") : null;
+}
+
+export function setRule(name: string, value: string): string {
+    return `gamerule ${name} ${value}`;
+}
+
+/**
+ * Dawn after a blood moon. A server that keeps its clock still - an operator's
+ * permanent noon - gets back the exact time it had; one whose days turn gets the
+ * sunrise.
+ */
+export function daybreak(
+    rules: Readonly<Record<string, string>> = {},
+    timeBefore: number | null = null
+): string[] {
+    const frozen = FROZEN_RULES[0].some((name) => rules[name] === "false") && timeBefore !== null;
+    return [
+        frozen ? `time set ${timeBefore}` : "time set 23500",
+        "weather clear",
+        `kill @e[tag=${MOB_TAG}]`
+    ];
+}
+
+/** The world's time of day, to put back: `The time is 6000`. */
+export const READ_DAYTIME = "time query daytime";
+export function readDaytime(output: string): number | null {
+    const match = /time is (\d+)/i.exec(output);
+    return match ? Number(match[1]) : null;
+}
+
+/** `The difficulty is Peaceful` - where hostile mobs vanish as they appear. */
+export const READ_DIFFICULTY = "difficulty";
+export function isPeaceful(output: string): boolean {
+    return /difficulty is peaceful/i.test(output);
+}
+
+/** Whoever is not playing in survival or adventure: creative mines and kills at
+ *  will, and a spectator cannot be hurt. */
+export const NOT_SURVIVAL =
+    "execute as @a[gamemode=!survival,gamemode=!adventure] run data get entity @s Pos";
 
 export const WAVE_EVERY_MS = 40_000;
 
@@ -763,9 +855,19 @@ export function release(
 export function cleanup(
     preset: EventPreset,
     place: { x: number; y: number; z: number } | null,
-    target: { x: number; z: number } | null = null
+    target: { x: number; z: number } | null = null,
+    /** Game rules the event changed, and what they were before. */
+    rules: Readonly<Record<string, string>> = {},
+    /** The time of day before a blood moon, for a server whose clock stands still. */
+    timeBefore: number | null = null
 ): string[] {
     const lines = [
+        ...Object.entries(rules)
+            .filter(
+                ([name, value]) =>
+                    /^[A-Za-z:_]+$/.test(name) && (value === "true" || value === "false")
+            )
+            .map(([name, value]) => setRule(name, value)),
         `bossbar remove ${BAR}`,
         `scoreboard objectives remove ${SCORE}`,
         `scoreboard objectives remove ${SUM}`,
@@ -780,7 +882,7 @@ export function cleanup(
     for (const one of components(preset))
         lines.push(`scoreboard objectives remove ${one.objective}`);
     if (preset.kind === "world-boss") lines.push(BOSS_BANISH);
-    if (preset.kind === "blood-moon") lines.push(...daybreak());
+    if (preset.kind === "blood-moon") lines.push(...daybreak(rules, timeBefore));
     if (preset.kind === "happy-hour")
         lines.push(...happyEffectsClear(preset.options as EventOptions<"happy-hour">));
     if (preset.kind === "supply-drop" && place) lines.push(removeChest(place));

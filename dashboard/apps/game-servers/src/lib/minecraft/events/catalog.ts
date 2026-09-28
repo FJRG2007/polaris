@@ -165,6 +165,8 @@ export interface EventPreset<K extends EventKind = EventKind> {
     readonly name: string;
     readonly enabled: boolean;
     readonly minutes: number;
+    /** The least to be ranked; absent reads the kind's default (`minScoreOf`). */
+    readonly minScore?: number;
     readonly options: EventOptions<K>;
     readonly rewards: Rewards;
 }
@@ -176,6 +178,10 @@ const presetBase = z.object({
     name: z.string().trim().min(1, "Give it a name").max(40, "At most 40 characters"),
     enabled: z.boolean().default(true),
     minutes: z.number().int().min(DURATION.min).max(DURATION.max).default(10),
+    /** The least a player must score to be ranked at all, and to get the prize
+     *  for taking part. Absent on an event saved before it existed, which then
+     *  reads its kind's default (`minScoreOf`). */
+    minScore: z.number().int().min(1, "At least 1").max(1_000_000).optional(),
     rewards: rewardsSchema
 });
 
@@ -401,6 +407,7 @@ export function newPreset(kind: EventKind, id: string): EventPreset {
         name: KIND_INFO[kind].label,
         enabled: true,
         minutes: kind === "happy-hour" ? 20 : kind === "trivia" ? 5 : 10,
+        minScore: DEFAULT_MIN_SCORE[kind],
         options,
         rewards: KIND_INFO[kind].competitive
             ? DEFAULT_REWARDS
@@ -457,6 +464,114 @@ export function readEventsConfig(config: Record<string, unknown>, timezone = "UT
 
 /** How long an event of this preset really runs: a trivia game runs for its
  *  rounds, whatever the minutes say. */
+/**
+ * Whether an event hands out anything: a competition with at least one prize
+ * that is not empty.
+ */
+export function awardsPrizes(preset: EventPreset): boolean {
+    if (!KIND_INFO[preset.kind].competitive) return false;
+    const { first, second, third, everyone } = preset.rewards;
+    return [first, second, third, everyone].some(
+        (reward) => reward.items.length > 0 || reward.levels > 0
+    );
+}
+
+/**
+ * The fewest players who must actually be playing for an event to start on its
+ * own.
+ *
+ * Never fewer than two for a competition with prizes, whatever the setting says:
+ * one player alone, or one playing beside a row of idle ones, would win it
+ * uncontested - a prize for being the only one there, handed out again at every
+ * draw, which is what farming a server's events looks like.
+ */
+export const PRIZE_COMPETITION_FLOOR = 2;
+
+export function activeNeeded(preset: EventPreset, settings: EventSettings): number {
+    return awardsPrizes(preset)
+        ? Math.max(settings.minActive, PRIZE_COMPETITION_FLOOR)
+        : settings.minActive;
+}
+
+/**
+ * What each kind asks for before somebody is ranked, in its own unit: enough to
+ * say they took part rather than happened to be there. Two players who each
+ * kill one zombie are not a podium; nobody reaching it means nobody wins.
+ */
+export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
+    "mining-rush": 10,
+    "mob-hunt": 5,
+    "supply-drop": 1,
+    "blood-moon": 3,
+    "world-boss": 20,
+    fishing: 3,
+    trivia: 1,
+    explorer: 250,
+    "happy-hour": 1,
+    "king-of-the-hill": 30
+};
+
+/** Whether the minimum is something an operator can set for this event. A
+ *  supply drop and a race have one winner and nothing to count. */
+export function hasMinScore(preset: EventPreset): boolean {
+    if (!KIND_INFO[preset.kind].competitive || preset.kind === "supply-drop") return false;
+    return !(
+        preset.kind === "explorer" && (preset.options as EventOptions<"explorer">).mode === "race"
+    );
+}
+
+export function minScoreOf(preset: EventPreset): number {
+    if (!hasMinScore(preset)) return 1;
+    return preset.minScore ?? DEFAULT_MIN_SCORE[preset.kind];
+}
+
+/**
+ * Whether the event happens on the surface of the Overworld - a chest, a boss, a
+ * circle, a finish line, a night - and so only counts the players who are there.
+ * A player in the Nether cannot reach a chest in the Overworld, and a mining
+ * rush or a trivia game does not care where anybody is.
+ */
+export function needsOverworld(preset: EventPreset): boolean {
+    switch (preset.kind) {
+        case "supply-drop":
+        case "world-boss":
+        case "blood-moon":
+        case "king-of-the-hill":
+            return true;
+        case "explorer":
+            return (preset.options as EventOptions<"explorer">).mode === "race";
+        default:
+            return false;
+    }
+}
+
+/** The events hostile mobs are the whole of, which Peaceful takes away. */
+export function needsHostileMobs(preset: EventPreset): boolean {
+    return (
+        preset.kind === "blood-moon" || preset.kind === "world-boss" || preset.kind === "mob-hunt"
+    );
+}
+
+/**
+ * Whether being AFK all the way through is a way to win it - a fishing farm, a
+ * mob farm, a water stream, a bunker through the night - and so keeps somebody
+ * off the podium. Not where standing still is the play: holding the hill,
+ * answering in the chat.
+ */
+export function afkCounts(preset: EventPreset): boolean {
+    switch (preset.kind) {
+        case "mining-rush":
+        case "mob-hunt":
+        case "fishing":
+        case "blood-moon":
+            return true;
+        case "explorer":
+            return (preset.options as EventOptions<"explorer">).mode === "distance";
+        default:
+            return false;
+    }
+}
+
 export function runMinutes(preset: EventPreset): number {
     if (preset.kind === "trivia") {
         const options = preset.options as EventOptions<"trivia">;

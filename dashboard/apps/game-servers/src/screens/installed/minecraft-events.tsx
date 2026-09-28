@@ -16,9 +16,9 @@ import { hostUi } from "@polaris/app-host/client";
 import * as catalog from "../../lib/minecraft/events/catalog";
 import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
 import type { EventsView } from "../../lib/minecraft/events/events-service";
-import { Copy, Loader2, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
+import { Copy, Info, Loader2, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { Badge, Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
+import * as ui from "@polaris/ui";
 
 const { useConfirm } = hostUi.confirmDialog;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -96,7 +96,7 @@ function DayPicker({
                                       : [...days, day].sort()
                             )
                         }
-                        className={cn(
+                        className={ui.cn(
                             "rounded-md border px-2 py-1 text-xs transition-colors",
                             picked
                                 ? "border-primary/50 bg-primary/10 text-foreground"
@@ -107,6 +107,85 @@ function DayPicker({
                     </button>
                 );
             })}
+        </div>
+    );
+}
+
+/**
+ * What one event is, said in full: what it is, and what this one is set to -
+ * how long, where it happens, what it takes to be ranked, when it will start on
+ * its own and what it gives away.
+ */
+function EventExplained({
+    preset,
+    settings
+}: {
+    preset: catalog.EventPreset;
+    settings: catalog.EventSettings | null;
+}) {
+    const info = catalog.KIND_INFO[preset.kind];
+    const facts: string[] = [
+        preset.kind === "trivia"
+            ? `${(preset.options as catalog.EventOptions<"trivia">).rounds} rounds of ${(preset.options as catalog.EventOptions<"trivia">).seconds} seconds.`
+            : `Lasts ${preset.minutes} minutes.`
+    ];
+    if (preset.kind === "happy-hour") {
+        const options = preset.options as catalog.EventOptions<"happy-hour">;
+        const effects = [
+            options.haste && "Haste II (mining and digging faster)",
+            options.luck && "Luck (better fishing and chest loot)",
+            options.speed && "Speed (moving faster)",
+            options.regeneration && "Regeneration (health comes back on its own)"
+        ].filter(Boolean);
+        facts.push(
+            `Everybody on gets ${effects.join(", ")} until it ends, including whoever joins meanwhile.`
+        );
+    }
+    if (catalog.needsOverworld(preset))
+        facts.push("Happens in the Overworld; only players there take part.");
+    if (catalog.hasMinScore(preset)) {
+        facts.push(
+            `Ranked from ${catalog.minScoreOf(preset)} ${info.unit}; below that, no podium and no prize.`
+        );
+    }
+    if (settings) {
+        const needed = catalog.activeNeeded(preset, settings);
+        facts.push(
+            `Starts on its own only with ${needed} ${needed === 1 ? "player" : "players"} actually playing, and not while somebody is in a fight.`
+        );
+    }
+    if (catalog.needsHostileMobs(preset)) {
+        facts.push("Needs the server above Peaceful, where hostile mobs exist.");
+    }
+    if (info.competitive) {
+        facts.push(
+            catalog.afkCounts(preset)
+                ? "Nobody playing in creative or spectator, caught by the anti-cheat, or AFK the whole time is ranked."
+                : "Nobody playing in creative or spectator, or caught by the anti-cheat, is ranked."
+        );
+    }
+    if (info.competitive) {
+        const prizes = [
+            ["1st", preset.rewards.first],
+            ["2nd", preset.rewards.second],
+            ["3rd", preset.rewards.third],
+            ["taking part", preset.rewards.everyone]
+        ] as const;
+        const given = prizes.filter(([, reward]) => reward.items.length > 0 || reward.levels > 0);
+        facts.push(
+            given.length > 0
+                ? `Prizes - ${given.map(([place, reward]) => `${place}: ${rewardText(reward)}`).join("; ")}.`
+                : "No prizes set."
+        );
+    }
+    return (
+        <div className="mt-2 flex flex-col gap-1 rounded-md bg-muted/40 px-3 py-2 text-xs">
+            <p className="text-foreground">{info.summary}</p>
+            {facts.map((fact) => (
+                <p key={fact} className="text-muted-foreground">
+                    {fact}
+                </p>
+            ))}
         </div>
     );
 }
@@ -125,6 +204,15 @@ export function MinecraftEvents({
     const [draft, setDraft] = useState<catalog.EventsConfig | null>(() => view?.config ?? null);
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
+    /** The events whose explanation is open under their row. */
+    const [explained, setExplained] = useState<ReadonlySet<string>>(() => new Set());
+    const explain = (id: string) =>
+        setExplained((current) => {
+            const next = new Set(current);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
     const [editing, setEditing] = useState<{ preset: catalog.EventPreset; isNew: boolean } | null>(
         null
     );
@@ -151,14 +239,20 @@ export function MinecraftEvents({
     useEffect(() => {
         let alive = true;
         const read = () =>
-            void actions.readEventsAction(installedAppId).then((answer) => {
-                if (!alive) return;
-                if (answer.view) {
-                    setView(answer.view);
-                    writeSnapshot(snapshotKey(installedAppId), answer.view);
-                    setDraft((current) => current ?? answer.view!.config);
-                } else setError(answer.error ?? "The events could not be read");
-            });
+            void actions
+                .readEventsAction(installedAppId)
+                .then((answer) => {
+                    if (!alive) return;
+                    if (answer.view) {
+                        setView(answer.view);
+                        writeSnapshot(snapshotKey(installedAppId), answer.view);
+                        setDraft((current) => current ?? answer.view!.config);
+                    } else setError(answer.error ?? "The events could not be read");
+                })
+                .catch(() => {
+                    // A read that did not come back - a restart, a dropped
+                    // connection - is tried again on the next beat.
+                });
         read();
         const timer = setInterval(read, running ? 5_000 : 30_000);
         return () => {
@@ -166,6 +260,14 @@ export function MinecraftEvents({
             clearInterval(timer);
         };
     }, [installedAppId, running]);
+
+    // A line about what was just done is said once and goes: "Blood moon is
+    // starting" left on screen until a reload read as the event never moving on.
+    useEffect(() => {
+        if (!note) return;
+        const timer = setTimeout(() => setNote(null), 5_000);
+        return () => clearTimeout(timer);
+    }, [note]);
 
     useEffect(() => {
         if (!running) return;
@@ -290,19 +392,19 @@ export function MinecraftEvents({
     return (
         <div className="flex flex-col gap-4">
             {refusal && (
-                <Card>
-                    <CardBody className="text-sm text-muted-foreground">{refusal}.</CardBody>
-                </Card>
+                <ui.Card>
+                    <ui.CardBody className="text-sm text-muted-foreground">{refusal}.</ui.CardBody>
+                </ui.Card>
             )}
 
             {/* What is on now. */}
-            <Card>
-                <CardBody className="flex flex-col gap-3">
+            <ui.Card>
+                <ui.CardBody className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
                             <p className="text-sm font-medium">Now</p>
                             {!view ? (
-                                <Skeleton className="mt-1 h-4 w-56" />
+                                <ui.Skeleton className="mt-1 h-4 w-56" />
                             ) : view.run ? (
                                 <p className="text-sm">
                                     <span className="font-medium">{view.run.name}</span>
@@ -327,7 +429,7 @@ export function MinecraftEvents({
                             )}
                         </div>
                         {view?.run && canManage && !view.run.cancelling && (
-                            <Button
+                            <ui.Button
                                 variant="secondary"
                                 size="sm"
                                 disabled={pending}
@@ -335,7 +437,7 @@ export function MinecraftEvents({
                             >
                                 <Square className="size-4" />
                                 Call off
-                            </Button>
+                            </ui.Button>
                         )}
                     </div>
                     {view?.run && view.run.standings.length > 0 && (
@@ -370,49 +472,54 @@ export function MinecraftEvents({
                                       : null}
                             </p>
                         )}
-                </CardBody>
-            </Card>
+                </ui.CardBody>
+            </ui.Card>
 
             {/* The events this server has. */}
-            <Card>
-                <CardBody className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <p className="text-sm font-medium">Events</p>
-                            <p className="text-xs text-muted-foreground">
-                                Played with the game's own commands - scoreboard, boss bar, titles -
-                                so they work on Paper, NeoForge, Fabric and vanilla from 1.13 on,
-                                with nothing to install.
-                            </p>
-                        </div>
+            <ui.Card>
+                <ui.CardBody className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm font-medium">Events</p>
                         {!locked && draft && (
-                            <div className="w-56">
-                                <Select
-                                    value=""
-                                    placeholder="Add an event"
-                                    aria-label="Add an event"
-                                    options={catalog.EVENT_KINDS.map((kind) => ({
-                                        value: kind,
-                                        label: catalog.KIND_INFO[kind].label
-                                    }))}
-                                    onValueChange={(kind) =>
-                                        setEditing({
-                                            preset: catalog.newPreset(
-                                                kind as catalog.EventKind,
-                                                newId()
-                                            ),
-                                            isNew: true
-                                        })
-                                    }
-                                />
-                            </div>
+                            // A button that says what it does, opening the kinds
+                            // with a line about each - rather than a select with
+                            // nothing chosen, which read as a setting.
+                            <ui.DropdownMenu>
+                                <ui.DropdownMenuTrigger asChild>
+                                    <ui.Button variant="secondary" size="sm">
+                                        <Plus className="size-4" />
+                                        Add an event
+                                    </ui.Button>
+                                </ui.DropdownMenuTrigger>
+                                <ui.DropdownMenuContent align="end" className="w-80">
+                                    {catalog.EVENT_KINDS.map((kind) => (
+                                        <ui.DropdownMenuItem
+                                            key={kind}
+                                            className="flex flex-col items-start gap-0.5"
+                                            onSelect={() =>
+                                                setEditing({
+                                                    preset: catalog.newPreset(kind, newId()),
+                                                    isNew: true
+                                                })
+                                            }
+                                        >
+                                            <span className="text-sm">
+                                                {catalog.KIND_INFO[kind].label}
+                                            </span>
+                                            <span className="line-clamp-2 text-xs text-muted-foreground">
+                                                {catalog.KIND_INFO[kind].summary}
+                                            </span>
+                                        </ui.DropdownMenuItem>
+                                    ))}
+                                </ui.DropdownMenuContent>
+                            </ui.DropdownMenu>
                         )}
                     </div>
                     {!draft ? (
                         <div className="flex flex-col gap-2" aria-busy="true">
-                            <Skeleton className="h-10 w-full" />
-                            <Skeleton className="h-10 w-full" />
-                            <Skeleton className="h-10 w-2/3" />
+                            <ui.Skeleton className="h-10 w-full" />
+                            <ui.Skeleton className="h-10 w-full" />
+                            <ui.Skeleton className="h-10 w-2/3" />
                         </div>
                     ) : presets.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
@@ -421,99 +528,118 @@ export function MinecraftEvents({
                     ) : (
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                             {presets.map((preset) => (
-                                <li
-                                    key={preset.id}
-                                    className="flex flex-wrap items-center gap-3 px-3 py-2"
-                                >
-                                    <div className="min-w-0 flex-1">
-                                        <p
-                                            className="truncate text-sm font-medium"
-                                            title={preset.name}
-                                        >
-                                            {preset.name}
-                                        </p>
-                                        <p className="truncate text-xs text-muted-foreground">
-                                            {catalog.KIND_INFO[preset.kind].label}
-                                            {" - "}
-                                            {preset.kind === "trivia"
-                                                ? `${(preset.options as catalog.EventOptions<"trivia">).rounds} rounds`
-                                                : `${preset.minutes} min`}
-                                            {catalog.KIND_INFO[preset.kind].competitive
-                                                ? ` - first place: ${rewardText(preset.rewards.first)}`
-                                                : ""}
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={preset.enabled}
-                                        disabled={locked}
-                                        aria-label={`${preset.name} can come round on its own`}
-                                        onChange={(enabled) =>
-                                            change({
-                                                presets: presets.map((one) =>
-                                                    one.id === preset.id ? { ...one, enabled } : one
-                                                )
-                                            })
-                                        }
-                                    />
-                                    <div className="flex items-center gap-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label={`Run ${preset.name} now`}
-                                            title={dirty ? "Save first" : `Run ${preset.name} now`}
-                                            disabled={
-                                                locked ||
-                                                pending ||
-                                                running ||
-                                                dirty ||
-                                                !view?.config.presets.some(
-                                                    (one) => one.id === preset.id
-                                                )
-                                            }
-                                            onClick={() => run(preset)}
-                                        >
-                                            <Play className="size-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label={`Edit ${preset.name}`}
-                                            title={`Edit ${preset.name}`}
+                                <li key={preset.id} className="flex flex-col px-3 py-2">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <div className="min-w-0 flex-1">
+                                            <p
+                                                className="truncate text-sm font-medium"
+                                                title={preset.name}
+                                            >
+                                                {preset.name}
+                                            </p>
+                                            <p className="truncate text-xs text-muted-foreground">
+                                                {catalog.KIND_INFO[preset.kind].label}
+                                                {" - "}
+                                                {preset.kind === "trivia"
+                                                    ? `${(preset.options as catalog.EventOptions<"trivia">).rounds} rounds`
+                                                    : `${preset.minutes} min`}
+                                                {catalog.KIND_INFO[preset.kind].competitive
+                                                    ? ` - first place: ${rewardText(preset.rewards.first)}`
+                                                    : ""}
+                                            </p>
+                                        </div>
+                                        <ui.Switch
+                                            checked={preset.enabled}
                                             disabled={locked}
-                                            onClick={() => setEditing({ preset, isNew: false })}
-                                        >
-                                            <Pencil className="size-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label={`Duplicate ${preset.name}`}
-                                            title={`Duplicate ${preset.name}`}
-                                            disabled={locked}
-                                            onClick={() =>
-                                                setEditing({
-                                                    preset: {
-                                                        ...preset,
-                                                        id: newId(),
-                                                        name: `${preset.name} 2`.slice(0, 40)
-                                                    },
-                                                    isNew: true
+                                            aria-label={`${preset.name} can come round on its own`}
+                                            onChange={(enabled) =>
+                                                change({
+                                                    presets: presets.map((one) =>
+                                                        one.id === preset.id
+                                                            ? { ...one, enabled }
+                                                            : one
+                                                    )
                                                 })
                                             }
-                                        >
-                                            <Copy className="size-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label={`Delete ${preset.name}`}
-                                            title={`Delete ${preset.name}`}
-                                            disabled={locked}
-                                            onClick={() => void remove(preset)}
-                                        >
-                                            <Trash2 className="size-4" />
-                                        </Button>
+                                        />
+                                        <div className="flex items-center gap-1">
+                                            <ui.Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label={`What ${preset.name} is`}
+                                                title={`What ${preset.name} is`}
+                                                aria-expanded={explained.has(preset.id)}
+                                                onClick={() => explain(preset.id)}
+                                            >
+                                                <Info className="size-4" />
+                                            </ui.Button>
+                                            <ui.Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label={`Run ${preset.name} now`}
+                                                title={
+                                                    dirty ? "Save first" : `Run ${preset.name} now`
+                                                }
+                                                disabled={
+                                                    locked ||
+                                                    pending ||
+                                                    running ||
+                                                    dirty ||
+                                                    !view?.config.presets.some(
+                                                        (one) => one.id === preset.id
+                                                    )
+                                                }
+                                                onClick={() => run(preset)}
+                                            >
+                                                <Play className="size-4" />
+                                            </ui.Button>
+                                            <ui.Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label={`Edit ${preset.name}`}
+                                                title={`Edit ${preset.name}`}
+                                                disabled={locked}
+                                                onClick={() => setEditing({ preset, isNew: false })}
+                                            >
+                                                <Pencil className="size-4" />
+                                            </ui.Button>
+                                            <ui.Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label={`Duplicate ${preset.name}`}
+                                                title={`Duplicate ${preset.name}`}
+                                                disabled={locked}
+                                                onClick={() =>
+                                                    setEditing({
+                                                        preset: {
+                                                            ...preset,
+                                                            id: newId(),
+                                                            name: `${preset.name} 2`.slice(0, 40)
+                                                        },
+                                                        isNew: true
+                                                    })
+                                                }
+                                            >
+                                                <Copy className="size-4" />
+                                            </ui.Button>
+                                            <ui.Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label={`Delete ${preset.name}`}
+                                                title={`Delete ${preset.name}`}
+                                                disabled={locked}
+                                                onClick={() => void remove(preset)}
+                                            >
+                                                <Trash2 className="size-4" />
+                                            </ui.Button>
+                                        </div>
                                     </div>
+                                    {explained.has(preset.id) && (
+                                        <EventExplained
+                                            preset={preset}
+                                            settings={settings ?? null}
+                                        />
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -522,27 +648,27 @@ export function MinecraftEvents({
                         The switch lets an event be scheduled or drawn at random. Run starts it now,
                         whoever is playing.
                     </p>
-                </CardBody>
-            </Card>
+                </ui.CardBody>
+            </ui.Card>
 
             {/* When they come round on their own. */}
-            <Card>
-                <CardBody className="flex flex-col gap-4">
+            <ui.Card>
+                <ui.CardBody className="flex flex-col gap-4">
                     <div>
-                        <p className="text-sm font-medium">On their own</p>
+                        <p className="text-sm font-medium">Automatic events</p>
                         <p className="text-xs text-muted-foreground">
                             An automatic event only starts while enough players are actually playing
                             - somebody who has not moved or turned for a while does not count.
                         </p>
                     </div>
                     {!settings ? (
-                        <Skeleton className="h-28 w-full" />
+                        <ui.Skeleton className="h-28 w-full" />
                     ) : (
                         <>
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="font-medium">Players playing, at least</span>
-                                    <Input
+                                    <ui.Input
                                         type="number"
                                         min={1}
                                         max={50}
@@ -561,7 +687,7 @@ export function MinecraftEvents({
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="font-medium">Idle after (minutes)</span>
-                                    <Input
+                                    <ui.Input
                                         type="number"
                                         min={2}
                                         max={30}
@@ -580,7 +706,7 @@ export function MinecraftEvents({
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="font-medium">Warning before it starts</span>
-                                    <Select
+                                    <ui.Select
                                         value={String(settings.countdownSeconds)}
                                         disabled={locked}
                                         aria-label="Warning before it starts"
@@ -598,7 +724,7 @@ export function MinecraftEvents({
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="font-medium">What players read</span>
-                                    <Select
+                                    <ui.Select
                                         value={settings.language}
                                         disabled={locked}
                                         aria-label="What players read"
@@ -613,7 +739,7 @@ export function MinecraftEvents({
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="font-medium">Time zone</span>
-                                    <Input
+                                    <ui.Input
                                         value={settings.timezone}
                                         disabled={locked}
                                         placeholder="Europe/Madrid"
@@ -627,14 +753,14 @@ export function MinecraftEvents({
                             <div className="flex flex-col gap-3 border-t border-border pt-4">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
-                                        <p className="text-sm font-medium">Drawn at random</p>
+                                        <p className="text-sm font-medium">Random events</p>
                                         <p className="text-xs text-muted-foreground">
                                             In the hours below, an event is drawn from the ones
                                             ticked every so often, weighted, and never the same kind
                                             twice in a row.
                                         </p>
                                     </div>
-                                    <Switch
+                                    <ui.Switch
                                         checked={settings.random.enabled}
                                         disabled={locked}
                                         aria-label="Draw events at random"
@@ -650,7 +776,7 @@ export function MinecraftEvents({
                                         <div className="grid gap-3 sm:grid-cols-4">
                                             <label className="flex flex-col gap-1 text-sm">
                                                 <span className="font-medium">From</span>
-                                                <Input
+                                                <ui.Input
                                                     type="time"
                                                     value={settings.random.from}
                                                     disabled={locked}
@@ -661,7 +787,7 @@ export function MinecraftEvents({
                                             </label>
                                             <label className="flex flex-col gap-1 text-sm">
                                                 <span className="font-medium">Until</span>
-                                                <Input
+                                                <ui.Input
                                                     type="time"
                                                     value={settings.random.to}
                                                     disabled={locked}
@@ -672,9 +798,9 @@ export function MinecraftEvents({
                                             </label>
                                             <label className="flex flex-col gap-1 text-sm">
                                                 <span className="font-medium">
-                                                    Wait at least (min)
+                                                    Time between events: at least (min)
                                                 </span>
-                                                <Input
+                                                <ui.Input
                                                     type="number"
                                                     min={15}
                                                     disabled={locked}
@@ -693,8 +819,10 @@ export function MinecraftEvents({
                                                 />
                                             </label>
                                             <label className="flex flex-col gap-1 text-sm">
-                                                <span className="font-medium">At most (min)</span>
-                                                <Input
+                                                <span className="font-medium">
+                                                    and at most (min)
+                                                </span>
+                                                <ui.Input
                                                     type="number"
                                                     min={15}
                                                     disabled={locked}
@@ -724,7 +852,7 @@ export function MinecraftEvents({
                                                         key={preset.id}
                                                         className="flex items-center gap-3 text-sm"
                                                     >
-                                                        <Switch
+                                                        <ui.Switch
                                                             checked={entry !== undefined}
                                                             disabled={locked || !preset.enabled}
                                                             aria-label={`Draw ${preset.name}`}
@@ -749,7 +877,7 @@ export function MinecraftEvents({
                                                             }
                                                         />
                                                         <span
-                                                            className={cn(
+                                                            className={ui.cn(
                                                                 "min-w-0 flex-1 truncate",
                                                                 !preset.enabled &&
                                                                     "text-muted-foreground"
@@ -761,7 +889,7 @@ export function MinecraftEvents({
                                                         {entry && (
                                                             <label className="flex items-center gap-2 text-xs text-muted-foreground">
                                                                 How often
-                                                                <Select
+                                                                <ui.Select
                                                                     value={String(entry.weight)}
                                                                     disabled={locked}
                                                                     aria-label={`How often ${preset.name} comes up`}
@@ -815,7 +943,7 @@ export function MinecraftEvents({
                                             playing at that time.
                                         </p>
                                     </div>
-                                    <Button
+                                    <ui.Button
                                         variant="secondary"
                                         size="sm"
                                         disabled={locked || presets.length === 0}
@@ -836,7 +964,7 @@ export function MinecraftEvents({
                                     >
                                         <Plus className="size-4" />
                                         Add a time
-                                    </Button>
+                                    </ui.Button>
                                 </div>
                                 {(draft?.schedules ?? []).length === 0 ? (
                                     <p className="text-xs text-muted-foreground">No set times.</p>
@@ -860,7 +988,7 @@ export function MinecraftEvents({
                                                     className="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2"
                                                 >
                                                     <div className="w-44">
-                                                        <Select
+                                                        <ui.Select
                                                             value={entry.presetId}
                                                             disabled={locked}
                                                             aria-label="Which event"
@@ -874,7 +1002,7 @@ export function MinecraftEvents({
                                                         days={entry.days}
                                                         onChange={(days) => update({ days })}
                                                     />
-                                                    <Input
+                                                    <ui.Input
                                                         className="w-28"
                                                         type="time"
                                                         aria-label="At"
@@ -884,13 +1012,13 @@ export function MinecraftEvents({
                                                             update({ at: event.target.value })
                                                         }
                                                     />
-                                                    <Switch
+                                                    <ui.Switch
                                                         checked={entry.enabled}
                                                         disabled={locked}
                                                         aria-label="On"
                                                         onChange={(enabled) => update({ enabled })}
                                                     />
-                                                    <Button
+                                                    <ui.Button
                                                         variant="ghost"
                                                         size="icon-sm"
                                                         className="ml-auto"
@@ -908,7 +1036,7 @@ export function MinecraftEvents({
                                                         }
                                                     >
                                                         <Trash2 className="size-4" />
-                                                    </Button>
+                                                    </ui.Button>
                                                 </li>
                                             );
                                         })}
@@ -917,14 +1045,14 @@ export function MinecraftEvents({
                             </div>
                         </>
                     )}
-                </CardBody>
-            </Card>
+                </ui.CardBody>
+            </ui.Card>
 
             {/* Saving what was changed above. */}
             {(dirty || error || note) && (
                 <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-elevated px-4 py-3 shadow-modal">
                     <span
-                        className={cn(
+                        className={ui.cn(
                             "text-sm",
                             error || problem ? "text-danger" : "text-muted-foreground"
                         )}
@@ -934,17 +1062,20 @@ export function MinecraftEvents({
                     </span>
                     {dirty && (
                         <div className="flex items-center gap-2">
-                            <Button
+                            <ui.Button
                                 variant="ghost"
                                 disabled={pending}
                                 onClick={() => view && setDraft(view.config)}
                             >
                                 Discard
-                            </Button>
-                            <Button disabled={pending || problem !== null || locked} onClick={save}>
+                            </ui.Button>
+                            <ui.Button
+                                disabled={pending || problem !== null || locked}
+                                onClick={save}
+                            >
                                 {pending && <Loader2 className="size-4 animate-spin" />}
                                 Save
-                            </Button>
+                            </ui.Button>
                         </div>
                     )}
                 </div>
@@ -952,8 +1083,8 @@ export function MinecraftEvents({
 
             {/* Prizes still owed. */}
             {view && view.pending.length > 0 && (
-                <Card>
-                    <CardBody className="flex flex-col gap-2">
+                <ui.Card>
+                    <ui.CardBody className="flex flex-col gap-2">
                         <div>
                             <p className="text-sm font-medium">Prizes waiting</p>
                             <p className="text-xs text-muted-foreground">
@@ -973,7 +1104,7 @@ export function MinecraftEvents({
                                     >
                                         {one.event} - {rewardText(one.reward)}
                                     </span>
-                                    <Button
+                                    <ui.Button
                                         variant="ghost"
                                         size="icon-sm"
                                         aria-label={`Forget ${one.player}'s prize`}
@@ -982,20 +1113,20 @@ export function MinecraftEvents({
                                         onClick={() => void forget(one.id, one.player)}
                                     >
                                         <Trash2 className="size-4" />
-                                    </Button>
+                                    </ui.Button>
                                 </li>
                             ))}
                         </ul>
-                    </CardBody>
-                </Card>
+                    </ui.CardBody>
+                </ui.Card>
             )}
 
             {/* How the last ones went. */}
-            <Card>
-                <CardBody className="flex flex-col gap-2">
+            <ui.Card>
+                <ui.CardBody className="flex flex-col gap-2">
                     <p className="text-sm font-medium">History</p>
                     {!view ? (
-                        <Skeleton className="h-16 w-full" />
+                        <ui.Skeleton className="h-16 w-full" />
                     ) : view.history.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                             No events have run on this server yet.
@@ -1009,9 +1140,9 @@ export function MinecraftEvents({
                                 >
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="font-medium">{entry.name}</span>
-                                        <Badge variant={OUTCOME[entry.outcome].tone}>
+                                        <ui.Badge variant={OUTCOME[entry.outcome].tone}>
                                             {OUTCOME[entry.outcome].label}
-                                        </Badge>
+                                        </ui.Badge>
                                         <span className="text-xs text-muted-foreground">
                                             {TRIGGER_LABEL[entry.trigger]} -{" "}
                                             {display.dateTime(entry.startedAt)} -{" "}
@@ -1034,8 +1165,8 @@ export function MinecraftEvents({
                             ))}
                         </ul>
                     )}
-                </CardBody>
-            </Card>
+                </ui.CardBody>
+            </ui.Card>
 
             {editing && (
                 <EventEditor
