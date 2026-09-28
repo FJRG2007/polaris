@@ -762,6 +762,12 @@ async function showClock(loop: Loop): Promise<void> {
             lines.push(commands.sound(commands.SOUNDS.tick));
             if (mark <= 5) lines.push(`title @a actionbar ${commands.text(`&e${mark}`)}`);
         }
+    } else if (catalog.playsInArena(preset) && loop.run.readyAt === null) {
+        // Its time starts once everybody is in the arena, so the clock waits
+        // full until then instead of running down and jumping back up.
+        lines.push(
+            ...commands.barUpdate(messages.arenaGettingReady(preset.name, loop.language), 1, 1)
+        );
     } else if (preset.kind !== "world-boss" && preset.kind !== "waves") {
         const left = (loop.run.endsAt - now) / 1000;
         if (left <= 0) return;

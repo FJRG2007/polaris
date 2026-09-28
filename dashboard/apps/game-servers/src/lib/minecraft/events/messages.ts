@@ -166,6 +166,11 @@ export function barName(name: string, secondsLeft: number): string {
     return `${name} - ${clock(secondsLeft)}`;
 }
 
+/** The bar while an arena is still going up, before its clock starts. */
+export function arenaGettingReady(name: string, language: Language): string {
+    return language === "es" ? `${name} - preparando` : `${name} - getting ready`;
+}
+
 export function startsInBar(name: string, secondsLeft: number, language: Language): string {
     return language === "es"
         ? `${name} empieza en ${clock(secondsLeft)}`

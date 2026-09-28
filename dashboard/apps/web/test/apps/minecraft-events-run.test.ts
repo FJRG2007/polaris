@@ -3091,6 +3091,27 @@ async function joinAndStart(presetId: string): Promise<void> {
 describe("a team duel", () => {
     const duelOf = (minutes = 3) => ({ ...catalog.newPreset("team-duel", "duel"), minutes });
 
+    it("never runs its clock back up while the arena goes up", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        await play(10_000);
+        expect(state().run?.readyAt).not.toBeNull();
+        // The clock as the bar's name shows it, from the end of the countdown on.
+        const start = world.sent.findLastIndex(
+            (line) =>
+                line.startsWith("bossbar set polaris:event name") && line.includes("starts in")
+        );
+        const shown = world.sent
+            .slice(start + 1)
+            .map((line) => /^bossbar set polaris:event name .*- (\d+):(\d\d)"/.exec(line))
+            .filter((match): match is RegExpExecArray => match !== null)
+            .map((match) => Number(match[1]) * 60 + Number(match[2]));
+        expect(shown.length).toBeGreaterThan(3);
+        for (let index = 1; index < shown.length; index += 1)
+            expect(shown[index]).toBeLessThanOrEqual(shown[index - 1]!);
+    });
+
     it("builds its arena in the air, fights with a marked kit, and puts everything back", async () => {
         world.online = ["Ana", "Ben", "Cy"];
         world.dealt = { Ana: 10 };
