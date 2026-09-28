@@ -68,6 +68,11 @@ export function RestartPlanner({
     const [restartingSince, setRestartingSince] = useState<number | null>(null);
     /** Whether a booking was last seen, so one that disappears can be told apart. */
     const booked = useRef(false);
+    /** Whether the server has been seen down since the restart began. */
+    const wentDown = useRef(false);
+    const wasChanged = useRef(changed);
+    const restarted = useRef(onRestarted);
+    restarted.current = onRestarted;
     const [error, setError] = useState<string | null>(null);
     /** The time somebody is typing, while they are typing it. */
     const [at, setAt] = useState<string | null>(null);
@@ -75,7 +80,10 @@ export function RestartPlanner({
     const load = useCallback(async () => {
         const answer = await actions.readGameRestartAction(installedAppId);
         // A booking that is gone without anybody calling it off here is one that ran.
-        if (booked.current && !answer.pending) setRestartingSince(Date.now());
+        if (booked.current && !answer.pending) {
+            setRestartingSince(Date.now());
+            restarted.current?.();
+        }
         booked.current = answer.pending !== null;
         setPending(answer.pending);
     }, [installedAppId]);
@@ -98,6 +106,19 @@ export function RestartPlanner({
         const timer = setTimeout(() => setRestartingSince(null), Math.max(0, left));
         return () => clearTimeout(timer);
     }, [restartingSince]);
+
+    // Back up after going down is the restart finished, and a change saved since
+    // is a new one that needs its own answer.
+    useEffect(() => {
+        const newChange = changed && !wasChanged.current;
+        wasChanged.current = changed;
+        if (restartingSince === null) {
+            wentDown.current = false;
+            return;
+        }
+        if (!running) wentDown.current = true;
+        else if (wentDown.current || newChange) setRestartingSince(null);
+    }, [running, changed, restartingSince]);
 
     async function book(when: "empty" | "at", moment?: string): Promise<void> {
         setBusy(when);
