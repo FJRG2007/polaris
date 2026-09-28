@@ -32,7 +32,9 @@ export function catches(options: EventOptions<"rare-catch">): readonly RareCatch
     return options.treasure === "any" ? RARE_CATCHES : [options.treasure];
 }
 
-function counted(options: EventOptions<"rare-catch">): { picked: string; dropped: string; id: string }[] {
+function counted(
+    options: EventOptions<"rare-catch">
+): { picked: string; dropped: string; id: string }[] {
     return catches(options).map((id) => {
         const index = RARE_CATCHES.indexOf(id);
         return { picked: `pe_rp${index}`, dropped: `pe_rd${index}`, id };
@@ -65,7 +67,10 @@ export function catchSetup(options: EventOptions<"rare-catch">): string[] {
 export function catchLook(options: EventOptions<"rare-catch">): string[] {
     const lines: string[] = [];
     for (const one of counted(options)) {
-        lines.push(`scoreboard players add @a ${one.picked} 0`, `scoreboard players add @a ${one.dropped} 0`);
+        lines.push(
+            `scoreboard players add @a ${one.picked} 0`,
+            `scoreboard players add @a ${one.dropped} 0`
+        );
     }
     for (const objective of [ROD, ROD_BEFORE, RECENT, COUNT_BEFORE])
         lines.push(`scoreboard players add @a ${objective} 0`);

@@ -769,9 +769,7 @@ async function begin(
         lines.push(...gather.gatheringSetup(material), ...gather.gatheringTick(material));
     }
     if (preset.kind === "rare-catch") {
-        lines.push(
-            ...rareCatch.catchSetup(preset.options as catalog.EventOptions<"rare-catch">)
-        );
+        lines.push(...rareCatch.catchSetup(preset.options as catalog.EventOptions<"rare-catch">));
     }
     if (preset.kind === "xp-boost") {
         lines.push(...boost.boostSetup(preset.options as catalog.EventOptions<"xp-boost">));
@@ -961,7 +959,10 @@ async function play(
             break;
         case "team-duel":
         case "build-battle":
-            decided = await arenaService.arenaTick(kindContext(installedAppId, loop, server, now), lines);
+            decided = await arenaService.arenaTick(
+                kindContext(installedAppId, loop, server, now),
+                lines
+            );
             break;
         default:
             break;
@@ -1469,7 +1470,9 @@ async function treasureHunt(
         changed = true;
         const remaining = chests.filter((one) => !one.opened).length;
         lines.push(
-            commands.say(messages.tag(language) + messages.huntOpened(by ?? "?", remaining, language)),
+            commands.say(
+                messages.tag(language) + messages.huntOpened(by ?? "?", remaining, language)
+            ),
             commands.sound(commands.SOUNDS.win)
         );
         if (by) {
@@ -1511,9 +1514,7 @@ async function hideTreasure(
     options: catalog.EventOptions<"treasure-hunt">
 ): Promise<void> {
     if (!loop.run.origin) {
-        const origin = hunt.centreOf(
-            commands.readWhere(await server.say([commands.IN_OVERWORLD]))
-        );
+        const origin = hunt.centreOf(commands.readWhere(await server.say([commands.IN_OVERWORLD])));
         if (!origin) throw new PlaceNotFound();
         loop.run = { ...loop.run, origin };
     }
@@ -1631,7 +1632,10 @@ async function gathering(loop: Loop, server: ServerContainer, lines: string[]): 
     const counts = commands.readScores(await server.say([gather.READ_PROGRESS]));
     for (const [name, count] of counts) {
         lines.push(
-            commands.actionbarFor(name, messages.gatherBar(material, Math.max(0, count), loop.language))
+            commands.actionbarFor(
+                name,
+                messages.gatherBar(material, Math.max(0, count), loop.language)
+            )
         );
     }
 }
@@ -1794,7 +1798,6 @@ async function triviaTick(
     );
     return null;
 }
-
 
 /** Every chat line in a stretch of log, oldest first: who said it, and what. */
 export function chatLines(log: string): { name: string; text: string }[] {
@@ -2323,7 +2326,8 @@ async function finish(
                     });
             }
             lines.push(commands.say(messages.resultsHeader(preset.name, language)));
-            if (catalog.playsInArena(preset)) lines.push(...arenaService.resultLines(run, language));
+            if (catalog.playsInArena(preset))
+                lines.push(...arenaService.resultLines(run, language));
             if (preset.kind === "world-boss" && !run.decidedBy) {
                 lines.push(
                     commands.say(
@@ -2636,10 +2640,7 @@ async function results(
     if (preset.kind === "gathering") {
         await server.sayAll(
             gather.gatheringTick(
-                gather.materialOf(
-                    run.material,
-                    preset.options as catalog.EventOptions<"gathering">
-                )
+                gather.materialOf(run.material, preset.options as catalog.EventOptions<"gathering">)
             )
         );
     }

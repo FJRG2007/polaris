@@ -57,7 +57,9 @@ export function tooClose(point: Spot, chests: readonly HiddenChest[]): boolean {
 }
 
 /** Where everybody in the Overworld is, on average: what the first clue is told from. */
-export function centreOf(players: readonly { x: number; z: number }[]): { x: number; z: number } | null {
+export function centreOf(
+    players: readonly { x: number; z: number }[]
+): { x: number; z: number } | null {
     if (players.length === 0) return null;
     const sum = players.reduce((total, one) => ({ x: total.x + one.x, z: total.z + one.z }), {
         x: 0,

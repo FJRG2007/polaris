@@ -75,20 +75,39 @@ export function drawMaterial(
 }
 
 /** The material a stored run is for, whatever was written. */
-export function materialOf(stored: string | null, options: EventOptions<"gathering">): GatherMaterial {
+export function materialOf(
+    stored: string | null,
+    options: EventOptions<"gathering">
+): GatherMaterial {
     const known = GATHER_MATERIALS.find((one) => one === stored);
     if (known) return known;
     return options.material === "random" ? "wheat" : options.material;
 }
 
 /** Each statistic the ceiling is added up from, and whether it adds or takes away. */
-function statistics(material: GatherMaterial): { objective: string; criterion: string; sign: 1 | -1 }[] {
+function statistics(
+    material: GatherMaterial
+): { objective: string; criterion: string; sign: 1 | -1 }[] {
     const { ids, crafted } = MATERIALS[material];
     return ids.flatMap((id, index) => [
-        { objective: `pe_gp${index}`, criterion: `minecraft.picked_up:minecraft.${id}`, sign: 1 as const },
-        { objective: `pe_gd${index}`, criterion: `minecraft.dropped:minecraft.${id}`, sign: -1 as const },
+        {
+            objective: `pe_gp${index}`,
+            criterion: `minecraft.picked_up:minecraft.${id}`,
+            sign: 1 as const
+        },
+        {
+            objective: `pe_gd${index}`,
+            criterion: `minecraft.dropped:minecraft.${id}`,
+            sign: -1 as const
+        },
         ...(crafted
-            ? [{ objective: `pe_gc${index}`, criterion: `minecraft.crafted:minecraft.${id}`, sign: 1 as const }]
+            ? [
+                  {
+                      objective: `pe_gc${index}`,
+                      criterion: `minecraft.crafted:minecraft.${id}`,
+                      sign: 1 as const
+                  }
+              ]
             : [])
     ]);
 }
@@ -103,7 +122,10 @@ export function gatheringSetup(material: GatherMaterial): string[] {
         );
     }
     for (const objective of [HAVE, BASE, SEEN, CAP, PROGRESS]) {
-        lines.push(`scoreboard objectives remove ${objective}`, `scoreboard objectives add ${objective} dummy`);
+        lines.push(
+            `scoreboard objectives remove ${objective}`,
+            `scoreboard objectives add ${objective} dummy`
+        );
     }
     return lines;
 }

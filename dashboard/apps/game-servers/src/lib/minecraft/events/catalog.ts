@@ -125,7 +125,13 @@ export const GATHER_MATERIALS = [
 ] as const;
 export type GatherMaterial = (typeof GATHER_MATERIALS)[number];
 /** What a rare catch can be for: the fishing treasures. `any` is whichever of them. */
-export const RARE_CATCHES = ["name_tag", "saddle", "nautilus_shell", "enchanted_book", "bow"] as const;
+export const RARE_CATCHES = [
+    "name_tag",
+    "saddle",
+    "nautilus_shell",
+    "enchanted_book",
+    "bow"
+] as const;
 export type RareCatch = (typeof RARE_CATCHES)[number];
 /** Which monsters a horde defence sends: only ones that cannot break a block. */
 export const WAVE_MIXES = ["classic", "undead", "mixed"] as const;

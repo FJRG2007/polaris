@@ -479,7 +479,9 @@ describe("a treasure hunt", () => {
         );
         const removals = lines.filter((line) => line.includes("setblock"));
         expect(removals).toEqual([commands.removeChest(chest(100, 100))]);
-        expect(removals[0]).toContain("if block 100 70 100 minecraft:chest if data block 100 70 100 LootTable");
+        expect(removals[0]).toContain(
+            "if block 100 70 100 minecraft:chest if data block 100 70 100 LootTable"
+        );
         // Each chunk let go once: the column tried and the chest share one.
         expect(lines.filter((line) => line.includes("forceload remove"))).toEqual([
             commands.forceloadRemove(100, 100),
@@ -489,10 +491,13 @@ describe("a treasure hunt", () => {
     });
 
     it("keeps every chest's chunk loaded", () => {
-        expect(hunt.holdChests([{ x: 5, z: 5 }, { x: 6, z: 7 }, { x: 40, z: 5 }])).toEqual([
-            commands.forceload(6, 7),
-            commands.forceload(40, 5)
-        ]);
+        expect(
+            hunt.holdChests([
+                { x: 5, z: 5 },
+                { x: 6, z: 7 },
+                { x: 40, z: 5 }
+            ])
+        ).toEqual([commands.forceload(6, 7), commands.forceload(40, 5)]);
     });
 
     it("tells the clues in three steps, and none for a chest already opened", () => {
@@ -540,7 +545,12 @@ describe("a treasure hunt", () => {
         const options = { chests: 5, distance: 300, loot: "dungeon" as const };
         expect(hunt.huntDistance(options, () => 0)).toBe(105);
         expect(hunt.huntDistance(options, () => 0.999)).toBeLessThanOrEqual(300);
-        expect(hunt.centreOf([{ x: 0, z: 0 }, { x: 10, z: -20 }])).toEqual({ x: 5, z: -10 });
+        expect(
+            hunt.centreOf([
+                { x: 0, z: 0 },
+                { x: 10, z: -20 }
+            ])
+        ).toEqual({ x: 5, z: -10 });
         expect(hunt.centreOf([])).toBeNull();
     });
 });
@@ -562,12 +572,22 @@ describe("a gathering", () => {
         expect(lines).toContain(
             "execute as @a store result score @s pe_have run clear @s #minecraft:logs 0"
         );
-        expect(lines).toContain("execute as @a run scoreboard players operation @s pe_cap += @s pe_gp0");
-        expect(lines).toContain("execute as @a run scoreboard players operation @s pe_cap -= @s pe_gd0");
-        expect(lines).toContain("execute as @a run scoreboard players operation @s pe_prog < @s pe_cap");
+        expect(lines).toContain(
+            "execute as @a run scoreboard players operation @s pe_cap += @s pe_gp0"
+        );
+        expect(lines).toContain(
+            "execute as @a run scoreboard players operation @s pe_cap -= @s pe_gd0"
+        );
+        expect(lines).toContain(
+            "execute as @a run scoreboard players operation @s pe_prog < @s pe_cap"
+        );
         const setup = gather.gatheringSetup("logs");
-        expect(setup).toContain("scoreboard objectives add pe_gp0 minecraft.picked_up:minecraft.oak_log");
-        expect(setup).toContain("scoreboard objectives add pe_gd10 minecraft.dropped:minecraft.warped_stem");
+        expect(setup).toContain(
+            "scoreboard objectives add pe_gp0 minecraft.picked_up:minecraft.oak_log"
+        );
+        expect(setup).toContain(
+            "scoreboard objectives add pe_gd10 minecraft.dropped:minecraft.warped_stem"
+        );
         // Only iron is made rather than found: smelting it counts.
         expect(gather.gatheringSetup("iron_ingot")).toContain(
             "scoreboard objectives add pe_gc0 minecraft.crafted:minecraft.iron_ingot"
@@ -612,13 +632,21 @@ describe("a rare catch", () => {
 
     it("counts the treasure picked up, less dropped, and the rod reeled in", () => {
         const setup = rareCatch.catchSetup({ treasure: "saddle" });
-        expect(setup).toContain("scoreboard objectives add pe_rp1 minecraft.picked_up:minecraft.saddle");
-        expect(setup).toContain("scoreboard objectives add pe_rd1 minecraft.dropped:minecraft.saddle");
-        expect(setup).toContain("scoreboard objectives add pe_rod minecraft.used:minecraft.fishing_rod");
+        expect(setup).toContain(
+            "scoreboard objectives add pe_rp1 minecraft.picked_up:minecraft.saddle"
+        );
+        expect(setup).toContain(
+            "scoreboard objectives add pe_rd1 minecraft.dropped:minecraft.saddle"
+        );
+        expect(setup).toContain(
+            "scoreboard objectives add pe_rod minecraft.used:minecraft.fishing_rod"
+        );
         expect(setup.some((line) => line.includes("name_tag"))).toBe(false);
         expect(rareCatch.catches({ treasure: "any" })).toEqual(catalog.RARE_CATCHES);
         const look = rareCatch.catchLook({ treasure: "saddle" });
-        expect(look).toContain("execute as @a run scoreboard players operation @s pe_rcnt -= @s pe_rd1");
+        expect(look).toContain(
+            "execute as @a run scoreboard players operation @s pe_rcnt -= @s pe_rd1"
+        );
         expect(look).toContain(
             `scoreboard players set @a[scores={pe_rdf=1..}] pe_rfr ${rareCatch.RECENT_LOOKS}`
         );
@@ -649,22 +677,28 @@ describe("an experience boost", () => {
             expect(line).toMatch(/run xp add @s \d+ points$/);
         expect(lines.join("\n")).not.toMatch(/xp (set|remove)|xp add @s -/);
         // An ore put down is taken off the ores mined.
-        expect(lines).toContain("execute as @a run scoreboard players operation @s pe_xo -= @s pe_xu0");
+        expect(lines).toContain(
+            "execute as @a run scoreboard players operation @s pe_xo -= @s pe_xu0"
+        );
     });
 
     it("counts only what it rewards", () => {
         const kills = boost.boostSetup({ perKill: 4, perOre: 0 });
-        expect(kills).toContain("scoreboard objectives add pe_xk minecraft.custom:minecraft.mob_kills");
-        expect(kills.some((line) => line.includes("minecraft.mined"))).toBe(false);
-        expect(boost.boostTick({ perKill: 0, perOre: 2 }).some((line) => line.includes("pe_xk "))).toBe(
-            false
+        expect(kills).toContain(
+            "scoreboard objectives add pe_xk minecraft.custom:minecraft.mob_kills"
         );
+        expect(kills.some((line) => line.includes("minecraft.mined"))).toBe(false);
+        expect(
+            boost.boostTick({ perKill: 0, perOre: 2 }).some((line) => line.includes("pe_xk "))
+        ).toBe(false);
     });
 
     it("pays what is still owed before taking its objectives back out", () => {
         const lines = boost.boostCleanup(options);
         const lastPay = lines.findLastIndex((line) => line.includes("xp add"));
-        const firstRemove = lines.findIndex((line) => line.startsWith("scoreboard objectives remove"));
+        const firstRemove = lines.findIndex((line) =>
+            line.startsWith("scoreboard objectives remove")
+        );
         expect(lastPay).toBeGreaterThan(0);
         expect(firstRemove).toBeGreaterThan(lastPay);
         const removed = new Set(objectives(lines, "remove"));
@@ -717,7 +751,9 @@ describe("the new kinds in the catalog", () => {
             messages.huntUnfound(3, language),
             messages.huntOpened("Ana", 0, language),
             messages.huntBeams(language),
-            ...catalog.GATHER_MATERIALS.map((material) => messages.gatherTarget(material, language)),
+            ...catalog.GATHER_MATERIALS.map((material) =>
+                messages.gatherTarget(material, language)
+            ),
             messages.gatherBar("wheat", 12, language),
             ...(["any", ...catalog.RARE_CATCHES] as const).map((one) =>
                 messages.catchTarget(one, language)
@@ -1392,9 +1428,7 @@ describe("an arena is built only into air and taken down only where it is ours",
         const pieces = arena.slices(box);
         expect(pieces.length).toBeGreaterThan(1);
         expect(pieces.every((piece) => arena.volume(piece) <= arena.VOLUME_MAX)).toBe(true);
-        expect(pieces.reduce((sum, piece) => sum + arena.volume(piece), 0)).toBe(
-            arena.volume(box)
-        );
+        expect(pieces.reduce((sum, piece) => sum + arena.volume(piece), 0)).toBe(arena.volume(box));
     });
 
     it("builds a duel arena with keep only, inside its own box", () => {
@@ -1566,7 +1600,9 @@ describe("a team duel and a build battle", () => {
                 now
             )
         ).toBe("Cy");
-        expect(duel.creditFor(["Ben"], new Map(), new Map([["Ben", now - 20_000]]), now)).toBeNull();
+        expect(
+            duel.creditFor(["Ben"], new Map(), new Map([["Ben", now - 20_000]]), now)
+        ).toBeNull();
     });
 
     it("takes one vote per player, never for their own plot", () => {
@@ -1619,7 +1655,9 @@ describe("a team duel and a build battle", () => {
 
     it("gives a join event time to type join, and a build battle its vote", () => {
         const settings = catalog.settingsSchema.parse({ countdownSeconds: 0 });
-        expect(catalog.countdownSecondsFor(preset("team-duel"), settings)).toBe(catalog.JOIN_SECONDS);
+        expect(catalog.countdownSecondsFor(preset("team-duel"), settings)).toBe(
+            catalog.JOIN_SECONDS
+        );
         expect(catalog.countdownSecondsFor(preset("fishing"), settings)).toBe(0);
         expect(catalog.runMinutes({ ...preset("build-battle"), minutes: 5 })).toBe(6);
         expect(catalog.needsPvp(preset("team-duel"))).toBe(true);

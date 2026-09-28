@@ -18,7 +18,9 @@ export function XpBoostOptions({
     issues: readonly { path: (string | number)[]; message: string }[];
 }) {
     // The rule over both fields at once: one of them has to give something.
-    const nothing = issues.find((issue) => issue.path.length === 1 && issue.path[0] === "options")?.message;
+    const nothing = issues.find(
+        (issue) => issue.path.length === 1 && issue.path[0] === "options"
+    )?.message;
     return (
         <div className="flex flex-col gap-2">
             <div className="grid grid-cols-2 gap-3">

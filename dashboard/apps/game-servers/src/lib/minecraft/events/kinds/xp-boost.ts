@@ -102,5 +102,8 @@ export function boostCleanup(options: EventOptions<"xp-boost">): string[] {
         OWED,
         ...ORES.flatMap((_, index) => [mined(index), placed(index)])
     ];
-    return [...boostTick(options), ...every.map((objective) => `scoreboard objectives remove ${objective}`)];
+    return [
+        ...boostTick(options),
+        ...every.map((objective) => `scoreboard objectives remove ${objective}`)
+    ];
 }
