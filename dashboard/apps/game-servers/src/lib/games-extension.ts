@@ -152,9 +152,7 @@ export const gameServersExtension: AppExtension = {
         // are pointed at their own page.
         const access =
             game.game === "minecraft"
-                ? await (
-                      await import("./minecraft/player-access")
-                  )
+                ? await (await import("./minecraft/player-access"))
                       .listPlayerAccess(ownerId, game.installedAppId)
                       .catch(() => null)
                 : null;

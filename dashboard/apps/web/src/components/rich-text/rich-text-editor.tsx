@@ -138,9 +138,20 @@ export interface RichTextEditorProps {
      * has no account for it to be asked about. A caller with its own roster
      * hands it over here, and the picker knows no different.
      */
-    mentionSource?: ((kinds: readonly refs.ReferenceKind[], query: string) => Promise<
-        readonly { kind: refs.ReferenceKind; id: string; label: string; detail?: string; image?: string | null }[]
-    >) | null;
+    mentionSource?:
+        | ((
+              kinds: readonly refs.ReferenceKind[],
+              query: string
+          ) => Promise<
+              readonly {
+                  kind: refs.ReferenceKind;
+                  id: string;
+                  label: string;
+                  detail?: string;
+                  image?: string | null;
+              }[]
+          >)
+        | null;
     /**
      * What the right-press menu offers for a list somebody selected, when this
      * surface can do something with one.
@@ -488,7 +499,8 @@ export function RichTextEditor({
              */
             onMouseDown={(event) => {
                 const target = event.target as HTMLElement;
-                if (target.closest(".ProseMirror, button, a, input, textarea, [role='button']")) return;
+                if (target.closest(".ProseMirror, button, a, input, textarea, [role='button']"))
+                    return;
                 event.preventDefault();
                 editor.commands.focus("end");
             }}
@@ -543,11 +555,7 @@ function insertMarkdown(editor: Editor, text: string): void {
     }
     const doc = md.markdownToDoc(text, origin());
     const pending = collectReferences(doc);
-    editor
-        .chain()
-        .focus()
-        .insertContent(inlineIfOneLine(doc))
-        .run();
+    editor.chain().focus().insertContent(inlineIfOneLine(doc)).run();
     if (pending.length > 0) void nameReferences(editor, pending);
 }
 

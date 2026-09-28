@@ -92,12 +92,19 @@ export function isGameTab(slug: string, game: GameId | null = null): boolean {
 }
 
 /** The screens this viewer may open, given what they hold on this server. */
-export function visibleGameTabs(held: readonly Permission[], game: GameId | null = null): GameTab[] {
+export function visibleGameTabs(
+    held: readonly Permission[],
+    game: GameId | null = null
+): GameTab[] {
     return tabsForGame(game).filter((tab) => held.includes(tab.permission));
 }
 
 /** Whether this viewer may open one screen. */
-export function canOpenGameTab(slug: string, held: readonly Permission[], game: GameId | null = null): boolean {
+export function canOpenGameTab(
+    slug: string,
+    held: readonly Permission[],
+    game: GameId | null = null
+): boolean {
     const tab = tabsForGame(game).find((entry) => entry.slug === slug);
     return tab !== undefined && held.includes(tab.permission);
 }
