@@ -15,6 +15,7 @@ import { prisma } from "@polaris/db";
 import { accessRefusal } from "./access";
 import * as polarisLogin from "./polaris-login";
 import { bundledModVersion } from "./polaris-mod-files";
+import { anticheatHoldsMod } from "./polaris-anticheat";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { enableLogin, foreignLogin, PROJECTS_KEY, SOFTWARE_KEY } from "./join-guard";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
@@ -416,6 +417,10 @@ export async function setLogin(
         });
     } else {
         writes = polarisLogin.disableEnv(current);
+        // The anti-cheat switched on through the same mod keeps it.
+        if (anticheatHoldsMod(current)) {
+            writes.set(polarisLogin.MODS_KEY, current.get(polarisLogin.MODS_KEY) ?? "");
+        }
     }
     await setEnvVars("application", applicationId, ownerId, polarisLogin.envWrites(writes));
 }

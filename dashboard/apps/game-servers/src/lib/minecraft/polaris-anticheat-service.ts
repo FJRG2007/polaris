@@ -10,7 +10,7 @@ import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { TOKEN_KEY, loginOn } from "./polaris-login";
 import { SOFTWARE_KEY } from "./join-guard";
-import { anticheatBundled, bundledModVersion } from "./polaris-mod-files";
+import { anticheatBundled } from "./polaris-mod-files";
 import { EVIDENCE_WINDOW_MS, readXray } from "./xray";
 import { engineScore } from "./suspicion";
 import * as anticheat from "./polaris-anticheat";
@@ -41,7 +41,10 @@ export async function anticheatState(
         publicAppUrl().catch(() => null)
     ]);
     const env = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
-    const build = anticheat.anticheatBuildFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? "");
+    const build = anticheat.anticheatBuildFor(
+        env.get(SOFTWARE_KEY) ?? "",
+        env.get("VERSION") ?? ""
+    );
     return {
         on: anticheat.anticheatActive(env),
         supported: build !== null,
@@ -78,9 +81,11 @@ export async function setAnticheat(
                 "Polaris anti-cheat needs this Polaris to have a public address: the server downloads the plugin from it when it starts."
             );
         }
-        if (build.kind === "plugin" ? !(await anticheatBundled()) : (await bundledModVersion(build.file)) === null) {
+        if (!(await anticheatBundled(build.file))) {
             throw new Error(
-                "This Polaris was installed without the anti-cheat plugin. Update Polaris from Settings to get it."
+                build.kind === "plugin"
+                    ? "This Polaris was installed without the anti-cheat plugin. Update Polaris from Settings to get it."
+                    : "This Polaris was installed without the Polaris mod for this release. Update Polaris from Settings to get it."
             );
         }
         // The token the server already has, when the login plugin gave it one:
@@ -108,7 +113,7 @@ export async function setAnticheat(
  */
 export async function adoptAnticheatDefaults(): Promise<{ adopted: number }> {
     const baseUrl = await publicAppUrl().catch(() => null);
-    if (baseUrl === null || !(await anticheatBundled())) return { adopted: 0 };
+    if (baseUrl === null) return { adopted: 0 };
     const installs = await prisma.installedApp.findMany({
         where: { catalogId: "minecraft", status: { not: "removed" }, applicationId: { not: null } },
         select: { id: true, ownerId: true, applicationId: true }
@@ -139,6 +144,11 @@ export async function adoptAnticheatDefaults(): Promise<{ adopted: number }> {
             const vars = await listEnvVars("application", applicationId, install.ownerId);
             const current = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
             if (!anticheat.wantsDefaultAnticheat(current)) continue;
+            const build = anticheat.anticheatBuildFor(
+                current.get(SOFTWARE_KEY) ?? "",
+                current.get("VERSION") ?? ""
+            );
+            if (build === null || !(await anticheatBundled(build.file))) continue;
             const token =
                 (await readInstallEnvSecret(applicationId, install.ownerId, TOKEN_KEY)) ??
                 randomBytes(32).toString("hex");

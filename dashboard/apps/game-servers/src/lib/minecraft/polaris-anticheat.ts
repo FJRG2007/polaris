@@ -72,7 +72,10 @@ export function withoutReplacedAnticheats(projects: string): string {
  */
 export function wantsDefaultAnticheat(env: ReadonlyMap<string, string>): boolean {
     const decided = (env.get(ANTICHEAT_KEY) ?? "").trim().toLowerCase();
-    return decided === "" && anticheatBuildFor(env.get("TYPE") ?? "", env.get("VERSION") ?? "") !== null;
+    return (
+        decided === "" &&
+        anticheatBuildFor(env.get("TYPE") ?? "", env.get("VERSION") ?? "") !== null
+    );
 }
 
 /** The file the dashboard serves the plugin as. */
@@ -133,7 +136,10 @@ function carries(env: ReadonlyMap<string, string>, file: string): boolean {
 export function anticheatOn(env: ReadonlyMap<string, string>): boolean {
     if (env.get(ANTICHEAT_KEY)?.trim().toLowerCase() !== "on") return false;
     const build = anticheatBuildFor(env.get("TYPE") ?? "", env.get("VERSION") ?? "");
-    return entries(env.get(MODS_KEY) ?? "").some(isEntry) || (build?.kind === "mod" && carries(env, build.file));
+    return (
+        entries(env.get(MODS_KEY) ?? "").some(isEntry) ||
+        (build?.kind === "mod" && carries(env, build.file))
+    );
 }
 
 /**
@@ -185,30 +191,54 @@ export function withoutAnticheat(mods: string): string {
 }
 
 /**
- * What a move to other software has to write for the engine, or null: it comes
- * off a server moving to software it cannot run on, since a plugin copied into a
- * mod loader's folder is at best dead weight. `mods` is the list as the rest of
- * the same save leaves it. Nobody decided against it, so the switch is left
- * undecided rather than off, and a move back to software it runs on gets it again.
+ * What a move to other software or another release has to write for the engine,
+ * or null: it comes off a server moving where the same build does not load, since
+ * a plugin copied into a mod loader's folder is at best dead weight and a mod
+ * built for another release ends the boot. `env` is the server as it is before
+ * the move, and `mods` the list as the rest of the same save leaves it. Nobody
+ * decided against it, so the switch is left undecided rather than off, and
+ * wherever it runs the default gets it on again with the build that loads there.
  */
 export function anticheatMovedTo(
     env: ReadonlyMap<string, string>,
     software: string,
+    version: string,
     mods: string = env.get(MODS_KEY) ?? ""
 ): Map<string, string> | null {
-    if (!anticheatOn(env) || anticheatRunsOn(software)) return null;
+    if (!anticheatOn(env)) return null;
+    const from = anticheatBuildFor(env.get("TYPE") ?? "", env.get("VERSION") ?? "");
+    const to = anticheatBuildFor(software, version);
+    if (from !== null && to !== null && from.kind === to.kind && from.file === to.file) return null;
     // The mod stays where the login still needs it; that switch moves it itself.
-    const build = anticheatBuildFor(env.get("TYPE") ?? "", env.get("VERSION") ?? "");
     const kept =
-        build?.kind === "mod" && !loginOn(env)
+        from?.kind === "mod" && !loginOn(env)
             ? entries(withoutAnticheat(mods))
-                  .filter((entry) => fileOf(entry) !== build.file)
+                  .filter((entry) => fileOf(entry) !== from.file)
                   .join(",")
             : withoutAnticheat(mods);
     return new Map([
         [MODS_KEY, kept],
-        [ANTICHEAT_KEY, ""]
+        [ANTICHEAT_KEY, ""],
+        ...(from?.kind === "mod" ? [[ANTIXRAY_KEY, ""] as [string, string]] : [])
     ]);
+}
+
+/** Whether the engine is switched on here through the Polaris mod, which then
+ *  has to stay on the list whatever the login does. */
+export function anticheatHoldsMod(env: ReadonlyMap<string, string>): boolean {
+    const build = anticheatBuildFor(env.get("TYPE") ?? "", env.get("VERSION") ?? "");
+    return build?.kind === "mod" && anticheatOn(env);
+}
+
+/** A `MODS` list without anything the engine put on it for this server: the
+ *  plugin, and the mod's build unless the login still needs it. */
+export function withoutAnticheatBuild(env: ReadonlyMap<string, string>): string {
+    const mods = withoutAnticheat(env.get(MODS_KEY) ?? "");
+    const build = anticheatBuildFor(env.get("TYPE") ?? "", env.get("VERSION") ?? "");
+    if (build === null || !anticheatHoldsMod(env) || loginOn(env)) return mods;
+    return entries(mods)
+        .filter((entry) => fileOf(entry) !== build.file)
+        .join(",");
 }
 
 /** What turning it off writes. Empty is a real value: the image only removes

@@ -13,7 +13,10 @@
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { guardForSave } from "@polaris-app/game-servers/src/lib/minecraft/join-guard";
+import {
+    guardAsTemplate,
+    guardForSave
+} from "@polaris-app/game-servers/src/lib/minecraft/join-guard";
 import * as anticheat from "@polaris-app/game-servers/src/lib/minecraft/polaris-anticheat";
 
 const BASE = "https://polaris.example";
@@ -238,5 +241,55 @@ describe("on a NeoForge server, through the Polaris mod", () => {
         expect(anticheat.anticheatActive(env)).toBe(true);
         expect(anticheat.anticheatOn(env)).toBe(true);
         expect(anticheat.anticheatDisableEnv(env).get("MODS")).toBe("");
+    });
+
+    const guarded = () =>
+        neo([
+            ["MODS", MOD],
+            ["POLARIS_ANTICHEAT", "on"]
+        ]);
+    const saved = async (vars: { key: string; value: string }[], env: Map<string, string>) =>
+        new Map((await guardForSave(vars, async () => env)).map((one) => [one.key, one.value]));
+
+    it("takes the mod off a release it has no build for, on a save of the release alone", async () => {
+        const writes = await saved([{ key: "VERSION", value: "1.21.1" }], guarded());
+        expect(writes.get("MODS")).toBe("");
+        expect(writes.get("POLARIS_ANTICHEAT")).toBe("");
+    });
+
+    it("hands a move to Paper back to the default, which gives it the plugin", async () => {
+        const writes = await saved([{ key: "TYPE", value: "PAPER" }], guarded());
+        expect(writes.get("MODS")).toBe("");
+        expect(writes.get("POLARIS_ANTICHEAT")).toBe("");
+        const moved = new Map([...guarded(), ...writes, ["TYPE", "PAPER"]]);
+        expect(anticheat.wantsDefaultAnticheat(moved)).toBe(true);
+    });
+
+    it("judges the build by where the server was, not where it is going", () => {
+        const writes = anticheat.anticheatMovedTo(guarded(), "NEOFORGE", "1.21.1");
+        expect(writes?.get("MODS")).toBe("");
+        expect(anticheat.anticheatMovedTo(guarded(), "NEOFORGE", "1.21.4")).toBeNull();
+    });
+
+    it("keeps the mod on the list for the login, which moves it itself", () => {
+        const both = new Map([...guarded(), ["POLARIS_LOGIN", "on"]]);
+        expect(anticheat.anticheatMovedTo(both, "FABRIC", "1.21.4")?.get("MODS")).toBe(MOD);
+    });
+
+    it("is not carried by a template", () => {
+        const extra = "https://example.org/extra.jar";
+        const env = neo([
+            ["MODS", `${extra},${MOD}`],
+            ["POLARIS_ANTICHEAT", "on"]
+        ]);
+        expect(guardAsTemplate(env).get("MODS")).toBe(extra);
+    });
+
+    it("holds the mod against the login switching off only while switched on", () => {
+        expect(anticheat.anticheatHoldsMod(guarded())).toBe(true);
+        expect(anticheat.anticheatHoldsMod(neo([["MODS", MOD]]))).toBe(false);
+        expect(
+            anticheat.anticheatHoldsMod(new Map([...guarded(), ["POLARIS_ANTICHEAT", "off"]]))
+        ).toBe(false);
     });
 });
