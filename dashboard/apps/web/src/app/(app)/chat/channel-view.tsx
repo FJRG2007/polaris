@@ -643,7 +643,8 @@ export function ChannelView({
         fetching.current = true;
         const result = await actions.readSinceAction(channelId, newest);
         release();
-        const arrived = result.page?.messages ?? [];
+        const known = new Set(held.current.map((message) => message.id));
+        const arrived = (result.page?.messages ?? []).filter((message) => !known.has(message.id));
         if (arrived.length === 0) return;
 
         // Below the fold for somebody reading further up. Counted rather than
