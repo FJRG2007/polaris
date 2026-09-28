@@ -27,7 +27,7 @@ import * as core from "@polaris/core";
 import * as office from "@/lib/office/documents";
 import { officeReader } from "@/lib/office/reader";
 import { publishOfficeChange } from "@/lib/office/live";
-import { resolveSession, sessionCan } from "@/lib/session";
+import { backgroundUser, sessionCan } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,7 +46,7 @@ export async function POST(
     // document without one. When there IS a session it still has to hold the
     // app's own permission, so a link cannot be used to give somebody Office on
     // an instance whose administrator took it away from them.
-    const session = await resolveSession();
+    const session = await backgroundUser();
     if (session && !(await sessionCan(session, "office.use"))) {
         return new Response("Forbidden", { status: 403 });
     }

@@ -16,7 +16,7 @@
 import * as core from "@polaris/core";
 import { cookies } from "next/headers";
 import { documentAccess } from "./documents";
-import { linkPassCookie, readLinkPass } from "./links";
+import { linkPassCookie, linkPassStanding } from "./links";
 
 /** What this request may do here, and on whose behalf. */
 export interface OfficeReader {
@@ -45,8 +45,10 @@ export async function officeReader(
     }
 
     const pass = (await cookies()).get(linkPassCookie(documentId))?.value;
-    const role = readLinkPass(documentId, pass);
     // The role is inside the signature rather than beside it, so this cannot be
-    // promoted by editing the half in front of the dot - see `signLinkPass`.
+    // promoted by editing the half in front of the dot - see `signLinkPass` - and
+    // the link that issued it is asked whether it still stands, so revoking a
+    // link ends the passes it handed out.
+    const role = await linkPassStanding(documentId, pass);
     return role ? { userId, role } : null;
 }

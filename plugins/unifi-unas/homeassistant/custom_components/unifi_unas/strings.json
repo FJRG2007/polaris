@@ -45,10 +45,12 @@
           "mqtt_tls": "Use TLS",
           "device_model": "Device Model",
           "device_name": "Device Name",
-          "scan_interval": "Polling Interval (seconds, 5-60)"
+          "scan_interval": "Polling Interval (seconds, 5-60)",
+          "trust_new_host_key": "Trust the new SSH host key"
         },
         "data_description": {
           "mqtt_tls": "Only enable if your MQTT broker is configured for TLS (port 8883). Leave off for standard setups.",
+          "trust_new_host_key": "Only tick this if you reinstalled, reset or replaced the UNAS. Home Assistant then accepts the key the UNAS presents now and stops trusting the old one.",
           "device_model": "WARNING: Changing the device model requires deleting and re-adding the integration to update drive entities.",
           "device_name": "Changes device display names only. Entity IDs are set at initial setup and cannot be changed here."
         }
@@ -74,6 +76,7 @@
       "mqtt_library_missing": "MQTT library not available. Please restart Home Assistant.",
       "model_changed": "Device model cannot be changed during reconfiguration. Please delete and re-add the integration to change the device model.",
       "mqtt_tls_verify_failed": "TLS certificate verification failed. Enable 'Allow untrusted certificate' if your broker uses a self-signed certificate.",
+      "host_key_mismatch": "The UNAS presented a different SSH host key than the one recorded at setup, so no password was sent. If you reinstalled, reset or replaced the UNAS, tick 'Trust the new SSH host key'. Otherwise another device on your network may be impersonating it.",
       "unknown": "Unexpected error occurred. Please check the logs."
     },
     "abort": {
@@ -101,6 +104,10 @@
     "duplicate_publishers": {
       "title": "Multiple devices publishing to the same MQTT topic",
       "description": "More than one device is publishing UniFi UNAS data to the same MQTT topic prefix. This usually means the integration's SSH host was reconfigured at some point and the previous device is still running the orphaned agent, which will corrupt sensor values by mixing data from both devices.\n\nMachine IDs seen: {machine_ids}\n\nTo identify which device is the orphan, compare the machine IDs above against `/etc/machine-id` on your UNAS. Then SSH into the other device(s) and run:\n\n```\nsystemctl stop polaris-unas-agent\nsystemctl disable polaris-unas-agent\nrm -f /etc/systemd/system/polaris-unas-agent.service\nrm -f /root/polaris-unas-agent /etc/polaris-unas-agent.env\nsystemctl daemon-reload\n```\n\nThis warning will clear automatically once only one device is publishing."
+    },
+    "ssh_host_key_changed": {
+      "title": "UNAS SSH host key changed",
+      "description": "The UniFi UNAS at `{host}` presented a different SSH host key than the one Home Assistant recorded, so the connection was refused and no password was sent.\n\nIf you reinstalled, reset or replaced the UNAS, open the integration's Reconfigure option and tick 'Trust the new SSH host key'. If you did not, another device on your network may be impersonating the UNAS; do not accept the new key until you know why it changed.\n\nThis warning clears automatically once the UNAS is reached with a trusted key."
     },
     "ssh_unavailable": {
       "title": "UNAS SSH connection unavailable",

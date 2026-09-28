@@ -107,7 +107,14 @@ export default async function SharePage({
 
     if (share.passwordHash) {
         const cookieValue = (await cookies()).get(shareUnlockCookie(share.id))?.value;
-        if (!verifyShareUnlock(share.id, cookieValue, loadEnv().POLARIS_AUTH_SECRET)) {
+        if (
+            !verifyShareUnlock(
+                share.id,
+                cookieValue,
+                share.passwordHash,
+                loadEnv().POLARIS_AUTH_SECRET
+            )
+        ) {
             return <LinkPasswordForm token={token} unlock={unlockShareAction} />;
         }
     }

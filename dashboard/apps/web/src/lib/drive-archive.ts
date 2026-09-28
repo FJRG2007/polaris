@@ -41,11 +41,18 @@ function ensureEncryptedFormat(): void {
     encryptedRegistered = true;
 }
 
+/** Whether a path found inside a walked folder may go into the archive. The
+ *  folder itself was authorized by the caller; this is for what is under it. */
+export type ZipPathFilter = (path: string) => Promise<boolean>;
+
+const EVERYTHING: ZipPathFilter = async () => true;
+
 /** Walk one requested path, yielding zip sources with archive-relative names. */
 async function* walk(
     driver: StorageDriver,
     root: string,
-    lockedRoots: Set<string>
+    lockedRoots: Set<string>,
+    mayInclude: ZipPathFilter
 ): AsyncGenerator<ZipSource> {
     const rootName = baseNameOf(root);
     let stat;
@@ -55,7 +62,13 @@ async function* walk(
         return; // A vanished/unreadable item is skipped rather than failing the bundle.
     }
     if (stat.kind === "file") {
-        yield { name: rootName, kind: "file", size: stat.size, mtime: stat.modifiedAt, body: () => driver.readStream(root) };
+        yield {
+            name: rootName,
+            kind: "file",
+            size: stat.size,
+            mtime: stat.modifiedAt,
+            body: () => driver.readStream(root)
+        };
         return;
     }
 
@@ -74,6 +87,8 @@ async function* walk(
         }
         for (const entry of listing.entries) {
             if (isReservedRootPath(entry.path)) continue;
+            // A denied subfolder is neither listed nor descended.
+            if (!(await mayInclude(entry.path))) continue;
             const archivePath = `${current.archive}/${entry.name}`;
             if (entry.kind === "dir") {
                 if (lockedRoots.has(entry.path)) continue; // never descend a locked subtree
@@ -81,7 +96,13 @@ async function* walk(
                 queue.push({ path: entry.path, archive: archivePath });
             } else if (entry.kind === "file") {
                 const filePath = entry.path;
-                yield { name: archivePath, kind: "file", size: entry.size, mtime: entry.modifiedAt, body: () => driver.readStream(filePath) };
+                yield {
+                    name: archivePath,
+                    kind: "file",
+                    size: entry.size,
+                    mtime: entry.modifiedAt,
+                    body: () => driver.readStream(filePath)
+                };
             }
         }
     }
@@ -91,10 +112,11 @@ async function* walk(
 export async function* zipSourcesFor(
     driver: StorageDriver,
     paths: string[],
-    lockedRoots: Set<string>
+    lockedRoots: Set<string>,
+    mayInclude: ZipPathFilter = EVERYTHING
 ): AsyncGenerator<ZipSource> {
     for (const root of paths) {
-        yield* walk(driver, root, lockedRoots);
+        yield* walk(driver, root, lockedRoots, mayInclude);
     }
 }
 
@@ -128,7 +150,9 @@ export async function writeArchiveToDriver(
         for await (const source of sources) {
             if (source.kind === "file" && source.body) {
                 const web = await source.body();
-                archive.append(Readable.fromWeb(web as unknown as NodeWebReadableStream), { name: source.name });
+                archive.append(Readable.fromWeb(web as unknown as NodeWebReadableStream), {
+                    name: source.name
+                });
             }
             // Empty directories are implied by file paths; store-only preserves
             // them explicitly, encrypted archives omit empty dirs (acceptable).

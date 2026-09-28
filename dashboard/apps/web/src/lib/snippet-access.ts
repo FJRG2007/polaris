@@ -104,7 +104,14 @@ export async function gateSnippetRequest(token: string, action: string): Promise
 
     if (snippet.passwordHash) {
         const cookieValue = (await cookies()).get(snippetUnlockCookie(snippet.id))?.value;
-        if (!verifySnippetUnlock(snippet.id, cookieValue, loadEnv().POLARIS_AUTH_SECRET)) {
+        if (
+            !verifySnippetUnlock(
+                snippet.id,
+                cookieValue,
+                snippet.passwordHash,
+                loadEnv().POLARIS_AUTH_SECRET
+            )
+        ) {
             return deny(401, "password_required");
         }
     }

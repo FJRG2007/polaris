@@ -59,7 +59,7 @@ export async function gateOfficeLink(token: string): Promise<OfficeLinkGate> {
 
     if (visit.needsPassword) {
         const solved = (await cookies()).get(links.linkUnlockCookie(visit.linkId))?.value;
-        if (!links.linkUnlocked(visit.linkId, solved)) {
+        if (!links.linkUnlocked(visit.linkId, visit.passwordHash, solved)) {
             return { ok: false, status: 401, reason: "password_required" };
         }
     }

@@ -12,16 +12,15 @@
  */
 
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
+import { backgroundUser } from "@/lib/session";
 import { readConsumption } from "@/lib/consumption-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-    const session = await getSession();
-    const user = session?.user as { id?: string; isAdmin?: boolean } | undefined;
-    if (!user?.isAdmin || !user.id) {
+    const user = await backgroundUser();
+    if (!user?.isAdmin) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

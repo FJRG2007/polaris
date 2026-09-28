@@ -355,18 +355,25 @@ export function fileRequestUnlockCookie(requestId: string): string {
     return unlockCookieName(DROP_LINK_SCOPE, requestId);
 }
 
-/** Sign an unlock marker so the "PIN solved" cookie cannot be forged. */
-export function signFileRequestUnlock(requestId: string, secret: string): string {
-    return signUnlock(DROP_LINK_SCOPE, requestId, secret);
+/** Sign an unlock marker so the "PIN solved" cookie cannot be forged. Signed
+ *  against the current PIN's hash, so changing the PIN ends earlier unlocks. */
+export function signFileRequestUnlock(
+    requestId: string,
+    passwordHash: string | null,
+    secret: string
+): string {
+    return signUnlock(DROP_LINK_SCOPE, requestId, { passwordHash }, secret);
 }
 
-/** Constant-time check of an unlock cookie against the expected signature. */
+/** Constant-time check of an unlock cookie: this drop point, its current PIN,
+ *  and not expired. */
 export function verifyFileRequestUnlock(
     requestId: string,
     value: string | undefined,
+    passwordHash: string | null,
     secret: string
 ): boolean {
-    return verifyUnlock(DROP_LINK_SCOPE, requestId, value, secret);
+    return verifyUnlock(DROP_LINK_SCOPE, requestId, value, { passwordHash }, secret);
 }
 
 /** Parse a stored JSON string array back into a string[] (empty on any error). */

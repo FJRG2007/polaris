@@ -467,6 +467,7 @@ export async function renameHostGroupAction(
     name: string
 ): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
+    if (!z.string().uuid().safeParse(groupId).success) return { error: "Server group not found" };
     try {
         await renameHostGroup(user.id, groupId, name);
         revalidatePath(SERVERS_PATH);
@@ -479,6 +480,7 @@ export async function renameHostGroupAction(
 /** Delete a group. Its firewall rules go with it - see deleteHostGroup. */
 export async function deleteHostGroupAction(groupId: string): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
+    if (!z.string().uuid().safeParse(groupId).success) return { error: "Server group not found" };
     try {
         await deleteHostGroup(user.id, groupId);
         await recordAudit({
@@ -499,8 +501,11 @@ export async function setHostGroupMembersAction(
     hostIds: string[]
 ): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
+    if (!z.string().uuid().safeParse(groupId).success) return { error: "Server group not found" };
+    const members = z.array(z.string().uuid()).max(1000).safeParse(hostIds);
+    if (!members.success) return { error: "Pick servers from the list" };
     try {
-        await setHostGroupMembers(user.id, groupId, hostIds);
+        await setHostGroupMembers(user.id, groupId, members.data);
         revalidatePath(SERVERS_PATH);
         return {};
     } catch (caught) {

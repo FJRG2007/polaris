@@ -83,7 +83,9 @@ type ShareRow = {
 function list(json: string): string[] {
     try {
         const parsed: unknown = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }
@@ -286,7 +288,10 @@ export async function registerNoteShareView(shareId: string): Promise<boolean> {
     });
     if (!capped) return false;
     if (capped.maxViews === null) {
-        await prisma.noteShare.update({ where: { id: shareId }, data: { viewCount: { increment: 1 } } });
+        await prisma.noteShare.update({
+            where: { id: shareId },
+            data: { viewCount: { increment: 1 } }
+        });
         return true;
     }
     const taken = await prisma.noteShare.updateMany({
@@ -301,16 +306,21 @@ export function noteUnlockCookie(shareId: string): string {
     return unlockCookieName(NOTE_LINK_SCOPE, shareId);
 }
 
-export function signNoteUnlock(shareId: string, secret: string): string {
-    return signUnlock(NOTE_LINK_SCOPE, shareId, secret);
+export function signNoteUnlock(
+    shareId: string,
+    passwordHash: string | null,
+    secret: string
+): string {
+    return signUnlock(NOTE_LINK_SCOPE, shareId, { passwordHash }, secret);
 }
 
 export function verifyNoteUnlock(
     shareId: string,
     value: string | undefined,
+    passwordHash: string | null,
     secret: string
 ): boolean {
-    return verifyUnlock(NOTE_LINK_SCOPE, shareId, value, secret);
+    return verifyUnlock(NOTE_LINK_SCOPE, shareId, value, { passwordHash }, secret);
 }
 
 /** Whether a password opens this link. Wrong and unset both answer false: a link
@@ -329,7 +339,7 @@ export async function verifyNoteSharePassword(shareId: string, password: string)
 export interface PublishedNote {
     readonly title: string;
     readonly body: string;
-    readonly children: readonly { readonly title: string; readonly body: string; }[];
+    readonly children: readonly { readonly title: string; readonly body: string }[];
     readonly updatedAt: string;
 }
 

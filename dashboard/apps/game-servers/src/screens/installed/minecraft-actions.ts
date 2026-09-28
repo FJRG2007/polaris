@@ -57,10 +57,7 @@ import { readPlayerRecord, type PlayerRecord } from "../../lib/games-activity-se
 import { cancelAction, pendingFor, queueAction } from "../../lib/minecraft/queue-service";
 import { isBackupName, isBiome, isLevelName, isLevelType } from "../../lib/minecraft/world";
 import { parseDimension, parsePosition, type PlayerPosition } from "../../lib/minecraft/position";
-import {
-    resetMinecraftServerSchema,
-    type ResetMinecraftServerInput
-} from "../../lib/games-schema";
+import { resetMinecraftServerSchema, type ResetMinecraftServerInput } from "../../lib/games-schema";
 import {
     MAX_IDLE_MINUTES,
     MIN_IDLE_MINUTES,
@@ -129,7 +126,8 @@ const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { listEnvVars, setEnvVars } = host.envVarService;
 const { writeContainerFile } = host.containerFilesService;
 const { deployApplication, setApplicationRunning } = host.deployService;
-const { envFormatHint, findApp, isAllowedEnvValue, normalizeEnvValue, tunableEnvVars } = host.appsCatalog;
+const { envFormatHint, findApp, isAllowedEnvValue, normalizeEnvValue, tunableEnvVars } =
+    host.appsCatalog;
 
 /** A Minecraft (Java Edition) account name. */
 const playerNameSchema = z
@@ -951,6 +949,8 @@ export async function findMinecraftPlayerByUserAction(
     unverified?: boolean;
     name?: string;
     addresses?: string[];
+    /** The administrator keeps other accounts' addresses from this screen. */
+    addressesHidden?: boolean;
     error?: string;
 }> {
     const parsed = z.string().trim().min(1).max(120).safeParse(query);
@@ -962,13 +962,19 @@ export async function findMinecraftPlayerByUserAction(
             return { error: "Nobody here goes by that. Check the username or the email address." };
         // Only the ones a rule can be written against. A session that arrived
         // over something this build cannot parse is not an address to offer.
-        const addresses = (await userSessionAddresses(found.userId)).filter(isAddressRule);
+        // Where somebody else signs in from is theirs; an administrator decides
+        // whether the people running a server are shown it.
+        const shown = await playerAccess.viewerSeesSignInAddresses();
+        const addresses = shown
+            ? (await userSessionAddresses(found.userId)).filter(isAddressRule)
+            : [];
         // Somebody who has not linked Minecraft can still be tied to a name the
         // operator types, so the account comes back either way.
         return {
             userId: found.userId,
             name: found.name,
             addresses,
+            ...(shown ? {} : { addressesHidden: true }),
             ...(found.identity
                 ? {
                       username: found.identity.label,
@@ -1109,7 +1115,9 @@ export async function playerAccessAction(
 ): Promise<playerAccess.PlayerAccessView | null> {
     try {
         const { access } = await requireGameServer("games.read", installedAppId);
-        return await playerAccess.listPlayerAccess(access.ownerId, installedAppId);
+        return await playerAccess.forViewer(
+            await playerAccess.listPlayerAccess(access.ownerId, installedAppId)
+        );
     } catch {
         return null;
     }
@@ -1540,7 +1548,11 @@ const worldTrimSchema = z.object({
     installedAppId: z.string().uuid(),
     enabled: z.boolean(),
     /** Ticks of inhabited time a chunk needs to be kept. */
-    keepTicks: z.number().int().min(0).max(24_000 * 30),
+    keepTicks: z
+        .number()
+        .int()
+        .min(0)
+        .max(24_000 * 30),
     keepRadius: z.number().int().min(0).max(64),
     everyDays: z.number().int().min(1).max(365)
 });
@@ -1550,7 +1562,8 @@ export type WorldTrimInput = z.infer<typeof worldTrimSchema>;
 /** Whether Polaris may do this on its own, and how. */
 export async function saveWorldTrimAction(input: WorldTrimInput): Promise<{ error?: string }> {
     const parsed = worldTrimSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const { installedAppId, ...settings } = parsed.data;
     await requireGameServer("games.manage", installedAppId);
     const { WORLD_TRIM_KEY } = await import("../../lib/minecraft/world-trim");
@@ -1593,9 +1606,13 @@ export async function setModpackAction(
     input: z.infer<typeof modpackSchema>
 ): Promise<{ error?: string }> {
     const parsed = modpackSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the pack and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the pack and try again" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         const install = await prisma.installedApp.findFirst({
             where: { id: parsed.data.installedAppId, ownerId: access.ownerId },
             select: { applicationId: true }
@@ -1606,18 +1623,19 @@ export async function setModpackAction(
         if (pack.length > 0 && !isModpackReference(pack))
             throw new Error("That is a modpack short name, or the link to its page");
 
-        const vars = pack.length > 0
-            ? [
-                  { key: SOFTWARE_KEY, value: "MODRINTH", isSecret: false },
-                  { key: "MODRINTH_MODPACK", value: pack, isSecret: false },
-                  // The pack brings its own, and what was here was chosen for a
-                  // different server.
-                  { key: PROJECTS_KEY, value: "", isSecret: false }
-              ]
-            : [
-                  { key: SOFTWARE_KEY, value: "PAPER", isSecret: false },
-                  { key: "MODRINTH_MODPACK", value: "", isSecret: false }
-              ];
+        const vars =
+            pack.length > 0
+                ? [
+                      { key: SOFTWARE_KEY, value: "MODRINTH", isSecret: false },
+                      { key: "MODRINTH_MODPACK", value: pack, isSecret: false },
+                      // The pack brings its own, and what was here was chosen for a
+                      // different server.
+                      { key: PROJECTS_KEY, value: "", isSecret: false }
+                  ]
+                : [
+                      { key: SOFTWARE_KEY, value: "PAPER", isSecret: false },
+                      { key: "MODRINTH_MODPACK", value: "", isSecret: false }
+                  ];
         await setEnvVars("application", install.applicationId, access.ownerId, vars);
         await recordAudit({
             actorId: user.id,
@@ -1673,9 +1691,13 @@ export async function saveSpigotPluginsAction(
     input: z.infer<typeof spigotListSchema>
 ): Promise<{ error?: string }> {
     const parsed = spigotListSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the list and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the list and try again" };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         const install = await prisma.installedApp.findFirst({
             where: { id: parsed.data.installedAppId, ownerId: access.ownerId },
             select: { applicationId: true }

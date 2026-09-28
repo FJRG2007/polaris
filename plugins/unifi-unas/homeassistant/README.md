@@ -163,6 +163,8 @@ systemctl status polaris-unas-agent
 
 **Removing the integration** - stops and removes the agent (binary, systemd unit, env file) and restores stock fan control. No packages were installed, so nothing is uninstalled.
 
+**"UNAS SSH host key changed" / host key mismatch** - the integration pins the SSH host key it sees on the first successful connection and refuses to connect if a later connection presents a different one, so no password is ever sent to an unverified host. If you reinstalled, reset or replaced the UNAS, open the integration's Reconfigure option and tick "Trust the new SSH host key". If you did not, treat this as a warning: another device on the network may be answering on the UNAS's address.
+
 ## License
 
 Apache-2.0 - see [LICENSE](LICENSE).

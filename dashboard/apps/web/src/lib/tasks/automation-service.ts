@@ -129,7 +129,9 @@ function toFacts(record: FactRecord, blocked: boolean, watcherIds: string[]): co
         archived: record.archived,
         order: record.order,
         blocked,
-        customValues: Object.fromEntries(record.fieldValues.map((value) => [value.fieldId, value.value]))
+        customValues: Object.fromEntries(
+            record.fieldValues.map((value) => [value.fieldId, value.value])
+        )
     };
 }
 
@@ -166,7 +168,11 @@ export async function hasAutomationsFor(
  * write; it is a no-op when the space has no rules for that trigger.
  */
 export async function runAutomations(event: AutomationEventInput): Promise<void> {
-    await runAutomationsFor({ trigger: event.trigger, taskIds: [event.taskId], actorId: event.actorId });
+    await runAutomationsFor({
+        trigger: event.trigger,
+        taskIds: [event.taskId],
+        actorId: event.actorId
+    });
 }
 
 /**
@@ -182,7 +188,10 @@ export async function runAutomationsFor(event: AutomationBatchInput): Promise<vo
     const taskIds = [...new Set(event.taskIds)];
     if (taskIds.length === 0) return;
 
-    const records = await prisma.task.findMany({ where: { id: { in: taskIds } }, select: FACT_SELECT });
+    const records = await prisma.task.findMany({
+        where: { id: { in: taskIds } },
+        select: FACT_SELECT
+    });
     if (records.length === 0) return;
 
     const stored = await prisma.taskAutomation.findMany({
@@ -220,8 +229,12 @@ export async function runAutomationsFor(event: AutomationBatchInput): Promise<vo
     // A rule that never asks whether a task is held up does not pay for the
     // answer. When none of them asks, the flag is left false rather than guessed:
     // nothing reads it, so a wrong value cannot reach a decision.
-    const readsBlocked = rules.some((rule) => rule.conditions.conditions.some((one) => one.field === "blocked"));
-    const heldUp = readsBlocked ? await blockedByDependency(involved.map((record) => record.id)) : new Set<string>();
+    const readsBlocked = rules.some((rule) =>
+        rule.conditions.conditions.some((one) => one.field === "blocked")
+    );
+    const heldUp = readsBlocked
+        ? await blockedByDependency(involved.map((record) => record.id))
+        : new Set<string>();
     // Who follows each of these. It used to arrive with the row through a
     // relation; the table is addressed by subject now, so it is one query for
     // the batch - the same shape as the dependency lookup above.
@@ -248,7 +261,11 @@ export async function runAutomationsFor(event: AutomationBatchInput): Promise<vo
             watching.get(record.id) ?? []
         );
         const scoped = perSpace.get(record.spaceId) ?? [];
-        const selected = core.selectAutomations(scoped, { trigger: event.trigger, task: facts }, now);
+        const selected = core.selectAutomations(
+            scoped,
+            { trigger: event.trigger, task: facts },
+            now
+        );
 
         for (const rule of selected) {
             const definition = scoped.find((entry) => entry.id === rule.id);
@@ -301,7 +318,9 @@ async function applyAction(
                 where: { id: taskId },
                 data: {
                     statusId: action.targetId,
-                    completedAt: core.isFinishedStatus(status.type as core.TaskStatusType) ? new Date() : null
+                    completedAt: core.isFinishedStatus(status.type as core.TaskStatusType)
+                        ? new Date()
+                        : null
                 }
             });
             return;
@@ -326,7 +345,9 @@ async function applyAction(
         }
         case "addTag": {
             if (!action.targetId) return;
-            await prisma.taskTagLink.create({ data: { taskId, tagId: action.targetId } }).catch(() => undefined);
+            await prisma.taskTagLink
+                .create({ data: { taskId, tagId: action.targetId } })
+                .catch(() => undefined);
             return;
         }
         case "removeTag": {
@@ -352,7 +373,11 @@ async function applyAction(
         }
         case "addComment": {
             if (!action.text) return;
-            await comments.post(null, { subjectType: "task", subjectId: taskId, body: action.text });
+            await comments.post(null, {
+                subjectType: "task",
+                subjectId: taskId,
+                body: action.text
+            });
             return;
         }
         case "addWatcher": {
@@ -408,7 +433,10 @@ export interface AutomationView {
 }
 
 export async function listAutomations(spaceId: string): Promise<AutomationView[]> {
-    const rules = await prisma.taskAutomation.findMany({ where: { spaceId }, orderBy: { createdAt: "asc" } });
+    const rules = await prisma.taskAutomation.findMany({
+        where: { spaceId },
+        orderBy: { createdAt: "asc" }
+    });
     return rules.map((rule) => ({
         id: rule.id,
         name: rule.name,
@@ -441,9 +469,22 @@ export async function createAutomation(
     });
 }
 
-export async function updateAutomation(automationId: string, input: core.AutomationInput): Promise<void> {
-    await prisma.taskAutomation.update({
-        where: { id: automationId },
+/**
+ * The writes below take the space the caller was cleared for and keep to it. A
+ * rule id alone says nothing about which space it is in, so matching on it alone
+ * would let an admin of one space rewrite every other space's rules.
+ */
+function ruleNotInSpace(): Error {
+    return new Error("That rule is not in this space");
+}
+
+export async function updateAutomation(
+    spaceId: string,
+    automationId: string,
+    input: core.AutomationInput
+): Promise<void> {
+    const { count } = await prisma.taskAutomation.updateMany({
+        where: { id: automationId, spaceId },
         data: {
             listId: input.listId,
             name: input.name,
@@ -453,12 +494,24 @@ export async function updateAutomation(automationId: string, input: core.Automat
             enabled: input.enabled
         }
     });
+    if (count === 0) throw ruleNotInSpace();
 }
 
-export async function setAutomationEnabled(automationId: string, enabled: boolean): Promise<void> {
-    await prisma.taskAutomation.update({ where: { id: automationId }, data: { enabled } });
+export async function setAutomationEnabled(
+    spaceId: string,
+    automationId: string,
+    enabled: boolean
+): Promise<void> {
+    const { count } = await prisma.taskAutomation.updateMany({
+        where: { id: automationId, spaceId },
+        data: { enabled: enabled === true }
+    });
+    if (count === 0) throw ruleNotInSpace();
 }
 
-export async function deleteAutomation(automationId: string): Promise<void> {
-    await prisma.taskAutomation.delete({ where: { id: automationId } });
+export async function deleteAutomation(spaceId: string, automationId: string): Promise<void> {
+    const { count } = await prisma.taskAutomation.deleteMany({
+        where: { id: automationId, spaceId }
+    });
+    if (count === 0) throw ruleNotInSpace();
 }

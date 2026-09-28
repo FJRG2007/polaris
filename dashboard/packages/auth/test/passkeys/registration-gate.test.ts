@@ -18,9 +18,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const userSecurity = { findUnique: vi.fn(), upsert: vi.fn() };
 const accountDevice = { findFirst: vi.fn(), findMany: vi.fn() };
 const session = { findFirst: vi.fn() };
+const sessionState = { findUnique: vi.fn(), findFirst: vi.fn() };
 
 vi.mock("@polaris/db", () => ({
-    prisma: { userSecurity, accountDevice, session, passkey: { update: vi.fn(), findMany: vi.fn() } }
+    prisma: {
+        userSecurity,
+        accountDevice,
+        session,
+        sessionState,
+        passkey: { update: vi.fn(), findMany: vi.fn() }
+    }
 }));
 
 const { refuseProtectedEndpoint } = await import("../../src/auth.js");
@@ -38,16 +45,21 @@ function post(path: string): Request {
 
 /** The account settled and its password proved a moment ago. */
 function readyToRegister() {
-    userSecurity.findUnique.mockImplementation(async (args: { select?: Record<string, boolean> }) =>
-        args.select?.reauthUntil
-            ? { reauthUntil: new Date(Date.now() + 60_000), reauthSessionId: "session-1" }
-            : { newDeviceGraceDays: 0 }
+    userSecurity.findUnique.mockImplementation(
+        async (args: { select?: Record<string, boolean> }) =>
+            args.select?.reauthUntil
+                ? { reauthUntil: new Date(Date.now() + 60_000), reauthSessionId: "session-1" }
+                : { newDeviceGraceDays: 0 }
     );
 }
 
 beforeEach(() => {
     vi.clearAllMocks();
     session.findFirst.mockResolvedValue({ userAgent: "Chrome", state: null });
+    // A session the dashboard has already cleared, which is every case below
+    // that is not about the approval gate.
+    sessionState.findUnique.mockResolvedValue({ approval: "approved", lockedAt: null });
+    sessionState.findFirst.mockResolvedValue(null);
 });
 
 describe("refuseProtectedEndpoint", () => {
@@ -74,8 +86,9 @@ describe("refuseProtectedEndpoint", () => {
     });
 
     it("refuses to start a registration the password has not been confirmed for", async () => {
-        userSecurity.findUnique.mockImplementation(async (args: { select?: Record<string, boolean> }) =>
-            args.select?.reauthUntil ? null : { newDeviceGraceDays: 0 }
+        userSecurity.findUnique.mockImplementation(
+            async (args: { select?: Record<string, boolean> }) =>
+                args.select?.reauthUntil ? null : { newDeviceGraceDays: 0 }
         );
         const refusal = await refuseProtectedEndpoint(
             authFor(SIGNED_IN),
@@ -86,10 +99,14 @@ describe("refuseProtectedEndpoint", () => {
     });
 
     it("refuses a confirmation another session proved", async () => {
-        userSecurity.findUnique.mockImplementation(async (args: { select?: Record<string, boolean> }) =>
-            args.select?.reauthUntil
-                ? { reauthUntil: new Date(Date.now() + 60_000), reauthSessionId: "another-session" }
-                : { newDeviceGraceDays: 0 }
+        userSecurity.findUnique.mockImplementation(
+            async (args: { select?: Record<string, boolean> }) =>
+                args.select?.reauthUntil
+                    ? {
+                          reauthUntil: new Date(Date.now() + 60_000),
+                          reauthSessionId: "another-session"
+                      }
+                    : { newDeviceGraceDays: 0 }
         );
         const refusal = await refuseProtectedEndpoint(
             authFor(SIGNED_IN),
@@ -99,10 +116,11 @@ describe("refuseProtectedEndpoint", () => {
     });
 
     it("refuses a confirmation that has expired", async () => {
-        userSecurity.findUnique.mockImplementation(async (args: { select?: Record<string, boolean> }) =>
-            args.select?.reauthUntil
-                ? { reauthUntil: new Date(Date.now() - 1_000), reauthSessionId: "session-1" }
-                : { newDeviceGraceDays: 0 }
+        userSecurity.findUnique.mockImplementation(
+            async (args: { select?: Record<string, boolean> }) =>
+                args.select?.reauthUntil
+                    ? { reauthUntil: new Date(Date.now() - 1_000), reauthSessionId: "session-1" }
+                    : { newDeviceGraceDays: 0 }
         );
         const refusal = await refuseProtectedEndpoint(
             authFor(SIGNED_IN),
@@ -114,7 +132,10 @@ describe("refuseProtectedEndpoint", () => {
     it("lets a confirmed registration through", async () => {
         readyToRegister();
         expect(
-            await refuseProtectedEndpoint(authFor(SIGNED_IN), post("/passkey/generate-register-options"))
+            await refuseProtectedEndpoint(
+                authFor(SIGNED_IN),
+                post("/passkey/generate-register-options")
+            )
         ).toBeNull();
     });
 
@@ -122,7 +143,9 @@ describe("refuseProtectedEndpoint", () => {
         userSecurity.findUnique.mockResolvedValue({ newDeviceGraceDays: 7 });
         // Seen for the first time just now, which is what a device serving the
         // wait looks like in the register.
-        accountDevice.findMany.mockResolvedValue([{ userAgent: "Chrome", firstSeenAt: new Date() }]);
+        accountDevice.findMany.mockResolvedValue([
+            { userAgent: "Chrome", firstSeenAt: new Date() }
+        ]);
         // Some other browser opened the account, so this one is genuinely new to it
         // rather than the founding device the wait never applies to.
         accountDevice.findFirst.mockResolvedValue({ userAgent: "Some other browser" });
@@ -145,6 +168,85 @@ describe("refuseProtectedEndpoint", () => {
         userSecurity.findUnique.mockResolvedValue({ newDeviceGraceDays: 0 });
         for (const path of ["/passkey/delete-passkey", "/two-factor/disable"]) {
             expect(await refuseProtectedEndpoint(authFor(SIGNED_IN), post(path))).toBeNull();
+        }
+    });
+});
+
+describe("a session the dashboard has not let in", () => {
+    const GATED = [
+        "/two-factor/enable",
+        "/passkey/generate-register-options",
+        "/revoke-other-sessions",
+        "/revoke-sessions",
+        "/revoke-session",
+        "/change-password",
+        "/list-sessions",
+        "/update-user"
+    ];
+
+    it("is refused while it waits for another device's approval", async () => {
+        sessionState.findUnique.mockResolvedValue({ approval: "pending", lockedAt: null });
+        for (const path of GATED) {
+            const refusal = await refuseProtectedEndpoint(authFor(SIGNED_IN), post(path));
+            expect(refusal?.status, path).toBe(403);
+            expect(await refusal?.json()).toMatchObject({ code: "SESSION_NOT_CLEARED" });
+        }
+    });
+
+    it("is refused while its screen is locked", async () => {
+        sessionState.findUnique.mockResolvedValue({ approval: "approved", lockedAt: new Date() });
+        const refusal = await refuseProtectedEndpoint(
+            authFor(SIGNED_IN),
+            post("/revoke-other-sessions")
+        );
+        expect(refusal?.status).toBe(403);
+    });
+
+    it("is refused before its first page when the account would hold it for approval", async () => {
+        // The shortcut: sign in, never open a page, and arm an authenticator or
+        // end the sessions that could approve - either one used to walk through.
+        sessionState.findUnique.mockResolvedValue(null);
+        sessionState.findFirst.mockResolvedValue({ sessionId: "approved-elsewhere" });
+        userSecurity.findUnique.mockResolvedValue({
+            requireLoginApproval: true,
+            newDeviceGraceDays: 0
+        });
+        for (const path of ["/two-factor/enable", "/revoke-other-sessions"]) {
+            const refusal = await refuseProtectedEndpoint(authFor(SIGNED_IN), post(path));
+            expect(refusal?.status, path).toBe(403);
+        }
+    });
+
+    it("is let through before its first page when nothing would hold it", async () => {
+        sessionState.findUnique.mockResolvedValue(null);
+        userSecurity.findUnique.mockResolvedValue({
+            requireLoginApproval: false,
+            newDeviceGraceDays: 0
+        });
+        expect(
+            await refuseProtectedEndpoint(authFor(SIGNED_IN), post("/revoke-other-sessions"))
+        ).toBeNull();
+
+        // Nobody else is signed in to ask, which is the case the gate lets in.
+        userSecurity.findUnique.mockResolvedValue({
+            requireLoginApproval: true,
+            newDeviceGraceDays: 0
+        });
+        sessionState.findFirst.mockResolvedValue(null);
+        expect(
+            await refuseProtectedEndpoint(authFor(SIGNED_IN), post("/revoke-other-sessions"))
+        ).toBeNull();
+    });
+
+    it("never stands in front of the challenge that finishes a sign-in", async () => {
+        sessionState.findUnique.mockResolvedValue({ approval: "pending", lockedAt: null });
+        for (const path of [
+            "/two-factor/verify-totp",
+            "/two-factor/verify-otp",
+            "/sign-out",
+            "/get-session"
+        ]) {
+            expect(await refuseProtectedEndpoint(authFor(SIGNED_IN), post(path)), path).toBeNull();
         }
     });
 });

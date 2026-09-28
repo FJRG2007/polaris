@@ -237,7 +237,8 @@ export async function inviteOrgMemberAction(
     if (!parsed.success)
         return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        await orgs.requireOrgPermission(caller, orgId, "people.manage");
+        const access = await orgs.requireOrgPermission(caller, orgId, "people.manage");
+        await orgs.requireRoleWithinOwn(access, orgId, parsed.data.role);
         const sent = await invitations.inviteToOrg(
             orgId,
             parsed.data.identifier,
@@ -312,7 +313,8 @@ export async function setOrgDefaultInviteRoleAction(
     const parsed = core.orgRoleSlugField.safeParse(role);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Pick a role" };
     try {
-        await orgs.requireOrgPermission(caller, orgId, "people.manage");
+        const access = await orgs.requireOrgPermission(caller, orgId, "people.manage");
+        await orgs.requireRoleWithinOwn(access, orgId, parsed.data);
         await orgs.setOrgDefaultInviteRole(orgId, parsed.data);
         await record(caller.id, orgId, "org.invite.default", { role: parsed.data });
         refresh();
@@ -376,7 +378,10 @@ export async function setOrgMemberRoleAction(
 ): Promise<{ error?: string }> {
     const caller = await actor();
     try {
-        await orgs.requireOrgPermission(caller, orgId, "people.manage");
+        const access = await orgs.requireOrgPermission(caller, orgId, "people.manage");
+        // Both roles: the one they hold now and the one they are given.
+        await orgs.requireMemberWithinOwn(access, orgId, String(userId));
+        await orgs.requireRoleWithinOwn(access, orgId, String(role));
         await orgs.setOrgMemberRole(orgId, userId, role);
         await record(caller.id, orgId, "org.member.role", { userId, role });
         refresh();
@@ -404,8 +409,10 @@ export async function removeOrgMemberAction(
         // themselves - a restricted member included, who holds no permission here
         // at all and must still be able to go. Taking somebody else off takes
         // running the people here.
-        if (userId !== caller.id) await orgs.requireOrgPermission(caller, orgId, "people.manage");
-        else {
+        if (userId !== caller.id) {
+            const access = await orgs.requireOrgPermission(caller, orgId, "people.manage");
+            await orgs.requireMemberWithinOwn(access, orgId, String(userId));
+        } else {
             const access = await orgs.resolveOrgAccess(caller, orgId);
             if (!access || access.role === "successor") throw new orgs.OrgAccessError();
         }
@@ -548,7 +555,8 @@ export async function createOrgRoleAction(
     if (!parsed.success)
         return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        await orgs.requireOrgPermission(caller, orgId, "roles.manage");
+        const access = await orgs.requireOrgPermission(caller, orgId, "roles.manage");
+        orgs.requireWithinOwn(access, parsed.data.permissions);
         await roles.createOrgRole(orgId, parsed.data);
         await record(caller.id, orgId, "org.role.create", {
             slug: parsed.data.slug,
@@ -571,7 +579,11 @@ export async function updateOrgRoleAction(
     if (!parsed.success)
         return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        await orgs.requireOrgPermission(caller, orgId, "roles.manage");
+        const access = await orgs.requireOrgPermission(caller, orgId, "roles.manage");
+        // The grants written, and the role as it stands: narrowing a role that
+        // reaches further than the actor's is taking from people above them.
+        orgs.requireWithinOwn(access, parsed.data.permissions);
+        await orgs.requireRoleWithinOwn(access, orgId, String(slug));
         await roles.updateOrgRole(orgId, slug, parsed.data);
         // What a role may do is the one change here that silently moves what
         // other people can do, so the grants themselves go into the record.

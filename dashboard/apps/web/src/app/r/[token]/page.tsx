@@ -79,7 +79,14 @@ export default async function DropPointPage({ params }: { params: Promise<{ toke
 
     if (request.passwordHash) {
         const cookieValue = (await cookies()).get(fileRequestUnlockCookie(request.id))?.value;
-        if (!verifyFileRequestUnlock(request.id, cookieValue, loadEnv().POLARIS_AUTH_SECRET)) {
+        if (
+            !verifyFileRequestUnlock(
+                request.id,
+                cookieValue,
+                request.passwordHash,
+                loadEnv().POLARIS_AUTH_SECRET
+            )
+        ) {
             return (
                 <LinkPasswordForm
                     token={token}

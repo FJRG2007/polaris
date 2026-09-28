@@ -19,7 +19,7 @@ import type { ArkAccessView } from "../../lib/ark/service";
 import { gameDomainSuffix } from "../../lib/minecraft/address";
 import { BLUEPRINT_KEY, MAP_KEY } from "../../lib/games-create";
 import { readArkAccess, readArkPorts } from "../../lib/ark/service";
-import { listPlayerAccess } from "../../lib/minecraft/player-access";
+import { forViewer, listPlayerAccess } from "../../lib/minecraft/player-access";
 import type { PlayerAccessView } from "../../lib/minecraft/player-access";
 import { clientMods, packCommands } from "../../lib/minecraft/client-pack";
 import { editionOf, type MinecraftEdition } from "../../lib/minecraft/service";
@@ -160,7 +160,9 @@ export async function gameContextFor(app: {
         ownerId ? gameServerFacts(ownerId, app.id).catch(() => null) : null,
         game.id === "ark" && ownerId ? readArkAccess(ownerId, app.id).catch(() => null) : null,
         game.id === "minecraft" && ownerId
-            ? listPlayerAccess(ownerId, app.id).catch(() => null)
+            ? listPlayerAccess(ownerId, app.id)
+                  .then(forViewer)
+                  .catch(() => null)
             : null,
         game.id === "fivem" && ownerId ? readFivemAccess(ownerId, app.id).catch(() => null) : null,
         game.id === "ark" ? readArkPorts(app.applicationId).catch(() => null) : null,

@@ -14,6 +14,7 @@ const READER = { id: "reader", isAdmin: false, name: "Reader" };
 
 vi.mock("../../src/lib/session", () => ({
     resolveSession: async () => READER,
+    backgroundUser: async () => READER,
     sessionCan: async () => true
 }));
 vi.mock("../../src/lib/chat/access", () => ({
@@ -27,7 +28,9 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function listen(): Promise<{ frames: () => unknown[]; close: () => void }> {
     const controller = new AbortController();
-    const response = await GET(new Request("http://polaris.test/api/chat/stream", { signal: controller.signal }));
+    const response = await GET(
+        new Request("http://polaris.test/api/chat/stream", { signal: controller.signal })
+    );
     const reader = (response.body as ReadableStream<Uint8Array>).getReader();
     const decoder = new TextDecoder();
     const seen: string[] = [];

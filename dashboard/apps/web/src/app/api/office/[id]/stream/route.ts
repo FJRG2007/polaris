@@ -23,7 +23,7 @@
 
 import { officeReader } from "@/lib/office/reader";
 import { subscribeOfficeChanges } from "@/lib/office/live";
-import { resolveSession, sessionCan } from "@/lib/session";
+import { backgroundUser, sessionCan } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export async function GET(
 ): Promise<Response> {
     // Optional, because a link is a way into one document without a session.
     // When there is one it still has to hold the app's own permission.
-    const session = await resolveSession();
+    const session = await backgroundUser();
     if (session && !(await sessionCan(session, "office.use"))) {
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -50,9 +50,12 @@ export async function GET(
     // something that is not going to start working.
     const reader = await officeReader(id, session?.id ?? null);
     if (!reader) {
-        return Response.json({ error: session ? "Forbidden" : "Unauthorized" }, {
-            status: session ? 403 : 401
-        });
+        return Response.json(
+            { error: session ? "Forbidden" : "Unauthorized" },
+            {
+                status: session ? 403 : 401
+            }
+        );
     }
 
     // The tab that opened this. Named by the browser so two tabs of one account

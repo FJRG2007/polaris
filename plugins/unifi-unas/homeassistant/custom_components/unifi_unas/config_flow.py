@@ -40,10 +40,13 @@ from .const import (
     CONF_SCAN_INTERVAL,
     CONF_DEVICE_MODEL,
     CONF_DEVICE_NAME,
+    CONF_SSH_HOST_KEY,
+    CONF_TRUST_NEW_HOST_KEY,
     DEVICE_MODELS,
     HA_SSH_KEY_PATHS,
     get_mqtt_topics,
 )
+from .ssh_manager import HostKeyMismatch, open_ssh_connection
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,6 +78,9 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 2
 
+    # Host key presented by the NAS in the last successful SSH test.
+    _ssh_host_key: str | None = None
+
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
@@ -86,12 +92,19 @@ class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         old_model = entry.data[CONF_DEVICE_MODEL]
 
         if user_input is not None:
+            user_input = dict(user_input)
+            trust_new_key = user_input.pop(CONF_TRUST_NEW_HOST_KEY, False)
+            # Same NAS: it must still present the pinned key unless the user
+            # explicitly accepts a new one. A new address is trusted on first use.
+            pinned_key = None
+            if not trust_new_key and user_input[CONF_HOST] == entry.data[CONF_HOST]:
+                pinned_key = entry.data.get(CONF_SSH_HOST_KEY)
             new_model = user_input[CONF_DEVICE_MODEL]
 
             if new_model != old_model:
                 errors["base"] = "model_changed"
             elif error_key := await self._test_ssh(user_input[CONF_HOST], user_input[CONF_USERNAME],
-                                                   user_input.get(CONF_PASSWORD)):
+                                                   user_input.get(CONF_PASSWORD), pinned_key):
                 errors["base"] = error_key
             elif user_input.get(CONF_MQTT_TLS):
                 self._pending_input = user_input
@@ -109,7 +122,7 @@ class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self.hass.config_entries.async_update_entry(
                     entry,
                     title=f"{device_name} ({user_input[CONF_HOST]})",
-                    data=user_input,
+                    data=self._with_host_key(user_input),
                 )
                 await self.hass.config_entries.async_reload(entry.entry_id)
                 return self.async_abort(reason="reconfigure_successful")
@@ -137,6 +150,7 @@ class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                              default=entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)): NumberSelector(
                     NumberSelectorConfig(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL, mode=NumberSelectorMode.BOX)
                 ),
+                vol.Optional(CONF_TRUST_NEW_HOST_KEY, default=False): BooleanSelector(),
             }
         )
 
@@ -172,7 +186,7 @@ class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self.hass.config_entries.async_update_entry(
                     entry,
                     title=f"{device_name} ({merged[CONF_HOST]})",
-                    data=merged,
+                    data=self._with_host_key(merged),
                 )
                 await self.hass.config_entries.async_reload(entry.entry_id)
                 return self.async_abort(reason="reconfigure_successful")
@@ -248,8 +262,15 @@ class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         device_name = data.get(CONF_DEVICE_NAME) or DEVICE_MODELS[data[CONF_DEVICE_MODEL]]
         return self.async_create_entry(
             title=f"{device_name} ({data[CONF_HOST]})",
-            data=data,
+            data=self._with_host_key(data),
         )
+
+    def _with_host_key(self, data: dict[str, Any]) -> dict[str, Any]:
+        # Pin the key seen during the SSH test so the first connection after
+        # setup is already verified against it.
+        if not self._ssh_host_key:
+            return data
+        return {**data, CONF_SSH_HOST_KEY: self._ssh_host_key}
 
     async def _ensure_mqtt(self, data: dict[str, Any]) -> bool:
         # Drive the core MQTT config flow with the broker details we already
@@ -285,7 +306,10 @@ class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.warning("Automatic MQTT setup failed (%s); asking the user to add it", err)
         return False
 
-    async def _test_ssh(self, host: str, username: str, password: str | None) -> str | None:
+    async def _test_ssh(
+        self, host: str, username: str, password: str | None,
+        pinned_host_key: str | None = None,
+    ) -> str | None:
         try:
             client_keys = None
             if not password:
@@ -295,14 +319,12 @@ class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         _LOGGER.debug("Using SSH key from %s", key_path)
                         break
 
-            conn = await asyncio.wait_for(
-                asyncssh.connect(
-                    host,
-                    username=username,
-                    password=password if password else None,
-                    client_keys=client_keys,
-                    known_hosts=None,
-                ),
+            conn, host_key = await open_ssh_connection(
+                host,
+                username=username,
+                password=password,
+                client_keys=client_keys,
+                pinned_host_key=pinned_host_key,
                 timeout=10.0,
             )
             result = await conn.run("echo 'test'", check=True)
@@ -311,7 +333,11 @@ class UNASProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             if result.stdout.strip() != "test":
                 return "unknown"
+            self._ssh_host_key = host_key
             return None
+        except HostKeyMismatch as err:
+            _LOGGER.error("%s", err)
+            return "host_key_mismatch"
         except asyncssh.Error:
             return "cannot_connect"
         except asyncio.TimeoutError:

@@ -160,7 +160,14 @@ vi.mock("@polaris/db", () => ({
             findMany: async ({ where }: { where: { userId: string } }) =>
                 channelMembers
                     .filter((row) => row.userId === where.userId)
-                    .map((row) => ({ channelId: row.channelId }))
+                    .map((row) => ({
+                        channelId: row.channelId,
+                        channel: {
+                            spaceId:
+                                channels.find((entry) => entry.id === row.channelId)?.spaceId ??
+                                null
+                        }
+                    }))
         }
     }
 }));
@@ -349,5 +356,20 @@ describe("what the live stream is allowed to tell somebody", () => {
         const reachable = await access.reachableChannelIds(me);
 
         expect([...reachable].sort()).toEqual(["dm", "open"]);
+    });
+
+    it("drops a room whose row outlived their place in its space", async () => {
+        // Read once while they were in the organization, which left a row behind;
+        // then they left it. The room refuses to open, so nothing that reads by
+        // this set - search, toasts, the live stream - may keep serving it.
+        spaces = [{ id: "org-space", ownerId: "other", orgId: "o1", visibility: "internal" }];
+        orgIds = [];
+        channels = [
+            { id: "general", spaceId: "org-space", kind: "text", private: false, archived: false }
+        ];
+        channelMembers = [{ channelId: "general", userId: "me", role: "member" }];
+
+        expect(await access.channelAccess(me, "general")).toBeNull();
+        expect(await access.reachableChannelIds(me)).not.toContain("general");
     });
 });

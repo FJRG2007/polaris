@@ -366,16 +366,24 @@ export function textRequestUnlockCookie(requestId: string): string {
     return unlockCookieName(TEXT_DROP_SCOPE, requestId);
 }
 
-/** Sign an unlock marker so the "password solved" cookie cannot be forged. */
-export function signTextRequestUnlock(requestId: string, secret: string): string {
-    return signUnlock(TEXT_DROP_SCOPE, requestId, secret);
+/** Sign an unlock marker so the "password solved" cookie cannot be forged.
+ *  Signed against the current password's hash, so changing it ends earlier
+ *  unlocks. */
+export function signTextRequestUnlock(
+    requestId: string,
+    passwordHash: string | null,
+    secret: string
+): string {
+    return signUnlock(TEXT_DROP_SCOPE, requestId, { passwordHash }, secret);
 }
 
-/** Constant-time check of an unlock cookie against its expected signature. */
+/** Constant-time check of an unlock cookie: this drop point, its current
+ *  password, and not expired. */
 export function verifyTextRequestUnlock(
     requestId: string,
     value: string | undefined,
+    passwordHash: string | null,
     secret: string
 ): boolean {
-    return verifyUnlock(TEXT_DROP_SCOPE, requestId, value, secret);
+    return verifyUnlock(TEXT_DROP_SCOPE, requestId, value, { passwordHash }, secret);
 }

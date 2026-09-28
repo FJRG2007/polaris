@@ -9,7 +9,7 @@
 
 import { headers } from "next/headers";
 import { baseName } from "@polaris/core";
-import { mimeForName } from "@/lib/mime";
+import { mimeForName, untrustedFileHeaders } from "@/lib/mime";
 import { pipeThenDispose } from "@/lib/drive-stream";
 import { gateShareRequest } from "@/lib/share-access";
 import { getDriverForConnection } from "@/lib/storage-service";
@@ -65,9 +65,13 @@ export async function GET(
         await logShareAccess({ shareId: share.id, action: "download", ip, ipHash, userAgentHash });
 
         const headerStore = await headers();
+        const contentType =
+            stat.mime ?? mimeForName(baseName(target)) ?? "application/octet-stream";
         const responseHeaders = new Headers({
-            "content-type":
-                stat.mime ?? mimeForName(baseName(target)) ?? "application/octet-stream",
+            "content-type": contentType,
+            // A visitor on an upload link chooses what lands here, and an SVG or
+            // HTML file previewed inline would run its script on this origin.
+            ...untrustedFileHeaders(contentType),
             "accept-ranges": "bytes",
             // Says "this download has started" to the page that asked for it - see
             // `download-ticket`. Nothing at all when no ticket was sent.

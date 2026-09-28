@@ -22,7 +22,7 @@
 import { subscribeMail } from "@/lib/mailbox/live";
 import { watchMailboxes } from "@/lib/mailbox/watch";
 import { everyAccountId } from "@/lib/mailbox/access";
-import { resolveSession, sessionCan } from "@/lib/session";
+import { backgroundUser, sessionCan } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +41,7 @@ const SCOPE_TTL_MS = 30_000;
 const HEARTBEAT_MS = 25_000;
 
 export async function GET(request: Request): Promise<Response> {
-    const session = await resolveSession();
+    const session = await backgroundUser();
     // A non-200 makes EventSource give up rather than reconnect every few
     // seconds against a session that is gone.
     if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });

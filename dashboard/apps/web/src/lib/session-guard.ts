@@ -37,7 +37,12 @@ import { describeOrigin } from "@/lib/session-directory";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { getInstanceSecurity } from "@/lib/instance-security";
 import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
-import { consumeSessionRotation, rememberAccountDevice, resolveSignInRules, takeSignInRecord } from "@polaris/auth";
+import {
+    consumeSessionRotation,
+    rememberAccountDevice,
+    resolveSignInRules,
+    takeSignInRecord
+} from "@polaris/auth";
 import {
     clientHost,
     clientIp,
@@ -68,6 +73,13 @@ interface GuardInput {
     sessionId: string;
     /** When the session was issued, for the absolute-lifetime check. */
     sessionCreatedAt: Date;
+    /**
+     * Whether this request counts as somebody being here. False for a stream, a
+     * poll or a beacon: every control still applies to them, but they must not
+     * refresh the stamp the idle lock measures, or a tab nobody is sitting at
+     * would hold an unattended session open forever. Defaults to true.
+     */
+    touch?: boolean;
 }
 
 /**
@@ -139,7 +151,8 @@ export async function revokeSessionsRefusedByRules(userId: string): Promise<numb
     for (const state of states) {
         let allowed = verdicts.get(state.ip);
         if (allowed === undefined) {
-            allowed = (await evaluateAccountAccess(userId, state.ip ?? undefined, ownRules)).allowed;
+            allowed = (await evaluateAccountAccess(userId, state.ip ?? undefined, ownRules))
+                .allowed;
             verdicts.set(state.ip, allowed);
         }
         if (!allowed) refused.push(state.sessionId);
@@ -187,7 +200,8 @@ async function secondFactorVerdict(hasFactor: boolean): Promise<SessionVerdict |
 export async function guardSession({
     userId,
     sessionId,
-    sessionCreatedAt
+    sessionCreatedAt,
+    touch = true
 }: GuardInput): Promise<SessionVerdict> {
     const [record, state] = await Promise.all([
         prisma.user.findUnique({
@@ -377,9 +391,13 @@ export async function guardSession({
     //    session opened before the host was recorded adopts it here, which is the
     //    only way an already-open one ever gets a name against it.
     const host = state.host ?? (await clientHost()) ?? null;
-    if (host !== state.host || now - state.lastSeenAt.getTime() >= ACTIVITY_WRITE_INTERVAL_MS) {
+    const stale = touch && now - state.lastSeenAt.getTime() >= ACTIVITY_WRITE_INTERVAL_MS;
+    if (host !== state.host || stale) {
         await prisma.sessionState
-            .update({ where: { sessionId }, data: { lastSeenAt: new Date(), host } })
+            .update({
+                where: { sessionId },
+                data: { ...(stale ? { lastSeenAt: new Date() } : {}), host }
+            })
             .catch(() => undefined);
     }
 
@@ -586,7 +604,13 @@ async function createSessionState(input: {
             userId: input.userId,
             event: "account.signin",
             title: "A new sign-in is waiting for your approval",
-            body: describeOrigin(input.ip, input.country, userAgent, userAgentBrands, userAgentPlatform),
+            body: describeOrigin(
+                input.ip,
+                input.country,
+                userAgent,
+                userAgentBrands,
+                userAgentPlatform
+            ),
             href: "/account/sessions",
             actionRequired: true
         });
@@ -596,7 +620,13 @@ async function createSessionState(input: {
         // has not happened yet as one that has.
         await notifySessionOpened({
             userId: input.userId,
-            origin: describeOrigin(input.ip, input.country, userAgent, userAgentBrands, userAgentPlatform)
+            origin: describeOrigin(
+                input.ip,
+                input.country,
+                userAgent,
+                userAgentBrands,
+                userAgentPlatform
+            )
         });
     }
     return { approval };

@@ -146,24 +146,54 @@ export async function thread(
 
 /** Only the author may rewrite what they said. */
 export async function edit(actorId: string, commentId: string, body: string): Promise<void> {
-    const updated = await prisma.comment.updateMany({ where: { id: commentId, userId: actorId }, data: { body } });
+    if (typeof commentId !== "string") throw new Error("You can only edit your own comments");
+    const updated = await prisma.comment.updateMany({
+        where: { id: commentId, userId: actorId },
+        data: { body }
+    });
     if (updated.count === 0) throw new Error("You can only edit your own comments");
 }
 
-/** The author, or somebody the owning app decided may moderate. */
-export async function remove(actorId: string, commentId: string, canModerate: boolean): Promise<void> {
+/** The thread a caller was cleared for. A comment id alone says nothing about
+ *  which subject it belongs to, so every change a moderator makes is kept to the
+ *  subject the owning app checked - never to whatever id was posted. */
+export interface CommentThreadRef {
+    readonly subjectType: CommentSubject;
+    readonly subjectId: string;
+}
+
+/** The author, or somebody the owning app decided may moderate this thread. */
+export async function remove(
+    actorId: string,
+    thread: CommentThreadRef,
+    commentId: string,
+    canModerate: boolean
+): Promise<void> {
+    if (typeof commentId !== "string") throw new Error("You can only delete your own comments");
+    const inThread = {
+        id: commentId,
+        subjectType: thread.subjectType,
+        subjectId: thread.subjectId
+    };
     const deleted = await prisma.comment.deleteMany({
-        where: canModerate ? { id: commentId } : { id: commentId, userId: actorId }
+        where: canModerate ? inThread : { ...inThread, userId: actorId }
     });
     if (deleted.count === 0) throw new Error("You can only delete your own comments");
 }
 
 /** Mark one dealt with, or reopen it. */
-export async function setResolved(actorId: string, commentId: string, resolved: boolean): Promise<void> {
-    await prisma.comment.update({
-        where: { id: commentId },
+export async function setResolved(
+    actorId: string,
+    thread: CommentThreadRef,
+    commentId: string,
+    resolved: boolean
+): Promise<void> {
+    if (typeof commentId !== "string") throw new Error("That comment is not here");
+    const updated = await prisma.comment.updateMany({
+        where: { id: commentId, subjectType: thread.subjectType, subjectId: thread.subjectId },
         data: { resolvedAt: resolved ? new Date() : null, resolvedById: resolved ? actorId : null }
     });
+    if (updated.count === 0) throw new Error("That comment is not here");
 }
 
 /** How many, for a screen that shows a count beside a tab. */

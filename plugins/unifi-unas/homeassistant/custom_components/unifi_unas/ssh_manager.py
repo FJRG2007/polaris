@@ -5,7 +5,7 @@ import json
 import logging
 import shlex
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import asyncssh
 
@@ -50,6 +50,65 @@ def _env_line(key: str, value: str) -> str:
     return f'{key}="{escaped}"'
 
 
+class HostKeyMismatch(ConnectionError):
+    """The NAS presented an SSH host key other than the one pinned for it."""
+
+
+def host_key_to_str(key: asyncssh.SSHKey) -> str:
+    # OpenSSH one-line form without a comment: "<algorithm> <base64>".
+    return " ".join(key.export_public_key("openssh").decode("ascii").split()[:2])
+
+
+async def open_ssh_connection(
+        host: str,
+        *,
+        username: str,
+        password: Optional[str],
+        client_keys: Optional[list[str]],
+        pinned_host_key: Optional[str],
+        port: int = 22,
+        timeout: float = SSH_CONNECT_TIMEOUT,
+) -> tuple[asyncssh.SSHClientConnection, Optional[str]]:
+    """Open an SSH connection, verifying the host key when one is pinned.
+
+    With no pinned key the connection is trust-on-first-use: it is accepted and
+    the key the server presented is returned so the caller can pin it. With a
+    pinned key only that exact key is trusted, and any other key is refused
+    during key exchange, before a password or client key is ever sent.
+    """
+    known_hosts = None
+    if pinned_host_key:
+        known_hosts = ([asyncssh.import_public_key(pinned_host_key)], [], [])
+
+    try:
+        conn = await asyncio.wait_for(
+            asyncssh.connect(
+                host,
+                port=port,
+                username=username,
+                password=password if password else None,
+                client_keys=client_keys,
+                known_hosts=known_hosts,
+            ),
+            timeout=timeout,
+        )
+    except (asyncssh.HostKeyNotVerifiable, asyncssh.KeyExchangeFailed) as err:
+        # A pin also limits key exchange to the pinned key's algorithm, so a
+        # server that no longer has a key of that type fails here instead.
+        if isinstance(err, asyncssh.KeyExchangeFailed) and not (
+                pinned_host_key and "host key" in err.reason):
+            raise
+        raise HostKeyMismatch(
+            f"The SSH host key of the UNAS at {host} does not match the one recorded "
+            "when it was first set up, so Home Assistant refused to connect and sent "
+            "no password. If the UNAS was reinstalled, reset or replaced, open the "
+            "integration's Reconfigure option and tick 'Trust the new SSH host key'."
+        ) from err
+
+    server_key = conn.get_server_host_key()
+    return conn, host_key_to_str(server_key) if server_key is not None else None
+
+
 class SSHManager:
     def __init__(
             self,
@@ -65,6 +124,8 @@ class SSHManager:
             mqtt_tls: bool = False,
             mqtt_tls_insecure: bool = False,
             scan_interval: int = 30,
+            host_key: Optional[str] = None,
+            on_host_key: Optional[Callable[[str], None]] = None,
     ) -> None:
         self.host = host
         self.username = username
@@ -78,6 +139,9 @@ class SSHManager:
         self.mqtt_tls = mqtt_tls
         self.mqtt_tls_insecure = mqtt_tls_insecure
         self.scan_interval = scan_interval
+        # Pinned SSH host key; None until the first successful connection.
+        self.host_key = host_key
+        self._on_host_key = on_host_key
         self._conn: Optional[asyncssh.SSHClientConnection] = None
         self._lock = asyncio.Lock()
 
@@ -111,18 +175,25 @@ class SSHManager:
                         _LOGGER.debug("Using SSH key from %s", key_path)
                         break
 
-            self._conn = await asyncio.wait_for(
-                asyncssh.connect(
-                    self.host,
-                    port=self.port,
-                    username=self.username,
-                    password=self.password if self.password else None,
-                    client_keys=client_keys,
-                    known_hosts=None,
-                ),
-                timeout=SSH_CONNECT_TIMEOUT,
+            self._conn, server_key = await open_ssh_connection(
+                self.host,
+                port=self.port,
+                username=self.username,
+                password=self.password,
+                client_keys=client_keys,
+                pinned_host_key=self.host_key,
             )
             _LOGGER.debug("SSH connection established")
+
+            if not self.host_key and server_key:
+                self.host_key = server_key
+                _LOGGER.info(
+                    "Pinned the SSH host key of %s (%s); later connections must present it",
+                    self.host,
+                    asyncssh.import_public_key(server_key).get_fingerprint(),
+                )
+                if self._on_host_key is not None:
+                    self._on_host_key(server_key)
 
     async def disconnect(self) -> None:
         async with self._lock:

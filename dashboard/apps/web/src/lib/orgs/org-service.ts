@@ -178,6 +178,51 @@ export async function requireOrgPermission(
     return access;
 }
 
+/**
+ * Refuses handing out more than the actor holds.
+ *
+ * Running the roster or the roles is a permission a custom role can carry, and
+ * without this it is every permission: somebody trusted to add people could give
+ * themselves, or an account of their own, the admin role - or write every grant
+ * into the role they hold. So what is handed out, whether a set of grants or the
+ * role a person is given or already holds, has to fit inside the actor's own.
+ * The owner, and an instance administrator, hold everything and are not asked.
+ */
+export function requireWithinOwn(access: OrgMembership, permissions: readonly string[]): void {
+    if (access.isOwner) return;
+    const exceeds = permissions.some(
+        (permission) => !core.hasOrgPermission(access.permissions, permission as core.OrgPermission)
+    );
+    if (exceeds) {
+        throw new OrgAccessError("You cannot hand out more than your own role can do");
+    }
+}
+
+/** The same, for a role named by its slug. */
+export async function requireRoleWithinOwn(
+    access: OrgMembership,
+    orgId: string,
+    slug: string
+): Promise<void> {
+    if (access.isOwner) return;
+    requireWithinOwn(access, (await roleFor(orgId, slug)).permissions);
+}
+
+/** The same, for whatever role somebody on the roster holds now: a member whose
+ *  role reaches further than the actor's is not the actor's to move or remove. */
+export async function requireMemberWithinOwn(
+    access: OrgMembership,
+    orgId: string,
+    userId: string
+): Promise<void> {
+    if (access.isOwner) return;
+    const member = await prisma.organizationMember.findUnique({
+        where: { orgId_userId: { orgId, userId } },
+        select: { role: true }
+    });
+    if (member) await requireRoleWithinOwn(access, orgId, member.role);
+}
+
 /** Handing the organization on. Never a permission, so no role anybody writes
  *  can end up able to give the organization away. An instance administrator
  *  counts, and nobody else does. */
@@ -305,7 +350,10 @@ export async function orgIdsWhere(
  * asking. Each role is resolved once however many people hold it, and exactly as
  * access is resolved, so the people told are the people who could act on it.
  */
-export async function orgPeopleHolding(orgId: string, permission: core.OrgPermission): Promise<string[]> {
+export async function orgPeopleHolding(
+    orgId: string,
+    permission: core.OrgPermission
+): Promise<string[]> {
     const org = await prisma.organization.findUnique({
         where: { id: orgId },
         select: { ownerId: true, members: { select: { userId: true, role: true } } }

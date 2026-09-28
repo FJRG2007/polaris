@@ -21,6 +21,7 @@
  *    actually read, and no permission grants it.
  */
 
+import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
@@ -232,6 +233,13 @@ export async function createPersonalVaultAction(
  * different message for each would answer "is there a vault with this id" to
  * anybody who asks.
  */
+/**
+ * An id from the browser, checked to be one before it reaches a query. The types
+ * say string, but a server action takes whatever is posted, and an object here
+ * is a Prisma filter that matches rows it was never meant to.
+ */
+const idSchema = z.string().uuid();
+
 async function administered(
     vaultId: string
 ): Promise<{ ok: true; vaultId: string; userId: string } | { ok: false; error: string }> {
@@ -377,11 +385,12 @@ export async function inviteVaultMemberAction(
         core.ORG_ROLE_MANAGER,
         core.ORG_ROLE_USER
     ];
-    await vaultOrgs.inviteMember(
+    const invited = await vaultOrgs.inviteMember(
         gate.vaultId,
         parsed.data,
         roles.includes(type) ? type : core.ORG_ROLE_USER
     );
+    if (!invited.ok) return { error: "That is the owner of this vault." };
     revalidatePath("/vault/vaults");
     return {};
 }
@@ -400,6 +409,8 @@ export async function memberPublicKeyAction(
 ): Promise<{ publicKey?: string; error?: string }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
+    if (!idSchema.safeParse(memberId).success)
+        return { error: "That member is not in this vault." };
     const member = await prisma.vaultOrgUser.findFirst({
         where: { id: memberId, orgId: gate.vaultId },
         select: { userId: true }
@@ -411,7 +422,9 @@ export async function memberPublicKeyAction(
           })
         : null;
     if (!account?.publicKey) {
-        return { error: "They have not set up a vault of their own yet, so there is no key to wrap this to." };
+        return {
+            error: "They have not set up a vault of their own yet, so there is no key to wrap this to."
+        };
     }
     return { publicKey: account.publicKey };
 }
@@ -426,6 +439,8 @@ export async function confirmVaultMemberAction(
 ): Promise<{ error?: string }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
+    if (!idSchema.safeParse(memberId).success)
+        return { error: "That member could not be confirmed." };
     const parsed = core.vaultScopeSchema.safeParse(scope);
     if (!parsed.success) return { error: "Say what they should reach." };
     // Handing the key over while granting nothing is strictly worse than not
@@ -448,6 +463,8 @@ export async function setMemberScopeAction(
 ): Promise<{ error?: string }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
+    if (!idSchema.safeParse(memberId).success)
+        return { error: "That member is not in this vault." };
     const parsed = core.vaultScopeSchema.safeParse(scope);
     if (!parsed.success) return { error: "Say what they should reach." };
     if (!(await vaultOrgs.setMemberScope(gate.vaultId, memberId, parsed.data))) {
@@ -463,6 +480,8 @@ export async function removeVaultMemberAction(
 ): Promise<{ error?: string }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
+    if (!idSchema.safeParse(memberId).success)
+        return { error: "That member is not in this vault." };
     if (!(await vaultOrgs.removeMember(gate.vaultId, memberId))) {
         return { error: "That member is not in this vault." };
     }
@@ -493,6 +512,9 @@ export async function saveVaultCollectionAction(
 ): Promise<{ collection?: Record<string, unknown>; error?: string }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
+    if (collectionId !== null && !idSchema.safeParse(collectionId).success) {
+        return { error: "That collection is not in this vault." };
+    }
     if (!core.isEncString(name)) return { error: "A collection name must be encrypted." };
     const collection = collectionId
         ? await vaultOrgs.updateCollection(gate.vaultId, collectionId, name)
@@ -508,6 +530,8 @@ export async function deleteVaultCollectionAction(
 ): Promise<{ error?: string }> {
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
+    if (!idSchema.safeParse(collectionId).success)
+        return { error: "That collection is not in this vault." };
     if (!(await vaultOrgs.deleteCollection(gate.vaultId, collectionId))) {
         return { error: "That collection is not in this vault." };
     }

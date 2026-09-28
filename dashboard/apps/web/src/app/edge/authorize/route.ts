@@ -17,7 +17,8 @@
 
 import { randomUUID } from "node:crypto";
 import { loadEnv } from "@polaris/config";
-import { getSession } from "@/lib/session";
+import { resolveSession } from "@/lib/session";
+import { guardSession } from "@/lib/session-guard";
 import { wafBlockPage } from "@polaris/core";
 import { resolveWaf } from "@/lib/waf-service";
 import { clientIp } from "@/lib/request-context";
@@ -55,8 +56,8 @@ export async function GET(request: Request): Promise<Response> {
         return new Response("Invalid redirect", { status: 400 });
     }
 
-    const session = await getSession();
-    if (!session?.user) {
+    const session = await resolveSession();
+    if (!session) {
         // Not signed in: send to the Polaris login, preserving the return trip. A
         // relative Location resolves against the public URL (request.url is the
         // internal upstream behind the reverse proxy).
@@ -64,9 +65,23 @@ export async function GET(request: Request): Promise<Response> {
         return redirect(`/oauth/login?redirect=${encodeURIComponent(back)}`);
     }
 
-    const userId = (session.user as { id: string }).id;
+    // Signed in is not the same as cleared. A sign-in still waiting for approval,
+    // a locked screen, a refused address or a second factor the instance demands
+    // all stop a page, and a token minted here is a page on another host: it gets
+    // the same verdict, and is sent where the dashboard would send it.
+    const cleared = await guardSession({
+        userId: session.id,
+        sessionId: session.sessionId,
+        sessionCreatedAt: session.sessionCreatedAt
+    });
+    if (!cleared.ok) return redirect(cleared.redirect);
+
+    const userId = session.id;
     const now = Math.floor(Date.now() / 1000);
-    const [waf, principals] = await Promise.all([resolveWaf(applicationId), principalsOfUser(userId)]);
+    const [waf, principals] = await Promise.all([
+        resolveWaf(applicationId),
+        principalsOfUser(userId)
+    ]);
     const held = new Set(principals.map((entry) => `${entry.principalType}:${entry.principalId}`));
     // Signed in, but this service's firewall names who may reach it and this account is
     // not one of them - or is one of the accounts it refuses. Answered here rather than

@@ -90,6 +90,7 @@ export default async function TextDropPointPage({
             !textRequests.verifyTextRequestUnlock(
                 request.id,
                 cookieValue,
+                request.passwordHash,
                 loadEnv().POLARIS_AUTH_SECRET
             )
         ) {

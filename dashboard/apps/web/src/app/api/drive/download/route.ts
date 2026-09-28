@@ -4,7 +4,7 @@
  * and media scrubbing work. Node runtime because Prisma and the drivers need it.
  */
 
-import { mimeForName } from "@/lib/mime";
+import { mimeForName, untrustedFileHeaders } from "@/lib/mime";
 import { apiUser } from "@/lib/api-session";
 import { recordAudit } from "@/lib/audit-service";
 import { pipeThenDispose } from "@/lib/drive-stream";
@@ -63,11 +63,16 @@ export async function GET(request: Request): Promise<Response> {
 
         // An inline request feeds an in-dashboard viewer (image/pdf/media); the default
         // is an attachment download. Both stream the same bytes and honor Range.
+        // Either way the bytes are whatever somebody put on the storage, served
+        // from this origin: an HTML or SVG file opened inline must not run as the
+        // reader.
         const inline = url.searchParams.get("disposition") === "inline";
+        const contentType = stat.mime ?? mimeForName(baseName(path)) ?? "application/octet-stream";
         const headers = new Headers({
-            "content-type": stat.mime ?? mimeForName(baseName(path)) ?? "application/octet-stream",
+            "content-type": contentType,
             "accept-ranges": "bytes",
-            "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(baseName(path))}`
+            "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(baseName(path))}`,
+            ...untrustedFileHeaders(contentType)
         });
         // The page asked to be told when this began. A file on a share behind a
         // fresh connection can be many seconds before its first byte, and until

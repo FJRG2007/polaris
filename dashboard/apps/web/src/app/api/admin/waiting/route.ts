@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminWaiting, NOTHING_WAITING } from "@/lib/admin-waiting";
-import { resolveSession } from "@/lib/session";
+import { backgroundUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  * somebody who cannot act on any of it.
  */
 export async function GET(): Promise<Response> {
-    const session = await resolveSession();
+    const session = await backgroundUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!session.isAdmin) return NextResponse.json(NOTHING_WAITING);
     return NextResponse.json(await adminWaiting());

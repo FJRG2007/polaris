@@ -69,7 +69,20 @@ export async function listForms(spaceId: string): Promise<FormView[]> {
     }));
 }
 
-export async function createForm(spaceId: string, actorId: string, input: core.FormInput): Promise<string> {
+/** A form files what it receives into its list, so the list has to be one of
+ *  the form's own space - never a list somebody else's space keeps. */
+async function requireListInSpace(spaceId: string, listId: string): Promise<void> {
+    if ((await prisma.taskList.count({ where: { id: listId, spaceId } })) === 0) {
+        throw new Error("That list is not in this space");
+    }
+}
+
+export async function createForm(
+    spaceId: string,
+    actorId: string,
+    input: core.FormInput
+): Promise<string> {
+    await requireListInSpace(spaceId, input.listId);
     const form = await prisma.taskForm.create({
         data: {
             spaceId,
@@ -89,9 +102,14 @@ export async function createForm(spaceId: string, actorId: string, input: core.F
     return form.id;
 }
 
-export async function updateForm(formId: string, input: core.FormInput): Promise<void> {
-    await prisma.taskForm.update({
-        where: { id: formId },
+export async function updateForm(
+    spaceId: string,
+    formId: string,
+    input: core.FormInput
+): Promise<void> {
+    await requireListInSpace(spaceId, input.listId);
+    const { count } = await prisma.taskForm.updateMany({
+        where: { id: formId, spaceId },
         data: {
             listId: input.listId,
             name: input.name,
@@ -103,10 +121,12 @@ export async function updateForm(formId: string, input: core.FormInput): Promise
             enabled: input.enabled
         }
     });
+    if (count === 0) throw new Error("That form is not in this space");
 }
 
-export async function deleteForm(formId: string): Promise<void> {
-    await prisma.taskForm.delete({ where: { id: formId } });
+export async function deleteForm(spaceId: string, formId: string): Promise<void> {
+    const { count } = await prisma.taskForm.deleteMany({ where: { id: formId, spaceId } });
+    if (count === 0) throw new Error("That form is not in this space");
 }
 
 /** What the public page renders. Never includes the list, the space, or
@@ -167,8 +187,10 @@ export async function submitForm(
             createdById: true
         }
     });
-    if (!form || !form.enabled) return { ok: false, error: "This form is no longer accepting responses" };
-    if (form.requireLogin && !submittedById) return { ok: false, error: "Sign in to send this form" };
+    if (!form || !form.enabled)
+        return { ok: false, error: "This form is no longer accepting responses" };
+    if (form.requireLogin && !submittedById)
+        return { ok: false, error: "Sign in to send this form" };
 
     const fields = parseFields(form.fields);
     const clean: Record<string, string> = {};
@@ -213,7 +235,10 @@ export async function submitForm(
         }
     }
 
-    if (!name) name = fields[0] ? (clean[fields[0].id] ?? "Form submission").slice(0, 255) : "Form submission";
+    if (!name)
+        name = fields[0]
+            ? (clean[fields[0].id] ?? "Form submission").slice(0, 255)
+            : "Form submission";
     const body = [description, ...spare].filter(Boolean).join("\n\n");
 
     // The task has no author: a form submission is not something an account did,

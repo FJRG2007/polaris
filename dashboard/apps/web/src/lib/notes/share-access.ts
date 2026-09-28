@@ -28,8 +28,8 @@ import {
 } from "@/lib/notes/share-service";
 
 export type NoteShareGate =
-    | { ok: true; share: NoteShareRecord; }
-    | { ok: false; status: number; reason: string; };
+    | { ok: true; share: NoteShareRecord }
+    | { ok: false; status: number; reason: string };
 
 /** Why a gate refused, in words a visitor can act on. */
 export const NOTE_DENIAL_MESSAGES: Readonly<Record<string, string>> = {
@@ -64,7 +64,9 @@ export async function gateNoteShareRequest(token: string): Promise<NoteShareGate
 
     if (share.passwordHash) {
         const solved = (await cookies()).get(noteUnlockCookie(share.id))?.value;
-        if (!verifyNoteUnlock(share.id, solved, loadEnv().POLARIS_AUTH_SECRET)) {
+        if (
+            !verifyNoteUnlock(share.id, solved, share.passwordHash, loadEnv().POLARIS_AUTH_SECRET)
+        ) {
             return { ok: false, status: 401, reason: "password_required" };
         }
     }

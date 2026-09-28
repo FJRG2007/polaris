@@ -60,9 +60,7 @@ export interface ShareLogRow {
 }
 
 /** Create a share and return the absolute link to hand out (once). */
-export async function createShareAction(
-    input: unknown
-): Promise<{ url?: string; error?: string }> {
+export async function createShareAction(input: unknown): Promise<{ url?: string; error?: string }> {
     const user = await requirePermission("shares.create");
     const parsed = createShareSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid share" };
@@ -87,17 +85,24 @@ export async function createShareAction(
 }
 
 /** Reveal a share's link again (owner-only; decrypts the stored token). */
-export async function revealShareLinkAction(shareId: string): Promise<{ url?: string; error?: string }> {
+export async function revealShareLinkAction(
+    shareId: string
+): Promise<{ url?: string; error?: string }> {
     const user = await requirePermission("shares.create");
     const url = await revealShareLink(user.id, shareId);
     if (!url) {
-        return { error: "This link cannot be revealed - it predates link recovery. Create a new share instead." };
+        return {
+            error: "This link cannot be revealed - it predates link recovery. Create a new share instead."
+        };
     }
     return { url };
 }
 
 /** Edit an existing share's guardrails (owner-scoped). */
-export async function updateShareAction(shareId: string, input: UpdateShareInput): Promise<{ error?: string }> {
+export async function updateShareAction(
+    shareId: string,
+    input: UpdateShareInput
+): Promise<{ error?: string }> {
     const user = await requirePermission("shares.create");
     const cidrs = (input.allowedCidrs ?? []).map((value) => value.trim()).filter(Boolean);
     const invalid = cidrs.find((value) => !isCidr(value) && !isIpAddress(value));
@@ -105,7 +110,12 @@ export async function updateShareAction(shareId: string, input: UpdateShareInput
     await updateShare(user.id, shareId, {
         password: input.password === undefined ? undefined : input.password || null,
         maxDownloads: input.maxDownloads === undefined ? undefined : input.maxDownloads || null,
-        expiresAt: input.expiresAt === undefined ? undefined : input.expiresAt ? new Date(input.expiresAt) : null,
+        expiresAt:
+            input.expiresAt === undefined
+                ? undefined
+                : input.expiresAt
+                  ? new Date(input.expiresAt)
+                  : null,
         allowDownload: input.allowDownload,
         allowPreview: input.allowPreview,
         allowUpload: input.allowUpload,
@@ -115,7 +125,12 @@ export async function updateShareAction(shareId: string, input: UpdateShareInput
         allowOverwrite: input.allowOverwrite,
         allowedCidrs: input.allowedCidrs === undefined ? undefined : cidrs
     });
-    await recordAudit({ actorId: user.id, action: "share.update", targetType: "share", targetId: shareId });
+    await recordAudit({
+        actorId: user.id,
+        action: "share.update",
+        targetType: "share",
+        targetId: shareId
+    });
     revalidatePath("/drive/shared-links");
     return {};
 }
@@ -139,7 +154,12 @@ export async function getShareLogsAction(shareId: string): Promise<{ logs: Share
 export async function revokeShareAction(shareId: string): Promise<void> {
     const user = await requirePermission("shares.create");
     await revokeShare(user.id, shareId);
-    await recordAudit({ actorId: user.id, action: "share.revoke", targetType: "share", targetId: shareId });
+    await recordAudit({
+        actorId: user.id,
+        action: "share.revoke",
+        targetType: "share",
+        targetId: shareId
+    });
     revalidatePath("/drive/shared-links");
 }
 
@@ -149,7 +169,10 @@ export async function revokeShareAction(shareId: string): Promise<void> {
  * share skip the prompt. No session required - the link plus the password is the
  * credential. Returns a generic failure so it cannot be used as an oracle.
  */
-export async function unlockShareAction(token: string, password: string): Promise<{ error?: string }> {
+export async function unlockShareAction(
+    token: string,
+    password: string
+): Promise<{ error?: string }> {
     const share = await resolveShareByToken(token);
     if (!share) return { error: "This link is not available." };
     if (!shareUsability(share).ok) return { error: "This link is no longer available." };
@@ -165,7 +188,8 @@ export async function unlockShareAction(token: string, password: string): Promis
     await resetRateLimit(limitKey);
     const env = loadEnv();
     const store = await cookies();
-    store.set(shareUnlockCookie(share.id), signShareUnlock(share.id, env.POLARIS_AUTH_SECRET), {
+    const unlock = signShareUnlock(share.id, share.passwordHash, env.POLARIS_AUTH_SECRET);
+    store.set(shareUnlockCookie(share.id), unlock, {
         httpOnly: true,
         sameSite: "lax",
         secure: env.POLARIS_SECURE_COOKIES,

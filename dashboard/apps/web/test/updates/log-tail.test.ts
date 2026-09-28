@@ -16,7 +16,7 @@ const directory = await mkdtemp(join(tmpdir(), "polaris-update-log-"));
 const logPath = join(directory, "update.log");
 process.env.POLARIS_UPDATE_LOG = logPath;
 
-vi.mock("@/lib/session", () => ({ getSession: async () => ({ user: { isAdmin: true } }) }));
+vi.mock("@/lib/session", () => ({ backgroundUser: async () => ({ id: "admin", isAdmin: true }) }));
 
 const { GET } = await import("../../src/app/api/updates/logs/route");
 const { isRecentRun, isUpdateInFlight, logIsFromRun, RECENT_RUN_MS, STALE_LOG_MS } = await import(

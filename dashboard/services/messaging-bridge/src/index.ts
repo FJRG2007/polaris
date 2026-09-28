@@ -16,10 +16,15 @@ const ingestUrl = (process.env.WEB_INGEST_URL ?? "").replace(/\/+$/, "");
 const ingestKey = process.env.WEB_INGEST_KEY ?? "";
 
 if (!authToken) {
-    console.warn("messaging-bridge: BRIDGE_TOKEN is unset; the API would be unauthenticated - refusing risky start.");
+    console.error(
+        "messaging-bridge: BRIDGE_TOKEN is unset; refusing to start an unauthenticated API."
+    );
+    process.exit(1);
 }
 if (!ingestUrl) {
-    console.warn("messaging-bridge: WEB_INGEST_URL is unset; inbound messages have nowhere to be delivered.");
+    console.warn(
+        "messaging-bridge: WEB_INGEST_URL is unset; inbound messages have nowhere to be delivered."
+    );
 }
 
 async function forwardInbound(message: InboundMessage): Promise<void> {
@@ -31,7 +36,9 @@ async function forwardInbound(message: InboundMessage): Promise<void> {
             body: JSON.stringify(message)
         });
     } catch (caught) {
-        console.error(`messaging-bridge: inbound forward failed: ${caught instanceof Error ? caught.message : caught}`);
+        console.error(
+            `messaging-bridge: inbound forward failed: ${caught instanceof Error ? caught.message : caught}`
+        );
     }
 }
 
@@ -58,7 +65,9 @@ async function shutdown(signal: string): Promise<void> {
         await registry.disconnectAll();
         server.close();
     } catch (caught) {
-        console.error(`messaging-bridge: shutdown error: ${caught instanceof Error ? caught.message : caught}`);
+        console.error(
+            `messaging-bridge: shutdown error: ${caught instanceof Error ? caught.message : caught}`
+        );
     } finally {
         clearTimeout(hardExit);
         process.exit(0);

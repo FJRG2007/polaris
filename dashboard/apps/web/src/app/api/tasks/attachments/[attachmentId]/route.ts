@@ -9,6 +9,7 @@
 
 import { requireTask, TaskAccessError } from "@/lib/tasks/access";
 import { apiPermission } from "@/lib/api-session";
+import { untrustedFileHeaders } from "@/lib/mime";
 import { attachmentTaskId, readAttachment } from "@/lib/tasks/attachment-service";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
 
@@ -37,7 +38,10 @@ export async function GET(
     const file = await readAttachment(attachmentId);
     if (!file) return new Response("Not found", { status: 404 });
 
-    const inline = file.mime.startsWith("image/") || file.mime.startsWith("video/") || file.mime === "application/pdf";
+    const inline =
+        file.mime.startsWith("image/") ||
+        file.mime.startsWith("video/") ||
+        file.mime === "application/pdf";
     return new Response(file.body, {
         headers: {
             "Content-Type": file.mime,
@@ -48,7 +52,10 @@ export async function GET(
             // The name is quoted and stripped of anything that could end the
             // header early; a file name is user input like any other.
             "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${file.name.replace(/["\\\r\n]/g, "")}"`,
-            "Cache-Control": "private, max-age=300"
+            "Cache-Control": "private, max-age=300",
+            // The type is whatever the uploader's browser claimed, so an SVG
+            // opened in a tab would otherwise run its script on this origin.
+            ...untrustedFileHeaders(file.mime)
         }
     });
 }

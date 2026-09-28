@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const owned = vi.hoisted(() => ({ ids: [] as string[], asked: 0 }));
 
 vi.mock("@/lib/session", () => ({
-    resolveSession: async () => ({ id: "reader" }),
+    backgroundUser: async () => ({ id: "reader" }),
     sessionCan: async () => true
 }));
 vi.mock("@/lib/mailbox/watch", () => ({ watchMailboxes: () => () => {} }));
@@ -39,7 +39,8 @@ async function nextFrame(reader: ReadableStreamDefaultReader<Uint8Array>, waitMs
         if (!chunk || chunk.done) break;
         text += decoder.decode(chunk.value);
         const data = text.split("\n\n").find((frame) => frame.startsWith("data: "));
-        if (data) return JSON.parse(data.slice("data: ".length)) as { kind: string; accounts: string[] };
+        if (data)
+            return JSON.parse(data.slice("data: ".length)) as { kind: string; accounts: string[] };
     }
     return null;
 }
@@ -55,7 +56,9 @@ describe("the mail stream", () => {
     async function open() {
         const abort = new AbortController();
         aborts.push(abort);
-        const response = await GET(new Request("http://polaris.test/api/mail/stream", { signal: abort.signal }));
+        const response = await GET(
+            new Request("http://polaris.test/api/mail/stream", { signal: abort.signal })
+        );
         const reader = response.body!.getReader();
         await reader.read(); // the opening comment
         return reader;

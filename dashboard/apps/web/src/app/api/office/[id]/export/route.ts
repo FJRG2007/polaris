@@ -22,7 +22,7 @@ import * as core from "@polaris/core";
 import { officeReader } from "@/lib/office/reader";
 import { readByLink } from "@/lib/office/documents";
 import { exportDocument } from "@/lib/office/export";
-import { resolveSession, sessionCan } from "@/lib/session";
+import { backgroundUser, sessionCan } from "@/lib/session";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
 
 export const runtime = "nodejs";
@@ -47,7 +47,7 @@ export async function GET(
 ): Promise<Response> {
     // Optional, because a link is a way into one document without a session.
     // When there is one it still has to hold the app's own permission.
-    const session = await resolveSession();
+    const session = await backgroundUser();
     if (session && !(await sessionCan(session, "office.use"))) {
         return new Response("Forbidden", { status: 403 });
     }

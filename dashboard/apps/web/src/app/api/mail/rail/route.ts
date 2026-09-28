@@ -19,14 +19,14 @@
 import { NextResponse } from "next/server";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { listAccountViews } from "@/lib/mailbox/accounts";
-import { resolveSession, sessionCan } from "@/lib/session";
+import { backgroundUser, sessionCan } from "@/lib/session";
 import { listFolders, unreadCounts } from "@/lib/mailbox/views";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-    const session = await resolveSession();
+    const session = await backgroundUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!(await sessionCan(session, "mail.use"))) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });

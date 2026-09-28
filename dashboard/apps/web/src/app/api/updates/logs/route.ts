@@ -10,7 +10,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { open, stat } from "node:fs/promises";
-import { getSession } from "@/lib/session";
+import { backgroundUser } from "@/lib/session";
 import type { UpdateLogTail } from "@/lib/update-log";
 import { UPDATE_LOG_PATH as LOG_PATH } from "@/lib/update-runner";
 
@@ -22,8 +22,7 @@ const MAX_CHUNK = 128 * 1024;
 const MARKER = /POLARIS_UPDATE_EXIT=(-?\d+)/;
 
 export async function GET(request: NextRequest): Promise<Response> {
-    const session = await getSession();
-    if (!(session?.user as { isAdmin?: boolean } | undefined)?.isAdmin) {
+    if (!(await backgroundUser())?.isAdmin) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

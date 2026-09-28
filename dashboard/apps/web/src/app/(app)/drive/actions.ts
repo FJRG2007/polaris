@@ -69,6 +69,7 @@ import {
     createConnectionSchema,
     findConnectionProvider,
     normalizeRelPath,
+    parentPath,
     removeConnectionSchema,
     storageConfigSchema,
     storageCredentialsSchema
@@ -302,7 +303,10 @@ export async function mkdirAction(
     const target = normalizeRelPath(path ? `${path}/${name}` : name);
     let driver;
     try {
-        driver = await requireDriveDriver(user.id, connectionId, path, "write");
+        // Cleared on the folder the new one actually lands in, not the one it was
+        // asked from: a name carrying "../" or "a/b" is resolved above, and the
+        // folder that resolves to is the one whose rules and lock apply.
+        driver = await requireDriveDriver(user.id, connectionId, parentPath(target), "write");
     } catch (caught) {
         return { error: driveErrorMessage(caught, "You cannot create a folder here.") };
     }
@@ -340,7 +344,8 @@ export async function createFileAction(
     const target = normalizeRelPath(path ? `${path}/${clean}` : clean);
     let driver;
     try {
-        driver = await requireDriveDriver(user.id, connectionId, path, "write");
+        // The folder the file really lands in - see mkdirAction.
+        driver = await requireDriveDriver(user.id, connectionId, parentPath(target), "write");
     } catch (caught) {
         return { error: driveErrorMessage(caught, "You cannot create a file here.") };
     }
@@ -821,6 +826,12 @@ export async function renameAction(
     const normalizedTo = normalizeRelPath(to);
     let driver;
     try {
+        // A rename that lands in another folder is a move, and takes the right to
+        // write there - the same check a move into a folder makes.
+        const destination = parentPath(normalizedTo);
+        if (destination !== parentPath(normalizedFrom)) {
+            await authorizeDrive(user.id, connectionId, destination, "write");
+        }
         driver = await requireDriveDriver(user.id, connectionId, from, "rename");
     } catch (caught) {
         return { error: driveErrorMessage(caught, "You cannot move or rename this item.") };

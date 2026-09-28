@@ -14,7 +14,9 @@ Cloud inbound arrives on the web's Meta webhook, not here.
 ## Environment
 
 - `BRIDGE_PORT` - HTTP port (default `8787`).
-- `BRIDGE_TOKEN` - bearer token the web presents on every API call.
+- `BRIDGE_TOKEN` - bearer token the web presents on every API call. Required: the
+  process exits at startup if it is unset, since an empty token would leave the
+  API unauthenticated. Polaris installs always set a random one.
 - `WEB_INGEST_URL` - the web's inbound ingest endpoint. Polaris sets this per
   install: a local install uses the web's internal service DNS
   (`http://web:3000/api/inbox/ingest`) over the shared `polaris-hub` network,

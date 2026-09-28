@@ -45,6 +45,9 @@ const TARGET = "vault-item";
 /** Whether this account may see the item at all. The same rule the vault itself
  *  reads by, so the log can never be more permissive than the vault. */
 async function mayReach(userId: string, cipherId: string): Promise<boolean> {
+    // An id from the browser; anything but a string would reach the query below
+    // as a filter and match items that are not this one.
+    if (typeof cipherId !== "string") return false;
     const filter = await reachableCipherFilter(userId);
     const row = await prisma.vaultCipher.findFirst({
         where: { AND: [{ id: cipherId }, filter] },
@@ -55,11 +58,7 @@ async function mayReach(userId: string, cipherId: string): Promise<boolean> {
 
 /** Record one use of an item. Silent about an item this account cannot reach:
  *  answering would tell a stranger which ids exist. */
-export async function recordItemUse(
-    userId: string,
-    cipherId: string,
-    use: ItemUse
-): Promise<void> {
+export async function recordItemUse(userId: string, cipherId: string, use: ItemUse): Promise<void> {
     if (!(await mayReach(userId, cipherId))) return;
     await recordAudit({
         actorId: userId,
@@ -87,7 +86,11 @@ export async function listItemUses(
 ): Promise<ItemUseEntry[]> {
     if (!(await mayReach(userId, cipherId))) return [];
     const rows = await prisma.auditLog.findMany({
-        where: { targetType: TARGET, targetId: cipherId, action: { in: [...USE_BY_ACTION.keys()] } },
+        where: {
+            targetType: TARGET,
+            targetId: cipherId,
+            action: { in: [...USE_BY_ACTION.keys()] }
+        },
         orderBy: { at: "desc" },
         take: limit,
         select: { id: true, actorId: true, action: true, at: true }
@@ -97,12 +100,16 @@ export async function listItemUses(
     // One query for the names rather than a join per row, and an account that has
     // since been deleted reads as "somebody who has left" rather than dropping
     // the line - the use happened whether or not the account still exists.
-    const actorIds = [...new Set(rows.map((row) => row.actorId).filter((id): id is string => Boolean(id)))];
+    const actorIds = [
+        ...new Set(rows.map((row) => row.actorId).filter((id): id is string => Boolean(id)))
+    ];
     const people = await prisma.user.findMany({
         where: { id: { in: actorIds } },
         select: { id: true, name: true, username: true }
     });
-    const names = new Map(people.map((person) => [person.id, person.name || person.username || "Somebody"]));
+    const names = new Map(
+        people.map((person) => [person.id, person.name || person.username || "Somebody"])
+    );
 
     return rows.map((row) => ({
         id: row.id,

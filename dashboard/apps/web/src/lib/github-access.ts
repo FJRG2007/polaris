@@ -53,7 +53,8 @@ export async function githubCredentialsForUser(userId: string): Promise<GithubCr
         // A typed name carries no credential to act with.
         if (link.method === "manual") continue;
         const token = await usableToken(link.id).catch(() => null);
-        if (token) usable.push({ connectionId: link.id, login: link.label, method: link.method, token });
+        if (token)
+            usable.push({ connectionId: link.id, login: link.label, method: link.method, token });
     }
     return usable;
 }
@@ -72,7 +73,9 @@ export async function githubTokenForUser(userId: string, owner?: string): Promis
 async function credentialForUser(userId: string, owner?: string): Promise<GithubCredential | null> {
     const credentials = await githubCredentialsForUser(userId);
     const wanted = owner?.toLowerCase();
-    const match = wanted ? credentials.find((entry) => entry.login.toLowerCase() === wanted) : undefined;
+    const match = wanted
+        ? credentials.find((entry) => entry.login.toLowerCase() === wanted)
+        : undefined;
     return match ?? credentials[0] ?? null;
 }
 
@@ -81,14 +84,17 @@ export async function listReposForUser(userId: string): Promise<GithubRepo[]> {
     const credentials = await githubCredentialsForUser(userId);
     const repos: GithubRepo[] = [];
     for (const credential of credentials) {
-        const listed = await (credential.method === "token"
-            ? listReposForPat(credential.token)
-            : listReposForUserToken(credential.token)
+        const listed = await (
+            credential.method === "token"
+                ? listReposForPat(credential.token)
+                : listReposForUserToken(credential.token)
         ).catch(() => []);
         repos.push(...listed);
     }
     const seen = new Set<string>();
-    return repos.filter((repo) => (seen.has(repo.fullName) ? false : (seen.add(repo.fullName), true)));
+    return repos.filter((repo) =>
+        seen.has(repo.fullName) ? false : (seen.add(repo.fullName), true)
+    );
 }
 
 /**
@@ -97,7 +103,10 @@ export async function listReposForUser(userId: string): Promise<GithubRepo[]> {
  * repository read or nothing at all - the same answer as before any account was
  * linked.
  */
-export async function githubTokenForOwner(userId: string | null, owner?: string): Promise<string | null> {
+export async function githubTokenForOwner(
+    userId: string | null,
+    owner?: string
+): Promise<string | null> {
     if (userId) {
         const personal = await githubTokenForUser(userId, owner).catch(() => null);
         if (personal) return personal;
@@ -136,6 +145,56 @@ export async function githubCloneIdentity(
     const installed = await githubAppInstallationToken(owner).catch(() => null);
     const header = cloneAuthHeader(installed);
     return header ? { header, as: "the GitHub App installed on this Polaris" } : null;
+}
+
+/** Who is pointing a service at a repository. */
+export interface RepoChooser {
+    readonly id: string;
+    readonly isAdmin: boolean;
+}
+
+/**
+ * Why this person may not point a service at `repoUrl`, or null when they may.
+ *
+ * Asked only when a repository is set on a service - never at a build, a
+ * redeploy or a webhook - because the clone that follows goes out as the project
+ * owner's account or, failing that, as the App an administrator installed. Either
+ * is a credential that is not the chooser's, and without this anybody allowed to
+ * create a service could have Polaris read a private repository they cannot see
+ * on GitHub and read the source back out of the build.
+ *
+ * So the chooser has to be able to see it themselves: an administrator (who put
+ * the App there), a repository that is public, a clone that would go out as their
+ * own account anyway, or a linked account of theirs that GitHub says reaches it -
+ * the one that owns it included.
+ */
+export async function githubRepoChoiceRefusal(
+    chooser: RepoChooser,
+    ownerId: string,
+    repoUrl: string
+): Promise<string | null> {
+    const repo = parseGithubRepo(repoUrl);
+    if (!repo || chooser.isAdmin) return null;
+
+    const mine = await githubCredentialsForUser(chooser.id).catch(() => []);
+    // The owner cloning as their own account is only their own access.
+    if (chooser.id === ownerId && mine.length > 0) return null;
+    // Nothing to lend: the clone goes out as nobody, and that reads only what
+    // anybody could.
+    const lent = await githubCloneIdentity(ownerId, repo.owner).catch(() => null);
+    if (!lent) return null;
+
+    const wanted = repo.owner.toLowerCase();
+    if (mine.some((credential) => credential.login.toLowerCase() === wanted)) return null;
+    for (const credential of mine) {
+        if ((await repoAccessFor(repo.owner, repo.repo, credential.token)) === "reachable")
+            return null;
+    }
+    if (await resolveGithubRepo(repo.owner, repo.repo, null).catch(() => null)) return null;
+
+    return mine.length > 0
+        ? `None of your connected GitHub accounts can see ${repo.owner}/${repo.repo}. Connect the account that has access to it under Connected accounts, then try again.`
+        : `${repo.owner}/${repo.repo} is private, and you have no GitHub account connected that can see it. Connect the account that has access to it under Connected accounts, then try again.`;
 }
 
 /**
@@ -186,7 +245,10 @@ export async function githubCloneProblem(
  * connect one for, and refusing it because nothing is linked would break every
  * deploy that has ever worked without a link.
  */
-export async function githubRepoReach(userId: string | null, repoUrl: string): Promise<string | null> {
+export async function githubRepoReach(
+    userId: string | null,
+    repoUrl: string
+): Promise<string | null> {
     const repo = parseGithubRepo(repoUrl);
     if (!repo) return null;
 
@@ -241,7 +303,9 @@ async function usableToken(connectionId: string): Promise<string | null> {
     const renewed = await refreshGithubUserToken(credential.refreshToken);
     await updateCredential(connectionId, {
         accessToken: renewed.accessToken,
-        ...(renewed.refreshToken ? { refreshToken: renewed.refreshToken } : { refreshToken: credential.refreshToken }),
+        ...(renewed.refreshToken
+            ? { refreshToken: renewed.refreshToken }
+            : { refreshToken: credential.refreshToken }),
         ...(renewed.expiresAt ? { expiresAt: renewed.expiresAt } : {})
     });
     return renewed.accessToken;

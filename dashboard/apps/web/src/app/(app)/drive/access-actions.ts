@@ -9,6 +9,7 @@
  * limited per user and lock so it cannot be brute-forced.
  */
 
+import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
@@ -197,18 +198,27 @@ export async function unlockPathAction(
         return { error: "You do not have access to this item" };
     }
 
+    // One spelling per lock, so the limit below is one bucket per lock: the
+    // database reads the same id in upper case or without its dashes, and each of
+    // those spellings would otherwise be a fresh ten tries at the password.
+    const parsed = z.string().uuid().safeParse(lockId);
+    if (!parsed.success) return { error: "Incorrect password." };
+    lockId = parsed.data.toLowerCase();
+
     const limitKey = `lock-unlock:${lockId}:${user.id}`;
     if (!(await rateLimit(limitKey, 10, 15 * 60 * 1000)).ok) {
         return { error: "Too many attempts. Please wait a few minutes and try again." };
     }
-    if (!(await verifyLockPassword(lockId, password))) {
+    const passwordHash = await verifyLockPassword(lockId, password);
+    if (!passwordHash) {
         return { error: "Incorrect password." };
     }
     await resetRateLimit(limitKey);
 
     const env = loadEnv();
     const store = await cookies();
-    store.set(lockUnlockCookie(lockId), signLockUnlock(lockId, env.POLARIS_AUTH_SECRET), {
+    const unlock = signLockUnlock({ id: lockId, passwordHash }, user.id, env.POLARIS_AUTH_SECRET);
+    store.set(lockUnlockCookie(lockId), unlock, {
         httpOnly: true,
         sameSite: "lax",
         secure: env.POLARIS_SECURE_COOKIES,

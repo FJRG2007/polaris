@@ -25,6 +25,11 @@ CONF_MQTT_PORT = "mqtt_port"
 CONF_MQTT_TLS = "mqtt_tls"
 CONF_MQTT_TLS_INSECURE = "mqtt_tls_insecure"
 CONF_SCAN_INTERVAL = "scan_interval"
+# The NAS's SSH host key ("<algorithm> <base64>"), recorded on the first
+# successful connection and required to match on every connection after it.
+CONF_SSH_HOST_KEY = "ssh_host_key"
+# Reconfigure-only checkbox; never stored in the entry.
+CONF_TRUST_NEW_HOST_KEY = "trust_new_host_key"
 
 DEFAULT_MQTT_PORT = 1883
 DEFAULT_MQTT_TLS_PORT = 8883

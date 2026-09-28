@@ -52,7 +52,7 @@ vi.mock("@/lib/orgs/org-service", () => ({
         access !== null && access.permissions.some((held) => held === "*" || held === permission)
 }));
 
-const { authorizeDrive, DriveAccessError } = await import("@/lib/drive-authz");
+const { authorizeDrive, drivePathFilter, DriveAccessError } = await import("@/lib/drive-authz");
 
 const ORG = "018f2b7a-0000-7000-8000-0000000000c1";
 const PERSON = "018f2b7a-0000-7000-8000-0000000000a1";
@@ -123,5 +123,29 @@ describe("an organization's Drive", () => {
         resolveOrgAccess.mockResolvedValue(null);
         resolveDriveDecision.mockResolvedValue("allow");
         await expect(authorizeDrive(PERSON, ORG, "handover", "read")).resolves.toBeUndefined();
+    });
+});
+
+describe("walking a folder of an organization's Drive", () => {
+    it("leaves out a subfolder denied under a folder the roster opens", async () => {
+        // The zip, the search and the recent list authorize the folder they start
+        // from and then walk it. The folder only Legal opens is a rule on that
+        // folder, and a walk that never asked would hand its files over.
+        resolveOrgAccess.mockResolvedValue({ isOwner: false, permissions: ["org.read"] });
+        resolveDriveDecision.mockImplementation(
+            async (_user: string, _conn: string, path: string) =>
+                path === "legal" || path.startsWith("legal/") ? "deny" : "implicit-deny"
+        );
+        const mayRead = await drivePathFilter(PERSON, ORG, "download");
+        expect(await mayRead("contracts/a.pdf")).toBe(true);
+        expect(await mayRead("legal")).toBe(false);
+        expect(await mayRead("legal/settlement.pdf")).toBe(false);
+    });
+
+    it("asks nothing per path of an administrator", async () => {
+        findUniqueUser.mockResolvedValue({ isAdmin: true });
+        const mayRead = await drivePathFilter(PERSON, ORG, "download");
+        expect(await mayRead("legal/settlement.pdf")).toBe(true);
+        expect(resolveDriveDecision).not.toHaveBeenCalled();
     });
 });

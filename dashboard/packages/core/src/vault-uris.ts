@@ -106,18 +106,16 @@ export function hostOf(value: string): string | null {
  * on somebody else's site, so the list stays short and the failure stays on the
  * safe side.
  */
-const SECOND_LEVEL = new Set([
-    "co",
-    "com",
-    "net",
-    "org",
-    "gov",
-    "edu",
-    "ac",
-    "mil"
-]);
+const SECOND_LEVEL = new Set(["co", "com", "net", "org", "gov", "edu", "ac", "mil"]);
+
+/** A dotted IPv4 address, which `URL` has already normalized to four decimals. */
+const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/;
 
 export function baseDomain(host: string): string {
+    // An address is not a name: its labels are octets, and the "last two" of
+    // `192.168.1.1` are `1.1`, which every host ending in `.1.1` would match. The
+    // whole address is the only site it can mean, as Bitwarden reads it too.
+    if (IPV4.test(host) || host.includes(":")) return host.toLowerCase();
     const labels = host.toLowerCase().split(".").filter(Boolean);
     if (labels.length <= 2) return labels.join(".");
     const [secondLast] = labels.slice(-2, -1);
@@ -134,7 +132,10 @@ export function baseDomain(host: string): string {
  * Everything else is stored as it was typed, because a URL somebody pasted is a
  * URL they may want to see again.
  */
-export function readUriEntry(typed: string, match: UriMatch | null): { uri: string; match: UriMatch | null } {
+export function readUriEntry(
+    typed: string,
+    match: UriMatch | null
+): { uri: string; match: UriMatch | null } {
     const value = typed.trim();
     // A pattern is somebody's own regular expression, in which a `*` is a
     // quantifier and taking it out would change what they wrote into something
@@ -243,5 +244,7 @@ export function urisCovering<T extends { uri: string; match: UriMatch | null }>(
 ): T[] {
     return entries
         .filter((entry) => uriMatches(entry.uri, entry.match, candidate))
-        .sort((left, right) => (right.match ?? DEFAULT_URI_MATCH) - (left.match ?? DEFAULT_URI_MATCH));
+        .sort(
+            (left, right) => (right.match ?? DEFAULT_URI_MATCH) - (left.match ?? DEFAULT_URI_MATCH)
+        );
 }

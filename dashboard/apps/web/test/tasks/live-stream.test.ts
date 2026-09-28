@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const READER = { id: "u1", isAdmin: false, name: "Reader" };
 
-const resolveSession = vi.fn(async () => READER as unknown);
+const backgroundUser = vi.fn(async () => READER as unknown);
 const sessionCan = vi.fn(async () => true);
 const visibleScope = vi.fn(async () => ({
     spaceIds: ["visible"],
@@ -23,7 +23,7 @@ const visibleScope = vi.fn(async () => ({
     partialRoles: {}
 }));
 
-vi.mock("../../src/lib/session", () => ({ resolveSession, sessionCan }));
+vi.mock("../../src/lib/session", () => ({ backgroundUser, sessionCan }));
 vi.mock("../../src/lib/tasks/access", () => ({ visibleScope }));
 
 const { GET } = await import("../../src/app/api/tasks/stream/route");
@@ -38,7 +38,9 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Open a connection and collect what it writes until it is closed. */
 async function listen(): Promise<{ frames: () => string[]; close: () => void }> {
     const controller = new AbortController();
-    const response = await GET(new Request("http://polaris.test/api/tasks/stream", { signal: controller.signal }));
+    const response = await GET(
+        new Request("http://polaris.test/api/tasks/stream", { signal: controller.signal })
+    );
     const reader = (response.body as ReadableStream<Uint8Array>).getReader();
     const decoder = new TextDecoder();
     const seen: string[] = [];
@@ -67,14 +69,14 @@ async function listen(): Promise<{ frames: () => string[]; close: () => void }> 
 
 describe("the tasks live stream", () => {
     beforeEach(() => {
-        resolveSession.mockResolvedValue(READER);
+        backgroundUser.mockResolvedValue(READER);
         sessionCan.mockResolvedValue(true);
     });
 
     afterEach(() => vi.clearAllMocks());
 
     it("refuses a request with no session, so the browser stops retrying", async () => {
-        resolveSession.mockResolvedValue(null);
+        backgroundUser.mockResolvedValue(null);
 
         const response = await GET(new Request("http://polaris.test/api/tasks/stream"));
 

@@ -177,6 +177,12 @@ async function requireService(projectId: string, id: string): Promise<Row> {
     return row;
 }
 
+/** Which environment a row is in, for a caller whose access may stop at some
+ *  of a project's environments. Refuses a row from another project. */
+export async function externalServiceEnvironment(projectId: string, id: string): Promise<string> {
+    return (await requireService(projectId, id)).environmentId;
+}
+
 /**
  * The credential behind a row, as the string a driver takes.
  *
@@ -222,7 +228,10 @@ function driverFor(provider: string): ProviderDriver {
  * not a reason for a project board to fail to load, and the row says what
  * happened where its state would be.
  */
-export async function refreshExternalService(projectId: string, id: string): Promise<ExternalServiceView> {
+export async function refreshExternalService(
+    projectId: string,
+    id: string
+): Promise<ExternalServiceView> {
     const row = await requireService(projectId, id);
     let state: ExternalState | null = null;
     let failure: string | null = null;
@@ -324,7 +333,8 @@ export async function addExternalService(
         select: { id: true, provider: true }
     });
     if (!link) throw new ProviderError("That account is not connected to your profile", "refused");
-    if (!isProvider(link.provider)) throw new ProviderError("Polaris cannot watch that service", "refused");
+    if (!isProvider(link.provider))
+        throw new ProviderError("Polaris cannot watch that service", "refused");
 
     const environment = await prisma.environment.findFirst({
         where: { id: input.environmentId, projectId },
@@ -360,7 +370,10 @@ export async function addExternalService(
 
 /** Release one again, at the provider. Polaris sends nothing but which one: what
  *  goes into the build belongs to whoever is building it. */
-export async function deployExternalService(projectId: string, id: string): Promise<ExternalServiceView> {
+export async function deployExternalService(
+    projectId: string,
+    id: string
+): Promise<ExternalServiceView> {
     const row = await requireService(projectId, id);
     const token = await tokenFor(row);
     await driverFor(row.provider).deploy(token, row.externalId, refOf(row));

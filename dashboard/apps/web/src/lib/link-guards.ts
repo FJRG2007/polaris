@@ -19,7 +19,7 @@
 
 import { ipAllowed } from "@polaris/core";
 import { geoAllowedForIp } from "@/lib/geo-service";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 /** The limits every link carries, whatever it points at. */
 export interface LinkLimits {
@@ -114,26 +114,57 @@ export function unlockCookieName(scope: string, id: string): string {
     return `polaris_${scope}_${id}`;
 }
 
-/**
- * The two messages that were signed before this module existed.
- *
- * They are kept verbatim rather than folded into the scoped form below, because
- * changing the message invalidates every unlock cookie already in a browser -
- * which means everybody who had solved a password gets asked for it again the
- * moment this ships. Nothing else may be added here: a new surface has no
- * cookies in the wild to preserve.
- */
-const LEGACY_UNLOCK_MESSAGES: Readonly<Record<string, (id: string) => string>> = {
-    share: (id) => `unlock:${id}`,
-    drop: (id) => `drop-unlock:${id}`,
-    lock: (id) => `lock-unlock:${id}`
-};
+/** How long a solved password is honoured - by the server, not only by the
+ *  browser. A cookie's max-age is the browser's promise, and a copied value
+ *  keeps none of it, so the expiry travels inside the signed value too. */
+export const UNLOCK_TTL_SECONDS = 60 * 60 * 12;
 
-/** The message the unlock marker signs. Scoped, so a marker for one kind of link
- *  can never satisfy another. */
-function unlockMessage(scope: string, id: string): string {
-    const legacy = LEGACY_UNLOCK_MESSAGES[scope];
-    return legacy ? legacy(id) : `unlock:${scope}:${id}`;
+/** What an unlock was granted against, and so what ends it. */
+export interface UnlockGrant {
+    /**
+     * The stored hash the password was checked against. The hash is salted, so a
+     * new password - even the same one set again - is a new hash, and that ends
+     * every unlock the old one handed out.
+     */
+    readonly passwordHash: string | null;
+    /** The signed-in user who solved it, when the unlock is theirs rather than
+     *  the browser's. Public links have nobody to bind to and leave it out. */
+    readonly userId?: string;
+}
+
+/** A fingerprint of the password an unlock was granted against. Only ever
+ *  signed over, never sent: the cookie carries the expiry and the signature. */
+export function passwordVersion(passwordHash: string | null): string {
+    return createHash("sha256")
+        .update(passwordHash ?? "")
+        .digest("base64url");
+}
+
+/**
+ * The message an unlock cookie signs: the kind of link, the link, the password
+ * it was solved against, who solved it, and when it stops.
+ *
+ * Scoped, so a marker for one kind of link can never satisfy another, and
+ * encoded as a JSON array so no field can run into the next. This replaced the
+ * bare messages shares, drop points and locks signed before (`unlock:<id>`,
+ * `drop-unlock:<id>`, `lock-unlock:<id>`), which were kept verbatim for a while
+ * so nobody holding a cookie was asked again. They named nothing but the link:
+ * the same value for every visitor, honoured for as long as somebody kept it,
+ * and still honoured after the owner changed the password to shut them out.
+ * Keeping them was the wrong trade. A cookie in the old shape no longer
+ * verifies, so whoever solved a password in the last twelve hours is asked for
+ * it once more - the only visible effect, and one their cookie's own max-age was
+ * at most twelve hours from anyway.
+ */
+function unlockMessage(scope: string, id: string, grant: UnlockGrant, expiresAt: number): string {
+    return JSON.stringify([
+        "unlock",
+        scope,
+        id,
+        passwordVersion(grant.passwordHash),
+        grant.userId ?? "",
+        expiresAt
+    ]);
 }
 
 /**
@@ -158,17 +189,39 @@ export function verifyMarker(message: string, value: string | undefined, secret:
     return timingSafeEqual(presented, expected);
 }
 
-/** Sign the "password solved" marker for one link. */
-export function signUnlock(scope: string, id: string, secret: string): string {
-    return signMarker(unlockMessage(scope, id), secret);
+/**
+ * Sign the "password solved" marker for one link: `<expiresAt>.<signature>`,
+ * the expiry in seconds and inside the signature as well as in front of it.
+ */
+export function signUnlock(
+    scope: string,
+    id: string,
+    grant: UnlockGrant,
+    secret: string,
+    now: number = Date.now()
+): string {
+    const expiresAt = Math.floor(now / 1000) + UNLOCK_TTL_SECONDS;
+    return `${expiresAt}.${signMarker(unlockMessage(scope, id, grant, expiresAt), secret)}`;
 }
 
-/** Constant-time check of an unlock cookie value against its signature. */
+/**
+ * Constant-time check of an unlock cookie: signed for this link, against the
+ * password it has now, for this user when it was bound to one, and not expired.
+ */
 export function verifyUnlock(
     scope: string,
     id: string,
     value: string | undefined,
-    secret: string
+    grant: UnlockGrant,
+    secret: string,
+    now: number = Date.now()
 ): boolean {
-    return verifyMarker(unlockMessage(scope, id), value, secret);
+    if (!value) return false;
+    const parts = value.split(".");
+    if (parts.length !== 2) return false;
+    const [expiry, signature] = parts as [string, string];
+    if (!/^\d{1,12}$/.test(expiry)) return false;
+    const expiresAt = Number(expiry);
+    if (expiresAt * 1000 <= now) return false;
+    return verifyMarker(unlockMessage(scope, id, grant, expiresAt), signature, secret);
 }

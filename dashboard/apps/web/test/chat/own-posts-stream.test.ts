@@ -13,6 +13,7 @@ const READER = { id: "reader", isAdmin: false, name: "Reader" };
 
 vi.mock("../../src/lib/session", () => ({
     resolveSession: async () => READER,
+    backgroundUser: async () => READER,
     sessionCan: async () => true
 }));
 vi.mock("../../src/lib/chat/access", () => ({

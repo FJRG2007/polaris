@@ -66,7 +66,14 @@ export async function gateShareRequest(token: string, action: string): Promise<S
 
     if (share.passwordHash) {
         const cookieValue = (await cookies()).get(shareUnlockCookie(share.id))?.value;
-        if (!verifyShareUnlock(share.id, cookieValue, loadEnv().POLARIS_AUTH_SECRET)) {
+        if (
+            !verifyShareUnlock(
+                share.id,
+                cookieValue,
+                share.passwordHash,
+                loadEnv().POLARIS_AUTH_SECRET
+            )
+        ) {
             return deny(401, "password_required");
         }
     }

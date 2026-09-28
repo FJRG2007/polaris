@@ -164,7 +164,11 @@ export async function unlockTextRequestAction(
     const store = await cookies();
     store.set(
         textRequests.textRequestUnlockCookie(request.id),
-        textRequests.signTextRequestUnlock(request.id, env.POLARIS_AUTH_SECRET),
+        textRequests.signTextRequestUnlock(
+            request.id,
+            request.passwordHash,
+            env.POLARIS_AUTH_SECRET
+        ),
         {
             httpOnly: true,
             sameSite: "lax",
@@ -224,6 +228,7 @@ export async function submitTextAction(
             !textRequests.verifyTextRequestUnlock(
                 request.id,
                 cookieValue,
+                request.passwordHash,
                 loadEnv().POLARIS_AUTH_SECRET
             )
         ) {

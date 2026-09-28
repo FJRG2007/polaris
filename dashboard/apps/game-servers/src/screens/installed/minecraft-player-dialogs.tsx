@@ -645,6 +645,8 @@ export function PlayerAccessDialog({
         unverified?: boolean;
         name?: string;
         addresses?: string[];
+        /** The administrator keeps other accounts' addresses from this screen. */
+        addressesHidden?: boolean;
         error?: string;
     }>;
     /** Tie the player to a Polaris account. `followSignIns` false keeps the
@@ -690,6 +692,7 @@ export function PlayerAccessDialog({
     const [looking, startLooking] = useTransition();
     /** Where that account signs in from, offered under the address field. */
     const [suggested, setSuggested] = useState<readonly string[]>([]);
+    const [addressesHidden, setAddressesHidden] = useState(false);
     const [inviting, startInviting] = useTransition();
     const [invited, setInvited] = useState<{
         email: string;
@@ -710,9 +713,11 @@ export function PlayerAccessDialog({
             if (found.error || !found.userId) {
                 setLookUpError(found.error ?? "Could not look that up");
                 setSuggested([]);
+                setAddressesHidden(false);
                 setAccount(null);
                 return;
             }
+            setAddressesHidden(found.addressesHidden === true);
             setAccount({ userId: found.userId, name: found.name ?? identifier });
             setNoMinecraft(!found.username);
             setTypedName(found.username && found.unverified ? found.username : null);
@@ -902,6 +907,12 @@ export function PlayerAccessDialog({
                                 The account they make is tied to {name}.
                             </span>
                         </div>
+                    )}
+                    {addressesHidden && (
+                        <p className="pt-1 text-xs text-muted-foreground">
+                            This Polaris does not show where other people sign in from. Ask them for
+                            the address they play from.
+                        </p>
                     )}
                     {inviteError && <p className="pt-1 text-xs text-danger">{inviteError}</p>}
                     {invited && (

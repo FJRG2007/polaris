@@ -524,18 +524,26 @@ export function snippetUnlockCookie(snippetId: string): string {
     return unlockCookieName(SNIPPET_LINK_SCOPE, snippetId);
 }
 
-/** Sign an unlock marker so the "password solved" cookie cannot be forged. */
-export function signSnippetUnlock(snippetId: string, secret: string): string {
-    return signUnlock(SNIPPET_LINK_SCOPE, snippetId, secret);
+/** Sign an unlock marker so the "password solved" cookie cannot be forged.
+ *  Signed against the current password's hash, so changing it ends earlier
+ *  unlocks. */
+export function signSnippetUnlock(
+    snippetId: string,
+    passwordHash: string | null,
+    secret: string
+): string {
+    return signUnlock(SNIPPET_LINK_SCOPE, snippetId, { passwordHash }, secret);
 }
 
-/** Constant-time check of an unlock cookie against its expected signature. */
+/** Constant-time check of an unlock cookie: this snippet, its current
+ *  password, and not expired. */
 export function verifySnippetUnlock(
     snippetId: string,
     value: string | undefined,
+    passwordHash: string | null,
     secret: string
 ): boolean {
-    return verifyUnlock(SNIPPET_LINK_SCOPE, snippetId, value, secret);
+    return verifyUnlock(SNIPPET_LINK_SCOPE, snippetId, value, { passwordHash }, secret);
 }
 
 /** Append an access-log entry. Never throws; logging must not block a read. */

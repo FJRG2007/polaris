@@ -342,8 +342,10 @@ describe("confirmMember", () => {
 describe("setMemberScope", () => {
     it("replaces the rows rather than merging them", async () => {
         await orgs.setMemberScope("vorg-1", "m1", WHOLE);
+        // Kept to members of this vault, so an id that is not one of them can
+        // never clear another vault's rows.
         expect(vaultCollectionAccessDeleteMany).toHaveBeenCalledWith({
-            where: { orgUserId: "m1" }
+            where: { orgUserId: "m1", member: { orgId: "vorg-1" } }
         });
         // Nothing to write beside `accessAll`, and no leftover rows to outlive it.
         expect(vaultCollectionAccessCreateMany).not.toHaveBeenCalled();
@@ -390,9 +392,7 @@ describe("setCollectionMembers", () => {
             { id: "m-elsewhere", readOnly: false, hidePasswords: false }
         ]);
         expect(vaultCollectionAccessCreateMany).toHaveBeenCalledWith({
-            data: [
-                { collectionId: "col-1", orgUserId: "m1", readOnly: true, hidePasswords: true }
-            ]
+            data: [{ collectionId: "col-1", orgUserId: "m1", readOnly: true, hidePasswords: true }]
         });
         expect(bumpRevision).toHaveBeenCalledWith("u2");
     });
@@ -410,6 +410,32 @@ describe("removeMember", () => {
         expect(await orgs.removeMember("vorg-1", "m1")).toBe(true);
         expect(vaultOrgUserDelete).toHaveBeenCalledWith({ where: { id: "m1" } });
         expect(bumpRevision).toHaveBeenCalledWith("u2");
+    });
+});
+
+describe("the owner of a personal vault", () => {
+    // Somebody the owner made an administrator may manage everybody else, never
+    // the owner: their row carries the only copy of their key to the vault.
+    const OWNER_ONLY = { OR: [{ userId: null }, { userId: { not: "owner-1" } }] };
+
+    beforeEach(() => {
+        vaultOrganizationFindUnique.mockResolvedValue({ ownerUserId: "owner-1" });
+    });
+
+    it("keeps the owner's row out of removal, re-keying and scoping", async () => {
+        vaultOrgUserFindFirst.mockResolvedValue(null);
+        expect(await orgs.removeMember("vorg-1", "m-owner")).toBe(false);
+        expect(vaultOrgUserFindFirst).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: "m-owner", orgId: "vorg-1", ...OWNER_ONLY } })
+        );
+        expect(vaultOrgUserDelete).not.toHaveBeenCalled();
+
+        await orgs.setMemberScope("vorg-1", "m-owner", WHOLE);
+        await orgs.confirmMember("vorg-1", "m-owner", ENC, WHOLE);
+        expect(vaultOrgUserUpdateMany).toHaveBeenCalledTimes(2);
+        for (const call of vaultOrgUserUpdateMany.mock.calls) {
+            expect((call[0] as { where: unknown }).where).toMatchObject(OWNER_ONLY);
+        }
     });
 });
 

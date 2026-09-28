@@ -35,13 +35,18 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { orgCan, resolveOrgAccess } = await import("@/lib/orgs/org-service");
+const { orgCan, resolveOrgAccess, requireRoleWithinOwn, requireWithinOwn } = await import(
+    "@/lib/orgs/org-service"
+);
 
 const ACTOR = { id: "user-1", isAdmin: false };
 
 /** An organization owned by somebody else, with this actor holding `role`. */
 function membership(role: string | null): void {
-    orgFindUnique.mockResolvedValue({ ownerId: "somebody-else", members: role === null ? [] : [{ role }] });
+    orgFindUnique.mockResolvedValue({
+        ownerId: "somebody-else",
+        members: role === null ? [] : [{ role }]
+    });
 }
 
 describe("resolveOrgAccess", () => {
@@ -103,7 +108,10 @@ describe("resolveOrgAccess", () => {
 
     it("reads the grants off the organization's own role", async () => {
         membership("ops");
-        roleFindUnique.mockResolvedValue({ name: "Operations", permissions: JSON.stringify(["deploy.manage"]) });
+        roleFindUnique.mockResolvedValue({
+            name: "Operations",
+            permissions: JSON.stringify(["deploy.manage"])
+        });
         const access = await resolveOrgAccess(ACTOR, "org-1");
 
         expect(access?.role).toBe("ops");
@@ -148,5 +156,44 @@ describe("resolveOrgAccess", () => {
         expect(access?.isOwner).toBe(false);
         expect(orgCan(access, "domains.manage")).toBe(true);
         expect(orgCan(access, "activity.read")).toBe(true);
+    });
+});
+
+describe("handing out no more than one holds", () => {
+    // Somebody trusted to run the roster, and nothing else.
+    const hr = {
+        orgId: "org-1",
+        role: "hr",
+        roleName: "HR",
+        isOwner: false,
+        permissions: ["org.read", "people.manage"]
+    };
+
+    beforeEach(() => {
+        roleFindUnique.mockReset();
+        roleFindUnique.mockResolvedValue(null);
+    });
+
+    it("refuses giving anybody - themselves included - the admin role", async () => {
+        await expect(requireRoleWithinOwn(hr, "org-1", "admin")).rejects.toThrow(
+            /more than your own/
+        );
+    });
+
+    it("lets them give out a role that fits inside their own", async () => {
+        await expect(requireRoleWithinOwn(hr, "org-1", "member")).resolves.toBeUndefined();
+        await expect(requireRoleWithinOwn(hr, "org-1", "restricted")).resolves.toBeUndefined();
+    });
+
+    it("refuses writing grants into a role that they do not hold", () => {
+        expect(() => requireWithinOwn(hr, ["people.manage", "vault.manage"])).toThrow(
+            /more than your own/
+        );
+        expect(() => requireWithinOwn(hr, ["people.manage"])).not.toThrow();
+    });
+
+    it("never asks the owner", async () => {
+        const owner = { ...hr, role: "owner", isOwner: true, permissions: ["*"] };
+        await expect(requireRoleWithinOwn(owner, "org-1", "admin")).resolves.toBeUndefined();
     });
 });

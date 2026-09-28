@@ -5,7 +5,7 @@
  * Node runtime; Server Actions are avoided here because they buffer the body.
  */
 
-import { normalizeRelPath } from "@polaris/core";
+import { normalizeRelPath, parentPath } from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
 import { sessionCan } from "@/lib/session";
 import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
@@ -42,7 +42,10 @@ export async function PUT(request: Request): Promise<Response> {
     let driver;
     try {
         // Authorize against the destination folder (the parent), where the write lands.
-        driver = await requireDriveDriver(user.id, connectionId, rawPath, "write");
+        // That is the folder the normalized target sits in, not the `p` the caller
+        // named: a `name` carrying `../` or a nested path moves the write out of
+        // `p`, past the access rules and locks that were checked there.
+        driver = await requireDriveDriver(user.id, connectionId, parentPath(target), "write");
     } catch (caught) {
         if (caught instanceof DriveLockedError) return new Response("Locked", { status: 423 });
         if (caught instanceof DriveAccessError) return new Response("Forbidden", { status: 403 });
@@ -74,7 +77,9 @@ export async function PUT(request: Request): Promise<Response> {
         });
         return Response.json({ ok: true, path: stat.path, size: stat.size.toString() });
     } catch (error) {
-        return new Response(error instanceof Error ? error.message : "Upload failed", { status: 500 });
+        return new Response(error instanceof Error ? error.message : "Upload failed", {
+            status: 500
+        });
     } finally {
         await driver.dispose();
     }

@@ -17,12 +17,18 @@ import { requireAdmin } from "@/lib/session";
 import { SecurityAdmin } from "./security-admin";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { getInstanceSecurity } from "@/lib/instance-security";
+import { PlayerAddressesCard } from "./player-addresses-card";
+import { playerAddressesShared } from "@/lib/player-address-policy";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminSecurityPage() {
     await requireAdmin();
-    const [policy, mail] = await Promise.all([getInstanceSecurity(), getAuthMailStatus()]);
+    const [policy, mail, addressesShared] = await Promise.all([
+        getInstanceSecurity(),
+        getAuthMailStatus(),
+        playerAddressesShared()
+    ]);
 
     return (
         <>
@@ -31,6 +37,9 @@ export default async function AdminSecurityPage() {
                 description="What every account on this Polaris has to carry before it can be used."
             />
             <SecurityAdmin policy={policy} mailReady={mail.channelId !== null} />
+            <div className="mt-3 max-w-2xl">
+                <PlayerAddressesCard shared={addressesShared} />
+            </div>
         </>
     );
 }

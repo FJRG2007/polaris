@@ -405,8 +405,12 @@ export async function removeSpaceMember(
     quietly = false
 ): Promise<void> {
     // Leaving is always allowed; removing somebody else takes an admin.
-    if (userId !== actor.id) await requireSpace(actor, spaceId, "admin");
-    else await requireSpace(actor, spaceId);
+    if (userId !== actor.id) {
+        await requireSpace(actor, spaceId, "admin");
+        // Never the owner, for the reason a ban refuses it: an admin does not
+        // get to decide about whoever made the space.
+        await refuseSpaceOwner(spaceId, userId);
+    } else await requireSpace(actor, spaceId);
 
     await prisma.$transaction(async (tx) => {
         await tx.chatSpaceMember.deleteMany({ where: { spaceId, userId } });
@@ -433,6 +437,15 @@ export async function removeSpaceMember(
         actorId: actor.id,
         audience: [userId]
     });
+}
+
+/** Refuses when the person being acted on owns the space. */
+async function refuseSpaceOwner(spaceId: string, userId: string): Promise<void> {
+    const space = await prisma.chatSpace.findUnique({
+        where: { id: spaceId },
+        select: { ownerId: true }
+    });
+    if (space?.ownerId === userId) throw new ChatRuleError("That is the owner of this space");
 }
 
 /** A ban, as the list that lifts them draws it. */
@@ -1317,6 +1330,7 @@ export async function removeChannelMember(
     if (userId !== actor.id && !access.mayAdminister) {
         throw new ChatAccessError("You cannot remove people from that channel");
     }
+    if (userId !== actor.id && access.spaceId) await refuseSpaceOwner(access.spaceId, userId);
     const removed = await prisma.chatChannelMember.deleteMany({ where: { channelId, userId } });
     // The last one out takes the group with them: a group with nobody in it is
     // messages and files kept for no one. There is nobody left to tell.

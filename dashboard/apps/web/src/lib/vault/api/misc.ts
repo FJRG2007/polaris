@@ -76,7 +76,11 @@ export async function icon(context: VaultContext): Promise<Response> {
             "content-type": icon.contentType,
             // Long, because a favicon does not move and the alternative is a
             // request per site on every vault open.
-            "cache-control": "public, max-age=86400, immutable"
+            "cache-control": "public, max-age=86400, immutable",
+            // Somebody else's bytes on this origin: never sniffed into a page and
+            // never able to run anything if opened directly.
+            "x-content-type-options": "nosniff",
+            "content-security-policy": "default-src 'none'; sandbox"
         }
     });
 }
