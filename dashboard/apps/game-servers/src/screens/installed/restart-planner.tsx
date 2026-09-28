@@ -224,7 +224,11 @@ export function RestartPlanner({
                         </p>
                     </div>
                     {pending ? (
-                        <Button variant="ghost" disabled={busy !== null} onClick={() => void cancel()}>
+                        <Button
+                            variant="ghost"
+                            disabled={busy !== null}
+                            onClick={() => void cancel()}
+                        >
                             {busy === "cancel" ? (
                                 <Loader2 className="size-4 animate-spin" />
                             ) : (
