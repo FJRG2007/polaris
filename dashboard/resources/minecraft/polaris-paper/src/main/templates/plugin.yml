@@ -6,10 +6,10 @@ description: Asks every player for a password kept by Polaris before they can pl
 commands:
   register:
     description: Choose a password for this server.
-    usage: /register <password> <password>
+    usage: /register <passcode> <passcode>
   login:
     description: Log in with your password.
-    usage: /login <password>
+    usage: /login <passcode>
   changepassword:
     description: Change your password.
     usage: /changepassword <current> <new>
