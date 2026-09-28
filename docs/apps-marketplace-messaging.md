@@ -584,6 +584,24 @@ configured means the machine's own address, as before.
   polaris-hostd had to learn it: its `PortSpec` is `deny_unknown_fields`, so a
   Bedrock server would have been refused by the local daemon. A host running an
   older daemon cannot publish UDP.
+- **Linked chat is the one record of who a server talks to.** A server names
+  either a group (a single conversation with a call of its own, so it is both
+  the call and the channel) or a space's voice and text channels, each chosen
+  and each optional; that link is what `{call.*}` reads, where `/online` and
+  `/status` are answered, where an announcement is repeated, and - Java only -
+  whose messages are shown in the game (`lib/minecraft/chat-link.ts`,
+  `chat-link-service.ts`). The old `callGroupId` picker on the Side panel is
+  gone: a server that had one still reads it, as a link to that group with only
+  the call turned on, until something newer is saved, which clears it. The
+  **Linked chat** tab (`games.manage`) is the one screen for it now; the Side
+  panel names whose call it reads and points there instead of choosing one of
+  its own. Saving a different conversation, or turning on the messages it shows
+  in the game or the announcements it repeats, is asked of a manager who may
+  reach that conversation (a group they are in, a space they run); turning a
+  use off, or answering commands, is any manager's. Chat itself imports nothing
+  of the game - it asks the app extension registry which of its conversations
+  are linked and draws a badge naming the server, in the rail and the header,
+  linking to its page only for a reader who could open it anyway.
 
 - **Install is one click.** The card installs on this server with the manifest's
   defaults and opens the app. `Configure` is the same install with the server,

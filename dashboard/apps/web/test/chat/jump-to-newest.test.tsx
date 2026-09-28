@@ -116,6 +116,7 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
                 archived: false,
                 unreadCount: 0,
                 mayModerate: false,
+                gameLinks: [],
                 // A one-to-one conversation is named after who is in it, and the
                 // profile panel beside it is drawn from the same list.
                 others: [{ id: "grace", name: "Grace" }]

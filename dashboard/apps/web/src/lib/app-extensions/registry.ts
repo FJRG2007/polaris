@@ -18,9 +18,12 @@ import type {
     AppExtension,
     AppJob,
     AppSlot,
+    ChatCommandSpec,
+    ChatGameLink,
     ExtensionInstall,
     GameServerSummary,
     PlayingNow,
+    RelayedChannelMessage,
     RelayedChatMessage
 } from "./types";
 
@@ -28,9 +31,12 @@ export type {
     AppExtension,
     AppJob,
     AppSlot,
+    ChatCommandSpec,
+    ChatGameLink,
     ExtensionInstall,
     GameServerSummary,
     PlayingNow,
+    RelayedChannelMessage,
     RelayedChatMessage
 };
 
@@ -245,6 +251,62 @@ export async function playingNowFor(userIds: readonly string[]): Promise<Map<str
         }
     }
     return found;
+}
+
+/** The installed apps that have a say about this hook. */
+async function installedWith(hook: keyof AppExtension): Promise<AppExtension[]> {
+    const offering = extensions().filter((extension) => extension[hook]);
+    const installed = await Promise.all(offering.map((extension) => isAppInstalled(extension.id)));
+    return offering.filter((_, index) => installed[index]);
+}
+
+/** What the installed apps have linked to these Chat conversations. One app
+ *  failing leaves the others' badges, and never the conversations, standing. */
+export async function chatGameLinks(channelIds: readonly string[]): Promise<ChatGameLink[]> {
+    if (channelIds.length === 0) return [];
+    const lists = await Promise.all(
+        (await installedWith("chatGameLinks")).map((extension) =>
+            (extension.chatGameLinks?.(channelIds) ?? Promise.resolve([])).catch(
+                (caught: unknown) => {
+                    console.error(`polaris: ${extension.id} could not say what it links:`, caught);
+                    return [] as readonly ChatGameLink[];
+                }
+            )
+        )
+    );
+    return lists.flat();
+}
+
+/** Every installed app's answers to a command written in a conversation. */
+export async function answerChatCommand(input: {
+    readonly channelId: string;
+    readonly command: string;
+}): Promise<string[]> {
+    const answers: string[] = [];
+    for (const extension of await installedWith("answerChatCommand")) {
+        const said = await extension.answerChatCommand?.(input).catch((caught: unknown) => {
+            console.error(`polaris: ${extension.id} could not answer a command:`, caught);
+            return [] as readonly string[];
+        });
+        answers.push(...(said ?? []));
+    }
+    return answers;
+}
+
+/** What hands a channel's message to every app that shows linked channels to
+ *  everybody in a game, or null when no installed app can. Never fails. */
+export async function channelRelayer(): Promise<
+    ((message: RelayedChannelMessage) => Promise<void>) | null
+> {
+    const relays = await installedWith("relayChannelMessage");
+    if (relays.length === 0) return null;
+    return async (message) => {
+        for (const extension of relays) {
+            await extension.relayChannelMessage?.(message).catch((caught: unknown) => {
+                console.error("polaris: a channel message could not be shown in a game:", caught);
+            });
+        }
+    };
 }
 
 /** Whether this account reaches an app it holds no permission for. */

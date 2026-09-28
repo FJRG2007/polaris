@@ -2007,6 +2007,23 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
             "who is online"
         ]
     },
+    chat: {
+        label: "Linked chat",
+        icon: MessagesSquare,
+        group: TALKING_GROUP,
+        keywords: [
+            "chat group",
+            "space",
+            "channel",
+            "call",
+            "voice",
+            "commands",
+            "online",
+            "status",
+            "relay",
+            "discord"
+        ]
+    },
     schedule: {
         label: "Schedule",
         icon: CalendarClock,

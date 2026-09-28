@@ -15,6 +15,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
 import { rulesForChannel } from "./rules";
+import { commandIn } from "./chat-command";
 import { publishChatChange } from "./live";
 import { nicknamesFor } from "@/lib/contact-names";
 import { clearFriendNoticeAbout } from "@/lib/friends-service";
@@ -26,13 +27,13 @@ import {
     resolveChatReferences,
     type ChatReferenceView
 } from "./references";
-import { announceRoomMention, refuseRoomMention } from "./room-mentions";
 import { pollsFor, type ChatPollView } from "./polls";
 import { mentionsReader, readerTeams } from "./notify";
 import { noticePeople, renderNotice } from "./notice-text";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
-import { channelMentions, isBlankMarkdown } from "@/components/rich-text/markdown";
+import { announceRoomMention, refuseRoomMention } from "./room-mentions";
 import { allowedBy, maySee, receiptsBetween } from "@/lib/privacy-service";
+import { channelMentions, isBlankMarkdown } from "@/components/rich-text/markdown";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
 import { knownPreviews, unfurl, type KnownPreview, type LinkPreviewView } from "./link-preview";
 import {
@@ -514,6 +515,13 @@ export async function send(
         .catch((error: unknown) =>
             console.error("polaris: a message could not be relayed:", error)
         );
+    // `/online` in a conversation a game server is linked to - see `game-links`.
+    // Only a body that is a command costs anything past the pattern.
+    if (!input.parentId && commandIn(input.body)) {
+        void import("./game-links")
+            .then((links) => links.answerCommand(id, actor.id))
+            .catch(() => undefined);
+    }
 
     return id;
 }

@@ -19,7 +19,7 @@ function groupOf(spec: VariableSpec): string {
     if (spec.name.startsWith("rank.") || spec.name === "server.levels")
         return "Leaderboards and lists";
     if (spec.name.startsWith("death.")) return "Last death";
-    if (spec.name.startsWith("call.")) return "The chat group's call";
+    if (spec.name.startsWith("call.")) return "The linked chat's call";
     if (spec.kind === "game" || spec.kind === "account") return "The player reading it";
     return "The server";
 }
@@ -29,7 +29,7 @@ const GROUP_ORDER = [
     "The player reading it",
     "Leaderboards and lists",
     "Last death",
-    "The chat group's call"
+    "The linked chat's call"
 ];
 
 export function VariablesHelp({

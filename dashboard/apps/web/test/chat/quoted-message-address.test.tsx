@@ -105,6 +105,7 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
                 archived: false,
                 unreadCount: 0,
                 mayModerate: false,
+                gameLinks: [],
                 others: [{ id: "grace", name: "Grace" }]
             }
         ],

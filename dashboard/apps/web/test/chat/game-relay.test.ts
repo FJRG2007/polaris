@@ -41,8 +41,12 @@ const fake = vi.hoisted(() => ({
     levels: new Map<string, string>(),
     blocked: new Map<string, Set<string>>(),
     relayed: [] as Record<string, unknown>[],
+    /** Whether an installed app shows linked channels to everybody playing. */
+    showing: false,
+    shown: [] as Record<string, unknown>[],
     asked: [] as unknown[],
-    namesRead: 0
+    namesRead: 0,
+    authorsRead: 0
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -77,7 +81,10 @@ vi.mock("@polaris/db", () => ({
             }
         },
         user: {
-            findUnique: async () => ({ name: "Carla" }),
+            findUnique: async () => {
+                fake.authorsRead += 1;
+                return { name: "Carla" };
+            },
             findMany: async (query: { where: { id: { not: string } } }) => {
                 fake.asked.push(query);
                 return [...fake.optedIn]
@@ -92,6 +99,12 @@ vi.mock("@/lib/app-extensions/registry", () => ({
         fake.offered
             ? async (message: Record<string, unknown>) => {
                   fake.relayed.push(message);
+              }
+            : null,
+    channelRelayer: async () =>
+        fake.showing
+            ? async (message: Record<string, unknown>) => {
+                  fake.shown.push(message);
               }
             : null
 }));
@@ -123,7 +136,7 @@ function message(body: string, overrides: Record<string, unknown> = {}) {
         forwarded: false,
         attachments: [],
         poll: null,
-        channel: { spaceId: null, name: "" },
+        channel: { spaceId: null, name: "", kind: "group" },
         ...overrides
     };
 }
@@ -143,8 +156,11 @@ beforeEach(() => {
     fake.levels = new Map();
     fake.blocked = new Map();
     fake.relayed = [];
+    fake.showing = false;
+    fake.shown = [];
     fake.asked = [];
     fake.namesRead = 0;
+    fake.authorsRead = 0;
 });
 
 describe("relaying a message into a game", () => {
@@ -159,7 +175,8 @@ describe("relaying a message into a game", () => {
                 text: "see you at spawn",
                 files: null,
                 poll: null,
-                forwarded: false
+                forwarded: false,
+                channelId: "c1"
             },
             {
                 userId: BEN,
@@ -169,7 +186,8 @@ describe("relaying a message into a game", () => {
                 text: "see you at spawn",
                 files: null,
                 poll: null,
-                forwarded: false
+                forwarded: false,
+                channelId: "c1"
             }
         ]);
     });
@@ -282,7 +300,50 @@ describe("relaying a message into a game", () => {
 
     it("leaves a deleted message alone", async () => {
         fake.message = message("gone", { deletedAt: new Date() });
+        fake.showing = true;
         await relayToGames("m1");
         expect(fake.relayed).toEqual([]);
+        expect(fake.shown).toEqual([]);
+    });
+});
+
+describe("a channel a game server shows to everybody playing", () => {
+    it("is handed every message, whatever each reader chose, by the channel's own name", async () => {
+        fake.showing = true;
+        fake.offered = false;
+        fake.optedIn = new Set();
+        fake.message = message("raid at eight", {
+            channel: { spaceId: "s1", name: "builders", kind: "text" }
+        });
+        await relayToGames("m1");
+        expect(fake.shown).toEqual([
+            {
+                channelId: "c1",
+                authorId: AUTHOR,
+                conversation: "builders",
+                text: "raid at eight",
+                files: null,
+                poll: null,
+                forwarded: false
+            }
+        ]);
+        // Nobody's own setting was asked about: the operator linked it.
+        expect(fake.asked).toEqual([]);
+        // Named by the app only once it has a server showing the channel.
+        expect(fake.authorsRead).toBe(0);
+    });
+
+    it("is never handed a direct message, which no server can be linked to", async () => {
+        fake.showing = true;
+        fake.message = message("just us", { channel: { spaceId: null, name: "", kind: "dm" } });
+        await relayToGames("m1");
+        expect(fake.shown).toEqual([]);
+    });
+
+    it("never names an unnamed group after the people in it", async () => {
+        fake.showing = true;
+        await relayToGames("m1");
+        expect(fake.shown[0]).toMatchObject({ conversation: "Group" });
+        expect(fake.shown[0]).not.toHaveProperty("userId");
     });
 });

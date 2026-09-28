@@ -1970,6 +1970,13 @@ export function ChannelView({
                         // person - see `drafts`.
                         draftKey={channelDraftKey(channelId)}
                         roomMentions={channel.mayMentionRoom}
+                        // `/online` and the rest, where a game server is linked.
+                        commands={channel.gameLinks
+                            .flatMap((link) => link.commands)
+                            .filter(
+                                (command, at, all) =>
+                                    all.findIndex((one) => one.name === command.name) === at
+                            )}
                         rules={rules}
                         disabled={!canPost}
                         attachable={may.attach}

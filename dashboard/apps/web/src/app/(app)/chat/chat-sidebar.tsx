@@ -44,6 +44,7 @@ import { PersonName, PersonRow } from "@/components/person-name";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { NotifyOptions } from "./notify-menu";
+import { GameLinkMark } from "./game-link-badge";
 import { blockPersonAction, unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import { LeaveDialog } from "./leave-dialog";
@@ -1016,6 +1017,9 @@ function Row({
                     className="shrink-0 text-xs text-foreground-subtle md:hidden"
                 />
             )}
+            {/* A game server talks through this conversation: its call is on
+                the server's panel, and members may ask it `/online` here. */}
+            {channel && channel.gameLinks.length > 0 && <GameLinkMark links={channel.gameLinks} />}
             {/* Said quietly, and only because a row that sits above a newer
                 conversation with nothing to explain it reads as a bug. */}
             {channel?.pinned && (

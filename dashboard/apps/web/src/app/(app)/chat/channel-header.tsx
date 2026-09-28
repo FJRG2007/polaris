@@ -30,6 +30,7 @@ import { ChatPictureDialog } from "./picture-dialog";
 import { AddPeopleDialog } from "./add-people-dialog";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { NotifyOptions } from "./notify-menu";
+import { GameLinkChips } from "./game-link-badge";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import { GroupSettingsDialog } from "./group-settings-dialog";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
@@ -216,6 +217,9 @@ export function ChannelHeader({
                         className="hidden max-w-[16rem] shrink sm:flex"
                     />
                 ) : null}
+                {/* Which game server talks through this conversation, and the
+                    way to its page for somebody who may open it. */}
+                <GameLinkChips links={channel.gameLinks} />
                 {channel.topic && (
                     <>
                         <span className="hidden h-4 w-px bg-border sm:block" />

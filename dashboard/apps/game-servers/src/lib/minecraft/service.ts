@@ -284,7 +284,10 @@ export async function broadcastToMinecraft(
 export async function sendAnnouncement(
     ownerId: string,
     installedAppId: string,
-    announcement: Announcement
+    announcement: Announcement,
+    /** Who sent it, for the line that repeats it in the linked chat. None
+     *  repeats it nowhere. */
+    actorId: string | null = null
 ): Promise<number> {
     const install = await resolveInstall(ownerId, installedAppId);
     // The editor runs the same check as it is typed; this is the one that
@@ -335,6 +338,20 @@ export async function sendAnnouncement(
         }
         assertSafeArgument(line);
         await execCommand(install, ownerId, [line]);
+    }
+    // Repeated in the chat the server is linked to, where the link asks for it,
+    // with the values the players were shown.
+    if (actorId) {
+        await (
+            await import("./chat-link-service")
+        ).mirrorAnnouncement(
+            installedAppId,
+            install.name,
+            install.config,
+            announcement,
+            context.values,
+            actorId
+        );
     }
     return lines.length;
 }
@@ -642,6 +659,22 @@ export async function getServerPlayers(
     installedAppId: string
 ): Promise<MinecraftPlayers> {
     return readLivePlayers(await resolveInstall(ownerId, installedAppId), ownerId);
+}
+
+/**
+ * Whether the server is meant to be up, and who is on when it answered - what a
+ * question asked about it in Chat is answered from. Nothing about why it is not
+ * answering: that names containers and logs, and the answer is read by
+ * everybody in a conversation, not only by whoever runs the server.
+ */
+export async function serverReading(
+    ownerId: string,
+    installedAppId: string
+): Promise<{ running: boolean; players: parse.PlayerList | null }> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    if (!install.running) return { running: false, players: null };
+    const live = await readLivePlayers(install, ownerId);
+    return { running: true, players: live.answering ? live.players : null };
 }
 
 /**

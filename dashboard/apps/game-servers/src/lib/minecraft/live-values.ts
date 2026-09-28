@@ -1,6 +1,6 @@
 /**
  * The values Polaris fills into announcements and the side panel: the server's
- * own, the call of the chat group chosen for it, and the Polaris account each
+ * own, the call of the chat it is linked to, and the Polaris account each
  * player online is tied to. The words themselves are in `text-vars`.
  *
  * Asked only for what a text actually uses: a line with no `{polaris.*}` never
@@ -13,6 +13,7 @@ import type { PlayerList } from "./parse";
 import type { Recipient, SendContext } from "./announcement";
 import type { ServerContainer } from "./service";
 import * as events from "./player-events";
+import { linkedChannels, readChatLink, type ChatLink } from "./chat-link";
 import { searchContainerTail } from "../container-files";
 import {
     INLINE_TOP,
@@ -33,27 +34,34 @@ import {
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { voicePresence } = host.chatCalls;
 
-/** Where the chat group whose call `{call.*}` reads is kept on the install. */
-export const CALL_GROUP_KEY = "callGroupId";
-
-/** The chat group chosen for this server, or null. */
-export function readCallGroup(config: Record<string, unknown>): string | null {
-    const value = config[CALL_GROUP_KEY];
-    return typeof value === "string" && /^[0-9a-f-]{36}$/i.test(value) ? value : null;
-}
-
 /** The names in a call, joined the way a line on screen reads them. */
 function joined(names: readonly string[]): string {
     return names.join(", ");
 }
 
-/** How many people the chat group has - everybody the call could hold. */
-async function groupSize(groupId: string): Promise<number> {
-    return prisma.chatChannelMember.count({ where: { channelId: groupId } });
+/**
+ * Everybody the linked call could hold: the group's members, or for a voice
+ * channel of a space its limit when it has one, and otherwise whoever may walk
+ * in - the members of the room when it is private, of the space when it is not.
+ */
+async function callSize(link: ChatLink): Promise<number | null> {
+    if (link.kind === "group") {
+        return prisma.chatChannelMember.count({ where: { channelId: link.groupId } });
+    }
+    if (!link.callChannelId) return null;
+    const room = await prisma.chatChannel.findUnique({
+        where: { id: link.callChannelId },
+        select: { userLimit: true, private: true }
+    });
+    if (!room) return null;
+    if (room.userLimit > 0) return room.userLimit;
+    return room.private
+        ? prisma.chatChannelMember.count({ where: { channelId: link.callChannelId } })
+        : prisma.chatSpaceMember.count({ where: { spaceId: link.spaceId } });
 }
 
 /**
- * Who is in the chat group's call right now, by the name they show there.
+ * Who is in the linked call right now, by the name they show there.
  *
  * Asked of the chat rather than read off the seats, so the panel and the chat
  * agree on who is there. A seat stays open for a while after somebody closes the
@@ -61,9 +69,9 @@ async function groupSize(groupId: string): Promise<number> {
  * and counting open seats kept them "in call" on every screen long after the
  * chat had stopped showing them.
  */
-async function callMembers(groupId: string): Promise<string[]> {
-    const byChannel = await voicePresence([groupId]);
-    return [...new Set((byChannel.get(groupId) ?? []).map((one) => one.name))];
+async function callMembers(channelId: string): Promise<string[]> {
+    const byChannel = await voicePresence([channelId]);
+    return [...new Set((byChannel.get(channelId) ?? []).map((one) => one.name))];
 }
 
 /**
@@ -96,14 +104,16 @@ export async function liveContext(
         "server.max": players ? String(players.max) : null,
         "server.players": players && players.players.length > 0 ? joined(players.players) : null
     };
-    const group = readCallGroup(config);
+    // The call of whatever the server is linked to in Chat (`chat-link`).
+    const link = readChatLink(config);
+    const call = linkedChannels(link).call;
     if (used.has("call.count") || used.has("call.members")) {
-        const inCall = group ? await callMembers(group).catch(() => null) : null;
+        const inCall = call ? await callMembers(call).catch(() => null) : null;
         values["call.count"] = inCall ? String(inCall.length) : null;
         values["call.members"] = inCall && inCall.length > 0 ? joined(inCall) : null;
     }
     if (used.has("call.max")) {
-        const size = group ? await groupSize(group).catch(() => null) : null;
+        const size = link && call ? await callSize(link).catch(() => null) : null;
         values["call.max"] = size === null ? null : String(size);
     }
 

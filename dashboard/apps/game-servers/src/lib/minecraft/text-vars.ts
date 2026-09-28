@@ -12,10 +12,10 @@
  *   Only Polaris knows that, so a line using one is written once per player
  *   online, with their own values in it.
  * - **The server's**, the same for everybody: how many are online, the server's
- *   name, who is in the call of the chat group chosen for this server.
+ *   name, who is in the call of the chat this server is linked to.
  *
  * `| "text"` after a name is what to write when there is no value - a player
- * with no Polaris account, a server with no chat group chosen. Without one, an
+ * with no Polaris account, a server linked to no chat. Without one, an
  * empty value is written as nothing.
  *
  * Pure: parsing, checking and filling in can all be asserted without a server,
@@ -211,7 +211,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "call.count",
-        label: "People in the group's call",
+        label: "People in the linked call",
         kind: "server",
         sample: "2",
         bedrock: true,
@@ -219,9 +219,9 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         // Beside `{call.count}` the way `{server.max}` sits beside
-        // `{server.online}`: "In call: 2/5" is how many of the group are in it.
+        // `{server.online}`: "In call: 2/5" is how many of those who could be are in it.
         name: "call.max",
-        label: "People in the group",
+        label: "People who could join the call",
         kind: "server",
         sample: "5",
         bedrock: true,
@@ -229,7 +229,7 @@ export const VARIABLES: readonly VariableSpec[] = [
     },
     {
         name: "call.members",
-        label: "Who is in the group's call",
+        label: "Who is in the linked call",
         kind: "server",
         sample: "Ada, Grace",
         bedrock: true,

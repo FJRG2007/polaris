@@ -28,8 +28,7 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/live-display-actions", 
     readLiveDisplayAction: async () => ({
         state: {
             sidebar: { ...DEFAULT_SIDEBAR, enabled: true },
-            callGroupId: null,
-            groups: [],
+            callLinked: false,
             sidebarRefusal: null
         }
     }),

@@ -63,13 +63,7 @@ import {
     Video,
     X
 } from "lucide-react";
-import {
-    Button,
-    cn,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuTrigger
-} from "@polaris/ui";
+import { Button, cn, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@polaris/ui";
 import { SendButton } from "./send-button";
 import { SavedDraftsBar, useSavedDrafts } from "./saved-drafts";
 
@@ -84,6 +78,7 @@ export function Composer({
     channelId,
     draftKey = null,
     roomMentions = true,
+    commands,
     rules,
     disabled,
     attachable = true,
@@ -129,6 +124,9 @@ export function Composer({
     /** Whether @ offers `@everyone` and `@here`. Off for somebody the group's
      *  owner has kept them from; the send refuses them either way. */
     roomMentions?: boolean;
+    /** Commands this conversation answers - a game server linked to it - for
+     *  the "/" list. */
+    commands?: React.ComponentProps<typeof RichTextEditor>["slashCommands"];
     /** What this kind of conversation allows: how long a message may be, how
      *  many files it may carry and how big one may be. Enforced again on the
      *  server; here so a limit is met while typing rather than after a
@@ -529,10 +527,9 @@ export function Composer({
         const staying = kept;
         // The marks over both lists, in the order the server reads them: the
         // uploads first and then the ones staying where they are.
-        const hidden = [
-            ...covered,
-            ...[...coveredKept].map((at) => sending.length + at)
-        ].sort((one, other) => one - other);
+        const hidden = [...covered, ...[...coveredKept].map((at) => sending.length + at)].sort(
+            (one, other) => one - other
+        );
         setBody("");
         setFiles([]);
         setKept([]);
@@ -768,7 +765,11 @@ export function Composer({
             )}
         >
             {!editing && (
-                <SavedDraftsBar drafts={aside.drafts} onRestore={bringBack} onDelete={aside.remove} />
+                <SavedDraftsBar
+                    drafts={aside.drafts}
+                    onRestore={bringBack}
+                    onDelete={aside.remove}
+                />
             )}
 
             {replyingTo && !editing && (
@@ -972,6 +973,7 @@ export function Composer({
                         // it used to offer and is a different question entirely.
                         mentionsIn={channelId}
                         roomMentions={roomMentions}
+                        slashCommands={commands}
                         mentionSource={mentionSource}
                         focusWhere={focusWhere}
                         // A screenshot on the clipboard is a screenshot somebody
@@ -1302,11 +1304,7 @@ function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => vo
                         every press is no place for one - a plain button inside a
                         menu surface is not an option, so nothing closes when one
                         is pressed. */}
-                    <DropdownMenuContent
-                        align="start"
-                        side="top"
-                        className="w-72"
-                    >
+                    <DropdownMenuContent align="start" side="top" className="w-72">
                         <MicSettings className="p-1" />
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -1396,9 +1394,7 @@ function StagedFile({
             onClick={onCover}
             className={cn(
                 "rounded p-0.5 transition-colors",
-                covered
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
+                covered ? "text-primary" : "text-muted-foreground hover:text-foreground"
             )}
         >
             {covered ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
@@ -1452,10 +1448,7 @@ function StagedFile({
                         src={preview}
                         alt={file.name}
                         title={`${file.name} - ${readableSize(file.size)}`}
-                        className={cn(
-                            "size-full object-cover",
-                            covered && "scale-110 blur-md"
-                        )}
+                        className={cn("size-full object-cover", covered && "scale-110 blur-md")}
                     />
                 </button>
             )}
@@ -1517,7 +1510,9 @@ function StagedFromDrive({
             <button
                 type="button"
                 aria-pressed={covered}
-                aria-label={covered ? `Send ${kept.name} uncovered` : `Send ${kept.name} as a spoiler`}
+                aria-label={
+                    covered ? `Send ${kept.name} uncovered` : `Send ${kept.name} as a spoiler`
+                }
                 title={covered ? "Sent as a spoiler" : "Send as a spoiler"}
                 onClick={onCover}
                 className={cn(

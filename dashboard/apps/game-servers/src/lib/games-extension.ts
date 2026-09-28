@@ -7,13 +7,13 @@
  * screen, a core job or a core pass is reached through here.
  */
 
-import { GAME_SERVERS_APP_ID, gameOfServer, isGameManagerApp } from "@polaris/core";
+import { host } from "@polaris/app-host";
 import { gameJobTable } from "./games-jobs";
 import { SOFTWARE_KEY } from "./minecraft/join-guard";
+import type { AppHostTypes } from "@polaris/app-host";
 import { minecraftImageFor } from "./minecraft/runtime";
 import { isPluginLoader, loaderForType } from "./minecraft/modrinth";
-import { host } from "@polaris/app-host";
-import type { AppHostTypes } from "@polaris/app-host";
+import { GAME_SERVERS_APP_ID, gameOfServer, isGameManagerApp } from "@polaris/core";
 
 const { isGameServerApp } = host.appsCatalog;
 type AppExtension = AppHostTypes["AppExtension"];
@@ -104,6 +104,17 @@ export const gameServersExtension: AppExtension = {
     playingNow: async (userIds) =>
         (await import("./minecraft/playing-now")).playingMinecraftNow(userIds),
 
+    // The chat a Minecraft server is linked to: the badge on it, the commands
+    // answered in it, and its messages shown to everybody playing.
+    chatGameLinks: async (channelIds) =>
+        (await import("./minecraft/chat-link-service")).chatGameLinks(channelIds),
+
+    answerChatCommand: async (input) =>
+        (await import("./minecraft/chat-link-service")).answerChatCommand(input),
+
+    relayChannelMessage: async (message) =>
+        (await import("./minecraft/chat-link-service")).relayChannelMessage(message),
+
     // Somebody invited because they play here has just made their account.
 
     claimLink: async ({ userId, installedAppId, grantedById, link }) => {
@@ -141,9 +152,7 @@ export const gameServersExtension: AppExtension = {
         // are pointed at their own page.
         const access =
             game.game === "minecraft"
-                ? await (
-                      await import("./minecraft/player-access")
-                  )
+                ? await (await import("./minecraft/player-access"))
                       .listPlayerAccess(ownerId, game.installedAppId)
                       .catch(() => null)
                 : null;

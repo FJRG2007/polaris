@@ -21,7 +21,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
-import { chatRelayer } from "@/lib/app-extensions/registry";
+import { channelRelayer, chatRelayer } from "@/lib/app-extensions/registry";
 import { conversationName, filesLabel } from "./toasts";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { SMALL_GROUP_SIZE } from "./in-game-choice";
@@ -49,8 +49,8 @@ const MOST_CANDIDATES = 200;
  * and swallowed.
  */
 export async function relayToGames(messageId: string): Promise<void> {
-    const relay = await chatRelayer();
-    if (!relay) return;
+    const [relay, shown] = await Promise.all([chatRelayer(), channelRelayer()]);
+    if (!relay && !shown) return;
 
     const message = await prisma.chatMessage.findUnique({
         where: { id: messageId },
@@ -69,12 +69,35 @@ export async function relayToGames(messageId: string): Promise<void> {
             poll: {
                 select: { options: { orderBy: { position: "asc" }, select: { text: true } } }
             },
-            channel: { select: { spaceId: true, name: true } }
+            channel: { select: { spaceId: true, name: true, kind: true } }
         }
     });
     if (!message || message.deletedAt || !message.authorId) return;
     const authorId = message.authorId;
     const { channelId, channel } = message;
+    const text = plainExcerpt(message.body, RELAY_EXCERPT);
+    const files = filesLabel(message.attachments);
+    const poll =
+        message.kind === "poll" && message.poll
+            ? message.poll.options.slice(0, POLL_OPTIONS).map((option) => option.text)
+            : null;
+
+    // A channel a game shows to everybody playing, whoever is reading: the
+    // operator who linked it decided that, not each reader. Named by the
+    // conversation's own name - a group without one is not called after its
+    // members in front of people who are not in it.
+    if (shown && channel.kind !== "dm") {
+        await shown({
+            channelId,
+            authorId,
+            conversation: channel.name || "Group",
+            text,
+            files,
+            poll,
+            forwarded: message.forwarded
+        });
+    }
+    if (!relay) return;
 
     const readers = await readersOf(channelId, channel.spaceId, authorId);
     if (readers.length === 0) return;
@@ -90,12 +113,6 @@ export async function relayToGames(messageId: string): Promise<void> {
                   select: { userId: true, user: { select: { name: true } } }
               })
     ]);
-    const text = plainExcerpt(message.body, RELAY_EXCERPT);
-    const files = filesLabel(message.attachments);
-    const poll =
-        message.kind === "poll" && message.poll
-            ? message.poll.options.slice(0, POLL_OPTIONS).map((option) => option.text)
-            : null;
 
     let relayed = 0;
     for (const reader of readers) {
@@ -110,7 +127,8 @@ export async function relayToGames(messageId: string): Promise<void> {
             text,
             files,
             poll,
-            forwarded: message.forwarded
+            forwarded: message.forwarded,
+            channelId
         });
     }
 }
