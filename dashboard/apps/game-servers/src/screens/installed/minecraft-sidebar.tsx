@@ -29,7 +29,7 @@ import {
     withRotatingBlocksAt,
     type SidebarBlock
 } from "../../lib/minecraft/sidebar-blocks";
-import { RANKINGS, STATS_RANKINGS } from "../../lib/minecraft/rankings";
+import { EVENTS_RANKING, RANKINGS, STATS_RANKINGS } from "../../lib/minecraft/rankings";
 import {
     Button,
     Card,
@@ -605,7 +605,8 @@ function RotatingDialog({
 const SAMPLE_LISTS: Readonly<Record<string, readonly string[]>> = {
     "server.levels": ["Steve Lv 12", "Alex Lv 5"],
     "rank.level": ["1. Steve 12", "2. Alex 5"],
-    ...Object.fromEntries(STATS_RANKINGS.map((name) => [name, RANKINGS[name].sample]))
+    ...Object.fromEntries(STATS_RANKINGS.map((name) => [name, RANKINGS[name].sample])),
+    [EVENTS_RANKING]: ["1. Steve 7", "2. Alex 3"]
 };
 
 /** How often the preview is drawn again while something on it moves: often
