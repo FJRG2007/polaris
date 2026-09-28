@@ -348,6 +348,18 @@ export function gameJobTable(): readonly AppJob[] {
             run: async () => (await import("./minecraft/live-display-service")).sweepLiveDisplays()
         },
         {
+            key: "game-events",
+            // Every minute: an event that lost its loop to a restart gets it back,
+            // prizes owed to somebody who is on now are handed over, and a
+            // scheduled or drawn event whose moment has come starts. The event
+            // itself runs every two seconds in this process.
+            everyMs: Number(process.env.POLARIS_GAME_EVENTS_MS) || MINUTE,
+            // Leased: two passes would each hand the same prize to the same
+            // player, and could each start the event that was due.
+            leaseMs: 5 * MINUTE,
+            run: async () => (await import("./minecraft/events/events-service")).sweepEvents()
+        },
+        {
             key: "game-xray",
             // Every minute, and all it does is start the loop that places and
             // watches the Anti X-Ray honeypots on a server that has lost it -

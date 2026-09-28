@@ -25,6 +25,7 @@ import { MinecraftAnnounce } from "./minecraft-announce";
 import { MinecraftChatLink } from "./minecraft-chat-link";
 import { MinecraftSidebar } from "./minecraft-sidebar";
 import { MinecraftXray } from "./minecraft-xray";
+import { MinecraftEvents } from "./minecraft-events";
 import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
 import { SpigotPluginsCard } from "./minecraft-spigot-plugins";
@@ -490,6 +491,14 @@ export function MinecraftPanel({
                 <MinecraftSidebar installedAppId={installedAppId} canManage={canManage} />
             )}
             {tab === "chat" && <MinecraftChatLink installedAppId={installedAppId} />}
+            {tab === "events" && (
+                <CardBoundary name="Events">
+                    <MinecraftEvents
+                        installedAppId={installedAppId}
+                        canManage={held.includes("games.console")}
+                    />
+                </CardBoundary>
+            )}
             {tab === "anticheat" &&
                 ((game?.edition ?? status?.edition ?? "java") === "bedrock" ? (
                     <Card>

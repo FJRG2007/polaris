@@ -55,6 +55,9 @@ export const GAME_TABS: readonly GameTab[] = [
     // reads, where members ask it `/online`, where announcements are repeated.
     // A setting of the server, so the manager's.
     { slug: "chat", label: "Linked chat", permission: "games.manage", games: ["minecraft"] },
+    // Competitions and happenings run on the server: the console's grant, since
+    // an event talks to everybody on it and hands out items.
+    { slug: "events", label: "Events", permission: "games.console", games: ["minecraft"] },
     { slug: "players", label: "Players", permission: "games.read", games: EVERY_GAME },
     { slug: "world", label: "World", permission: "games.manage", games: ["minecraft"] },
     { slug: "rules", label: "Rules", permission: "games.read", games: EVERY_GAME },

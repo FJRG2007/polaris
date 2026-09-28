@@ -62,6 +62,7 @@ import {
     MonitorSmartphone,
     Network,
     NotebookPen,
+    PartyPopper,
     Radio,
     Rocket,
     ScanFace,
@@ -2022,6 +2023,24 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
             "status",
             "relay",
             "discord"
+        ]
+    },
+    events: {
+        label: "Events",
+        icon: PartyPopper,
+        group: TALKING_GROUP,
+        keywords: [
+            "event",
+            "competition",
+            "minigame",
+            "tournament",
+            "mining rush",
+            "boss",
+            "trivia",
+            "blood moon",
+            "supply drop",
+            "prizes",
+            "rewards"
         ]
     },
     schedule: {

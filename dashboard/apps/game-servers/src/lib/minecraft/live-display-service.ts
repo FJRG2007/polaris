@@ -94,6 +94,31 @@ interface Loop {
 
 const loops = new Map<string, Loop>();
 
+/** Servers whose side panel an event is showing its scoreboard in. */
+const sidebarHeld = new Set<string>();
+
+/**
+ * An event takes the side of the screen. There is one sidebar slot and both
+ * want it, and a panel redrawn over an event's scoreboard every ten seconds
+ * would be the two of them flickering between each other.
+ */
+export function holdSidebar(installedAppId: string): void {
+    sidebarHeld.add(installedAppId);
+    const loop = loops.get(installedAppId);
+    if (loop) loop.lastPanel = 0;
+}
+
+/** Given back: the panel, if there is one, is drawn again from the start. */
+export function releaseSidebar(ownerId: string, installedAppId: string): void {
+    if (!sidebarHeld.delete(installedAppId)) return;
+    const loop = loops.get(installedAppId);
+    if (loop) {
+        loop.panel = null;
+        loop.lastPanel = 0;
+    }
+    startLiveDisplay(ownerId, installedAppId);
+}
+
 /** Whether a text shows anything of a call. */
 function readsCall(text: string): boolean {
     return variablesIn(text).some((use) => use.spec?.name.startsWith("call."));
@@ -223,7 +248,12 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     const stored = readPinned(settings.config);
     const pinned = pinnedAt(stored, now);
     const sidebar: SidebarConfig = readSidebar(settings.config);
-    const panelOn = sidebar.enabled && sidebarRefusal(settings.edition, settings.release) === null;
+    // An event is using the side of the screen: the panel steps aside for it,
+    // and is drawn again from nothing once the event gives it back.
+    const panelOn =
+        sidebar.enabled &&
+        !sidebarHeld.has(installedAppId) &&
+        sidebarRefusal(settings.edition, settings.release) === null;
 
     // Down at its moment, and taken off the screen rather than left to fade;
     // a held one it went over is back straight away.
