@@ -11,6 +11,9 @@ Asks every player for a password kept by the Polaris that manages this server.
 Server-side only: players join with an unmodified client.
 '''
 
+[[mixins]]
+config="polaris.mixins.json"
+
 [[dependencies.${mod_id}]]
     modId="neoforge"
     type="required"

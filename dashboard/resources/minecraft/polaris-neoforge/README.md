@@ -20,6 +20,18 @@ that, Polaris is asked whether the name is on the server's player list (and from
 that network, when the list binds names to networks); a name that is not is
 turned away before it can register.
 
+## Anti-xray
+
+The mod also sends every ore no player could see as the rock around it, so an
+X-Ray client shows nothing buried: an ore (anything tagged `c:ores`, modded ones
+included) whose six faces all touch blocks that render solid. Every block update
+goes through the same test, so asking the server about a guessed position gets
+rock back, and ore is sent for real the moment a block beside it stops covering
+it. Polaris's X-Ray honeypots are left visible, and digging at buried ore is
+reported to Polaris as `XRayProbe`. It runs unless `POLARIS_ANTIXRAY` is `off`,
+whether or not the login is on; honeypots and reports need the login's address,
+id and token.
+
 ## Configuration
 
 Polaris writes these when the server's join-password card switches the mod on.
@@ -31,6 +43,7 @@ The mod does nothing unless `POLARIS_LOGIN` is `on`.
 | `POLARIS_URL`          | The Polaris the server asks       |
 | `POLARIS_SERVER_ID`    | This server's id in Polaris       |
 | `POLARIS_SERVER_TOKEN` | What the server proves it is with |
+| `POLARIS_ANTIXRAY`     | `off` to stop hiding buried ore   |
 
 With `online-mode=true` the mod asks for nothing: Mojang already checks who
 players are.

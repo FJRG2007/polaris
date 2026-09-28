@@ -8,7 +8,7 @@
 
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
-import { TOKEN_KEY } from "./polaris-login";
+import { TOKEN_KEY, loginOn } from "./polaris-login";
 import { SOFTWARE_KEY } from "./join-guard";
 import { anticheatBundled } from "./polaris-mod-files";
 import { EVIDENCE_WINDOW_MS, readXray } from "./xray";
@@ -159,7 +159,9 @@ export async function adoptAnticheatDefaults(): Promise<{ adopted: number }> {
 
 /**
  * The server a report is from, when it carries that server's token and still has
- * the engine switched on. An unknown server and a wrong token are the same answer.
+ * the engine switched on - or Polaris login, whose NeoForge mod carries the
+ * anti-xray on servers the engine does not run on. An unknown server and a wrong
+ * token are the same answer.
  */
 export async function authorizeReporter(
     request: Request,
@@ -174,9 +176,8 @@ export async function authorizeReporter(
     });
     if (!install?.applicationId) return null;
     const vars = await listEnvVars("application", install.applicationId, install.ownerId);
-    if (!anticheat.anticheatOn(new Map(vars.map((entry) => [entry.key, entry.value ?? ""])))) {
-        return null;
-    }
+    const env = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
+    if (!anticheat.anticheatOn(env) && !loginOn(env)) return null;
     const token = await readInstallEnvSecret(install.applicationId, install.ownerId, TOKEN_KEY);
     const digest = (value: string) => createHash("sha256").update(value).digest();
     if (!token || !timingSafeEqual(digest(presented), digest(token))) return null;

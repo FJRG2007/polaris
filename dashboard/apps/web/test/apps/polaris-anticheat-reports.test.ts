@@ -225,6 +225,17 @@ describe("handing the plugin the honeypots", () => {
         expect((await traps()).status).toBe(401);
     });
 
+    it("answers the NeoForge mod on a server with Polaris login instead of the engine", async () => {
+        fake.env = new Map([
+            ["MODS", "https://polaris.example/api/minecraft/mod/polaris-neoforge-1.21.4.jar"],
+            ["POLARIS_LOGIN", "on"]
+        ]);
+        expect((await traps()).status).toBe(200);
+        expect((await report({ flags: [flag({ check: "XRayProbe" })] })).status).toBe(200);
+        fake.env.set("POLARIS_LOGIN", "off");
+        expect((await traps()).status).toBe(401);
+    });
+
     it("is an empty list for a server with no traps", async () => {
         expect(await (await traps()).json()).toEqual({ traps: [] });
     });
