@@ -42,13 +42,25 @@ const fake = vi.hoisted(() => ({
 vi.mock("@polaris/db", () => ({
     prisma: {
         userActivity: {
-            findUnique: async ({ where }: { where: { userId_source: { userId: string; source: string } } }) =>
+            findUnique: async ({
+                where
+            }: {
+                where: { userId_source: { userId: string; source: string } };
+            }) =>
                 fake.rows.find(
                     (row) =>
-                        row.userId === where.userId_source.userId && row.source === where.userId_source.source
+                        row.userId === where.userId_source.userId &&
+                        row.source === where.userId_source.source
                 ) ?? null,
-            findMany: async ({ where }: { where: { userId: { in: string[] }; expiresAt: { gt: Date } } }) =>
-                fake.rows.filter((row) => where.userId.in.includes(row.userId) && row.expiresAt > where.expiresAt.gt),
+            findMany: async ({
+                where
+            }: {
+                where: { userId: { in: string[] }; expiresAt: { gt: Date } };
+            }) =>
+                fake.rows.filter(
+                    (row) =>
+                        where.userId.in.includes(row.userId) && row.expiresAt > where.expiresAt.gt
+                ),
             upsert: async ({
                 where,
                 create,
@@ -60,26 +72,33 @@ vi.mock("@polaris/db", () => ({
             }) => {
                 const found = fake.rows.find(
                     (row) =>
-                        row.userId === where.userId_source.userId && row.source === where.userId_source.source
+                        row.userId === where.userId_source.userId &&
+                        row.source === where.userId_source.source
                 );
                 if (found) Object.assign(found, update);
                 else fake.rows.push({ ...create });
             },
-            deleteMany: async ({ where }: { where: { userId: string; source: string; expiresAt?: Date } }) => {
+            deleteMany: async ({
+                where
+            }: {
+                where: { userId: string; source: string; expiresAt?: Date };
+            }) => {
                 const before = fake.rows.length;
                 fake.rows = fake.rows.filter(
                     (row) =>
                         !(
                             row.userId === where.userId &&
                             row.source === where.source &&
-                            (!where.expiresAt || row.expiresAt.getTime() === where.expiresAt.getTime())
+                            (!where.expiresAt ||
+                                row.expiresAt.getTime() === where.expiresAt.getTime())
                         )
                 );
                 return { count: before - fake.rows.length };
             }
         },
         userActivitySettings: {
-            findUnique: async ({ where }: { where: { userId: string } }) => fake.settings.get(where.userId) ?? null,
+            findUnique: async ({ where }: { where: { userId: string } }) =>
+                fake.settings.get(where.userId) ?? null,
             findMany: async ({ where }: { where: { userId: { in: string[] } } }) =>
                 where.userId.in
                     .filter((id) => fake.settings.has(id))
@@ -94,7 +113,10 @@ vi.mock("@polaris/db", () => ({
                 update: Record<string, unknown>;
             }) => {
                 const held = fake.settings.get(where.userId);
-                fake.settings.set(where.userId, held ? { ...held, ...update } : { ...defaults(), ...create });
+                fake.settings.set(
+                    where.userId,
+                    held ? { ...held, ...update } : { ...defaults(), ...create }
+                );
             }
         }
     }
@@ -146,7 +168,9 @@ beforeEach(() => {
 
 describe("a report from the desktop app", () => {
     it("is shown, and announced once rather than on every heartbeat", async () => {
-        expect(await reportGame("ada", game("celeste.exe", "Celeste"), NOW)).toEqual({ shown: true });
+        expect(await reportGame("ada", game("celeste.exe", "Celeste"), NOW)).toEqual({
+            shown: true
+        });
         expect(fake.announced).toEqual(["ada"]);
 
         await reportGame("ada", game("celeste.exe", "Celeste"), new Date(NOW.getTime() + 60_000));
@@ -154,7 +178,12 @@ describe("a report from the desktop app", () => {
 
         const found = await activitiesFor(VIEWER, ["ada"], NOW);
         expect(found.get("ada")).toEqual([
-            expect.objectContaining({ source: "game", key: "celeste.exe", name: "Celeste", endsAt: null })
+            expect.objectContaining({
+                source: "game",
+                key: "celeste.exe",
+                name: "Celeste",
+                endsAt: null
+            })
         ]);
     });
 
@@ -226,7 +255,12 @@ describe("what a reader is told", () => {
 
     it("draws a server here as one card with the game on the computer", async () => {
         await reportGame("ada", game("javaw.exe", "Minecraft"), NOW);
-        fake.playing.set("ada", { userId: "ada", game: "Minecraft", server: "Survival", since: NOW });
+        fake.playing.set("ada", {
+            userId: "ada",
+            game: "Minecraft",
+            server: "Survival",
+            since: NOW
+        });
         const found = await activitiesFor(VIEWER, ["ada"], NOW);
         expect(found.get("ada")).toEqual([
             expect.objectContaining({ source: "minecraft", name: "Minecraft", details: "Survival" })
@@ -235,7 +269,12 @@ describe("what a reader is told", () => {
 
     it("leaves the server out for somebody who switched Minecraft off", async () => {
         fake.settings.set("ada", { ...defaults(), minecraft: false });
-        fake.playing.set("ada", { userId: "ada", game: "Minecraft", server: "Survival", since: NOW });
+        fake.playing.set("ada", {
+            userId: "ada",
+            game: "Minecraft",
+            server: "Survival",
+            since: NOW
+        });
         expect((await activitiesFor(VIEWER, ["ada"], NOW)).size).toBe(0);
     });
 });

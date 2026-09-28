@@ -88,7 +88,8 @@ export function ActivitySharingCard({
     // already hidden even if they have since dropped off the seen list.
     const games = new Map<string, string>();
     for (const game of seenGames) games.set(game.key, game.name);
-    for (const game of draft.customGames) if (!games.has(game.executable)) games.set(game.executable, game.name);
+    for (const game of draft.customGames)
+        if (!games.has(game.executable)) games.set(game.executable, game.name);
     for (const key of draft.hiddenGames) if (!games.has(key)) games.set(key, key);
 
     const off = !draft.share;
@@ -130,7 +131,9 @@ export function ActivitySharingCard({
                             <Switch
                                 checked={!off && draft[source.id]}
                                 disabled={off}
-                                onChange={(on) => commit((state) => ({ ...state, [source.id]: on }))}
+                                onChange={(on) =>
+                                    commit((state) => ({ ...state, [source.id]: on }))
+                                }
                                 aria-label={source.label}
                             />
                         </li>
@@ -153,7 +156,10 @@ export function ActivitySharingCard({
                                 return (
                                     <li key={key} className="flex items-center gap-3 px-3 py-2">
                                         <span className="min-w-0 flex-1">
-                                            <span className="block truncate text-[0.8125rem]" title={name}>
+                                            <span
+                                                className="block truncate text-[0.8125rem]"
+                                                title={name}
+                                            >
                                                 {name}
                                             </span>
                                             <span
@@ -170,7 +176,9 @@ export function ActivitySharingCard({
                                                 commit((state) => ({
                                                     ...state,
                                                     hiddenGames: shown
-                                                        ? state.hiddenGames.filter((entry) => entry !== key)
+                                                        ? state.hiddenGames.filter(
+                                                              (entry) => entry !== key
+                                                          )
                                                         : state.hiddenGames.includes(key)
                                                           ? state.hiddenGames
                                                           : [...state.hiddenGames, key]
@@ -188,12 +196,16 @@ export function ActivitySharingCard({
                 <OwnGames
                     games={draft.customGames}
                     disabled={off || !draft.games}
-                    runningPrograms={bridge?.runningPrograms ? () => bridge.runningPrograms!() : null}
+                    runningPrograms={
+                        bridge?.runningPrograms ? () => bridge.runningPrograms!() : null
+                    }
                     onAdd={(game) =>
                         commit((state) => ({
                             ...state,
                             customGames: [
-                                ...state.customGames.filter((entry) => entry.executable !== game.executable),
+                                ...state.customGames.filter(
+                                    (entry) => entry.executable !== game.executable
+                                ),
                                 game
                             ]
                         }))
@@ -201,7 +213,9 @@ export function ActivitySharingCard({
                     onRemove={(executable) =>
                         commit((state) => ({
                             ...state,
-                            customGames: state.customGames.filter((entry) => entry.executable !== executable)
+                            customGames: state.customGames.filter(
+                                (entry) => entry.executable !== executable
+                            )
                         }))
                     }
                 />
@@ -245,7 +259,8 @@ function OwnGames({
     // Checked as it is typed, against the same rules the server keeps. An empty
     // field is not wrong yet, only unfinished.
     const candidate = core.customGameSchema.safeParse({ executable: program, name });
-    const taken = candidate.success && games.some((game) => game.executable === candidate.data.executable);
+    const taken =
+        candidate.success && games.some((game) => game.executable === candidate.data.executable);
     const problem =
         program.trim() && name.trim()
             ? taken
@@ -271,8 +286,8 @@ function OwnGames({
                 Your own games
             </h3>
             <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
-                A game the desktop app does not know yet: the program that runs it, and what to
-                call it.
+                A game the desktop app does not know yet: the program that runs it, and what to call
+                it.
             </p>
             {games.length > 0 && (
                 <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
@@ -334,7 +349,9 @@ function OwnGames({
                 running ? (
                     <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
                         {running.length === 0 ? (
-                            <span className="text-[0.6875rem] text-muted-foreground">Nothing could be listed.</span>
+                            <span className="text-[0.6875rem] text-muted-foreground">
+                                Nothing could be listed.
+                            </span>
                         ) : (
                             running.map((entry) => (
                                 <button

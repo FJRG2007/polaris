@@ -20,7 +20,8 @@ beforeEach(() => {
         sent.push({ method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
         return {
             ok: true,
-            json: async () => (method === "GET" ? { customGames: [{ executable: "mine.exe", name: "Mine" }] } : {})
+            json: async () =>
+                method === "GET" ? { customGames: [{ executable: "mine.exe", name: "Mine" }] } : {}
         } as Response;
     });
 });
@@ -68,12 +69,22 @@ describe("reporting the game on this computer", () => {
     it("hands the app this account's games and reports what is running", async () => {
         const app = desktop(true);
         render(<DesktopGameReporter />);
-        await waitFor(() => expect(app.setCustomGames).toHaveBeenCalledWith([{ executable: "mine.exe", name: "Mine" }]));
+        await waitFor(() =>
+            expect(app.setCustomGames).toHaveBeenCalledWith([
+                { executable: "mine.exe", name: "Mine" }
+            ])
+        );
         await waitFor(() =>
             expect(sent.filter((entry) => entry.method === "POST")).toEqual([
                 {
                     method: "POST",
-                    body: { game: { key: "celeste.exe", name: "Celeste", startedAt: "2026-09-28T10:00:00.000Z" } }
+                    body: {
+                        game: {
+                            key: "celeste.exe",
+                            name: "Celeste",
+                            startedAt: "2026-09-28T10:00:00.000Z"
+                        }
+                    }
                 }
             ])
         );
