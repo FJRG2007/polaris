@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
-import { PersonName, PersonRow } from "@/components/person-name";
+import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
 import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
 import { listMembersAction, setGroupOptionsAction, transferGroupAction } from "./actions";
 import {
@@ -173,6 +173,10 @@ export function GroupSettingsDialog({
                                 There is nobody else in this group yet.
                             </p>
                         ) : (
+                            // Plain: this is where somebody is chosen to own the
+                            // group, and a plate or a coloured name is not what
+                            // tells two members apart - the name they go by is.
+                            <PlainNames>
                             <ul className="flex flex-col gap-1">
                                 {others.map((member) => (
                                     <PersonRow
@@ -224,6 +228,7 @@ export function GroupSettingsDialog({
                                     </PersonRow>
                                 ))}
                             </ul>
+                            </PlainNames>
                         )}
                     </div>
 

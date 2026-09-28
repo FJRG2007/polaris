@@ -22,7 +22,7 @@ import Suggestion from "@tiptap/suggestion";
 import { Avatar } from "@/components/avatar";
 import { ReactRenderer } from "@tiptap/react";
 import { PluginKey, type EditorState } from "@tiptap/pm/state";
-import { PersonName, PersonRow } from "@/components/person-name";
+import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
 import type { MentionCandidate } from "@/lib/rich-text/mention-service";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
@@ -171,7 +171,11 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
     // sentence matches nobody is answering a question they never asked.
     if (items.length === 0) return null;
 
+    // Plain, like every other picker: an @ list is read at typing speed to find
+    // one name, and plates and coloured names down it are noise between the
+    // reader and the person they are looking for.
     return (
+        <PlainNames>
         <ul className={POPUP_CLASS}>
             {items.map((item, index) => (
                 <li key={`${item.kind}-${item.id}`}>
@@ -223,6 +227,7 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
                 </li>
             ))}
         </ul>
+        </PlainNames>
     );
 });
 
