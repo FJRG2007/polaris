@@ -101,6 +101,7 @@ export async function GET(request: Request): Promise<Response> {
             }
 
             await scope.refresh();
+            if (closed) return;
 
             unsubscribe = subscribeChatChanges((change) => {
                 if (closed) return;

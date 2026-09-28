@@ -121,28 +121,42 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
     // nothing on the page shows until a dialog opens.
     useEffect(() => {
         let cancelled = false;
-        void actions.listCamerasAction().then((list) => {
-            if (cancelled) return;
-            if (list.error) setError(list.error);
-            setCameras(list.cameras ?? []);
-            // A link from the wall names the camera to open, so pressing a name
-            // there lands on its settings rather than on a list to find it in.
-            if (openId) {
-                const wanted = list.cameras?.find((camera) => camera.id === openId);
-                if (wanted) setEditing(wanted);
+        void actions.listCamerasAction().then(
+            (list) => {
+                if (cancelled) return;
+                if (list.error) setError(list.error);
+                setCameras(list.cameras ?? []);
+                // A link from the wall names the camera to open, so pressing a name
+                // there lands on its settings rather than on a list to find it in.
+                if (openId) {
+                    const wanted = list.cameras?.find((camera) => camera.id === openId);
+                    if (wanted) setEditing(wanted);
+                }
+            },
+            () => {
+                if (!cancelled)
+                    setError("Your cameras could not be read. Reload the page to try again.");
             }
-        });
+        );
         void Promise.all([
             actions.listServersAction(),
             actions.listStorageOptionsAction(),
             actions.detectionDefaultsAction()
-        ]).then(([machines, disks, tuning]) => {
-            if (cancelled) return;
-            setServers(machines.servers ?? []);
-            setStorage(disks.options ?? []);
-            setDefaults(tuning.defaults ?? null);
-            setExtras(true);
-        });
+        ]).then(
+            ([machines, disks, tuning]) => {
+                if (cancelled) return;
+                setServers(machines.servers ?? []);
+                setStorage(disks.options ?? []);
+                setDefaults(tuning.defaults ?? null);
+                setExtras(true);
+            },
+            () => {
+                if (cancelled) return;
+                setError(
+                    "The machines and disks a camera is set up with could not be read, so cameras cannot be added or changed. Reload the page to try again."
+                );
+            }
+        );
         return () => {
             cancelled = true;
         };

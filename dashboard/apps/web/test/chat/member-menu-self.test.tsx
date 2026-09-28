@@ -92,3 +92,27 @@ describe("the menu on your own row", () => {
         expect(screen.queryByText("Edit your profile")).toBeNull();
     });
 });
+
+describe("the menu opened without a right-click", () => {
+    it("still offers the card when pressed, as a touch or a button opens it", () => {
+        const cards: string[] = [];
+        render(
+            <PersonPressContext.Provider value={(person) => cards.push(person.id)}>
+                <MemberMenu
+                    member={{ userId: "me", name: "Ana" }}
+                    channel={channel}
+                    viewerId="someone-else"
+                    openWith="press"
+                    onNickname={() => undefined}
+                    onChanged={() => undefined}
+                    onError={() => undefined}
+                >
+                    <button type="button">Ana row</button>
+                </MemberMenu>
+            </PersonPressContext.Provider>
+        );
+        fireEvent.pointerDown(screen.getByText("Ana row"), { button: 0, ctrlKey: false, pointerType: "mouse" });
+        fireEvent.click(screen.getByText("Profile"));
+        expect(cards).toEqual(["me"]);
+    });
+});

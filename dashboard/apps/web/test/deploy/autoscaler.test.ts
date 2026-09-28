@@ -210,8 +210,33 @@ describe("a deploy on its way", () => {
             checked = (await runAutoscale(at)).checked;
         }
         expect(checked).toBe(1);
-        expect(inFlight).toHaveBeenCalledTimes(3);
+        // One read for the pass, and one more only for a service about to move.
+        const passReads = inFlight.mock.calls.filter(
+            (call) => (call as unknown as [{ where: { deployableId: { in: string[] } } }])[0].where.deployableId.in.length === 2
+        );
+        expect(passReads).toHaveLength(3);
+        expect(inFlight).toHaveBeenCalledTimes(4);
         expect(scaleService).toHaveBeenCalledWith("app-others", "owner-1", 3);
         expect(scaleService).not.toHaveBeenCalledWith("app-deploying", expect.anything(), expect.anything());
+    });
+
+    it("does not queue a second deploy behind one queued while the pass was reading", async () => {
+        findMany.mockResolvedValue([
+            service("app-steady", { min: 1, max: 4, cpuPercent: 50, requestsPerCopy: 100 }),
+            service("app-queued", { min: 1, max: 4, cpuPercent: 50, requestsPerCopy: 100 })
+        ]);
+        // Nothing on its way when the pass starts; a deploy of the second one
+        // has been queued by the time it is about to be scaled.
+        inFlight.mockImplementation(async (...args: unknown[]) => {
+            const ids = (args[0] as { where: { deployableId: { in: string[] } } }).where.deployableId.in;
+            return ids.length === 1 && ids[0] === "app-queued" ? [{ deployableId: "app-queued" }] : [];
+        });
+        for (let tick = 0; tick < 3; tick++) {
+            const at = NOW + tick * 60_000;
+            log.text = traffic(at, 250);
+            await runAutoscale(at);
+        }
+        expect(scaleService).toHaveBeenCalledWith("app-steady", "owner-1", 3);
+        expect(scaleService).not.toHaveBeenCalledWith("app-queued", expect.anything(), expect.anything());
     });
 });

@@ -85,4 +85,13 @@ describe("their own doing", () => {
         tab.close();
         expect(tab.frames()).toEqual([]);
     });
+
+    it("tells their other tabs about a change addressed to them alone", async () => {
+        // Blocking somebody, done in another tab.
+        const tab = await listen();
+        publishChatChange({ kind: "channels", actorId: READER.id, audience: [READER.id] });
+        await wait(100);
+        tab.close();
+        expect(tab.frames()).toEqual([{ kind: "channels" }]);
+    });
 });

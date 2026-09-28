@@ -396,20 +396,30 @@ export function ChannelView({
     // not drag the reader back to it over and over.
     const landed = useRef<string | null>(null);
 
-    // The conversation as the first page described it, held only until the
-    // rail's list lands. Opening one from a link asks for its messages before
-    // the list has arrived, and the page brings the conversation with it so
-    // the header can be drawn at once rather than a moment later.
+    // The conversation as the first page described it, held until the rail's
+    // list has it. Opening one from a link asks for its messages before the
+    // list has arrived, and the page brings the conversation with it so the
+    // header can be drawn at once rather than a moment later.
     const [described, setDescribed] = useState<ChatChannelView | null>(null);
+    const listed = channels.some((entry) => entry.id === channelId);
     const channel = useMemo(
         () =>
             channels.find((entry) => entry.id === channelId) ??
-            // The list is the authority once it is here: a conversation it
-            // does not have is one this reader has left or been removed from,
-            // and a first page read a moment earlier does not overrule that.
-            (!loaded && described?.id === channelId ? described : null),
-        [channels, channelId, loaded, described]
+            (described?.id === channelId ? described : null),
+        [channels, channelId, described]
     );
+    // Whichever of the two was read last decides. A list that arrives without
+    // the conversation is one this reader has left or been removed from, and a
+    // first page read a moment earlier does not overrule that; a page read after
+    // the list is a conversation the list has not caught up with yet - a new
+    // direct message, a group they were just added to - so the list is asked
+    // again rather than the reader being told it is not theirs.
+    useEffect(() => {
+        if (loaded && !listed) setDescribed(null);
+    }, [channels, loaded, listed]);
+    useEffect(() => {
+        if (loaded && !listed && described?.id === channelId) refresh();
+    }, [described, loaded, listed, channelId, refresh]);
     // What the bar calls this call while somebody is elsewhere in Polaris.
     const callTitle = channel
         ? channel.kind === "text"

@@ -81,19 +81,31 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
             actions.listAlertsAction(),
             actions.listCamerasAction(),
             canManage ? actions.listRecipientsAction() : Promise.resolve({ people: [] })
-        ]).then(([list, cams, recipients]) => {
-            if (cancelled) return;
-            if (list.error) setError(list.error);
-            setCameras(cams.cameras ?? []);
-            setPeople(recipients.people ?? []);
-            setRules(list.rules ?? []);
-        });
+        ]).then(
+            ([list, cams, recipients]) => {
+                if (cancelled) return;
+                if (list.error) setError(list.error);
+                setCameras(cams.cameras ?? []);
+                setPeople(recipients.people ?? []);
+                setRules(list.rules ?? []);
+            },
+            () => {
+                if (!cancelled)
+                    setError("Your alerts could not be read. Reload the page to try again.");
+            }
+        );
         void Promise.all([actions.listPeopleAction(), actions.listPlaceZoneNamesAction()]).then(
             ([faces, drawn]) => {
                 if (cancelled) return;
                 setKnown((faces.people ?? []).map((person) => ({ id: person.id, name: person.name })));
                 setAreas(drawn.zones ?? []);
                 setExtras(true);
+            },
+            () => {
+                if (cancelled) return;
+                setError(
+                    "The faces and areas an alert can name could not be read, so alerts cannot be added or changed. Reload the page to try again."
+                );
             }
         );
         return () => {

@@ -41,7 +41,9 @@ import { runAction } from "@/lib/run-action";
 import {
     useState,
     type ComponentType,
+    type KeyboardEvent as ReactKeyboardEvent,
     type MouseEvent as ReactMouseEvent,
+    type PointerEvent as ReactPointerEvent,
     type ReactNode
 } from "react";
 import { PersonName } from "@/components/person-name";
@@ -145,6 +147,8 @@ interface MenuParts {
     readonly Trigger: ComponentType<{
         asChild?: boolean;
         onContextMenu?: (event: ReactMouseEvent) => void;
+        onPointerDown?: (event: ReactPointerEvent) => void;
+        onKeyDown?: (event: ReactKeyboardEvent) => void;
         children: ReactNode;
     }>;
     readonly Content: ComponentType<{
@@ -311,6 +315,10 @@ export function MemberMenu({
                     event.stopPropagation();
                     setAnchor(event.currentTarget as HTMLElement);
                 }}
+                // A long press on a touch screen and a key that opens the menu
+                // never raise a right-click, and the row is noted all the same.
+                onPointerDown={(event) => setAnchor(event.currentTarget as HTMLElement)}
+                onKeyDown={(event) => setAnchor(event.currentTarget as HTMLElement)}
             >
                 {children}
             </menu.Trigger>

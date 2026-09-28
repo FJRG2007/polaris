@@ -282,13 +282,19 @@ async function evaluateOne(alarm: AlarmRow, context: PassContext): Promise<"unch
 export async function evaluateAlarms(): Promise<void> {
     const alarms = await prisma.alarm.findMany({ where: { enabled: true } });
     if (alarms.length === 0) return;
-    const context = await passContext(alarms);
+    // One failed batch read falls back to each alarm reading what it names, so
+    // it fails that alarm alone rather than the whole pass.
+    const shared = await passContext(alarms).catch((error: unknown) => {
+        console.error("polaris: alarm evaluation failed:", error);
+        return null;
+    });
     // Most alarms, most passes, are exactly where they were. They still show
     // when they were last checked, so their stamp moves too - in one statement
     // at the end rather than one write each.
     const unchanged: string[] = [];
     for (const alarm of alarms) {
         try {
+            const context = shared ?? (await passContext([alarm]));
             if ((await evaluateOne(alarm, context)) === "unchanged") unchanged.push(alarm.id);
         } catch (error) {
             console.error("polaris: alarm evaluation failed:", error);

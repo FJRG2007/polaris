@@ -144,12 +144,14 @@ export interface PlayerMining {
  * Every stats file the world has, by the name of the player it belongs to. In as
  * many commands as their length needs: together they are longer than one command
  * can answer, and reading them as one left all but the first few out. Empty for
- * Bedrock and for
- * a server that cannot be reached.
+ * Bedrock; null for a server that cannot be reached.
  */
 type StatsFile = { readonly name: string; readonly json: string; readonly seen: number };
 
-async function readAllStatsFiles(ownerId: string, installedAppId: string): Promise<StatsFile[]> {
+async function readAllStatsFiles(
+    ownerId: string,
+    installedAppId: string
+): Promise<StatsFile[] | null> {
     try {
         return await withServerContainer(ownerId, installedAppId, async (server) => {
             const dir = await statsDir(server, ownerId);
@@ -170,7 +172,7 @@ async function readAllStatsFiles(ownerId: string, installedAppId: string): Promi
             });
         });
     } catch {
-        return [];
+        return null;
     }
 }
 
@@ -179,18 +181,39 @@ async function readAllStatsFiles(ownerId: string, installedAppId: string): Promi
  *  would only read the same files again. */
 const FIGURES_TTL_MS = 60_000;
 
-const filesRead = new Map<string, { at: number; value: Promise<StatsFile[]> }>();
+const filesRead = new Map<string, { at: number; value: Promise<StatsFile[] | null> }>();
+
+/** Drops every reading older than the TTL, so a server nobody opens again (or
+ *  one that was removed) does not keep its players' files in memory. */
+function dropExpired<T>(held: Map<string, { at: number; value: T }>, now: number): void {
+    for (const [id, one] of held) if (now - one.at >= FIGURES_TTL_MS) held.delete(id);
+}
+
+/** Forgets a reading that failed, so the next request reads again instead of
+ *  showing nothing until the TTL runs out. */
+function forgetFailed<T>(
+    held: Map<string, { at: number; value: T }>,
+    installedAppId: string,
+    value: T
+): void {
+    if (held.get(installedAppId)?.value === value) held.delete(installedAppId);
+}
 
 /**
  * Every player's stats file, read from the container at most once a minute per
  * server. The rankings and the anti-cheat's mining rates read the same files, so
  * opening one after the other is one trip into the container, not two.
  */
-function statsFiles(ownerId: string, installedAppId: string): Promise<StatsFile[]> {
+function statsFiles(ownerId: string, installedAppId: string): Promise<StatsFile[] | null> {
+    const now = Date.now();
+    dropExpired(filesRead, now);
     const held = filesRead.get(installedAppId);
-    if (held && Date.now() - held.at < FIGURES_TTL_MS) return held.value;
+    if (held) return held.value;
     const value = readAllStatsFiles(ownerId, installedAppId);
-    filesRead.set(installedAppId, { at: Date.now(), value });
+    filesRead.set(installedAppId, { at: now, value });
+    void value.then((files) => {
+        if (!files) forgetFailed(filesRead, installedAppId, value);
+    });
     return value;
 }
 
@@ -201,7 +224,7 @@ export async function readAllMining(
     installedAppId: string
 ): Promise<PlayerMining[]> {
     const byName = new Map<string, PlayerMining>();
-    for (const file of await statsFiles(ownerId, installedAppId)) {
+    for (const file of (await statsFiles(ownerId, installedAppId)) ?? []) {
         const figures = miningFigures(file.json);
         if (!figures) continue;
         const key = file.name.toLowerCase();
@@ -229,10 +252,16 @@ export async function readAllPlayerStats(
     ownerId: string,
     installedAppId: string
 ): Promise<PlayerFigures[]> {
+    const now = Date.now();
+    dropExpired(figuresRead, now);
     const held = figuresRead.get(installedAppId);
-    if (held && Date.now() - held.at < FIGURES_TTL_MS) return held.value;
+    if (held) return held.value;
     // A player filed under two uuids is one row with the time of both.
-    const value = statsFiles(ownerId, installedAppId).then((files) => {
+    const value: Promise<PlayerFigures[]> = statsFiles(ownerId, installedAppId).then((files) => {
+        if (!files) {
+            forgetFailed(figuresRead, installedAppId, value);
+            return [];
+        }
         const byName = new Map<
             string,
             { name: string; all: PlayerStats[]; tallies: { seen: number; of: PlayerTallies }[] }
@@ -260,6 +289,6 @@ export async function readAllPlayerStats(
             return stats ? [{ name: one.name, stats, ...(tallies ? { tallies } : {}) }] : [];
         });
     });
-    figuresRead.set(installedAppId, { at: Date.now(), value });
+    figuresRead.set(installedAppId, { at: now, value });
     return value;
 }

@@ -220,7 +220,12 @@ export async function resolveInstalls(
     const resolved = await Promise.all(
         deployed.map(async (install) => {
             const app = appOf.get(install.applicationId);
-            return app ? installFrom(install, app, await currentReleaseRef(app)) : null;
+            if (!app) return null;
+            try {
+                return installFrom(install, app, await currentReleaseRef(app));
+            } catch {
+                return null;
+            }
         })
     );
     return new Map(

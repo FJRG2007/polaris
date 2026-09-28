@@ -7,8 +7,10 @@
  * server actions one at a time, so whatever is asked first is what the rest
  * wait behind; a first page that lands before the list is a conversation still
  * arriving, not one the reader is refused; the first page brings the
- * conversation itself, so the header is drawn with it; and once the list is
- * here, a conversation it does not have is refused as before.
+ * conversation itself, so the header is drawn with it; once the list is here,
+ * a conversation it does not have is refused as before; and a first page read
+ * after the list - a new direct message the list has not caught up with - is
+ * shown and the list asked again, until a newer list says otherwise.
  */
 
 import { ChannelView } from "@/app/(app)/chat/channel-view";
@@ -63,6 +65,8 @@ let loaded = false;
 let asked: string[] = [];
 /** Whether the first page brings the conversation with it. */
 let describes = false;
+/** How many times the list was asked for again. */
+let refreshed = 0;
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
@@ -118,7 +122,9 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
         activeSpaceId: null,
         setActiveSpaceId: () => undefined,
         loaded,
-        refresh: () => undefined,
+        refresh: () => {
+            refreshed += 1;
+        },
         rulesFor: () => ({
             maxAttachments: 10,
             maxAttachmentMib: 25,
@@ -165,6 +171,7 @@ beforeEach(() => {
     loaded = false;
     asked = [];
     describes = false;
+    refreshed = 0;
     Element.prototype.scrollIntoView = () => undefined;
 });
 
@@ -202,11 +209,24 @@ describe("a conversation opened before the list has arrived", () => {
         expect(await screen.findByText(REFUSED)).toBeTruthy();
     });
 
-    it("lets the list overrule a first page once it has arrived", async () => {
-        // Removed from it between the two answers: the list is the authority.
+    it("shows a conversation the list has not caught up with, and asks for the list again", async () => {
+        // A new direct message: the page was read after the list was.
         describes = true;
         loaded = true;
         render(<ChannelView channelId="c1" />);
+        expect(await screen.findByRole("heading", { name: "Grace" })).toBeTruthy();
+        expect(refreshed).toBeGreaterThan(0);
+        expect(screen.queryByText(REFUSED)).toBeNull();
+    });
+
+    it("lets a list that arrives after the first page overrule it", async () => {
+        // Removed from it between the two answers: the newer list is the authority.
+        describes = true;
+        loaded = true;
+        const view = render(<ChannelView channelId="c1" />);
+        expect(await screen.findByRole("heading", { name: "Grace" })).toBeTruthy();
+        channels = [];
+        view.rerender(<ChannelView channelId="c1" />);
         expect(await screen.findByText(REFUSED)).toBeTruthy();
     });
 });

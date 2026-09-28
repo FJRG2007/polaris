@@ -145,8 +145,11 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
             states.get(app.id) ?? AUTOSCALE_IDLE,
             now
         );
+        const moves = step.replicas !== running && step.signal !== null;
+        // The pass's reads take a while; a deploy queued since it began counts too.
+        if (moves && (await deployingNow([app.id])).has(app.id)) continue;
         states.set(app.id, step.state);
-        if (step.replicas === running || step.signal === null) continue;
+        if (!moves) continue;
         try {
             await scaleService(app.id, app.environment.project.ownerId, step.replicas);
             scaled += 1;

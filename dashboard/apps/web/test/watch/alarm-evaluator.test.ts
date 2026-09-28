@@ -194,4 +194,16 @@ describe("the pass's writes", () => {
             data: { lastEvaluatedAt: expect.any(Date) }
         });
     });
+
+    it("still judges every alarm when the pass's shared read fails once", async () => {
+        const { prisma } = await import("@polaris/db");
+        vi.mocked(prisma.host.findMany).mockRejectedValueOnce(new Error("connection reset"));
+        const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        samples = [sample("host", LOCAL, 30_000, { diskUsedBytes: 95n, diskTotalBytes: 100n })];
+        alarms = [alarm({ targetType: "host", targetId: HOST, metric: "disk", threshold: 90 })];
+        await expect(evaluateAlarms()).resolves.toBeUndefined();
+        quiet.mockRestore();
+        expect(updates.at(-1)?.state).toBe("alarm");
+        expect(events).toEqual([{ kind: "triggered", detail: "Disk 95.0% (threshold > 90%)" }]);
+    });
 });
