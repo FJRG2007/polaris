@@ -34,22 +34,10 @@ export type IntegrationCategory =
  *  first because it is the one group that is about refusing things rather than
  *  reaching them. */
 export const INTEGRATION_CATEGORIES: ReadonlyArray<{ name: IntegrationCategory; hint: string }> = [
-    {
-        name: "Security",
-        hint: "What checks a file, an address or a visitor before Polaris trusts it."
-    },
-    {
-        name: "OAuth apps",
-        hint: "Applications you register with a provider so people here can link that account or sign in with it."
-    },
-    {
-        name: "Networking",
-        hint: "How a deployment is reached from outside: names, records and tunnels."
-    },
-    {
-        name: "Games",
-        hint: "The stores and accounts a game server needs to install, update and let people in."
-    },
+    { name: "Security", hint: "What checks a file, an address or a visitor before Polaris trusts it." },
+    { name: "OAuth apps", hint: "Applications you register with a provider so people here can link that account or sign in with it." },
+    { name: "Networking", hint: "How a deployment is reached from outside: names, records and tunnels." },
+    { name: "Games", hint: "The stores and accounts a game server needs to install, update and let people in." },
     { name: "Chat", hint: "What conversations and calls here can reach." }
 ];
 
@@ -683,10 +671,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyLabel: "API key",
         apiKeyHelp: "From AI Studio, not a Google Cloud service account.",
         defaultModel: { label: "Gemini (Google)", slug: "google/gemini-3.1-flash-lite" },
-        freeTier: {
-            kind: "free",
-            note: "AI Studio keys carry a free tier, with per-model daily limits."
-        }
+        freeTier: { kind: "free", note: "AI Studio keys carry a free tier, with per-model daily limits." }
     },
     {
         slug: "xai",
@@ -742,10 +727,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         requiresApiKey: true,
         apiKeyLabel: "API key",
         defaultModel: { label: "GPT OSS 120B (Groq)", slug: "groq/openai/gpt-oss-120b" },
-        freeTier: {
-            kind: "free",
-            note: "A free tier with no card, capped per minute rather than metered."
-        }
+        freeTier: { kind: "free", note: "A free tier with no card, capped per minute rather than metered." }
     },
     {
         slug: "cerebras",
@@ -774,10 +756,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyLabel: "API key",
         apiKeyHelp: "Starts with sk-or-. Set a spend limit on it if you want a ceiling.",
         defaultModel: { label: "MiniMax M2.5 (OpenRouter)", slug: "openrouter/minimax-m2.5" },
-        freeTier: {
-            kind: "free",
-            note: "The models suffixed :free cost nothing per token, within a request limit."
-        }
+        freeTier: { kind: "free", note: "The models suffixed :free cost nothing per token, within a request limit." }
     },
     {
         slug: "enigma",

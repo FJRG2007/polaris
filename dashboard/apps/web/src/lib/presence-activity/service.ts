@@ -212,9 +212,7 @@ export async function sourceSharedWith(
     const allowed = [...(await allowedBy(viewer, "activity", ids))];
     const settings = await activitySettingsFor(allowed);
     return new Set(
-        allowed.filter((id) =>
-            core.activitySourceOn(settings.get(id) ?? core.DEFAULT_ACTIVITY_SETTINGS, source)
-        )
+        allowed.filter((id) => core.activitySourceOn(settings.get(id) ?? core.DEFAULT_ACTIVITY_SETTINGS, source))
     );
 }
 

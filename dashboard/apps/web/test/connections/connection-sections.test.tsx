@@ -12,9 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CONNECTION_PROVIDERS, connectionSections } from "@polaris/core";
 
-vi.mock("next/navigation", () => ({
-    useRouter: () => ({ push: () => undefined, refresh: () => undefined })
-}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, refresh: () => undefined }) }));
 vi.mock("../../src/app/(app)/account/connections/actions", () => ({
     connectAwsAction: async () => ({}),
     connectTokenAction: async () => ({}),
@@ -22,9 +20,7 @@ vi.mock("../../src/app/(app)/account/connections/actions", () => ({
     saveMinecraftNameAction: async () => ({})
 }));
 
-const { ConnectionsView } = await import(
-    "../../src/app/(app)/account/connections/connections-view"
-);
+const { ConnectionsView } = await import("../../src/app/(app)/account/connections/connections-view");
 
 type Card = Parameters<typeof ConnectionsView>[0]["providers"][number];
 
@@ -47,9 +43,7 @@ function cards(): Card[] {
 
 describe("which section a service is listed under", () => {
     it("puts the building and shipping services under Developers", () => {
-        const developer = CONNECTION_PROVIDERS.filter(
-            (provider) => provider.category === "developer"
-        )
+        const developer = CONNECTION_PROVIDERS.filter((provider) => provider.category === "developer")
             .map((provider) => provider.slug)
             .sort();
         expect(developer).toEqual(["aws", "github", "railway", "vercel"]);
@@ -84,12 +78,7 @@ describe("which section a service is listed under", () => {
             "spotify",
             "dropbox"
         ]);
-        expect(sections[1]?.providers.map((provider) => provider.slug)).toEqual([
-            "github",
-            "vercel",
-            "railway",
-            "aws"
-        ]);
+        expect(sections[1]?.providers.map((provider) => provider.slug)).toEqual(["github", "vercel", "railway", "aws"]);
     });
 
     it("draws no heading over a section with nothing in it", () => {

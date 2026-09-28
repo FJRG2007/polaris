@@ -29,10 +29,7 @@ import { SpotifyMark } from "@/components/brand-icons";
 import { usePresence, type PresenceOf } from "@/components/presence-store";
 
 /** The icon a source is drawn with where there is no art. */
-const SOURCE_ICONS: Record<
-    core.ActivitySource,
-    ComponentType<{ className?: string; "aria-hidden"?: boolean }>
-> = {
+const SOURCE_ICONS: Record<core.ActivitySource, ComponentType<{ className?: string; "aria-hidden"?: boolean }>> = {
     spotify: SpotifyMark,
     game: Gamepad2,
     minecraft: Pickaxe
@@ -72,10 +69,7 @@ export function ActivityLine({
     const line = core.activityShortLine(first);
     return (
         <span
-            className={cn(
-                "flex min-w-0 items-center gap-1 text-xs text-muted-foreground",
-                className
-            )}
+            className={cn("flex min-w-0 items-center gap-1 text-xs text-muted-foreground", className)}
             title={line}
         >
             <Icon className="size-3 shrink-0" aria-hidden />
@@ -167,25 +161,18 @@ export function ActivityCard({
                             {activity.name}
                         </a>
                     ) : (
-                        <span
-                            className="truncate font-semibold text-foreground"
-                            title={activity.name}
-                        >
+                        <span className="truncate font-semibold text-foreground" title={activity.name}>
                             {activity.name}
                         </span>
                     )}
                     {activity.details ? (
                         <span className="truncate text-muted-foreground" title={activity.details}>
-                            {activity.source === "spotify"
-                                ? `by ${activity.details}`
-                                : activity.details}
+                            {activity.source === "spotify" ? `by ${activity.details}` : activity.details}
                         </span>
                     ) : null}
                     {activity.state ? (
                         <span className="truncate text-muted-foreground" title={activity.state}>
-                            {activity.source === "spotify"
-                                ? `on ${activity.state}`
-                                : activity.state}
+                            {activity.source === "spotify" ? `on ${activity.state}` : activity.state}
                         </span>
                     ) : null}
                     {activity.endsAt ? null : <Elapsed startedAt={activity.startedAt} />}

@@ -73,8 +73,7 @@ function refresh(force = false): void {
     held.asking = fetch(PATH, { cache: "no-store" })
         .then((response) => (response.ok ? response.json() : null))
         .then((body: { hostId?: unknown } | null) => {
-            if (body && held.at === asked)
-                publish(typeof body.hostId === "string" ? body.hostId : null);
+            if (body && held.at === asked) publish(typeof body.hostId === "string" ? body.hostId : null);
         })
         .catch(() => undefined)
         .finally(() => {
@@ -114,10 +113,7 @@ export function ListenAlongButton({ hostId }: { hostId: string }) {
             if (!response.ok) {
                 publish(before);
                 setError({
-                    text:
-                        typeof body?.error === "string"
-                            ? body.error
-                            : "That did not work. Try again.",
+                    text: typeof body?.error === "string" ? body.error : "That did not work. Try again.",
                     link: body?.kind === "link"
                 });
             }
@@ -137,11 +133,7 @@ export function ListenAlongButton({ hostId }: { hostId: string }) {
                 onClick={() => void press()}
                 disabled={busy}
                 className="w-full"
-                title={
-                    mine
-                        ? "Stop following their music"
-                        : "Play this on your own Spotify, in step with them"
-                }
+                title={mine ? "Stop following their music" : "Play this on your own Spotify, in step with them"}
             >
                 {busy ? (
                     <Loader2 className="size-4 shrink-0 animate-spin" />

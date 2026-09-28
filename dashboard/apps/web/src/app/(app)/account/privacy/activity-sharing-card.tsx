@@ -107,9 +107,8 @@ export function ActivitySharingCard({
                 <div>
                     <h2 className="text-sm font-medium">Activity</h2>
                     <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
-                        What you are playing or listening to, shown beside your name. Only people
-                        who can see that you are here see it, and nobody sees it while you appear
-                        offline.
+                        What you are playing or listening to, shown beside your name. Only people who can see that
+                        you are here see it, and nobody sees it while you appear offline.
                     </p>
                 </div>
 
