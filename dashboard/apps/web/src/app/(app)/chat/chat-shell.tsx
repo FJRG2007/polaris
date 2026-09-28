@@ -78,7 +78,7 @@ export function ChatShell({
 
 function ChatColumns({ children }: { children: ReactNode }) {
     const pathname = usePathname();
-    const { refresh, viewerId } = useChat();
+    const { refresh, refreshChannels, viewerId } = useChat();
     // Written as it moves, not on release: a drag that ends by closing the tab
     // is still a decision somebody made. The window can spare less than the
     // list may be, and a width remembered from a wide screen arrives on a
@@ -91,12 +91,19 @@ function ChatColumns({ children }: { children: ReactNode }) {
     useChatStream(
         useCallback(
             (frame) => {
-                // A message moves the order and the unread marks, and a
-                // membership change moves the list itself. Both are answered by
-                // asking for the list again - it is one small query, and the
-                // alternative is teaching the client to apply every kind of
-                // change to a shape the server already knows how to build.
-                if (frame.kind === "posted" || frame.kind === "channels") refresh();
+                // A membership change moves the list itself, and the spaces
+                // and headings with it: everything is asked for again. Answered
+                // by asking rather than patching - the alternative is teaching
+                // the client to apply every kind of change to a shape the
+                // server already knows how to build.
+                if (frame.kind === "channels") refresh();
+                // A message moves the order and the unread marks and nothing
+                // else, so only the conversations are asked for - and a burst of
+                // them once, a moment later. The spaces, their headings and who
+                // is blocked cannot have moved because somebody talked, and
+                // asking for them on every message was three requests in the
+                // queue the reader's own sends wait behind.
+                if (frame.kind === "posted") refreshChannels();
                 // Caught up by this same person, wherever they did it - a phone,
                 // another tab, or the conversation open beside this rail.
                 // Nothing arrived, but the counts here are no longer true, and
@@ -106,9 +113,9 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 // again on its own. Somebody else catching up changes nothing
                 // here, and is only ever announced to them and the one person
                 // whose ticks it moves.
-                if (frame.kind === "read" && frame.userId === viewerId) refresh();
+                if (frame.kind === "read" && frame.userId === viewerId) refreshChannels();
             },
-            [refresh, viewerId]
+            [refresh, refreshChannels, viewerId]
         )
     );
 

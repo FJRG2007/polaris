@@ -661,9 +661,19 @@ async function onOpenShelf<T extends { spaceId: string | null; orgId: string | n
     );
 }
 
-export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]> {
-    const spaces = await reachableSpaceIds(actor);
-    const [memberships, administered] = await Promise.all([
+export async function listChannels(
+    actor: ChatActor,
+    /** One conversation rather than the whole rail - what opening one asks for,
+     *  so its header can be drawn with its first page instead of waiting for
+     *  the list. Answered by exactly the same rules: absent from the answer is
+     *  absent from the rail. */
+    only?: string
+): Promise<ChatChannelView[]> {
+    // Three independent reads, asked together: the spaces decide which public
+    // channels are listed, and neither the memberships nor the administered
+    // spaces depend on them.
+    const [spaces, memberships, administered] = await Promise.all([
+        reachableSpaceIds(actor),
         prisma.chatChannelMember.findMany({
             where: { userId: actor.id },
             select: {
@@ -682,6 +692,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
 
     const found = await prisma.chatChannel.findMany({
         where: {
+            ...(only ? { id: only } : {}),
             OR: [
                 { id: { in: memberships.map((row) => row.channelId) } },
                 ...(spaces.size ? [{ spaceId: { in: [...spaces] }, private: false }] : [])
@@ -706,7 +717,16 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             membersMayMention: true,
             slowmode: true,
             userLimit: true,
-            members: { select: { userId: true, user: { select: { name: true } } } }
+            // Only where somebody reads them: a direct message or a group is
+            // named after, and drawn with, the people in it. A channel in a
+            // space is neither - its `others` is always empty - and a public
+            // one there can hold everybody on the instance, which was every
+            // one of them loaded, with their name, on every refresh of the
+            // rail.
+            members: {
+                where: { channel: { spaceId: null } },
+                select: { userId: true, user: { select: { name: true } } }
+            }
         }
     });
     // Which chat this shelf is: an organization keeping its own shows that one
@@ -720,33 +740,37 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
     const channels = await onOpenShelf(actor, found);
     if (channels.length === 0) return [];
 
-    const unread = await unreadCounts(actor, channels, mine);
-    // What this reader calls people, over what those people are called. A direct
-    // message is named after who is in it, so a nickname has to reach the list
-    // itself and not only the messages inside it.
-    const called = await nicknamesFor(
-        actor.id,
-        channels.flatMap((channel) => channel.members.map((member) => member.userId))
-    );
-    // One read for the whole rail, and only over the people in one-to-one
-    // conversations: a block does not close a group or a channel, so asking
-    // about their members would be asking a question nothing here answers.
-    const shut = await blockedBy(
-        actor.id,
-        channels
-            .filter((channel) => channel.kind === "dm")
-            .flatMap((channel) => channel.members.map((member) => member.userId))
-    );
-    // Loaded when asked: it reaches the app registry, which a rail with no app
-    // installed has no reason to load. A badge is never worth the rail.
-    const linked = await import("./game-links")
-        .then((links) =>
-            links.gameLinksFor(
-                actor,
-                channels.filter((channel) => channel.kind !== "dm").map((channel) => channel.id)
+    // Four reads that depend on nothing but the rows above, asked together
+    // rather than one after another.
+    const [unread, called, shut, linked] = await Promise.all([
+        unreadCounts(actor, channels, mine),
+        // What this reader calls people, over what those people are called. A
+        // direct message is named after who is in it, so a nickname has to
+        // reach the list itself and not only the messages inside it.
+        nicknamesFor(
+            actor.id,
+            channels.flatMap((channel) => channel.members.map((member) => member.userId))
+        ),
+        // One read for the whole rail, and only over the people in one-to-one
+        // conversations: a block does not close a group or a channel, so asking
+        // about their members would be asking a question nothing here answers.
+        blockedBy(
+            actor.id,
+            channels
+                .filter((channel) => channel.kind === "dm")
+                .flatMap((channel) => channel.members.map((member) => member.userId))
+        ),
+        // Loaded when asked: it reaches the app registry, which a rail with no
+        // app installed has no reason to load. A badge is never worth the rail.
+        import("./game-links")
+            .then((links) =>
+                links.gameLinksFor(
+                    actor,
+                    channels.filter((channel) => channel.kind !== "dm").map((channel) => channel.id)
+                )
             )
-        )
-        .catch(() => new Map<string, ChatGameLinkView[]>());
+            .catch(() => new Map<string, ChatGameLinkView[]>())
+    ]);
 
     return channels.map((channel) => {
         const others = channel.members
@@ -1513,27 +1537,18 @@ export async function directCounterpart(
 }
 
 /**
- * The direct message with these people, opening it if it is the first time.
+ * Everything `openDirect` refuses for, asked before it writes anything, and the
+ * chat the conversation belongs to when nothing refuses.
  *
- * A one-to-one conversation is keyed by the pair itself, so two tabs asking at
- * the same moment end up in the same room rather than in two rooms with half the
- * history each. A group has no such key - three people can genuinely want two
- * different group conversations - so asking twice makes two.
- *
- * Which chat it lands in is the shelf: an organization keeping its own gets a
- * conversation filed under it, and the key carries the organization too, so the
- * same two people hold one conversation in each without either being able to
- * collide with the other. In an organization's own chat the people have to be
- * on its roster - a conversation with somebody outside it filed under it would
- * be the isolation not holding.
+ * Its own function so that finding an existing conversation - which writes
+ * nothing, and is what the page for "the conversation with this person" does
+ * while it renders - applies exactly the rules opening one does. A lookup that
+ * skipped one of them would be a way into a conversation the action refuses.
  */
-export async function openDirect(
+async function directAllowed(
     actor: ChatActor,
-    userIds: readonly string[],
-    /** What to call it, for a group whose starter typed something. A one-to-one
-     *  conversation ignores it: it is named after the person in it. */
-    name = ""
-): Promise<string> {
+    userIds: readonly string[]
+): Promise<{ others: string[]; orgId: string | null }> {
     const others = [...new Set(userIds)].filter((id) => id !== actor.id);
     if (others.length === 0) throw new ChatAccessError("Pick somebody to message");
 
@@ -1571,6 +1586,51 @@ export async function openDirect(
         if (others.some((id) => !roster.has(id)))
             throw new ChatAccessError("They are not in this organization");
     }
+
+    return { others, orgId };
+}
+
+/**
+ * The one-to-one conversation with this person when it already exists, or null
+ * when opening it would have to create it.
+ *
+ * Never writes, so it is safe where a write is not: a page render, which a
+ * prefetch or a crawler can cause. Refuses exactly as `openDirect` does, by
+ * throwing the same `ChatAccessError`.
+ */
+export async function existingDirect(actor: ChatActor, userId: string): Promise<string | null> {
+    const { others, orgId } = await directAllowed(actor, [userId]);
+    if (others.length !== 1) return null;
+    const existing = await prisma.chatChannel.findUnique({
+        where: { dmKey: core.dmKeyFor([actor.id, ...others], orgId) },
+        select: { id: true }
+    });
+    return existing?.id ?? null;
+}
+
+/**
+ * The direct message with these people, opening it if it is the first time.
+ *
+ * A one-to-one conversation is keyed by the pair itself, so two tabs asking at
+ * the same moment end up in the same room rather than in two rooms with half the
+ * history each. A group has no such key - three people can genuinely want two
+ * different group conversations - so asking twice makes two.
+ *
+ * Which chat it lands in is the shelf: an organization keeping its own gets a
+ * conversation filed under it, and the key carries the organization too, so the
+ * same two people hold one conversation in each without either being able to
+ * collide with the other. In an organization's own chat the people have to be
+ * on its roster - a conversation with somebody outside it filed under it would
+ * be the isolation not holding.
+ */
+export async function openDirect(
+    actor: ChatActor,
+    userIds: readonly string[],
+    /** What to call it, for a group whose starter typed something. A one-to-one
+     *  conversation ignores it: it is named after the person in it. */
+    name = ""
+): Promise<string> {
+    const { others, orgId } = await directAllowed(actor, userIds);
 
     const everyone = [actor.id, ...others];
     if (others.length === 1) {
@@ -1850,11 +1910,20 @@ export async function unreadTotal(actor: ChatActor): Promise<ChatUnread> {
  * of them always forgets. Own messages are excluded: sending one is having read
  * it, and a badge that counted them would never reach zero.
  *
- * One query per channel the reader has a mark in, because each has its own
- * threshold and no single grouped query can carry a different one per group.
- * They run together, and the number of channels one person is in is tens rather
- * than thousands - if that ever stops being true, the fix is a stored counter
- * with one writer, not a cleverer query.
+ * One grouped query for every channel, however many there are. Each channel
+ * has its own threshold - the reader's mark in it, or none - and that is
+ * carried as one branch of an OR per channel rather than one count per channel:
+ * a rail of forty conversations used to be forty-one round trips on every page
+ * (the badge in the app switcher reads this too), plus a count of every message
+ * ever written in each of them that was then thrown away for every channel with
+ * a mark. The channels with no mark share one branch, since for them the
+ * threshold is the same - the beginning.
+ *
+ * Kept in the query builder rather than written as SQL on purpose: the schema is
+ * kept portable to SQLite, and a Postgres-only statement here would be the one
+ * query the local setup cannot run. What it costs is the cap, which is applied
+ * afterwards rather than inside the count. The index that serves the branches is
+ * the one on `(channelId, createdAt)`.
  */
 async function unreadCounts(
     actor: ChatActor,
@@ -1862,15 +1931,24 @@ async function unreadCounts(
     mine: ReadonlyMap<string, { lastReadAt: Date | null }>
 ): Promise<Map<string, number>> {
     const counted = new Map<string, number>();
-    // Read once and applied to both counts below. A blocked account writing into
-    // a room this reader is in must not light their badge: the whole of blocking
-    // somebody is not being made to look, and a number that says three messages
-    // are waiting is Polaris asking them to look.
+    if (channels.length === 0) return counted;
+    // Read once and applied to every branch below. A blocked account writing
+    // into a room this reader is in must not light their badge: the whole of
+    // blocking somebody is not being made to look, and a number that says three
+    // messages are waiting is Polaris asking them to look.
     const ignored = [actor.id, ...(await blockedIds(actor.id))];
+
+    const unseen: string[] = [];
+    const since: Prisma.ChatMessageWhereInput[] = [];
+    for (const channel of channels) {
+        const mark = mine.get(channel.id)?.lastReadAt;
+        if (mark) since.push({ channelId: channel.id, createdAt: { gt: mark } });
+        else unseen.push(channel.id);
+    }
+
     const grouped = await prisma.chatMessage.groupBy({
         by: ["channelId"],
         where: {
-            channelId: { in: channels.map((channel) => channel.id) },
             deletedAt: null,
             authorId: { notIn: ignored },
             // Somebody joining is not somebody talking. A room that lit up
@@ -1879,7 +1957,8 @@ async function unreadCounts(
             kind: { not: "system" },
             // A thread reply is unread inside the thread, not in the channel:
             // counting both would double every conversation that has one.
-            parentId: null
+            parentId: null,
+            OR: [...(unseen.length > 0 ? [{ channelId: { in: unseen } }] : []), ...since]
         },
         _count: { _all: true }
     });
@@ -1887,28 +1966,8 @@ async function unreadCounts(
     // ones with nothing are already zero.
     const totals = new Map(grouped.map((row) => [row.channelId, row._count._all]));
 
-    const seen = channels.filter((channel) => mine.get(channel.id)?.lastReadAt);
-    const since = await Promise.all(
-        seen.map(async (channel) => {
-            const mark = mine.get(channel.id)!.lastReadAt!;
-            const count = await prisma.chatMessage.count({
-                where: {
-                    channelId: channel.id,
-                    deletedAt: null,
-                    parentId: null,
-                    authorId: { notIn: ignored },
-                    kind: { not: "system" },
-                    createdAt: { gt: mark }
-                }
-            });
-            return [channel.id, count] as const;
-        })
-    );
-    const marked = new Map(since);
-
     for (const channel of channels) {
-        const count = marked.get(channel.id) ?? totals.get(channel.id) ?? 0;
-        counted.set(channel.id, Math.min(count, UNREAD_CAP));
+        counted.set(channel.id, Math.min(totals.get(channel.id) ?? 0, UNREAD_CAP));
     }
     return counted;
 }

@@ -16,7 +16,7 @@
  */
 
 import { subscribeChatChanges } from "@/lib/chat/live";
-import { reachableChannelIds } from "@/lib/chat/access";
+import { holdStreamScope } from "@/lib/chat/stream-scope";
 import { backgroundUser, sessionCan } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -54,35 +54,17 @@ export async function GET(request: Request): Promise<Response> {
     let closed = false;
     let sequence = 0;
 
-    /** The channels this reader is in, as of when they were last resolved. */
-    let reachable = new Set<string>();
-    let resolvedAt = 0;
-    let resolving: Promise<void> | null = null;
+    /** The channels this reader is in, as of when they were last resolved -
+     *  shared with every other stream this account has open, so five tabs are
+     *  one resolution rather than five. See `stream-scope.ts`. */
+    const scope = holdStreamScope(actor);
     /** Which channels moved since the last wake, so one frame can name them all
      *  and the tab only refetches the ones it is actually showing. */
     let moved = new Set<string>();
 
-    async function resolveReachable(): Promise<void> {
-        reachable = await reachableChannelIds(actor);
-        resolvedAt = Date.now();
-    }
-
-    /** Re-resolve at most one query at a time, and never more often than the TTL. */
-    function refreshReachable(): Promise<void> {
-        if (resolving) return resolving;
-        resolving = resolveReachable()
-            .catch(() => {
-                // A transient database error leaves the previous answer in
-                // place; the next event past the TTL tries again.
-            })
-            .finally(() => {
-                resolving = null;
-            });
-        return resolving;
-    }
-
     function stop(): void {
         closed = true;
+        scope.release();
         if (heartbeat) clearInterval(heartbeat);
         if (pending) clearTimeout(pending);
         heartbeat = null;
@@ -118,7 +100,7 @@ export async function GET(request: Request): Promise<Response> {
                 }, COALESCE_MS);
             }
 
-            await refreshReachable();
+            await scope.refresh();
 
             unsubscribe = subscribeChatChanges((change) => {
                 if (closed) return;
@@ -133,7 +115,7 @@ export async function GET(request: Request): Promise<Response> {
                 // redrew.
                 if (change.kind === "appearance") {
                     if (change.actorId === actor.id) return;
-                    if (!change.channels?.some((id) => reachable.has(id))) return;
+                    if (!change.channels?.some((id) => scope.reachable().has(id))) return;
                     send({ kind: "appearance", actorId: change.actorId });
                     return;
                 }
@@ -150,7 +132,7 @@ export async function GET(request: Request): Promise<Response> {
                 // service did.
                 if (change.kind === "activity") {
                     const mine = change.actorId === actor.id;
-                    if (!mine && !change.channels?.some((id) => reachable.has(id))) return;
+                    if (!mine && !change.channels?.some((id) => scope.reachable().has(id))) return;
                     send({ kind: "activity", actorId: change.actorId });
                     return;
                 }
@@ -162,9 +144,11 @@ export async function GET(request: Request): Promise<Response> {
                     const forThem = !change.audience || change.audience.includes(actor.id);
                     // No channel means the change is about a whole space, and
                     // those are always addressed: there is nothing to intersect.
-                    if (!forThem && (!change.channelId || !reachable.has(change.channelId))) return;
-                    resolvedAt = 0;
-                    void refreshReachable().then(() => {
+                    if (!forThem && (!change.channelId || !scope.reachable().has(change.channelId))) {
+                        return;
+                    }
+                    scope.invalidate(change);
+                    void scope.refresh().then(() => {
                         if (!closed) send({ kind: "channels" });
                     });
                     return;
@@ -185,7 +169,7 @@ export async function GET(request: Request): Promise<Response> {
                 if (change.kind === "read") {
                     if (!change.channelId) return;
                     if (change.audience && !change.audience.includes(actor.id)) return;
-                    if (change.actorId !== actor.id && !reachable.has(change.channelId)) return;
+                    if (change.actorId !== actor.id && !scope.reachable().has(change.channelId)) return;
                     send({
                         kind: "read",
                         channelId: change.channelId,
@@ -212,7 +196,7 @@ export async function GET(request: Request): Promise<Response> {
                 const channelId = change.channelId;
                 if (!channelId) return;
 
-                if (reachable.has(channelId)) {
+                if (scope.reachable().has(channelId)) {
                     if (change.kind === "call") {
                         // Never coalesced. A call frame is not "something
                         // changed, go and look" - it is what makes a browser
@@ -255,10 +239,19 @@ export async function GET(request: Request): Promise<Response> {
 
                 // An unfamiliar channel is usually somebody else's. Re-ask once
                 // the TTL is up, in case it is one they were just added to.
-                if (Date.now() - resolvedAt < SCOPE_TTL_MS) return;
+                //
+                // Not narrowed any further than that on purpose. Whether this
+                // reader can reach a room also moves without a chat frame at
+                // all - an organization they joined, a room granted to a team
+                // they are on - and this is the only thing that notices. What
+                // keeps it cheap is that the answer is shared: every tab this
+                // person has open asks once between them, not once each.
+                if (Date.now() - scope.resolvedAt() < SCOPE_TTL_MS) return;
                 const kind = change.kind;
-                void refreshReachable().then(() => {
-                    if (!closed && kind === "posted" && reachable.has(channelId)) wake(channelId);
+                void scope.refresh().then(() => {
+                    if (!closed && kind === "posted" && scope.reachable().has(channelId)) {
+                        wake(channelId);
+                    }
                 });
             });
 

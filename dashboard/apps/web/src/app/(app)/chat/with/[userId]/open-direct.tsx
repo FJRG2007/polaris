@@ -7,11 +7,20 @@ import { useRouter } from "next/navigation";
 import { openDirectAction } from "../../actions";
 import { Button, EmptyState, Skeleton } from "@polaris/ui";
 
-export function OpenDirect({ userId }: { userId: string }) {
+export function OpenDirect({
+    userId,
+    refused
+}: {
+    userId: string;
+    /** Why it cannot be opened, when the page already found out. Shown as it
+     *  is, and nothing is asked again. */
+    refused?: string;
+}) {
     const router = useRouter();
-    const [error, setError] = useState("");
+    const [error, setError] = useState(refused ?? "");
 
     useEffect(() => {
+        if (refused) return;
         let live = true;
         void openDirectAction({ userIds: [userId] })
             .then((result) => {
@@ -25,7 +34,7 @@ export function OpenDirect({ userId }: { userId: string }) {
         return () => {
             live = false;
         };
-    }, [router, userId]);
+    }, [refused, router, userId]);
 
     if (error) {
         return (
