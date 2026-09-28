@@ -76,6 +76,15 @@ Punishments:
       - "1:1 [log]"
       - "1:1 [webhook]"
       - "1:1 [proxy]"
+  XRay:
+    remove-violations-after: 600
+    checks:
+      - "XRayProbe"
+    commands:
+      - "3:3 [alert]"
+      - "1:1 [log]"
+      - "3:3 [webhook]"
+      - "3:3 [proxy]"
   Hitboxes:
     remove-violations-after: 300
     checks:

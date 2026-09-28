@@ -1,5 +1,6 @@
 /**
- * What Polaris's anti-cheat plugin caught, from inside a Minecraft server.
+ * What Polaris's anti-cheat plugin caught, from inside a Minecraft server - and
+ * where the server's X-Ray honeypots are, which its anti-xray leaves visible.
  *
  * Not a session route: the caller is a server, proving which one with the token
  * its environment carries, and everything it sends is about that server's own
@@ -35,6 +36,18 @@ const body = z.object({ flags: z.array(flag).min(1).max(200) });
 
 const reply = (status: number, content: Record<string, unknown>) =>
     Response.json(content, { status, headers: { "cache-control": "no-store" } });
+
+/** Where the honeypots are, for the plugin's anti-xray to leave them visible. */
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
+    const { id } = await params;
+    if (!z.string().uuid().safeParse(id).success) return reply(401, { error: "unauthorized" });
+    const server = await service.authorizeReporter(request, id);
+    if (!server) return reply(401, { error: "unauthorized" });
+    return reply(200, { traps: await service.honeypotsFor(server.installedAppId) });
+}
 
 export async function POST(
     request: Request,

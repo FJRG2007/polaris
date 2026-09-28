@@ -223,6 +223,8 @@ public class PolarisPlayer implements PolarisUser {
     public final @NotNull CompensatedInventory inventory;
     public final @NotNull PacketEntityReplication packetEntityReplication = new PacketEntityReplication(this);
     public final @NotNull LatencyUtils latencyUtils = new LatencyUtils(this);
+    /** What the anti-xray has hidden from this player's client. */
+    public final @NotNull polaris.anticheat.antixray.AntiXrayView antiXray = new polaris.anticheat.antixray.AntiXrayView();
     public final @NotNull PointThreeEstimator pointThreeEstimator;
     public final @NotNull TrigHandler trigHandler = new TrigHandler(this);
     public final @NotNull PacketStateData packetStateData = new PacketStateData();

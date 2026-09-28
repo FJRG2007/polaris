@@ -42,6 +42,10 @@ public final class PolarisReporter {
     /** Flags in one request, which the Polaris route also caps. */
     static final int BATCH_MAX = 200;
     private static final long FLUSH_EVERY_MS = 5_000;
+    /** How often the honeypot list is fetched again (see PolarisTraps). */
+    private static final long TRAPS_EVERY_MS = 60_000;
+    /** The longest honeypot list read: far more than Polaris ever places. */
+    private static final int TRAPS_BODY_MAX = 256 * 1024;
     /** The longest a verbose line is kept: the route refuses longer ones. */
     static final int VERBOSE_MAX = 300;
 
@@ -66,6 +70,7 @@ public final class PolarisReporter {
             return thread;
         });
         this.sender.scheduleWithFixedDelay(this::flush, FLUSH_EVERY_MS, FLUSH_EVERY_MS, TimeUnit.MILLISECONDS);
+        this.sender.scheduleWithFixedDelay(this::fetchTraps, 3_000, TRAPS_EVERY_MS, TimeUnit.MILLISECONDS);
     }
 
     /** The reporter for this server, or null when Polaris has not set one up. */
@@ -169,6 +174,24 @@ public final class PolarisReporter {
             keep(batch, "HTTP " + status);
         } catch (Exception failed) {
             keep(batch, failed.getClass().getSimpleName());
+        }
+    }
+
+    /** Fetch where Polaris's X-Ray honeypots are, so the anti-xray leaves them visible. */
+    private void fetchTraps() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("authorization", "Bearer " + token)
+                    .GET()
+                    .build();
+            HttpResponse<String> answer = client.send(request, HttpResponse.BodyHandlers.ofString());
+            String body = answer.body();
+            if (answer.statusCode() == 200 && body != null && body.length() <= TRAPS_BODY_MAX) {
+                PolarisTraps.accept(body);
+            }
+        } catch (Exception ignored) {
+            // The last list stays; a Polaris that is down is already logged by flush.
         }
     }
 

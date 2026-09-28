@@ -29,14 +29,15 @@ const fake = vi.hoisted(() => ({
     }[],
     env: new Map<string, string>(),
     token: "the-token" as string | null,
-    notified: [] as { title: string; body: string; userId: string }[]
+    notified: [] as { title: string; body: string; userId: string }[],
+    config: {} as Record<string, unknown>
 }));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
             findFirst: async () => ({ applicationId: "app-1", ownerId: "owner-1" }),
-            findUnique: async () => ({ name: "Offgrid" })
+            findUnique: async () => ({ name: "Offgrid", config: fake.config })
         },
         minecraftAnticheatFlag: {
             createMany: async ({ data }: { data: typeof fake.rows }) => {
@@ -80,6 +81,7 @@ vi.mock("@polaris/app-host", () => ({
             setEnvVars: async () => undefined
         },
         appsInstallSecret: { readInstallEnvSecret: async () => fake.token },
+        appsInstallConfig: { readInstallConfig: (config: Record<string, unknown>) => config },
         rateLimitService: { rateLimit: async () => ({ ok: true, retryAfterMs: 0 }) },
         notificationService: {
             createNotification: async (input: { title: string; body: string; userId: string }) => {
@@ -89,7 +91,7 @@ vi.mock("@polaris/app-host", () => ({
     }
 }));
 
-const { POST } = await import(
+const { GET, POST } = await import(
     "@polaris-app/game-servers/src/routes/api/minecraft/anticheat/[id]/route"
 );
 const { engineCheckLabel, engineScore } = await import(
@@ -123,6 +125,7 @@ beforeEach(() => {
     fake.rows = [];
     fake.notified = [];
     fake.token = "the-token";
+    fake.config = {};
     fake.env = new Map([
         ["MODS", "https://polaris.example/api/minecraft/mod/polaris-anticheat-bukkit.jar"],
         ["POLARIS_ANTICHEAT", "on"]
@@ -185,6 +188,45 @@ describe("taking a report", () => {
         });
         await report({ flags: [flag()] });
         expect(fake.notified).toHaveLength(1);
+    });
+});
+
+describe("handing the plugin the honeypots", () => {
+    const traps = (token = "the-token", id = SERVER) =>
+        GET(
+            new Request(`https://polaris.example/api/minecraft/anticheat/${id}`, {
+                headers: { authorization: `Bearer ${token}` }
+            }),
+            { params: Promise.resolve({ id }) }
+        );
+
+    it("lists every trap as [dimension, x, y, z], the Nether as 1", async () => {
+        fake.config = {
+            xrayTraps: {
+                honeypots: [
+                    { dimension: "minecraft:overworld", x: 120, y: -40, z: -8, placedAt: NOW },
+                    { dimension: "minecraft:the_nether", x: -5, y: 15, z: 300, placedAt: NOW }
+                ]
+            }
+        };
+        const answer = await traps();
+        expect(answer.status).toBe(200);
+        expect(await answer.json()).toEqual({
+            traps: [
+                [0, 120, -40, -8],
+                [1, -5, 15, 300]
+            ]
+        });
+    });
+
+    it("tells nobody without the server's token, and nothing to a server with the engine off", async () => {
+        expect((await traps("wrong")).status).toBe(401);
+        fake.env.set("POLARIS_ANTICHEAT", "off");
+        expect((await traps()).status).toBe(401);
+    });
+
+    it("is an empty list for a server with no traps", async () => {
+        expect(await (await traps()).json()).toEqual({ traps: [] });
     });
 });
 
