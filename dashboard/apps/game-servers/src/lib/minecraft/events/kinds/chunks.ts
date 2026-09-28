@@ -41,9 +41,11 @@ export function chunksAround(x: number, z: number, reach: number): Chunk[] {
     return chunks;
 }
 
-/** Of `wanted`, the ones not held already. All of them when that is not known. */
+/** Of `wanted`, the ones not held already. None when that is not known: a
+ *  chunk that might be the operator's is never taken on, or let go of. */
 export function notHeld(wanted: readonly Chunk[], held: ReadonlySet<string> | null): Chunk[] {
-    return wanted.filter((chunk) => !held?.has(`${chunk.x},${chunk.z}`));
+    if (!held) return [];
+    return wanted.filter((chunk) => !held.has(`${chunk.x},${chunk.z}`));
 }
 
 export function holdChunk(chunk: Chunk): string {

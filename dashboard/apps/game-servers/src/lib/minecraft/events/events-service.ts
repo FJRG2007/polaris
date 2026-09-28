@@ -854,6 +854,7 @@ async function begin(
             );
         }
         loop.run = { ...loop.run, gamerules: { ...before, ...loop.run.gamerules } };
+        await persist(installedAppId, loop);
     }
     await server.sayAll(lines);
     loop.run = { ...loop.run, phase: "running", startsAt: now };
@@ -1516,6 +1517,7 @@ async function hideTreasure(
         if (!origin) throw new PlaceNotFound();
         loop.run = { ...loop.run, origin };
     }
+    await settlePendingChest(installedAppId, loop, server, options);
     // No more places to be had: the hunt goes on with the chests already down.
     const enough = async () => {
         if (loop.run.chests.length === 0) throw new PlaceNotFound();
@@ -1546,7 +1548,16 @@ async function hideTreasure(
         const air =
             !hunt.tooClose(found, loop.run.chests) &&
             commands.readTest(await server.say([hunt.airAt(found)])) === "passed";
+        const before = { chests: loop.run.chests, held: loop.run.held };
         if (air) {
+            // Written down before it is placed, so whatever ends the event
+            // takes it away again.
+            loop.run = {
+                ...loop.run,
+                chests: [...before.chests, { ...found, opened: false, by: null }],
+                held: [...before.held, ...(target ? [target] : []), { x: found.x, z: found.z }]
+            };
+            await persist(installedAppId, loop);
             await server.sayAll([hunt.hideChest(found, options.loot), commands.CLEAR_MARK]);
             // Down, and unopened: a protected area that refused the block reads
             // as nothing there.
@@ -1556,12 +1567,14 @@ async function hideTreasure(
         if (!placed) {
             // Given up without taking the chunks of the chests already down.
             await server.sayAll([
+                ...(air ? [commands.removeChest(found)] : []),
                 commands.CLEAR_MARK,
                 ...commands.release(found, target),
-                ...hunt.holdChests(loop.run.held)
+                ...hunt.holdChests(before.held)
             ]);
             loop.run = {
                 ...loop.run,
+                ...before,
                 place: null,
                 target: null,
                 placeTries: loop.run.placeTries + 1
@@ -1570,18 +1583,44 @@ async function hideTreasure(
             if (loop.run.placeTries >= PLACE_TRIES) return enough();
             continue;
         }
-        const chests = [...loop.run.chests, { ...found, opened: false, by: null }];
         loop.run = {
             ...loop.run,
-            chests,
-            held: [...loop.run.held, ...(target ? [target] : []), { x: found.x, z: found.z }],
             place: null,
             target: null,
             placeTries: 0,
-            hidden: chests.length >= options.chests
+            hidden: loop.run.chests.length >= options.chests
         };
         await persist(installedAppId, loop);
     }
+}
+
+/**
+ * A chest written down but not yet confirmed placed when Polaris stopped: kept
+ * if it is there, unopened; otherwise taken off the list, so it is never
+ * counted as found.
+ */
+async function settlePendingChest(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    options: catalog.EventOptions<"treasure-hunt">
+): Promise<void> {
+    const place = loop.run.place;
+    const last = loop.run.chests.at(-1);
+    if (!place || !last || last.opened) return;
+    if (last.x !== place.x || last.y !== place.y || last.z !== place.z) return;
+    const there = commands.readTest(await server.say([commands.chestUnopened(last)])) === "passed";
+    if (!there) {
+        await server.sayAll([commands.removeChest(last)]);
+        loop.run = { ...loop.run, chests: loop.run.chests.slice(0, -1) };
+    }
+    loop.run = {
+        ...loop.run,
+        place: null,
+        target: null,
+        hidden: loop.run.chests.length >= options.chests
+    };
+    await persist(installedAppId, loop);
 }
 
 /** A gathering's tick: everybody's count brought up to date, and shown to them. */

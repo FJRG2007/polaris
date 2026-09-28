@@ -339,7 +339,8 @@ export function readGameModes(output: string): Map<string, number> {
 
 /**
  * A player's spot as it is now, to send them back to - or null when they cannot
- * take part: not on, or in creative or spectator (0 is survival, 2 adventure).
+ * take part: not on, in a world that could not be read, or in creative or
+ * spectator (0 is survival, 2 adventure).
  */
 export function savedFrom(
     name: string,
@@ -352,8 +353,8 @@ export function savedFrom(
     if (!at || !PLAYER_NAME.test(at.name)) return null;
     const mode = modes.get(at.name);
     if (mode !== 0 && mode !== 2) return null;
-    const dimension = dimensions.get(at.name) ?? "minecraft:overworld";
-    if (!DIMENSION.test(dimension)) return null;
+    const dimension = dimensions.get(at.name);
+    if (!dimension || !DIMENSION.test(dimension)) return null;
     const turned = facing.get(at.name) ?? { yaw: 0, pitch: 0 };
     return {
         name: at.name,

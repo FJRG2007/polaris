@@ -1923,6 +1923,39 @@ describe("a treasure hunt", () => {
         expect(state().history[0]).toMatchObject({ id: "resumed-live", outcome: "finished" });
         expect(world.chests).toEqual([]);
     });
+
+    it("after a restart between writing a chest down and placing it, never counts it as found", async () => {
+        world.markFollows = true;
+        const made = { ...catalog.newPreset("treasure-hunt", "hunt"), minutes: 10 };
+        setUp([{ ...made, options: { ...made.options, chests: 2 } }]);
+        const now = Date.now();
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed-hiding",
+                trigger: "manual",
+                startedBy: null,
+                preset: { ...made, options: { ...made.options, chests: 2 } },
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 30_000,
+                endsAt: now + 9 * 60_000,
+                participants: ["Ana", "Ben"],
+                hidden: false,
+                origin: { x: 0, z: 0 },
+                chests: [{ x: 500, y: 70, z: 500 }],
+                held: [{ x: 500, z: 500 }],
+                place: { x: 500, y: 70, z: 500 },
+                target: { x: 500, z: 500 }
+            }
+        };
+        await events.sweepEvents();
+        await play(30_000);
+        const run = state().run!;
+        expect(run.hidden).toBe(true);
+        expect(run.chests.some((one) => one.opened)).toBe(false);
+        expect(run.points).toEqual({});
+        expect(world.chests).toEqual(run.chests.map(at));
+    });
 });
 
 describe("a gathering", () => {
@@ -3383,6 +3416,11 @@ describe("a build battle", () => {
                 `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${block}`
             );
         }
+        // What the builders put up comes down with the platform.
+        expect(run.arena!.blocks).toEqual(expect.arrayContaining(["minecraft:glass", "minecraft:red_stained_glass"]));
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace minecraft:red_stained_glass`
+        );
         expect(world.sent).toContain("gamemode survival Ana");
         expect(after.arenaLeftovers).toEqual([]);
         onlyOurBlocks();

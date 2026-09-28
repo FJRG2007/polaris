@@ -853,7 +853,7 @@ describe("chunks an event holds", () => {
         const mine = chunks.notHeld(around, new Set(["18,0"]));
         expect(mine).toHaveLength(24);
         expect(mine.some((chunk) => chunk.x === 18 && chunk.z === 0)).toBe(false);
-        expect(chunks.notHeld(around, null)).toHaveLength(25);
+        expect(chunks.notHeld(around, null)).toEqual([]);
         expect(chunks.holdChunk({ x: 18, z: -1 })).toBe(
             "execute in minecraft:overworld run forceload add 288 -16"
         );
@@ -1252,6 +1252,8 @@ describe("what an arena sends", () => {
         });
         expect(stage.savedFrom("Ben", where, facing, dims, modes)).toBeNull();
         expect(stage.savedFrom("Cy", where, facing, dims, modes)).toBeNull();
+        // A world that could not be read is no world to send anybody back to.
+        expect(stage.savedFrom("Ana", where, facing, new Map(), modes)).toBeNull();
     });
 
     it("sends a player back exactly where they were, and takes only what the event gave", () => {

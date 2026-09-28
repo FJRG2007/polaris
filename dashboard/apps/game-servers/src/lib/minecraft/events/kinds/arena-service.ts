@@ -203,6 +203,11 @@ function fillsFor(run: stored.EventRun, box: stored.Box): { box: stored.Box; blo
         : build.platformFills(box, run.joined.length, plotSize(run));
 }
 
+function blocksFor(run: stored.EventRun, fills: { block: string }[]): string[] {
+    const placed = run.preset.kind === "team-duel" ? [] : build.PLATFORM_BLOCKS;
+    return [...new Set([...fills.map((one) => one.block), ...placed])];
+}
+
 /**
  * The arena put up, over a few ticks: ground found, the box above it loaded,
  * counted - nothing but air, or the site is given up - written down as ours,
@@ -254,7 +259,7 @@ async function raise(ctx: KindContext): Promise<void> {
     // Nothing but air: ours to build in, and written down as ours before a
     // single block goes in.
     const fills = fillsFor(run, box);
-    const built: stored.Arena = { box, blocks: [...new Set(fills.map((one) => one.block))] };
+    const built: stored.Arena = { box, blocks: blocksFor(run, fills) };
     ctx.run = { ...ctx.run, arena: built };
     await ctx.persist();
     await ctx.server.sayAll([
