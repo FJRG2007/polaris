@@ -30,7 +30,7 @@
  */
 
 import * as polarisLogin from "./polaris-login";
-import { anticheatMovedTo, anticheatRunsOn, withoutAnticheat } from "./polaris-anticheat";
+import { anticheatMovedTo, withoutAnticheatBuild } from "./polaris-anticheat";
 import {
     formatProjectList,
     isPluginLoader,
@@ -323,21 +323,19 @@ export async function guardForSave(
     const once = () => (held ??= readEnv());
     const writes = await loginGuardForSave(vars, once);
     const software = vars.find((entry) => entry.key === SOFTWARE_KEY)?.value;
-    // Polaris's anti-cheat comes off software it cannot run on, from the list
-    // as the login's own writes above leave it. Only a move to such software is
-    // worth reading the environment for, and never the card's own write.
-    if (
-        !software ||
-        anticheatRunsOn(software) ||
-        vars.some((entry) => entry.key === PROJECTS_KEY)
-    ) {
+    const version = vars.find((entry) => entry.key === "VERSION")?.value;
+    // Polaris's anti-cheat comes off software or a release its build does not
+    // load on, from the list as the login's own writes above leave it. Never on
+    // the card's own write.
+    if ((!software && !version) || vars.some((entry) => entry.key === PROJECTS_KEY)) {
         return writes;
     }
     const current = await once();
     const listed = writes.find((entry) => entry.key === polarisLogin.MODS_KEY)?.value;
     const off = anticheatMovedTo(
         current,
-        software,
+        software || (current.get(SOFTWARE_KEY) ?? ""),
+        version ?? current.get("VERSION") ?? "",
         listed ?? current.get(polarisLogin.MODS_KEY) ?? ""
     );
     if (off === null) return writes;
@@ -390,8 +388,8 @@ async function loginGuardForSave(
 export function guardAsTemplate(env: ReadonlyMap<string, string>): Map<string, string> {
     const copy = new Map(env);
     const mods = env.get(polarisLogin.MODS_KEY);
-    if (mods !== undefined && withoutAnticheat(mods) !== mods) {
-        copy.set(polarisLogin.MODS_KEY, withoutAnticheat(mods));
+    if (mods !== undefined && withoutAnticheatBuild(env) !== mods) {
+        copy.set(polarisLogin.MODS_KEY, withoutAnticheatBuild(env));
     }
     if (!polarisLogin.loginOn(env)) return copy;
     copy.set(polarisLogin.MODS_KEY, polarisLogin.withoutMod(copy.get(polarisLogin.MODS_KEY) ?? ""));

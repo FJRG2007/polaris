@@ -50,12 +50,13 @@ export function bundledModVersion(file: string): Promise<string | null> {
 }
 
 /**
- * Whether this image carries the anti-cheat's jar. A server with it on the list
- * downloads it on every boot and does not start when the answer is not the jar,
- * so nothing switches it on while the image has none to serve.
+ * Whether this image carries the anti-cheat's jar - the plugin, or the mod build
+ * that carries it on NeoForge. A server with it on the list downloads it on every
+ * boot and does not start when the answer is not the jar, so nothing switches it
+ * on while the image has none to serve.
  */
-export async function anticheatBundled(): Promise<boolean> {
-    const location = modPath(ANTICHEAT_FILE);
+export async function anticheatBundled(file: string = ANTICHEAT_FILE): Promise<boolean> {
+    const location = modPath(file);
     if (location === null) return false;
     const info = await stat(location).catch(() => null);
     return info?.isFile() ?? false;

@@ -68,16 +68,27 @@ export function AnticheatEngineCard({
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <p className="text-sm font-medium">Polaris anti-cheat</p>
-                        <p className="text-xs text-muted-foreground">
-                            Checks every player&apos;s movement and combat against what the game
-                            allows, packet by packet: flying, speed, reach, killaura, no-fall and
-                            the rest. Runs on the server, compensating for each player&apos;s
-                            latency, so a laggy player is not taken for a cheater. It also sends
-                            buried ore as plain rock, so X-Ray shows nothing but Polaris&apos;s
-                            honeypots. On by default; a server made before it gets it on its next
-                            start. While it is on, the server downloads it from this Polaris each
-                            time it starts, and does not start if Polaris cannot be reached.
-                        </p>
+                        {state?.kind === "mod" ? (
+                            <p className="text-xs text-muted-foreground">
+                                On this NeoForge server, Polaris&apos;s own mod sends buried ore as
+                                plain rock, so X-Ray shows nothing but Polaris&apos;s honeypots, and
+                                reports whoever digs at ore they could not see. On by default; it
+                                takes effect on the next start. Movement and combat checks need
+                                Paper or another plugin server.
+                            </p>
+                        ) : (
+                            <p className="text-xs text-muted-foreground">
+                                Checks every player&apos;s movement and combat against what the game
+                                allows, packet by packet: flying, speed, reach, killaura, no-fall
+                                and the rest. Runs on the server, compensating for each
+                                player&apos;s latency, so a laggy player is not taken for a cheater.
+                                It also sends buried ore as plain rock, so X-Ray shows nothing but
+                                Polaris&apos;s honeypots. On by default; a server made before it
+                                gets it on its next start. While it is on, the server downloads it
+                                from this Polaris each time it starts, and does not start if Polaris
+                                cannot be reached.
+                            </p>
+                        )}
                     </div>
                     <Switch
                         checked={state?.on ?? false}
@@ -93,8 +104,9 @@ export function AnticheatEngineCard({
                 </div>
                 {state && !state.supported ? (
                     <p className="text-xs text-muted-foreground">
-                        It runs on Paper, Purpur, Pufferfish, Leaf, Folia and Spigot. Switch the
-                        server to one of them in Settings to use it.
+                        It runs on Paper, Purpur, Pufferfish, Leaf, Folia and Spigot, and its
+                        anti-xray on NeoForge 1.21.4. Switch the server to one of them in Settings
+                        to use it.
                     </p>
                 ) : state && !state.reachable && !state.on ? (
                     <p className="text-xs text-muted-foreground">

@@ -26,6 +26,8 @@ export interface AnticheatState {
     readonly on: boolean;
     /** Whether the engine runs on this server's software at all. */
     readonly supported: boolean;
+    /** What carries it here: the full plugin, or the Polaris mod's anti-xray. */
+    readonly kind: "plugin" | "mod" | null;
     /** Whether this Polaris has an address the server can download it from. */
     readonly reachable: boolean;
 }
@@ -39,9 +41,14 @@ export async function anticheatState(
         publicAppUrl().catch(() => null)
     ]);
     const env = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
+    const build = anticheat.anticheatBuildFor(
+        env.get(SOFTWARE_KEY) ?? "",
+        env.get("VERSION") ?? ""
+    );
     return {
-        on: anticheat.anticheatOn(env),
-        supported: anticheat.anticheatRunsOn(env.get(SOFTWARE_KEY) ?? ""),
+        on: anticheat.anticheatActive(env),
+        supported: build !== null,
+        kind: build?.kind ?? null,
         reachable: publicUrl !== null
     };
 }
@@ -57,9 +64,13 @@ export async function setAnticheat(
     const current = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
     let writes: Map<string, string>;
     if (on) {
-        if (!anticheat.anticheatRunsOn(current.get(SOFTWARE_KEY) ?? "")) {
+        const build = anticheat.anticheatBuildFor(
+            current.get(SOFTWARE_KEY) ?? "",
+            current.get("VERSION") ?? ""
+        );
+        if (!build) {
             throw new Error(
-                "Polaris anti-cheat runs on Paper, Purpur, Pufferfish, Leaf, Folia and Spigot. This server's software cannot load it."
+                "Polaris anti-cheat runs on Paper, Purpur, Pufferfish, Leaf, Folia and Spigot, and its anti-xray on NeoForge 1.21.4. This server's software cannot load it."
             );
         }
         // The server downloads the plugin from this address when it boots and
@@ -70,9 +81,11 @@ export async function setAnticheat(
                 "Polaris anti-cheat needs this Polaris to have a public address: the server downloads the plugin from it when it starts."
             );
         }
-        if (!(await anticheatBundled())) {
+        if (!(await anticheatBundled(build.file))) {
             throw new Error(
-                "This Polaris was installed without the anti-cheat plugin. Update Polaris from Settings to get it."
+                build.kind === "plugin"
+                    ? "This Polaris was installed without the anti-cheat plugin. Update Polaris from Settings to get it."
+                    : "This Polaris was installed without the Polaris mod for this release. Update Polaris from Settings to get it."
             );
         }
         // The token the server already has, when the login plugin gave it one:
@@ -100,7 +113,7 @@ export async function setAnticheat(
  */
 export async function adoptAnticheatDefaults(): Promise<{ adopted: number }> {
     const baseUrl = await publicAppUrl().catch(() => null);
-    if (baseUrl === null || !(await anticheatBundled())) return { adopted: 0 };
+    if (baseUrl === null) return { adopted: 0 };
     const installs = await prisma.installedApp.findMany({
         where: { catalogId: "minecraft", status: { not: "removed" }, applicationId: { not: null } },
         select: { id: true, ownerId: true, applicationId: true }
@@ -111,7 +124,7 @@ export async function adoptAnticheatDefaults(): Promise<{ adopted: number }> {
         where: {
             scopeType: "application",
             scopeId: { in: installs.map((install) => install.applicationId!) },
-            key: { in: [anticheat.ANTICHEAT_KEY, SOFTWARE_KEY] }
+            key: { in: [anticheat.ANTICHEAT_KEY, SOFTWARE_KEY, "VERSION"] }
         },
         select: { scopeId: true, key: true, value: true }
     });
@@ -131,6 +144,11 @@ export async function adoptAnticheatDefaults(): Promise<{ adopted: number }> {
             const vars = await listEnvVars("application", applicationId, install.ownerId);
             const current = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
             if (!anticheat.wantsDefaultAnticheat(current)) continue;
+            const build = anticheat.anticheatBuildFor(
+                current.get(SOFTWARE_KEY) ?? "",
+                current.get("VERSION") ?? ""
+            );
+            if (build === null || !(await anticheatBundled(build.file))) continue;
             const token =
                 (await readInstallEnvSecret(applicationId, install.ownerId, TOKEN_KEY)) ??
                 randomBytes(32).toString("hex");

@@ -32,6 +32,7 @@ import { ALLOW_LIST_KEY, withPlayer } from "./ark/access";
 import * as polarisLogin from "./minecraft/polaris-login";
 import { anticheatBundled } from "./minecraft/polaris-mod-files";
 import {
+    anticheatBuildFor,
     anticheatEnableEnv,
     anticheatEnvWrites,
     anticheatMovedTo,
@@ -340,6 +341,7 @@ function javaSoftwareEnv(
     // What the operator chose, then what the blueprint insists on: a blueprint
     // that needs Paper is not a suggestion, it is what its plugins load into.
     const software = blueprint.software ?? shape.software ?? "PAPER";
+    const before = new Map(env);
     env.set(SOFTWARE_KEY, software);
     // What this software needs set beyond its own name - Spigot has to be
     // compiled because its downloads stopped answering machines - and the one
@@ -358,7 +360,13 @@ function javaSoftwareEnv(
     const mod = polarisLogin.modMovedTo(env, software, env.get("VERSION") ?? "");
     for (const [key, value] of mod ?? []) env.set(key, value);
     // Polaris's anti-cheat, the same way: off software it cannot run on.
-    for (const [key, value] of anticheatMovedTo(env, software) ?? []) env.set(key, value);
+    for (const [key, value] of anticheatMovedTo(
+        before,
+        software,
+        env.get("VERSION") ?? "",
+        env.get(polarisLogin.MODS_KEY) ?? ""
+    ) ?? [])
+        env.set(key, value);
     // What its plugins need from SpigotMC, which is where several of the
     // libraries they depend on are published and Modrinth is not. Written every
     // time, blank included, so a server reset onto a blueprint that needs none
@@ -660,9 +668,10 @@ async function anticheatSeed(
         ...env,
         ...(seed?.env ?? []).map((entry) => [entry.key, entry.value] as const)
     ]);
-    if (!wantsDefaultAnticheat(seeded)) return seed;
+    const build = anticheatBuildFor(seeded.get(SOFTWARE_KEY) ?? "", seeded.get("VERSION") ?? "");
+    if (build === null || !wantsDefaultAnticheat(seeded)) return seed;
     const baseUrl = await publicAppUrl().catch(() => null);
-    if (baseUrl === null || !(await anticheatBundled())) return seed;
+    if (baseUrl === null || !(await anticheatBundled(build.file))) return seed;
     const installedAppId = seed?.installedAppId ?? randomUUID();
     const token = seeded.get(polarisLogin.TOKEN_KEY) || randomBytes(32).toString("hex");
     const written = anticheatEnableEnv(seeded, { baseUrl, installedAppId, token });
