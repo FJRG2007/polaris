@@ -158,6 +158,9 @@ export function MinecraftEvents({
                     writeSnapshot(snapshotKey(installedAppId), answer.view);
                     setDraft((current) => current ?? answer.view!.config);
                 } else setError(answer.error ?? "The events could not be read");
+            }).catch(() => {
+                // A read that did not come back - a restart, a dropped
+                // connection - is tried again on the next beat.
             });
         read();
         const timer = setInterval(read, running ? 5_000 : 30_000);
@@ -166,6 +169,14 @@ export function MinecraftEvents({
             clearInterval(timer);
         };
     }, [installedAppId, running]);
+
+    // A line about what was just done is said once and goes: "Blood moon is
+    // starting" left on screen until a reload read as the event never moving on.
+    useEffect(() => {
+        if (!note) return;
+        const timer = setTimeout(() => setNote(null), 5_000);
+        return () => clearTimeout(timer);
+    }, [note]);
 
     useEffect(() => {
         if (!running) return;

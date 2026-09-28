@@ -18,6 +18,7 @@ import * as plan from "./plan";
 import * as stored from "./state";
 import { readXray } from "../xray";
 import { prisma } from "@polaris/db";
+import { withTimeout } from "@polaris/core";
 import * as catalog from "./catalog";
 import * as commands from "./commands";
 import * as messages from "./messages";
@@ -200,7 +201,11 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
     const run = loops.get(installedAppId)?.run ?? state.run;
     let standings: { name: string; score: number }[] = [];
     if (run && run.phase === "running" && catalog.KIND_INFO[run.preset.kind].competitive) {
-        standings = await currentStandings(row.ownerId, installedAppId, run).catch(() => []);
+        // Bounded: the screen asks every few seconds, and a server slow to answer
+        // must not hold the rest of what it shows.
+        standings = await withTimeout(currentStandings(row.ownerId, installedAppId, run), 3_000, "slow").catch(
+            () => []
+        );
     }
     const seen = activity.get(installedAppId);
     return {
