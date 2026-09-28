@@ -18,11 +18,7 @@ import { gameDomainSuffix } from "../lib/minecraft/address";
 import { clearQueue } from "../lib/minecraft/queue-service";
 import { clearSnapshots } from "../lib/minecraft/inventory-service";
 import { releaseVersions } from "../lib/minecraft/blueprint-version";
-import {
-    blueprintVersions,
-    createGameServer,
-    expectedMinecraftHeapMb
-} from "../lib/games-create";
+import { blueprintVersions, createGameServer, expectedMinecraftHeapMb } from "../lib/games-create";
 import { listGameMachines, type GameMachine } from "../lib/games-service";
 import { clearGameServerPrefs, setGameServerPref } from "../lib/games-prefs";
 import { clearLogins } from "../lib/minecraft/polaris-login-service";

@@ -18,8 +18,15 @@ import {
     forgetModrinthAnswers,
     projectSlug
 } from "@polaris-app/game-servers/src/lib/minecraft/modrinth";
-import { commonVersions, knownUnsupported } from "@polaris-app/game-servers/src/lib/minecraft/blueprint-version";
-import { blueprintFor, minecraftShapeEnv, withoutBlueprintProjects } from "@polaris-app/game-servers/src/lib/games-create";
+import {
+    commonVersions,
+    knownUnsupported
+} from "@polaris-app/game-servers/src/lib/minecraft/blueprint-version";
+import {
+    blueprintFor,
+    minecraftShapeEnv,
+    withoutBlueprintProjects
+} from "@polaris-app/game-servers/src/lib/games-create";
 import {
     CROSSPLAY_PROJECTS,
     GAME_BLUEPRINTS,
@@ -340,9 +347,9 @@ describe("the world a blueprint opens on", () => {
 
 describe("resetting a server onto another blueprint", () => {
     it("takes the previous blueprint's plugin back off the list", () => {
-        expect(withoutBlueprintProjects("coreprotect?,luckperms?,bedwars1058,geyser,floodgate")).toBe(
-            "coreprotect?,luckperms?"
-        );
+        expect(
+            withoutBlueprintProjects("coreprotect?,luckperms?,bedwars1058,geyser,floodgate")
+        ).toBe("coreprotect?,luckperms?");
     });
 
     it("takes off the anti-cheat plugin Polaris's own replaced", () => {
@@ -352,7 +359,9 @@ describe("resetting a server onto another blueprint", () => {
     it("leaves alone what somebody installed themselves", () => {
         // A change of game is not a request to uninstall the map plugin they added
         // from the Mods screen.
-        expect(withoutBlueprintProjects("coreprotect?,dynmap,iridiumskyblock")).toBe("coreprotect?,dynmap");
+        expect(withoutBlueprintProjects("coreprotect?,dynmap,iridiumskyblock")).toBe(
+            "coreprotect?,dynmap"
+        );
     });
 
     it("survives a list that names a file rather than a project", () => {

@@ -43,7 +43,9 @@ import {
  * had never heard of and the third installed a jar the server could not boot on.
  */
 describe("the mod list a server starts with", () => {
-    const field = (findApp("minecraft")?.template?.env ?? []).find((entry) => entry.key === "MODRINTH_PROJECTS");
+    const field = (findApp("minecraft")?.template?.env ?? []).find(
+        (entry) => entry.key === "MODRINTH_PROJECTS"
+    );
 
     it("is seeded only onto a server that runs plugins", () => {
         expect(field).toBeDefined();
@@ -96,7 +98,6 @@ describe("the app every game is created from", () => {
 });
 
 describe("every game", () => {
-
     it("names server manifests that declare themselves game servers", () => {
         for (const game of GAMES) {
             expect(game.serverCatalogIds.length).toBeGreaterThan(0);

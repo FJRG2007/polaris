@@ -359,7 +359,10 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // moved to anything it could have been created as. Two lists
                     // meant a server running Purpur that this picker could not
                     // even select.
-                    options: MINECRAFT_SOFTWARE.map((entry) => ({ value: entry.id, label: entry.name })),
+                    options: MINECRAFT_SOFTWARE.map((entry) => ({
+                        value: entry.id,
+                        label: entry.name
+                    })),
                     tunable: true,
                     group: "Server"
                 },
