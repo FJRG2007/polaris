@@ -59,8 +59,8 @@ function size(bytes: number | null): string {
 
 /** Remove every volume the storage screen judges safe to delete. */
 export async function removeLeftoverVolumes(): Promise<RemovedVolume[]> {
-    if (!(await autoRemoveOn())) return [];
-    const volumes = await hostVolumes();
+    if ((await getSetting(AUTO_REMOVE_KEY)) === "off") return [];
+    const volumes = await hostVolumes({ strict: true });
     // A machine that would not say what it holds is not a machine holding nothing.
     if (!volumes) return [];
 

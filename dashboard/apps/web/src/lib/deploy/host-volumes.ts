@@ -146,8 +146,7 @@ async function claimed(): Promise<Map<string, string>> {
         .findMany({
             where: { kind: "volume", source: { not: null } },
             select: { source: true, application: { select: { name: true } } }
-        })
-        .catch(() => []);
+        });
     const names = new Map<string, string>();
     for (const row of rows) {
         if (row.source) names.set(row.source, row.application?.name ?? "an app on this machine");
@@ -175,8 +174,7 @@ async function projectOwners(): Promise<
                 name: true,
                 environment: { select: { name: true, project: { select: { name: true } } } }
             }
-        })
-        .catch(() => []);
+        });
     return new Map(
         apps.map((app) => [
             `polaris-${shortHash(app.id, 8)}`,
@@ -188,8 +186,7 @@ async function projectOwners(): Promise<
 /** The volumes Polaris's own databases keep their data in, by volume name. */
 async function databaseVolumes(): Promise<Map<string, { id: string; name: string; engine: string }>> {
     const rows = await prisma.managedDatabase
-        .findMany({ select: { id: true, name: true, engine: true, volumeName: true } })
-        .catch(() => []);
+        .findMany({ select: { id: true, name: true, engine: true, volumeName: true } });
     return new Map(rows.filter((row) => row.volumeName).map((row) => [row.volumeName, row]));
 }
 
@@ -223,16 +220,18 @@ function containerName(entry: DockerContainer): string {
  * `/volumes` is what knows when each one was created and what it was labelled
  * with. A volume missing from either is still listed, with what is known.
  */
-export async function hostVolumes(): Promise<HostVolume[] | null> {
+export async function hostVolumes(options: { strict?: boolean } = {}): Promise<HostVolume[] | null> {
     const daemon = new HostdClient();
+    const known = <T>(lookup: () => Promise<T>, none: T): Promise<T> =>
+        options.strict ? lookup() : lookup().catch(() => none);
     const [listing, df, records, owners, running, databases, notes] = await Promise.all([
         read(daemon, "/volumes"),
         read(daemon, "/system/df"),
-        claimed(),
-        projectOwners(),
+        known(claimed, new Map()),
+        known(projectOwners, new Map()),
         containers(daemon),
-        databaseVolumes(),
-        volumeNotes()
+        known(databaseVolumes, new Map()),
+        known(() => volumeNotes(), new Map())
     ]);
     if (!listing) return null;
 
@@ -360,7 +359,13 @@ export type VolumeRemoval = { ok: true } | { ok: false; reason: string };
  * for the gap between this check and the call.
  */
 export async function removeHostVolume(name: string): Promise<VolumeRemoval> {
-    const volumes = await hostVolumes();
+    const volumes = await hostVolumes({ strict: true }).catch((caught: unknown) => {
+        console.error("polaris: could not read whose the volumes are:", caught);
+        return undefined;
+    });
+    if (volumes === undefined) {
+        return { ok: false, reason: "Polaris could not read whose it is. Nothing was removed." };
+    }
     if (!volumes) return { ok: false, reason: "This machine would not say what it is holding." };
     const volume = volumes.find((entry) => entry.name === name);
     if (!volume) return { ok: false, reason: "That volume is not on this machine any more." };

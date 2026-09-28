@@ -22,11 +22,16 @@ const fake = vi.hoisted(() => ({
     removed: [] as string[],
     audits: [] as { action: string; targetId?: string; actorId: string | null }[],
     alerts: [] as { title: string; body: string }[],
-    setting: null as string | null
+    setting: null as string | null,
+    settingFails: false,
+    strict: [] as (boolean | undefined)[]
 }));
 
 vi.mock("@/lib/deploy/host-volumes", () => ({
-    hostVolumes: async () => fake.volumes,
+    hostVolumes: async (options?: { strict?: boolean }) => {
+        fake.strict.push(options?.strict);
+        return fake.volumes;
+    },
     removeHostVolume: async (name: string) => {
         if (fake.refuse.has(name)) return { ok: false, reason: "Something is using it now." };
         fake.removed.push(name);
@@ -39,7 +44,10 @@ vi.mock("@/lib/audit-service", () => ({
     }
 }));
 vi.mock("@/lib/setting-store", () => ({
-    getSetting: async () => fake.setting,
+    getSetting: async () => {
+        if (fake.settingFails) throw new Error("database unavailable");
+        return fake.setting;
+    },
     setSetting: async (_key: string, value: string | null) => {
         fake.setting = value;
     }
@@ -68,7 +76,9 @@ beforeEach(() => {
         removed: [],
         audits: [],
         alerts: [],
-        setting: null
+        setting: null,
+        settingFails: false,
+        strict: []
     });
 });
 
@@ -118,5 +128,19 @@ describe("removing leftover volumes", () => {
         await setAutoRemove(true);
         expect(fake.setting).toBeNull();
         expect(await removeLeftoverVolumes()).toHaveLength(1);
+    });
+
+    it("judges from records it could read, never from ones it could not", async () => {
+        fake.volumes = [volume("polaris-36e74d11_data", "safe")];
+        await removeLeftoverVolumes();
+        expect(fake.strict).toEqual([true]);
+    });
+
+    it("skips the pass when the switch cannot be read", async () => {
+        fake.volumes = [volume("polaris-36e74d11_data", "safe")];
+        fake.settingFails = true;
+        await expect(removeLeftoverVolumes()).rejects.toThrow();
+        expect(fake.removed).toEqual([]);
+        expect(fake.alerts).toEqual([]);
     });
 });

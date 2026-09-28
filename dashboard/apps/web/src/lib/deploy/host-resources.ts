@@ -120,8 +120,7 @@ export async function volumeNotes(serverId = LOCAL_SERVER): Promise<Map<string, 
                 ownerDeletedAt: true,
                 createdAt: true
             }
-        })
-        .catch(() => []);
+        });
     return new Map(
         rows.map((row) => [
             row.name,

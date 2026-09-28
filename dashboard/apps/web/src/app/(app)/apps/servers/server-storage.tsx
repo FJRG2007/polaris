@@ -90,12 +90,19 @@ export function ServerStorage() {
     const [error, setError] = useState<string | null>(null);
     const [freed, setFreed] = useState<{ name: string; bytes: number | null } | null>(null);
     const [autoRemove, setAutoRemoveShown] = useState<boolean | null>(null);
+    const [autoRemoveUnread, setAutoRemoveUnread] = useState(false);
 
-    useEffect(() => {
+    const readAutoRemove = useCallback(() => {
+        setAutoRemoveUnread(false);
         void leftoverAutoRemoveAction()
             .then(setAutoRemoveShown)
-            .catch(() => setAutoRemoveShown(null));
+            .catch(() => {
+                setAutoRemoveShown(null);
+                setAutoRemoveUnread(true);
+            });
     }, []);
+
+    useEffect(readAutoRemove, [readAutoRemove]);
 
     // Shown at once and put back if the server says no.
     const switchAutoRemove = async (on: boolean) => {
@@ -178,10 +185,23 @@ export function ServerStorage() {
                         />
                         <span>
                             <span className="block font-medium">Remove leftovers automatically</span>
-                            <span className="text-muted-foreground">
-                                The data of an app deleted over a week ago that nothing has used
-                                since. You are told what went.
-                            </span>
+                            {autoRemoveUnread ? (
+                                <span className="text-danger">
+                                    Could not read whether this is on.{" "}
+                                    <button
+                                        type="button"
+                                        className="underline underline-offset-2"
+                                        onClick={readAutoRemove}
+                                    >
+                                        Try again
+                                    </button>
+                                </span>
+                            ) : (
+                                <span className="text-muted-foreground">
+                                    The data of an app deleted over a week ago that nothing has
+                                    used since. You are told what went.
+                                </span>
+                            )}
                         </span>
                     </label>
                 </div>
