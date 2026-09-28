@@ -785,7 +785,7 @@ export function EventEditor({
                                     label="Everybody who took part"
                                     hint={
                                         draft.kind === "blood-moon"
-                                            ? "Everybody who survived the night."
+                                            ? "Everybody who survived the night with a kill."
                                             : draft.kind === "supply-drop" ||
                                                 (draft.kind === "explorer" &&
                                                     (

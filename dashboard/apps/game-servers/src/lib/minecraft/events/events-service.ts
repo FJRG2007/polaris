@@ -1348,7 +1348,7 @@ async function finish(
             const minimum = catalog.minScoreOf(preset);
             placed = plan.podium(scores, disqualified, minimum);
             // Taking part is reaching the minimum too - one zombie is not taking part
-            // in a hunt. A blood moon's is surviving it, which is its own bar.
+            // in a hunt. A blood moon's is surviving it with a kill, its own bar.
             const counted =
                 preset.kind === "blood-moon"
                     ? took
@@ -1544,7 +1544,7 @@ function scoreText(preset: catalog.EventPreset, score: number): string {
 
 /**
  * The final scores, and everybody who took part in the event's own sense:
- * scored at all - or, on a blood moon, lived to see the dawn.
+ * scored at all - and, on a blood moon, lived to see the dawn.
  */
 async function results(
     server: ServerContainer,
@@ -1575,15 +1575,11 @@ async function results(
     }
     if (preset.kind === "blood-moon") {
         const alive = new Set((await survivorsOf(server, run)).map((name) => name.toLowerCase()));
-        for (const name of [...scores.keys()])
-            if (!alive.has(name.toLowerCase())) scores.delete(name);
         // Taking part is fighting through the night and seeing the dawn: alive
         // and at least one kill. Somebody who sat it out indoors saw the dawn
         // too, and was being handed the prize for it.
-        return {
-            scores,
-            took: [...scores.entries()].filter(([, score]) => score > 0).map(([name]) => name)
-        };
+        for (const name of [...scores.keys()])
+            if (!alive.has(name.toLowerCase())) scores.delete(name);
     }
     return {
         scores,

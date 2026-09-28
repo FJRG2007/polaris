@@ -63,7 +63,7 @@ export const rewardsSchema = z.object({
     first: rewardSchema,
     second: rewardSchema,
     third: rewardSchema,
-    /** For everybody who took part - scored at all, or survived the night. */
+    /** For everybody who took part - scored at all, and on a blood moon survived the night. */
     everyone: rewardSchema
 });
 
