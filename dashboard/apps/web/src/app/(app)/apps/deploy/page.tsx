@@ -32,13 +32,18 @@ export default async function DeployPage() {
 
     const shown = projects.map((project) => ({
         project,
-        environment: project.environments.find((environment) => environment.isDefault) ?? project.environments[0]
+        environment:
+            project.environments.find((environment) => environment.isDefault) ??
+            project.environments[0]
     }));
     // Live status per service, so a card counts what is actually up rather than what
     // has ever been deployed, and can say a build is running before it has a release.
     const statuses = await getApplicationDeployStatuses(
         shown.flatMap(({ environment }) =>
-            (environment?.applications ?? []).map((app) => ({ id: app.id, currentDeploymentId: app.currentDeploymentId }))
+            (environment?.applications ?? []).map((app) => ({
+                id: app.id,
+                currentDeploymentId: app.currentDeploymentId
+            }))
         )
     );
     const cards: ProjectCardData[] = shown.map(({ project, environment }) => {
@@ -49,8 +54,10 @@ export default async function DeployPage() {
             ...databases.map((): ServiceKind => "database")
         ];
         const online =
-            apps.filter((app) => ONLINE_DB_STATES.has((statuses[app.id] ?? "").toLowerCase())).length +
-            databases.filter((database) => ONLINE_DB_STATES.has(database.status.toLowerCase())).length;
+            apps.filter((app) => ONLINE_DB_STATES.has((statuses[app.id] ?? "").toLowerCase()))
+                .length +
+            databases.filter((database) => ONLINE_DB_STATES.has(database.status.toLowerCase()))
+                .length;
         return {
             id: project.id,
             name: project.name,
@@ -64,7 +71,5 @@ export default async function DeployPage() {
         };
     });
 
-    return (
-        <ProjectsGrid projects={cards} canManage={canManage} localReady={localReady} />
-    );
+    return <ProjectsGrid projects={cards} canManage={canManage} localReady={localReady} />;
 }

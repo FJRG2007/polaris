@@ -97,7 +97,9 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
         void Promise.all([actions.listPeopleAction(), actions.listPlaceZoneNamesAction()]).then(
             ([faces, drawn]) => {
                 if (cancelled) return;
-                setKnown((faces.people ?? []).map((person) => ({ id: person.id, name: person.name })));
+                setKnown(
+                    (faces.people ?? []).map((person) => ({ id: person.id, name: person.name }))
+                );
                 setAreas(drawn.zones ?? []);
                 setExtras(true);
             },

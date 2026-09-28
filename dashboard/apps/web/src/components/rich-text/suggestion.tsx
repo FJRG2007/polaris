@@ -176,57 +176,57 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
     // reader and the person they are looking for.
     return (
         <PlainNames>
-        <ul className={POPUP_CLASS}>
-            {items.map((item, index) => (
-                <li key={`${item.kind}-${item.id}`}>
-                    <PersonRow
-                        as="button"
-                        // A team or a task is not somebody, and only a person
-                        // has a plate to wear.
-                        personId={item.kind === "user" ? item.id : null}
-                        type="button"
-                        // Pointer down rather than click: the editor takes the
-                        // focus back on mouse up, and a click fired after that
-                        // lands with the caret already moved.
-                        onMouseDown={(event) => {
-                            event.preventDefault();
-                            choose(index);
-                        }}
-                        onMouseEnter={() => setActive(index)}
-                        className={cn(
-                            POPUP_ITEM_CLASS,
-                            index === active ? "bg-option-hover" : "hover:bg-option-hover/60"
-                        )}
-                    >
-                        {item.kind === "user" ? (
-                            <Avatar
-                                person={{ id: item.id, name: item.label, image: item.image }}
-                                size={20}
-                            />
-                        ) : item.kind === "room" ? (
-                            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[0.6875rem] text-primary">
-                                <AtSign className="size-3" />
+            <ul className={POPUP_CLASS}>
+                {items.map((item, index) => (
+                    <li key={`${item.kind}-${item.id}`}>
+                        <PersonRow
+                            as="button"
+                            // A team or a task is not somebody, and only a person
+                            // has a plate to wear.
+                            personId={item.kind === "user" ? item.id : null}
+                            type="button"
+                            // Pointer down rather than click: the editor takes the
+                            // focus back on mouse up, and a click fired after that
+                            // lands with the caret already moved.
+                            onMouseDown={(event) => {
+                                event.preventDefault();
+                                choose(index);
+                            }}
+                            onMouseEnter={() => setActive(index)}
+                            className={cn(
+                                POPUP_ITEM_CLASS,
+                                index === active ? "bg-option-hover" : "hover:bg-option-hover/60"
+                            )}
+                        >
+                            {item.kind === "user" ? (
+                                <Avatar
+                                    person={{ id: item.id, name: item.label, image: item.image }}
+                                    size={20}
+                                />
+                            ) : item.kind === "room" ? (
+                                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[0.6875rem] text-primary">
+                                    <AtSign className="size-3" />
+                                </span>
+                            ) : (
+                                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[0.625rem] uppercase text-muted-foreground">
+                                    {item.kind.slice(0, 1)}
+                                </span>
+                            )}
+                            <span className="min-w-0 flex-1 truncate" title={item.label}>
+                                <PersonName
+                                    id={item.kind === "user" ? item.id : null}
+                                    name={item.label}
+                                />
                             </span>
-                        ) : (
-                            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[0.625rem] uppercase text-muted-foreground">
-                                {item.kind.slice(0, 1)}
-                            </span>
-                        )}
-                        <span className="min-w-0 flex-1 truncate" title={item.label}>
-                            <PersonName
-                                id={item.kind === "user" ? item.id : null}
-                                name={item.label}
-                            />
-                        </span>
-                        {item.detail && (
-                            <span className="max-w-[9rem] shrink-0 truncate text-[0.6875rem] text-muted-foreground">
-                                {item.detail}
-                            </span>
-                        )}
-                    </PersonRow>
-                </li>
-            ))}
-        </ul>
+                            {item.detail && (
+                                <span className="max-w-[9rem] shrink-0 truncate text-[0.6875rem] text-muted-foreground">
+                                    {item.detail}
+                                </span>
+                            )}
+                        </PersonRow>
+                    </li>
+                ))}
+            </ul>
         </PlainNames>
     );
 });

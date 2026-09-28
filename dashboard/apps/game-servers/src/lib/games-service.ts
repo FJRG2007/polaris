@@ -44,12 +44,7 @@ import {
     resolveInstalls,
     type MinecraftInstall
 } from "./minecraft/service";
-import {
-    gamePorts,
-    probeListening,
-    probeReach,
-    reachConfirmedAt
-} from "./minecraft/reach";
+import { gamePorts, probeListening, probeReach, reachConfirmedAt } from "./minecraft/reach";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -346,7 +341,9 @@ export async function listGameServerFacts(
             // `PAPER` as somebody writes it, from the same catalogue the picker
             // offers - so NeoForge is not filed under "Neoforge" and a server
             // running something this build has never heard of is still nameable.
-            software: (env.get(SOFTWARE_VAR) ?? "").trim() ? softwareLabel(env.get(SOFTWARE_VAR)) : null,
+            software: (env.get(SOFTWARE_VAR) ?? "").trim()
+                ? softwareLabel(env.get(SOFTWARE_VAR))
+                : null,
             edition: game?.id === "minecraft" ? editionOf(install.catalogId) : null,
             crossplay: hasCrossplay(env.get(CROSSPLAY_VAR)),
             lastOnlineAt: uptime.lastOnlineAt,
@@ -440,7 +437,9 @@ export async function listGameServerPresence(
     const minecraft = await resolveInstalls(
         ownerId,
         servers
-            .filter((server) => server.running && server.applicationId && server.game === "minecraft")
+            .filter(
+                (server) => server.running && server.applicationId && server.game === "minecraft"
+            )
             .map((server) => server.id)
     ).catch(() => new Map<string, MinecraftInstall>());
     return Promise.all(

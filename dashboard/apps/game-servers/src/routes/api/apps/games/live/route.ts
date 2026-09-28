@@ -27,12 +27,16 @@ export async function GET(): Promise<Response> {
         await sweepWatchedGameSchedules(user.id, {
             // Null for a server that did not answer: nought would be the sweep
             // reading silence as an empty world and stopping it.
-            known: new Map(servers.map((server) => [server.id, server.answering ? server.online : null]))
+            known: new Map(
+                servers.map((server) => [server.id, server.answering ? server.online : null])
+            )
         }).catch(() => undefined);
         return NextResponse.json({ servers });
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : "Could not read your game servers" },
+            {
+                error: caught instanceof Error ? caught.message : "Could not read your game servers"
+            },
             { status: 400 }
         );
     }

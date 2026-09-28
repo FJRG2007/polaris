@@ -22,7 +22,13 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-type Along = { listenerId: string; hostId: string; trackId: string; syncedAt: Date; startedAt: Date };
+type Along = {
+    listenerId: string;
+    hostId: string;
+    trackId: string;
+    syncedAt: Date;
+    startedAt: Date;
+};
 
 const fake = vi.hoisted(() => ({
     links: [] as { id: string; userId: string }[],
@@ -54,15 +60,26 @@ vi.mock("@polaris/db", () => ({
         },
         userActivitySettings: {
             findMany: async ({ where }: { where: { userId: { in: string[] } } }) =>
-                where.userId.in.filter((id) => fake.settings.has(id)).map((id) => ({ userId: id, ...fake.settings.get(id) }))
+                where.userId.in
+                    .filter((id) => fake.settings.has(id))
+                    .map((id) => ({ userId: id, ...fake.settings.get(id) }))
         },
         userActivity: {
-            findUnique: async ({ where }: { where: { userId_source: { userId: string; source: string } } }) =>
+            findUnique: async ({
+                where
+            }: {
+                where: { userId_source: { userId: string; source: string } };
+            }) =>
                 fake.activity.find(
                     (row) =>
-                        row.userId === where.userId_source.userId && row.source === where.userId_source.source
+                        row.userId === where.userId_source.userId &&
+                        row.source === where.userId_source.source
                 ) ?? null,
-            upsert: async ({ create }: { create: { userId: string; source: string; key: string; expiresAt: Date } }) => {
+            upsert: async ({
+                create
+            }: {
+                create: { userId: string; source: string; key: string; expiresAt: Date };
+            }) => {
                 fake.activity = fake.activity.filter(
                     (row) => !(row.userId === create.userId && row.source === create.source)
                 );
@@ -87,7 +104,13 @@ vi.mock("@polaris/db", () => ({
                 fake.along = fake.along.filter((row) => row.listenerId !== create.listenerId);
                 fake.along.push({ startedAt: new Date(), ...create });
             },
-            update: async ({ where, data }: { where: { listenerId: string }; data: Partial<Along> }) => {
+            update: async ({
+                where,
+                data
+            }: {
+                where: { listenerId: string };
+                data: Partial<Along>;
+            }) => {
                 const row = fake.along.find((entry) => entry.listenerId === where.listenerId);
                 if (row) Object.assign(row, data);
             },
@@ -108,7 +131,8 @@ vi.mock("@/lib/connections/spotify", async (original) => {
         ...real,
         getSpotifyOAuthClient: async () => ({ clientId: "c", clientSecret: "s" }),
         spotifyAccessToken: async (_client: unknown, credential: { accessToken: string }) => {
-            if (fake.refreshRefused.has(credential.accessToken)) throw new real.SpotifyUnauthorized();
+            if (fake.refreshRefused.has(credential.accessToken))
+                throw new real.SpotifyUnauthorized();
             if (fake.blip.has(credential.accessToken)) throw new Error("Spotify timed out");
             return { accessToken: credential.accessToken, refreshed: null };
         },
@@ -119,7 +143,11 @@ vi.mock("@/lib/connections/spotify", async (original) => {
             return fake.playing.get(token) ?? null;
         },
         spotifyPlay: async (token: string, uri: string, position: number) => {
-            if (fake.refuse.has(token)) throw new real.SpotifyPlayerRefusal("premium", "Listening along needs Spotify Premium.");
+            if (fake.refuse.has(token))
+                throw new real.SpotifyPlayerRefusal(
+                    "premium",
+                    "Listening along needs Spotify Premium."
+                );
             fake.plays.push({ token, uri, position });
         },
         spotifyPause: async (token: string) => {
@@ -201,7 +229,9 @@ describe("when an account is asked about again", () => {
     });
 
     it("backs off from a minute to five while nothing plays", () => {
-        expect([1, 2, 3, 4, 9].map(poll.nextIdleCheck)).toEqual([60_000, 120_000, 240_000, 300_000, 300_000]);
+        expect([1, 2, 3, 4, 9].map(poll.nextIdleCheck)).toEqual([
+            60_000, 120_000, 240_000, 300_000, 300_000
+        ]);
     });
 });
 
@@ -210,7 +240,9 @@ describe("a pass", () => {
         fake.playing.set("token-ana-link", song("s1"));
         await poll.pollSpotify(1_000_000);
         expect(fake.asked).toEqual(["token-ana-link"]);
-        expect(fake.activity).toEqual([expect.objectContaining({ userId: ANA, source: "spotify", key: "s1" })]);
+        expect(fake.activity).toEqual([
+            expect.objectContaining({ userId: ANA, source: "spotify", key: "s1" })
+        ]);
     });
 
     it("does not ask about somebody who switched Spotify off", async () => {
@@ -242,7 +274,9 @@ describe("a pass", () => {
         fake.playing.set("token-bob-link", song("s1", 10_000));
         fake.slow = 60;
         await poll.pollSpotify(1_000_000);
-        const bob = fake.activity.find((row) => row.userId === BOB) as unknown as { startedAt: Date } | undefined;
+        const bob = fake.activity.find((row) => row.userId === BOB) as unknown as
+            | { startedAt: Date }
+            | undefined;
         expect(bob?.startedAt.getTime()).toBeGreaterThanOrEqual(1_000_000 - 10_000 + 100);
     });
 
@@ -256,7 +290,15 @@ describe("a pass", () => {
 
     it("ends following a host who unlinked Spotify", async () => {
         fake.links = [{ id: "bob-link", userId: BOB }];
-        fake.along = [{ listenerId: BOB, hostId: ANA, trackId: "s1", syncedAt: new Date(0), startedAt: new Date(0) }];
+        fake.along = [
+            {
+                listenerId: BOB,
+                hostId: ANA,
+                trackId: "s1",
+                syncedAt: new Date(0),
+                startedAt: new Date(0)
+            }
+        ];
         await poll.pollSpotify(1_000_000);
         expect(fake.along).toEqual([]);
     });
@@ -279,12 +321,16 @@ describe("listening along", () => {
     it("starts where the host is, through the presence rule", async () => {
         fake.visible.set(ANA, { key: "s1", startedAt: new Date(1_000_000 - 42_000).toISOString() });
         await along.startListenAlong(listener, ANA, 1_000_000);
-        expect(fake.plays).toEqual([{ token: "token-bob-link", uri: "spotify:track:s1", position: 42_000 }]);
+        expect(fake.plays).toEqual([
+            { token: "token-bob-link", uri: "spotify:track:s1", position: 42_000 }
+        ]);
         expect(await along.listenAlongOf(BOB)).toBe(ANA);
     });
 
     it("refuses a card the listener may not see exactly like an empty one", async () => {
-        await expect(along.startListenAlong(listener, ANA)).rejects.toThrow(/not playing anything you can see/);
+        await expect(along.startListenAlong(listener, ANA)).rejects.toThrow(
+            /not playing anything you can see/
+        );
         await expect(along.startListenAlong(listener, BOB)).rejects.toThrow(/your own/);
     });
 
@@ -299,10 +345,20 @@ describe("listening along", () => {
     });
 
     it("puts the host's next song on the listener, and pauses them with the host", async () => {
-        fake.along = [{ listenerId: BOB, hostId: ANA, trackId: "s1", syncedAt: new Date(0), startedAt: new Date(0) }];
+        fake.along = [
+            {
+                listenerId: BOB,
+                hostId: ANA,
+                trackId: "s1",
+                syncedAt: new Date(0),
+                startedAt: new Date(0)
+            }
+        ];
         fake.visible.set(ANA, { key: "s2", startedAt: new Date().toISOString() });
         await along.followHost(ANA, song("s2", 1_500), true, 100_000);
-        expect(fake.plays).toEqual([{ token: "token-bob-link", uri: "spotify:track:s2", position: 1_500 }]);
+        expect(fake.plays).toEqual([
+            { token: "token-bob-link", uri: "spotify:track:s2", position: 1_500 }
+        ]);
         expect(fake.along[0]?.trackId).toBe("s2");
 
         await along.followHost(ANA, null, true, 110_000);
@@ -311,13 +367,29 @@ describe("listening along", () => {
     });
 
     it("ends with a paused host who is no longer visible, or paused too long", async () => {
-        fake.along = [{ listenerId: BOB, hostId: ANA, trackId: "s1", syncedAt: new Date(0), startedAt: new Date(0) }];
+        fake.along = [
+            {
+                listenerId: BOB,
+                hostId: ANA,
+                trackId: "s1",
+                syncedAt: new Date(0),
+                startedAt: new Date(0)
+            }
+        ];
         await along.followHost(ANA, null, true, 100_000);
         expect(fake.along).toEqual([]);
         expect(fake.pauses).toEqual([]);
 
         fake.visible.set(ANA, { key: "s1", startedAt: new Date().toISOString() });
-        fake.along = [{ listenerId: BOB, hostId: ANA, trackId: "", syncedAt: new Date(100_000), startedAt: new Date(0) }];
+        fake.along = [
+            {
+                listenerId: BOB,
+                hostId: ANA,
+                trackId: "",
+                syncedAt: new Date(100_000),
+                startedAt: new Date(0)
+            }
+        ];
         await along.followHost(ANA, null, true, 100_000 + 14 * 60_000);
         expect(fake.along).toHaveLength(1);
         await along.followHost(ANA, null, true, 100_000 + 15 * 60_000);
@@ -325,7 +397,15 @@ describe("listening along", () => {
     });
 
     it("keeps following through a blip, and ends when Spotify refuses the listener", async () => {
-        fake.along = [{ listenerId: BOB, hostId: ANA, trackId: "s1", syncedAt: new Date(0), startedAt: new Date(0) }];
+        fake.along = [
+            {
+                listenerId: BOB,
+                hostId: ANA,
+                trackId: "s1",
+                syncedAt: new Date(0),
+                startedAt: new Date(0)
+            }
+        ];
         fake.visible.set(ANA, { key: "s2", startedAt: new Date().toISOString() });
         fake.blip.add("token-bob-link");
         await along.followHost(ANA, song("s2"), true, 100_000);
@@ -337,21 +417,45 @@ describe("listening along", () => {
     });
 
     it("leaves a listener already on the right song alone", async () => {
-        fake.along = [{ listenerId: BOB, hostId: ANA, trackId: "s1", syncedAt: new Date(0), startedAt: new Date(0) }];
+        fake.along = [
+            {
+                listenerId: BOB,
+                hostId: ANA,
+                trackId: "s1",
+                syncedAt: new Date(0),
+                startedAt: new Date(0)
+            }
+        ];
         fake.visible.set(ANA, { key: "s1", startedAt: new Date().toISOString() });
         await along.followHost(ANA, song("s1"), false, 100_000);
         expect(fake.plays).toEqual([]);
     });
 
     it("ends when the host is no longer somebody the listener may see listening", async () => {
-        fake.along = [{ listenerId: BOB, hostId: ANA, trackId: "s1", syncedAt: new Date(0), startedAt: new Date(0) }];
+        fake.along = [
+            {
+                listenerId: BOB,
+                hostId: ANA,
+                trackId: "s1",
+                syncedAt: new Date(0),
+                startedAt: new Date(0)
+            }
+        ];
         await along.followHost(ANA, song("s2"), true, 100_000);
         expect(fake.along).toEqual([]);
         expect(fake.plays).toEqual([]);
     });
 
     it("ends only after the listener is seen on something else twice, apart", async () => {
-        fake.along = [{ listenerId: BOB, hostId: ANA, trackId: "s1", syncedAt: new Date(0), startedAt: new Date(0) }];
+        fake.along = [
+            {
+                listenerId: BOB,
+                hostId: ANA,
+                trackId: "s1",
+                syncedAt: new Date(0),
+                startedAt: new Date(0)
+            }
+        ];
         await along.noticeListener(BOB, song("other"), 100_000);
         expect(fake.along).toHaveLength(1);
         await along.noticeListener(BOB, song("s1"), 110_000);

@@ -106,7 +106,9 @@ export async function GET(
                 // that on its own schedule; an instance with no cron configured
                 // would otherwise hand out cool-offs that never end, so opening the
                 // screen that grants them is also when the due ones are lifted.
-                wantsRoster && status.answering ? sweepTimeouts(server.ownerId, id).catch(() => 0) : 0
+                wantsRoster && status.answering
+                    ? sweepTimeouts(server.ownerId, id).catch(() => 0)
+                    : 0
             ] as const);
             return {
                 status,

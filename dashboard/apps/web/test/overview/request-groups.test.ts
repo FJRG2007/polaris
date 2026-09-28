@@ -10,7 +10,9 @@ import { overviewRequestGroups } from "@/lib/overview/request-groups";
 
 describe("overview request groups", () => {
     it("sends the slow cards apart from the quick ones", () => {
-        expect(overviewRequestGroups(["activity", "alarms", "services", "storage", "tasks", "usage"])).toEqual([
+        expect(
+            overviewRequestGroups(["activity", "alarms", "services", "storage", "tasks", "usage"])
+        ).toEqual([
             ["activity", "services", "tasks"],
             ["alarms", "storage", "usage"]
         ]);

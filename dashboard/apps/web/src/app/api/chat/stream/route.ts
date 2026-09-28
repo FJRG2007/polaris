@@ -145,7 +145,10 @@ export async function GET(request: Request): Promise<Response> {
                     const forThem = !change.audience || change.audience.includes(actor.id);
                     // No channel means the change is about a whole space, and
                     // those are always addressed: there is nothing to intersect.
-                    if (!forThem && (!change.channelId || !scope.reachable().has(change.channelId))) {
+                    if (
+                        !forThem &&
+                        (!change.channelId || !scope.reachable().has(change.channelId))
+                    ) {
                         return;
                     }
                     scope.invalidate(change);
@@ -170,7 +173,8 @@ export async function GET(request: Request): Promise<Response> {
                 if (change.kind === "read") {
                     if (!change.channelId) return;
                     if (change.audience && !change.audience.includes(actor.id)) return;
-                    if (change.actorId !== actor.id && !scope.reachable().has(change.channelId)) return;
+                    if (change.actorId !== actor.id && !scope.reachable().has(change.channelId))
+                        return;
                     send({
                         kind: "read",
                         channelId: change.channelId,

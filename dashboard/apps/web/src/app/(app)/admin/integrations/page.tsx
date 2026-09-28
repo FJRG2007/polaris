@@ -233,7 +233,10 @@ export default async function IntegrationsPage() {
                     The outside services Polaris can use, grouped by the job connecting one does.
                     Whatever is set up here works everywhere at once - there is nothing to switch on
                     per screen. The model providers agents run on have their own list under{" "}
-                    <Link href="/admin/integrations/models" className="text-primary hover:underline">
+                    <Link
+                        href="/admin/integrations/models"
+                        className="text-primary hover:underline"
+                    >
                         AI providers
                     </Link>
                     .

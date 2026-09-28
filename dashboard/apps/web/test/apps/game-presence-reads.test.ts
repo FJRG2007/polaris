@@ -33,7 +33,10 @@ let playersAsked: { id: string; resolved: unknown }[] = [];
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
-            findMany: async (query: { where: Record<string, unknown>; select?: Record<string, unknown> }) => {
+            findMany: async (query: {
+                where: Record<string, unknown>;
+                select?: Record<string, unknown>;
+            }) => {
                 listed.push(query);
                 return [row(ONE), row(TWO)];
             }

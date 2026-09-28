@@ -78,7 +78,10 @@ export function FivemRules({
             (setting) =>
                 setting.group === group &&
                 (wanted.length === 0 ||
-                    [setting.key, setting.label, setting.hint, group].join(" ").toLowerCase().includes(wanted))
+                    [setting.key, setting.label, setting.hint, group]
+                        .join(" ")
+                        .toLowerCase()
+                        .includes(wanted))
         )
     })).filter((entry) => entry.settings.length > 0);
 
@@ -105,14 +108,15 @@ export function FivemRules({
         setChanged(true);
     }
 
-    const ruleFor = (key: string): FivemRule | null => rules?.find((rule) => rule.key === key) ?? null;
+    const ruleFor = (key: string): FivemRule | null =>
+        rules?.find((rule) => rule.key === key) ?? null;
 
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm text-muted-foreground">
-                    These are the lines in the server&apos;s own config. It reads them when it starts, so a change
-                    takes effect the next time it does.
+                    These are the lines in the server&apos;s own config. It reads them when it
+                    starts, so a change takes effect the next time it does.
                 </p>
                 <Button
                     size="icon"
@@ -192,14 +196,14 @@ export function FivemRules({
 
             {shown.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                    Nothing here matches “{query}”. A resource can add settings of its own, and those live in its own
-                    config rather than here.
+                    Nothing here matches “{query}”. A resource can add settings of its own, and
+                    those live in its own config rather than here.
                 </p>
             ) : null}
 
             <p className="text-xs text-muted-foreground">
-                Anything a resource adds - jobs, economy, spawn points - is configured inside that resource, which you
-                can reach from the Resources screen or in Drive.
+                Anything a resource adds - jobs, economy, spawn points - is configured inside that
+                resource, which you can reach from the Resources screen or in Drive.
             </p>
         </div>
     );
@@ -235,7 +239,12 @@ function SettingRow({
     useEffect(() => setDraft(value ?? ""), [value]);
 
     return (
-        <div className={cn("flex flex-wrap items-center justify-between gap-3 py-3", !first && "border-t border-border")}>
+        <div
+            className={cn(
+                "flex flex-wrap items-center justify-between gap-3 py-3",
+                !first && "border-t border-border"
+            )}
+        >
             <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 text-sm font-medium">
                     {setting.label}
@@ -245,11 +254,15 @@ function SettingRow({
                     <code className="min-w-0 truncate font-mono text-[0.6875rem] font-normal text-foreground-subtle">
                         {setting.key}
                     </code>
-                    {busy && <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />}
+                    {busy && (
+                        <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+                    )}
                 </p>
                 {setting.hint && <p className="text-xs text-muted-foreground">{setting.hint}</p>}
                 {!isSet && !loading && (
-                    <p className="text-xs text-muted-foreground">Not set - the server uses {setting.fallback}.</p>
+                    <p className="text-xs text-muted-foreground">
+                        Not set - the server uses {setting.fallback}.
+                    </p>
                 )}
             </div>
             {loading ? (
@@ -297,8 +310,14 @@ function SettingRow({
                             value={value ?? ""}
                             onValueChange={(next) => onChange(next || null)}
                             options={[
-                                { value: "", label: `Leave it to the server (${setting.fallback})` },
-                                ...(setting.choices ?? []).map((choice) => ({ value: choice.value, label: choice.label }))
+                                {
+                                    value: "",
+                                    label: `Leave it to the server (${setting.fallback})`
+                                },
+                                ...(setting.choices ?? []).map((choice) => ({
+                                    value: choice.value,
+                                    label: choice.label
+                                }))
                             ]}
                         />
                     ) : (
@@ -311,12 +330,18 @@ function SettingRow({
                             max={setting.max}
                             autoComplete="off"
                             spellCheck={false}
-                            placeholder={setting.secret && isSet ? "Set - type a new one to replace it" : setting.fallback}
+                            placeholder={
+                                setting.secret && isSet
+                                    ? "Set - type a new one to replace it"
+                                    : setting.fallback
+                            }
                             value={draft}
                             onChange={(event) => setDraft(event.target.value)}
                             // Committed on blur and on Enter rather than per keystroke: a
                             // write per digit would set the slots to 3, then 32, then 320.
-                            onBlur={() => draft !== (value ?? "") && onChange(draft.length > 0 ? draft : null)}
+                            onBlur={() =>
+                                draft !== (value ?? "") && onChange(draft.length > 0 ? draft : null)
+                            }
                             onKeyDown={(event) => {
                                 if (event.key === "Enter" && draft !== (value ?? "")) {
                                     onChange(draft.length > 0 ? draft : null);

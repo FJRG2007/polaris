@@ -727,25 +727,27 @@ export async function readThreadView(
  * Memoized for the request: a Mail page asks twice - the layout for the rail,
  * and the header for the app switcher's badge - and both want the same answer.
  */
-export const unreadCounts = cache(async (
-    userId: string,
-    shelfOrgId: MailShelf
-): Promise<{ total: number; byAccount: Record<string, number> }> => {
-    const rows = await prisma.mailMessage.groupBy({
-        by: ["accountId"],
-        where: {
-            account: onShelf(userId, shelfOrgId),
-            folder: { role: "inbox" },
-            seen: false,
-            OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }]
-        },
-        _count: { _all: true }
-    });
-    const byAccount: Record<string, number> = {};
-    let total = 0;
-    for (const row of rows) {
-        byAccount[row.accountId] = row._count._all;
-        total += row._count._all;
+export const unreadCounts = cache(
+    async (
+        userId: string,
+        shelfOrgId: MailShelf
+    ): Promise<{ total: number; byAccount: Record<string, number> }> => {
+        const rows = await prisma.mailMessage.groupBy({
+            by: ["accountId"],
+            where: {
+                account: onShelf(userId, shelfOrgId),
+                folder: { role: "inbox" },
+                seen: false,
+                OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }]
+            },
+            _count: { _all: true }
+        });
+        const byAccount: Record<string, number> = {};
+        let total = 0;
+        for (const row of rows) {
+            byAccount[row.accountId] = row._count._all;
+            total += row._count._all;
+        }
+        return { total, byAccount };
     }
-    return { total, byAccount };
-});
+);

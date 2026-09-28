@@ -22,7 +22,13 @@ let installReads = 0;
 let applicationReads = 0;
 
 function installRow(id: string, applicationId: string | null) {
-    return { id, name: `Server ${id.slice(0, 1)}`, catalogId: "minecraft", applicationId, config: "{}" };
+    return {
+        id,
+        name: `Server ${id.slice(0, 1)}`,
+        catalogId: "minecraft",
+        applicationId,
+        config: "{}"
+    };
 }
 
 function application(id: string) {
@@ -64,7 +70,10 @@ vi.mock("@polaris/db", () => ({
 }));
 
 vi.mock("@/lib/deploy/releases", () => ({
-    currentReleaseRef: async (app: { id: string }) => ({ name: `container-${app.id}`, portSubject: app.id })
+    currentReleaseRef: async (app: { id: string }) => ({
+        name: `container-${app.id}`,
+        portSubject: app.id
+    })
 }));
 vi.mock("@/lib/deploy-service", () => ({
     readAppRuntimeLog: async () => "",

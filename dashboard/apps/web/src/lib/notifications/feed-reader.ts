@@ -26,7 +26,11 @@ export interface FeedReader {
     read(): Promise<NotificationView[]>;
 }
 
-export function createFeedReader(userId: string, shelf: string, now: () => number = Date.now): FeedReader {
+export function createFeedReader(
+    userId: string,
+    shelf: string,
+    now: () => number = Date.now
+): FeedReader {
     let version: string | null = null;
     let items: NotificationView[] = [];
     let readAt = 0;

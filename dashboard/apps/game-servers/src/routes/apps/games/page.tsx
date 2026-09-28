@@ -40,7 +40,9 @@ export default async function GameServersPage() {
         // Creating a server is instance-wide. Being invited to help run one is
         // not an offer to start more.
         userHasManage(user, "games.manage"),
-        reachableInstallIds(user, "games.read").then((granted) => listInstalledApps(user.id, granted))
+        reachableInstallIds(user, "games.read").then((granted) =>
+            listInstalledApps(user.id, granted)
+        )
     ]);
     const games = installs.filter((install) => isGameServerApp(install.catalogId));
     const [prefs, held] = await Promise.all([

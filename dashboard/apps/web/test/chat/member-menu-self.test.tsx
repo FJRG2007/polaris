@@ -15,7 +15,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 const pushed: string[] = [];
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: (to: string) => pushed.push(to) }) }));
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ push: (to: string) => pushed.push(to) })
+}));
 vi.mock("@/app/(app)/chat/chat-context", () => ({
     useChat: () => ({ spaces: [], blocked: new Set<string>(), refresh: () => undefined })
 }));
@@ -111,7 +113,11 @@ describe("the menu opened without a right-click", () => {
                 </MemberMenu>
             </PersonPressContext.Provider>
         );
-        fireEvent.pointerDown(screen.getByText("Ana row"), { button: 0, ctrlKey: false, pointerType: "mouse" });
+        fireEvent.pointerDown(screen.getByText("Ana row"), {
+            button: 0,
+            ctrlKey: false,
+            pointerType: "mouse"
+        });
         fireEvent.click(screen.getByText("Profile"));
         expect(cards).toEqual(["me"]);
     });

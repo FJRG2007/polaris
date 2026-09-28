@@ -27,7 +27,8 @@ export interface PolicySummary {
 /** Validate and store a policy document, returning the parsed statements. */
 function serializeDocument(document: unknown): string {
     const parsed = policyDocumentSchema.safeParse(document);
-    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid policy document");
+    if (!parsed.success)
+        throw new Error(parsed.error.issues[0]?.message ?? "Invalid policy document");
     return JSON.stringify(parsed.data);
 }
 
@@ -50,7 +51,11 @@ export async function createPolicy(
     const trimmed = name.trim();
     if (!trimmed) throw new Error("Enter a policy name");
     return prisma.policy.create({
-        data: { name: trimmed, description: description?.trim() || null, document: serializeDocument(document) },
+        data: {
+            name: trimmed,
+            description: description?.trim() || null,
+            document: serializeDocument(document)
+        },
         select: { id: true }
     });
 }
@@ -66,8 +71,12 @@ export async function updatePolicy(
         where: { id },
         data: {
             ...(changes.name !== undefined ? { name: changes.name.trim() } : {}),
-            ...(changes.description !== undefined ? { description: changes.description?.trim() || null } : {}),
-            ...(changes.document !== undefined ? { document: serializeDocument(changes.document) } : {})
+            ...(changes.description !== undefined
+                ? { description: changes.description?.trim() || null }
+                : {}),
+            ...(changes.document !== undefined
+                ? { document: serializeDocument(changes.document) }
+                : {})
         }
     });
 }
@@ -162,7 +171,9 @@ export const principalsOfUser = perRequest(async function principalsOfUser(
  * Drive-resource decisions (the caller supplies the action and resource).
  */
 export async function resolvePrincipalPolicyStatements(userId: string): Promise<PolicyStatement[]> {
-    return (await resolvePrincipalPolicyStatementsBySource(userId)).flatMap((entry) => entry.statements);
+    return (await resolvePrincipalPolicyStatementsBySource(userId)).flatMap(
+        (entry) => entry.statements
+    );
 }
 
 /** One policy's statements, and which principal brought them. */
@@ -182,34 +193,36 @@ export interface SourcedPolicyStatements {
  * this" but "they may do this because of that". Split rather than written twice,
  * so the explanation can never disagree with the decision.
  */
-export const resolvePrincipalPolicyStatementsBySource = perRequest(async function resolvePrincipalPolicyStatementsBySource(
-    userId: string
-): Promise<SourcedPolicyStatements[]> {
-    const principals = await principalsOfUser(userId);
+export const resolvePrincipalPolicyStatementsBySource = perRequest(
+    async function resolvePrincipalPolicyStatementsBySource(
+        userId: string
+    ): Promise<SourcedPolicyStatements[]> {
+        const principals = await principalsOfUser(userId);
 
-    const attachments = await prisma.policyAttachment.findMany({
-        where: { OR: principals },
-        select: { policyId: true, principalType: true, principalId: true }
-    });
-    const policyIds = [...new Set(attachments.map((row) => row.policyId))];
-    if (policyIds.length === 0) return [];
+        const attachments = await prisma.policyAttachment.findMany({
+            where: { OR: principals },
+            select: { policyId: true, principalType: true, principalId: true }
+        });
+        const policyIds = [...new Set(attachments.map((row) => row.policyId))];
+        if (policyIds.length === 0) return [];
 
-    const policies = await prisma.policy.findMany({
-        where: { id: { in: policyIds } },
-        select: { id: true, name: true, document: true }
-    });
-    const byId = new Map(policies.map((policy) => [policy.id, policy]));
-    return attachments.flatMap((attachment) => {
-        const policy = byId.get(attachment.policyId);
-        if (!policy) return [];
-        return [
-            {
-                policyId: policy.id,
-                policyName: policy.name,
-                principalType: attachment.principalType as PrincipalType,
-                principalId: attachment.principalId,
-                statements: parseDocument(policy.document)
-            }
-        ];
-    });
-});
+        const policies = await prisma.policy.findMany({
+            where: { id: { in: policyIds } },
+            select: { id: true, name: true, document: true }
+        });
+        const byId = new Map(policies.map((policy) => [policy.id, policy]));
+        return attachments.flatMap((attachment) => {
+            const policy = byId.get(attachment.policyId);
+            if (!policy) return [];
+            return [
+                {
+                    policyId: policy.id,
+                    policyName: policy.name,
+                    principalType: attachment.principalType as PrincipalType,
+                    principalId: attachment.principalId,
+                    statements: parseDocument(policy.document)
+                }
+            ];
+        });
+    }
+);

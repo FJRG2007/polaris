@@ -132,10 +132,15 @@ export const grantsForUser = perRequest(async function grantsForUser(
 });
 
 /** Those grants as engine statements. */
-export async function resourceGrantStatements(userId: string, now?: Date): Promise<core.PolicyStatement[]> {
+export async function resourceGrantStatements(
+    userId: string,
+    now?: Date
+): Promise<core.PolicyStatement[]> {
     // Only "now" is shared across a request: a Date made here would be a new
     // argument every time, and the lookup would be read again each call.
-    return (await (now ? grantsForUser(userId, now) : grantsForUser(userId))).flatMap(grantStatements);
+    return (await (now ? grantsForUser(userId, now) : grantsForUser(userId))).flatMap(
+        grantStatements
+    );
 }
 
 /** One grant, compiled. A row with no readable action contributes nothing at all
@@ -224,7 +229,9 @@ export async function removeResourceGrant(ref: core.ResourceRef, grantId: string
  *  is inert, since it can only reach a row that no longer loads, but leaving it is
  *  the kind of tidiness that stops being optional once ids are reused. */
 export async function clearResourceGrants(ref: core.ResourceRef): Promise<void> {
-    await prisma.resourceGrant.deleteMany({ where: { resourceKind: ref.kind, resourceId: ref.id } });
+    await prisma.resourceGrant.deleteMany({
+        where: { resourceKind: ref.kind, resourceId: ref.id }
+    });
 }
 
 /**
@@ -265,7 +272,10 @@ export async function grantedResourceIds(
 /** Whether this user holds the permission on at least one thing. What a landing
  *  page and the app switcher ask: an account given one server has to be able to
  *  find the app that server lives in. */
-export async function holdsAnyGrantCarrying(userId: string, permission: core.Permission): Promise<boolean> {
+export async function holdsAnyGrantCarrying(
+    userId: string,
+    permission: core.Permission
+): Promise<boolean> {
     const grants = await grantsForUser(userId);
     return grants.some((grant) => grant.effect === "allow" && grant.actions.includes(permission));
 }

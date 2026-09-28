@@ -17,7 +17,11 @@ import { prisma } from "@polaris/db";
 import { notify } from "@/lib/notifications/dispatch";
 import { bridgeSend } from "@/lib/messaging/bridge-client";
 import { COLLECT_TICK_MS, LOCAL_HOST_SUBJECT, STORAGE_EVERY_TICKS } from "@/lib/metrics-shared";
-import { isLocalMachine, localMachineIdentity, type LocalMachineIdentity } from "@/lib/local-machine";
+import {
+    isLocalMachine,
+    localMachineIdentity,
+    type LocalMachineIdentity
+} from "@/lib/local-machine";
 import {
     alarmUnit,
     breaches,
@@ -61,24 +65,41 @@ async function evaluateCondition(alarm: AlarmRow, context: PassContext): Promise
     // Domain reachability (or an app's http metric pointed at a domain id).
     if (alarm.targetType === "domain" || alarm.metric === "http") {
         const domain = context.domains.get(alarm.targetId);
-        if (!domain) return { breach: false, value: null, detail: "Domain not found", insufficient: true };
+        if (!domain)
+            return { breach: false, value: null, detail: "Domain not found", insufficient: true };
         if (domain.healthStatus !== "up" && domain.healthStatus !== "down") {
             return { breach: false, value: null, detail: "Not checked yet", insufficient: true };
         }
         const breach = domain.healthStatus === "down";
-        return { breach, value: null, detail: breach ? (domain.healthDetail ?? "unreachable") : "reachable", insufficient: false };
+        return {
+            breach,
+            value: null,
+            detail: breach ? (domain.healthDetail ?? "unreachable") : "reachable",
+            insufficient: false
+        };
     }
 
     // App service liveness: down if it should be up but has no recent metrics.
     if (alarm.metric === "service") {
         const app = context.apps.get(alarm.targetId);
-        if (!app) return { breach: false, value: null, detail: "App not found", insufficient: true };
+        if (!app)
+            return { breach: false, value: null, detail: "App not found", insufficient: true };
         if (app.desiredState !== "running") {
-            return { breach: false, value: null, detail: "stopped (not expected up)", insufficient: false };
+            return {
+                breach: false,
+                value: null,
+                detail: "stopped (not expected up)",
+                insufficient: false
+            };
         }
         // Asleep for being idle is stopped on purpose, and wakes on the next visit.
         if (app.asleepSince) {
-            return { breach: false, value: null, detail: "asleep (wakes on the next visit)", insufficient: false };
+            return {
+                breach: false,
+                value: null,
+                detail: "asleep (wakes on the next visit)",
+                insufficient: false
+            };
         }
         const sample = await prisma.metricSample.findFirst({
             where: { subjectType: "app", subjectId: alarm.targetId },
@@ -86,18 +107,25 @@ async function evaluateCondition(alarm: AlarmRow, context: PassContext): Promise
             select: { ts: true }
         });
         const recent = sample !== null && Date.now() - sample.ts.getTime() < RECENT_SAMPLE_MS;
-        return { breach: !recent, value: null, detail: recent ? "running" : "no recent metrics (down?)", insufficient: false };
+        return {
+            breach: !recent,
+            value: null,
+            detail: recent ? "running" : "no recent metrics (down?)",
+            insufficient: false
+        };
     }
 
     const unit = alarmUnit(alarm.metric, alarm.targetType);
-    if (unit === null) return { breach: false, value: null, detail: "unknown metric", insufficient: true };
+    if (unit === null)
+        return { breach: false, value: null, detail: "unknown metric", insufficient: true };
 
     // A service's disk is what its volumes hold, measured as subjects of their own.
     const value =
         alarm.metric === "disk" && alarm.targetType === "application"
             ? await serviceDiskGb(alarm.targetId)
             : await subjectValue(alarm, context);
-    if (typeof value === "string") return { breach: false, value: null, detail: value, insufficient: true };
+    if (typeof value === "string")
+        return { breach: false, value: null, detail: value, insufficient: true };
 
     const threshold = alarm.threshold ?? 0;
     const label = METRIC_LABEL[alarm.metric as keyof typeof METRIC_LABEL] ?? alarm.metric;
@@ -128,7 +156,8 @@ async function passContext(alarms: readonly AlarmRow[]): Promise<PassContext> {
     for (const alarm of alarms) {
         if (alarm.targetType === "domain" || alarm.metric === "http") domainIds.add(alarm.targetId);
         else if (alarm.metric === "service") appIds.add(alarm.targetId);
-        else if (alarm.targetType === "host" && alarm.targetId !== LOCAL_HOST_SUBJECT) hostIds.add(alarm.targetId);
+        else if (alarm.targetType === "host" && alarm.targetId !== LOCAL_HOST_SUBJECT)
+            hostIds.add(alarm.targetId);
     }
     const [domains, apps, hosts] = await Promise.all([
         domainIds.size > 0
@@ -163,7 +192,10 @@ async function passContext(alarms: readonly AlarmRow[]): Promise<PassContext> {
  * the machine Polaris runs on is filed under its reserved subject whichever way
  * the alarm names it, since that is where its samples are.
  */
-async function subjectOf(alarm: AlarmRow, context: PassContext): Promise<{ type: "app" | "host"; id: string }> {
+async function subjectOf(
+    alarm: AlarmRow,
+    context: PassContext
+): Promise<{ type: "app" | "host"; id: string }> {
     if (alarm.targetType !== "host") return { type: "app", id: alarm.targetId };
     if (alarm.targetId === LOCAL_HOST_SUBJECT) return { type: "host", id: LOCAL_HOST_SUBJECT };
     const host = context.hosts.get(alarm.targetId) ?? null;
@@ -200,7 +232,10 @@ async function subjectValue(alarm: AlarmRow, context: PassContext): Promise<numb
 
 /** What a service's volumes hold, from each one's latest measurement. */
 async function serviceDiskGb(applicationId: string): Promise<number | string> {
-    const volumes = await prisma.volume.findMany({ where: { applicationId }, select: { id: true } });
+    const volumes = await prisma.volume.findMany({
+        where: { applicationId },
+        select: { id: true }
+    });
     if (volumes.length === 0) return "the service has no volumes";
     const since = new Date(Date.now() - RECENT_VOLUME_MS);
     const readings = await Promise.all(
@@ -216,7 +251,11 @@ async function serviceDiskGb(applicationId: string): Promise<number | string> {
     return value === null ? "no recent volume measurement" : value;
 }
 
-async function notifyTransition(alarm: AlarmRow, kind: "triggered" | "resolved", detail: string): Promise<void> {
+async function notifyTransition(
+    alarm: AlarmRow,
+    kind: "triggered" | "resolved",
+    detail: string
+): Promise<void> {
     const triggered = kind === "triggered";
     await notify({
         userId: alarm.ownerId,
@@ -241,7 +280,10 @@ async function notifyTransition(alarm: AlarmRow, kind: "triggered" | "resolved",
 
 /** Evaluate one alarm. Says whether it only needs its check time moving - no
  *  state or streak to write - so the pass can stamp all of those at once. */
-async function evaluateOne(alarm: AlarmRow, context: PassContext): Promise<"unchanged" | "written"> {
+async function evaluateOne(
+    alarm: AlarmRow,
+    context: PassContext
+): Promise<"unchanged" | "written"> {
     const result = await evaluateCondition(alarm, context);
     let state = alarm.state;
     let streak = alarm.breachStreak;
@@ -272,7 +314,12 @@ async function evaluateOne(alarm: AlarmRow, context: PassContext): Promise<"unch
 
     if (transition) {
         await prisma.alarmEvent.create({
-            data: { alarmId: alarm.id, kind: transition, value: result.value, detail: result.detail }
+            data: {
+                alarmId: alarm.id,
+                kind: transition,
+                value: result.value,
+                detail: result.detail
+            }
         });
         await notifyTransition(alarm, transition, result.detail);
     }

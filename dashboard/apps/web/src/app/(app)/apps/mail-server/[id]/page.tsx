@@ -18,7 +18,11 @@ import { adoptMailServerApp } from "@/lib/mail-server/app-install";
 
 export const dynamic = "force-dynamic";
 
-export default async function MailServerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function MailServerDetailPage({
+    params
+}: {
+    params: Promise<{ id: string }>;
+}) {
     const user = await requirePermission("mailserver.manage");
     const { id } = await params;
     if (!(await adoptMailServerApp())) {
@@ -33,13 +37,19 @@ export default async function MailServerDetailPage({ params }: { params: Promise
         );
     }
     if (!z.string().uuid().safeParse(id).success) notFound();
-    const server = await requireServer({ id: user.id, isAdmin: user.isAdmin }, id).catch(() => null);
+    const server = await requireServer({ id: user.id, isAdmin: user.isAdmin }, id).catch(
+        () => null
+    );
     if (!server) notFound();
     return (
         <ServerView
             serverId={server.id}
             hostname={server.hostname}
-            seed={{ hostname: server.hostname, primaryDomain: server.primaryDomain, status: server.status }}
+            seed={{
+                hostname: server.hostname,
+                primaryDomain: server.primaryDomain,
+                status: server.status
+            }}
         />
     );
 }

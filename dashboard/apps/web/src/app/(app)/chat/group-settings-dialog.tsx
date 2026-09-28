@@ -107,7 +107,8 @@ export function GroupSettingsDialog({
                 <DialogHeader>
                     <DialogTitle>Group settings</DialogTitle>
                     <DialogDescription>
-                        Yours, because you run this group. Everything else about it is everybody&apos;s.
+                        Yours, because you run this group. Everything else about it is
+                        everybody&apos;s.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -177,57 +178,57 @@ export function GroupSettingsDialog({
                             // group, and a plate or a coloured name is not what
                             // tells two members apart - the name they go by is.
                             <PlainNames>
-                            <ul className="flex flex-col gap-1">
-                                {others.map((member) => (
-                                    <PersonRow
-                                        as="li"
-                                        key={member.userId}
-                                        personId={member.userId}
-                                        className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
-                                    >
-                                        <Avatar
-                                            size={24}
-                                            person={{ id: member.userId, name: member.name }}
-                                        />
-                                        <span className="min-w-0 flex-1 truncate text-sm">
-                                            <PersonName id={member.userId} name={member.name} />
-                                        </span>
-                                        {handingTo === member.userId ? (
-                                            <>
-                                                {/* Asked twice, because it cannot be
+                                <ul className="flex flex-col gap-1">
+                                    {others.map((member) => (
+                                        <PersonRow
+                                            as="li"
+                                            key={member.userId}
+                                            personId={member.userId}
+                                            className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
+                                        >
+                                            <Avatar
+                                                size={24}
+                                                person={{ id: member.userId, name: member.name }}
+                                            />
+                                            <span className="min-w-0 flex-1 truncate text-sm">
+                                                <PersonName id={member.userId} name={member.name} />
+                                            </span>
+                                            {handingTo === member.userId ? (
+                                                <>
+                                                    {/* Asked twice, because it cannot be
                                                     undone from this side: the person
                                                     it went to is the only one who can
                                                     hand it back. */}
+                                                    <Button
+                                                        size="xs"
+                                                        variant="danger"
+                                                        disabled={busy}
+                                                        onClick={() => void hand(member.userId)}
+                                                    >
+                                                        Hand it over
+                                                    </Button>
+                                                    <Button
+                                                        size="xs"
+                                                        variant="ghost"
+                                                        disabled={busy}
+                                                        onClick={() => setHandingTo(null)}
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                </>
+                                            ) : (
                                                 <Button
                                                     size="xs"
-                                                    variant="danger"
+                                                    variant="secondary"
                                                     disabled={busy}
-                                                    onClick={() => void hand(member.userId)}
+                                                    onClick={() => setHandingTo(member.userId)}
                                                 >
-                                                    Hand it over
+                                                    Make owner
                                                 </Button>
-                                                <Button
-                                                    size="xs"
-                                                    variant="ghost"
-                                                    disabled={busy}
-                                                    onClick={() => setHandingTo(null)}
-                                                >
-                                                    Cancel
-                                                </Button>
-                                            </>
-                                        ) : (
-                                            <Button
-                                                size="xs"
-                                                variant="secondary"
-                                                disabled={busy}
-                                                onClick={() => setHandingTo(member.userId)}
-                                            >
-                                                Make owner
-                                            </Button>
-                                        )}
-                                    </PersonRow>
-                                ))}
-                            </ul>
+                                            )}
+                                        </PersonRow>
+                                    ))}
+                                </ul>
                             </PlainNames>
                         )}
                     </div>

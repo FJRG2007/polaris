@@ -10,7 +10,11 @@
 
 import { HostdClient } from "@polaris/hostd-client";
 import { localDockerDriver } from "@/lib/docker-service";
-import { localContainerOf, resolveLocalContainer, type ResolvedContainer } from "@/lib/container-files-service";
+import {
+    localContainerOf,
+    resolveLocalContainer,
+    type ResolvedContainer
+} from "@/lib/container-files-service";
 import { parseContainerState, type ContainerState } from "@polaris/deploy";
 
 export interface AppContainerMetrics {
@@ -37,7 +41,10 @@ export interface AppContainerMetrics {
  * Null when it cannot be answered: a remote target, whose daemon proxy this does
  * not reach, or a container that is gone.
  */
-export async function readAppContainerState(applicationId: string, ownerId: string): Promise<string | null> {
+export async function readAppContainerState(
+    applicationId: string,
+    ownerId: string
+): Promise<string | null> {
     return readAppContainerRuntime(applicationId, ownerId).then((state) => state?.status ?? null);
 }
 
@@ -72,7 +79,10 @@ async function containerName(
 }
 
 async function inspectContainer(container: string): Promise<ContainerState> {
-    const inspect = await new HostdClient().dockerRequest("GET", `/containers/${encodeURIComponent(container)}/json`);
+    const inspect = await new HostdClient().dockerRequest(
+        "GET",
+        `/containers/${encodeURIComponent(container)}/json`
+    );
     return parseContainerState(inspect.status === 200 ? JSON.parse(inspect.body) : null);
 }
 

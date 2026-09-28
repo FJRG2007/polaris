@@ -56,7 +56,14 @@ export interface StreamScope {
 export function holdStreamScope(actor: ChatActor): StreamScope {
     let scope = scopes.get(actor.id);
     if (!scope) {
-        scope = { reachable: new Set(), resolvedAt: 0, generation: 0, cause: null, resolving: null, holders: 0 };
+        scope = {
+            reachable: new Set(),
+            resolvedAt: 0,
+            generation: 0,
+            cause: null,
+            resolving: null,
+            holders: 0
+        };
         scopes.set(actor.id, scope);
     }
     scope.holders += 1;

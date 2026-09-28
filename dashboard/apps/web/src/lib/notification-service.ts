@@ -143,7 +143,11 @@ function personIn(metadata: string | null): string | null {
 /** Names for the people a page of alerts is about, in one query rather than one
  *  per row. Empty when no row names anybody, which is most pages. */
 async function namesFor(rows: readonly NotificationRow[]): Promise<Map<string, string>> {
-    const ids = [...new Set(rows.map((row) => personIn(row.metadata)).filter((id): id is string => id !== null))];
+    const ids = [
+        ...new Set(
+            rows.map((row) => personIn(row.metadata)).filter((id): id is string => id !== null)
+        )
+    ];
     if (ids.length === 0) return new Map();
     const people = await prisma.user.findMany({
         where: { id: { in: ids } },
@@ -263,7 +267,10 @@ export async function listNotificationHistory(
     const names = await namesFor(page);
     return {
         items: page.map((row) => toView(row, names)),
-        cursor: rows.length > NOTIFICATION_PAGE_SIZE ? (page.at(-1)?.createdAt.toISOString() ?? null) : null
+        cursor:
+            rows.length > NOTIFICATION_PAGE_SIZE
+                ? (page.at(-1)?.createdAt.toISOString() ?? null)
+                : null
     };
 }
 
@@ -311,7 +318,10 @@ export async function listDeliveries(userId: string, limit = 100): Promise<Deliv
 
 /** Mark one notification read (scoped to the owner). */
 export async function markNotificationRead(userId: string, id: string): Promise<void> {
-    await prisma.notification.updateMany({ where: { id, userId, readAt: null }, data: { readAt: new Date() } });
+    await prisma.notification.updateMany({
+        where: { id, userId, readAt: null },
+        data: { readAt: new Date() }
+    });
 }
 
 /** Mark every unread notification on the open shelf read - the ones the bell
@@ -349,7 +359,10 @@ export async function markNotificationsReadByType(types: readonly string[]): Pro
 
 /** Mark a chosen set read. Scoped to the owner, so ids that arrive from a
  *  browser and belong to somebody else are simply not matched. */
-export async function markNotificationsRead(userId: string, ids: readonly string[]): Promise<number> {
+export async function markNotificationsRead(
+    userId: string,
+    ids: readonly string[]
+): Promise<number> {
     if (ids.length === 0) return 0;
     const done = await prisma.notification.updateMany({
         where: { id: { in: [...ids] }, userId, readAt: null },

@@ -11,7 +11,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** The rows the queries below read, per case. */
-let members: { channelId: string; lastReadAt: Date | null; muted: boolean; mutedUntil: Date | null }[] = [];
+let members: {
+    channelId: string;
+    lastReadAt: Date | null;
+    muted: boolean;
+    mutedUntil: Date | null;
+}[] = [];
 let channels: { id: string; spaceId: string | null; orgId: string | null }[] = [];
 let spaces: { id: string; orgId: string | null }[] = [];
 /** Every countable message, by conversation and when it was written. */
@@ -82,8 +87,17 @@ vi.mock("@polaris/db", () => ({
 const { unreadTotal } = await import("@/lib/chat/chat-service");
 
 /** A membership in a conversation, read up to `at` or never opened. */
-function member(channelId: string, at: Date | null = null, mute?: { muted: boolean; mutedUntil: Date | null }) {
-    return { channelId, lastReadAt: at, muted: mute?.muted ?? false, mutedUntil: mute?.mutedUntil ?? null };
+function member(
+    channelId: string,
+    at: Date | null = null,
+    mute?: { muted: boolean; mutedUntil: Date | null }
+) {
+    return {
+        channelId,
+        lastReadAt: at,
+        muted: mute?.muted ?? false,
+        mutedUntil: mute?.mutedUntil ?? null
+    };
 }
 
 /** A live conversation, in the shared chat unless it is filed elsewhere. */
@@ -135,7 +149,9 @@ describe("what is waiting in Chat", () => {
     it("counts one whose mute has run out", async () => {
         // Nothing runs to clear the flag when the end passes, so it is worked
         // out rather than read - the same way the rail works it out.
-        members = [member("a", null, { muted: true, mutedUntil: new Date("2020-01-01T00:00:00Z") })];
+        members = [
+            member("a", null, { muted: true, mutedUntil: new Date("2020-01-01T00:00:00Z") })
+        ];
         channels = [room("a")];
         say("a", 4);
         expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 4, conversations: 1 });

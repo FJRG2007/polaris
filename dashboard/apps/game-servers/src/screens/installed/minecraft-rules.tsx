@@ -387,7 +387,9 @@ function RuleRow({
             {reading === "failed" ? null : reading === "reading" ? (
                 <Skeleton
                     className={
-                        rule.type === "boolean" ? "h-5 w-9 shrink-0 rounded-full" : "h-9 w-24 shrink-0"
+                        rule.type === "boolean"
+                            ? "h-5 w-9 shrink-0 rounded-full"
+                            : "h-9 w-24 shrink-0"
                     }
                 />
             ) : rule.type === "boolean" ? (

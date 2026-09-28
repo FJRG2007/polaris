@@ -34,7 +34,10 @@ export const dynamic = "force-dynamic";
  * and holding the address and the player list behind that would leave a page whose
  * facts were all in the database sitting empty anyway.
  */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const { id } = await params;
     const { access: server } = await requireGameServer("games.read", id);
     // Who was last seen when is a database read per player, so it is gathered for
@@ -61,7 +64,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         // it, which is a container that has lost what it was handed.
         const access = status.answering
             ? await applyFivemAccess(server.ownerId, id, status.guardRunning === false)
-                  .then((applied) => (applied > 0 ? readFivemAccess(server.ownerId, id).catch(() => held) : held))
+                  .then((applied) =>
+                      applied > 0 ? readFivemAccess(server.ownerId, id).catch(() => held) : held
+                  )
                   .catch(() => held)
             : held;
         // The schedule, on the server it belongs to and with the player count this
@@ -84,8 +89,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         // under whatever name the player was using.
         const seen = wantsPlayers
             ? await readLastSeen(id, [
-                  ...status.players.map((player) => ({ name: player.name, id: primaryIdentifier(player) })),
-                  ...(access?.allowList ?? []).map((player) => ({ name: player.label, id: player.identifier }))
+                  ...status.players.map((player) => ({
+                      name: player.name,
+                      id: primaryIdentifier(player)
+                  })),
+                  ...(access?.allowList ?? []).map((player) => ({
+                      name: player.label,
+                      id: player.identifier
+                  }))
               ]).catch(() => ({}))
             : {};
         return NextResponse.json({ status, reach, access, seen, address: facts?.address ?? null });

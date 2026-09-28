@@ -100,7 +100,9 @@ export default async function WatchSubjectPage({
             select: {
                 id: true,
                 name: true,
-                environment: { select: { name: true, projectId: true, project: { select: { name: true } } } }
+                environment: {
+                    select: { name: true, projectId: true, project: { select: { name: true } } }
+                }
             }
         })
     ]);

@@ -812,7 +812,11 @@ async function readLivePlayers(
             crashLoop: halted
         };
     }
-    const runtime = await readAppContainerRuntime(install.applicationId, ownerId, containerOf(install));
+    const runtime = await readAppContainerRuntime(
+        install.applicationId,
+        ownerId,
+        containerOf(install)
+    );
     const state = runtime?.status ?? null;
     // A container being restarted over and over is the one state that looks
     // exactly like a server that is merely slow to boot, and the one nobody can

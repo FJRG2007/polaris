@@ -27,10 +27,17 @@ const LOCAL_ONLY = "Container file browsing is currently supported on the local 
 
 /** Resolve an application to its local container name, checking ownership and that
  *  the target is the local host. Throws a client-safe message otherwise. */
-export async function resolveLocalContainer(applicationId: string, ownerId: string): Promise<string> {
+export async function resolveLocalContainer(
+    applicationId: string,
+    ownerId: string
+): Promise<string> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        include: { environment: { include: { project: true } }, target: true, volumes: { select: { id: true } } }
+        include: {
+            environment: { include: { project: true } },
+            target: true,
+            volumes: { select: { id: true } }
+        }
     });
     if (!app) throw new Error("Application not found");
     if (app.target.kind !== "local") throw new Error(LOCAL_ONLY);
@@ -50,7 +57,11 @@ export function localContainerOf(resolved: ResolvedContainer): string {
 export async function resolveContainerName(applicationId: string): Promise<string> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId },
-        include: { environment: { include: { project: true } }, target: true, volumes: { select: { id: true } } }
+        include: {
+            environment: { include: { project: true } },
+            target: true,
+            volumes: { select: { id: true } }
+        }
     });
     if (!app) throw new Error("Application not found");
     if (app.target.kind !== "local") {
@@ -67,13 +78,22 @@ export async function listContainerFiles(
     path: string
 ): Promise<ContainerEntry[]> {
     const container = await resolveLocalContainer(applicationId, ownerId);
-    const stream = await new HostdClient().fsRead(container, ["ls", "-1Ap", "--", normalizePath(path)]);
+    const stream = await new HostdClient().fsRead(container, [
+        "ls",
+        "-1Ap",
+        "--",
+        normalizePath(path)
+    ]);
     const text = await streamToString(stream);
     return text
         .split("\n")
         .map((line) => line.trimEnd())
         .filter((line) => line.length > 0)
-        .map((line) => (line.endsWith("/") ? { name: line.slice(0, -1), isDir: true } : { name: line, isDir: false }));
+        .map((line) =>
+            line.endsWith("/")
+                ? { name: line.slice(0, -1), isDir: true }
+                : { name: line, isDir: false }
+        );
 }
 
 /** Open a readable stream of a file inside the container (for download). */

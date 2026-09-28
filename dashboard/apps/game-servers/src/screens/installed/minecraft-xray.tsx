@@ -483,9 +483,9 @@ export function MinecraftXray({
                                 ? TABLE_LOADING
                                 : !loaded
                                   ? "The players could not be read."
-                                : suspects.length === 0
-                                  ? "Nothing recorded against anybody yet, and no mining figures to show."
-                                  : "No player matches."
+                                  : suspects.length === 0
+                                    ? "Nothing recorded against anybody yet, and no mining figures to show."
+                                    : "No player matches."
                         }
                         rows={shown.map((suspect) => (
                             <tr

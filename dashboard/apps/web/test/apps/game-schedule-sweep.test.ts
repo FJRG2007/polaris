@@ -69,7 +69,8 @@ vi.mock("@polaris-app/game-servers/src/lib/games-flush", () => ({
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/ark/service", () => ({
-    getArkPlayers: async () => arkPlayers ?? { answering: false, containerRunning: null, players: [], message: "no" }
+    getArkPlayers: async () =>
+        arkPlayers ?? { answering: false, containerRunning: null, players: [], message: "no" }
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({

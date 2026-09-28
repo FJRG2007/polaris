@@ -161,7 +161,9 @@ export function MinecraftSidebar({
             <Card>
                 <CardBody className="flex flex-col gap-4">
                     <SidebarHeading
-                        control={error ? null : <Skeleton className="h-5 w-9 shrink-0 rounded-full" />}
+                        control={
+                            error ? null : <Skeleton className="h-5 w-9 shrink-0 rounded-full" />
+                        }
                     />
                     {error ? (
                         <p role="alert" className="text-sm text-danger">

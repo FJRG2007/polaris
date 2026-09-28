@@ -200,9 +200,9 @@ export function ArkMods({
                             />
                         ) : (
                             <p className="py-4 text-sm text-muted-foreground">
-                                This server runs one of the maps that come with the game. A
-                                Workshop map replaces it, and its world is kept separately from
-                                the one you have now.
+                                This server runs one of the maps that come with the game. A Workshop
+                                map replaces it, and its world is kept separately from the one you
+                                have now.
                             </p>
                         )}
                     </CardBody>
@@ -234,7 +234,11 @@ export function ArkMods({
                                     position={index + 1}
                                     busy={busy}
                                     canManage={canManage}
-                                    onUp={index > 0 ? () => void save(movedMod(ids, id, -1)) : undefined}
+                                    onUp={
+                                        index > 0
+                                            ? () => void save(movedMod(ids, id, -1))
+                                            : undefined
+                                    }
                                     onDown={
                                         index < ids.length - 1
                                             ? () => void save(movedMod(ids, id, 1))
@@ -298,12 +302,17 @@ function ModShelves({
     onSetMap: (id: string) => void;
 }) {
     const [shelves, setShelves] = useState<
-        readonly { group: string; entries: { suggestion: ArkModSuggestion; item: WorkshopItem | null }[] }[]
+        readonly {
+            group: string;
+            entries: { suggestion: ArkModSuggestion; item: WorkshopItem | null }[];
+        }[]
     >([]);
     const [open, setOpen] = useState(true);
 
     useEffect(() => {
-        void actions.readArkModShelvesAction(installedAppId).then((answer) => setShelves(answer.shelves));
+        void actions
+            .readArkModShelvesAction(installedAppId)
+            .then((answer) => setShelves(answer.shelves));
     }, [installedAppId]);
 
     const shown = shelves
@@ -321,8 +330,8 @@ function ModShelves({
                     <div className="min-w-0">
                         <p className="text-sm font-medium">Worth a look</p>
                         <p className="text-xs text-muted-foreground">
-                            The ones most private servers end up running. Anything else on the Workshop
-                            goes in above, by its link.
+                            The ones most private servers end up running. Anything else on the
+                            Workshop goes in above, by its link.
                         </p>
                     </div>
                     <Button size="sm" variant="ghost" onClick={() => setOpen(!open)}>
@@ -344,13 +353,18 @@ function ModShelves({
                                     {item ? (
                                         <Preview installedAppId={installedAppId} item={item} />
                                     ) : (
-                                        <div className="size-12 shrink-0 rounded-md bg-muted" aria-hidden />
+                                        <div
+                                            className="size-12 shrink-0 rounded-md bg-muted"
+                                            aria-hidden
+                                        />
                                     )}
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-sm font-medium">
                                             {item?.title ?? suggestion.name}
                                         </p>
-                                        <p className="text-xs text-muted-foreground">{suggestion.why}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {suggestion.why}
+                                        </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {[
                                                 size(item?.sizeBytes ?? null),
@@ -382,7 +396,11 @@ function ModShelves({
                                             Use as the map
                                         </Button>
                                     ) : (
-                                        <Button size="sm" disabled={busy} onClick={() => onAdd(suggestion.id)}>
+                                        <Button
+                                            size="sm"
+                                            disabled={busy}
+                                            onClick={() => onAdd(suggestion.id)}
+                                        >
                                             <Plus className="size-4" /> Add
                                         </Button>
                                     )}
@@ -426,7 +444,8 @@ function AddMod({
         if (/^\d{6,12}$/.test(text) || text.includes("id=")) {
             const answer = await actions.lookUpArkModAction(installedAppId, text);
             setLooking(false);
-            if (answer.error || !answer.item) setError(answer.error ?? "Steam does not know that id");
+            if (answer.error || !answer.item)
+                setError(answer.error ?? "Steam does not know that id");
             else setFound(answer.item);
             return;
         }
@@ -456,8 +475,15 @@ function AddMod({
                             }}
                         />
                     </div>
-                    <Button disabled={busy || looking || query.trim().length === 0} onClick={() => void go()}>
-                        {looking ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+                    <Button
+                        disabled={busy || looking || query.trim().length === 0}
+                        onClick={() => void go()}
+                    >
+                        {looking ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Search className="size-4" />
+                        )}
                         Look it up
                     </Button>
                 </div>
@@ -470,9 +496,9 @@ function AddMod({
 
                 {needsKey && (
                     <p className="text-xs text-muted-foreground">
-                        Searching the Workshop needs a Steam Web API key, which Polaris asks for under
-                        Integrations. Without one, paste a mod&apos;s link here and it is added the same
-                        way.
+                        Searching the Workshop needs a Steam Web API key, which Polaris asks for
+                        under Integrations. Without one, paste a mod&apos;s link here and it is
+                        added the same way.
                     </p>
                 )}
 
@@ -495,7 +521,9 @@ function AddMod({
                 )}
 
                 {results !== null && results.length === 0 && !needsKey && (
-                    <p className="text-sm text-muted-foreground">Nothing on the Workshop matches that.</p>
+                    <p className="text-sm text-muted-foreground">
+                        Nothing on the Workshop matches that.
+                    </p>
                 )}
 
                 {results !== null && results.length > 0 && (
@@ -543,18 +571,33 @@ function Candidate({
         <div className="flex flex-wrap items-center gap-3 rounded-md border border-border p-2">
             <Preview installedAppId={installedAppId} item={item} />
             <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium" title={item.title}>{item.title}</p>
+                <p className="truncate text-sm font-medium" title={item.title}>
+                    {item.title}
+                </p>
                 {/* The author's own description, quoted rather than rendered: it is
                     somebody else's text and it arrives with the Workshop's own
                     markup in it. */}
-                {item.summary && <p className="truncate text-xs text-muted-foreground">{item.summary}</p>}
+                {item.summary && (
+                    <p className="truncate text-xs text-muted-foreground">{item.summary}</p>
+                )}
                 <p className="truncate text-xs text-muted-foreground">
-                    {[size(item.sizeBytes), item.subscriptions ? `${item.subscriptions.toLocaleString()} subscribers` : ""]
+                    {[
+                        size(item.sizeBytes),
+                        item.subscriptions
+                            ? `${item.subscriptions.toLocaleString()} subscribers`
+                            : ""
+                    ]
                         .filter(Boolean)
                         .join(" - ")}
                 </p>
             </div>
-            <Button size="sm" variant="secondary" disabled={busy} onClick={onSetMap} title="Run this as the map">
+            <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                onClick={onSetMap}
+                title="Run this as the map"
+            >
                 Use as the map
             </Button>
             <Button size="sm" disabled={busy} onClick={onAdd}>

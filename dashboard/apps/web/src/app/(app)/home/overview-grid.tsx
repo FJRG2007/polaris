@@ -30,9 +30,35 @@ import type { OverviewData } from "@/lib/overview/overview-service";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { overviewSize, overviewWidget, OVERVIEW_SIZE_LABELS } from "@/lib/overview/catalog";
 import { AppsWidget, NotificationsWidget, RecentWidget, ShortcutsWidget } from "./widgets/personal";
-import { AlarmsWidget, GamesWidget, ServicesWidget, StorageWidget, TasksWidget, UsageWidget } from "./widgets/infrastructure";
-import { ArrowDown, ArrowUp, EyeOff, GripVertical, LayoutGrid, MoreVertical, RefreshCw, Settings2, Trash2 } from "lucide-react";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, cn } from "@polaris/ui";
+import {
+    AlarmsWidget,
+    GamesWidget,
+    ServicesWidget,
+    StorageWidget,
+    TasksWidget,
+    UsageWidget
+} from "./widgets/infrastructure";
+import {
+    ArrowDown,
+    ArrowUp,
+    EyeOff,
+    GripVertical,
+    LayoutGrid,
+    MoreVertical,
+    RefreshCw,
+    Settings2,
+    Trash2
+} from "lucide-react";
+import {
+    Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    cn
+} from "@polaris/ui";
 import {
     resolveOverviewLayout,
     type OverviewPreferences,
@@ -80,7 +106,6 @@ const SPAN: Record<OverviewWidgetSize, string> = {
 
 /** The same widths as columns, for the arithmetic that fits a row to the grid. */
 const COLUMNS: Record<OverviewWidgetSize, number> = { sm: 1, md: 2, lg: 3, xl: 4 };
-
 
 export function OverviewGrid({
     name,
@@ -133,7 +158,11 @@ export function OverviewGrid({
     const [columns, setColumns] = useState(0);
 
     // What the server last accepted, to put back if it refuses the next change.
-    const accepted = useRef<{ widgets: OverviewWidgetPreference[]; shortcuts: OverviewShortcut[]; greeting: boolean }>({
+    const accepted = useRef<{
+        widgets: OverviewWidgetPreference[];
+        shortcuts: OverviewShortcut[];
+        greeting: boolean;
+    }>({
         widgets: layout,
         shortcuts: preferences.shortcuts,
         greeting: preferences.greeting
@@ -152,7 +181,11 @@ export function OverviewGrid({
     );
 
     const persist = useCallback(
-        (next: { widgets: OverviewWidgetPreference[]; shortcuts: OverviewShortcut[]; greeting: boolean }) => {
+        (next: {
+            widgets: OverviewWidgetPreference[];
+            shortcuts: OverviewShortcut[];
+            greeting: boolean;
+        }) => {
             setWidgets(next.widgets);
             setShortcuts(next.shortcuts);
             setGreeting(next.greeting);
@@ -179,7 +212,9 @@ export function OverviewGrid({
                         setWidgets(previous.widgets);
                         setShortcuts(previous.shortcuts);
                         setGreeting(previous.greeting);
-                        setFailure("That change could not be saved. Check your connection and try again.");
+                        setFailure(
+                            "That change could not be saved. Check your connection and try again."
+                        );
                     });
             }, SAVE_DEBOUNCE_MS);
         },
@@ -189,7 +224,8 @@ export function OverviewGrid({
     const current = () => ({ widgets, shortcuts, greeting });
 
     function reorder(from: number, to: number): void {
-        if (from < 0 || to < 0 || from === to || from >= widgets.length || to >= widgets.length) return;
+        if (from < 0 || to < 0 || from === to || from >= widgets.length || to >= widgets.length)
+            return;
         const next = [...widgets];
         const [held] = next.splice(from, 1);
         next.splice(to, 0, held!);
@@ -215,7 +251,9 @@ export function OverviewGrid({
     function toggle(id: OverviewWidgetId, visible: boolean): void {
         persist({
             ...current(),
-            widgets: widgets.map((widget) => (widget.id === id ? { ...widget, hidden: !visible } : widget))
+            widgets: widgets.map((widget) =>
+                widget.id === id ? { ...widget, hidden: !visible } : widget
+            )
         });
     }
 
@@ -227,16 +265,27 @@ export function OverviewGrid({
     }
 
     function pin(shortcut: OverviewShortcut): void {
-        if (shortcuts.length >= MAX_OVERVIEW_SHORTCUTS || shortcuts.some((held) => held.href === shortcut.href)) return;
+        if (
+            shortcuts.length >= MAX_OVERVIEW_SHORTCUTS ||
+            shortcuts.some((held) => held.href === shortcut.href)
+        )
+            return;
         persist({ ...current(), shortcuts: [...shortcuts, shortcut] });
     }
 
     function unpin(href: string): void {
-        persist({ ...current(), shortcuts: shortcuts.filter((shortcut) => shortcut.href !== href) });
+        persist({
+            ...current(),
+            shortcuts: shortcuts.filter((shortcut) => shortcut.href !== href)
+        });
     }
 
     function reset(): void {
-        persist({ widgets: resolveOverviewLayout({ ...preferences, widgets: [] }, available), shortcuts, greeting: true });
+        persist({
+            widgets: resolveOverviewLayout({ ...preferences, widgets: [] }, available),
+            shortcuts,
+            greeting: true
+        });
     }
 
     // The requests for every card that needs the server, re-run when the set of
@@ -293,7 +342,9 @@ export function OverviewGrid({
                 cache: "no-store",
                 signal: controller.signal
             })
-                .then((response) => (response.ok ? response.json() : Promise.reject(new Error("read failed"))))
+                .then((response) =>
+                    response.ok ? response.json() : Promise.reject(new Error("read failed"))
+                )
                 .then((body: OverviewData) => {
                     dataCache.set(groupKey, { at: Date.now(), data: body });
                     landed(group, body);
@@ -324,7 +375,8 @@ export function OverviewGrid({
         if (!element || typeof ResizeObserver === "undefined") return;
         const measure = (): void => {
             const tracks = window.getComputedStyle(element).gridTemplateColumns;
-            const count = tracks && tracks !== "none" ? tracks.split(" ").filter(Boolean).length : 0;
+            const count =
+                tracks && tracks !== "none" ? tracks.split(" ").filter(Boolean).length : 0;
             setColumns((held) => (held === count ? held : count));
         };
         measure();
@@ -361,7 +413,11 @@ export function OverviewGrid({
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">
-                        {greeting ? (hello ? `${hello}, ${firstName(name)}` : `Welcome back, ${firstName(name)}`) : "Overview"}
+                        {greeting
+                            ? hello
+                                ? `${hello}, ${firstName(name)}`
+                                : `Welcome back, ${firstName(name)}`
+                            : "Overview"}
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                         What is running, what needs you, and the places you go most.
@@ -375,7 +431,13 @@ export function OverviewGrid({
                         aria-label="Refresh the figures"
                         className="grid size-9 place-items-center rounded-md border border-border bg-surface text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
-                        <RefreshCw className={cn("size-4", (pending === null || pending.size > 0) && "animate-spin")} aria-hidden="true" />
+                        <RefreshCw
+                            className={cn(
+                                "size-4",
+                                (pending === null || pending.size > 0) && "animate-spin"
+                            )}
+                            aria-hidden="true"
+                        />
                     </button>
                     <Button variant="outline" size="sm" onClick={() => setCustomizing(true)}>
                         <Settings2 className="size-4" aria-hidden="true" />
@@ -385,7 +447,10 @@ export function OverviewGrid({
             </div>
 
             {failure ? (
-                <p role="alert" className="rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {failure}
                 </p>
             ) : null}
@@ -411,7 +476,9 @@ export function OverviewGrid({
                                     "min-w-0 rounded-lg transition-opacity",
                                     SPAN[overviewSize(widget.id, widget.size)],
                                     dragged === widget.id && "opacity-40",
-                                    over === widget.id && dragged !== widget.id && "ring-2 ring-primary"
+                                    over === widget.id &&
+                                        dragged !== widget.id &&
+                                        "ring-2 ring-primary"
                                 )}
                                 onDragOver={(event) => {
                                     if (!dragged) return;
@@ -421,7 +488,9 @@ export function OverviewGrid({
                                     event.dataTransfer.dropEffect = "move";
                                     setOver(widget.id);
                                 }}
-                                onDragLeave={() => setOver((held) => (held === widget.id ? null : held))}
+                                onDragLeave={() =>
+                                    setOver((held) => (held === widget.id ? null : held))
+                                }
                                 onDrop={(event) => {
                                     event.preventDefault();
                                     if (dragged) moveOnto(dragged, widget.id);
@@ -466,7 +535,11 @@ export function OverviewGrid({
                                 >
                                     <WidgetBody
                                         id={widget.id}
-                                        data={pending === null || pending.has(widget.id) ? undefined : data}
+                                        data={
+                                            pending === null || pending.has(widget.id)
+                                                ? undefined
+                                                : data
+                                        }
                                         apps={apps}
                                         shortcuts={shortcuts}
                                         historyNonce={historyNonce}
@@ -533,7 +606,9 @@ function WidgetBody({
         case "apps":
             return <AppsWidget apps={apps} />;
         case "services":
-            return <ServicesWidget data={data === undefined ? undefined : (data.services ?? null)} />;
+            return (
+                <ServicesWidget data={data === undefined ? undefined : (data.services ?? null)} />
+            );
         case "usage":
             return <UsageWidget data={data === undefined ? undefined : (data.usage ?? null)} />;
         case "alarms":
@@ -543,9 +618,13 @@ function WidgetBody({
         case "tasks":
             return <TasksWidget data={data === undefined ? undefined : (data.tasks ?? null)} />;
         case "sessions":
-            return <SessionsWidget data={data === undefined ? undefined : (data.sessions ?? null)} />;
+            return (
+                <SessionsWidget data={data === undefined ? undefined : (data.sessions ?? null)} />
+            );
         case "activity":
-            return <ActivityWidget data={data === undefined ? undefined : (data.activity ?? null)} />;
+            return (
+                <ActivityWidget data={data === undefined ? undefined : (data.activity ?? null)} />
+            );
         case "games":
             return <GamesWidget data={data === undefined ? undefined : (data.games ?? null)} />;
     }
@@ -559,7 +638,15 @@ function WidgetBody({
  * where anybody not using a mouse arranges the grid - and a focusable control
  * that does nothing when it is pressed is worse than no control at all.
  */
-function WidgetGrip({ label, onStart, onEnd }: { label: string; onStart: () => void; onEnd: () => void }) {
+function WidgetGrip({
+    label,
+    onStart,
+    onEnd
+}: {
+    label: string;
+    onStart: () => void;
+    onEnd: () => void;
+}) {
     return (
         <span
             draggable

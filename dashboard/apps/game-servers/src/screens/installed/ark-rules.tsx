@@ -210,8 +210,8 @@ export function ArkRules({
             {shown.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                     Nothing here matches “{query}”. ARK has a great many settings and Polaris offers
-                    the ones it can set as launch options; anything else lives in the game&apos;s own
-                    files.
+                    the ones it can set as launch options; anything else lives in the game&apos;s
+                    own files.
                 </p>
             ) : null}
 
@@ -268,7 +268,8 @@ function SettingRow({
     // A switch is described as on or off rather than as the True or False in the
     // file: for the settings ARK names `DisableSomething` those two words are
     // opposites, and printing the raw one is the same trap as drawing it.
-    const said = setting.type === "boolean" ? (switchIsOn(setting, live ?? "") ? "on" : "off") : live;
+    const said =
+        setting.type === "boolean" ? (switchIsOn(setting, live ?? "") ? "on" : "off") : live;
     const source =
         loading || pinned !== null
             ? null
@@ -294,14 +295,20 @@ function SettingRow({
                     <code className="min-w-0 truncate font-mono text-[0.6875rem] font-normal text-foreground-subtle">
                         {setting.key}
                     </code>
-                    {busy && <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />}
+                    {busy && (
+                        <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+                    )}
                 </p>
                 {setting.hint && <p className="text-xs text-muted-foreground">{setting.hint}</p>}
                 {source && <p className="text-xs text-muted-foreground">{source}</p>}
             </div>
             {loading ? (
                 <Skeleton
-                    className={setting.type === "boolean" ? "h-5 w-9 shrink-0 rounded-full" : "h-9 w-28 shrink-0"}
+                    className={
+                        setting.type === "boolean"
+                            ? "h-5 w-9 shrink-0 rounded-full"
+                            : "h-9 w-28 shrink-0"
+                    }
                 />
             ) : (
                 <div className="flex items-center gap-2">

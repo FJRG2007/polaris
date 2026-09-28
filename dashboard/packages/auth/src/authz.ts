@@ -39,7 +39,9 @@ const GLOBAL_RESOURCE = "*";
 function parseRoleGrants(raw: string): string[] {
     try {
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((value): value is string => typeof value === "string")
+            : [];
     } catch {
         return [];
     }
@@ -97,8 +99,13 @@ export const resolveGlobalStatements = perRequest(async function resolveGlobalSt
 });
 
 /** Whether the account is an administrator, which short-circuits every check. */
-const isAdministrator = perRequest(async function isAdministrator(userId: string): Promise<boolean> {
-    const account = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
+const isAdministrator = perRequest(async function isAdministrator(
+    userId: string
+): Promise<boolean> {
+    const account = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true }
+    });
     return account?.isAdmin === true;
 });
 
@@ -128,7 +135,9 @@ export interface SourcedStatements {
  * than two so an explanation of somebody's access can never say something the
  * decision would not.
  */
-export async function resolveGlobalStatementsBySource(userId: string): Promise<SourcedStatements[]> {
+export async function resolveGlobalStatementsBySource(
+    userId: string
+): Promise<SourcedStatements[]> {
     const [roles, policies, overrides] = await Promise.all([
         prisma.userRole.findMany({
             where: { userId },
@@ -172,7 +181,10 @@ export async function resolveGlobalStatementsBySource(userId: string): Promise<S
 }
 
 /** Whether a user holds a global capability. Admins are allowed everything. */
-export async function can(userId: string, permission: Permission | typeof ALL_PERMISSIONS): Promise<boolean> {
+export async function can(
+    userId: string,
+    permission: Permission | typeof ALL_PERMISSIONS
+): Promise<boolean> {
     if (await isAdministrator(userId)) return true;
     const statements = await resolveGlobalStatements(userId);
     return isAllowed(statements, permission, GLOBAL_RESOURCE);

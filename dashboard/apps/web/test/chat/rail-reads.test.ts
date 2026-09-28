@@ -48,7 +48,10 @@ vi.mock("@/lib/chat/notices", () => ({
 vi.mock("@/lib/chat/attachments", () => ({ discardChannelFiles: async () => undefined }));
 vi.mock("@/lib/avatar-service", () => ({ discardAvatars: async () => undefined }));
 vi.mock("@/lib/access/grants", () => ({ dropGrantsFor: async () => undefined }));
-vi.mock("@/lib/orgs/org-service", () => ({ readsOrgWhere: () => ({}), memberOrgIds: async () => [] }));
+vi.mock("@/lib/orgs/org-service", () => ({
+    readsOrgWhere: () => ({}),
+    memberOrgIds: async () => []
+}));
 vi.mock("@/lib/contact-names", () => ({ nicknamesFor: async () => new Map() }));
 vi.mock("@/lib/blocks", () => ({
     blockedBy: async () => new Set(),
@@ -91,7 +94,10 @@ vi.mock("@polaris/db", () => ({
         chatChannel: {
             findMany: async (query: Query) => {
                 channelQueries.push(query);
-                const rows = [row("dm", null, "dm", ["ada", "grace"]), row("general", "s1", "text", [])];
+                const rows = [
+                    row("dm", null, "dm", ["ada", "grace"]),
+                    row("general", "s1", "text", [])
+                ];
                 const only = query.where?.id;
                 return typeof only === "string" ? rows.filter((entry) => entry.id === only) : rows;
             },

@@ -15,7 +15,10 @@ const SERVER = "aaaaaaaa-1111-4111-8111-111111111111";
 const OWNER = "11111111-1111-4111-8111-111111111111";
 
 const LIVE = { ops: ["Ana"], whitelist: [], bans: [], whitelistEnforced: true };
-const KEPT = { roster: { ops: ["Old"], whitelist: [], bans: [], whitelistEnforced: false }, at: "2026-09-01T00:00:00.000Z" };
+const KEPT = {
+    roster: { ops: ["Old"], whitelist: [], bans: [], whitelistEnforced: false },
+    at: "2026-09-01T00:00:00.000Z"
+};
 
 let answering = true;
 let releaseStatus: () => void = () => undefined;
@@ -50,7 +53,7 @@ vi.mock("@polaris/app-host", () => ({
     }
 }));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
-    sharingInstallReads: <T,>(work: () => Promise<T>) => work(),
+    sharingInstallReads: <T>(work: () => Promise<T>) => work(),
     getServerStatus: async () => {
         started.push("status");
         if (holdStatus) await new Promise<void>((resolve) => (releaseStatus = resolve));
@@ -70,8 +73,12 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     },
     getPlayerLevels: async () => ({})
 }));
-vi.mock("@polaris-app/game-servers/src/lib/minecraft/reach", () => ({ reachAdviceFor: async () => null }));
-vi.mock("@polaris-app/game-servers/src/lib/games-activity-service", () => ({ readLastSeen: async () => ({}) }));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/reach", () => ({
+    reachAdviceFor: async () => null
+}));
+vi.mock("@polaris-app/game-servers/src/lib/games-activity-service", () => ({
+    readLastSeen: async () => ({})
+}));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/schedule-service", () => ({
     sweepWatchedGameSchedules: async () => null
 }));

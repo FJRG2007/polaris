@@ -55,7 +55,11 @@ vi.mock("@polaris/db", () => ({
                 const groups = new Map<string, { player: string; check: string; flags: Flag[] }>();
                 for (const flag of flags) {
                     const key = `${flag.player}|${flag.check}`;
-                    const held = groups.get(key) ?? { player: flag.player, check: flag.check, flags: [] };
+                    const held = groups.get(key) ?? {
+                        player: flag.player,
+                        check: flag.check,
+                        flags: []
+                    };
                     held.flags.push(flag);
                     groups.set(key, held);
                 }

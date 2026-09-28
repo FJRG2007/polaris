@@ -84,7 +84,9 @@ afterEach(() => {
 
 describe("ARK's settings before the server answers", () => {
     it("draws the search and every setting, with no control in a guessed position", async () => {
-        const { ArkRules } = await import("@polaris-app/game-servers/src/screens/installed/ark-rules");
+        const { ArkRules } = await import(
+            "@polaris-app/game-servers/src/screens/installed/ark-rules"
+        );
         const { arkSettingGroups } = await import("@polaris-app/game-servers/src/lib/ark/settings");
         render(<ArkRules installedAppId={SERVER} canManage running />);
         expect(screen.getByLabelText("Find a setting")).toBeTruthy();
@@ -96,7 +98,9 @@ describe("ARK's settings before the server answers", () => {
 
 describe("FiveM's settings before the server answers", () => {
     it("draws the search and every setting, with no control in a guessed position", async () => {
-        const { FivemRules } = await import("@polaris-app/game-servers/src/screens/installed/fivem-rules");
+        const { FivemRules } = await import(
+            "@polaris-app/game-servers/src/screens/installed/fivem-rules"
+        );
         const { FIVEM_SETTINGS } = await import("@polaris-app/game-servers/src/lib/fivem/settings");
         render(<FivemRules installedAppId={SERVER} canManage running />);
         expect(screen.getByLabelText("Find a setting")).toBeTruthy();
@@ -108,7 +112,9 @@ describe("FiveM's settings before the server answers", () => {
 
 describe("ARK's mods before the server answers", () => {
     it("draws both lists' headings and claims nothing about what is in them", async () => {
-        const { ArkMods } = await import("@polaris-app/game-servers/src/screens/installed/ark-mods");
+        const { ArkMods } = await import(
+            "@polaris-app/game-servers/src/screens/installed/ark-mods"
+        );
         render(<ArkMods installedAppId={SERVER} canManage={false} running />);
         expect(screen.getByText("Map")).toBeTruthy();
         expect(screen.getByText("Mods")).toBeTruthy();
