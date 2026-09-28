@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { queryFits } from "@/components/rich-text/suggestion";
+import { queryFits, roomMatches } from "@/components/rich-text/suggestion";
 
 describe("what keeps the mention picker open", () => {
     it("opens on the trigger alone, which is somebody asking for the list", () => {
@@ -45,5 +45,32 @@ describe("what keeps the mention picker open", () => {
     it("leaves a title its punctuation, but not a Markdown heading", () => {
         expect(queryFits("#", "Fix the cert, again (urgent)")).toBe(true);
         expect(queryFits("#", " Heading")).toBe(false);
+    });
+});
+
+describe("a room mention once it is written", () => {
+    // Picking @everyone writes "@everyone " as text. The picker allows spaces,
+    // so it stayed open over it and offered @everyone again: Enter picked it a
+    // second time, added a space, and the message was never sent.
+    it("closes the picker the moment the space after it is there", () => {
+        expect(queryFits("@", "everyone ")).toBe(false);
+        expect(queryFits("@", "here ")).toBe(false);
+        expect(queryFits("@", "All ")).toBe(false);
+    });
+
+    it("still offers it while it is being typed", () => {
+        expect(queryFits("@", "every")).toBe(true);
+        expect(roomMatches("every").map((room) => room.id)).toEqual(["everyone"]);
+        expect(roomMatches("al").map((room) => room.id)).toEqual(["everyone"]);
+    });
+
+    it("is never offered for a query with a space in it", () => {
+        expect(roomMatches("everyone ")).toEqual([]);
+        expect(roomMatches("every one")).toEqual([]);
+    });
+
+    it("leaves names that only start like one alone", () => {
+        expect(queryFits("@", "Allison Ruiz")).toBe(true);
+        expect(queryFits("@", "Herenia")).toBe(true);
     });
 });

@@ -107,10 +107,19 @@ export interface RoomSuggestion {
 /** What either popup can offer: something to point at, or the room itself. */
 export type SuggestionItem = MentionCandidate | RoomSuggestion;
 
-/** The room mentions matching what has been typed. `@all` is a spelling of
- *  `@everyone` the parser already takes, so it finds it too. */
-function roomMatches(query: string): RoomSuggestion[] {
-    const needle = query.trim().toLowerCase();
+/**
+ * The room mentions matching what has been typed. `@all` is a spelling of
+ * `@everyone` the parser already takes, so it finds it too.
+ *
+ * A room mention is one word, and nothing once there is a space after it. The
+ * picker allows spaces - people's names have them - and a room mention is put in
+ * as plain text, `@everyone ` with its space, so the picker was still open over
+ * what it had just written and offering it again: Enter picked it a second time,
+ * added another space, and the message was never sent.
+ */
+export function roomMatches(query: string): RoomSuggestion[] {
+    if (/\s/.test(query)) return [];
+    const needle = query.toLowerCase();
     if (needle.length === 0) return [...ROOM_MENTIONS];
     return ROOM_MENTIONS.filter(
         (room) => room.id.startsWith(needle) || (room.id === "everyone" && "all".startsWith(needle))
@@ -286,6 +295,11 @@ export function queryFits(char: string, query: string): boolean {
     // A space straight after the trigger is the tell: nobody starts a name with
     // one, and "@ " or "# " is punctuation or a Markdown heading.
     if (/^\s/.test(query)) return false;
+    // A room mention written out and followed by a space is finished. Picking
+    // one puts it in as text, and the picker has to be gone the moment it is -
+    // not after a search comes back - or the next Enter picks it again rather
+    // than sending the message.
+    if (char === "@" && /^(everyone|here|all)\s/i.test(query)) return false;
     if (char === "@") return query.length <= MAX_QUERY.person && PERSON_QUERY.test(query);
     // A title can hold almost anything, so the only limit is length.
     return query.length <= MAX_QUERY.work;
