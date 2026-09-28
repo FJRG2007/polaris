@@ -87,6 +87,35 @@ import {
  */
 export async function AppChrome({ user, children }: { user: SessionUser; children: ReactNode }) {
     const capabilities = getCapabilities();
+    const nav = reachableAppNav(accessFor(user));
+    // Seeded here rather than fetched by the provider, so the badge on the tab
+    // icon is right on the first paint instead of appearing a second into the
+    // page - which reads as a message that has just arrived when it has been
+    // waiting since yesterday. Only for somebody who has Chat: the count is
+    // zero for everybody else and asking would be a query per page load.
+    // Both for the open shelf, as the apps list it - see `shelf-counts`.
+    //
+    // Chained on the apps rather than awaited after everything else, so the
+    // three counts run beside the rest of the frame instead of one after another
+    // at the end of it.
+    const chatWaiting = nav.then((apps) =>
+        apps.ids.includes("chat")
+            ? chatWaitingOnShelf(user.id).catch(() => NO_CHAT_WAITING)
+            : NO_CHAT_WAITING
+    );
+    // The same, for mail. A person who spends the day in Deploy is told a
+    // message arrived by the same badge that tells them about a chat.
+    const mailWaiting = nav.then((apps) =>
+        apps.ids.includes("mail")
+            ? mailWaitingOnShelf(user.id).catch(() => NO_MAIL_WAITING)
+            : NO_MAIL_WAITING
+    );
+    // And the same for Management. Only for an administrator: nobody else can
+    // act on any of it, so for everybody else the honest count is nothing and
+    // asking would be two queries per page load for a badge that cannot appear.
+    const adminCount = user.isAdmin
+        ? countAdminWaiting().catch(() => NO_ADMIN_WAITING)
+        : NO_ADMIN_WAITING;
     const [
         notifications,
         display,
@@ -100,7 +129,10 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         presence,
         status,
         soundVolume,
-        favoriteApps
+        favoriteApps,
+        chatUnread,
+        mailUnread,
+        adminWaiting
     ] = await Promise.all([
         // The open shelf's, as the bell shows them - see `lib/shelf`.
         openShelfFor(user.id).then((shelf) => listNotifications(user.id, shelf)),
@@ -110,7 +142,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         // quiet on every load after the first.
         getReportedTimeZone(user.id),
         appBaseUrl(),
-        reachableAppNav(accessFor(user)),
+        nav,
         heldSectionPermissions(accessFor(user)),
         installedSectionApps(accessFor(user)),
         resolveScope(user.id),
@@ -120,31 +152,11 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         // A sound at the wrong volume is not worth failing the page over.
         getSoundVolume(user.id).catch(() => DEFAULT_SOUND_VOLUME),
         // The apps pinned to the top of the switcher. Never worth a failed page.
-        getFavoriteApps(user.id).catch(() => [])
+        getFavoriteApps(user.id).catch(() => []),
+        chatWaiting,
+        mailWaiting,
+        adminCount
     ]);
-    // Seeded here rather than fetched by the provider, so the badge on the tab
-    // icon is right on the first paint instead of appearing a second into the
-    // page - which reads as a message that has just arrived when it has been
-    // waiting since yesterday. Only for somebody who has Chat: the count is
-    // zero for everybody else and asking would be a query per page load.
-    // Both for the open shelf, as the apps list it - see `shelf-counts`.
-    const chatUnread = apps.ids.includes("chat")
-        ? await chatWaitingOnShelf(user.id).catch(() => NO_CHAT_WAITING)
-        : NO_CHAT_WAITING;
-
-    // The same, for mail. A person who spends the day in Deploy is told a
-    // message arrived by the same badge that tells them about a chat.
-    const mailUnread = apps.ids.includes("mail")
-        ? await mailWaitingOnShelf(user.id).catch(() => NO_MAIL_WAITING)
-        : NO_MAIL_WAITING;
-
-    // And the same for Management. Only for an administrator: nobody else can
-    // act on any of it, so for everybody else the honest count is nothing and
-    // asking would be two queries per page load for a badge that cannot appear.
-    const adminWaiting = user.isAdmin
-        ? await countAdminWaiting().catch(() => NO_ADMIN_WAITING)
-        : NO_ADMIN_WAITING;
-
     const build = buildStamp();
 
     return (

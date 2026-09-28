@@ -19,7 +19,7 @@
 import { Skeleton } from "@polaris/ui";
 import { TriangleAlert } from "lucide-react";
 import { loginStateAction } from "./minecraft-login-actions";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { LoginState } from "../../lib/minecraft/polaris-login-service";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -50,6 +50,10 @@ export function useLoginState(
     const [state, setState] = useState<LoginState | null>(enabled ? initial : null);
     const [loaded, setLoaded] = useState(state !== null);
     const [error, setError] = useState<string | null>(null);
+    // Whether the first render already holds what the server read for the page.
+    // Asking again on mount would be the same answer a moment later, and on the
+    // Minecraft tabs that one call headed the queue every other action waits in.
+    const seeded = useRef(enabled && initial !== null);
 
     useEffect(() => {
         if (!enabled || initial) return;
@@ -73,7 +77,8 @@ export function useLoginState(
 
     useEffect(() => {
         if (!enabled) return;
-        void reload();
+        if (seeded.current) seeded.current = false;
+        else void reload();
         if (!refreshMs) return;
         const timer = setInterval(() => void reload(), refreshMs);
         return () => clearInterval(timer);
@@ -136,8 +141,8 @@ export function LoginDetails({
                 Players register with{" "}
                 <span className="font-mono">/register &lt;password&gt; &lt;password&gt;</span>, come
                 back with <span className="font-mono">/login &lt;password&gt;</span> and change it
-                with <span className="font-mono">/changepassword &lt;old&gt; &lt;new&gt;</span>. A
-                password with spaces or symbols goes in double quotes.
+                with <span className="font-mono">/changepassword &lt;old&gt; &lt;new&gt;</span>.
+                Letters, digits and symbols all work; a password with spaces goes in double quotes.
             </p>
 
             <p className="text-xs text-muted-foreground">

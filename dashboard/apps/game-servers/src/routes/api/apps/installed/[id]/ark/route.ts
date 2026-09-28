@@ -6,7 +6,7 @@ import { applyPendingArkRules } from "../../../../../../lib/ark/settings-service
 import { readPlayerTimeouts } from "../../../../../../lib/player-timeout-service";
 import { readLastSeen } from "../../../../../../lib/games-activity-service";
 import type { ArkProfile } from "../../../../../../lib/ark/profile";
-import { sweepGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
+import { sweepWatchedGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
 import {
     applyAllowList,
     getArkStatus,
@@ -38,7 +38,10 @@ export const dynamic = "force-dynamic";
  * player list and the port advice behind it - so a page whose facts were all in the
  * database sat empty anyway.
  */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const { id } = await params;
     const { access: server } = await requireGameServer("games.read", id);
     // The survivors and the admin list are two more reads inside the container, so
@@ -61,7 +64,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         // not it is a failing exec on every poll.
         const access = status.answering
             ? await applyAllowList(server.ownerId, id)
-                  .then((applied) => (applied > 0 ? readArkAccess(server.ownerId, id).catch(() => allow) : allow))
+                  .then((applied) =>
+                      applied > 0 ? readArkAccess(server.ownerId, id).catch(() => allow) : allow
+                  )
                   .catch(() => allow)
             : allow;
         // The schedule, on the server it belongs to and with the player count this
@@ -69,7 +74,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         // schedule and the Game servers page sweeps the ones it lists; neither
         // covers somebody sitting on this page with no cron configured, which is
         // exactly where "I set a schedule and nothing happened" comes from.
-        await sweepGameSchedules(server.ownerId, new Date(), {
+        await sweepWatchedGameSchedules(server.ownerId, {
             only: id,
             // What this poll already found out, silence included, so the sweep
             // never asks the same container the same question twice.
@@ -106,11 +111,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const seen = wantsPlayers
             ? await readLastSeen(id, [
                   ...status.players.map((player) => ({ name: player.name, id: player.steamId })),
-                  ...(access?.players ?? []).map((player) => ({ name: player.label, id: player.steamId })),
-                  ...Object.entries(profiles as Record<string, ArkProfile>).map(([steamId, profile]) => ({
-                      name: profile.characterName ?? "",
-                      id: steamId
-                  }))
+                  ...(access?.players ?? []).map((player) => ({
+                      name: player.label,
+                      id: player.steamId
+                  })),
+                  ...Object.entries(profiles as Record<string, ArkProfile>).map(
+                      ([steamId, profile]) => ({
+                          name: profile.characterName ?? "",
+                          id: steamId
+                      })
+                  )
               ]).catch(() => ({}))
             : {};
         return NextResponse.json({

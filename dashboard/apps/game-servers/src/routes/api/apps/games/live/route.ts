@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { listGameServerLive } from "../../../../../lib/games-service";
-import { sweepGameSchedules } from "../../../../../lib/minecraft/schedule-service";
+import { sweepWatchedGameSchedules } from "../../../../../lib/minecraft/schedule-service";
 import { host } from "@polaris/app-host";
 
 const { requirePermissionAny } = host.session;
@@ -24,15 +24,19 @@ export async function GET(): Promise<Response> {
         // Only over this caller's own servers. Somebody looking at a server they
         // were invited to help with should not be the reason it starts or stops,
         // and the owner's own poll - or the cron - is what decides that.
-        await sweepGameSchedules(user.id, new Date(), {
+        await sweepWatchedGameSchedules(user.id, {
             // Null for a server that did not answer: nought would be the sweep
             // reading silence as an empty world and stopping it.
-            known: new Map(servers.map((server) => [server.id, server.answering ? server.online : null]))
+            known: new Map(
+                servers.map((server) => [server.id, server.answering ? server.online : null])
+            )
         }).catch(() => undefined);
         return NextResponse.json({ servers });
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : "Could not read your game servers" },
+            {
+                error: caught instanceof Error ? caught.message : "Could not read your game servers"
+            },
             { status: 400 }
         );
     }

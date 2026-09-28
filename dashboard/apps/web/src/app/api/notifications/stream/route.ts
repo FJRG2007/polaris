@@ -4,7 +4,9 @@
  * along without a reload. Change detection is a server-side poll rather than an
  * in-process event bus because notifications are also written by background work
  * (scans, alarms, the network check); polling covers every producer with one
- * path. Node runtime for Prisma, and always scoped to the session user.
+ * path. Each tick is a one-row probe; the list itself is only re-read when the
+ * probe says it could have changed (see `feed-reader`). Node runtime for Prisma,
+ * and always scoped to the session user.
  *
  * Each frame also says whether the connection reading it is the one that should
  * make a sound. The clients cannot work that out between themselves: the tabs of
@@ -16,7 +18,7 @@
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { backgroundUser } from "@/lib/session";
-import { listNotifications, NOTIFICATION_FEED_LIMIT } from "@/lib/notification-service";
+import { createFeedReader } from "@/lib/notifications/feed-reader";
 import {
     closeLiveClient,
     liveClientChimes,
@@ -28,7 +30,7 @@ import { openShelfFor } from "@/lib/workspace-scope";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** How often the feed is re-read. Fast enough to read as live, cheap enough to hold open. */
+/** How often the feed is checked for a change. Fast enough to read as live, cheap enough to hold open. */
 const POLL_MS = 5000;
 
 /** What kind of Polaris is asking. A value nobody recognises is not refused - the
@@ -69,6 +71,7 @@ export async function GET(request: Request): Promise<Response> {
     let timer: ReturnType<typeof setInterval> | null = null;
     let closed = false;
     let previous = "";
+    const feed = createFeedReader(userId, shelf);
 
     function stop(): void {
         closed = true;
@@ -89,7 +92,7 @@ export async function GET(request: Request): Promise<Response> {
                 let payload: string;
                 try {
                     payload = JSON.stringify({
-                        items: await listNotifications(userId, shelf, NOTIFICATION_FEED_LIMIT),
+                        items: await feed.read(),
                         // Whether this connection is the one to make the sound. It
                         // rides the frame rather than being asked for separately
                         // because it can change while a connection is open - the

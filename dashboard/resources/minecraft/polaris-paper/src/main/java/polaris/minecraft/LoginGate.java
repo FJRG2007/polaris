@@ -380,7 +380,7 @@ final class LoginGate implements Listener, CommandExecutor {
             tell(player, "Log in with /login <password>. You have " + seconds + " seconds.");
         } else {
             tell(player, "Choose a password for this server with /register <password> <password>. You have "
-                    + seconds + " seconds. Put it in double quotes if it has spaces or symbols.");
+                    + seconds + " seconds. Put it in double quotes if it has spaces.");
         }
     }
 
@@ -457,7 +457,7 @@ final class LoginGate implements Listener, CommandExecutor {
     }
 
     private static boolean usage(Player player, String usage) {
-        tell(player, "Use " + usage + ". Put a password in double quotes if it has spaces or symbols.");
+        tell(player, "Use " + usage + ". Put a password in double quotes if it has spaces.");
         return true;
     }
 

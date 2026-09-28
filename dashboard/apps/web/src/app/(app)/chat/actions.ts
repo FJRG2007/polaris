@@ -29,6 +29,7 @@ import { requirePermission } from "@/lib/session";
 import { storeAttachment } from "@/lib/chat/attachments";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
+import { listBlocked } from "@/lib/blocks";
 import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
 import { chatProfile, type ChatProfile } from "@/lib/chat/profiles";
@@ -91,11 +92,6 @@ async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: str
 // Reading
 // ---------------------------------------------------------------------------
 
-export async function listSpacesAction(): Promise<{ spaces: ChatSpaceView[] }> {
-    const me = await actor();
-    return { spaces: await chat.listSpaces(me) };
-}
-
 export async function listChannelsAction(): Promise<{ channels: ChatChannelView[] }> {
     const me = await actor();
     return { channels: await chat.listChannels(me) };
@@ -108,9 +104,39 @@ export async function conversationsElsewhereAction(): Promise<{ chats: ChatElsew
     return { chats: await chat.conversationsElsewhere(me) };
 }
 
-export async function listCategoriesAction(): Promise<{ categories: ChatCategoryView[] }> {
+/**
+ * Everything the chat context holds, in one request.
+ *
+ * Four answers the rail used to ask for as four actions - the conversations,
+ * the spaces, their headings and who this reader has blocked. A browser runs
+ * server actions one at a time, so four of them on every refresh were four
+ * places in the queue a message being sent had to wait behind, each checking
+ * the same permission again. One action checks it once and reads the four
+ * together.
+ *
+ * Each part fails on its own, as the four did: one that could not be read comes
+ * back null and the screen keeps what it had, rather than losing the other
+ * three over it.
+ */
+export async function chatListsAction(): Promise<{
+    channels: ChatChannelView[] | null;
+    spaces: ChatSpaceView[] | null;
+    categories: ChatCategoryView[] | null;
+    blocked: string[] | null;
+}> {
     const me = await actor();
-    return { categories: await chat.listCategories(me) };
+    const part = <T>(read: Promise<T>): Promise<T | null> =>
+        read.catch((caught: unknown) => {
+            console.error("[chat] a part of the conversation list could not be read", caught);
+            return null;
+        });
+    const [channels, spaces, categories, blocked] = await Promise.all([
+        part(chat.listChannels(me)),
+        part(chat.listSpaces(me)),
+        part(chat.listCategories(me)),
+        part(listBlocked(me.id).then((people) => people.map((person) => person.id)))
+    ]);
+    return { channels, spaces, categories, blocked };
 }
 
 /**
@@ -130,13 +156,38 @@ export async function voicePresenceAction(
     return { inRoom: Object.fromEntries(found) };
 }
 
+/**
+ * A page of one conversation - and, with the newest page, the conversation
+ * itself as the rail describes it.
+ *
+ * The screen draws its header from the rail's list, and opening a conversation
+ * straight from a link asks for this before the list has arrived. Answering both
+ * here is what lets the header paint with the first page instead of a moment
+ * after it. Read side by side, and by the same rules the rail applies, so a
+ * conversation this could not describe is one the rail would not list either.
+ */
 export async function readChannelAction(
     channelId: string,
     before?: string
-): Promise<{ page?: ChatPage; error?: string }> {
+): Promise<{ page?: ChatPage; channel?: ChatChannelView | null; error?: string }> {
     const me = await actor();
-    const result = await guard(() => messages.readChannel(me, channelId, before));
-    return result.error ? { error: result.error } : { page: result.value };
+    const [result, described] = await Promise.all([
+        guard(() => messages.readChannel(me, channelId, before)),
+        // Only for the newest page: an older one is somebody scrolling a
+        // conversation whose header is already drawn.
+        before === undefined
+            ? chat.listChannels(me, channelId).then(
+                  (found) => found[0] ?? null,
+                  // A header that could not be described is drawn from the
+                  // rail's list when it lands, as it always was.
+                  () => undefined
+              )
+            : Promise.resolve(undefined)
+    ]);
+    if (result.error) return { error: result.error };
+    return described === undefined
+        ? { page: result.value }
+        : { page: result.value, channel: described };
 }
 
 export async function readSinceAction(

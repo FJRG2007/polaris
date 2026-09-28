@@ -22,6 +22,7 @@ import { flushGameWorld } from "../games-flush";
 import { broadcastToMinecraft, getServerPlayers, runConsoleLine } from "./service";
 import { readPendingRestart } from "../games-restart";
 import { runDueRestart } from "../games-restart-service";
+import { gameServerCatalogIds } from "../game-catalog";
 import {
     CHECKED_AT_KEY,
     EMPTY_SINCE_KEY,
@@ -55,9 +56,27 @@ const COUNT_TIMEOUT_MS = 15_000;
  *  minute the cron runs on, so a schedule that is being followed always says so. */
 const CHECK_NOTE_EVERY_MS = 30_000;
 
+/**
+ * How often a screen somebody is watching may sweep.
+ *
+ * The screens sweep so that an instance with no cron still has schedules that
+ * fire, and they are read every few seconds - the presence watcher every three.
+ * Nothing a sweep does needs that: a window opens or closes on the minute, the
+ * cron itself runs once a minute, and the check note above is only rewritten
+ * every thirty seconds. So a watched screen sweeps at that rate and no faster;
+ * the cron is not throttled and neither is a caller that asks directly.
+ */
+const WATCHED_SWEEP_EVERY_MS = 30_000;
+
+/** When each audience last swept, by owner and the servers it was narrowed to. */
+const watchedSweeps = new Map<string, number>();
+
 /** Whether the note is old enough to be worth writing again. */
 function staleCheck(config: Record<string, unknown>, at: Date): boolean {
-    const held = typeof config[CHECKED_AT_KEY] === "string" ? Date.parse(config[CHECKED_AT_KEY] as string) : Number.NaN;
+    const held =
+        typeof config[CHECKED_AT_KEY] === "string"
+            ? Date.parse(config[CHECKED_AT_KEY] as string)
+            : Number.NaN;
     return Number.isNaN(held) || at.getTime() - held >= CHECK_NOTE_EVERY_MS;
 }
 
@@ -92,12 +111,18 @@ export interface SweepOptions {
 
 /** The schedule on one server. */
 export async function getGameSchedule(installedAppId: string): Promise<GameSchedule> {
-    const row = await prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { config: true } });
+    const row = await prisma.installedApp.findUnique({
+        where: { id: installedAppId },
+        select: { config: true }
+    });
     return readSchedule(readInstallConfig(row?.config));
 }
 
 /** Write one, merged into the rest of the install's settings. */
-export async function setGameSchedule(installedAppId: string, schedule: GameSchedule): Promise<void> {
+export async function setGameSchedule(
+    installedAppId: string,
+    schedule: GameSchedule
+): Promise<void> {
     await patchInstallConfig(installedAppId, { schedule });
 }
 
@@ -114,31 +139,56 @@ export async function sweepGameSchedules(
     options: SweepOptions = {}
 ): Promise<ScheduleSweep> {
     const { known, only } = options;
+    // Game servers only: a schedule and a booked restart are both theirs, and any
+    // other app's config is a row read to be thrown away.
     const installs = await prisma.installedApp.findMany({
         where: {
             ownerId,
             status: { not: "removed" },
             applicationId: { not: null },
+            catalogId: { in: gameServerCatalogIds() },
             ...(only ? { id: typeof only === "string" ? only : { in: [...only] } } : {})
         },
         select: { id: true, applicationId: true, config: true, catalogId: true }
     });
+    // What each one has to do is decided from its own config, so the ones with
+    // nothing to do are dropped before anything else is read, and the rest have
+    // their applications read in one query rather than one each.
+    const pending = installs
+        .map((install) => {
+            const config = readInstallConfig(install.config);
+            // A restart somebody booked for later rides on this walk. It is not
+            // part of the schedule and does not need one: a server with no
+            // schedule at all still has settings that only take effect when it
+            // comes back, and this is the pass that notices the last player has
+            // left.
+            return {
+                install,
+                config,
+                schedule: readSchedule(config),
+                waiting: readPendingRestart(config)
+            };
+        })
+        .filter((entry) => entry.schedule.enabled || entry.waiting);
+    const desired =
+        pending.length === 0
+            ? new Map<string, string>()
+            : await prisma.application
+                  .findMany({
+                      where: {
+                          id: { in: pending.map((entry) => entry.install.applicationId as string) }
+                      },
+                      select: { id: true, desiredState: true }
+                  })
+                  .then((apps) => new Map(apps.map((app) => [app.id, app.desiredState])))
+                  .catch(() => new Map<string, string>());
     let started = 0;
     let stopped = 0;
     let restarted = 0;
-    for (const install of installs) {
-        const config = readInstallConfig(install.config);
-        const schedule = readSchedule(config);
-        // A restart somebody booked for later rides on this walk. It is not part of
-        // the schedule and does not need one: a server with no schedule at all
-        // still has settings that only take effect when it comes back, and this is
-        // the pass that notices the last player has left.
-        const waiting = readPendingRestart(config);
-        if (!schedule.enabled && !waiting) continue;
-        const app = await prisma.application
-            .findFirst({ where: { id: install.applicationId as string }, select: { desiredState: true } })
-            .catch(() => null);
-        if (!app) continue;
+    for (const { install, config, schedule, waiting } of pending) {
+        const desiredState = desired.get(install.applicationId as string);
+        if (desiredState === undefined) continue;
+        const app = { desiredState };
         const running = app.desiredState === "running";
 
         // Only a running server can be asked who is on it, and only a running
@@ -171,7 +221,9 @@ export async function sweepGameSchedules(
         // sweeps on its poll, and a row rewritten every five seconds to say the
         // same thing is a write nobody reads.
         if (staleCheck(config, at)) {
-            await patchInstallConfig(install.id, { [CHECKED_AT_KEY]: at.toISOString() }).catch(() => undefined);
+            await patchInstallConfig(install.id, { [CHECKED_AT_KEY]: at.toISOString() }).catch(
+                () => undefined
+            );
         }
 
         const action = scheduleAction(schedule, at, { running, playersOnline, emptySince });
@@ -179,7 +231,11 @@ export async function sweepGameSchedules(
         // A scheduled stop is the one nobody is watching, so it is the one where an
         // unwritten world would be noticed last: flush before it goes down.
         if (action !== "start") await flushGameWorld(ownerId, install.id);
-        const applied = await setApplicationRunning(install.applicationId as string, ownerId, action === "start")
+        const applied = await setApplicationRunning(
+            install.applicationId as string,
+            ownerId,
+            action === "start"
+        )
             .then(() => true)
             .catch(() => false);
         if (!applied) continue;
@@ -190,6 +246,29 @@ export async function sweepGameSchedules(
         await patchInstallConfig(install.id, { [EMPTY_SINCE_KEY]: null }).catch(() => undefined);
     }
     return { started, stopped, restarted };
+}
+
+/**
+ * The sweep a screen runs while somebody is watching it, at most once every
+ * `WATCHED_SWEEP_EVERY_MS` for the same owner and servers. Null when it was not
+ * this caller's turn.
+ */
+export async function sweepWatchedGameSchedules(
+    ownerId: string,
+    options: SweepOptions = {}
+): Promise<ScheduleSweep | null> {
+    const now = Date.now();
+    const only = options.only;
+    const key = `${ownerId}|${only === undefined ? "*" : typeof only === "string" ? only : [...only].sort().join(",")}`;
+    const last = watchedSweeps.get(key);
+    if (last !== undefined && now - last < WATCHED_SWEEP_EVERY_MS) return null;
+    // Taken before the sweep rather than after it, so two screens arriving at
+    // once do not both sweep.
+    watchedSweeps.set(key, now);
+    for (const [held, at] of watchedSweeps) {
+        if (now - at >= WATCHED_SWEEP_EVERY_MS && held !== key) watchedSweeps.delete(held);
+    }
+    return sweepGameSchedules(ownerId, new Date(now), options);
 }
 
 /**
@@ -204,15 +283,26 @@ export async function sweepGameSchedules(
  * wedged never answers at all, and an unbounded wait there is a sweep that never
  * finishes and a schedule that never fires again.
  */
-async function countOnline(ownerId: string, install: { id: string; catalogId: string }): Promise<number | null> {
+async function countOnline(
+    ownerId: string,
+    install: { id: string; catalogId: string }
+): Promise<number | null> {
     const game = gameOfServer(install.catalogId)?.id;
     const ask =
         game === "ark"
-            ? getArkPlayers(ownerId, install.id).then((live) => (live.answering ? live.players.length : null))
+            ? getArkPlayers(ownerId, install.id).then((live) =>
+                  live.answering ? live.players.length : null
+              )
             : game === "fivem"
-              ? getFivemPlayers(ownerId, install.id).then((live) => (live.answering ? live.players.length : null))
-              : getServerPlayers(ownerId, install.id).then((live) => (live.answering ? live.players.online : null));
-    return withTimeout(ask, COUNT_TIMEOUT_MS, "the server did not say who was on it").catch(() => null);
+              ? getFivemPlayers(ownerId, install.id).then((live) =>
+                    live.answering ? live.players.length : null
+                )
+              : getServerPlayers(ownerId, install.id).then((live) =>
+                    live.answering ? live.players.online : null
+                );
+    return withTimeout(ask, COUNT_TIMEOUT_MS, "the server did not say who was on it").catch(
+        () => null
+    );
 }
 
 /**
@@ -231,13 +321,17 @@ async function trackEmptiness(
     playersOnline: number | null,
     at: Date
 ): Promise<string | null> {
-    const held = typeof config[EMPTY_SINCE_KEY] === "string" ? (config[EMPTY_SINCE_KEY] as string) : null;
+    const held =
+        typeof config[EMPTY_SINCE_KEY] === "string" ? (config[EMPTY_SINCE_KEY] as string) : null;
     // A server that could not be asked changes nothing: the clock it had is kept,
     // so a minute of silence in the middle of an empty evening does not restart
     // the count, and a server that has never answered never starts one.
     if (playersOnline === null) return held;
     if (!running || playersOnline > 0) {
-        if (held !== null) await patchInstallConfig(installedAppId, { [EMPTY_SINCE_KEY]: null }).catch(() => undefined);
+        if (held !== null)
+            await patchInstallConfig(installedAppId, { [EMPTY_SINCE_KEY]: null }).catch(
+                () => undefined
+            );
         return null;
     }
     if (held !== null) return held;
@@ -260,7 +354,11 @@ async function trackEmptiness(
  * which is the difference between a schedule that works and one that quietly does
  * nothing at four in the morning with nobody watching.
  */
-export async function runGameRoutines(ownerId: string, installedAppId: string, now: Date = new Date()): Promise<number> {
+export async function runGameRoutines(
+    ownerId: string,
+    installedAppId: string,
+    now: Date = new Date()
+): Promise<number> {
     const install = await prisma.installedApp
         .findFirst({
             where: { id: installedAppId, ownerId, status: { not: "removed" } },
@@ -305,13 +403,16 @@ async function runRoutine(
                 case "broadcast":
                     // Each game says it its own way, and saying it the other way is
                     // a message nobody in the game ever sees.
-                    if (game === "ark") await runArkCommand(ownerId, installedAppId, `Broadcast ${action.value}`);
-                    else if (game === "fivem") await broadcastToFivem(ownerId, installedAppId, action.value);
+                    if (game === "ark")
+                        await runArkCommand(ownerId, installedAppId, `Broadcast ${action.value}`);
+                    else if (game === "fivem")
+                        await broadcastToFivem(ownerId, installedAppId, action.value);
                     else await broadcastToMinecraft(ownerId, installedAppId, action.value);
                     break;
                 case "command":
                     if (game === "ark") await runArkCommand(ownerId, installedAppId, action.value);
-                    else if (game === "fivem") await runFivemCommand(ownerId, installedAppId, action.value);
+                    else if (game === "fivem")
+                        await runFivemCommand(ownerId, installedAppId, action.value);
                     else await runConsoleLine(ownerId, installedAppId, action.value);
                     break;
                 case "backup":
@@ -326,8 +427,16 @@ async function runRoutine(
                     // drops the last few minutes of a world is a restart nobody
                     // asked for.
                     await flushGameWorld(ownerId, installedAppId).catch(() => undefined);
-                    await setApplicationRunning(await applicationOf(ownerId, installedAppId), ownerId, false);
-                    await setApplicationRunning(await applicationOf(ownerId, installedAppId), ownerId, true);
+                    await setApplicationRunning(
+                        await applicationOf(ownerId, installedAppId),
+                        ownerId,
+                        false
+                    );
+                    await setApplicationRunning(
+                        await applicationOf(ownerId, installedAppId),
+                        ownerId,
+                        true
+                    );
                     break;
             }
         } catch (caught) {

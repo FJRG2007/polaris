@@ -20,7 +20,7 @@ import { requirePermission } from "@/lib/session";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { listAccountViews } from "@/lib/mailbox/accounts";
 import { listFolders, unreadCounts } from "@/lib/mailbox/views";
-import { listIdentities, listLabels } from "@/lib/mailbox/labels";
+import { listIdentitiesByAccount, listLabels } from "@/lib/mailbox/labels";
 
 export const dynamic = "force-dynamic";
 
@@ -29,23 +29,22 @@ export default async function MailLayout({ children }: { children: React.ReactNo
     // Which working life this is. Mail draws one shelf at a time, the way Drive
     // and Notes do: somebody's own mailboxes, or the ones an organization handed
     // them - never the two stacked in one rail.
-    const shelfOrgId = await mailShelfFor(user.id);
-    const [accounts, folders, labels, unread] = await Promise.all([
+    // The labels are the person's own on every shelf, so they are read beside
+    // the shelf rather than after it.
+    const [shelfOrgId, labels] = await Promise.all([mailShelfFor(user.id), listLabels(user.id)]);
+    const [accounts, folders, unread] = await Promise.all([
         listAccountViews(user.id, shelfOrgId),
         listFolders(user.id, shelfOrgId),
-        listLabels(user.id),
         unreadCounts(user.id, shelfOrgId)
     ]);
 
     // The addresses each mailbox may send as, so the composer can offer them
     // without a round trip when somebody presses Write. Small, and read here
-    // because the composer is mounted by the shell rather than by a screen.
-    const identities = Object.fromEntries(
-        await Promise.all(
-            accounts.map(
-                async (account) => [account.id, await listIdentities(user.id, account.id)] as const
-            )
-        )
+    // because the composer is mounted by the shell rather than by a screen. One
+    // query for every mailbox on the rail, not one per mailbox.
+    const identities = await listIdentitiesByAccount(
+        user.id,
+        accounts.map((account) => account.id)
     );
 
     return (

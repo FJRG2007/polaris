@@ -47,7 +47,7 @@ vi.mock("@polaris/db", () => ({
             }
         },
         sessionState: {
-            findMany: async () => [{ userId: person.id, lastSeenAt }]
+            groupBy: async () => [{ userId: person.id, _max: { lastSeenAt } }]
         },
         meetingParticipant: { findMany: async () => [] }
     }

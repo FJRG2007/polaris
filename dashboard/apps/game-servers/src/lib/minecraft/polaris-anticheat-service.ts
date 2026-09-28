@@ -293,23 +293,49 @@ export interface EngineRecord {
 
 /** Flags listed per player on the tab. */
 const RECENT_PER_PLAYER = 20;
+/** How many players' lists are read at the same time. */
+const PLAYERS_AT_ONCE = 6;
 
 export async function engineRecords(installedAppId: string): Promise<EngineRecord[]> {
     const since = new Date(Date.now() - EVIDENCE_WINDOW_MS);
-    const [groups, rows] = await Promise.all([
-        prisma.minecraftAnticheatFlag.groupBy({
-            by: ["player", "check"],
-            where: { installedAppId, at: { gte: since } },
-            _count: { _all: true },
-            _max: { violations: true, at: true, playerName: true }
-        }),
-        prisma.minecraftAnticheatFlag.findMany({
-            where: { installedAppId, at: { gte: since } },
-            orderBy: { at: "desc" },
-            take: 2000,
-            select: { player: true, check: true, violations: true, verbose: true, at: true }
-        })
-    ]);
+    const groups = await prisma.minecraftAnticheatFlag.groupBy({
+        by: ["player", "check"],
+        where: { installedAppId, at: { gte: since } },
+        _count: { _all: true },
+        _max: { violations: true, at: true, playerName: true }
+    });
+    // The newest few per player and no more. The counts above are what the tab
+    // totals; these rows are only the list under each player, so one query per
+    // player bounded to what is shown, rather than two thousand plugin lines read
+    // for the whole server and most of them thrown away. Through the query API
+    // rather than a window function, because a raw query here would have to
+    // compare a uuid column to a text parameter, which Postgres refuses without
+    // a cast that SQLite does not have.
+    //
+    // A few at a time: a server with a hundred flagged players would otherwise
+    // ask for a hundred queries at once, which is the whole connection pool and
+    // every other request on the instance waiting behind this tab.
+    const players = [...new Set(groups.map((group) => group.player))];
+    const rows: {
+        player: string;
+        check: string;
+        violations: number;
+        verbose: string;
+        at: Date;
+    }[] = [];
+    for (let start = 0; start < players.length; start += PLAYERS_AT_ONCE) {
+        const batch = await Promise.all(
+            players.slice(start, start + PLAYERS_AT_ONCE).map((player) =>
+                prisma.minecraftAnticheatFlag.findMany({
+                    where: { installedAppId, player, at: { gte: since } },
+                    orderBy: { at: "desc" },
+                    take: RECENT_PER_PLAYER,
+                    select: { player: true, check: true, violations: true, verbose: true, at: true }
+                })
+            )
+        );
+        rows.push(...batch.flat());
+    }
     const records = new Map<
         string,
         {

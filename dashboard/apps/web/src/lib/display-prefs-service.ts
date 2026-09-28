@@ -83,7 +83,9 @@ export async function getReportedTimeZone(userId: string): Promise<string | null
  * device - so without it a date rendered into a page and a status schedule
  * deciding whether somebody is hidden both quietly used the deployment's clock.
  */
-export async function resolveDisplayPreferencesFor(userId: string | null): Promise<DisplayPreferences> {
+export async function resolveDisplayPreferencesFor(
+    userId: string | null
+): Promise<DisplayPreferences> {
     const [platform, account] = await Promise.all([
         getPlatformDisplayPreferences(),
         userId ? readAccountDisplay(userId) : Promise.resolve(NOTHING_HELD)
@@ -161,7 +163,9 @@ export async function patchUserDisplayPreferences(
     await saveUserDisplayPreferences(userId, { ...current, ...change });
 }
 
-export async function savePlatformDisplayPreferences(preferences: DisplayPreferences): Promise<void> {
+export async function savePlatformDisplayPreferences(
+    preferences: DisplayPreferences
+): Promise<void> {
     await setSetting(PLATFORM_KEY, stringifyDisplayPreferences(preferences));
 }
 
@@ -203,8 +207,10 @@ export async function setUsersMayChooseTheme(allowed: boolean): Promise<void> {
  */
 export async function resolveTextSize(userId: string | null): Promise<number> {
     try {
-        const platform = await getPlatformDisplayPreferences();
-        const mine = userId ? await getUserDisplayPreferences(userId) : {};
+        const [platform, mine] = await Promise.all([
+            getPlatformDisplayPreferences(),
+            userId ? getUserDisplayPreferences(userId) : ({} as UserDisplayPreferences)
+        ]);
         const chosen = mine.textSize ?? platform.textSize;
         return isTextSize(chosen) ? chosen : DISPLAY_DEFAULTS.textSize;
     } catch {

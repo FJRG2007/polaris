@@ -96,9 +96,15 @@ vi.mock("@polaris/app-host", () => ({
         }
     }
 }));
+/** Whether the container refuses to be reached, as a stopped or restarting
+ *  server does. */
+const reach = { down: false };
+
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
-    withServerContainer: async (_owner: string, _id: string, work: (s: unknown) => unknown) =>
-        work(server)
+    withServerContainer: async (_owner: string, _id: string, work: (s: unknown) => unknown) => {
+        if (reach.down) throw new Error("The server is not running");
+        return work(server);
+    }
 }));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/world", async (importOriginal) => ({
     ...(await importOriginal<object>()),
@@ -106,7 +112,7 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/world", async (importOrigin
     DATA_DIR: "/data"
 }));
 
-const { readAllPlayerStats, readMinecraftStats } = await import(
+const { readAllMining, readAllPlayerStats, readMinecraftStats } = await import(
     "@polaris-app/game-servers/src/lib/minecraft/stats-service"
 );
 const { statsRanking } = await import("@polaris-app/game-servers/src/lib/minecraft/rankings");
@@ -132,5 +138,16 @@ describe("the playtime leaderboard, read from the server", () => {
         const stats = await readMinecraftStats("owner", "offgrid", "FJRG2007");
         expect(stats?.playedMs).toBe((5_752_132 + 26_912) * 50);
         expect(stats?.deaths).toBe(2);
+    });
+});
+
+describe("a server that could not be read", () => {
+    it("is read again on the next request rather than holding nothing for a minute", async () => {
+        reach.down = true;
+        expect(await readAllPlayerStats("owner", "restarting")).toEqual([]);
+        expect(await readAllMining("owner", "restarting")).toEqual([]);
+        reach.down = false;
+        const figures = await readAllPlayerStats("owner", "restarting");
+        expect(statsRanking("rank.playtime", figures)[0]).toBe("1. FJRG2007 80h");
     });
 });

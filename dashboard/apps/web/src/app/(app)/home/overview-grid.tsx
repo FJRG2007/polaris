@@ -10,8 +10,9 @@
  * have to wait on a round trip to find out where they moved a card to.
  *
  * The figures are the other way round: the grid draws its frames first and asks
- * for the numbers once it is on screen, in one request covering every card that
- * needs one. A card whose data has not landed shows the shape of its own
+ * for the numbers once it is on screen - the quick cards in one request and the
+ * slow ones in another, so a monitoring read never holds a task count back (see
+ * `request-groups`). A card whose data has not landed shows the shape of its own
  * contents, so the page does not move under the reader when it does.
  */
 
@@ -23,14 +24,41 @@ import { saveOverviewPreferencesAction } from "./actions";
 import { packOverviewSpans } from "@/lib/overview/pack";
 import { useShelfScope } from "@/components/shelf-scope";
 import { clearRecentPlaces } from "@/lib/overview/recent-places";
+import { overviewRequestGroups } from "@/lib/overview/request-groups";
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
 import type { OverviewData } from "@/lib/overview/overview-service";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { overviewSize, overviewWidget, OVERVIEW_SIZE_LABELS } from "@/lib/overview/catalog";
 import { AppsWidget, NotificationsWidget, RecentWidget, ShortcutsWidget } from "./widgets/personal";
-import { AlarmsWidget, GamesWidget, ServicesWidget, StorageWidget, TasksWidget, UsageWidget } from "./widgets/infrastructure";
-import { ArrowDown, ArrowUp, EyeOff, GripVertical, LayoutGrid, MoreVertical, RefreshCw, Settings2, Trash2 } from "lucide-react";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, cn } from "@polaris/ui";
+import {
+    AlarmsWidget,
+    GamesWidget,
+    ServicesWidget,
+    StorageWidget,
+    TasksWidget,
+    UsageWidget
+} from "./widgets/infrastructure";
+import {
+    ArrowDown,
+    ArrowUp,
+    EyeOff,
+    GripVertical,
+    LayoutGrid,
+    MoreVertical,
+    RefreshCw,
+    Settings2,
+    Trash2
+} from "lucide-react";
+import {
+    Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    cn
+} from "@polaris/ui";
 import {
     resolveOverviewLayout,
     type OverviewPreferences,
@@ -58,8 +86,9 @@ const DATA_TTL_MS = 30_000;
 const SAVE_DEBOUNCE_MS = 600;
 
 // Held outside the component so returning to the Overview paints the figures the
-// last visit already fetched.
-let dataCache: { at: number; key: string; data: OverviewData } | null = null;
+// last visit already fetched. One entry per request sent, keyed by the shelf and
+// the cards it asked for.
+const dataCache = new Map<string, { at: number; data: OverviewData }>();
 
 /**
  * How wide each stored size is drawn before the grid has been measured - the
@@ -77,7 +106,6 @@ const SPAN: Record<OverviewWidgetSize, string> = {
 
 /** The same widths as columns, for the arithmetic that fits a row to the grid. */
 const COLUMNS: Record<OverviewWidgetSize, number> = { sm: 1, md: 2, lg: 3, xl: 4 };
-
 
 export function OverviewGrid({
     name,
@@ -105,7 +133,10 @@ export function OverviewGrid({
     const [widgets, setWidgets] = useState(layout);
     const [shortcuts, setShortcuts] = useState<OverviewShortcut[]>(preferences.shortcuts);
     const [greeting, setGreeting] = useState(preferences.greeting);
-    const [data, setData] = useState<OverviewData | undefined>(undefined);
+    const [data, setData] = useState<OverviewData>({});
+    // The cards whose figures are still on their way. Null before the first ask,
+    // which is every card.
+    const [pending, setPending] = useState<ReadonlySet<string> | null>(null);
     const [customizing, setCustomizing] = useState(false);
     const [picking, setPicking] = useState(false);
     // The card being dragged, and the one it is currently over. Dragging is the
@@ -127,7 +158,11 @@ export function OverviewGrid({
     const [columns, setColumns] = useState(0);
 
     // What the server last accepted, to put back if it refuses the next change.
-    const accepted = useRef<{ widgets: OverviewWidgetPreference[]; shortcuts: OverviewShortcut[]; greeting: boolean }>({
+    const accepted = useRef<{
+        widgets: OverviewWidgetPreference[];
+        shortcuts: OverviewShortcut[];
+        greeting: boolean;
+    }>({
         widgets: layout,
         shortcuts: preferences.shortcuts,
         greeting: preferences.greeting
@@ -146,7 +181,11 @@ export function OverviewGrid({
     );
 
     const persist = useCallback(
-        (next: { widgets: OverviewWidgetPreference[]; shortcuts: OverviewShortcut[]; greeting: boolean }) => {
+        (next: {
+            widgets: OverviewWidgetPreference[];
+            shortcuts: OverviewShortcut[];
+            greeting: boolean;
+        }) => {
             setWidgets(next.widgets);
             setShortcuts(next.shortcuts);
             setGreeting(next.greeting);
@@ -173,7 +212,9 @@ export function OverviewGrid({
                         setWidgets(previous.widgets);
                         setShortcuts(previous.shortcuts);
                         setGreeting(previous.greeting);
-                        setFailure("That change could not be saved. Check your connection and try again.");
+                        setFailure(
+                            "That change could not be saved. Check your connection and try again."
+                        );
                     });
             }, SAVE_DEBOUNCE_MS);
         },
@@ -183,7 +224,8 @@ export function OverviewGrid({
     const current = () => ({ widgets, shortcuts, greeting });
 
     function reorder(from: number, to: number): void {
-        if (from < 0 || to < 0 || from === to || from >= widgets.length || to >= widgets.length) return;
+        if (from < 0 || to < 0 || from === to || from >= widgets.length || to >= widgets.length)
+            return;
         const next = [...widgets];
         const [held] = next.splice(from, 1);
         next.splice(to, 0, held!);
@@ -209,7 +251,9 @@ export function OverviewGrid({
     function toggle(id: OverviewWidgetId, visible: boolean): void {
         persist({
             ...current(),
-            widgets: widgets.map((widget) => (widget.id === id ? { ...widget, hidden: !visible } : widget))
+            widgets: widgets.map((widget) =>
+                widget.id === id ? { ...widget, hidden: !visible } : widget
+            )
         });
     }
 
@@ -221,19 +265,30 @@ export function OverviewGrid({
     }
 
     function pin(shortcut: OverviewShortcut): void {
-        if (shortcuts.length >= MAX_OVERVIEW_SHORTCUTS || shortcuts.some((held) => held.href === shortcut.href)) return;
+        if (
+            shortcuts.length >= MAX_OVERVIEW_SHORTCUTS ||
+            shortcuts.some((held) => held.href === shortcut.href)
+        )
+            return;
         persist({ ...current(), shortcuts: [...shortcuts, shortcut] });
     }
 
     function unpin(href: string): void {
-        persist({ ...current(), shortcuts: shortcuts.filter((shortcut) => shortcut.href !== href) });
+        persist({
+            ...current(),
+            shortcuts: shortcuts.filter((shortcut) => shortcut.href !== href)
+        });
     }
 
     function reset(): void {
-        persist({ widgets: resolveOverviewLayout({ ...preferences, widgets: [] }, available), shortcuts, greeting: true });
+        persist({
+            widgets: resolveOverviewLayout({ ...preferences, widgets: [] }, available),
+            shortcuts,
+            greeting: true
+        });
     }
 
-    // One request for every card that needs the server, re-run when the set of
+    // The requests for every card that needs the server, re-run when the set of
     // those cards changes rather than on every rearrangement.
     const wanted = useMemo(
         () =>
@@ -255,33 +310,57 @@ export function OverviewGrid({
     useEffect(() => {
         if (!asked) {
             setData({});
-            return;
-        }
-        if (nonce === 0 && dataCache && dataCache.key === key && Date.now() - dataCache.at < DATA_TTL_MS) {
-            setData(dataCache.data);
+            setPending(new Set());
             return;
         }
         const controller = new AbortController();
-        setData(undefined);
-        void fetch(`/api/overview?widgets=${encodeURIComponent(asked)}`, {
-            cache: "no-store",
-            signal: controller.signal
-        })
-            .then((response) => (response.ok ? response.json() : Promise.reject(new Error("read failed"))))
-            .then((body: OverviewData) => {
-                dataCache = { at: Date.now(), key, data: body };
-                setData(body);
-            })
-            .catch((caught: unknown) => {
-                if (caught instanceof DOMException && caught.name === "AbortError") return;
-                // Every card then says it could not be read, which is the truth.
-                setData({});
+        const kept: OverviewData = {};
+        const waiting = new Set<string>();
+        const sends: string[][] = [];
+        for (const group of overviewRequestGroups(asked.split(","))) {
+            const held = dataCache.get(`${on}|${group.join(",")}`);
+            if (nonce === 0 && held && Date.now() - held.at < DATA_TTL_MS) {
+                Object.assign(kept, held.data);
+            } else {
+                sends.push(group);
+                for (const id of group) waiting.add(id);
+            }
+        }
+        setData(kept);
+        setPending(waiting);
+        const landed = (group: readonly string[], body: OverviewData): void => {
+            setData((previous) => ({ ...previous, ...body }));
+            setPending((previous) => {
+                const next = new Set(previous);
+                for (const id of group) next.delete(id);
+                return next;
             });
+        };
+        for (const group of sends) {
+            const groupKey = `${on}|${group.join(",")}`;
+            void fetch(`/api/overview?widgets=${encodeURIComponent(group.join(","))}`, {
+                cache: "no-store",
+                signal: controller.signal
+            })
+                .then((response) =>
+                    response.ok ? response.json() : Promise.reject(new Error("read failed"))
+                )
+                .then((body: OverviewData) => {
+                    dataCache.set(groupKey, { at: Date.now(), data: body });
+                    landed(group, body);
+                })
+                .catch((caught: unknown) => {
+                    if (caught instanceof DOMException && caught.name === "AbortError") return;
+                    // Every card in the request then says it could not be read,
+                    // which is the truth; the other request's cards are unaffected.
+                    landed(group, Object.fromEntries(group.map((id) => [id, null])));
+                });
+        }
         return () => controller.abort();
-    }, [key, asked, nonce]);
+    }, [key, asked, on, nonce]);
 
     function refresh(): void {
-        dataCache = null;
+        dataCache.clear();
         setNonce((value) => value + 1);
     }
 
@@ -296,7 +375,8 @@ export function OverviewGrid({
         if (!element || typeof ResizeObserver === "undefined") return;
         const measure = (): void => {
             const tracks = window.getComputedStyle(element).gridTemplateColumns;
-            const count = tracks && tracks !== "none" ? tracks.split(" ").filter(Boolean).length : 0;
+            const count =
+                tracks && tracks !== "none" ? tracks.split(" ").filter(Boolean).length : 0;
             setColumns((held) => (held === count ? held : count));
         };
         measure();
@@ -333,7 +413,11 @@ export function OverviewGrid({
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">
-                        {greeting ? (hello ? `${hello}, ${firstName(name)}` : `Welcome back, ${firstName(name)}`) : "Overview"}
+                        {greeting
+                            ? hello
+                                ? `${hello}, ${firstName(name)}`
+                                : `Welcome back, ${firstName(name)}`
+                            : "Overview"}
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                         What is running, what needs you, and the places you go most.
@@ -347,7 +431,13 @@ export function OverviewGrid({
                         aria-label="Refresh the figures"
                         className="grid size-9 place-items-center rounded-md border border-border bg-surface text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
-                        <RefreshCw className={cn("size-4", data === undefined && "animate-spin")} aria-hidden="true" />
+                        <RefreshCw
+                            className={cn(
+                                "size-4",
+                                (pending === null || pending.size > 0) && "animate-spin"
+                            )}
+                            aria-hidden="true"
+                        />
                     </button>
                     <Button variant="outline" size="sm" onClick={() => setCustomizing(true)}>
                         <Settings2 className="size-4" aria-hidden="true" />
@@ -357,7 +447,10 @@ export function OverviewGrid({
             </div>
 
             {failure ? (
-                <p role="alert" className="rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {failure}
                 </p>
             ) : null}
@@ -383,7 +476,9 @@ export function OverviewGrid({
                                     "min-w-0 rounded-lg transition-opacity",
                                     SPAN[overviewSize(widget.id, widget.size)],
                                     dragged === widget.id && "opacity-40",
-                                    over === widget.id && dragged !== widget.id && "ring-2 ring-primary"
+                                    over === widget.id &&
+                                        dragged !== widget.id &&
+                                        "ring-2 ring-primary"
                                 )}
                                 onDragOver={(event) => {
                                     if (!dragged) return;
@@ -393,7 +488,9 @@ export function OverviewGrid({
                                     event.dataTransfer.dropEffect = "move";
                                     setOver(widget.id);
                                 }}
-                                onDragLeave={() => setOver((held) => (held === widget.id ? null : held))}
+                                onDragLeave={() =>
+                                    setOver((held) => (held === widget.id ? null : held))
+                                }
                                 onDrop={(event) => {
                                     event.preventDefault();
                                     if (dragged) moveOnto(dragged, widget.id);
@@ -438,7 +535,11 @@ export function OverviewGrid({
                                 >
                                     <WidgetBody
                                         id={widget.id}
-                                        data={data}
+                                        data={
+                                            pending === null || pending.has(widget.id)
+                                                ? undefined
+                                                : data
+                                        }
                                         apps={apps}
                                         shortcuts={shortcuts}
                                         historyNonce={historyNonce}
@@ -505,7 +606,9 @@ function WidgetBody({
         case "apps":
             return <AppsWidget apps={apps} />;
         case "services":
-            return <ServicesWidget data={data === undefined ? undefined : (data.services ?? null)} />;
+            return (
+                <ServicesWidget data={data === undefined ? undefined : (data.services ?? null)} />
+            );
         case "usage":
             return <UsageWidget data={data === undefined ? undefined : (data.usage ?? null)} />;
         case "alarms":
@@ -515,9 +618,13 @@ function WidgetBody({
         case "tasks":
             return <TasksWidget data={data === undefined ? undefined : (data.tasks ?? null)} />;
         case "sessions":
-            return <SessionsWidget data={data === undefined ? undefined : (data.sessions ?? null)} />;
+            return (
+                <SessionsWidget data={data === undefined ? undefined : (data.sessions ?? null)} />
+            );
         case "activity":
-            return <ActivityWidget data={data === undefined ? undefined : (data.activity ?? null)} />;
+            return (
+                <ActivityWidget data={data === undefined ? undefined : (data.activity ?? null)} />
+            );
         case "games":
             return <GamesWidget data={data === undefined ? undefined : (data.games ?? null)} />;
     }
@@ -531,7 +638,15 @@ function WidgetBody({
  * where anybody not using a mouse arranges the grid - and a focusable control
  * that does nothing when it is pressed is worse than no control at all.
  */
-function WidgetGrip({ label, onStart, onEnd }: { label: string; onStart: () => void; onEnd: () => void }) {
+function WidgetGrip({
+    label,
+    onStart,
+    onEnd
+}: {
+    label: string;
+    onStart: () => void;
+    onEnd: () => void;
+}) {
     return (
         <span
             draggable

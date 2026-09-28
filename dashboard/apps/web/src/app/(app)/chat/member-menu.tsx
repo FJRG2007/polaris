@@ -41,10 +41,13 @@ import { runAction } from "@/lib/run-action";
 import {
     useState,
     type ComponentType,
+    type KeyboardEvent as ReactKeyboardEvent,
     type MouseEvent as ReactMouseEvent,
+    type PointerEvent as ReactPointerEvent,
     type ReactNode
 } from "react";
 import { PersonName } from "@/components/person-name";
+import { usePersonPress } from "@/components/person-press";
 import { setVolumeFor, volumeFor } from "./call-volumes";
 import { memberActions } from "./member-actions";
 import { useOpenDirect } from "./use-open-direct";
@@ -61,6 +64,8 @@ import {
     Flag,
     ShieldBan,
     Timer,
+    UserPen,
+    UserRound,
     UserMinus,
     UserPlus,
     Volume2,
@@ -142,6 +147,8 @@ interface MenuParts {
     readonly Trigger: ComponentType<{
         asChild?: boolean;
         onContextMenu?: (event: ReactMouseEvent) => void;
+        onPointerDown?: (event: ReactPointerEvent) => void;
+        onKeyDown?: (event: ReactKeyboardEvent) => void;
         children: ReactNode;
     }>;
     readonly Content: ComponentType<{
@@ -222,6 +229,12 @@ export function MemberMenu({
 }) {
     const menu = openWith === "press" ? PRESS : RIGHT_CLICK;
     const router = useRouter();
+    // What opens somebody's card on this screen, and the row it opens beside -
+    // the one that was right-clicked, noted as it was.
+    const press = usePersonPress();
+    // State rather than a ref: the menu's items are drawn from this render, and
+    // a ref set by the right-click would not draw them again.
+    const [anchor, setAnchor] = useState<HTMLElement | null>(null);
     const { spaces, blocked, refresh } = useChat();
     const [busy, setBusy] = useState(false);
     const direct = useOpenDirect(onError);
@@ -296,7 +309,17 @@ export function MemberMenu({
                 Radix's own handler on this trigger, which is the one that opens
                 it.
             */}
-            <menu.Trigger asChild onContextMenu={(event) => event.stopPropagation()}>
+            <menu.Trigger
+                asChild
+                onContextMenu={(event) => {
+                    event.stopPropagation();
+                    setAnchor(event.currentTarget as HTMLElement);
+                }}
+                // A long press on a touch screen and a key that opens the menu
+                // never raise a right-click, and the row is noted all the same.
+                onPointerDown={(event) => setAnchor(event.currentTarget as HTMLElement)}
+                onKeyDown={(event) => setAnchor(event.currentTarget as HTMLElement)}
+            >
                 {children}
             </menu.Trigger>
             {/* Focus is not handed back to whatever was right-clicked. Mention
@@ -315,6 +338,39 @@ export function MemberMenu({
                     <PersonName id={member.userId} name={member.name} />
                 </menu.Label>
                 <menu.Separator />
+
+                {/* Anybody's card, yours included - the same one pressing the
+                    name opens. Only where the screen has cards to open; a menu
+                    opened from inside a card has nowhere else to go. */}
+                {press && anchor && (
+                    <menu.Item
+                        onSelect={() => {
+                            press({ id: member.userId, name: member.name }, anchor);
+                        }}
+                    >
+                        <UserRound className="size-3.5" />
+                        Profile
+                    </menu.Item>
+                )}
+
+                {/* Your own row. Nothing about reaching or moderating somebody
+                    applies to yourself, and a menu with only a name in it read as
+                    broken - so it offers what does: saying your own name in what
+                    you are writing, and changing how you appear. */}
+                {you && (
+                    <>
+                        {onMention && (
+                            <menu.Item onSelect={() => onMention(mentionOf(member))}>
+                                <AtSign className="size-3.5" />
+                                Mention
+                            </menu.Item>
+                        )}
+                        <menu.Item onSelect={() => router.push("/account")}>
+                            <UserPen className="size-3.5" />
+                            Edit your profile
+                        </menu.Item>
+                    </>
+                )}
 
                 {!you && (
                     <>

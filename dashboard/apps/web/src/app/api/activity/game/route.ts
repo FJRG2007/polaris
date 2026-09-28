@@ -12,7 +12,7 @@
  */
 
 import * as core from "@polaris/core";
-import { apiUser } from "@/lib/api-session";
+import { backgroundUser } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { reportGame } from "@/lib/presence-activity/service";
 import { activitySettingsOf } from "@/lib/presence-activity/settings";
@@ -30,8 +30,10 @@ const REPORT_WINDOW_MS = 60_000;
  * Only the account's own list, and only its own account's.
  */
 export async function GET(): Promise<Response> {
-    const user = await apiUser();
-    if (user instanceof Response) return user;
+    // Sent by the desktop app on its own while a game runs, not by anybody
+    // using Polaris, so it must not keep the idle lock from closing.
+    const user = await backgroundUser();
+    if (!user) return Response.json({ error: "Sign in to continue" }, { status: 401 });
     const { settings } = await activitySettingsOf(user.id);
     return Response.json(
         { customGames: settings.customGames },
@@ -40,8 +42,10 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-    const user = await apiUser();
-    if (user instanceof Response) return user;
+    // Sent by the desktop app on its own while a game runs, not by anybody
+    // using Polaris, so it must not keep the idle lock from closing.
+    const user = await backgroundUser();
+    if (!user) return Response.json({ error: "Sign in to continue" }, { status: 401 });
 
     const throttle = await rateLimit(`activity-game:${user.id}`, REPORT_LIMIT, REPORT_WINDOW_MS);
     if (!throttle.ok) {

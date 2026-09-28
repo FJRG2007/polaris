@@ -45,6 +45,7 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    Skeleton,
     Switch,
     allChosen,
     cn,
@@ -52,12 +53,28 @@ import {
 } from "@polaris/ui";
 import * as side from "../../lib/minecraft/sidebar";
 import { VariablesHelp } from "../../components/variables-help";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import {
     readLiveDisplayAction,
     saveLiveDisplayAction,
     type LiveDisplayState
 } from "./live-display-actions";
+
+/** The card's name and what it is for, with the switch beside them. */
+function SidebarHeading({ control }: { control: ReactNode }) {
+    return (
+        <div className="flex items-start justify-between gap-3">
+            <div>
+                <p className="text-sm font-medium">Side panel</p>
+                <p className="text-xs text-muted-foreground">
+                    A box on the right of every player&apos;s screen. Polaris keeps its values
+                    current while the server runs.
+                </p>
+            </div>
+            {control}
+        </div>
+    );
+}
 
 export function MinecraftSidebar({
     installedAppId,
@@ -136,17 +153,28 @@ export function MinecraftSidebar({
         });
     }
 
+    // What the card is and what it does are drawn at once; only the switch and
+    // the lines wait for the server's panel to be read, and a read that failed
+    // says so in their place.
     if (!state) {
         return (
             <Card>
-                <CardBody className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">Side panel</p>
+                <CardBody className="flex flex-col gap-4">
+                    <SidebarHeading
+                        control={
+                            error ? null : <Skeleton className="h-5 w-9 shrink-0 rounded-full" />
+                        }
+                    />
                     {error ? (
                         <p role="alert" className="text-sm text-danger">
                             {error}
                         </p>
                     ) : (
-                        <div className="h-24 animate-pulse rounded-md bg-muted" />
+                        <div className="flex flex-col gap-3" aria-busy="true">
+                            <Skeleton className="h-9 w-full" />
+                            <Skeleton className="h-9 w-full" />
+                            <Skeleton className="h-9 w-2/3" />
+                        </div>
                     )}
                 </CardBody>
             </Card>
@@ -159,21 +187,16 @@ export function MinecraftSidebar({
             <div className="flex min-w-0 flex-col gap-4">
                 <Card>
                     <CardBody className="flex flex-col gap-4">
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <p className="text-sm font-medium">Side panel</p>
-                                <p className="text-xs text-muted-foreground">
-                                    A box on the right of every player&apos;s screen. Polaris keeps
-                                    its values current while the server runs.
-                                </p>
-                            </div>
-                            <Switch
-                                checked={draft.enabled}
-                                disabled={!canManage || (refused !== null && !draft.enabled)}
-                                onChange={(enabled) => change({ enabled })}
-                                aria-label="Show the side panel"
-                            />
-                        </div>
+                        <SidebarHeading
+                            control={
+                                <Switch
+                                    checked={draft.enabled}
+                                    disabled={!canManage || (refused !== null && !draft.enabled)}
+                                    onChange={(enabled) => change({ enabled })}
+                                    aria-label="Show the side panel"
+                                />
+                            }
+                        />
                         {refused && <p className="text-xs text-muted-foreground">{refused}.</p>}
 
                         <div className="flex flex-col gap-1.5">

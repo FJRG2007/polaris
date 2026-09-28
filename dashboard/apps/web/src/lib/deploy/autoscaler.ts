@@ -37,7 +37,10 @@ const states = new Map<string, AutoscaleState>();
 
 /** Average CPU over the copies that answered, or null when none did. */
 async function averageCpu(
-    app: { target: { kind: string; hostId: string | null }; environment: { project: { ownerId: string } } },
+    app: {
+        target: { kind: string; hostId: string | null };
+        environment: { project: { ownerId: string } };
+    },
     names: readonly string[]
 ): Promise<number | null> {
     const driver =
@@ -50,7 +53,9 @@ async function averageCpu(
             const stats = samples.get(name);
             return stats ? [stats.cpuPercent] : [];
         });
-        return readings.length > 0 ? readings.reduce((sum, value) => sum + value, 0) / readings.length : null;
+        return readings.length > 0
+            ? readings.reduce((sum, value) => sum + value, 0) / readings.length
+            : null;
     } finally {
         await driver.dispose().catch(() => undefined);
     }
@@ -62,30 +67,67 @@ async function averageCpu(
  * moves before the release carrying it is serving, and stays moved when that
  * release never comes up.
  */
-async function servingCopies(apps: readonly { currentDeploymentId: string | null }[]): Promise<Map<string, number>> {
-    const ids = apps.map((app) => app.currentDeploymentId).filter((id): id is string => id !== null);
+async function servingCopies(
+    apps: readonly { currentDeploymentId: string | null }[]
+): Promise<Map<string, number>> {
+    const ids = apps
+        .map((app) => app.currentDeploymentId)
+        .filter((id): id is string => id !== null);
     if (ids.length === 0) return new Map();
     const rows = await prisma.deployment.findMany({
         where: { id: { in: ids } },
         select: { id: true, replicas: true }
     });
-    return new Map(rows.flatMap((row) => (row.replicas !== null ? [[row.id, row.replicas] as const] : [])));
+    return new Map(
+        rows.flatMap((row) => (row.replicas !== null ? [[row.id, row.replicas] as const] : []))
+    );
+}
+
+/** Which of these services have a deploy on its way, in one query for the pass
+ *  rather than a count per service. */
+async function deployingNow(ids: readonly string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const rows = await prisma.deployment.groupBy({
+        by: ["deployableId"],
+        where: {
+            deployableType: "application",
+            deployableId: { in: [...ids] },
+            status: { in: ["queued", "building", "deploying"] }
+        }
+    });
+    return new Set(rows.map((row) => row.deployableId));
 }
 
 export async function runAutoscale(now = Date.now()): Promise<{ checked: number; scaled: number }> {
     const apps = await prisma.application.findMany({
-        where: { autoscale: { not: null }, currentDeploymentId: { not: null }, desiredState: "running" },
-        include: {
-            environment: { include: { project: true } },
-            target: true,
+        where: {
+            autoscale: { not: null },
+            currentDeploymentId: { not: null },
+            desiredState: "running"
+        },
+        // Only what a pass reads: the whole project and target rows were loaded
+        // for every service once a minute to use three of their columns.
+        select: {
+            id: true,
+            slug: true,
+            autoscale: true,
+            currentDeploymentId: true,
+            replicas: true,
+            keepReleases: true,
+            sourceType: true,
+            environment: { select: { project: { select: { slug: true, ownerId: true } } } },
+            target: { select: { kind: true, hostId: true, runtime: true } },
             domains: { where: { enabled: true }, select: { hostname: true } },
             _count: { select: { volumes: true } }
         }
     });
     let checked = 0;
     let scaled = 0;
-    const names = await servingContainerNames(apps);
-    const copies = await servingCopies(apps);
+    const [names, copies, busy] = await Promise.all([
+        servingContainerNames(apps),
+        servingCopies(apps),
+        deployingNow(apps.map((app) => app.id))
+    ]);
     // Read on the first service that needs it, and not at all when none does.
     let log: Promise<EdgeVisits> | null = null;
     for (const app of apps) {
@@ -93,14 +135,7 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
         if (!config || app.target.runtime === "swarm" || singleCopyReason(app)) continue;
         // A deploy already on its way decides the count for itself; a second one
         // queued behind it would only undo or repeat it.
-        const inFlight = await prisma.deployment.count({
-            where: {
-                deployableType: "application",
-                deployableId: app.id,
-                status: { in: ["queued", "building", "deploying"] }
-            }
-        });
-        if (inFlight > 0) continue;
+        if (busy.has(app.id)) continue;
         checked += 1;
         const running = copies.get(app.currentDeploymentId ?? "") ?? app.replicas;
         const primary = names.get(app.id);
@@ -109,7 +144,11 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
             : null;
         let requests: number | null = null;
         if (config.requestsPerCopy !== null && trafficRefusal(app) === null) {
-            log ??= readEdgeVisits().catch(() => ({ visits: [], windowStart: null, truncated: false }));
+            log ??= readEdgeVisits().catch(() => ({
+                visits: [],
+                windowStart: null,
+                truncated: false
+            }));
             const visits = await log;
             requests = requestRate(
                 visitTimes(visits, serviceHostnames(app)),
@@ -125,8 +164,11 @@ export async function runAutoscale(now = Date.now()): Promise<{ checked: number;
             states.get(app.id) ?? AUTOSCALE_IDLE,
             now
         );
+        const moves = step.replicas !== running && step.signal !== null;
+        // The pass's reads take a while; a deploy queued since it began counts too.
+        if (moves && (await deployingNow([app.id])).has(app.id)) continue;
         states.set(app.id, step.state);
-        if (step.replicas === running || step.signal === null) continue;
+        if (!moves) continue;
         try {
             await scaleService(app.id, app.environment.project.ownerId, step.replicas);
             scaled += 1;

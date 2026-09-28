@@ -9,7 +9,7 @@
  */
 
 import { Loader2, MessagesSquare } from "lucide-react";
-import { Button, Card, CardBody, Select, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, Select, Skeleton, Switch } from "@polaris/ui";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     CHAT_COMMANDS,
@@ -102,6 +102,19 @@ function linkOf(draft: Draft): ChatLink | null | undefined {
     return parsed.data;
 }
 
+/** The card's name and what linking a chat does. */
+function ChatLinkHeading() {
+    return (
+        <div>
+            <p className="text-sm font-medium">Linked chat</p>
+            <p className="text-xs text-muted-foreground">
+                The chat group or space this server talks through. Its call feeds {"{call.*}"} on
+                the side panel and in announcements, and it shows the server&apos;s badge in Chat.
+            </p>
+        </div>
+    );
+}
+
 export function MinecraftChatLink({ installedAppId }: { installedAppId: string }) {
     const [state, setState] = useState<ChatLinkState | null>(null);
     const [draft, setDraft] = useState<Draft>(draftOf(null));
@@ -152,17 +165,22 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
         });
     }
 
+    // What the card is for is drawn at once; only the choice waits for the link
+    // and the chats that could be linked, and a read that failed says so.
     if (!state) {
         return (
             <Card>
-                <CardBody className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">Linked chat</p>
+                <CardBody className="flex flex-col gap-4">
+                    <ChatLinkHeading />
                     {error ? (
                         <p role="alert" className="text-sm text-danger">
                             {error}
                         </p>
                     ) : (
-                        <div className="h-24 animate-pulse rounded-md bg-muted" />
+                        <div className="flex flex-col gap-1" aria-busy="true">
+                            <span className="text-sm font-medium">Link to</span>
+                            <Skeleton className="h-9 w-full" />
+                        </div>
                     )}
                 </CardBody>
             </Card>
@@ -200,14 +218,7 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
     return (
         <Card>
             <CardBody className="flex flex-col gap-4">
-                <div>
-                    <p className="text-sm font-medium">Linked chat</p>
-                    <p className="text-xs text-muted-foreground">
-                        The chat group or space this server talks through. Its call feeds{" "}
-                        {"{call.*}"} on the side panel and in announcements, and it shows the
-                        server&apos;s badge in Chat.
-                    </p>
-                </div>
+                <ChatLinkHeading />
 
                 <label className="flex flex-col gap-1 text-sm">
                     <span className="font-medium">Link to</span>

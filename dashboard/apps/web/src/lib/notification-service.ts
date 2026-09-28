@@ -9,8 +9,8 @@
  */
 
 import { prisma } from "@polaris/db";
-import type { NotificationLevel } from "@polaris/core";
 import { shelfFilter } from "@/lib/shelf";
+import type { NotificationLevel } from "@polaris/core";
 
 export type { NotificationLevel };
 
@@ -143,7 +143,11 @@ function personIn(metadata: string | null): string | null {
 /** Names for the people a page of alerts is about, in one query rather than one
  *  per row. Empty when no row names anybody, which is most pages. */
 async function namesFor(rows: readonly NotificationRow[]): Promise<Map<string, string>> {
-    const ids = [...new Set(rows.map((row) => personIn(row.metadata)).filter((id): id is string => id !== null))];
+    const ids = [
+        ...new Set(
+            rows.map((row) => personIn(row.metadata)).filter((id): id is string => id !== null)
+        )
+    ];
     if (ids.length === 0) return new Map();
     const people = await prisma.user.findMany({
         where: { id: { in: ids } },
@@ -202,6 +206,31 @@ export async function listNotifications(
     return rows.map((row) => toView(row, names));
 }
 
+/**
+ * A fingerprint of a user's feed on one shelf that moves whenever the list
+ * `listNotifications` would return could have moved - one aggregate, no rows.
+ *
+ * Every write to the table is one of: a row created (the newest `createdAt`
+ * and the count move), a row deleted (the count moves), or a row marked read,
+ * which is always stamped with the time it happened - including the clearing
+ * of "Action needed", which sets `readAt` alongside it - so the latest
+ * `readAt` moves. Nothing edits a row's text in place. What this cannot see is
+ * a name changing on the person an alert is about; the stream re-reads the list
+ * on a slower clock for that.
+ */
+export async function notificationFeedVersion(userId: string, shelf: string): Promise<string> {
+    const probe = await prisma.notification.aggregate({
+        where: { userId, ...shelfFilter(shelf) },
+        _count: { _all: true },
+        _max: { createdAt: true, readAt: true }
+    });
+    return [
+        probe._count._all,
+        probe._max.createdAt?.getTime() ?? 0,
+        probe._max.readAt?.getTime() ?? 0
+    ].join(":");
+}
+
 /** How many rows one page of the history holds. */
 export const NOTIFICATION_PAGE_SIZE = 40;
 
@@ -238,7 +267,10 @@ export async function listNotificationHistory(
     const names = await namesFor(page);
     return {
         items: page.map((row) => toView(row, names)),
-        cursor: rows.length > NOTIFICATION_PAGE_SIZE ? (page.at(-1)?.createdAt.toISOString() ?? null) : null
+        cursor:
+            rows.length > NOTIFICATION_PAGE_SIZE
+                ? (page.at(-1)?.createdAt.toISOString() ?? null)
+                : null
     };
 }
 
@@ -286,7 +318,10 @@ export async function listDeliveries(userId: string, limit = 100): Promise<Deliv
 
 /** Mark one notification read (scoped to the owner). */
 export async function markNotificationRead(userId: string, id: string): Promise<void> {
-    await prisma.notification.updateMany({ where: { id, userId, readAt: null }, data: { readAt: new Date() } });
+    await prisma.notification.updateMany({
+        where: { id, userId, readAt: null },
+        data: { readAt: new Date() }
+    });
 }
 
 /** Mark every unread notification on the open shelf read - the ones the bell
@@ -324,7 +359,10 @@ export async function markNotificationsReadByType(types: readonly string[]): Pro
 
 /** Mark a chosen set read. Scoped to the owner, so ids that arrive from a
  *  browser and belong to somebody else are simply not matched. */
-export async function markNotificationsRead(userId: string, ids: readonly string[]): Promise<number> {
+export async function markNotificationsRead(
+    userId: string,
+    ids: readonly string[]
+): Promise<number> {
     if (ids.length === 0) return 0;
     const done = await prisma.notification.updateMany({
         where: { id: { in: [...ids] }, userId, readAt: null },

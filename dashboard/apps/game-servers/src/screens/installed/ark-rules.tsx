@@ -168,57 +168,50 @@ export function ArkRules({
             {/* Forty-odd rows in six groups, and somebody arriving here has
                 usually just read the name of one on a wiki. Matched against the
                 key as well as the words, which is the half that makes that
-                arrival work. */}
-            {!loading ? (
-                <label className="relative">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Find a setting, by what it does or what ARK calls it"
-                        aria-label="Find a setting"
-                        className="pl-8"
-                    />
-                </label>
-            ) : null}
+                arrival work. The catalogue is Polaris' own, so the search and
+                every row are drawn at once; only the values wait for the
+                container. */}
+            <label className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Find a setting, by what it does or what ARK calls it"
+                    aria-label="Find a setting"
+                    className="pl-8"
+                />
+            </label>
 
-            {loading ? (
-                <div className="flex flex-col gap-2">
-                    {Array.from({ length: 6 }, (_, index) => (
-                        <Skeleton key={index} className="h-12 w-full" />
-                    ))}
+            {shown.map((group) => (
+                <div key={group.group} className="flex flex-col gap-1">
+                    <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        {group.group}
+                    </p>
+                    <Card>
+                        <CardBody className="flex flex-col gap-0 py-0">
+                            {group.settings.map((setting, index) => (
+                                <SettingRow
+                                    key={setting.key}
+                                    setting={setting}
+                                    pinned={rules?.overrides[setting.key] ?? null}
+                                    live={rules?.live[setting.key] ?? null}
+                                    first={index === 0}
+                                    busy={busy === setting.key}
+                                    loading={loading}
+                                    disabled={!canManage || !running}
+                                    onChange={(value) => void apply(setting, value)}
+                                />
+                            ))}
+                        </CardBody>
+                    </Card>
                 </div>
-            ) : (
-                shown.map((group) => (
-                    <div key={group.group} className="flex flex-col gap-1">
-                        <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            {group.group}
-                        </p>
-                        <Card>
-                            <CardBody className="flex flex-col gap-0 py-0">
-                                {group.settings.map((setting, index) => (
-                                    <SettingRow
-                                        key={setting.key}
-                                        setting={setting}
-                                        pinned={rules?.overrides[setting.key] ?? null}
-                                        live={rules?.live[setting.key] ?? null}
-                                        first={index === 0}
-                                        busy={busy === setting.key}
-                                        disabled={!canManage || !running}
-                                        onChange={(value) => void apply(setting, value)}
-                                    />
-                                ))}
-                            </CardBody>
-                        </Card>
-                    </div>
-                ))
-            )}
+            ))}
 
-            {!loading && shown.length === 0 ? (
+            {shown.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                     Nothing here matches “{query}”. ARK has a great many settings and Polaris offers
-                    the ones it can set as launch options; anything else lives in the game&apos;s own
-                    files.
+                    the ones it can set as launch options; anything else lives in the game&apos;s
+                    own files.
                 </p>
             ) : null}
 
@@ -247,6 +240,7 @@ function SettingRow({
     live,
     first,
     busy,
+    loading,
     disabled,
     onChange
 }: {
@@ -259,6 +253,9 @@ function SettingRow({
     /** The first row carries no divider above it. */
     first: boolean;
     busy: boolean;
+    /** While the values are still being read: the row is drawn, its control is
+     *  an outline rather than a default that would flip once the value lands. */
+    loading: boolean;
     disabled: boolean;
     onChange: (value: string | null) => void;
 }) {
@@ -271,9 +268,10 @@ function SettingRow({
     // A switch is described as on or off rather than as the True or False in the
     // file: for the settings ARK names `DisableSomething` those two words are
     // opposites, and printing the raw one is the same trap as drawing it.
-    const said = setting.type === "boolean" ? (switchIsOn(setting, live ?? "") ? "on" : "off") : live;
+    const said =
+        setting.type === "boolean" ? (switchIsOn(setting, live ?? "") ? "on" : "off") : live;
     const source =
-        pinned !== null
+        loading || pinned !== null
             ? null
             : live !== null
               ? `The server's own file says ${said}.`
@@ -297,65 +295,77 @@ function SettingRow({
                     <code className="min-w-0 truncate font-mono text-[0.6875rem] font-normal text-foreground-subtle">
                         {setting.key}
                     </code>
-                    {busy && <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />}
+                    {busy && (
+                        <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+                    )}
                 </p>
                 {setting.hint && <p className="text-xs text-muted-foreground">{setting.hint}</p>}
                 {source && <p className="text-xs text-muted-foreground">{source}</p>}
             </div>
-            <div className="flex items-center gap-2">
-                {/* Only offered for a setting Polaris is pinning: there is nothing
-                    to take back otherwise, and a button that does nothing is worse
-                    than no button. */}
-                {pinned !== null && (
-                    <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label={`Stop setting ${setting.label}`}
-                        title="Leave it to the game"
-                        disabled={disabled || busy}
-                        onClick={() => onChange(null)}
-                    >
-                        <RotateCcw className="size-4" />
-                    </Button>
-                )}
-                {setting.type === "boolean" ? (
-                    <Switch
-                        aria-label={setting.label}
-                        disabled={disabled || busy}
-                        // Through the setting rather than straight off the text: a
-                        // few of ARK's switches are named `DisableSomething`, and
-                        // drawing those as they are stored is how somebody turns
-                        // gamma on and finds it off.
-                        checked={switchIsOn(setting, shown)}
-                        onChange={(next: boolean) => onChange(switchValue(setting, next))}
-                    />
-                ) : (
-                    <Input
-                        type="number"
-                        className="w-28"
-                        aria-label={setting.label}
-                        disabled={disabled || busy}
-                        min={setting.min}
-                        max={setting.max}
-                        step={setting.decimal ? "0.1" : "1"}
-                        placeholder={setting.fallback}
-                        value={draft}
-                        onChange={(event) => setDraft(event.target.value)}
-                        // Committed on blur and on Enter rather than per keystroke:
-                        // a write per digit would set the rate to 1, then 12, then
-                        // 125.
-                        onBlur={() => draft !== shown && onChange(draft)}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter" && draft !== shown) onChange(draft);
-                        }}
-                        title={
-                            setting.min !== undefined && setting.max !== undefined
-                                ? `${setting.min} to ${setting.max}`
-                                : undefined
-                        }
-                    />
-                )}
-            </div>
+            {loading ? (
+                <Skeleton
+                    className={
+                        setting.type === "boolean"
+                            ? "h-5 w-9 shrink-0 rounded-full"
+                            : "h-9 w-28 shrink-0"
+                    }
+                />
+            ) : (
+                <div className="flex items-center gap-2">
+                    {/* Only offered for a setting Polaris is pinning: there is nothing
+                        to take back otherwise, and a button that does nothing is worse
+                        than no button. */}
+                    {pinned !== null && (
+                        <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Stop setting ${setting.label}`}
+                            title="Leave it to the game"
+                            disabled={disabled || busy}
+                            onClick={() => onChange(null)}
+                        >
+                            <RotateCcw className="size-4" />
+                        </Button>
+                    )}
+                    {setting.type === "boolean" ? (
+                        <Switch
+                            aria-label={setting.label}
+                            disabled={disabled || busy}
+                            // Through the setting rather than straight off the text: a
+                            // few of ARK's switches are named `DisableSomething`, and
+                            // drawing those as they are stored is how somebody turns
+                            // gamma on and finds it off.
+                            checked={switchIsOn(setting, shown)}
+                            onChange={(next: boolean) => onChange(switchValue(setting, next))}
+                        />
+                    ) : (
+                        <Input
+                            type="number"
+                            className="w-28"
+                            aria-label={setting.label}
+                            disabled={disabled || busy}
+                            min={setting.min}
+                            max={setting.max}
+                            step={setting.decimal ? "0.1" : "1"}
+                            placeholder={setting.fallback}
+                            value={draft}
+                            onChange={(event) => setDraft(event.target.value)}
+                            // Committed on blur and on Enter rather than per keystroke:
+                            // a write per digit would set the rate to 1, then 12, then
+                            // 125.
+                            onBlur={() => draft !== shown && onChange(draft)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter" && draft !== shown) onChange(draft);
+                            }}
+                            title={
+                                setting.min !== undefined && setting.max !== undefined
+                                    ? `${setting.min} to ${setting.max}`
+                                    : undefined
+                            }
+                        />
+                    )}
+                </div>
+            )}
         </div>
     );
 }

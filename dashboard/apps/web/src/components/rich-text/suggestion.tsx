@@ -22,7 +22,7 @@ import Suggestion from "@tiptap/suggestion";
 import { Avatar } from "@/components/avatar";
 import { ReactRenderer } from "@tiptap/react";
 import { PluginKey, type EditorState } from "@tiptap/pm/state";
-import { PersonName, PersonRow } from "@/components/person-name";
+import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
 import type { MentionCandidate } from "@/lib/rich-text/mention-service";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
@@ -171,58 +171,63 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
     // sentence matches nobody is answering a question they never asked.
     if (items.length === 0) return null;
 
+    // Plain, like every other picker: an @ list is read at typing speed to find
+    // one name, and plates and coloured names down it are noise between the
+    // reader and the person they are looking for.
     return (
-        <ul className={POPUP_CLASS}>
-            {items.map((item, index) => (
-                <li key={`${item.kind}-${item.id}`}>
-                    <PersonRow
-                        as="button"
-                        // A team or a task is not somebody, and only a person
-                        // has a plate to wear.
-                        personId={item.kind === "user" ? item.id : null}
-                        type="button"
-                        // Pointer down rather than click: the editor takes the
-                        // focus back on mouse up, and a click fired after that
-                        // lands with the caret already moved.
-                        onMouseDown={(event) => {
-                            event.preventDefault();
-                            choose(index);
-                        }}
-                        onMouseEnter={() => setActive(index)}
-                        className={cn(
-                            POPUP_ITEM_CLASS,
-                            index === active ? "bg-option-hover" : "hover:bg-option-hover/60"
-                        )}
-                    >
-                        {item.kind === "user" ? (
-                            <Avatar
-                                person={{ id: item.id, name: item.label, image: item.image }}
-                                size={20}
-                            />
-                        ) : item.kind === "room" ? (
-                            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[0.6875rem] text-primary">
-                                <AtSign className="size-3" />
+        <PlainNames>
+            <ul className={POPUP_CLASS}>
+                {items.map((item, index) => (
+                    <li key={`${item.kind}-${item.id}`}>
+                        <PersonRow
+                            as="button"
+                            // A team or a task is not somebody, and only a person
+                            // has a plate to wear.
+                            personId={item.kind === "user" ? item.id : null}
+                            type="button"
+                            // Pointer down rather than click: the editor takes the
+                            // focus back on mouse up, and a click fired after that
+                            // lands with the caret already moved.
+                            onMouseDown={(event) => {
+                                event.preventDefault();
+                                choose(index);
+                            }}
+                            onMouseEnter={() => setActive(index)}
+                            className={cn(
+                                POPUP_ITEM_CLASS,
+                                index === active ? "bg-option-hover" : "hover:bg-option-hover/60"
+                            )}
+                        >
+                            {item.kind === "user" ? (
+                                <Avatar
+                                    person={{ id: item.id, name: item.label, image: item.image }}
+                                    size={20}
+                                />
+                            ) : item.kind === "room" ? (
+                                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[0.6875rem] text-primary">
+                                    <AtSign className="size-3" />
+                                </span>
+                            ) : (
+                                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[0.625rem] uppercase text-muted-foreground">
+                                    {item.kind.slice(0, 1)}
+                                </span>
+                            )}
+                            <span className="min-w-0 flex-1 truncate" title={item.label}>
+                                <PersonName
+                                    id={item.kind === "user" ? item.id : null}
+                                    name={item.label}
+                                />
                             </span>
-                        ) : (
-                            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[0.625rem] uppercase text-muted-foreground">
-                                {item.kind.slice(0, 1)}
-                            </span>
-                        )}
-                        <span className="min-w-0 flex-1 truncate" title={item.label}>
-                            <PersonName
-                                id={item.kind === "user" ? item.id : null}
-                                name={item.label}
-                            />
-                        </span>
-                        {item.detail && (
-                            <span className="max-w-[9rem] shrink-0 truncate text-[0.6875rem] text-muted-foreground">
-                                {item.detail}
-                            </span>
-                        )}
-                    </PersonRow>
-                </li>
-            ))}
-        </ul>
+                            {item.detail && (
+                                <span className="max-w-[9rem] shrink-0 truncate text-[0.6875rem] text-muted-foreground">
+                                    {item.detail}
+                                </span>
+                            )}
+                        </PersonRow>
+                    </li>
+                ))}
+            </ul>
+        </PlainNames>
     );
 });
 

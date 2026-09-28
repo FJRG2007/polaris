@@ -55,6 +55,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useAttention } from "@/components/use-attention";
 import { closeDesktopNotice } from "@/lib/desktop-notify";
 import type { ChatMessageView } from "@/lib/chat/messages";
+import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { sendFile } from "@/components/transfers/move-file";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CallPreview, CallPreviewLine } from "./call-preview";
@@ -202,7 +203,7 @@ export function ChannelView({
 }) {
     const router = useRouter();
     const params = useSearchParams();
-    const { viewerId, viewerName, channels, refresh, rulesFor, may, callsOff } = useChat();
+    const { viewerId, viewerName, channels, loaded, refresh, rulesFor, may, callsOff } = useChat();
     const [unblocking, setUnblocking] = useState(false);
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
@@ -395,10 +396,30 @@ export function ChannelView({
     // not drag the reader back to it over and over.
     const landed = useRef<string | null>(null);
 
+    // The conversation as the first page described it, held until the rail's
+    // list has it. Opening one from a link asks for its messages before the
+    // list has arrived, and the page brings the conversation with it so the
+    // header can be drawn at once rather than a moment later.
+    const [described, setDescribed] = useState<ChatChannelView | null>(null);
+    const listed = channels.some((entry) => entry.id === channelId);
     const channel = useMemo(
-        () => channels.find((entry) => entry.id === channelId) ?? null,
-        [channels, channelId]
+        () =>
+            channels.find((entry) => entry.id === channelId) ??
+            (described?.id === channelId ? described : null),
+        [channels, channelId, described]
     );
+    // Whichever of the two was read last decides. A list that arrives without
+    // the conversation is one this reader has left or been removed from, and a
+    // first page read a moment earlier does not overrule that; a page read after
+    // the list is a conversation the list has not caught up with yet - a new
+    // direct message, a group they were just added to - so the list is asked
+    // again rather than the reader being told it is not theirs.
+    useEffect(() => {
+        if (loaded && !listed) setDescribed(null);
+    }, [channels, loaded, listed]);
+    useEffect(() => {
+        if (loaded && !listed && described?.id === channelId) refresh();
+    }, [described, loaded, listed, channelId, refresh]);
     // What the bar calls this call while somebody is elsewhere in Polaris.
     const callTitle = channel
         ? channel.kind === "text"
@@ -472,8 +493,6 @@ export function ChannelView({
             .catch(() => setLive(null));
     }, [channelId]);
 
-    useEffect(checkCall, [checkCall]);
-
     /** Drop everything the server has now confirmed, so a message is never on
      *  screen twice. */
     const settle = useCallback((arrived: readonly ChatMessageView[]) => {
@@ -512,6 +531,7 @@ export function ChannelView({
      *  else. What opening a channel does. */
     const load = useCallback(async () => {
         const result = await actions.readChannelAction(channelId);
+        if (result.channel) setDescribed(result.channel);
         if (result.error) {
             setError(result.error);
             show([]);
@@ -532,6 +552,12 @@ export function ChannelView({
     useEffect(() => {
         void load();
     }, [load]);
+
+    // After the messages, on purpose. A browser runs server actions one at a
+    // time, in the order they were asked for, so whichever of these two
+    // effects is declared first is the one the other waits behind - and the
+    // messages are what somebody opening a conversation is waiting to read.
+    useEffect(checkCall, [checkCall]);
 
     /**
      * Pull in the page above the oldest message on screen, and let go of as much
@@ -1661,7 +1687,7 @@ export function ChannelView({
         observer.observe(band);
         if (column) observer.observe(column);
         return () => observer.disconnect();
-    }, [inCall, callPlace, !channel && messages === null]);
+    }, [inCall, callPlace, !channel && (messages === null || !loaded)]);
 
     const resizeBand = useCallback(
         (size: number) => {
@@ -1688,7 +1714,11 @@ export function ChannelView({
         bandLimit
     );
 
-    if (!channel && messages === null) {
+    // Waiting rather than refused while the list has not arrived: a first page
+    // that lands before it is the ordinary way in from a link, and saying the
+    // conversation is not theirs until the list catches up was a refusal that
+    // flashed on every such open.
+    if (!channel && (messages === null || !loaded)) {
         return (
             <div className="flex flex-1 flex-col">
                 <div className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">

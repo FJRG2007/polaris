@@ -17,13 +17,7 @@
 
 import * as core from "@polaris/core";
 import { callsUnavailableAction } from "./meeting-actions";
-import { listBlockedAction } from "@/app/(app)/account/privacy/actions";
-import {
-    chatRulesAction,
-    listCategoriesAction,
-    listChannelsAction,
-    listSpacesAction
-} from "./actions";
+import { chatListsAction, chatRulesAction, listChannelsAction } from "./actions";
 import type { ChatCategoryView, ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import {
     createContext,
@@ -31,6 +25,7 @@ import {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
     type ReactNode
 } from "react";
@@ -88,7 +83,20 @@ interface ChatContextValue {
     /** False until the first answer arrives, so a rail can tell "nothing yet"
      *  from "nothing at all" and skeleton the first rather than empty-state it. */
     readonly loaded: boolean;
+    /** Everything above asked for again: the conversations, the spaces, their
+     *  headings and who is blocked. What a screen calls after a write that
+     *  changes the shape of the list. */
     readonly refresh: () => void;
+    /**
+     * The conversations alone, asked for again a moment from now.
+     *
+     * What a message arriving or a conversation being caught up on needs: the
+     * order and the unread marks moved, and nothing else did. Calls that land
+     * inside the same moment are answered by one request - a busy room is a
+     * frame every few hundred milliseconds, and a request per frame is a queue
+     * the reader's own sends wait behind.
+     */
+    readonly refreshChannels: () => void;
     /** What the instance allows in a conversation of a given shape. The
      *  defaults until the answer arrives, so the composer is never briefly
      *  stricter than the server. */
@@ -110,6 +118,12 @@ const ChatContext = createContext<ChatContextValue | null>(null);
  *  instance asks once and stops, and a restarting one gets its buttons back
  *  within a few seconds of the media server coming up. */
 const CALLS_RECHECK_MS = 8000;
+
+/** How long a burst of arrivals is gathered before the conversations are asked
+ *  for again. Short enough that a new message moves the list while somebody is
+ *  still looking at where it landed; long enough that a room talking quickly is
+ *  one request rather than one per message. */
+export const CHANNELS_SETTLE_MS = 300;
 
 export function ChatProvider({
     viewerId,
@@ -135,28 +149,47 @@ export function ChatProvider({
     const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
 
     const refresh = useCallback(() => {
-        void listChannelsAction()
-            .then((result) => setChannels(result.channels))
-            .catch(() => {
-                // A failed refresh leaves the previous list on screen, which is
-                // more use than an empty rail and a red line.
+        // One request for the four, because a browser runs server actions one
+        // at a time: four of them were four places in the queue that anything
+        // else - a message being sent - had to wait behind. The spaces and
+        // their headings move far less often than the channels, but they move
+        // for the same reasons - one made, one left - and blocking somebody
+        // changes what the roster offers and what the list draws, so all of
+        // them ride this one signal rather than needing their own.
+        void chatListsAction()
+            .then((result) => {
+                // A part that could not be read comes back null and leaves the
+                // previous one on screen, which is more use than an empty rail
+                // and a red line.
+                if (result.channels) setChannels(result.channels);
+                if (result.spaces) setSpaces(result.spaces);
+                if (result.categories) setCategories(result.categories);
+                if (result.blocked) setBlocked(new Set(result.blocked));
             })
+            .catch(() => undefined)
             .finally(() => setLoaded(true));
-        // The spaces and their headings move far less often than the channels,
-        // but they move for the same reasons - one made, one left - so they are
-        // asked for together rather than needing their own signal.
-        void listSpacesAction()
-            .then((result) => setSpaces(result.spaces))
-            .catch(() => undefined);
-        void listCategoriesAction()
-            .then((result) => setCategories(result.categories))
-            .catch(() => undefined);
-        // Blocking somebody changes what the roster offers and what the list
-        // draws, so it rides the same signal rather than needing its own.
-        void listBlockedAction()
-            .then((result) => setBlocked(new Set(result.people.map((person) => person.id))))
-            .catch(() => undefined);
     }, []);
+
+    const channelsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const refreshChannels = useCallback(() => {
+        if (channelsTimer.current) return;
+        channelsTimer.current = setTimeout(() => {
+            channelsTimer.current = null;
+            void listChannelsAction()
+                .then((result) => setChannels(result.channels))
+                .catch(() => {
+                    // The previous list stays, as it does for a full refresh.
+                });
+        }, CHANNELS_SETTLE_MS);
+    }, []);
+
+    useEffect(
+        () => () => {
+            if (channelsTimer.current) clearTimeout(channelsTimer.current);
+            channelsTimer.current = null;
+        },
+        []
+    );
 
     useEffect(refresh, [refresh]);
 
@@ -234,6 +267,7 @@ export function ChatProvider({
             setActiveSpaceId,
             loaded,
             refresh,
+            refreshChannels,
             rulesFor,
             callsOff
         }),
@@ -250,6 +284,7 @@ export function ChatProvider({
             activeSpaceId,
             loaded,
             refresh,
+            refreshChannels,
             rulesFor,
             callsOff
         ]

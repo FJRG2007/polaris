@@ -176,87 +176,103 @@ export function ArkMods({
                 />
             )}
 
-            {loading ? (
-                <div className="flex flex-col gap-2">
-                    {Array.from({ length: 3 }, (_, index) => (
-                        <Skeleton key={index} className="h-16 w-full" />
-                    ))}
-                </div>
-            ) : (
-                <>
-                    <div className="flex flex-col gap-1">
-                        <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            Map
-                        </p>
-                        <Card>
-                            <CardBody className="py-0">
-                                {mods?.mapModId ? (
-                                    <ModRow
-                                        installedAppId={installedAppId}
-                                        id={mods.mapModId}
-                                        item={details(mods.mapModId)}
-                                        installed={mods.installed.includes(mods.mapModId)}
-                                        knowsDisk={running}
-                                        first
-                                        busy={busy}
-                                        canManage={canManage}
-                                        onRemove={() => void setMap(null)}
-                                    />
-                                ) : (
-                                    <p className="py-4 text-sm text-muted-foreground">
-                                        This server runs one of the maps that come with the game. A
-                                        Workshop map replaces it, and its world is kept separately from
-                                        the one you have now.
-                                    </p>
-                                )}
-                            </CardBody>
-                        </Card>
-                    </div>
+            {/* Both headings are drawn at once; only what is under them waits
+                for the server's files. */}
+            <div className="flex flex-col gap-1">
+                <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Map
+                </p>
+                <Card>
+                    <CardBody className="py-0">
+                        {loading || !mods ? (
+                            <ListPending loading={loading} rows={1} />
+                        ) : mods.mapModId ? (
+                            <ModRow
+                                installedAppId={installedAppId}
+                                id={mods.mapModId}
+                                item={details(mods.mapModId)}
+                                installed={mods.installed.includes(mods.mapModId)}
+                                knowsDisk={running}
+                                first
+                                busy={busy}
+                                canManage={canManage}
+                                onRemove={() => void setMap(null)}
+                            />
+                        ) : (
+                            <p className="py-4 text-sm text-muted-foreground">
+                                This server runs one of the maps that come with the game. A Workshop
+                                map replaces it, and its world is kept separately from the one you
+                                have now.
+                            </p>
+                        )}
+                    </CardBody>
+                </Card>
+            </div>
 
-                    <div className="flex flex-col gap-1">
-                        <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            Mods{ids.length > 0 ? ` - ${ids.length} of ${MAX_MODS}` : ""}
-                        </p>
-                        <Card>
-                            <CardBody className="py-0">
-                                {ids.length === 0 ? (
-                                    <p className="py-4 text-sm text-muted-foreground">
-                                        No mods. Paste a Workshop link above to add one.
-                                    </p>
-                                ) : (
-                                    ids.map((id, index) => (
-                                        <ModRow
-                                            key={id}
-                                            installedAppId={installedAppId}
-                                            id={id}
-                                            item={details(id)}
-                                            installed={(mods?.installed ?? []).includes(id)}
-                                            knowsDisk={running}
-                                            first={index === 0}
-                                            position={index + 1}
-                                            busy={busy}
-                                            canManage={canManage}
-                                            onUp={index > 0 ? () => void save(movedMod(ids, id, -1)) : undefined}
-                                            onDown={
-                                                index < ids.length - 1
-                                                    ? () => void save(movedMod(ids, id, 1))
-                                                    : undefined
-                                            }
-                                            onRemove={() => void save(withoutMod(ids, id))}
-                                        />
-                                    ))
-                                )}
-                            </CardBody>
-                        </Card>
-                    </div>
-                </>
-            )}
+            <div className="flex flex-col gap-1">
+                <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Mods{ids.length > 0 ? ` - ${ids.length} of ${MAX_MODS}` : ""}
+                </p>
+                <Card>
+                    <CardBody className="py-0">
+                        {loading || !mods ? (
+                            <ListPending loading={loading} rows={2} />
+                        ) : ids.length === 0 ? (
+                            <p className="py-4 text-sm text-muted-foreground">
+                                No mods. Paste a Workshop link above to add one.
+                            </p>
+                        ) : (
+                            ids.map((id, index) => (
+                                <ModRow
+                                    key={id}
+                                    installedAppId={installedAppId}
+                                    id={id}
+                                    item={details(id)}
+                                    installed={mods.installed.includes(id)}
+                                    knowsDisk={running}
+                                    first={index === 0}
+                                    position={index + 1}
+                                    busy={busy}
+                                    canManage={canManage}
+                                    onUp={
+                                        index > 0
+                                            ? () => void save(movedMod(ids, id, -1))
+                                            : undefined
+                                    }
+                                    onDown={
+                                        index < ids.length - 1
+                                            ? () => void save(movedMod(ids, id, 1))
+                                            : undefined
+                                    }
+                                    onRemove={() => void save(withoutMod(ids, id))}
+                                />
+                            ))
+                        )}
+                    </CardBody>
+                </Card>
+            </div>
 
             <p className="text-xs text-muted-foreground">
                 Mods load in the order above and a later one wins over an earlier one, which is what
                 decides the outcome when two of them change the same thing. Removing a mod stops the
                 server loading it; anything it added to the world goes with it.
             </p>
+        </div>
+    );
+}
+
+/** What stands in a list while it is read, and what it says once reading it has
+ *  failed - the error above says why, and "no mods" would be a claim nothing
+ *  checked. */
+function ListPending({ loading, rows }: { loading: boolean; rows: number }) {
+    if (!loading) {
+        return <p className="py-4 text-sm text-muted-foreground">Could not be read.</p>;
+    }
+    return (
+        <div className="flex flex-col gap-2 py-3" aria-busy="true">
+            {Array.from({ length: rows }, (_, index) => (
+                <Skeleton key={index} className="h-10 w-full" />
+            ))}
         </div>
     );
 }
@@ -286,12 +302,17 @@ function ModShelves({
     onSetMap: (id: string) => void;
 }) {
     const [shelves, setShelves] = useState<
-        readonly { group: string; entries: { suggestion: ArkModSuggestion; item: WorkshopItem | null }[] }[]
+        readonly {
+            group: string;
+            entries: { suggestion: ArkModSuggestion; item: WorkshopItem | null }[];
+        }[]
     >([]);
     const [open, setOpen] = useState(true);
 
     useEffect(() => {
-        void actions.readArkModShelvesAction(installedAppId).then((answer) => setShelves(answer.shelves));
+        void actions
+            .readArkModShelvesAction(installedAppId)
+            .then((answer) => setShelves(answer.shelves));
     }, [installedAppId]);
 
     const shown = shelves
@@ -309,8 +330,8 @@ function ModShelves({
                     <div className="min-w-0">
                         <p className="text-sm font-medium">Worth a look</p>
                         <p className="text-xs text-muted-foreground">
-                            The ones most private servers end up running. Anything else on the Workshop
-                            goes in above, by its link.
+                            The ones most private servers end up running. Anything else on the
+                            Workshop goes in above, by its link.
                         </p>
                     </div>
                     <Button size="sm" variant="ghost" onClick={() => setOpen(!open)}>
@@ -332,13 +353,18 @@ function ModShelves({
                                     {item ? (
                                         <Preview installedAppId={installedAppId} item={item} />
                                     ) : (
-                                        <div className="size-12 shrink-0 rounded-md bg-muted" aria-hidden />
+                                        <div
+                                            className="size-12 shrink-0 rounded-md bg-muted"
+                                            aria-hidden
+                                        />
                                     )}
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-sm font-medium">
                                             {item?.title ?? suggestion.name}
                                         </p>
-                                        <p className="text-xs text-muted-foreground">{suggestion.why}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {suggestion.why}
+                                        </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {[
                                                 size(item?.sizeBytes ?? null),
@@ -370,7 +396,11 @@ function ModShelves({
                                             Use as the map
                                         </Button>
                                     ) : (
-                                        <Button size="sm" disabled={busy} onClick={() => onAdd(suggestion.id)}>
+                                        <Button
+                                            size="sm"
+                                            disabled={busy}
+                                            onClick={() => onAdd(suggestion.id)}
+                                        >
                                             <Plus className="size-4" /> Add
                                         </Button>
                                     )}
@@ -414,7 +444,8 @@ function AddMod({
         if (/^\d{6,12}$/.test(text) || text.includes("id=")) {
             const answer = await actions.lookUpArkModAction(installedAppId, text);
             setLooking(false);
-            if (answer.error || !answer.item) setError(answer.error ?? "Steam does not know that id");
+            if (answer.error || !answer.item)
+                setError(answer.error ?? "Steam does not know that id");
             else setFound(answer.item);
             return;
         }
@@ -444,8 +475,15 @@ function AddMod({
                             }}
                         />
                     </div>
-                    <Button disabled={busy || looking || query.trim().length === 0} onClick={() => void go()}>
-                        {looking ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+                    <Button
+                        disabled={busy || looking || query.trim().length === 0}
+                        onClick={() => void go()}
+                    >
+                        {looking ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Search className="size-4" />
+                        )}
                         Look it up
                     </Button>
                 </div>
@@ -458,9 +496,9 @@ function AddMod({
 
                 {needsKey && (
                     <p className="text-xs text-muted-foreground">
-                        Searching the Workshop needs a Steam Web API key, which Polaris asks for under
-                        Integrations. Without one, paste a mod&apos;s link here and it is added the same
-                        way.
+                        Searching the Workshop needs a Steam Web API key, which Polaris asks for
+                        under Integrations. Without one, paste a mod&apos;s link here and it is
+                        added the same way.
                     </p>
                 )}
 
@@ -483,7 +521,9 @@ function AddMod({
                 )}
 
                 {results !== null && results.length === 0 && !needsKey && (
-                    <p className="text-sm text-muted-foreground">Nothing on the Workshop matches that.</p>
+                    <p className="text-sm text-muted-foreground">
+                        Nothing on the Workshop matches that.
+                    </p>
                 )}
 
                 {results !== null && results.length > 0 && (
@@ -531,18 +571,33 @@ function Candidate({
         <div className="flex flex-wrap items-center gap-3 rounded-md border border-border p-2">
             <Preview installedAppId={installedAppId} item={item} />
             <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium" title={item.title}>{item.title}</p>
+                <p className="truncate text-sm font-medium" title={item.title}>
+                    {item.title}
+                </p>
                 {/* The author's own description, quoted rather than rendered: it is
                     somebody else's text and it arrives with the Workshop's own
                     markup in it. */}
-                {item.summary && <p className="truncate text-xs text-muted-foreground">{item.summary}</p>}
+                {item.summary && (
+                    <p className="truncate text-xs text-muted-foreground">{item.summary}</p>
+                )}
                 <p className="truncate text-xs text-muted-foreground">
-                    {[size(item.sizeBytes), item.subscriptions ? `${item.subscriptions.toLocaleString()} subscribers` : ""]
+                    {[
+                        size(item.sizeBytes),
+                        item.subscriptions
+                            ? `${item.subscriptions.toLocaleString()} subscribers`
+                            : ""
+                    ]
                         .filter(Boolean)
                         .join(" - ")}
                 </p>
             </div>
-            <Button size="sm" variant="secondary" disabled={busy} onClick={onSetMap} title="Run this as the map">
+            <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                onClick={onSetMap}
+                title="Run this as the map"
+            >
                 Use as the map
             </Button>
             <Button size="sm" disabled={busy} onClick={onAdd}>

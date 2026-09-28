@@ -23,7 +23,12 @@ import Link from "next/link";
 import * as actions from "./fivem-actions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PlayersTable, PlayerIconAction } from "../../components/game-players-table";
-import { isResourceName, isResourceUrl, RESOURCE_URL_HINT, type FivemResource } from "../../lib/fivem/resources";
+import {
+    isResourceName,
+    isResourceUrl,
+    RESOURCE_URL_HINT,
+    type FivemResource
+} from "../../lib/fivem/resources";
 import { AlertTriangle, FolderOpen, Play, Plus, RefreshCw, RotateCw, Square } from "lucide-react";
 import {
     Badge,
@@ -45,6 +50,15 @@ const COLUMNS = [
     { label: "Folder", className: "hidden md:table-cell" },
     { label: "State" }
 ];
+
+/** Rows sketched in a table whose resources are still being read. */
+const TABLE_LOADING = (
+    <div className="flex flex-col gap-2" aria-busy="true">
+        <Skeleton className="h-6 w-full" />
+        <Skeleton className="h-6 w-full" />
+        <Skeleton className="h-6 w-2/3" />
+    </div>
+);
 
 export function FivemResources({
     installedAppId,
@@ -91,13 +105,22 @@ export function FivemResources({
         const all = resources ?? [];
         return wanted.length === 0
             ? all
-            : all.filter((entry) => `${entry.name} ${entry.group ?? ""}`.toLowerCase().includes(wanted));
+            : all.filter((entry) =>
+                  `${entry.name} ${entry.group ?? ""}`.toLowerCase().includes(wanted)
+              );
     }, [resources, query]);
 
-    async function act(resource: FivemResource, action: "start" | "stop" | "restart"): Promise<void> {
+    async function act(
+        resource: FivemResource,
+        action: "start" | "stop" | "restart"
+    ): Promise<void> {
         setBusy(resource.name);
         setError(null);
-        const result = await actions.actOnFivemResourceAction(installedAppId, resource.name, action);
+        const result = await actions.actOnFivemResourceAction(
+            installedAppId,
+            resource.name,
+            action
+        );
         setBusy(null);
         if (result.error) {
             setError(result.error);
@@ -110,8 +133,8 @@ export function FivemResources({
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm text-muted-foreground">
-                    What this server runs. A resource that has just been added has to be started before it does
-                    anything.
+                    What this server runs. A resource that has just been added has to be started
+                    before it does anything.
                 </p>
                 <div className="ml-auto flex items-center gap-1">
                     {applicationId && (
@@ -151,88 +174,93 @@ export function FivemResources({
                 </Card>
             )}
 
-            {loading ? (
-                <div className="flex flex-col gap-2">
-                    {Array.from({ length: 5 }, (_, index) => (
-                        <Skeleton key={index} className="h-11 w-full" />
-                    ))}
-                </div>
-            ) : (
-                <PlayersTable
-                    columns={COLUMNS}
-                    minWidth="34rem"
-                    search={query}
-                    onSearch={setQuery}
-                    searchPlaceholder="Search resources"
-                    isEmpty={shown.length === 0}
-                    empty={
-                        !running
-                            ? "The server is not running, so there is nothing to list."
-                            : resources && resources.length > 0
-                              ? `Nothing here matches “${query}”.`
-                              : "No resources yet. Add one from a link, or drop a folder into the resources folder."
-                    }
-                    rows={shown.map((resource) => (
-                        <tr key={resource.name} className="border-t border-border">
-                            <td className="px-3 py-2">
-                                <span className="flex min-w-0 items-center gap-2">
-                                    <span className="truncate font-medium" title={resource.name}>{resource.name}</span>
-                                    {resource.managed && (
-                                        <Badge className="shrink-0 text-[0.6875rem]">Polaris</Badge>
-                                    )}
+            {/* The table and its search are drawn at once; only the rows wait for
+                the container to be asked what is in it. */}
+            <PlayersTable
+                columns={COLUMNS}
+                minWidth="34rem"
+                search={query}
+                onSearch={setQuery}
+                searchPlaceholder="Search resources"
+                isEmpty={loading || shown.length === 0}
+                empty={
+                    loading
+                        ? TABLE_LOADING
+                        : !running
+                          ? "The server is not running, so there is nothing to list."
+                          : resources && resources.length > 0
+                            ? `Nothing here matches “${query}”.`
+                            : "No resources yet. Add one from a link, or drop a folder into the resources folder."
+                }
+                rows={shown.map((resource) => (
+                    <tr key={resource.name} className="border-t border-border">
+                        <td className="px-3 py-2">
+                            <span className="flex min-w-0 items-center gap-2">
+                                <span className="truncate font-medium" title={resource.name}>
+                                    {resource.name}
                                 </span>
                                 {resource.managed && (
-                                    <span className="text-xs text-muted-foreground">
-                                        Keeps players off the server. Open it to everyone from the Security screen
-                                        instead of stopping this.
-                                    </span>
+                                    <Badge className="shrink-0 text-[0.6875rem]">Polaris</Badge>
                                 )}
-                            </td>
-                            <td className="hidden px-3 py-2 text-muted-foreground md:table-cell">
-                                {resource.group ?? "resources"}
-                            </td>
-                            <td className="px-3 py-2">
-                                <span className={cn("text-xs", resource.running ? "text-success" : "text-muted-foreground")}>
-                                    {resource.running ? "Running" : "Stopped"}
+                            </span>
+                            {resource.managed && (
+                                <span className="text-xs text-muted-foreground">
+                                    Keeps players off the server. Open it to everyone from the
+                                    Security screen instead of stopping this.
                                 </span>
-                            </td>
-                            <td className="px-3 py-2">
-                                <div className="flex items-center justify-end gap-0.5">
-                                    {resource.running ? (
-                                        <>
-                                            <PlayerIconAction
-                                                label={`Restart ${resource.name}`}
-                                                icon={<RotateCw className="size-4" />}
-                                                disabled={!canManage || busy !== null}
-                                                onClick={() => void act(resource, "restart")}
-                                            />
-                                            <PlayerIconAction
-                                                label={`Stop ${resource.name}`}
-                                                icon={<Square className="size-4" />}
-                                                disabled={!canManage || busy !== null || resource.managed}
-                                                danger
-                                                onClick={() => void act(resource, "stop")}
-                                            />
-                                        </>
-                                    ) : (
+                            )}
+                        </td>
+                        <td className="hidden px-3 py-2 text-muted-foreground md:table-cell">
+                            {resource.group ?? "resources"}
+                        </td>
+                        <td className="px-3 py-2">
+                            <span
+                                className={cn(
+                                    "text-xs",
+                                    resource.running ? "text-success" : "text-muted-foreground"
+                                )}
+                            >
+                                {resource.running ? "Running" : "Stopped"}
+                            </span>
+                        </td>
+                        <td className="px-3 py-2">
+                            <div className="flex items-center justify-end gap-0.5">
+                                {resource.running ? (
+                                    <>
                                         <PlayerIconAction
-                                            label={`Start ${resource.name}`}
-                                            icon={<Play className="size-4" />}
+                                            label={`Restart ${resource.name}`}
+                                            icon={<RotateCw className="size-4" />}
                                             disabled={!canManage || busy !== null}
-                                            onClick={() => void act(resource, "start")}
+                                            onClick={() => void act(resource, "restart")}
                                         />
-                                    )}
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
-                />
-            )}
+                                        <PlayerIconAction
+                                            label={`Stop ${resource.name}`}
+                                            icon={<Square className="size-4" />}
+                                            disabled={
+                                                !canManage || busy !== null || resource.managed
+                                            }
+                                            danger
+                                            onClick={() => void act(resource, "stop")}
+                                        />
+                                    </>
+                                ) : (
+                                    <PlayerIconAction
+                                        label={`Start ${resource.name}`}
+                                        icon={<Play className="size-4" />}
+                                        disabled={!canManage || busy !== null}
+                                        onClick={() => void act(resource, "start")}
+                                    />
+                                )}
+                            </div>
+                        </td>
+                    </tr>
+                ))}
+            />
 
             <p className="text-xs text-muted-foreground">
-                Starting a resource here lasts until the server restarts. To have one start every time, add an{" "}
-                <code className="font-mono">ensure</code> line for it in the server config - Polaris does that for the
-                resources it installs itself.
+                Starting a resource here lasts until the server restarts. To have one start every
+                time, add an <code className="font-mono">ensure</code> line for it in the server
+                config - Polaris does that for the resources it installs itself.
             </p>
 
             {adding && (
@@ -287,7 +315,11 @@ function AddResourceDialog({
     async function install(): Promise<void> {
         setPending(true);
         setError(null);
-        const result = await actions.installFivemResourceAction(installedAppId, url.trim(), name.trim());
+        const result = await actions.installFivemResourceAction(
+            installedAppId,
+            url.trim(),
+            name.trim()
+        );
         setPending(false);
         if (result.error) {
             setError(result.error);
@@ -312,7 +344,12 @@ function AddResourceDialog({
                             autoComplete="off"
                             spellCheck={false}
                         />
-                        <span className={cn("text-xs", linkError ? "text-danger" : "text-muted-foreground")}>
+                        <span
+                            className={cn(
+                                "text-xs",
+                                linkError ? "text-danger" : "text-muted-foreground"
+                            )}
+                        >
                             {linkError ?? RESOURCE_URL_HINT}
                         </span>
                     </label>
@@ -329,7 +366,12 @@ function AddResourceDialog({
                             autoComplete="off"
                             spellCheck={false}
                         />
-                        <span className={cn("text-xs", nameError ? "text-danger" : "text-muted-foreground")}>
+                        <span
+                            className={cn(
+                                "text-xs",
+                                nameError ? "text-danger" : "text-muted-foreground"
+                            )}
+                        >
                             {nameError ??
                                 "What the server will know it by. A folder of this name is replaced outright if there is one."}
                         </span>

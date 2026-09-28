@@ -22,16 +22,19 @@ const reads: { only: readonly string[] | undefined }[] = [];
 const sweeps: { only: unknown; known: ReadonlyMap<string, number | null> | undefined }[] = [];
 
 vi.mock("@polaris-app/game-servers/src/lib/games-service", () => ({
-    listGameServerPresence: async (_ownerId: string, _alsoIds: readonly string[], only?: readonly string[]) => {
+    listGameServerPresence: async (
+        _ownerId: string,
+        _alsoIds: readonly string[],
+        only?: readonly string[]
+    ) => {
         reads.push({ only });
         return answer;
     }
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/schedule-service", () => ({
-    sweepGameSchedules: async (
+    sweepWatchedGameSchedules: async (
         _ownerId: string,
-        _at: Date,
         options: { only?: unknown; known?: ReadonlyMap<string, number | null> }
     ) => {
         sweeps.push({ only: options.only, known: options.known });
@@ -63,11 +66,15 @@ beforeEach(() => {
 describe("subscribeGamePresence", () => {
     it("reads once for everybody watching the same thing", async () => {
         const seen: number[] = [];
-        const first = subscribeGamePresence(OWNER, [], (reading) => seen.push(reading.servers.length));
+        const first = subscribeGamePresence(OWNER, [], (reading) =>
+            seen.push(reading.servers.length)
+        );
         await vi.advanceTimersByTimeAsync(0);
         // A second screen joins: it is handed what is already known rather than
         // starting a reading of its own.
-        const second = subscribeGamePresence(OWNER, [], (reading) => seen.push(reading.servers.length));
+        const second = subscribeGamePresence(OWNER, [], (reading) =>
+            seen.push(reading.servers.length)
+        );
         await vi.advanceTimersByTimeAsync(0);
 
         expect(reads).toHaveLength(1);
@@ -79,7 +86,9 @@ describe("subscribeGamePresence", () => {
     it("hands on a change and says nothing when nothing moved", async () => {
         const seen: string[][] = [];
         const stop = subscribeGamePresence(OWNER, [], (reading) =>
-            seen.push(reading.servers.flatMap((server) => server.players.map((player) => player.name)))
+            seen.push(
+                reading.servers.flatMap((server) => server.players.map((player) => player.name))
+            )
         );
         await vi.advanceTimersByTimeAsync(0);
         expect(seen).toEqual([[]]);

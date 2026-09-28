@@ -18,6 +18,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { perRequest } from "./request-cache.js";
 import { principalsOfUser, type PrincipalType } from "./policies.js";
 
 /** One stored grant, with its actions decoded. */
@@ -117,7 +118,10 @@ function unexpired(now: Date) {
  * resolve to. The same set policy attachments use, because a group grant has to
  * mean the same thing in both places or one grant would mean two things.
  */
-export async function grantsForUser(userId: string, now = new Date()): Promise<ResourceGrantRow[]> {
+export const grantsForUser = perRequest(async function grantsForUser(
+    userId: string,
+    now = new Date()
+): Promise<ResourceGrantRow[]> {
     const principals = await principalsOfUser(userId);
     if (principals.length === 0) return [];
     const rows = await prisma.resourceGrant.findMany({
@@ -125,11 +129,18 @@ export async function grantsForUser(userId: string, now = new Date()): Promise<R
         select: GRANT_FIELDS
     });
     return rows.map(toRow).filter((row): row is ResourceGrantRow => row !== null);
-}
+});
 
 /** Those grants as engine statements. */
-export async function resourceGrantStatements(userId: string, now = new Date()): Promise<core.PolicyStatement[]> {
-    return (await grantsForUser(userId, now)).flatMap(grantStatements);
+export async function resourceGrantStatements(
+    userId: string,
+    now?: Date
+): Promise<core.PolicyStatement[]> {
+    // Only "now" is shared across a request: a Date made here would be a new
+    // argument every time, and the lookup would be read again each call.
+    return (await (now ? grantsForUser(userId, now) : grantsForUser(userId))).flatMap(
+        grantStatements
+    );
 }
 
 /** One grant, compiled. A row with no readable action contributes nothing at all
@@ -218,7 +229,9 @@ export async function removeResourceGrant(ref: core.ResourceRef, grantId: string
  *  is inert, since it can only reach a row that no longer loads, but leaving it is
  *  the kind of tidiness that stops being optional once ids are reused. */
 export async function clearResourceGrants(ref: core.ResourceRef): Promise<void> {
-    await prisma.resourceGrant.deleteMany({ where: { resourceKind: ref.kind, resourceId: ref.id } });
+    await prisma.resourceGrant.deleteMany({
+        where: { resourceKind: ref.kind, resourceId: ref.id }
+    });
 }
 
 /**
@@ -259,7 +272,10 @@ export async function grantedResourceIds(
 /** Whether this user holds the permission on at least one thing. What a landing
  *  page and the app switcher ask: an account given one server has to be able to
  *  find the app that server lives in. */
-export async function holdsAnyGrantCarrying(userId: string, permission: core.Permission): Promise<boolean> {
+export async function holdsAnyGrantCarrying(
+    userId: string,
+    permission: core.Permission
+): Promise<boolean> {
     const grants = await grantsForUser(userId);
     return grants.some((grant) => grant.effect === "allow" && grant.actions.includes(permission));
 }

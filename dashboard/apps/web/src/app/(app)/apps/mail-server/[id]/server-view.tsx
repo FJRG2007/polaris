@@ -12,7 +12,7 @@ import { ArrowLeft } from "lucide-react";
 import { BackupsTab } from "./backups-tab";
 import { ReportsTab } from "./reports-tab";
 import { SendingTab } from "./sending-tab";
-import { OverviewTab } from "./overview-tab";
+import { OverviewTab, type OverviewSeed } from "./overview-tab";
 import { ForwardsTab } from "./forwards-tab";
 import { MailboxesTab } from "./mailboxes-tab";
 import { Card, CardBody, cn, ScrollRow } from "@polaris/ui";
@@ -31,7 +31,17 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-export function ServerView({ serverId, hostname }: { serverId: string; hostname: string }) {
+export function ServerView({
+    serverId,
+    hostname,
+    seed
+}: {
+    serverId: string;
+    hostname: string;
+    /** What the page already read to check access, so the overview's header is
+     *  drawn at once. */
+    seed: OverviewSeed;
+}) {
     const router = useRouter();
     const params = useSearchParams();
     const asked = params.get("tab");
@@ -42,7 +52,9 @@ export function ServerView({ serverId, hostname }: { serverId: string; hostname:
         if (next === "overview") query.delete("tab");
         else query.set("tab", next);
         const search = query.toString();
-        router.replace(`/apps/mail-server/${serverId}${search ? `?${search}` : ""}`, { scroll: false });
+        router.replace(`/apps/mail-server/${serverId}${search ? `?${search}` : ""}`, {
+            scroll: false
+        });
     }
 
     return (
@@ -56,7 +68,10 @@ export function ServerView({ serverId, hostname }: { serverId: string; hostname:
                 >
                     <ArrowLeft className="size-4" />
                 </Link>
-                <h1 className="min-w-0 truncate text-[17px] font-semibold tracking-tight text-foreground" title={hostname}>
+                <h1
+                    className="min-w-0 truncate text-[17px] font-semibold tracking-tight text-foreground"
+                    title={hostname}
+                >
                     {hostname}
                 </h1>
             </div>
@@ -71,7 +86,9 @@ export function ServerView({ serverId, hostname }: { serverId: string; hostname:
                             onClick={() => choose(entry.id)}
                             className={cn(
                                 "shrink-0 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-muted",
-                                tab === entry.id ? "bg-muted font-medium text-foreground" : "text-muted-foreground"
+                                tab === entry.id
+                                    ? "bg-muted font-medium text-foreground"
+                                    : "text-muted-foreground"
                             )}
                         >
                             {entry.label}
@@ -79,7 +96,7 @@ export function ServerView({ serverId, hostname }: { serverId: string; hostname:
                     ))}
                 </ScrollRow>
                 <CardBody className="min-h-[24rem]">
-                    {tab === "overview" ? <OverviewTab serverId={serverId} /> : null}
+                    {tab === "overview" ? <OverviewTab serverId={serverId} seed={seed} /> : null}
                     {tab === "domains" ? <DnsTab serverId={serverId} /> : null}
                     {tab === "mailboxes" ? <MailboxesTab serverId={serverId} /> : null}
                     {tab === "forwards" ? <ForwardsTab serverId={serverId} /> : null}

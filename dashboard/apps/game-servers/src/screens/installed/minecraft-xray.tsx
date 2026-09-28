@@ -18,9 +18,9 @@
 
 import { Eraser, Loader2 } from "lucide-react";
 import { hostUi } from "@polaris/app-host/client";
-import { useEffect, useMemo, useState, useTransition } from "react";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
-import { Badge, Button, Card, CardBody, Input, Select, Switch, cn } from "@polaris/ui";
+import { useEffect, useMemo, useState, useTransition, type ComponentProps } from "react";
+import { Badge, Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
 import {
     BAN_HITS_MIN,
     CONFIRM_HITS,
@@ -119,6 +119,26 @@ function ScoreCell({ score }: { score: Score }) {
         </div>
     );
 }
+
+/** A switch, or its outline while the setting it shows is still being read -
+ *  a default drawn in its place would flip over once the real one arrives - and
+ *  nothing once reading it has failed. */
+function LoadedSwitch({
+    state,
+    ...props
+}: { state: "loaded" | "reading" | "failed" } & ComponentProps<typeof Switch>) {
+    if (state === "loaded") return <Switch {...props} />;
+    return state === "reading" ? <Skeleton className="h-5 w-9 shrink-0 rounded-full" /> : null;
+}
+
+/** Rows sketched in a table whose players are still being read. */
+const TABLE_LOADING = (
+    <div className="flex flex-col gap-2" aria-busy="true">
+        <Skeleton className="h-6 w-full" />
+        <Skeleton className="h-6 w-full" />
+        <Skeleton className="h-6 w-2/3" />
+    </div>
+);
 
 export function MinecraftXray({
     installedAppId,
@@ -225,22 +245,12 @@ export function MinecraftXray({
         });
     }
 
-    if (!view) {
-        return (
-            <Card>
-                <CardBody className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">Anti-cheat</p>
-                    {error ? (
-                        <p role="alert" className="text-sm text-danger">
-                            {error}
-                        </p>
-                    ) : (
-                        <div className="h-32 animate-pulse rounded-md bg-muted" />
-                    )}
-                </CardBody>
-            </Card>
-        );
-    }
+    // Everything that is not the reading itself is drawn straight away: the
+    // engine's own card asks for its state at the same time, and only the values
+    // and the tables wait. The reading goes into the container for the players'
+    // stats files and the player list, which is the slow part of this tab.
+    const loaded = view !== null;
+    const reading = loaded ? "loaded" : error ? "failed" : "reading";
 
     return (
         <div className="flex flex-col gap-4">
@@ -257,110 +267,136 @@ export function MinecraftXray({
                                 own could be chance.
                             </p>
                         </div>
-                        <Switch
+                        <LoadedSwitch
+                            state={reading}
                             checked={draft.enabled}
-                            disabled={!canManage || view.refusal !== null}
+                            disabled={!canManage || view?.refusal != null}
                             onChange={(enabled) => change({ enabled })}
                             aria-label="Hide honeypots"
                         />
                     </div>
-                    {view.refusal && (
+                    {view?.refusal && (
                         <p className="text-xs text-muted-foreground">{view.refusal}.</p>
                     )}
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Honeypots around each player</span>
-                            <Input
-                                type="number"
-                                min={4}
-                                max={40}
-                                value={draft.perDimension}
-                                disabled={!canManage}
-                                onChange={(event) =>
-                                    change({
-                                        perDimension: Math.round(Number(event.target.value) || 0)
-                                    })
-                                }
-                            />
-                            <span className="text-xs text-muted-foreground">
-                                Around every player, wherever they are. Between 4 and 40.
-                            </span>
-                        </label>
-                        <label className="flex items-center justify-between gap-2 text-sm sm:mt-6">
-                            <span>Ancient debris in the Nether too</span>
-                            <Switch
-                                checked={draft.nether}
-                                disabled={!canManage}
-                                onChange={(nether) => change({ nether })}
-                                aria-label="Hide ancient debris in the Nether"
-                            />
-                        </label>
-                    </div>
+                    {reading === "reading" ? (
+                        <Skeleton className="h-24 w-full" />
+                    ) : !loaded ? null : (
+                        <>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="flex flex-col gap-1 text-sm">
+                                    <span className="font-medium">
+                                        Honeypots around each player
+                                    </span>
+                                    <Input
+                                        type="number"
+                                        min={4}
+                                        max={40}
+                                        value={draft.perDimension}
+                                        disabled={!canManage}
+                                        onChange={(event) =>
+                                            change({
+                                                perDimension: Math.round(
+                                                    Number(event.target.value) || 0
+                                                )
+                                            })
+                                        }
+                                    />
+                                    <span className="text-xs text-muted-foreground">
+                                        Around every player, wherever they are. Between 4 and 40.
+                                    </span>
+                                </label>
+                                <label className="flex items-center justify-between gap-2 text-sm sm:mt-6">
+                                    <span>Ancient debris in the Nether too</span>
+                                    <Switch
+                                        checked={draft.nether}
+                                        disabled={!canManage}
+                                        onChange={(nether) => change({ nether })}
+                                        aria-label="Hide ancient debris in the Nether"
+                                    />
+                                </label>
+                            </div>
 
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">When somebody is confirmed</span>
-                        <Select
-                            value={draft.action}
-                            onValueChange={(value) => change({ action: value as XrayAction })}
-                            options={ACTIONS.map((one) => ({ value: one.value, label: one.label }))}
-                            disabled={!canManage}
-                            aria-label="What happens when somebody is confirmed"
-                        />
-                    </label>
-
-                    {draft.action !== "notify" && (
-                        <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Warning they see</span>
-                            <Input
-                                value={draft.warning}
-                                maxLength={400}
-                                disabled={!canManage}
-                                onChange={(event) => change({ warning: event.target.value })}
-                            />
-                            <span className="text-xs text-muted-foreground">
-                                In the chat, with a title. Colour codes such as &amp;c work.
-                            </span>
-                        </label>
-                    )}
-
-                    {draft.action === "warn-and-ban" && (
-                        <div className="grid gap-3 sm:grid-cols-2">
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Ban after this many honeypots</span>
-                                <Input
-                                    type="number"
-                                    min={BAN_HITS_MIN}
-                                    max={10}
-                                    value={draft.banHits}
-                                    disabled={!canManage}
-                                    onChange={(event) =>
-                                        change({
-                                            banHits: Math.round(Number(event.target.value) || 0)
-                                        })
+                                <span className="font-medium">When somebody is confirmed</span>
+                                <Select
+                                    value={draft.action}
+                                    onValueChange={(value) =>
+                                        change({ action: value as XrayAction })
                                     }
-                                />
-                                <span className="text-xs text-muted-foreground">
-                                    At least {BAN_HITS_MIN}, and only after the warning.
-                                </span>
-                            </label>
-                            <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Ban for (hours)</span>
-                                <Input
-                                    type="number"
-                                    min={1}
-                                    max={168}
-                                    value={draft.banHours}
+                                    options={ACTIONS.map((one) => ({
+                                        value: one.value,
+                                        label: one.label
+                                    }))}
                                     disabled={!canManage}
-                                    onChange={(event) =>
-                                        change({
-                                            banHours: Math.round(Number(event.target.value) || 0)
-                                        })
-                                    }
+                                    aria-label="What happens when somebody is confirmed"
                                 />
-                                <span className="text-xs text-muted-foreground">Up to a week.</span>
                             </label>
-                        </div>
+
+                            {draft.action !== "notify" && (
+                                <label className="flex flex-col gap-1 text-sm">
+                                    <span className="font-medium">Warning they see</span>
+                                    <Input
+                                        value={draft.warning}
+                                        maxLength={400}
+                                        disabled={!canManage}
+                                        onChange={(event) =>
+                                            change({ warning: event.target.value })
+                                        }
+                                    />
+                                    <span className="text-xs text-muted-foreground">
+                                        In the chat, with a title. Colour codes such as &amp;c work.
+                                    </span>
+                                </label>
+                            )}
+
+                            {draft.action === "warn-and-ban" && (
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <label className="flex flex-col gap-1 text-sm">
+                                        <span className="font-medium">
+                                            Ban after this many honeypots
+                                        </span>
+                                        <Input
+                                            type="number"
+                                            min={BAN_HITS_MIN}
+                                            max={10}
+                                            value={draft.banHits}
+                                            disabled={!canManage}
+                                            onChange={(event) =>
+                                                change({
+                                                    banHits: Math.round(
+                                                        Number(event.target.value) || 0
+                                                    )
+                                                })
+                                            }
+                                        />
+                                        <span className="text-xs text-muted-foreground">
+                                            At least {BAN_HITS_MIN}, and only after the warning.
+                                        </span>
+                                    </label>
+                                    <label className="flex flex-col gap-1 text-sm">
+                                        <span className="font-medium">Ban for (hours)</span>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={168}
+                                            value={draft.banHours}
+                                            disabled={!canManage}
+                                            onChange={(event) =>
+                                                change({
+                                                    banHours: Math.round(
+                                                        Number(event.target.value) || 0
+                                                    )
+                                                })
+                                            }
+                                        />
+                                        <span className="text-xs text-muted-foreground">
+                                            Up to a week.
+                                        </span>
+                                    </label>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     <div className="flex items-start justify-between gap-3 border-t border-border pt-4">
@@ -374,14 +410,15 @@ export function MinecraftXray({
                                 stasis chamber can look like a teleport.
                             </p>
                         </div>
-                        <Switch
+                        <LoadedSwitch
+                            state={reading}
                             checked={draft.movement}
-                            disabled={!canManage || view.refusal !== null}
+                            disabled={!canManage || view?.refusal != null}
                             onChange={(movement) => change({ movement })}
                             aria-label="Watch for flying and teleporting"
                         />
                     </div>
-                    {view.teleportCheck && (
+                    {view?.teleportCheck && (
                         <p className="text-xs text-warning-ink">{view.teleportCheck}.</p>
                     )}
 
@@ -393,14 +430,16 @@ export function MinecraftXray({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-xs text-muted-foreground">
                             {note ??
-                                (view.settings.enabled
+                                (view?.settings.enabled
                                     ? `${view.traps.overworld} diamonds and ${view.traps.nether} debris hidden right now. Changes apply without a restart.`
                                     : canManage
                                       ? "Changes apply to the running server, with no restart."
                                       : "Only somebody who manages this server can change it.")}
                         </span>
                         <Button
-                            disabled={!canManage || pending || !dirty || problem !== null}
+                            disabled={
+                                !loaded || !canManage || pending || !dirty || problem !== null
+                            }
                             onClick={save}
                         >
                             {pending && <Loader2 className="size-4 animate-spin" />}
@@ -440,9 +479,13 @@ export function MinecraftXray({
                         onFilter={setFilter}
                         isEmpty={shown.length === 0}
                         empty={
-                            suspects.length === 0
-                                ? "Nothing recorded against anybody yet, and no mining figures to show."
-                                : "No player matches."
+                            reading === "reading"
+                                ? TABLE_LOADING
+                                : !loaded
+                                  ? "The players could not be read."
+                                  : suspects.length === 0
+                                    ? "Nothing recorded against anybody yet, and no mining figures to show."
+                                    : "No player matches."
                         }
                         rows={shown.map((suspect) => (
                             <tr
@@ -515,7 +558,13 @@ export function MinecraftXray({
                         ]}
                         minWidth="36rem"
                         isEmpty={incidents.length === 0}
-                        empty="Nothing has happened in the last 14 days."
+                        empty={
+                            reading === "reading"
+                                ? TABLE_LOADING
+                                : loaded
+                                  ? "Nothing has happened in the last 14 days."
+                                  : "The incidents could not be read."
+                        }
                         rows={incidents.slice(0, 100).map((incident) => (
                             <tr
                                 key={`${incident.kind}:${incident.name}:${incident.at}:${incident.x}:${incident.z}`}

@@ -219,102 +219,99 @@ export function MinecraftRules({
                 </Card>
             ) : null}
 
-            {loading ? (
-                <div className="flex flex-col gap-2">
-                    {Array.from({ length: 6 }, (_, index) => (
-                        <Skeleton key={index} className="h-12 w-full" />
-                    ))}
-                </div>
-            ) : rules === null ? null : (
-                <>
-                    <Card>
-                        <CardBody className="flex flex-wrap items-center justify-between gap-3 py-3">
-                            <div className="min-w-0">
-                                <p className="text-sm font-medium">Difficulty</p>
-                                <p className="text-xs text-muted-foreground">
-                                    Peaceful removes hostile mobs and stops hunger draining.
-                                </p>
-                                {rules.pending.includes("difficulty") ? (
-                                    <p className="text-xs text-warning">{PENDING_NOTE}</p>
-                                ) : remembered && rules.difficulty ? (
-                                    <p className="text-xs text-warning">{REMEMBERED_NOTE}</p>
-                                ) : null}
-                                {rules.failures.difficulty ? (
-                                    <p className="text-xs text-danger">
-                                        {rules.failures.difficulty}
-                                    </p>
-                                ) : null}
-                            </div>
-                            <Select
-                                className="w-40"
-                                aria-label="Difficulty"
-                                disabled={!canManage || busy === "difficulty" || !rules.changeable}
-                                value={rules.difficulty ?? ""}
-                                onValueChange={(value) => void applyDifficulty(value)}
-                                options={[
-                                    ...(rules.difficulty ? [] : [{ value: "", label: "Unknown" }]),
-                                    ...DIFFICULTIES.map((entry) => ({
-                                        value: entry,
-                                        label: entry.charAt(0).toUpperCase() + entry.slice(1)
-                                    }))
-                                ]}
-                            />
-                        </CardBody>
-                    </Card>
+            {/* The difficulty and every rule are the game's own list, so they
+                are drawn at once; only their positions wait for a reading. With
+                no reading at all the error above says why, and the controls are
+                left out rather than drawn in a position nothing read. */}
+            <Card>
+                <CardBody className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                        <p className="text-sm font-medium">Difficulty</p>
+                        <p className="text-xs text-muted-foreground">
+                            Peaceful removes hostile mobs and stops hunger draining.
+                        </p>
+                        {rules?.pending.includes("difficulty") ? (
+                            <p className="text-xs text-warning">{PENDING_NOTE}</p>
+                        ) : remembered && rules?.difficulty ? (
+                            <p className="text-xs text-warning">{REMEMBERED_NOTE}</p>
+                        ) : null}
+                        {rules?.failures.difficulty ? (
+                            <p className="text-xs text-danger">{rules.failures.difficulty}</p>
+                        ) : null}
+                    </div>
+                    {rules ? (
+                        <Select
+                            className="w-40"
+                            aria-label="Difficulty"
+                            disabled={!canManage || busy === "difficulty" || !rules.changeable}
+                            value={rules.difficulty ?? ""}
+                            onValueChange={(value) => void applyDifficulty(value)}
+                            options={[
+                                ...(rules.difficulty ? [] : [{ value: "", label: "Unknown" }]),
+                                ...DIFFICULTIES.map((entry) => ({
+                                    value: entry,
+                                    label: entry.charAt(0).toUpperCase() + entry.slice(1)
+                                }))
+                            ]}
+                        />
+                    ) : loading ? (
+                        <Skeleton className="h-9 w-40 shrink-0" />
+                    ) : null}
+                </CardBody>
+            </Card>
 
-                    {reason && (
+            {reason && (
+                <Card>
+                    <CardBody className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+                        <Info className="size-4 shrink-0" aria-hidden />
+                        <span>
+                            {reason}
+                            {rules?.asOf ? (
+                                <>
+                                    {" "}
+                                    Read <RelativeTime iso={rules.asOf} />.
+                                </>
+                            ) : null}
+                        </span>
+                    </CardBody>
+                </Card>
+            )}
+
+            {groups.length === 0 ? (
+                <Card>
+                    <CardBody className="py-8 text-center text-sm text-muted-foreground">
+                        This server did not report any rules. Java servers from 1.13 answer this;
+                        Bedrock cannot be asked from here.
+                    </CardBody>
+                </Card>
+            ) : (
+                groups.map((group) => (
+                    <div key={group.group} className="flex flex-col gap-1">
+                        <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {group.group}
+                        </p>
                         <Card>
-                            <CardBody className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-                                <Info className="size-4 shrink-0" aria-hidden />
-                                <span>
-                                    {reason}
-                                    {rules.asOf ? (
-                                        <>
-                                            {" "}
-                                            Read <RelativeTime iso={rules.asOf} />.
-                                        </>
-                                    ) : null}
-                                </span>
+                            <CardBody className="flex flex-col gap-0 py-0">
+                                {group.rules.map((rule, index) => (
+                                    <RuleRow
+                                        key={rule.id}
+                                        rule={rule}
+                                        value={rules?.values[rule.id] ?? ""}
+                                        reading={rules ? "loaded" : loading ? "reading" : "failed"}
+                                        unknown={rules?.values[rule.id] === undefined}
+                                        remembered={remembered}
+                                        pending={rules?.pending.includes(rule.id) ?? false}
+                                        failure={rules?.failures[rule.id] ?? null}
+                                        first={index === 0}
+                                        busy={busy === rule.id}
+                                        disabled={!canManage || !rules?.changeable}
+                                        onChange={(value) => void apply(rule, value)}
+                                    />
+                                ))}
                             </CardBody>
                         </Card>
-                    )}
-
-                    {groups.length === 0 ? (
-                        <Card>
-                            <CardBody className="py-8 text-center text-sm text-muted-foreground">
-                                This server did not report any rules. Java servers from 1.13 answer
-                                this; Bedrock cannot be asked from here.
-                            </CardBody>
-                        </Card>
-                    ) : (
-                        groups.map((group) => (
-                            <div key={group.group} className="flex flex-col gap-1">
-                                <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                    {group.group}
-                                </p>
-                                <Card>
-                                    <CardBody className="flex flex-col gap-0 py-0">
-                                        {group.rules.map((rule, index) => (
-                                            <RuleRow
-                                                key={rule.id}
-                                                rule={rule}
-                                                value={rules.values[rule.id] ?? ""}
-                                                unknown={rules.values[rule.id] === undefined}
-                                                remembered={remembered}
-                                                pending={rules.pending.includes(rule.id)}
-                                                failure={rules.failures[rule.id] ?? null}
-                                                first={index === 0}
-                                                busy={busy === rule.id}
-                                                disabled={!canManage || !rules.changeable}
-                                                onChange={(value) => void apply(rule, value)}
-                                            />
-                                        ))}
-                                    </CardBody>
-                                </Card>
-                            </div>
-                        ))
-                    )}
-                </>
+                    </div>
+                ))
             )}
         </div>
     );
@@ -323,6 +320,7 @@ export function MinecraftRules({
 function RuleRow({
     rule,
     value,
+    reading,
     unknown = false,
     remembered = false,
     pending = false,
@@ -334,6 +332,10 @@ function RuleRow({
 }: {
     rule: GameRule;
     value: string;
+    /** Whether there is a reading yet. Until there is, the row is drawn with an
+     *  outline where its control goes - a default in its place would flip once
+     *  the value lands - and with none at all once reading has failed. */
+    reading: "loaded" | "reading" | "failed";
     /** The server would not say what this is set to. The row still draws - the
      *  rule exists and applies - but nothing here should look like a reading. */
     unknown?: boolean;
@@ -371,7 +373,7 @@ function RuleRow({
                 </p>
                 {rule.hint ? <p className="text-xs text-muted-foreground">{rule.hint}</p> : null}
                 {failure ? <p className="text-xs text-danger">{failure}</p> : null}
-                {pending ? (
+                {reading !== "loaded" ? null : pending ? (
                     <p className="text-xs text-warning">{PENDING_NOTE}</p>
                 ) : unknown ? (
                     <p className="text-xs text-warning">
@@ -382,7 +384,15 @@ function RuleRow({
                     <p className="text-xs text-warning">{REMEMBERED_NOTE}</p>
                 ) : null}
             </div>
-            {rule.type === "boolean" ? (
+            {reading === "failed" ? null : reading === "reading" ? (
+                <Skeleton
+                    className={
+                        rule.type === "boolean"
+                            ? "h-5 w-9 shrink-0 rounded-full"
+                            : "h-9 w-24 shrink-0"
+                    }
+                />
+            ) : rule.type === "boolean" ? (
                 <Switch
                     aria-label={rule.label}
                     disabled={disabled || busy}

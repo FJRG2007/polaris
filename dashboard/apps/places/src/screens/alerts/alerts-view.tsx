@@ -68,24 +68,48 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
     // nothing here a multi-selection would be for.
     const [focused, setFocused] = useState<string | null>(null);
 
+    /** Whether the faces and the drawn areas - read only by the dialog - have
+     *  arrived. */
+    const [extras, setExtras] = useState(false);
+
+    // Two reads side by side: what a row is written from (the rules, the camera
+    // names, who is told), and what only the dialog offers. The list used to
+    // wait for the dialog's half too.
     useEffect(() => {
         let cancelled = false;
-        void (async () => {
-            const [list, cams, recipients, faces, drawn] = await Promise.all([
-                actions.listAlertsAction(),
-                actions.listCamerasAction(),
-                canManage ? actions.listRecipientsAction() : Promise.resolve({ people: [] }),
-                actions.listPeopleAction(),
-                actions.listPlaceZoneNamesAction()
-            ]);
-            if (cancelled) return;
-            if (list.error) setError(list.error);
-            setRules(list.rules ?? []);
-            setCameras(cams.cameras ?? []);
-            setPeople(recipients.people ?? []);
-            setKnown((faces.people ?? []).map((person) => ({ id: person.id, name: person.name })));
-            setAreas(drawn.zones ?? []);
-        })();
+        void Promise.all([
+            actions.listAlertsAction(),
+            actions.listCamerasAction(),
+            canManage ? actions.listRecipientsAction() : Promise.resolve({ people: [] })
+        ]).then(
+            ([list, cams, recipients]) => {
+                if (cancelled) return;
+                if (list.error) setError(list.error);
+                setCameras(cams.cameras ?? []);
+                setPeople(recipients.people ?? []);
+                setRules(list.rules ?? []);
+            },
+            () => {
+                if (!cancelled)
+                    setError("Your alerts could not be read. Reload the page to try again.");
+            }
+        );
+        void Promise.all([actions.listPeopleAction(), actions.listPlaceZoneNamesAction()]).then(
+            ([faces, drawn]) => {
+                if (cancelled) return;
+                setKnown(
+                    (faces.people ?? []).map((person) => ({ id: person.id, name: person.name }))
+                );
+                setAreas(drawn.zones ?? []);
+                setExtras(true);
+            },
+            () => {
+                if (cancelled) return;
+                setError(
+                    "The faces and areas an alert can name could not be read, so alerts cannot be added or changed. Reload the page to try again."
+                );
+            }
+        );
         return () => {
             cancelled = true;
         };
@@ -151,8 +175,6 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
         }
     };
 
-    if (rules === null) return <Skeleton className="h-40 w-full" />;
-
     /** What a rule does, in one line somebody can check at a glance. */
     const describe = (rule: AlertRuleView): string => {
         const what = rule.kinds.map((kind) => KIND_LABEL[kind] ?? kind).join(" or ");
@@ -176,7 +198,9 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
 
             {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
 
-            {rules.length === 0 ? (
+            {rules === null ? (
+                <Skeleton className="h-40 w-full" />
+            ) : rules.length === 0 ? (
                 <EmptyState
                     icon={<Bell />}
                     title="No alerts yet"
@@ -295,7 +319,9 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                 </ul>
             )}
 
-            {editing || adding ? (
+            {/* Opened before the dialog's own lists arrive, it appears when they
+                do rather than offering no faces and no areas to choose from. */}
+            {rules !== null && extras && (editing || adding) ? (
                 <AlertDialog
                     rule={editing}
                     cameras={cameras}

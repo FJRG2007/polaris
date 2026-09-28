@@ -23,6 +23,7 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { findPeople } from "@/lib/people-search";
+import { publishChatChange } from "@/lib/chat/live";
 import { announceActivity } from "@/lib/presence-activity/live";
 import { saveActivitySettings } from "@/lib/presence-activity/settings";
 import { BlockError, block, listBlocked, unblock, type BlockedPerson } from "@/lib/blocks";
@@ -194,6 +195,13 @@ export async function loadFriendRequestsAction(): Promise<{ requests: FriendRequ
 // Who this account does not want to hear from
 // ---------------------------------------------------------------------------
 
+/** Every screen this account has open offers Block or Unblock from its own
+ *  copy of the list, so each is told to read it again. */
+function blockMoved(userId: string): void {
+    revalidatePath(CHAT_PATH);
+    publishChatChange({ kind: "channels", actorId: userId, audience: [userId] });
+}
+
 /**
  * Block somebody.
  *
@@ -206,7 +214,7 @@ export async function blockPersonAction(input: unknown): Promise<{ error?: strin
     if (!parsed.success) return { error: "That is not somebody this can block" };
 
     const result = await guard(() => block(user.id, parsed.data.userId));
-    if (!result.error) revalidatePath(CHAT_PATH);
+    if (!result.error) blockMoved(user.id);
     return result;
 }
 
@@ -217,7 +225,7 @@ export async function unblockPersonAction(input: unknown): Promise<{ error?: str
     if (!parsed.success) return { error: "That is not somebody this can unblock" };
 
     const result = await guard(() => unblock(user.id, parsed.data.userId));
-    if (!result.error) revalidatePath(CHAT_PATH);
+    if (!result.error) blockMoved(user.id);
     return result;
 }
 

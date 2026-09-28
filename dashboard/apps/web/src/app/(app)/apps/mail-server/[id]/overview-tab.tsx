@@ -16,7 +16,14 @@ import { useEffect, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { Button, ConfirmDeleteDialog, Select, Skeleton } from "@polaris/ui";
 import { Check, Circle, ExternalLink, Loader2, RefreshCw } from "lucide-react";
-import { Mono, PanelError, StatusBadge, usePanelData, VerdictBadge, forgetPanelData } from "../ui-bits";
+import {
+    Mono,
+    PanelError,
+    StatusBadge,
+    usePanelData,
+    VerdictBadge,
+    forgetPanelData
+} from "../ui-bits";
 import {
     healthAction,
     removeServerAction,
@@ -28,7 +35,15 @@ import {
 
 type Health = Extract<Awaited<ReturnType<typeof healthAction>>, { health: unknown }>["health"];
 
-export function OverviewTab({ serverId }: { serverId: string }) {
+/** The part of the server the page read before it drew, to stand in for the
+ *  detail until that arrives. */
+export interface OverviewSeed {
+    readonly hostname: string;
+    readonly primaryDomain: string;
+    readonly status: string;
+}
+
+export function OverviewTab({ serverId, seed }: { serverId: string; seed: OverviewSeed }) {
     const router = useRouter();
     const [detail, setDetail] = useState<MailServerDetail | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -42,12 +57,15 @@ export function OverviewTab({ serverId }: { serverId: string }) {
         let stopped = false;
         let timer: ReturnType<typeof setTimeout> | null = null;
         const tick = async () => {
-            const answer = await serverDetailAction(serverId).catch(() => ({ error: "Polaris could not be reached." }));
+            const answer = await serverDetailAction(serverId).catch(() => ({
+                error: "Polaris could not be reached."
+            }));
             if (stopped) return;
             if ("server" in answer && answer.server) {
                 setDetail(answer.server);
                 setError(null);
-                if (answer.server.running || answer.server.status === "setting-up") timer = setTimeout(tick, 3000);
+                if (answer.server.running || answer.server.status === "setting-up")
+                    timer = setTimeout(tick, 3000);
             } else {
                 setError(answer.error ?? "That mail server was not found.");
             }
@@ -78,26 +96,26 @@ export function OverviewTab({ serverId }: { serverId: string }) {
     }
 
     if (error && !detail) return <PanelError message={error} />;
-    if (!detail) {
-        return (
-            <div className="flex flex-col gap-3">
-                <Skeleton className="h-6 w-48" />
-                <Skeleton className="h-32 w-full" />
-            </div>
-        );
-    }
 
-    const settingUp = detail.running || detail.status === "setting-up";
+    // Until the detail arrives the header, the health check and the way out are
+    // drawn from what the page already read; only the steps, the log and the
+    // name of the machine wait. Removing waits too, since whether setup is
+    // running is not known until then.
+    const status = detail?.status ?? seed.status;
+    const settingUp = detail
+        ? detail.running || detail.status === "setting-up"
+        : status === "setting-up";
     return (
         <div className="flex flex-col gap-6">
             <section className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge status={detail.status} />
-                    <span className="text-[0.8125rem] text-muted-foreground">
-                        {detail.primaryDomain} on {detail.placementName}
+                    <StatusBadge status={status} />
+                    <span className="flex items-center gap-1 text-[0.8125rem] text-muted-foreground">
+                        {detail?.primaryDomain ?? seed.primaryDomain} on{" "}
+                        {detail ? detail.placementName : <Skeleton className="h-3.5 w-24" />}
                     </span>
                     <div className="ml-auto flex items-center gap-2">
-                        {detail.projectId ? (
+                        {detail?.projectId ? (
                             <Button asChild size="sm" variant="outline">
                                 <Link href={`/apps/deploy/${detail.projectId}`}>
                                     <ExternalLink />
@@ -108,7 +126,8 @@ export function OverviewTab({ serverId }: { serverId: string }) {
                     </div>
                 </div>
                 {error ? <PanelError message={error} /> : null}
-                {detail.status === "failed" && detail.error ? (
+                {!detail ? <Skeleton className="h-32 w-full" /> : null}
+                {detail && detail.status === "failed" && detail.error ? (
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger-edge bg-danger-soft px-3 py-2">
                         <span className="text-[0.8125rem] text-danger">{detail.error}</span>
                         <Button size="sm" onClick={() => void resume(null)} disabled={busy}>
@@ -116,62 +135,91 @@ export function OverviewTab({ serverId }: { serverId: string }) {
                         </Button>
                     </div>
                 ) : null}
-                <ol className="flex flex-col gap-1.5">
-                    {detail.steps.map((entry, index) => {
-                        const current = settingUp && !entry.done && (index === 0 || detail.steps[index - 1]?.done);
-                        return (
-                            <li key={entry.step} className="flex items-center gap-2 text-[0.8125rem]">
-                                {entry.done ? (
-                                    <Check className="size-4 text-success" />
-                                ) : current ? (
-                                    <Loader2 className="size-4 animate-spin text-primary" />
-                                ) : (
-                                    <Circle className="size-4 text-foreground-subtle" />
-                                )}
-                                <span className={entry.done ? "text-foreground" : "text-muted-foreground"}>{entry.label}</span>
-                            </li>
-                        );
-                    })}
-                </ol>
-                {detail.log ? (
+                {detail ? (
+                    <ol className="flex flex-col gap-1.5">
+                        {detail.steps.map((entry, index) => {
+                            const current =
+                                settingUp &&
+                                !entry.done &&
+                                (index === 0 || detail.steps[index - 1]?.done);
+                            return (
+                                <li
+                                    key={entry.step}
+                                    className="flex items-center gap-2 text-[0.8125rem]"
+                                >
+                                    {entry.done ? (
+                                        <Check className="size-4 text-success" />
+                                    ) : current ? (
+                                        <Loader2 className="size-4 animate-spin text-primary" />
+                                    ) : (
+                                        <Circle className="size-4 text-foreground-subtle" />
+                                    )}
+                                    <span
+                                        className={
+                                            entry.done ? "text-foreground" : "text-muted-foreground"
+                                        }
+                                    >
+                                        {entry.label}
+                                    </span>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                ) : null}
+                {detail?.log ? (
                     <pre className="max-h-64 overflow-auto overscroll-contain whitespace-pre-wrap rounded-md border border-border bg-surface p-3 font-mono text-xs text-muted-foreground">
                         {detail.log}
                     </pre>
                 ) : null}
-                {!settingUp ? (
+                {detail && !settingUp ? (
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Repair by running setup again from</span>
+                        <span className="text-xs text-muted-foreground">
+                            Repair by running setup again from
+                        </span>
                         <div className="w-64">
                             <Select
                                 aria-label="Step to repair from"
                                 value={repairFrom}
                                 onValueChange={setRepairFrom}
                                 placeholder="Choose a step"
-                                options={detail.steps.map((entry) => ({ value: entry.step, label: entry.label }))}
+                                options={detail.steps.map((entry) => ({
+                                    value: entry.step,
+                                    label: entry.label
+                                }))}
                             />
                         </div>
-                        <Button size="sm" variant="outline" disabled={!repairFrom || busy} onClick={() => void resume(repairFrom)}>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!repairFrom || busy}
+                            onClick={() => void resume(repairFrom)}
+                        >
                             Repair
                         </Button>
                     </div>
                 ) : null}
             </section>
 
-            {detail.status === "ready" || detail.status === "down" ? <HealthSection serverId={serverId} /> : null}
+            {status === "ready" || status === "down" ? <HealthSection serverId={serverId} /> : null}
 
             <section className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                 <p className="max-w-xl text-xs text-muted-foreground">
-                    Removing it here stops Polaris managing it. The service, its volumes and the mail in them stay in Deploy until you
-                    delete them there.
+                    Removing it here stops Polaris managing it. The service, its volumes and the
+                    mail in them stay in Deploy until you delete them there.
                 </p>
-                <Button size="sm" variant="outline" onClick={() => setRemoving(true)} disabled={detail.running}>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRemoving(true)}
+                    disabled={!detail || detail.running}
+                >
                     Remove from Polaris
                 </Button>
             </section>
             <ConfirmDeleteDialog
                 open={removing}
                 onOpenChange={setRemoving}
-                name={detail.hostname}
+                name={detail?.hostname ?? seed.hostname}
                 kind="mail server"
                 title="Stop managing this mail server?"
                 confirmLabel="Remove"
@@ -207,7 +255,12 @@ function HealthSection({ serverId }: { serverId: string }) {
         <section className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold text-foreground">Health</h2>
-                <Button size="sm" variant="outline" onClick={() => void check()} disabled={checking}>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void check()}
+                    disabled={checking}
+                >
                     <RefreshCw className={checking ? "animate-spin" : undefined} />
                     {checking ? "Checking..." : "Check now"}
                 </Button>
@@ -219,28 +272,52 @@ function HealthSection({ serverId }: { serverId: string }) {
                         <dt className="text-xs text-muted-foreground">Engine</dt>
                         <dd className="mt-1 flex items-center gap-2 text-[0.8125rem]">
                             <VerdictBadge
-                                verdict={health.engine.answers && health.engine.managed ? "pass" : "fail"}
-                                label={health.engine.answers ? (health.engine.managed ? "Answering" : "Not managed") : "Not answering"}
+                                verdict={
+                                    health.engine.answers && health.engine.managed ? "pass" : "fail"
+                                }
+                                label={
+                                    health.engine.answers
+                                        ? health.engine.managed
+                                            ? "Answering"
+                                            : "Not managed"
+                                        : "Not answering"
+                                }
                             />
                         </dd>
-                        {health.engine.note ? <p className="mt-1 text-xs text-muted-foreground">{health.engine.note}</p> : null}
+                        {health.engine.note ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {health.engine.note}
+                            </p>
+                        ) : null}
                     </div>
                     <div className="rounded-md border border-border p-3">
                         <dt className="text-xs text-muted-foreground">Waiting to go out</dt>
                         <dd className="mt-1 text-[0.8125rem] text-foreground">
-                            {health.engine.queued === null ? "Unknown" : `${health.engine.queued} message${health.engine.queued === 1 ? "" : "s"}`}
+                            {health.engine.queued === null
+                                ? "Unknown"
+                                : `${health.engine.queued} message${health.engine.queued === 1 ? "" : "s"}`}
                         </dd>
                     </div>
                     <div className="rounded-md border border-border p-3">
                         <dt className="text-xs text-muted-foreground">Certificate on 465</dt>
                         <dd className="mt-1 flex flex-wrap items-center gap-2 text-[0.8125rem]">
                             <VerdictBadge verdict={health.certificate.verdict} />
-                            {health.certificate.issuer ? <span className="text-muted-foreground">{health.certificate.issuer}</span> : null}
+                            {health.certificate.issuer ? (
+                                <span className="text-muted-foreground">
+                                    {health.certificate.issuer}
+                                </span>
+                            ) : null}
                         </dd>
                         {health.certificate.expiresAt ? (
-                            <p className="mt-1 text-xs text-muted-foreground">Expires {format.date(health.certificate.expiresAt)}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Expires {format.date(health.certificate.expiresAt)}
+                            </p>
                         ) : null}
-                        {health.certificate.note ? <p className="mt-1 text-xs text-muted-foreground">{health.certificate.note}</p> : null}
+                        {health.certificate.note ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {health.certificate.note}
+                            </p>
+                        ) : null}
                     </div>
                 </dl>
             ) : null}
@@ -279,7 +356,8 @@ function HealthSection({ serverId }: { serverId: string }) {
                     <p className="text-xs text-muted-foreground">
                         {ports.address ? (
                             <>
-                                Ports knocked on at <Mono>{ports.address}</Mono>, from where Polaris runs
+                                Ports knocked on at <Mono>{ports.address}</Mono>, from where Polaris
+                                runs
                                 {ports.at ? `, ${format.dateTime(ports.at)}` : ""}.
                             </>
                         ) : (
@@ -300,13 +378,22 @@ function HealthSection({ serverId }: { serverId: string }) {
                                     {ports.results.map((result) => (
                                         <tr key={result.port}>
                                             <td className="py-2 pr-3 font-mono text-xs">
-                                                {result.port} <span className="text-muted-foreground">{result.label}</span>
+                                                {result.port}{" "}
+                                                <span className="text-muted-foreground">
+                                                    {result.label}
+                                                </span>
                                             </td>
-                                            <td className="py-2 pr-3 text-muted-foreground">{result.purpose}</td>
+                                            <td className="py-2 pr-3 text-muted-foreground">
+                                                {result.purpose}
+                                            </td>
                                             <td className="py-2 pr-3">
                                                 <div className="flex flex-col gap-1">
                                                     <VerdictBadge verdict={result.verdict} />
-                                                    {result.note ? <span className="text-xs text-muted-foreground">{result.note}</span> : null}
+                                                    {result.note ? (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {result.note}
+                                                        </span>
+                                                    ) : null}
                                                 </div>
                                             </td>
                                         </tr>

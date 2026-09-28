@@ -20,6 +20,7 @@ import {
     resolvePrincipalPolicyStatementsBySource,
     type PrincipalType
 } from "./policies.js";
+import { perRequest } from "./request-cache.js";
 import { holdsAnyGrantCarrying, resourceGrantStatements } from "./resource-grants.js";
 import {
     ALL_PERMISSIONS,
@@ -38,7 +39,9 @@ const GLOBAL_RESOURCE = "*";
 function parseRoleGrants(raw: string): string[] {
     try {
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((value): value is string => typeof value === "string")
+            : [];
     } catch {
         return [];
     }
@@ -84,14 +87,27 @@ async function overrideStatements(userId: string): Promise<PolicyStatement[]> {
  * grants, every policy attached to them, their groups and their roles, and the
  * overrides set on the account itself.
  */
-export async function resolveGlobalStatements(userId: string): Promise<PolicyStatement[]> {
+export const resolveGlobalStatements = perRequest(async function resolveGlobalStatements(
+    userId: string
+): Promise<PolicyStatement[]> {
     const [roles, policies, overrides] = await Promise.all([
         roleStatements(userId),
         resolvePrincipalPolicyStatements(userId),
         overrideStatements(userId)
     ]);
     return [...roles, ...policies, ...overrides];
-}
+});
+
+/** Whether the account is an administrator, which short-circuits every check. */
+const isAdministrator = perRequest(async function isAdministrator(
+    userId: string
+): Promise<boolean> {
+    const account = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true }
+    });
+    return account?.isAdmin === true;
+});
 
 /** Where a statement came from, for the screen that has to explain an answer
  *  rather than only give one. */
@@ -119,7 +135,9 @@ export interface SourcedStatements {
  * than two so an explanation of somebody's access can never say something the
  * decision would not.
  */
-export async function resolveGlobalStatementsBySource(userId: string): Promise<SourcedStatements[]> {
+export async function resolveGlobalStatementsBySource(
+    userId: string
+): Promise<SourcedStatements[]> {
     const [roles, policies, overrides] = await Promise.all([
         prisma.userRole.findMany({
             where: { userId },
@@ -163,9 +181,11 @@ export async function resolveGlobalStatementsBySource(userId: string): Promise<S
 }
 
 /** Whether a user holds a global capability. Admins are allowed everything. */
-export async function can(userId: string, permission: Permission | typeof ALL_PERMISSIONS): Promise<boolean> {
-    const admin = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
-    if (admin?.isAdmin) return true;
+export async function can(
+    userId: string,
+    permission: Permission | typeof ALL_PERMISSIONS
+): Promise<boolean> {
+    if (await isAdministrator(userId)) return true;
     const statements = await resolveGlobalStatements(userId);
     return isAllowed(statements, permission, GLOBAL_RESOURCE);
 }
@@ -185,13 +205,15 @@ export async function can(userId: string, permission: Permission | typeof ALL_PE
  * The same split Drive has always made (see drive-acl-service), now written once
  * for every kind of thing.
  */
-export async function resolveResourceStatements(userId: string): Promise<PolicyStatement[]> {
+export const resolveResourceStatements = perRequest(async function resolveResourceStatements(
+    userId: string
+): Promise<PolicyStatement[]> {
     const [policies, grants] = await Promise.all([
         resolvePrincipalPolicyStatements(userId),
         resourceGrantStatements(userId)
     ]);
     return [...policies, ...grants];
-}
+});
 
 /**
  * Whether a user may do something to one particular thing.
@@ -217,8 +239,7 @@ export async function canOn(
     ref: ResourceRef,
     opts?: { ownerId?: string | null }
 ): Promise<boolean> {
-    const account = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
-    if (account?.isAdmin) return true;
+    if (await isAdministrator(userId)) return true;
 
     const statements = await resolveResourceStatements(userId);
     const decision = evaluateStatements(statements, permission, resourceString(ref));

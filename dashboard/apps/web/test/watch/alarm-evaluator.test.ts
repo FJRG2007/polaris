@@ -34,7 +34,12 @@ let alarms: Record<string, unknown>[] = [];
 const updates: { id: string; state: string }[] = [];
 const events: { kind: string; detail: string }[] = [];
 
-function sample(subjectType: string, subjectId: string, agoMs: number, fields: Partial<Sample>): Sample {
+function sample(
+    subjectType: string,
+    subjectId: string,
+    agoMs: number,
+    fields: Partial<Sample>
+): Sample {
     return {
         subjectType,
         subjectId,
@@ -65,11 +70,22 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         alarm: {
             findMany: vi.fn(async () => alarms),
-            update: vi.fn(async ({ where, data }: { where: { id: string }; data: { state: string } }) => {
-                updates.push({ id: where.id, state: data.state });
-                const alarm = alarms.find((row) => row.id === where.id);
-                if (alarm) Object.assign(alarm, data);
-                return alarm;
+            update: vi.fn(
+                async ({ where, data }: { where: { id: string }; data: { state: string } }) => {
+                    updates.push({ id: where.id, state: data.state });
+                    const alarm = alarms.find((row) => row.id === where.id);
+                    if (alarm) Object.assign(alarm, data);
+                    return alarm;
+                }
+            ),
+            // Only the check time moves on these; their state is recorded as it
+            // stands, so a test reads the last state either way.
+            updateMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) => {
+                for (const id of where.id.in) {
+                    const alarm = alarms.find((row) => row.id === id);
+                    updates.push({ id, state: String(alarm?.state) });
+                }
+                return { count: where.id.in.length };
             })
         },
         alarmEvent: {
@@ -79,19 +95,31 @@ vi.mock("@polaris/db", () => ({
             })
         },
         host: {
-            findFirst: vi.fn(async ({ where }: { where: { id: string } }) =>
-                where.id === HOST ? { id: HOST, dockerId: "docker-local", address: "10.0.0.2" } : null
+            findMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) =>
+                where.id.in.includes(HOST)
+                    ? [{ id: HOST, dockerId: "docker-local", address: "10.0.0.2" }]
+                    : []
             )
         },
         volume: {
             findMany: vi.fn(async () => [{ id: "vol-1" }, { id: "vol-2" }])
         },
         metricSample: {
-            findMany: vi.fn(async ({ where, take }: { where: { subjectType: string; subjectId: string }; take: number }) =>
-                newest(where).slice(0, take)
+            findMany: vi.fn(
+                async ({
+                    where,
+                    take
+                }: {
+                    where: { subjectType: string; subjectId: string };
+                    take: number;
+                }) => newest(where).slice(0, take)
             ),
-            findFirst: vi.fn(async ({ where }: { where: { subjectType: string; subjectId: string; ts?: { gte: Date } } }) =>
-                newest(where)[0] ?? null
+            findFirst: vi.fn(
+                async ({
+                    where
+                }: {
+                    where: { subjectType: string; subjectId: string; ts?: { gte: Date } };
+                }) => newest(where)[0] ?? null
             )
         }
     }
@@ -99,7 +127,11 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@/lib/notifications/dispatch", () => ({ notify: vi.fn(async () => undefined) }));
 vi.mock("@/lib/messaging/bridge-client", () => ({ bridgeSend: vi.fn(async () => undefined) }));
 vi.mock("@/lib/local-machine", () => ({
-    localMachineIdentity: vi.fn(async () => ({ hostId: null, dockerId: "docker-local", addresses: new Set<string>() })),
+    localMachineIdentity: vi.fn(async () => ({
+        hostId: null,
+        dockerId: "docker-local",
+        addresses: new Set<string>()
+    })),
     isLocalMachine: (host: { dockerId?: string | null }, identity: { dockerId: string | null }) =>
         Boolean(host.dockerId && host.dockerId === identity.dockerId)
 }));
@@ -143,7 +175,9 @@ describe("disk and network alarms", () => {
             sample("app", APP, 90_000, { netTxBytes: 0n }),
             sample("app", APP, 30_000, { netTxBytes: 60n * 3n * MIB })
         ];
-        alarms = [alarm({ targetType: "application", targetId: APP, metric: "network_out", threshold: 2 })];
+        alarms = [
+            alarm({ targetType: "application", targetId: APP, metric: "network_out", threshold: 2 })
+        ];
         await evaluateAlarms();
         expect(events[0]?.detail).toBe("Network out 3.00 MB/s (threshold > 2 MB/s)");
     });
@@ -153,16 +187,66 @@ describe("disk and network alarms", () => {
             sample("volume", "vol-1", 60_000, { diskUsedBytes: 2n * GIB }),
             sample("volume", "vol-2", 60_000, { diskUsedBytes: GIB })
         ];
-        alarms = [alarm({ targetType: "application", targetId: APP, metric: "disk", threshold: 2.5 })];
+        alarms = [
+            alarm({ targetType: "application", targetId: APP, metric: "disk", threshold: 2.5 })
+        ];
         await evaluateAlarms();
         expect(events[0]?.detail).toBe("Disk 3.00 GB (threshold > 2.5 GB)");
     });
 
     it("says there is no data when the reading is stale, rather than firing or clearing", async () => {
-        samples = [sample("host", LOCAL, 10 * 60_000, { diskUsedBytes: 99n, diskTotalBytes: 100n })];
+        samples = [
+            sample("host", LOCAL, 10 * 60_000, { diskUsedBytes: 99n, diskTotalBytes: 100n })
+        ];
         alarms = [alarm({ targetType: "host", targetId: LOCAL, metric: "disk", threshold: 90 })];
         await evaluateAlarms();
         expect(updates.at(-1)?.state).toBe("insufficient");
         expect(events).toEqual([]);
+    });
+});
+
+describe("the pass's writes", () => {
+    it("moves only the check time of an alarm whose state stands, in one statement", async () => {
+        const { prisma } = await import("@polaris/db");
+        samples = [sample("host", LOCAL, 30_000, { diskUsedBytes: 10n, diskTotalBytes: 100n })];
+        alarms = [
+            alarm({
+                id: "steady-1",
+                targetType: "host",
+                targetId: LOCAL,
+                metric: "disk",
+                threshold: 90,
+                state: "ok"
+            }),
+            alarm({
+                id: "steady-2",
+                targetType: "host",
+                targetId: LOCAL,
+                metric: "disk",
+                threshold: 90,
+                state: "ok"
+            })
+        ];
+        vi.mocked(prisma.alarm.update).mockClear();
+        vi.mocked(prisma.alarm.updateMany).mockClear();
+        await evaluateAlarms();
+        expect(prisma.alarm.update).not.toHaveBeenCalled();
+        expect(prisma.alarm.updateMany).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(prisma.alarm.updateMany).mock.calls[0]?.[0]).toMatchObject({
+            where: { id: { in: ["steady-1", "steady-2"] } },
+            data: { lastEvaluatedAt: expect.any(Date) }
+        });
+    });
+
+    it("still judges every alarm when the pass's shared read fails once", async () => {
+        const { prisma } = await import("@polaris/db");
+        vi.mocked(prisma.host.findMany).mockRejectedValueOnce(new Error("connection reset"));
+        const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        samples = [sample("host", LOCAL, 30_000, { diskUsedBytes: 95n, diskTotalBytes: 100n })];
+        alarms = [alarm({ targetType: "host", targetId: HOST, metric: "disk", threshold: 90 })];
+        await expect(evaluateAlarms()).resolves.toBeUndefined();
+        quiet.mockRestore();
+        expect(updates.at(-1)?.state).toBe("alarm");
+        expect(events).toEqual([{ kind: "triggered", detail: "Disk 95.0% (threshold > 90%)" }]);
     });
 });

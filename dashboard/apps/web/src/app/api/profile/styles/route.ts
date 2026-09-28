@@ -21,7 +21,7 @@
  */
 
 import { z } from "zod";
-import { apiUser } from "@/lib/api-session";
+import { backgroundUser } from "@/lib/session";
 import { MAX_PEOPLE_PER_STYLE_ASK } from "@polaris/core";
 import {
     namesFor,
@@ -48,8 +48,10 @@ const askSchema = z.object({
 });
 
 export async function POST(request: Request): Promise<Response> {
-    const viewer = await apiUser();
-    if (viewer instanceof Response) return viewer;
+    // Asked on a timer by every open tab, so it must not count as the person
+    // being here: that would keep the idle lock from ever closing.
+    const viewer = await backgroundUser();
+    if (!viewer) return Response.json({ error: "Sign in to continue" }, { status: 401 });
 
     let body: unknown;
     try {

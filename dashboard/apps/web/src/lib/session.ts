@@ -11,6 +11,7 @@
  * while the rest of the page shows somebody else's.
  */
 
+import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -50,7 +51,9 @@ export interface SessionUser {
  * call, once). Renewal belongs to `SessionKeeper`, which asks better-auth's own
  * endpoint, whose response does reach the browser.
  */
-export async function getSession() {
+// Once per request: the root layout, the app layout, a nested layout and the
+// page each ask, and each ask was the session and the user read again.
+export const getSession = cache(async function getSession() {
     try {
         return await auth.api.getSession({
             headers: await headers(),
@@ -59,7 +62,7 @@ export async function getSession() {
     } catch {
         return null;
     }
-}
+});
 
 /**
  * Resolve the current user or redirect. Beyond "is there a session", this is
@@ -72,16 +75,36 @@ export async function getSession() {
  * viewing another account never borrows or bypasses that account's controls.
  */
 export async function requireUser(): Promise<SessionUser> {
+    const cleared = await clearedSession(true);
+    if (cleared === null) redirect("/oauth/login");
+    if ("redirect" in cleared) redirect(cleared.redirect);
+    return cleared.user;
+}
+
+/**
+ * The guard's answer for this request's session, worked out once per request
+ * and per kind of caller.
+ *
+ * Every layout and the page each call requireUser, and every one of those ran
+ * the whole guard again - the account's standing, the session's state, the view
+ * an administrator may be using. Nothing it reads can change between two of them
+ * inside one request. `touch` is part of the key: a background caller must never
+ * be handed an answer that counted as activity, or the other way round.
+ */
+const clearedSession = cache(async function clearedSession(
+    touch: boolean
+): Promise<{ user: SessionUser } | { redirect: string } | null> {
     const resolved = await resolveSession();
-    if (!resolved) redirect("/oauth/login");
+    if (!resolved) return null;
     const verdict = await guardSession({
         userId: resolved.id,
         sessionId: resolved.sessionId,
-        sessionCreatedAt: resolved.sessionCreatedAt
+        sessionCreatedAt: resolved.sessionCreatedAt,
+        touch
     });
-    if (!verdict.ok) redirect(verdict.redirect);
-    return identityFor(resolved, verdict.view);
-}
+    if (!verdict.ok) return { redirect: verdict.redirect };
+    return { user: await identityFor(resolved, verdict.view) };
+});
 
 /**
  * The same answer as requireUser, but null instead of a redirect.
@@ -98,16 +121,8 @@ export async function requireUser(): Promise<SessionUser> {
  * decided by each account's privacy, exactly as it is for a signed-out reader.
  */
 export async function guardedUser(options: { touch?: boolean } = {}): Promise<SessionUser | null> {
-    const resolved = await resolveSession();
-    if (!resolved) return null;
-    const verdict = await guardSession({
-        userId: resolved.id,
-        sessionId: resolved.sessionId,
-        sessionCreatedAt: resolved.sessionCreatedAt,
-        touch: options.touch
-    });
-    if (!verdict.ok) return null;
-    return identityFor(resolved, verdict.view);
+    const cleared = await clearedSession(options.touch ?? true);
+    return cleared && "user" in cleared ? cleared.user : null;
 }
 
 /**
