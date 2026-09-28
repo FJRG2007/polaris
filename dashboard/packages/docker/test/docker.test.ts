@@ -114,6 +114,34 @@ describe("docker driver", () => {
         expect(stats.memPercent).toBe(10);
     });
 
+    it("leaves the reclaimable page cache out of memory on cgroup v2, as docker stats does", async () => {
+        const driver = driverReturning(
+            httpResponse("200 OK", {
+                cpu_stats: { cpu_usage: { total_usage: 0 }, system_cpu_usage: 0 },
+                precpu_stats: { cpu_usage: { total_usage: 0 }, system_cpu_usage: 0 },
+                // lirio-0's Minecraft server: 7094 MiB counted, 1741 MiB of it world
+                // files in the page cache.
+                memory_stats: {
+                    usage: 7094,
+                    limit: 32000,
+                    stats: { anon: 5292, file: 1750, inactive_file: 1741, active_file: 9 }
+                }
+            })
+        );
+        expect((await driver.stats("abc")).memUsage).toBe(5353);
+    });
+
+    it("uses the cgroup v1 name for the same thing", async () => {
+        const driver = driverReturning(
+            httpResponse("200 OK", {
+                cpu_stats: { cpu_usage: { total_usage: 0 }, system_cpu_usage: 0 },
+                precpu_stats: { cpu_usage: { total_usage: 0 }, system_cpu_usage: 0 },
+                memory_stats: { usage: 150, limit: 1000, stats: { total_inactive_file: 40, cache: 50 } }
+            })
+        );
+        expect((await driver.stats("abc")).memUsage).toBe(110);
+    });
+
     it("treats 304 on lifecycle actions as success", async () => {
         const driver = driverReturning(Buffer.from("HTTP/1.1 304 Not Modified\r\nConnection: close\r\n\r\n"));
         await expect(driver.start("abc")).resolves.toBeUndefined();

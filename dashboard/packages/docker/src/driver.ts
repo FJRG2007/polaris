@@ -445,8 +445,16 @@ function computeStats(raw: Record<string, unknown>): ContainerStats {
     const cpuPercent = systemDelta > 0 && cpuDelta > 0 ? (cpuDelta / systemDelta) * 100 : 0;
 
     const memory = (raw.memory_stats ?? {}) as Record<string, number> & { stats?: Record<string, number> };
-    const cache = memory.stats?.cache ?? 0;
-    const memUsage = Math.max(0, (memory.usage ?? 0) - cache);
+    // What the kernel can take back the moment anything else needs it is not
+    // memory the container uses. Docker's own client leaves it out the same way,
+    // under the name each cgroup version gives it: `inactive_file` on v2 (every
+    // current distribution), `total_inactive_file` on v1. Reading `cache` alone,
+    // a v1-only name, subtracted nothing on v2 - a Minecraft server with a 4 GB
+    // heap was shown using 8 GB, the difference being its world files sitting in
+    // the page cache.
+    const stats = memory.stats ?? {};
+    const reclaimable = stats.inactive_file ?? stats.total_inactive_file ?? stats.cache ?? 0;
+    const memUsage = Math.max(0, (memory.usage ?? 0) - reclaimable);
     const memLimit = memory.limit ?? 0;
     const memPercent = memLimit > 0 ? (memUsage / memLimit) * 100 : 0;
 
