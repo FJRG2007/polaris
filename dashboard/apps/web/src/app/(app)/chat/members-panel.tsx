@@ -32,6 +32,7 @@ import { useChatStream } from "./use-chat-stream";
 import { NicknameDialog } from "./nickname-dialog";
 import { nameplateCss } from "@/lib/profile-style-css";
 import { usePresence } from "@/components/presence-store";
+import { presenceLine } from "@/components/activity-card";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import { useWideScreen, WIDE_ENOUGH } from "./use-wide-screen";
 import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
@@ -277,7 +278,9 @@ function MemberRow({
     // The line wins over the role when there is one. A role is a fact that does
     // not change; a status is what somebody is doing this afternoon, and two
     // lines under a name in a 14rem column is a wall.
-    const under = where?.note || role;
+    // What they are doing comes after what they said and before the role, for
+    // the same reason: it is this afternoon, and the role is every afternoon.
+    const under = presenceLine(where) || role;
     // Asked from the same store the face asked, so it is one request for the
     // panel rather than one per member.
     const plate = usePersonNameplate(member.userId);

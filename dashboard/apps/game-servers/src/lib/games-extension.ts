@@ -99,6 +99,11 @@ export const gameServersExtension: AppExtension = {
 
     chatRelayReady: async (userId) => (await import("./minecraft/chat-relay")).relayReady(userId),
 
+    // "Playing Minecraft" beside somebody's face, from the visits the activity
+    // sweep already keeps - no server is asked.
+    playingNow: async (userIds) =>
+        (await import("./minecraft/playing-now")).playingMinecraftNow(userIds),
+
     // Somebody invited because they play here has just made their account.
 
     claimLink: async ({ userId, installedAppId, grantedById, link }) => {

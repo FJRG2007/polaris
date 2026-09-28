@@ -23,8 +23,8 @@ messages, groups, voice channels, threads, replies, reactions, forwarding,
 starring, pins, edit history, read receipts, typing and recording indicators,
 mutes, per-conversation and per-space notification levels, invites, search,
 attachments, voice notes, link previews, rich text with Markdown storage,
-mentions, presence, privacy audiences, reports, calls with screen sharing, and
-per-message moderation.
+mentions, presence, game activity status, privacy audiences, reports, calls with
+screen sharing, and per-message moderation.
 
 ---
 

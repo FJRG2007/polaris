@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { Avatar } from "@/components/avatar";
+import { ActivityLine } from "@/components/activity-card";
 import { PersonName, PersonRealName } from "@/components/person-name";
 import { LeaveDialog } from "./leave-dialog";
 import { NicknameDialog } from "./nickname-dialog";
@@ -204,6 +205,15 @@ export function ChannelHeader({
                         id={channel.others[0].id}
                         name={channel.others[0].name}
                         className="hidden min-w-0 shrink truncate text-xs sm:block"
+                    />
+                ) : null}
+                {/* What the person in a direct message is playing or listening
+                    to, beside their name - the first thing to go on a narrow
+                    screen, like the topic. */}
+                {!named && channel.others.length === 1 && channel.others[0] ? (
+                    <ActivityLine
+                        personId={channel.others[0].id}
+                        className="hidden max-w-[16rem] shrink sm:flex"
                     />
                 ) : null}
                 {channel.topic && (

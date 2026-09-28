@@ -29,6 +29,7 @@ import { PersonName } from "@/components/person-name";
 import type { ChatProfile } from "@/lib/chat/profiles";
 import { MutualPanel } from "@/components/mutual-panel";
 import { usePresence } from "@/components/presence-store";
+import { ActivityCards } from "@/components/activity-card";
 import { ProfileBanner } from "@/components/profile-banner";
 
 /** Somebody, as far as the screen already knows them. */
@@ -184,6 +185,11 @@ export function ProfileDetails({
                         {where.note}
                     </p>
                 )}
+
+                {/* What they are playing or listening to, when they share it
+                    with this reader - under what they said, which is theirs and
+                    wins the top spot. */}
+                <ActivityCards personId={person.id} />
 
                 {/* What the two of them have in common, from the same module the
                     profile page draws it from. Not on the card: a glance is the

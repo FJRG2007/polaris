@@ -85,6 +85,7 @@ What core asks an app today, grouped by the core screen that asks:
 | Overview and home widgets                            | counts and state of game servers                                           |
 | Router guide                                         | which ports the router has to forward                                      |
 | Cron                                                 | the game-\* jobs                                                           |
+| Presence activity (`presence-activity`)              | which server a player is on, to show "Playing Minecraft on \<server\>"     |
 
 The registry is a typed interface in core with one implementation per installed
 app. Core asks the registry and treats a missing app as "nothing to show". The

@@ -34,6 +34,7 @@ import { ProfileActions } from "./profile-actions";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { MutualPanel } from "@/components/mutual-panel";
 import { usePresence } from "@/components/presence-store";
+import { ActivityCards } from "@/components/activity-card";
 import type { PublicProfile } from "@/lib/profile-service";
 import { ProfileBanner } from "@/components/profile-banner";
 import { useDisplayFormat } from "@/components/display-format";
@@ -178,6 +179,11 @@ export function ProfileCard({
                         {where.note}
                     </p>
                 ) : null}
+
+                {/* What they are playing or listening to, when they share it
+                    with this reader. Nothing for somebody signed out: presence
+                    is not published to them, and this rides on it. */}
+                <ActivityCards personId={profile.id} />
 
                 {!own && signedIn ? (
                     <ProfileActions

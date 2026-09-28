@@ -26,6 +26,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { allowedBy } from "@/lib/privacy-service";
 import { reachableChannelIds } from "@/lib/chat/access";
+import { activitiesFor } from "@/lib/presence-activity/service";
 import { PARTICIPANT_TTL_MS } from "@/lib/chat/meetings";
 import { type Presence, type PresenceChoice } from "@polaris/core";
 import { getPlatformDisplayPreferences } from "@/lib/display-prefs-service";
@@ -65,6 +66,12 @@ export interface PresenceView {
      *  reader cannot reach - which is the same answer, because a call somebody
      *  cannot join is not news they can act on. */
     readonly inCall: string | null;
+    /**
+     * What they are playing or listening to, as this reader may be told. Empty
+     * for anybody drawn as offline, for the same reason the note is: somebody
+     * this reader cannot see is here is doing nothing as far as they know.
+     */
+    readonly activity: readonly core.ActivityView[];
 }
 
 /**
@@ -137,7 +144,7 @@ export async function presenceFor(
         if (!mine && !visible.has(person.id)) {
             // Not "unknown": there is no third colour, and a dot that is absent
             // for some people and grey for others says which is which.
-            answer.set(person.id, { status: "offline", note: "", inCall });
+            answer.set(person.id, { status: "offline", note: "", inCall, activity: [] });
             continue;
         }
         const rules = schedules.get(person.id) ?? [];
@@ -167,8 +174,25 @@ export async function presenceFor(
                 status !== "offline" && core.statusInForce(person, new Date(now))
                     ? person.statusText.trim()
                     : "",
-            inCall
+            inCall,
+            activity: []
         });
+    }
+
+    // Asked only about the people drawn as here, which on most screens is a
+    // handful of the faces - and never about anybody offline or invisible.
+    const here = [...answer].filter(([, view]) => view.status !== "offline").map(([id]) => id);
+    if (here.length > 0) {
+        const doing = await activitiesFor(viewer, here, at).catch((caught: unknown) => {
+            // The dot is worth more than the card beside it, and a failure here
+            // must not take the dots down with it.
+            console.error("polaris: could not read what people are doing:", caught);
+            return new Map<string, core.ActivityView[]>();
+        });
+        for (const [id, activity] of doing) {
+            const view = answer.get(id);
+            if (view) answer.set(id, { ...view, activity });
+        }
     }
     return answer;
 }

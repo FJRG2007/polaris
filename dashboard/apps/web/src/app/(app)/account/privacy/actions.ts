@@ -23,6 +23,8 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { findPeople } from "@/lib/people-search";
+import { announceActivity } from "@/lib/presence-activity/live";
+import { saveActivitySettings } from "@/lib/presence-activity/settings";
 import { BlockError, block, listBlocked, unblock, type BlockedPerson } from "@/lib/blocks";
 import {
     PrivacyError,
@@ -224,4 +226,28 @@ export async function unblockPersonAction(input: unknown): Promise<{ error?: str
 export async function listBlockedAction(): Promise<{ people: BlockedPerson[] }> {
     const user = await requireUser();
     return { people: await listBlocked(user.id) };
+}
+
+// ---------------------------------------------------------------------------
+// Sharing what you are doing
+// ---------------------------------------------------------------------------
+
+/**
+ * Save whether this account shares its activity, from where, and which games
+ * never. The whole set at once, so two switches flipped in quick succession
+ * cannot interleave into a state neither of them asked for.
+ *
+ * The screens drawing this person are told straight away: switching it off has
+ * to take the card down now, not at somebody else's next refresh.
+ */
+export async function saveActivitySettingsAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = core.activitySettingsSchema.safeParse(input);
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "Those settings could not be saved" };
+    }
+    await saveActivitySettings(user.id, parsed.data);
+    await announceActivity([user.id]);
+    revalidatePath(PRIVACY_PATH);
+    return {};
 }
