@@ -72,6 +72,8 @@ interface Loop {
 }
 
 const loops = new Map<string, Loop>();
+/** Servers whose combat counters this process has made sure exist. */
+const combatReady = new Set<string>();
 /** What each server's players were last seen doing, to tell playing from idle. */
 const activity = new Map<string, Map<string, plan.Seen>>();
 
@@ -288,10 +290,17 @@ export async function startEvent(input: {
     if (seen.size === 0) throw new Error("Nobody is on the server");
     // The minimum is for events that start on their own. An operator who
     // presses Run has looked at who is on and decided.
-    const active = plan.activePlayers(seen, config.settings.afkMinutes, Date.now()).length;
+    const active = plan.playersFor(preset, seen, config.settings.afkMinutes, Date.now()).length;
     const needed = catalog.activeNeeded(preset, config.settings);
     if (input.trigger !== "manual" && active < needed) {
-        throw new Error(`Only ${active} of the ${seen.size} players on are active; this event waits for ${needed}`);
+        const where = catalog.needsOverworld(preset) ? " in the Overworld" : "";
+        throw new Error(
+            `Only ${active} of the ${seen.size} players on are active${where}; this event waits for ${needed}`
+        );
+    }
+    if (input.trigger !== "manual") {
+        const busy = plan.busyReason(seen, config.settings.afkMinutes, Date.now());
+        if (busy) throw new Error(`Not now: ${busy}`);
     }
 
     const now = Date.now();
@@ -1312,7 +1321,9 @@ async function results(
 
 /** Everybody on at dawn who did not die during the night. */
 async function survivorsOf(server: ServerContainer, run: stored.EventRun): Promise<string[]> {
-    const on = commands.readWhere(await server.say([commands.WHERE])).map((one) => one.name);
+    // In the Overworld at dawn: sitting the night out in the Nether is not
+    // surviving it.
+    const on = commands.readWhere(await server.say([commands.IN_OVERWORLD])).map((one) => one.name);
     const deaths = commands.readDeaths(await server.say([commands.READ_DEATHS]));
     const took = new Set(run.participants.map((name) => name.toLowerCase()));
     return on.filter((name) => took.has(name.toLowerCase()) && (deaths.get(name) ?? 0) === 0);
@@ -1405,12 +1416,20 @@ async function look(
 ): Promise<Map<string, plan.Seen>> {
     const positions = commands.readWhere(await server.say([commands.WHERE]));
     const facing = commands.readFacing(await server.say([commands.FACING]));
-    const seen = plan.observe(
-        activity.get(installedAppId) ?? new Map(),
-        positions,
-        facing,
-        Date.now()
-    );
+    const dimensions = commands.readDimensions(await server.say([commands.DIMENSIONS]));
+    // Made once per server this process has looked at; adding one that is there
+    // already is refused by the game, harmlessly.
+    if (!combatReady.has(installedAppId)) {
+        await server.sayAll(commands.COMBAT_OBJECTIVES);
+        combatReady.add(installedAppId);
+    }
+    const hurt = commands.readScores(await server.say([commands.READ_HURT]), commands.HURT);
+    const hit = commands.readScores(await server.say([commands.READ_HIT]), commands.HIT);
+    const seen = plan.observe(activity.get(installedAppId) ?? new Map(), positions, facing, Date.now(), {
+        dimensions,
+        hurt,
+        hit
+    });
     activity.set(installedAppId, seen);
     return seen;
 }
@@ -1466,19 +1485,45 @@ async function sweepOne(
     if (seen === null) return false;
     if (pending.length > 0 && seen.size > 0) await deliverPending(ownerId, installedAppId, seen);
     const active = plan.activePlayers(seen, settings.settings.afkMinutes, now).length;
+    const activeFor = (preset: catalog.EventPreset) =>
+        plan.playersFor(preset, seen, settings.settings.afkMinutes, now).length;
+    const busy = plan.busyReason(seen, settings.settings.afkMinutes, now);
 
     // A time on the schedule first: somebody chose it.
     const due = plan.schedulesDue(settings.settings, settings.schedules, state.scheduleRuns, now);
+    // Still due a minute from now: a fight can be waited out that long.
+    const stillDue = new Set(
+        plan
+            .schedulesDue(settings.settings, settings.schedules, state.scheduleRuns, now + 60_000)
+            .map((entry) => entry.id)
+    );
     for (const entry of due) {
+        const preset = settings.presets.find((one) => one.id === entry.presetId);
+        if (!preset) continue;
+        // Somebody fighting: the event waits a minute at a time within its
+        // few minutes' grace, and is skipped only if the fight outlasts them.
+        if (busy && stillDue.has(entry.id)) {
+            await updateEventState(installedAppId, (current) => ({ ...current, waiting: `Waiting: ${busy}` }));
+            continue;
+        }
         await updateEventState(installedAppId, (current) => ({
             ...current,
             scheduleRuns: { ...current.scheduleRuns, [entry.id]: now }
         }));
-        const preset = settings.presets.find((one) => one.id === entry.presetId);
-        if (!preset) continue;
+        if (busy) {
+            await skip(installedAppId, preset, "scheduled", `Skipped: ${busy}`);
+            continue;
+        }
         const needed = catalog.activeNeeded(preset, settings.settings);
-        if (active < needed) {
-            await skip(installedAppId, preset, "scheduled", `Skipped: ${active} active of the ${needed} it waits for`);
+        const ready = activeFor(preset);
+        if (ready < needed) {
+            const where = catalog.needsOverworld(preset) ? " in the Overworld" : "";
+            await skip(
+                installedAppId,
+                preset,
+                "scheduled",
+                `Skipped: ${ready} active${where} of the ${needed} it waits for`
+            );
             continue;
         }
         try {
@@ -1507,6 +1552,8 @@ async function sweepOne(
         lastKind: state.lastKind,
         running: false,
         active,
+        activeFor,
+        busy,
         now,
         random: Math.random
     });
@@ -1601,6 +1648,14 @@ async function deliverPending(
             return rest ? [{ ...one, reward: rest }] : [];
         })
     }));
+}
+
+/** For a test: forget what was seen of every server's players, as a fresh
+ *  process has. A test clock that starts over would otherwise meet a fight
+ *  recorded "later" by the test before it. */
+export function forgetPlayers(): void {
+    activity.clear();
+    combatReady.clear();
 }
 
 /** For a test: what the loops hold. */

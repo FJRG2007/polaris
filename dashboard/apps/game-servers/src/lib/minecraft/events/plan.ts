@@ -10,6 +10,7 @@
 import { parseTime, zonedMoment } from "../schedule";
 import {
     activeNeeded,
+    needsOverworld,
     runMinutes,
     type EventPreset,
     type EventSettings,
@@ -32,7 +33,28 @@ export interface Seen {
     readonly since: number;
     /** When they last moved or turned. Null until they have been seen to. */
     readonly movedAt: number | null;
+    /** Which world they are in, when that was read. */
+    readonly dimension: string | null;
+    /** The game's running count of damage they have taken and dealt, as last
+     *  read, to tell when either went up. */
+    readonly hurt: number | null;
+    readonly hit: number | null;
+    /** When they were last seen taking or dealing damage. */
+    readonly fightingAt: number | null;
 }
+
+/** What else a look can tell about each player, by name. */
+export interface Readings {
+    readonly dimensions?: ReadonlyMap<string, string>;
+    readonly hurt?: ReadonlyMap<string, number>;
+    readonly hit?: ReadonlyMap<string, number>;
+}
+
+/** How long after the last blow somebody still counts as in a fight. */
+export const FIGHT_COOLDOWN_MS = 90_000;
+
+export const OVERWORLD = "minecraft:overworld";
+const THE_END = "minecraft:the_end";
 
 /** Less than this is standing still: a player's position wobbles a little. */
 const STILL_BLOCKS = 0.3;
@@ -50,7 +72,8 @@ export function observe(
     before: ReadonlyMap<string, Seen>,
     positions: readonly { name: string; x: number; y: number; z: number }[],
     facing: ReadonlyMap<string, { yaw: number; pitch: number }>,
-    now: number
+    now: number,
+    readings: Readings = {}
 ): Map<string, Seen> {
     const next = new Map<string, Seen>();
     for (const where of positions) {
@@ -70,10 +93,66 @@ export function observe(
             yaw: turned.yaw,
             pitch: turned.pitch,
             since: last?.since ?? now,
-            movedAt: moved ? now : (last?.movedAt ?? null)
+            movedAt: moved ? now : (last?.movedAt ?? null),
+            ...fight(last, readings, where.name, now)
         });
     }
     return next;
+}
+
+/** Whether their damage counts went up since the last look, which is what a
+ *  fight looks like from outside the game. */
+function fight(
+    last: Seen | undefined,
+    readings: Readings,
+    name: string,
+    now: number
+): Pick<Seen, "dimension" | "hurt" | "hit" | "fightingAt"> {
+    const hurt = readings.hurt?.get(name) ?? null;
+    const hit = readings.hit?.get(name) ?? null;
+    const rose =
+        last !== undefined &&
+        ((hurt !== null && last.hurt !== null && hurt > last.hurt) ||
+            (hit !== null && last.hit !== null && hit > last.hit));
+    return {
+        dimension: readings.dimensions?.get(name) ?? last?.dimension ?? null,
+        hurt,
+        hit,
+        fightingAt: rose ? now : (last?.fightingAt ?? null)
+    };
+}
+
+/**
+ * Whether somebody is in the middle of something an event should not land on:
+ * a fight in the last minute and a half, or the End, where the one thing to do
+ * is fight the dragon.
+ */
+export function busy(one: Seen, now: number): boolean {
+    if (one.dimension === THE_END) return true;
+    return one.fightingAt !== null && now - one.fightingAt <= FIGHT_COOLDOWN_MS;
+}
+
+/** The players who can take part in this event: active, and in the Overworld
+ *  when it happens there. Somebody whose world was not read is not held back. */
+export function playersFor(
+    preset: EventPreset,
+    seen: ReadonlyMap<string, Seen>,
+    afkMinutes: number,
+    now: number
+): Seen[] {
+    const active = activePlayers(seen, afkMinutes, now);
+    if (!needsOverworld(preset)) return active;
+    return active.filter((one) => one.dimension === null || one.dimension === OVERWORLD);
+}
+
+/** Why an automatic event should wait: the active players who are busy. */
+export function busyReason(seen: ReadonlyMap<string, Seen>, afkMinutes: number, now: number): string | null {
+    const names = activePlayers(seen, afkMinutes, now)
+        .filter((one) => busy(one, now))
+        .map((one) => one.name);
+    if (names.length === 0) return null;
+    const shown = names.slice(0, 3).join(", ");
+    return `${shown}${names.length > 3 ? " and others" : ""} ${names.length === 1 ? "is" : "are"} in a fight or in the End`;
 }
 
 function angleBetween(left: number, right: number): number {
@@ -184,6 +263,11 @@ export function decideRandom(input: {
     lastKind: string | null;
     running: boolean;
     active: number;
+    /** How many can take part in one event, when that differs by event -
+     *  the ones that happen in the Overworld count only who is there. */
+    activeFor?: (preset: EventPreset) => number;
+    /** Why now is a bad moment - somebody in a fight - or null. */
+    busy?: string | null;
     now: number;
     random: () => number;
 }): RandomDecision {
@@ -213,13 +297,25 @@ export function decideRandom(input: {
     // Only what this many players can start: a competition with prizes needs
     // two at least, so one player alone can still get a happy hour but never a
     // podium to themselves.
-    const startable = pool.filter((entry) => input.active >= activeNeeded(entry.preset, settings));
+    if (input.busy) {
+        return { start: null, nextRandomAt: input.nextRandomAt, waiting: `Waiting: ${input.busy}` };
+    }
+    const count = input.activeFor ?? (() => input.active);
+    const startable = pool.filter((entry) => count(entry.preset) >= activeNeeded(entry.preset, settings));
     if (startable.length === 0) {
-        const needed = Math.min(...pool.map((entry) => activeNeeded(entry.preset, settings)));
+        // Said for the event closest to starting: what it needs, where, and
+        // how many of those there are.
+        const nearest = pool
+            .map((entry) => ({
+                needed: activeNeeded(entry.preset, settings),
+                have: count(entry.preset),
+                where: needsOverworld(entry.preset) ? " in the Overworld" : ""
+            }))
+            .sort((left, right) => left.needed - left.have - (right.needed - right.have))[0]!;
         return {
             start: null,
             nextRandomAt: input.nextRandomAt,
-            waiting: `Waiting for ${needed} active ${needed === 1 ? "player" : "players"} (${input.active} now)`
+            waiting: `Waiting for ${nearest.needed} active ${nearest.needed === 1 ? "player" : "players"}${nearest.where} (${nearest.have} now)`
         };
     }
     const fresh = startable.filter((entry) => entry.preset.kind !== input.lastKind);

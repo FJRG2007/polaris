@@ -31,6 +31,10 @@ interface World {
     killerAt: [number, number, number];
     /** Item ids the server does not know. */
     unknownItems: string[];
+    /** Which world each player is in; the Overworld when not said. */
+    dims: Record<string, string>;
+    /** The game's running damage counts, per player. */
+    hurt: Record<string, number>;
 }
 
 const world: World = {
@@ -46,7 +50,9 @@ const world: World = {
     arrived: false,
     allWater: false,
     killerAt: [305, 70, 2],
-    unknownItems: []
+    unknownItems: [],
+    dims: {},
+    hurt: {}
 };
 let config: Record<string, unknown> = {};
 const held: string[] = [];
@@ -54,10 +60,24 @@ const released: string[] = [];
 
 function answer(line: string): string {
     world.sent.push(line);
-    if (
-        line === "execute as @a run data get entity @s Pos" ||
-        line.includes("as @a[distance=0..] run data get entity @s Pos")
-    ) {
+    if (line === "execute as @a run data get entity @s Dimension") {
+        return world.online
+            .map((name) => `${name} has the following entity data: "${world.dims[name] ?? "minecraft:overworld"}"`)
+            .join("\n");
+    }
+    const counted = /^execute as @a run scoreboard players get @s (pe_hurt|pe_hit)$/.exec(line);
+    if (counted) {
+        return world.online
+            .map((name) => `${name} has ${counted[1] === "pe_hurt" ? (world.hurt[name] ?? 0) : 0} [${counted[1]}]`)
+            .join("\n");
+    }
+    if (line.includes("as @a[distance=0..] run data get entity @s Pos")) {
+        return world.online
+            .filter((name) => (world.dims[name] ?? "minecraft:overworld") === "minecraft:overworld")
+            .map((name, index) => `${name} has the following entity data: [${index * 10 + Math.random()}d, 64.0d, 0.0d]`)
+            .join("\n");
+    }
+    if (line === "execute as @a run data get entity @s Pos") {
         return world.online
             .map(
                 (name, index) =>
@@ -252,6 +272,9 @@ beforeEach(() => {
     world.allWater = false;
     world.killerAt = [305, 70, 2];
     world.unknownItems = [];
+    world.dims = {};
+    world.hurt = {};
+    events.forgetPlayers();
     held.length = 0;
     released.length = 0;
 });
@@ -936,5 +959,66 @@ describe("the least to be ranked", () => {
         await play(3 * 60_000);
         expect(state().history[0]?.podium).toEqual([]);
         expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+    });
+});
+
+describe("where the players are, and what they are doing", () => {
+    const draw = (presetId: string) => ({
+        minActive: 1,
+        random: {
+            enabled: true,
+            days: [],
+            from: "00:00",
+            to: "23:59",
+            minGap: 15,
+            maxGap: 15,
+            pool: [{ presetId, weight: 1 }]
+        }
+    });
+
+    it("waits to draw an event while somebody is in a fight", async () => {
+        setUp([{ ...catalog.newPreset("fishing", "fish"), minutes: 5 }], draw("fish"));
+        await events.sweepEvents();
+        await play(15 * 60_000);
+        world.hurt = { Ana: 40 };
+        await events.sweepEvents();
+        world.hurt = { Ana: 55 };
+        const held = await events.sweepEvents();
+        expect(held.started).toBe(0);
+        expect(state().waiting).toBe("Waiting: Ana is in a fight or in the End");
+        // A minute and a half after the last blow, it goes ahead.
+        await play(100_000);
+        const started = await events.sweepEvents();
+        expect(started.started).toBe(1);
+    });
+
+    it("counts only the Overworld for an event that happens there", async () => {
+        world.dims = { Ana: "minecraft:the_nether", Ben: "minecraft:the_nether" };
+        setUp([{ ...catalog.newPreset("supply-drop", "drop"), minutes: 5 }], draw("drop"));
+        await events.sweepEvents();
+        await play(15 * 60_000);
+        await events.sweepEvents();
+        expect(state().run).toBeNull();
+        expect(state().waiting).toBe("Waiting for 2 active players in the Overworld (0 now)");
+    });
+
+    it("does not hold a mining rush back for players in the Nether", async () => {
+        world.dims = { Ana: "minecraft:the_nether", Ben: "minecraft:the_nether" };
+        setUp([{ ...catalog.newPreset("mining-rush", "rush"), minutes: 5 }], draw("rush"));
+        await events.sweepEvents();
+        await play(15 * 60_000);
+        const started = await events.sweepEvents();
+        expect(started.started).toBe(1);
+    });
+
+    it("does not count a night sat out in the Nether as surviving it", async () => {
+        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3, minScore: 1 };
+        setUp([moon]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "moon", trigger: "manual", startedBy: null });
+        await play(4_100);
+        world.scores = { Ana: 4, Ben: 9 };
+        world.dims = { Ben: "minecraft:the_nether" };
+        await play(3 * 60_000);
+        expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 4 }]);
     });
 });

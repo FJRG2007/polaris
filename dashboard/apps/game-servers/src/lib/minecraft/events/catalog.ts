@@ -519,6 +519,26 @@ export function minScoreOf(preset: EventPreset): number {
     return preset.minScore ?? DEFAULT_MIN_SCORE[preset.kind];
 }
 
+/**
+ * Whether the event happens on the surface of the Overworld - a chest, a boss, a
+ * circle, a finish line, a night - and so only counts the players who are there.
+ * A player in the Nether cannot reach a chest in the Overworld, and a mining
+ * rush or a trivia game does not care where anybody is.
+ */
+export function needsOverworld(preset: EventPreset): boolean {
+    switch (preset.kind) {
+        case "supply-drop":
+        case "world-boss":
+        case "blood-moon":
+        case "king-of-the-hill":
+            return true;
+        case "explorer":
+            return (preset.options as EventOptions<"explorer">).mode === "race";
+        default:
+            return false;
+    }
+}
+
 export function runMinutes(preset: EventPreset): number {
     if (preset.kind === "trivia") {
         const options = preset.options as EventOptions<"trivia">;

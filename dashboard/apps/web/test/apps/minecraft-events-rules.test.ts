@@ -441,3 +441,29 @@ describe("the least to be ranked", () => {
         expect(plan.podium(new Map([["Ana", 6], ["Ben", 4]]), new Set(), 5)).toEqual([{ place: 1, name: "Ana", score: 6 }]);
     });
 });
+
+describe("fights and worlds", () => {
+    const here = [{ name: "Ana", x: 0, y: 64, z: 0 }];
+    const facing = new Map([["Ana", { yaw: 0, pitch: 0 }]]);
+
+    it("sees a fight in the damage counts going up, and lets it go after a while", () => {
+        const first = plan.observe(new Map(), here, facing, 0, { hurt: new Map([["Ana", 10]]) });
+        const second = plan.observe(first, [{ name: "Ana", x: 5, y: 64, z: 0 }], facing, 60_000, { hurt: new Map([["Ana", 30]]) });
+        const ana = second.get("ana")!;
+        expect(plan.busy(ana, 60_000)).toBe(true);
+        expect(plan.busy(ana, 60_000 + plan.FIGHT_COOLDOWN_MS + 1)).toBe(false);
+        expect(plan.busyReason(second, 5, 60_000)).toBe("Ana is in a fight or in the End");
+    });
+
+    it("takes the End for a fight with the dragon", () => {
+        const seen = plan.observe(new Map(), here, facing, 0, { dimensions: new Map([["Ana", "minecraft:the_end"]]) });
+        expect(plan.busy(seen.get("ana")!, 0)).toBe(true);
+    });
+
+    it("counts only the Overworld for what happens there", () => {
+        const first = plan.observe(new Map(), here, facing, 0, { dimensions: new Map([["Ana", "minecraft:the_nether"]]) });
+        const moved = plan.observe(first, [{ name: "Ana", x: 9, y: 64, z: 0 }], facing, 60_000);
+        expect(plan.playersFor(catalog.newPreset("supply-drop", "d"), moved, 5, 60_000)).toHaveLength(0);
+        expect(plan.playersFor(catalog.newPreset("mining-rush", "m"), moved, 5, 60_000)).toHaveLength(1);
+    });
+});

@@ -367,6 +367,32 @@ export const FACING = "execute as @a run data get entity @s Rotation";
 export const IN_OVERWORLD =
     "execute in minecraft:overworld as @a[distance=0..] run data get entity @s Pos";
 
+/** Which world everybody is in: `Alice has the following entity data: "minecraft:the_nether"`. */
+export const DIMENSIONS = "execute as @a run data get entity @s Dimension";
+
+export function readDimensions(output: string): Map<string, string> {
+    const found = new Map<string, string>();
+    const pattern = /([A-Za-z0-9_]{1,16}) has the following entity data: "([a-z0-9_:./-]+)"/g;
+    for (const match of stripFormatting(output).matchAll(pattern)) {
+        found.set(match[1] as string, match[2] as string);
+    }
+    return found;
+}
+
+/**
+ * The two running counts that tell a fight from outside the game: damage taken
+ * and damage dealt. Kept on the server for good, under the same `pe_` prefix,
+ * so the next look can see whether either went up.
+ */
+export const HURT = "pe_hurt";
+export const HIT = "pe_hit";
+export const COMBAT_OBJECTIVES = [
+    `scoreboard objectives add ${HURT} minecraft.custom:minecraft.damage_taken`,
+    `scoreboard objectives add ${HIT} minecraft.custom:minecraft.damage_dealt`
+];
+export const READ_HURT = `execute as @a run scoreboard players get @s ${HURT}`;
+export const READ_HIT = `execute as @a run scoreboard players get @s ${HIT}`;
+
 /** Positions out of a `WHERE` answer. */
 export function readWhere(output: string): { name: string; x: number; y: number; z: number }[] {
     const found: { name: string; x: number; y: number; z: number }[] = [];
