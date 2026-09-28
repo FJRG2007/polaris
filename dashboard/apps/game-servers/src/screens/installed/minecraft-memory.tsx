@@ -57,14 +57,14 @@ export function MinecraftMemory({
     useKeptSnapshot<MemoryPlanView>(planKey, KEPT_PLAN_MS, (kept) =>
         setPlan((current) => current ?? kept.value)
     );
-    useEffect(() => {
-        if (plan) writeSnapshot(planKey, plan);
-    }, [planKey, plan]);
     /** Whether this visit's own read has answered with a plan. The kept one only
      *  paints: a save sends the whole pair, so nothing is chosen on a copy
      *  somebody may have changed since. */
     const [heard, setHeard] = useState(false);
     const heardRef = useRef(false);
+    useEffect(() => {
+        if (heard && plan) writeSnapshot(planKey, plan);
+    }, [heard, planKey, plan]);
     /** Null while the first read is out; a sentence when there is nothing to plan
      *  (a Bedrock server runs no JVM) or the read failed. */
     const [note, setNote] = useState<string | null>(null);

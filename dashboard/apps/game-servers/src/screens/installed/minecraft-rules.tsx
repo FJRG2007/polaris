@@ -82,15 +82,15 @@ export function MinecraftRules({
         );
         setLoading(false);
     });
-    useEffect(() => {
-        if (rules) writeSnapshot(rulesKey, rules);
-    }, [rulesKey, rules]);
     // Whether this visit has heard from Polaris's note or the server itself. The
     // kept copy only paints: nothing is set on its strength, and the note - which
     // any viewer's last reading updated - replaces it when it lands.
     const [heard, setHeard] = useState(false);
     /** Whether the server's own answer is in, after which the note has no say. */
     const serverRead = useRef(false);
+    useEffect(() => {
+        if (heard && rules) writeSnapshot(rulesKey, rules);
+    }, [heard, rulesKey, rules]);
 
     const load = useCallback(async () => {
         setChecking(true);

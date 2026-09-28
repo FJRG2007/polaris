@@ -24,7 +24,7 @@ import Image from "next/image";
 import * as actions from "./ark-actions";
 import { hostUi } from "@polaris/app-host/client";
 import { RestartPlanner } from "./restart-planner";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ArkModsView } from "../../lib/ark/mods-service";
 import type { ArkModSuggestion } from "../../lib/ark/mod-catalog";
 import { workshopUrl, type WorkshopItem } from "../../lib/ark/workshop";
@@ -82,13 +82,14 @@ export function ArkMods({
         setMods((current) => current ?? kept.value);
         setLoading(false);
     });
-    useEffect(() => {
-        if (mods) writeSnapshot(modsKey, mods);
-    }, [modsKey, mods]);
     // Whether this visit's own read has answered. The kept list only paints: every
     // change below writes the whole list, so none of them is offered on a copy
     // another admin may have changed since.
     const [fresh, setFresh] = useState(false);
+    const freshRef = useRef(false);
+    useEffect(() => {
+        if (fresh && mods) writeSnapshot(modsKey, mods);
+    }, [fresh, modsKey, mods]);
     const [busy, setBusy] = useState(false);
     const locked = busy || !fresh;
     const [error, setError] = useState<string | null>(null);
@@ -100,8 +101,12 @@ export function ArkMods({
         const found = result.mods;
         if (found) {
             setMods((current) => mergeUnchanged(current, found));
+            freshRef.current = true;
             setFresh(true);
-        } else setError(result.error ?? "The mods could not be read");
+        } else {
+            if (!freshRef.current) setMods(null);
+            setError(result.error ?? "The mods could not be read");
+        }
     }, [installedAppId]);
 
     useEffect(() => {

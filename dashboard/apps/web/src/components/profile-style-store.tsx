@@ -191,6 +191,9 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
      * rail, the member panel - and the first of those unmounting must not take
      * the other two off the list.
      */
+    /** Whether an answer has arrived on this load, before which the kept copy is
+     *  only painted and never written back as if it had just been read. */
+    const [heard, setHeard] = useState(false);
     const watched = useRef(new Map<string, number>());
     /**
      * Who a full answer has actually arrived for.
@@ -252,6 +255,7 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
                 at?: string;
             };
             const clock = typeof body.at === "string" ? body.at : null;
+            setHeard(true);
             // These have been answered in full. A chunk that failed never reaches
             // this line, which is what leaves its people to be asked about again.
             if (since === null) for (const id of ids) known.current.add(id);
@@ -509,12 +513,13 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
 
     // Kept after every change, for the next load of this tab to draw from.
     useEffect(() => {
+        if (!heard) return;
         writeSnapshot<Kept>(KEPT_KEY, {
             people: Object.fromEntries(people),
             names: Object.fromEntries(names),
             called: Object.fromEntries(called)
         });
-    }, [people, names, called]);
+    }, [heard, people, names, called]);
 
     const store = useMemo<Store>(
         () => ({ people, names, called, watch, refresh }),

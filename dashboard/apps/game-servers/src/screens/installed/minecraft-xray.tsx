@@ -171,20 +171,24 @@ export function MinecraftXray({
      *  saved or cleared: a draft is only ever started from what the server holds. */
     const [heard, setHeard] = useState(false);
     const answered = useRef(false);
+    useEffect(() => {
+        if (heard && view) writeSnapshot(viewKey, view);
+    }, [heard, viewKey, view]);
     useKeptSnapshot<XrayView>(viewKey, KEPT_XRAY_MS, (kept) => {
         if (answered.current) return;
         setView(kept.value);
         setDraft(kept.value.settings);
     });
-    useEffect(() => {
-        if (view) writeSnapshot(viewKey, view);
-    }, [viewKey, view]);
 
     useEffect(() => {
         void readXrayAction(installedAppId).then((answer) => {
             const fresh = answer.view;
             if (!fresh) {
                 setError(answer.error ?? "Anti-cheat could not be read");
+                if (!answered.current) {
+                    setView(null);
+                    setDraft(DEFAULT_XRAY_SETTINGS);
+                }
                 return;
             }
             // A save or a clear already answered with a newer view than this read.

@@ -15,16 +15,34 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
 let answerXray: (value: unknown) => void = () => undefined;
 const engineAsked = vi.fn();
+const written = vi.fn();
+let kept: { value: unknown; at: number } | null = null;
 
-vi.mock("@polaris/app-host/client", () => ({
-    hostUi: {
-        liveRead: { useKeptSnapshot: () => undefined },
-        snapshotCache: { readSnapshot: () => null, writeSnapshot: () => undefined, dropSnapshots: () => undefined },
-        structuralMerge: { mergeUnchanged: <T,>(_previous: T, next: T) => next },
-        confirmDialog: { useConfirm: () => [async () => true, null] },
-        displayFormat: { useDisplayFormat: () => ({ dateTime: (at: number) => String(at) }) }
-    }
-}));
+vi.mock("@polaris/app-host/client", async () => {
+    const { useLayoutEffect } = await import("react");
+    return {
+        hostUi: {
+            liveRead: {
+                useKeptSnapshot: (
+                    _key: string,
+                    _maxAgeMs: number,
+                    apply: (value: unknown) => void
+                ) =>
+                    useLayoutEffect(() => {
+                        if (kept) apply(kept);
+                    }, [])
+            },
+            snapshotCache: {
+                readSnapshot: () => null,
+                writeSnapshot: written,
+                dropSnapshots: () => undefined
+            },
+            structuralMerge: { mergeUnchanged: <T,>(_previous: T, next: T) => next },
+            confirmDialog: { useConfirm: () => [async () => true, null] },
+            displayFormat: { useDisplayFormat: () => ({ dateTime: (at: number) => String(at) }) }
+        }
+    };
+});
 vi.mock("@polaris-app/game-servers/src/screens/installed/xray-actions", () => ({
     readXrayAction: () =>
         new Promise((resolve) => {
@@ -46,7 +64,23 @@ const { MinecraftXray } = await import(
 );
 const { DEFAULT_XRAY_SETTINGS } = await import("@polaris-app/game-servers/src/lib/minecraft/xray");
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    kept = null;
+    written.mockClear();
+});
+
+const VIEW = {
+    settings: DEFAULT_XRAY_SETTINGS,
+    traps: { overworld: 0, nether: 0 },
+    players: [],
+    mining: [],
+    online: [],
+    movement: [],
+    teleportCheck: null,
+    refusal: null,
+    engine: []
+};
 
 describe("the Anti-cheat tab before the server answers", () => {
     it("shows every section and asks for the engine's state at the same time", () => {
@@ -87,5 +121,24 @@ describe("the Anti-cheat tab before the server answers", () => {
         await waitFor(() => expect(screen.getByText("The server is not running")).toBeTruthy());
         expect(screen.getByText("The incidents could not be read.")).toBeTruthy();
         expect(screen.getByText("Anti X-Ray")).toBeTruthy();
+    });
+
+    it("drops the kept view when the first read fails, and never writes it back", async () => {
+        kept = { value: VIEW, at: 0 };
+        render(<MinecraftXray installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        expect(screen.getByLabelText("Hide honeypots")).toBeTruthy();
+        answerXray({ error: "The server is not running" });
+        await waitFor(() => expect(screen.getByText("The server is not running")).toBeTruthy());
+        expect(screen.getByText("The incidents could not be read.")).toBeTruthy();
+        expect(screen.queryByLabelText("Hide honeypots")).toBeNull();
+        expect(written).not.toHaveBeenCalled();
+    });
+
+    it("keeps the view only once this visit's read has answered", async () => {
+        kept = { value: VIEW, at: 0 };
+        render(<MinecraftXray installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        expect(written).not.toHaveBeenCalled();
+        answerXray({ view: VIEW });
+        await waitFor(() => expect(written).toHaveBeenCalled());
     });
 });

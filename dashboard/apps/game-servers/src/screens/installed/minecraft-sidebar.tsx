@@ -140,6 +140,11 @@ export function MinecraftSidebar({
             const fresh = answer.state;
             if (!fresh) {
                 setError(answer.error ?? "The panel could not be read");
+                if (!answered.current) {
+                    setState(null);
+                    setDraft(side.DEFAULT_SIDEBAR);
+                    resetOrder(side.DEFAULT_SIDEBAR.lines.length);
+                }
                 return;
             }
             // A save already answered with a newer panel than this read.

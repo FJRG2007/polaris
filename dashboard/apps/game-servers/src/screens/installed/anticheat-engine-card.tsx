@@ -44,8 +44,8 @@ export function AnticheatEngineCard({
     const [confirm, confirmElement] = useConfirm();
 
     useEffect(() => {
-        if (state) writeSnapshot(stateKey, state);
-    }, [stateKey, state]);
+        if (heard && state) writeSnapshot(stateKey, state);
+    }, [heard, stateKey, state]);
 
     useEffect(() => {
         void anticheatStateAction(installedAppId).then((answer) => {
@@ -54,7 +54,10 @@ export function AnticheatEngineCard({
                 setState((current) => mergeUnchanged(current, found));
                 setHeard(true);
             }
-            else setError(answer.error ?? "Could not read the anti-cheat");
+            else {
+                setState(null);
+                setError(answer.error ?? "Could not read the anti-cheat");
+            }
         });
     }, [installedAppId]);
 

@@ -61,12 +61,12 @@ export function ArkRules({
         setRules((current) => current ?? kept.value);
         setLoading(false);
     });
-    useEffect(() => {
-        if (rules) writeSnapshot(rulesKey, rules);
-    }, [rulesKey, rules]);
     // Whether this visit's own read has answered. The kept values only paint: no
     // row can be typed into or switched until the file has been read again.
     const [fresh, setFresh] = useState(false);
+    useEffect(() => {
+        if (fresh && rules) writeSnapshot(rulesKey, rules);
+    }, [fresh, rulesKey, rules]);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     /** Whether anything has been changed since this screen was opened, which is
