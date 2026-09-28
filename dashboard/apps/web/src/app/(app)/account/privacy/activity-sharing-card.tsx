@@ -261,15 +261,17 @@ function OwnGames({
     const candidate = core.customGameSchema.safeParse({ executable: program, name });
     const taken =
         candidate.success && games.some((game) => game.executable === candidate.data.executable);
-    const problem =
-        program.trim() && name.trim()
-            ? taken
-                ? "That program is already on the list."
-                : candidate.success
-                  ? ""
-                  : (candidate.error.issues[0]?.message ?? "Check the program and the name.")
-            : "";
-    const ready = candidate.success && !taken && games.length < core.MOST_CUSTOM_GAMES;
+    const full = games.length >= core.MOST_CUSTOM_GAMES;
+    const problem = full
+        ? `The list is full at ${core.MOST_CUSTOM_GAMES}. Remove one to add another.`
+        : program.trim() && name.trim()
+          ? taken
+              ? "That program is already on the list."
+              : candidate.success
+                ? ""
+                : (candidate.error.issues[0]?.message ?? "Check the program and the name.")
+          : "";
+    const ready = candidate.success && !taken && !full;
 
     // Drawn on the list at once, like every switch on this card; a refused save
     // takes it off again and says why under the card.

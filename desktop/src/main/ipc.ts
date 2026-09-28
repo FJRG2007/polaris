@@ -50,6 +50,10 @@ const noticeSchema = z.object({
         .optional()
 });
 
+/** A control character: the dashboard refuses a name with one, so a report
+ *  carrying it would be dropped. */
+const CONTROL = /[\u0000-\u001f\u007f]/;
+
 /** A control character, or a character a path is built from. */
 const UNPRINTABLE = /[\u0000-\u001f\u007f/\\]/;
 
@@ -59,7 +63,12 @@ const customGamesSchema = z
     .array(
         z.object({
             executable: z.string().trim().min(1).max(120).refine((value) => !UNPRINTABLE.test(value)),
-            name: z.string().trim().min(1).max(100)
+            name: z
+                .string()
+                .trim()
+                .min(1)
+                .max(100)
+                .refine((value) => !CONTROL.test(value))
         })
     )
     .max(100);

@@ -160,6 +160,9 @@ export class GameWatcher {
     /** The programs somebody added as games, from the dashboard. */
     setCustomGames(games: readonly CustomGame[]): void {
         this.custom = games;
+        // Looked at again now rather than at the next tick, so a game added
+        // while it is already running is recognized the moment it is added.
+        if (this.timer) void this.check();
     }
 
     /** What is running now, as last seen. */

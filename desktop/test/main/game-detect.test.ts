@@ -92,6 +92,16 @@ describe("watching for a game", () => {
         expect(said[1]?.startedAt).toBe(new Date(15_000).toISOString());
     });
 
+    it("recognizes a game added while it is already running at once", async () => {
+        const { watch, said } = watcher([["mygame.exe"]]);
+        watch.start();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        watch.setCustomGames([{ executable: "mygame.exe", name: "My game" }]);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        watch.stop();
+        expect(said.map((game) => game?.name ?? null)).toEqual([null, "My game"]);
+    });
+
     it("changes nothing when it could not look", async () => {
         const { watch, said } = watcher([["celeste.exe"], new Error("no tasklist"), ["celeste.exe"]]);
         await watch.check(0);
