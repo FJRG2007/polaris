@@ -8,6 +8,7 @@
  */
 
 import type { EventKind, Language } from "./catalog";
+import type { Heading } from "./commands";
 
 type Text = Readonly<Record<Language, string>>;
 
@@ -264,6 +265,49 @@ export function scrambleLine(
         : `&bRound ${round}/${rounds}: &funscramble &e${word}`;
 }
 
+/** The round, big in the middle of the screen as it is asked. */
+export function roundTitle(round: number, rounds: number, language: Language): string {
+    return language === "es" ? `&bPregunta ${round}/${rounds}` : `&bQuestion ${round}/${rounds}`;
+}
+
+/** Longest a question can be and still fit under the title; a longer one is
+ *  left to the action bar, which is wider. */
+export const SUBTITLE_MAX = 48;
+
+/** Under the title: the question itself when it fits, or where to read it. */
+export function roundSubtitle(asked: string, scramble: boolean, language: Language): string {
+    if (scramble) return language === "es" ? `&fOrdena: &e${asked}` : `&fUnscramble: &e${asked}`;
+    if (asked.length <= SUBTITLE_MAX) return `&f${asked}`;
+    return language === "es"
+        ? "&7La pregunta, sobre tu barra"
+        : "&7The question is above your hotbar";
+}
+
+/** Above the hotbar for as long as the round is open, with the time left. */
+export function roundBar(
+    asked: string,
+    scramble: boolean,
+    secondsLeft: number,
+    language: Language
+): string {
+    const prompt = scramble
+        ? language === "es"
+            ? `&fOrdena: &e${asked}`
+            : `&fUnscramble: &e${asked}`
+        : `&f${asked}`;
+    const reply = language === "es" ? "responde en el chat" : "answer in the chat";
+    return `${prompt} &7- ${reply} (${Math.max(0, Math.ceil(secondsLeft))} s)`;
+}
+
+/** Who took the round, on screen as well as in the chat. */
+export function roundWonTitle(name: string, language: Language): string {
+    return language === "es" ? `&a${name} acierta` : `&a${name} got it`;
+}
+
+export function roundMissedTitle(language: Language): string {
+    return language === "es" ? "&7Nadie acertó" : "&7Nobody got it";
+}
+
 export function roundWon(name: string, answer: string, language: Language): string {
     return language === "es" ? `&a${name} acertó: &f${answer}` : `&a${name} got it: &f${answer}`;
 }
@@ -288,8 +332,32 @@ export function raceWon(name: string, language: Language): string {
 
 export function circleAt(x: number, y: number, z: number, language: Language): string {
     return language === "es"
-        ? `&eEl círculo está en &fX ${x} Y ${y} Z ${z}&e.`
-        : `&eThe circle is at &fX ${x} Y ${y} Z ${z}&e.`;
+        ? `&eEl círculo está en &fX ${x} Y ${y} Z ${z}&e: busca la columna de luz. Tu barra de acción te dice hacia dónde ir.`
+        : `&eThe circle is at &fX ${x} Y ${y} Z ${z}&e: look for the column of light. Your action bar shows the way.`;
+}
+
+const HEADING_ES: Readonly<Record<Heading, string>> = {
+    north: "norte",
+    "north-east": "noreste",
+    east: "este",
+    "south-east": "sureste",
+    south: "sur",
+    "south-west": "suroeste",
+    west: "oeste",
+    "north-west": "noroeste"
+};
+
+/** How far the circle is from a player, and which way. */
+export function hillGuide(metres: number, heading: Heading, language: Language): string {
+    return language === "es"
+        ? `&eCírculo: &f${metres} m &eal &f${HEADING_ES[heading]}`
+        : `&eCircle: &f${metres} m &e${heading}`;
+}
+
+export function hillInside(language: Language): string {
+    return language === "es"
+        ? "&aEstás en el círculo: aguanta"
+        : "&aYou are in the circle - hold it";
 }
 
 export function happyHourOver(language: Language): string {

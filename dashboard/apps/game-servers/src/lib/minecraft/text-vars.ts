@@ -23,7 +23,7 @@
  */
 
 import type { MinecraftEdition } from "./service";
-import { LEVEL_RANKING, RANKINGS, STATS_RANKINGS } from "./rankings";
+import { EVENTS_RANKING, LEVEL_RANKING, RANKINGS, STATS_RANKINGS } from "./rankings";
 
 /** The variable that becomes a line a player on the side panel. */
 export const LEVELS_VARIABLE = "server.levels";
@@ -193,6 +193,15 @@ export const VARIABLES: readonly VariableSpec[] = [
             width: 32
         })
     ),
+    {
+        // Polaris's own record, so it costs the server nothing to read.
+        name: EVENTS_RANKING,
+        label: "Most events won",
+        kind: "server",
+        sample: "1. Steve 7, 2. Alex 3",
+        bedrock: true,
+        width: 32
+    },
     {
         name: "death.player",
         label: "Who died last",

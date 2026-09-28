@@ -16,7 +16,7 @@ import { hostUi } from "@polaris/app-host/client";
 import * as catalog from "../../lib/minecraft/events/catalog";
 import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
 import type { EventsView } from "../../lib/minecraft/events/events-service";
-import { Copy, Info, Loader2, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
+import { Copy, FastForward, Info, Loader2, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import * as ui from "@polaris/ui";
 
@@ -327,6 +327,14 @@ export function MinecraftEvents({
         });
     }
 
+    function startNow(): void {
+        startTransition(async () => {
+            const answer = await actions.startNowAction(installedAppId);
+            if (answer.view) accept(answer.view, false);
+            else setError(answer.error ?? "The event could not start now");
+        });
+    }
+
     async function remove(preset: catalog.EventPreset): Promise<void> {
         const sure = await confirm({
             title: `Delete ${preset.name}?`,
@@ -429,15 +437,23 @@ export function MinecraftEvents({
                             )}
                         </div>
                         {view?.run && canManage && !view.run.cancelling && (
-                            <ui.Button
-                                variant="secondary"
-                                size="sm"
-                                disabled={pending}
-                                onClick={() => void cancel()}
-                            >
-                                <Square className="size-4" />
-                                Call off
-                            </ui.Button>
+                            <div className="flex flex-wrap gap-2">
+                                {view.run.phase === "countdown" && (
+                                    <ui.Button size="sm" disabled={pending} onClick={startNow}>
+                                        <FastForward className="size-4" />
+                                        Start now
+                                    </ui.Button>
+                                )}
+                                <ui.Button
+                                    variant="secondary"
+                                    size="sm"
+                                    disabled={pending}
+                                    onClick={() => void cancel()}
+                                >
+                                    <Square className="size-4" />
+                                    Call off
+                                </ui.Button>
+                            </div>
                         )}
                     </div>
                     {view?.run && view.run.standings.length > 0 && (

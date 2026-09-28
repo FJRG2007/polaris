@@ -102,6 +102,24 @@ export async function cancelEventAction(installedAppId: string): Promise<Answer>
     }
 }
 
+export async function startNowAction(installedAppId: string): Promise<Answer> {
+    const parsed = serverId.safeParse(installedAppId);
+    if (!parsed.success) return { error: "That server is not here" };
+    try {
+        const { user, access } = await requireGameServer("games.console", parsed.data);
+        await events.startNow(access.ownerId, parsed.data);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.events.start-now",
+            targetType: "installedApp",
+            targetId: parsed.data
+        });
+        return { view: await events.eventsView(parsed.data) };
+    } catch (caught) {
+        return { error: failure(caught, "The event could not start now") };
+    }
+}
+
 const forgetSchema = z.object({ installedAppId: serverId, pendingId: z.string().min(1).max(128) });
 
 export async function forgetPrizeAction(input: z.input<typeof forgetSchema>): Promise<Answer> {

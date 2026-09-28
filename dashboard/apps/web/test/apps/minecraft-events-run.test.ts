@@ -43,6 +43,14 @@ interface World {
     daylightCycle: "true" | "false";
     /** A version that knows the game rules by their new names only. */
     renamedRules: boolean;
+    /** Whether the ground under a place is somebody's build. */
+    built: boolean;
+    /** Ground names the server does not know. */
+    refusedGround: string[];
+    /** How many ground checks answer that the column is not loaded before any answers. */
+    unsureGround: number;
+    /** Where players online sleep: `Name: [x, z]`. */
+    homes: Record<string, [number, number]>;
 }
 
 const world: World = {
@@ -65,7 +73,11 @@ const world: World = {
     creative: [],
     difficulty: "Normal",
     daylightCycle: "true",
-    renamedRules: false
+    renamedRules: false,
+    built: false,
+    refusedGround: [],
+    unsureGround: 0,
+    homes: {}
 };
 let config: Record<string, unknown> = {};
 const held: string[] = [];
@@ -77,6 +89,26 @@ let step = 0;
 
 function answer(line: string): string {
     world.sent.push(line);
+    if (line.startsWith("execute in minecraft:overworld unless block")) {
+        const refused = world.refusedGround.find(
+            (id) => line.includes(`minecraft:${id} `) || line.endsWith(`minecraft:${id}`)
+        );
+        if (refused) return `Unknown block type 'minecraft:${refused}'`;
+        if (world.unsureGround > 0) {
+            world.unsureGround -= 1;
+            return "That position is not loaded";
+        }
+        return world.built ? "Test passed" : "Test failed";
+    }
+    if (
+        line === "execute as @a run data get entity @s SpawnX" ||
+        line === "execute as @a run data get entity @s SpawnZ"
+    ) {
+        const axis = line.endsWith("SpawnX") ? 0 : 1;
+        return Object.entries(world.homes)
+            .map(([name, home]) => `${name} has the following entity data: ${home[axis]}`)
+            .join("\n");
+    }
     if (line === "difficulty") return `The difficulty is ${world.difficulty}`;
     if (line === "time query daytime") return "The time is 6000";
     if (world.renamedRules && /^gamerule do\w+$/.test(line))
@@ -327,6 +359,10 @@ beforeEach(() => {
     world.difficulty = "Normal";
     world.daylightCycle = "true";
     world.renamedRules = false;
+    world.built = false;
+    world.refusedGround = [];
+    world.unsureGround = 0;
+    world.homes = {};
     events.forgetPlayers();
     held.length = 0;
     released.length = 0;
@@ -472,6 +508,43 @@ describe("a supply drop", () => {
         expect(state().run).toBeNull();
         for (const line of added)
             expect(world.sent).toContain(line.replace("forceload add", "forceload remove"));
+    });
+});
+
+describe("starting one now", () => {
+    it("skips what is left of the countdown and still runs its full time", async () => {
+        const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 10 };
+        setUp([hunt], { countdownSeconds: 60 });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hunt",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(4_100);
+        expect(state().run?.phase).toBe("countdown");
+        const pressed = Date.now();
+        await events.startNow("owner", SERVER);
+        await play(2_100);
+        const run = state().run;
+        expect(run?.phase).toBe("running");
+        expect(run!.startsAt).toBeLessThanOrEqual(pressed + 2_100);
+        expect(run!.endsAt - run!.startsAt).toBeGreaterThanOrEqual(10 * 60_000 - 2_100);
+        expect(world.sent).toContain("scoreboard objectives setdisplay sidebar pe_score");
+    });
+
+    it("says so once it has already begun", async () => {
+        setUp([{ ...catalog.newPreset("mob-hunt", "hunt"), minutes: 10 }]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hunt",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(4_100);
+        await expect(events.startNow("owner", SERVER)).rejects.toThrow("It has already started");
     });
 });
 
@@ -647,11 +720,37 @@ describe("trivia", () => {
                     line.startsWith("tellraw @a") && line.includes("Which green mob explodes?")
             )
         ).toBe(true);
+        // On screen too: the title as it is asked, and above the hotbar with the time left.
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("title @a title") && line.includes("Question 1/3")
+            )
+        ).toBe(true);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("title @a subtitle") &&
+                    line.includes("Which green mob explodes?")
+            )
+        ).toBe(true);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("title @a actionbar") &&
+                    line.includes("Which green mob explodes?") &&
+                    line.includes(" s)")
+            )
+        ).toBe(true);
         world.log +=
             "[20:00:05] [Server thread/INFO]: <Ana> zombie\n[20:00:06] [Server thread/INFO]: <Ben> Creeper!\n";
         await play(2_100);
         expect(state().run?.points).toEqual({ Ben: 1 });
         expect(world.sent).toContain("scoreboard players set Ben pe_score 1");
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("title @a title") && line.includes("Ben got it")
+            )
+        ).toBe(true);
         // The other two rounds nobody answers, and the game ends on its own.
         await play(2 * (15_000 + 6_000) + 10_000);
         const after = state();
@@ -825,6 +924,129 @@ describe("the others", () => {
         world.scores = { Ana: 95 };
         await play(3 * 60_000);
         expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 95 }]);
+    });
+
+    it("draws the circle's edge and a column of light, and tells each player the way", async () => {
+        world.online = ["Ana"];
+        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        setUp([hill]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(8_100);
+        expect(
+            world.sent.filter((line) => line.includes("particle minecraft:flame")).length
+        ).toBeGreaterThanOrEqual(24);
+        expect(world.sent.some((line) => line.includes("particle minecraft:end_rod"))).toBe(true);
+        // Ana is a little way west of the circle, which is at X 300.
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("title Ana actionbar") &&
+                    /"\d+ m "/.test(line) &&
+                    line.includes('"east"')
+            )
+        ).toBe(true);
+    });
+
+    it("gives up a place on somebody's build and says it could not find one", async () => {
+        world.built = true;
+        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        setUp([hill]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(60_000);
+        expect(
+            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))
+        ).toBe(false);
+        expect(state().history[0]?.outcome).toBe("failed");
+    });
+
+    it("judges the ground by older names on a server that refuses the newest", async () => {
+        world.built = true;
+        world.refusedGround = ["leaf_litter"];
+        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        setUp([hill]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(60_000);
+        expect(
+            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))
+        ).toBe(false);
+        expect(state().history[0]?.outcome).toBe("failed");
+    });
+
+    it("keeps judging the ground after a column that could not be read", async () => {
+        world.built = true;
+        world.unsureGround = 2;
+        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        setUp([hill]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(60_000);
+        expect(
+            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))
+        ).toBe(false);
+        expect(state().history[0]?.outcome).toBe("failed");
+    });
+
+    it("takes the fixed point an operator chose as it is", async () => {
+        world.built = true;
+        const hill = {
+            ...catalog.newPreset("king-of-the-hill", "hill"),
+            minutes: 3,
+            options: { place: { mode: "fixed" as const, x: 300, z: 0 }, radius: 6 }
+        };
+        setUp([hill]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(8_100);
+        expect(
+            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score 2"))
+        ).toBe(true);
+    });
+
+    it("looks past a player's bed for somewhere to put it", async () => {
+        world.homes = { Ana: [0, 0], Ben: [0, 0] };
+        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        setUp([hill]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(8_100);
+        const loaded = world.sent
+            .filter((line) => /run forceload add -?\d+ -?\d+$/.test(line))
+            .map((line) => line.split(" ").slice(-2).map(Number) as [number, number]);
+        expect(loaded.length).toBeGreaterThan(0);
+        for (const [x, z] of loaded) expect(Math.hypot(x, z)).toBeGreaterThanOrEqual(48);
     });
 
     it("a happy hour gives its effects for exactly as long as it lasts, and no prizes", async () => {

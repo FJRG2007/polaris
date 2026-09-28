@@ -10,6 +10,10 @@ import * as commands from "@polaris-app/game-servers/src/lib/minecraft/events/co
 import * as messages from "@polaris-app/game-servers/src/lib/minecraft/events/messages";
 import * as trivia from "@polaris-app/game-servers/src/lib/minecraft/events/trivia-bank";
 import {
+    COMMAND_BYTES_MAX,
+    commandBytes
+} from "@polaris-app/game-servers/src/lib/minecraft/command-size";
+import {
     atLeast,
     firstRight
 } from "@polaris-app/game-servers/src/lib/minecraft/events/events-service";
@@ -339,5 +343,87 @@ describe("a mining rush cannot be farmed", () => {
         expect(lines).toContain(
             `execute as @a run scoreboard players operation @s pe_tmp *= #w-8 pe_const`
         );
+    });
+});
+
+describe("where an event may go", () => {
+    it("reads where players sleep, the old way and the new", () => {
+        expect(
+            commands.readHomes(
+                "Ana has the following entity data: 120\nBen has the following entity data: -40",
+                "Ana has the following entity data: -7\nBen has the following entity data: 900",
+                "Cam has the following entity data: [I; 5, 64, -3]"
+            )
+        ).toEqual([
+            { x: 120, z: -7 },
+            { x: -40, z: 900 },
+            { x: 5, z: -3 }
+        ]);
+        expect(commands.readHomes("Found no elements matching SpawnX", "", "")).toEqual([]);
+    });
+
+    it("keeps clear of every home, going further out when it has to", () => {
+        const home = [{ x: 0, z: 0 }];
+        let turn = 0;
+        const random = () => (turn += 0.37) % 1;
+        const point = commands.clearPoint({ x: 0, z: 0 }, 24, home, random);
+        expect(point).not.toBeNull();
+        expect(Math.hypot(point!.x, point!.z)).toBeGreaterThanOrEqual(commands.HOME_CLEARANCE);
+        expect(commands.clearPoint({ x: 0, z: 0 }, 24, [], random)).not.toBeNull();
+    });
+
+    it("asks about the ground under a point by the names the server knows", () => {
+        const far = { x: -29999999, y: -63, z: -29999999 };
+        for (const names of commands.GROUND_NAMES) {
+            for (const line of commands.builtUnder(far, names)) {
+                expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
+                expect(line.startsWith("execute in minecraft:overworld unless block ")).toBe(true);
+            }
+        }
+        const modern = commands.builtUnder({ x: 1, y: 70, z: 2 }, "modern").join(" ");
+        expect(
+            modern.startsWith(
+                "execute in minecraft:overworld unless block 1 69 2 minecraft:grass_block"
+            )
+        ).toBe(true);
+        expect(modern).toContain("minecraft:short_grass");
+        expect(modern).toContain("#minecraft:small_flowers");
+        expect(modern).not.toContain("#minecraft:flowers");
+        expect(modern).not.toContain("leaves");
+        expect(modern).not.toContain("leaf_litter");
+        const latest = commands.builtUnder({ x: 1, y: 70, z: 2 }, "latest").join(" ");
+        expect(latest).toContain("minecraft:leaf_litter");
+        expect(latest).toContain("minecraft:short_dry_grass");
+        const legacy = commands.builtUnder({ x: 1, y: 70, z: 2 }, "legacy").join(" ");
+        expect(legacy).toContain("unless block 1 69 2 minecraft:grass ");
+        expect(legacy).not.toContain("short_grass");
+    });
+
+    it("tells a refused block name apart from a column that could not be read", () => {
+        expect(
+            commands.nameRefused(
+                "Unknown block type 'minecraft:leaf_litter'...ck 1 69 2 minecraft:leaf_litter<--[HERE]"
+            )
+        ).toBe(true);
+        expect(commands.nameRefused("That position is not loaded")).toBe(false);
+        expect(commands.nameRefused("")).toBe(false);
+    });
+
+    it("counts somebody in the circle only where the circle scores them", () => {
+        const centre = { x: 0, y: 64, z: 0 };
+        expect(commands.inHill({ x: 3.5, y: 64, z: 0.5 }, centre, 4)).toBe(true);
+        expect(commands.inHill({ x: 3.5, y: 68, z: 0.5 }, centre, 4)).toBe(false);
+        expect(commands.inHill({ x: 5.5, y: 64, z: 0.5 }, centre, 4)).toBe(false);
+    });
+
+    it("judges a place by its centre and two rings", () => {
+        expect(commands.siteSamples({ x: 0, z: 0 }, 6)).toHaveLength(17);
+        expect(commands.siteSamples({ x: 0, z: 0 }, 3)).toHaveLength(9);
+    });
+
+    it("names the way to go, north being -Z", () => {
+        expect(commands.headingTo({ x: 0, z: 0 }, { x: 0, z: -50 })).toBe("north");
+        expect(commands.headingTo({ x: 0, z: 0 }, { x: 50, z: 0 })).toBe("east");
+        expect(commands.headingTo({ x: 0, z: 0 }, { x: -50, z: 50 })).toBe("south-west");
     });
 });

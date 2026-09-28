@@ -116,7 +116,14 @@ export const eventStateSchema = z.object({
     /** The kind the last one was, so two of the same do not come back to back. */
     lastKind: z.enum(EVENT_KINDS).nullable().default(null),
     /** When each scheduled entry last fired, by entry id. */
-    scheduleRuns: z.record(z.number()).default({})
+    scheduleRuns: z.record(z.number()).default({}),
+    /** Events won, by lowercased player name - kept apart from the history,
+     *  which forgets. Null on a server that has not finished one since this was
+     *  kept, where the history is counted instead. */
+    wins: z
+        .record(z.object({ name: z.string(), count: z.number().int() }))
+        .nullable()
+        .default(null)
 });
 
 export type EventState = z.infer<typeof eventStateSchema> & { run: EventRun | null };
@@ -135,7 +142,8 @@ export const EMPTY_EVENT_STATE: EventState = {
     nextRandomAt: null,
     waiting: null,
     lastKind: null,
-    scheduleRuns: {}
+    scheduleRuns: {},
+    wins: null
 };
 
 export function readEventState(config: Record<string, unknown>): EventState {
@@ -143,9 +151,36 @@ export function readEventState(config: Record<string, unknown>): EventState {
     return parsed.success ? (parsed.data as EventState) : EMPTY_EVENT_STATE;
 }
 
-/** A finished event, first in the history, which keeps its last few. */
+/** A finished event, first in the history, which keeps its last few - and its
+ *  winners counted for good. */
 export function withHistory(state: EventState, entry: EventHistoryEntry): EventState {
-    return { ...state, history: [entry, ...state.history].slice(0, HISTORY_KEPT) };
+    return {
+        ...state,
+        history: [entry, ...state.history].slice(0, HISTORY_KEPT),
+        wins: counted(winsSoFar(state), entry)
+    };
+}
+
+type Wins = NonNullable<EventState["wins"]>;
+
+/** Whoever came first in it: a tie for first is a win for each. */
+function counted(wins: Wins, entry: EventHistoryEntry): Wins {
+    if (entry.outcome !== "finished") return wins;
+    const next = { ...wins };
+    for (const one of entry.podium.filter((place) => place.place === 1)) {
+        const key = one.name.toLowerCase();
+        next[key] = { name: one.name, count: (next[key]?.count ?? 0) + 1 };
+    }
+    return next;
+}
+
+function winsSoFar(state: EventState): Wins {
+    return state.wins ?? [...state.history].reverse().reduce<Wins>(counted, {});
+}
+
+/** How many events each player has won on this server, most first. */
+export function eventWins(state: EventState): { name: string; value: number }[] {
+    return Object.values(winsSoFar(state)).map((one) => ({ name: one.name, value: one.count }));
 }
 
 /** Prizes still owed, minus the ones too old to keep waiting for. */

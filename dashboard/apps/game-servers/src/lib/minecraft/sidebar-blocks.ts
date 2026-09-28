@@ -5,7 +5,7 @@
  * the name first.
  */
 
-import { RANKINGS, STATS_RANKINGS } from "./rankings";
+import { EVENTS_RANKING, RANKINGS, STATS_RANKINGS } from "./rankings";
 import { plainLine, type SidebarLine } from "./sidebar";
 
 export interface SidebarBlock {
@@ -27,6 +27,11 @@ export const SIDEBAR_BLOCKS: readonly SidebarBlock[] = [
         label: RANKINGS[id].label,
         lines: [`&6&l${RANKINGS[id].label}`, `&f{${id} | "Nobody yet"}`]
     })),
+    {
+        id: EVENTS_RANKING,
+        label: "Most events won",
+        lines: ["&6&lEvent winners", `&f{${EVENTS_RANKING} | "No winners yet"}`]
+    },
     {
         id: "death",
         label: "Last death",

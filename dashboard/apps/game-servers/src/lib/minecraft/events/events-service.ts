@@ -46,6 +46,8 @@ const SAVE_EVERY_MS = 60_000;
 const GIVE_UP_AFTER_MS = 2 * 60_000;
 /** How many places are tried before an event that needs one gives up. */
 const PLACE_TRIES = 6;
+/** How much ground a chest or a boss is judged by around where it goes. */
+const SPOT_RADIUS = 3;
 const WRITE_TRIES = 5;
 const LOG_FILE = "/data/logs/latest.log";
 
@@ -66,6 +68,9 @@ interface Loop {
     modern: { text: boolean; ids: boolean } | null;
     /** Trivia: how long the log was when the round was asked. */
     logFrom: number | null;
+    /** Which names this server knows its ground blocks by, once asked; `none`
+     *  when it refuses a name in every list and the ground cannot be judged. */
+    ground: commands.GroundNames | "none" | null;
     /** The countdown marks already sounded, in seconds before the start. */
     sounded: Set<number>;
     announced: boolean;
@@ -399,6 +404,32 @@ export async function cancelEvent(ownerId: string, installedAppId: string): Prom
     }
 }
 
+/**
+ * Skip what is left of the countdown: the event begins on the next tick and
+ * still lasts its full time, since its end moves forward by the same amount.
+ */
+export async function startNow(ownerId: string, installedAppId: string): Promise<void> {
+    const now = Date.now();
+    const skipped = (run: stored.EventRun): stored.EventRun => {
+        const early = Math.max(0, run.startsAt - now);
+        return { ...run, startsAt: run.startsAt - early, endsAt: run.endsAt - early };
+    };
+    const state = await updateEventState(installedAppId, (current) =>
+        current.run?.phase === "countdown" && !current.run.cancelled
+            ? { ...current, run: skipped(current.run) }
+            : current
+    );
+    if (!state?.run || state.run.cancelled) throw new Error("No event is on");
+    if (state.run.phase !== "countdown") throw new Error("It has already started");
+    const loop = loops.get(installedAppId);
+    if (loop) {
+        if (loop.run.phase === "countdown") loop.run = skipped(loop.run);
+    } else {
+        const row = await readRow(installedAppId);
+        if (row) startLoop(ownerId, installedAppId, state.run, settingsOf(row.config).settings);
+    }
+}
+
 /** Stop waiting to hand somebody a prize. */
 export async function forgetPending(installedAppId: string, pendingId: string): Promise<void> {
     await updateEventState(installedAppId, (state) => ({
@@ -447,6 +478,7 @@ function startLoop(
         bossAt: null,
         modern: null,
         logFrom: null,
+        ground: null,
         sounded: new Set(),
         // Resumed after a restart: the countdown was already said.
         announced: run.phase === "running",
@@ -732,23 +764,40 @@ async function play(
 
 /**
  * Somewhere for the event to happen, found over a few ticks: a point chosen,
- * its chunk loaded, a marker dropped onto the surface there. A point in water
- * is given up and another tried. Answers the point once it is found.
+ * its chunk loaded, a marker dropped onto the surface there. Answers the point
+ * once it is found.
+ *
+ * Nowhere that is somebody's, and nowhere nobody can get to: not near where any
+ * player online sleeps, not in water, and - over the whole of `radius` - only on
+ * ground the world made, flat enough to walk across. A place that fails any of
+ * it is given up and another tried. The one exception is the fixed point an
+ * operator chose, taken as given on the first try.
  */
 async function findPlace(
     installedAppId: string,
     loop: Loop,
     server: ServerContainer,
     place: catalog.EventPlace,
-    distance: number
+    distance: number,
+    radius: number
 ): Promise<stored.Point | "failed" | null> {
+    const chosen = place.mode === "fixed" && loop.run.placeTries === 0;
     if (!loop.run.target) {
         const centre = await centreFor(server, place);
         if (!centre) return "failed";
-        const point =
-            place.mode === "fixed" && loop.run.placeTries === 0
-                ? centre
-                : commands.pointAway(centre, distance, Math.random);
+        let point: { x: number; z: number } | null = centre;
+        if (!chosen) {
+            const [spawnX, spawnZ, respawn] = await Promise.all(
+                commands.HOMES.map((line) => server.say([line]).catch(() => ""))
+            );
+            const homes = commands.readHomes(spawnX ?? "", spawnZ ?? "", respawn ?? "");
+            point = commands.clearPoint(centre, distance, homes, Math.random);
+        }
+        if (!point) {
+            loop.run = { ...loop.run, placeTries: loop.run.placeTries + 1 };
+            await persist(installedAppId, loop);
+            return loop.run.placeTries >= PLACE_TRIES ? "failed" : null;
+        }
         // Written down before the chunk is loaded, so whatever ends the event
         // knows which one to let go of.
         loop.run = { ...loop.run, target: { x: point.x, z: point.z } };
@@ -761,7 +810,7 @@ async function findPlace(
     for (const line of commands.markSurface(x, z)) output = await server.say([line]);
     if (commands.spreadWorked(output)) {
         const point = commands.readPoint(await server.say([commands.READ_MARK]));
-        if (point) {
+        if (point && (chosen || (await siteIsOpen(loop, server, point, radius)))) {
             loop.run = { ...loop.run, place: point };
             await persist(installedAppId, loop);
             return point;
@@ -771,6 +820,91 @@ async function findPlace(
     loop.run = { ...loop.run, target: null, placeTries: loop.run.placeTries + 1 };
     await persist(installedAppId, loop);
     return loop.run.placeTries >= PLACE_TRIES ? "failed" : null;
+}
+
+/**
+ * Whether the ground over the whole of a place is the world's own and walkable:
+ * every sampled column dry, within a few blocks of the centre's height, and on
+ * nothing anybody built. Leaves the marker back on the centre, where whatever
+ * the event puts down is put.
+ */
+async function siteIsOpen(
+    loop: Loop,
+    server: ServerContainer,
+    centre: stored.Point,
+    radius: number
+): Promise<boolean> {
+    const reach = radius + 1;
+    const area = `${centre.x - reach} ${centre.z - reach} ${centre.x + reach} ${centre.z + reach}`;
+    await server.sayAll([`execute in minecraft:overworld run forceload add ${area}`]);
+    let open = true;
+    try {
+        for (const sample of commands.siteSamples(centre, radius)) {
+            let output = "";
+            for (const line of commands.markSurface(sample.x, sample.z))
+                output = await server.say([line]);
+            const ground = commands.spreadWorked(output)
+                ? commands.readPoint(await server.say([commands.READ_MARK]))
+                : null;
+            if (!ground || Math.abs(ground.y - centre.y) > commands.SITE_STEP) {
+                open = false;
+                break;
+            }
+            if ((await builtOn(loop, server, ground)) === true) {
+                open = false;
+                break;
+            }
+        }
+    } finally {
+        // The area let go, and the centre's own chunk held again as before.
+        await server.sayAll([
+            `execute in minecraft:overworld run forceload remove ${area}`,
+            commands.forceload(centre.x, centre.z),
+            ...commands.markSurface(centre.x, centre.z)
+        ]);
+    }
+    return open;
+}
+
+/**
+ * Whether a column stands on something somebody built. Null when the server
+ * refuses a name in every list of ground names, and so cannot be asked. An
+ * answer that is neither - a column not loaded yet, a reply that never came -
+ * counts as built, so the place is given up rather than guessed at, and nothing
+ * about the server's names is taken from it.
+ */
+async function builtOn(
+    loop: Loop,
+    server: ServerContainer,
+    point: stored.Point
+): Promise<boolean | null> {
+    while (loop.ground !== "none") {
+        const names = loop.ground ?? commands.GROUND_NAMES[0];
+        const answer = await groundAnswer(server, point, names);
+        if (answer === "refused") {
+            loop.ground = commands.GROUND_NAMES[commands.GROUND_NAMES.indexOf(names) + 1] ?? "none";
+            continue;
+        }
+        if (answer !== "passed" && answer !== "failed") return true;
+        loop.ground = names;
+        return answer === "passed";
+    }
+    return null;
+}
+
+/** One list of ground names asked about a column, a command at a time. */
+async function groundAnswer(
+    server: ServerContainer,
+    point: stored.Point,
+    names: commands.GroundNames
+): Promise<"passed" | "failed" | "refused" | "unsure"> {
+    for (const line of commands.builtUnder(point, names)) {
+        const output = await server.say([line]);
+        const answer = commands.readTest(output);
+        if (answer === "failed") return "failed";
+        if (answer !== "passed") return commands.nameRefused(output) ? "refused" : "unsure";
+    }
+    return "passed";
 }
 
 /** A place that was found and then would not take what was put there: undone,
@@ -817,7 +951,8 @@ async function supplyDrop(
             loop,
             server,
             options.place,
-            options.distance
+            options.distance,
+            SPOT_RADIUS
         );
         if (found === "failed") throw new PlaceNotFound();
         if (!found) return null;
@@ -873,7 +1008,7 @@ async function worldBoss(
     const language = loop.language;
     const name = messages.bossName(options.boss, language);
     if (!loop.run.place) {
-        const found = await findPlace(installedAppId, loop, server, options.place, 24);
+        const found = await findPlace(installedAppId, loop, server, options.place, 24, SPOT_RADIUS);
         if (found === "failed") throw new PlaceNotFound();
         if (!found) return null;
         const modern = loop.modern ?? (loop.modern = await modernity(server));
@@ -938,7 +1073,14 @@ async function kingOfTheHill(
 ): Promise<string | null> {
     const options = loop.run.preset.options as catalog.EventOptions<"king-of-the-hill">;
     if (!loop.run.place) {
-        const found = await findPlace(installedAppId, loop, server, options.place, 32);
+        const found = await findPlace(
+            installedAppId,
+            loop,
+            server,
+            options.place,
+            32,
+            options.radius
+        );
         if (found === "failed") throw new PlaceNotFound();
         if (!found) return null;
         await server.sayAll([
@@ -950,7 +1092,25 @@ async function kingOfTheHill(
         ]);
         return null;
     }
-    lines.push(...commands.hillTick(loop.run.place, options.radius, TICK_MS / 1000));
+    const place = loop.run.place;
+    lines.push(...commands.hillTick(place, options.radius, TICK_MS / 1000));
+    // Each player told how far it is and which way, in their own action bar:
+    // coordinates in the chat scroll away, and a circle is small from far off.
+    for (const one of commands.readWhere(await server.say([commands.IN_OVERWORLD]))) {
+        const away = Math.hypot(one.x - (place.x + 0.5), one.z - (place.z + 0.5));
+        lines.push(
+            commands.actionbarFor(
+                one.name,
+                commands.inHill(one, place, options.radius)
+                    ? messages.hillInside(loop.language)
+                    : messages.hillGuide(
+                          Math.round(away),
+                          commands.headingTo(one, { x: place.x + 0.5, z: place.z + 0.5 }),
+                          loop.language
+                      )
+            )
+        );
+    }
     return null;
 }
 
@@ -1030,10 +1190,18 @@ async function triviaTick(
         loop.run = { ...loop.run, round, roundEndsAt: now + options.seconds * 1000 };
         loop.logFrom = await containerFileSize(server, LOG_FILE);
         const asked = roundOf(loop.run, language);
+        const scramble = asked.kind === "scramble";
+        // On screen as well as in the chat, where a line scrolls away under the
+        // answers: a title as it is asked, then the action bar until it closes.
         lines.push(
+            ...commands.titleCommands(
+                messages.roundTitle(round + 1, options.rounds, language),
+                messages.roundSubtitle(asked.asked, scramble, language)
+            ),
+            `title @a actionbar ${commands.text(messages.roundBar(asked.asked, scramble, options.seconds, language))}`,
             commands.say(
                 messages.tag(language) +
-                    (asked.kind === "scramble"
+                    (scramble
                         ? messages.scrambleLine(round + 1, options.rounds, asked.asked, language)
                         : messages.questionLine(round + 1, options.rounds, asked.asked, language))
             ),
@@ -1067,6 +1235,10 @@ async function triviaTick(
         loop.run = { ...loop.run, points, roundEndsAt: null, closedAt: now };
         lines.push(
             commands.setScore(winner, points[winner] ?? 1),
+            ...commands.titleCommands(
+                messages.roundWonTitle(winner, language),
+                `&f${asked.accepted[0] ?? ""}`
+            ),
             commands.say(
                 messages.tag(language) +
                     messages.roundWon(winner, asked.accepted[0] ?? "", language)
@@ -1079,12 +1251,28 @@ async function triviaTick(
     if (now >= (loop.run.roundEndsAt ?? now)) {
         loop.run = { ...loop.run, roundEndsAt: null, closedAt: now };
         lines.push(
+            ...commands.titleCommands(
+                messages.roundMissedTitle(language),
+                `&f${asked.accepted[0] ?? ""}`
+            ),
             commands.say(
                 messages.tag(language) + messages.roundMissed(asked.accepted[0] ?? "", language)
             )
         );
         await persist(installedAppId, loop);
+        return null;
     }
+    // Still open: the question stays above the hotbar, the time counting down.
+    lines.push(
+        `title @a actionbar ${commands.text(
+            messages.roundBar(
+                asked.asked,
+                asked.kind === "scramble",
+                ((loop.run.roundEndsAt ?? now) - now) / 1000,
+                language
+            )
+        )}`
+    );
     return null;
 }
 

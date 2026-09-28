@@ -68,6 +68,7 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/events-actions", () => 
         started.push(input.presetId);
         return { view };
     },
+    startNowAction: async () => ({ view }),
     cancelEventAction: async () => ({ view }),
     forgetPrizeAction: async () => ({ view })
 }));
