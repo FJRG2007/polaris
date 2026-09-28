@@ -79,7 +79,8 @@ export function ActivitySharingCard({
     // already hidden even if they have since dropped off the seen list.
     const games = new Map<string, string>();
     for (const game of seenGames) games.set(game.key, game.name);
-    for (const game of draft.customGames) if (!games.has(game.executable)) games.set(game.executable, game.name);
+    for (const game of draft.customGames)
+        if (!games.has(game.executable)) games.set(game.executable, game.name);
     for (const key of draft.hiddenGames) if (!games.has(key)) games.set(key, key);
 
     const off = !draft.share;
@@ -121,7 +122,9 @@ export function ActivitySharingCard({
                             <Switch
                                 checked={!off && draft[source.id]}
                                 disabled={off}
-                                onChange={(on) => commit((state) => ({ ...state, [source.id]: on }))}
+                                onChange={(on) =>
+                                    commit((state) => ({ ...state, [source.id]: on }))
+                                }
                                 aria-label={source.label}
                             />
                         </li>
@@ -144,7 +147,10 @@ export function ActivitySharingCard({
                                 return (
                                     <li key={key} className="flex items-center gap-3 px-3 py-2">
                                         <span className="min-w-0 flex-1">
-                                            <span className="block truncate text-[0.8125rem]" title={name}>
+                                            <span
+                                                className="block truncate text-[0.8125rem]"
+                                                title={name}
+                                            >
                                                 {name}
                                             </span>
                                             <span
@@ -161,7 +167,9 @@ export function ActivitySharingCard({
                                                 commit((state) => ({
                                                     ...state,
                                                     hiddenGames: shown
-                                                        ? state.hiddenGames.filter((entry) => entry !== key)
+                                                        ? state.hiddenGames.filter(
+                                                              (entry) => entry !== key
+                                                          )
                                                         : state.hiddenGames.includes(key)
                                                           ? state.hiddenGames
                                                           : [...state.hiddenGames, key]

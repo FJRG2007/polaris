@@ -81,7 +81,10 @@ export const gameNameSchema = z
     .trim()
     .min(1, "Give the game a name")
     .max(100, "Keep the name under 100 characters")
-    .refine((value) => !/[\u0000-\u001f\u007f]/.test(value), "That name has characters it cannot show");
+    .refine(
+        (value) => !/[\u0000-\u001f\u007f]/.test(value),
+        "That name has characters it cannot show"
+    );
 
 /** A program somebody told the desktop app is a game. */
 export const customGameSchema = z.object({

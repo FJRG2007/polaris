@@ -66,7 +66,10 @@ export function ActivityLine({
     const line = core.activityShortLine(first);
     return (
         <span
-            className={cn("flex min-w-0 items-center gap-1 text-xs text-muted-foreground", className)}
+            className={cn(
+                "flex min-w-0 items-center gap-1 text-xs text-muted-foreground",
+                className
+            )}
             title={line}
         >
             <Icon className="size-3 shrink-0" aria-hidden />
@@ -96,7 +99,11 @@ export function ActivityCards({
     return (
         <div className={cn("flex w-full flex-col gap-2", className)}>
             {activity.map((one) => (
-                <ActivityCard key={`${one.source}:${one.key}`} activity={one} actions={actions?.(one)} />
+                <ActivityCard
+                    key={`${one.source}:${one.key}`}
+                    activity={one}
+                    actions={actions?.(one)}
+                />
             ))}
         </div>
     );
@@ -146,18 +153,25 @@ export function ActivityCard({
                             {activity.name}
                         </a>
                     ) : (
-                        <span className="truncate font-semibold text-foreground" title={activity.name}>
+                        <span
+                            className="truncate font-semibold text-foreground"
+                            title={activity.name}
+                        >
                             {activity.name}
                         </span>
                     )}
                     {activity.details ? (
                         <span className="truncate text-muted-foreground" title={activity.details}>
-                            {activity.source === "spotify" ? `by ${activity.details}` : activity.details}
+                            {activity.source === "spotify"
+                                ? `by ${activity.details}`
+                                : activity.details}
                         </span>
                     ) : null}
                     {activity.state ? (
                         <span className="truncate text-muted-foreground" title={activity.state}>
-                            {activity.source === "spotify" ? `on ${activity.state}` : activity.state}
+                            {activity.source === "spotify"
+                                ? `on ${activity.state}`
+                                : activity.state}
                         </span>
                     ) : null}
                     {activity.endsAt ? null : <Elapsed startedAt={activity.startedAt} />}

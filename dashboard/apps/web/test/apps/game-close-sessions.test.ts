@@ -17,7 +17,9 @@ vi.mock("@polaris/db", () => ({
         gamePlayerSession: {
             findMany: async ({ where }: { where: { installedAppId: string; leftAt: null } }) =>
                 fake.sessions
-                    .filter((row) => row.installedAppId === where.installedAppId && row.leftAt === null)
+                    .filter(
+                        (row) => row.installedAppId === where.installedAppId && row.leftAt === null
+                    )
                     .map((row) => ({ id: row.id, name: row.name })),
             updateMany: async ({
                 where,
@@ -52,7 +54,9 @@ vi.mock("@/lib/presence-activity/live", () => ({
     }
 }));
 
-const { closeGameSessions } = await import("@polaris-app/game-servers/src/lib/games-activity-service");
+const { closeGameSessions } = await import(
+    "@polaris-app/game-servers/src/lib/games-activity-service"
+);
 
 beforeEach(() => {
     fake.sessions = [];
@@ -64,7 +68,12 @@ describe("closing every visit on a server nobody is going to ask again", () => {
     it("closes the open visits and tells the accounts behind them, so their card clears", async () => {
         fake.sessions = [
             { id: "1", installedAppId: "s1", name: "AdaPlays", leftAt: null },
-            { id: "2", installedAppId: "s1", name: "Other", leftAt: new Date("2026-09-28T09:00:00.000Z") }
+            {
+                id: "2",
+                installedAppId: "s1",
+                name: "Other",
+                leftAt: new Date("2026-09-28T09:00:00.000Z")
+            }
         ];
         fake.links = [{ installedAppId: "s1", player: "adaplays", userId: "ada" }];
 

@@ -15,8 +15,19 @@ const ADA = "ada";
 const JOINED = new Date("2026-09-28T10:00:00.000Z");
 
 const fake = vi.hoisted(() => ({
-    links: [] as { installedAppId: string; player: string; userId: string; followSignIns: boolean }[],
-    installs: [] as { id: string; ownerId: string; catalogId: string; name: string; status: string }[],
+    links: [] as {
+        installedAppId: string;
+        player: string;
+        userId: string;
+        followSignIns: boolean;
+    }[],
+    installs: [] as {
+        id: string;
+        ownerId: string;
+        catalogId: string;
+        name: string;
+        status: string;
+    }[],
     connections: [] as { userId: string; label: string }[],
     sessions: [] as { installedAppId: string; name: string; joinedAt: Date; leftAt: Date | null }[]
 }));
@@ -24,7 +35,11 @@ const fake = vi.hoisted(() => ({
 vi.mock("@polaris/db", () => ({
     prisma: {
         gamePlayerLink: {
-            findMany: async ({ where }: { where: { userId?: { in: string[] }; installedAppId?: string } }) =>
+            findMany: async ({
+                where
+            }: {
+                where: { userId?: { in: string[] }; installedAppId?: string };
+            }) =>
                 fake.links.filter(
                     (link) =>
                         (!where.userId || where.userId.in.includes(link.userId)) &&
@@ -33,18 +48,28 @@ vi.mock("@polaris/db", () => ({
         },
         installedApp: {
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
-                fake.installs.filter((install) => where.id.in.includes(install.id) && install.status !== "removed")
+                fake.installs.filter(
+                    (install) => where.id.in.includes(install.id) && install.status !== "removed"
+                )
         },
         userConnection: {
-            findMany: async ({ where }: { where: { userId: { in: string[] }; provider: string } }) =>
+            findMany: async ({
+                where
+            }: {
+                where: { userId: { in: string[] }; provider: string };
+            }) =>
                 where.provider === "minecraft"
-                    ? fake.connections.filter((connection) => where.userId.in.includes(connection.userId))
+                    ? fake.connections.filter((connection) =>
+                          where.userId.in.includes(connection.userId)
+                      )
                     : []
         },
         gamePlayerSession: {
             findMany: async ({ where }: { where: { installedAppId: { in: string[] } } }) =>
                 fake.sessions.filter(
-                    (visit) => where.installedAppId.in.includes(visit.installedAppId) && visit.leftAt === null
+                    (visit) =>
+                        where.installedAppId.in.includes(visit.installedAppId) &&
+                        visit.leftAt === null
                 )
         }
     }
@@ -66,20 +91,26 @@ beforeEach(() => {
 
 describe("who is playing on a server here", () => {
     it("is an account whose link follows its sign-ins, with the server's name", async () => {
-        fake.links = [{ installedAppId: "s1", player: "adaplays", userId: ADA, followSignIns: true }];
+        fake.links = [
+            { installedAppId: "s1", player: "adaplays", userId: ADA, followSignIns: true }
+        ];
         expect(await playingMinecraftNow([ADA])).toEqual([
             { userId: ADA, game: "Minecraft", server: "Survival", since: JOINED }
         ]);
     });
 
     it("is an account whose connected Minecraft name is the player", async () => {
-        fake.links = [{ installedAppId: "s1", player: "AdaPlays", userId: ADA, followSignIns: false }];
+        fake.links = [
+            { installedAppId: "s1", player: "AdaPlays", userId: ADA, followSignIns: false }
+        ];
         fake.connections = [{ userId: ADA, label: "adaplays" }];
         expect(await playingMinecraftNow([ADA])).toHaveLength(1);
     });
 
     it("is not an account that only an operator says is that player", async () => {
-        fake.links = [{ installedAppId: "s1", player: "AdaPlays", userId: ADA, followSignIns: false }];
+        fake.links = [
+            { installedAppId: "s1", player: "AdaPlays", userId: ADA, followSignIns: false }
+        ];
         expect(await playingMinecraftNow([ADA])).toEqual([]);
     });
 
@@ -96,8 +127,12 @@ describe("who is playing on a server here", () => {
     });
 
     it("is nobody on a server that is not Minecraft", async () => {
-        fake.installs = [{ id: "s1", ownerId: "owner", catalogId: "ark", name: "Island", status: "running" }];
-        fake.links = [{ installedAppId: "s1", player: "AdaPlays", userId: ADA, followSignIns: true }];
+        fake.installs = [
+            { id: "s1", ownerId: "owner", catalogId: "ark", name: "Island", status: "running" }
+        ];
+        fake.links = [
+            { installedAppId: "s1", player: "AdaPlays", userId: ADA, followSignIns: true }
+        ];
         expect(await playingMinecraftNow([ADA])).toEqual([]);
     });
 });
