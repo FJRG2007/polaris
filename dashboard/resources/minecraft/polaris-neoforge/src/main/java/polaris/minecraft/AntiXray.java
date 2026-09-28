@@ -1,6 +1,7 @@
 package polaris.minecraft;
 
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -14,10 +15,13 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundBundlePacket;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkPacketData;
 import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerCommonPacketListenerImpl;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -28,6 +32,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.Tags;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import polaris.minecraft.mixin.SectionBlocksUpdateAccessor;
 
 /**
@@ -71,8 +76,35 @@ public final class AntiXray {
         return !value.equals("off");
     }
 
-    static void start() {
+    /**
+     * Switch it on once the server starts, if every hook made it into the game. The
+     * hooks are optional so a mismatch cannot stop the server; a partial set would
+     * write chunks whose size disagrees with their bytes, so it is all or nothing.
+     */
+    @SubscribeEvent
+    public void onServerStarting(ServerStartingEvent event) {
+        if (!hooked()) {
+            PolarisMod.LOG.error("Polaris anti-xray is off: this NeoForge build or another mod changed the code it hooks into.");
+            return;
+        }
         on = true;
+        PolarisMod.LOG.info("Polaris anti-xray is on: buried ore is sent as rock.");
+    }
+
+    private static boolean hooked() {
+        return has(ClientboundLevelChunkPacketData.class, "polaris$size")
+                && has(ClientboundLevelChunkPacketData.class, "polaris$write")
+                && has(ServerCommonPacketListenerImpl.class, "polaris$filter")
+                && has(ServerGamePacketListenerImpl.class, "polaris$probe")
+                && has(ServerLevel.class, "polaris$reveal")
+                && SectionBlocksUpdateAccessor.class.isAssignableFrom(ClientboundSectionBlocksUpdatePacket.class);
+    }
+
+    private static boolean has(Class<?> target, String handler) {
+        for (Method method : target.getDeclaredMethods()) {
+            if (method.getName().endsWith(handler)) return true;
+        }
+        return false;
     }
 
     public static boolean on() {
@@ -134,12 +166,23 @@ public final class AntiXray {
         for (int s = 0; s < sections.length; s++) {
             LevelChunkSection section = sections[s];
             if (section == null || section.hasOnlyAir() || !section.maybeHas(AntiXray::isOre)) continue;
+            List<BlockState> kinds = new ArrayList<>(4);
+            int[] left = {0};
+            section.getStates().count((state, count) -> {
+                if (isOre(state)) {
+                    kinds.add(state);
+                    left[0] += count;
+                }
+            });
             LevelChunkSection copy = null;
+            scan:
             for (int y = 0; y < 16; y++) {
                 for (int z = 0; z < 16; z++) {
                     for (int x = 0; x < 16; x++) {
+                        if (left[0] == 0) break scan;
                         BlockState state = section.getBlockState(x, y, z);
-                        if (!isOre(state)) continue;
+                        if (!kinds.contains(state)) continue;
+                        left[0]--;
                         int column = (s << 4) + y;
                         if (isOpen(sections, column + 1, x, z) || isOpen(sections, column - 1, x, z)) continue;
                         byte against = 0;
@@ -171,9 +214,10 @@ public final class AntiXray {
             }
         }
 
-        Long2ByteOpenHashMap levelPending = PENDING.computeIfAbsent(level, ignored -> new Long2ByteOpenHashMap());
-        if (pending != 0) levelPending.put(at.toLong(), pending);
-        else levelPending.remove(at.toLong());
+        if (pending != 0) {
+            Long2ByteOpenHashMap levelPending = PENDING.computeIfAbsent(level, ignored -> new Long2ByteOpenHashMap());
+            levelPending.put(at.toLong(), (byte) (levelPending.get(at.toLong()) | pending));
+        }
         return out;
     }
 

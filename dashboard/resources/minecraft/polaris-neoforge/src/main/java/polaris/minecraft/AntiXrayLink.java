@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -19,7 +20,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 /**
  * The anti-xray's line to the Polaris that runs this server: where Polaris buried
@@ -105,10 +109,37 @@ final class AntiXrayLink {
         try {
             HttpResponse<String> answer = http.send(request().GET().build(),
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (answer.statusCode() == 200) traps = parse(answer.body());
+            if (answer.statusCode() != 200) return;
+            LongOpenHashSet[] before = traps;
+            LongOpenHashSet[] next = parse(answer.body());
+            traps = next;
+            resend(before, next);
         } catch (Exception ignored) {
             // The last list stays until Polaris answers again.
         }
+    }
+
+    /**
+     * A honeypot placed since the last list reached the players near it as rock;
+     * send it again, now that it is known, so they see it for what it is.
+     */
+    private static void resend(LongOpenHashSet[] before, LongOpenHashSet[] next) {
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null || !AntiXray.on()) return;
+        LongArrayList[] added = {new LongArrayList(), new LongArrayList()};
+        for (int dimension = 0; dimension < next.length; dimension++) {
+            for (long trap : next[dimension]) {
+                if (!before[dimension].contains(trap)) added[dimension].add(trap);
+            }
+        }
+        if (added[0].isEmpty() && added[1].isEmpty()) return;
+        server.execute(() -> {
+            ServerLevel[] levels = {server.overworld(), server.getLevel(Level.NETHER)};
+            for (int dimension = 0; dimension < levels.length; dimension++) {
+                if (levels[dimension] == null) continue;
+                for (long trap : added[dimension]) levels[dimension].getChunkSource().blockChanged(BlockPos.of(trap));
+            }
+        });
     }
 
     static LongOpenHashSet[] parse(String body) {

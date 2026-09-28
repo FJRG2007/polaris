@@ -24,10 +24,8 @@ public final class PolarisMod {
     public PolarisMod(ModContainer container) {
         PolarisConfig config = PolarisConfig.fromEnvironment(System.getenv());
         if (AntiXray.wanted(System.getenv())) {
-            AntiXray.start();
             AntiXrayLink.start(config);
             NeoForge.EVENT_BUS.register(new AntiXray());
-            LOG.info("Polaris anti-xray is on: buried ore is sent as rock.");
         }
         switch (config.state()) {
             case OFF -> {

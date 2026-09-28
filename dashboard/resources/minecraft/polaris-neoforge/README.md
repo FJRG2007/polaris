@@ -30,12 +30,13 @@ rock back, and ore is sent for real the moment a block beside it stops covering
 it. Polaris's X-Ray honeypots are left visible, and digging at buried ore is
 reported to Polaris as `XRayProbe`. It runs unless `POLARIS_ANTIXRAY` is `off`,
 whether or not the login is on; honeypots and reports need the login's address,
-id and token.
+id and token. If this NeoForge build or another mod leaves out any of the code it
+hooks into, the anti-xray stays off and the server starts as usual.
 
 ## Configuration
 
 Polaris writes these when the server's join-password card switches the mod on.
-The mod does nothing unless `POLARIS_LOGIN` is `on`.
+The login does nothing unless `POLARIS_LOGIN` is `on`.
 
 | Variable               | Meaning                           |
 | ---------------------- | --------------------------------- |
