@@ -15,8 +15,9 @@
  * rather than forgetting them - and from it the screen can say what a leftover
  * was, how long it has sat unused, and whether it is safe to delete.
  *
- * The verdict is advice. Deleting still goes through `removeHostVolume`'s own
- * checks, which refuse anything in use or owned, whatever this says.
+ * A "safe" verdict is also what `leftover-volumes` removes on its own. Deleting
+ * still goes through `removeHostVolume`'s own checks, which refuse anything in
+ * use or owned, whatever this says.
  */
 
 import { prisma } from "@polaris/db";
@@ -30,8 +31,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** How long a volume whose owner was deleted sits unused before it is called
  *  safe to delete: long enough to change one's mind about the delete. */
 export const OWNER_GONE_GRACE_DAYS = 7;
-/** The same for a volume Polaris made and has no owner for at all. */
-export const ORPHAN_GRACE_DAYS = 30;
+/** The same for a volume Polaris made for an app that no longer exists, when
+ *  there is no note of the delete - an app deleted before the notes began. Its
+ *  owner is as gone as one deleted yesterday, so it gets the same week. */
+export const ORPHAN_GRACE_DAYS = OWNER_GONE_GRACE_DAYS;
 
 export interface ResourceNote {
     readonly description: string;
@@ -106,19 +109,17 @@ export function volumeVerdict(input: {
 
 /** The notes kept for this machine's volumes, by name. */
 export async function volumeNotes(serverId = LOCAL_SERVER): Promise<Map<string, ResourceNote>> {
-    const rows = await prisma.hostResourceRecord
-        .findMany({
-            where: { serverId, kind: "volume", removedAt: null },
-            select: {
-                name: true,
-                description: true,
-                purpose: true,
-                lastUsedAt: true,
-                ownerDeletedAt: true,
-                createdAt: true
-            }
-        })
-        .catch(() => []);
+    const rows = await prisma.hostResourceRecord.findMany({
+        where: { serverId, kind: "volume", removedAt: null },
+        select: {
+            name: true,
+            description: true,
+            purpose: true,
+            lastUsedAt: true,
+            ownerDeletedAt: true,
+            createdAt: true
+        }
+    });
     return new Map(
         rows.map((row) => [
             row.name,

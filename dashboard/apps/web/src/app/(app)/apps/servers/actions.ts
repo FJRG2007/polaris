@@ -24,6 +24,7 @@ import {
     type HostSpace
 } from "@/lib/deploy/host-space";
 import { hostVolumes, removeHostVolume, type HostVolume } from "@/lib/deploy/host-volumes";
+import { autoRemoveOn, setAutoRemove } from "@/lib/deploy/leftover-volumes";
 import { ImageStoreBusy } from "@/lib/deploy/image-store-lock";
 import {
     removeStrayContainer,
@@ -615,6 +616,27 @@ export async function removeHostVolumeAction(name: string): Promise<{ error?: st
         metadata: { bytes: before?.bytes ?? null, project: before?.project ?? null }
     });
     revalidatePath(SERVERS_PATH);
+    return {};
+}
+
+/** Whether Polaris removes the data of deleted apps on its own. */
+export async function leftoverAutoRemoveAction(): Promise<boolean> {
+    await requirePermission("system.manage");
+    return autoRemoveOn();
+}
+
+/** Switch it. Audited: it decides whether data is deleted without anybody pressing. */
+export async function setLeftoverAutoRemoveAction(on: boolean): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    if (typeof on !== "boolean") return { error: "That is not a setting." };
+    await setAutoRemove(on);
+    await recordAudit({
+        actorId: user.id,
+        action: "server.volume.autoremove",
+        targetType: "host",
+        targetId: "local",
+        metadata: { on }
+    });
     return {};
 }
 

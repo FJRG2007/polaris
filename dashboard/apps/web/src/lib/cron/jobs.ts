@@ -44,6 +44,7 @@ import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
 import { reapLeftoverContainers } from "@/lib/agents/leftover-containers";
+import { removeLeftoverVolumes } from "@/lib/deploy/leftover-volumes";
 import { sealAuditChain, verifyAuditChain } from "@/lib/audit-chain";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
@@ -473,6 +474,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // records, and one of them fails on what the other already took.
         leaseMs: 7 * 60 * MINUTE,
         run: sweepEveryDisk
+    },
+    {
+        key: "leftover-volumes",
+        // A week is the grace, so a day is plenty: nothing here is urgent, and a
+        // pass lists every volume and measures them.
+        everyMs: Number(process.env.POLARIS_LEFTOVER_VOLUMES_MS) || 24 * 60 * MINUTE,
+        // Longer than the gap between passes, like every leased job here.
+        leaseMs: 25 * 60 * MINUTE,
+        run: removeLeftoverVolumes
     },
     {
         key: "domain-health",

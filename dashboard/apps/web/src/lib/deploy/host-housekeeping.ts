@@ -19,7 +19,9 @@
  *
  * What it will never touch is volumes. They are usually the largest thing on the
  * disk and every byte of them is somebody's save file, database or upload, and
- * no timer gets to decide which of those are spare. That line is drawn in the
+ * no timer gets to decide which of those are spare. (The one exception is its own
+ * job with its own switch: `leftover-volumes`, for the data of apps that were
+ * deleted a week ago and nothing has used since.) That line is drawn in the
  * daemon's own allowlist as well as here. It also means the sweep can genuinely
  * fail to help - a disk full of volumes stays full - and the honest answer then
  * is to say so to the person who can decide, rather than to keep pruning nothing
@@ -36,7 +38,11 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { diskFullness, localDisk } from "@/lib/deploy/local-disk";
 import { hostSpace, reclaimHostSpace } from "@/lib/deploy/host-space";
 import { ImageStoreBusy } from "@/lib/deploy/image-store-lock";
-import { reclaimServerSpace, serverDiskFullness, serversWithDeployments } from "@/lib/deploy/server-space";
+import {
+    reclaimServerSpace,
+    serverDiskFullness,
+    serversWithDeployments
+} from "@/lib/deploy/server-space";
 
 /** What was last reported, so a disk that is tight for a month is one message
  *  rather than a hundred and twenty. */
@@ -125,7 +131,8 @@ export async function sweepHostSpace(): Promise<HousekeepingSweep> {
     try {
         freed = (await reclaimHostSpace({ whenIdle: true })) ?? 0;
     } catch (error) {
-        if (error instanceof ImageStoreBusy) return { before, after: before, freed: 0, reclaimed: false };
+        if (error instanceof ImageStoreBusy)
+            return { before, after: before, freed: 0, reclaimed: false };
         throw error;
     }
     const settled = await localDisk();
@@ -159,10 +166,12 @@ export async function sweepServerSpace(): Promise<{ id: string; name: string; fr
         // Null is "could not ask", never "there is room". A machine that is down
         // is not a machine with a healthy disk, and pruning is not what fixes it.
         if (fullness === null || fullness < HIGH_WATER) continue;
-        const freed = await reclaimServerSpace(server.id, { whenIdle: true }).catch((error: unknown) => {
-            if (error instanceof ImageStoreBusy) return 0;
-            throw error;
-        });
+        const freed = await reclaimServerSpace(server.id, { whenIdle: true }).catch(
+            (error: unknown) => {
+                if (error instanceof ImageStoreBusy) return 0;
+                throw error;
+            }
+        );
         swept.push({ id: server.id, name: server.name, freed: freed ?? 0 });
     }
     return swept;

@@ -30,17 +30,19 @@
  */
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ContainerStorage } from "./container-storage";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { HostVolume } from "@/lib/deploy/host-volumes";
 import type { StrayContainer } from "@/lib/deploy/host-containers";
 import { useLiveRead } from "@/components/use-live-resource";
-import { Badge, Button, EmptyState } from "@polaris/ui";
+import { Badge, Button, EmptyState, Switch } from "@polaris/ui";
 import { Boxes, HardDrive, Loader2, Trash2, FolderOpen } from "lucide-react";
 import {
     hostVolumesAction,
+    leftoverAutoRemoveAction,
     removeHostVolumeAction,
+    setLeftoverAutoRemoveAction,
     removeStrayContainerAction,
     strayContainersAction
 } from "./actions";
@@ -87,6 +89,34 @@ export function ServerStorage() {
     const [removing, setRemoving] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [freed, setFreed] = useState<{ name: string; bytes: number | null } | null>(null);
+    const [autoRemove, setAutoRemoveShown] = useState<boolean | null>(null);
+    const [autoRemoveUnread, setAutoRemoveUnread] = useState(false);
+
+    const readAutoRemove = useCallback(() => {
+        setAutoRemoveUnread(false);
+        void leftoverAutoRemoveAction()
+            .then(setAutoRemoveShown)
+            .catch(() => {
+                setAutoRemoveShown(null);
+                setAutoRemoveUnread(true);
+            });
+    }, []);
+
+    useEffect(readAutoRemove, [readAutoRemove]);
+
+    // Shown at once and put back if the server says no.
+    const switchAutoRemove = async (on: boolean) => {
+        const before = autoRemove;
+        setAutoRemoveShown(on);
+        setError(null);
+        const result = await setLeftoverAutoRemoveAction(on).catch(() => ({
+            error: "Could not change it. Try again."
+        }));
+        if (result.error) {
+            setAutoRemoveShown(before);
+            setError(result.error);
+        }
+    };
 
     const load = useCallback(async (): Promise<HostVolume[]> => {
         const volumes = await hostVolumesAction();
@@ -135,15 +165,47 @@ export function ServerStorage() {
             <ContainerStorage />
 
             <section className="flex flex-col gap-2">
-                <div>
-                    <h2 className="flex items-center gap-1.5 text-sm font-medium">
-                        <HardDrive className="size-4 shrink-0 text-muted-foreground" />
-                        Volumes
-                    </h2>
-                    <p className="text-muted-foreground text-xs">
-                        Largest first. A volume is where an app keeps what it wrote - a database, a
-                        world, an upload - so nothing here is removed for you.
-                    </p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 className="flex items-center gap-1.5 text-sm font-medium">
+                            <HardDrive className="size-4 shrink-0 text-muted-foreground" />
+                            Volumes
+                        </h2>
+                        <p className="text-muted-foreground text-xs">
+                            Largest first. A volume is where an app keeps what it wrote - a
+                            database, a world, an upload.
+                        </p>
+                    </div>
+                    <label className="flex max-w-sm items-start gap-2 text-xs">
+                        <Switch
+                            checked={autoRemove ?? false}
+                            disabled={autoRemove === null}
+                            onChange={(on) => void switchAutoRemove(on)}
+                            aria-label="Remove leftovers automatically"
+                        />
+                        <span>
+                            <span className="block font-medium">
+                                Remove leftovers automatically
+                            </span>
+                            {autoRemoveUnread ? (
+                                <span className="text-danger">
+                                    Could not read whether this is on.{" "}
+                                    <button
+                                        type="button"
+                                        className="underline underline-offset-2"
+                                        onClick={readAutoRemove}
+                                    >
+                                        Try again
+                                    </button>
+                                </span>
+                            ) : (
+                                <span className="text-muted-foreground">
+                                    The data of an app deleted over a week ago that nothing has used
+                                    since. You are told what went.
+                                </span>
+                            )}
+                        </span>
+                    </label>
                 </div>
 
                 {volumes === null ? (
@@ -163,7 +225,9 @@ export function ServerStorage() {
                             <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                 <tr>
                                     <th className="w-full max-w-0 px-3 py-2 font-medium">Volume</th>
-                                    <th className="whitespace-nowrap px-3 py-2 font-medium">Size</th>
+                                    <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                        Size
+                                    </th>
                                     <th className="hidden whitespace-nowrap px-3 py-2 font-medium md:table-cell">
                                         Created
                                     </th>
@@ -175,7 +239,10 @@ export function ServerStorage() {
                                     <tr key={volume.name} className="border-t border-border">
                                         <td className="w-full max-w-0 px-3 py-2">
                                             <span className="flex min-w-0 items-center gap-2">
-                                                <span className="min-w-0 truncate font-medium" title={volume.name}>
+                                                <span
+                                                    className="min-w-0 truncate font-medium"
+                                                    title={volume.name}
+                                                >
                                                     {volume.name}
                                                 </span>
                                                 {/* The verdict first, because it is the
@@ -215,7 +282,9 @@ export function ServerStorage() {
                                                       : volume.project
                                                         ? `Created by ${volume.project}`
                                                         : "Polaris has no record of this one"}
-                                                {volume.heldBy.length > 0 ? ` - ${holders(volume)}` : ""}
+                                                {volume.heldBy.length > 0
+                                                    ? ` - ${holders(volume)}`
+                                                    : ""}
                                                 {unusedFor(volume) ? ` - ${unusedFor(volume)}` : ""}
                                             </span>
                                             {!volume.inUse && !volume.owner ? (
@@ -278,10 +347,10 @@ export function ServerStorage() {
 
                 {spare.length > 0 ? (
                     <p className="text-muted-foreground text-xs">
-                        {spare.length === 1 ? "One volume is" : `${spare.length} volumes are`} holding{" "}
-                        {size(spareBytes)} that nothing on this machine references, that Polaris has no
-                        record of, and that has been sitting there for more than a day. Delete them one
-                        at a time, when you know what they were.
+                        {spare.length === 1 ? "One volume is" : `${spare.length} volumes are`}{" "}
+                        holding {size(spareBytes)} that nothing on this machine references, that
+                        Polaris has no record of, and that has been sitting there for more than a
+                        day. Delete them one at a time, when you know what they were.
                     </p>
                 ) : null}
 
@@ -302,14 +371,12 @@ export function ServerStorage() {
                         Files
                     </h2>
                     <p className="text-muted-foreground text-xs">
-                        What the containers on this machine are holding is above. The files people put
-                        here are Drive&apos;s side of the same disk, and it weighs its own folders.
+                        What the containers on this machine are holding is above. The files people
+                        put here are Drive&apos;s side of the same disk, and it weighs its own
+                        folders.
                     </p>
                 </div>
-                <Link
-                    href="/drive/insights"
-                    className="text-primary w-fit text-sm hover:underline"
-                >
+                <Link href="/drive/insights" className="text-primary w-fit text-sm hover:underline">
                     What is taking up room in Drive
                 </Link>
             </section>
@@ -323,7 +390,9 @@ export function ServerStorage() {
  *  minecraft-a1b2" is the answer somebody looking at a large row is after, and a
  *  number is not. */
 function holders(volume: HostVolume): string {
-    const names = volume.heldBy.map((holder) => `${holder.name}${holder.running ? "" : " (stopped)"}`);
+    const names = volume.heldBy.map(
+        (holder) => `${holder.name}${holder.running ? "" : " (stopped)"}`
+    );
     if (names.length === 1) return `held by ${names[0]}`;
     const rest = names.length - 2;
     return `held by ${names.slice(0, 2).join(", ")}${rest > 0 ? ` and ${rest} more` : ""}`;
@@ -393,9 +462,11 @@ function StrayContainers() {
                     Left behind
                 </h2>
                 <p className="text-muted-foreground text-xs">
-                    Polaris put {strays.length === 1 ? "this container" : `these ${strays.length} containers`} on
-                    this machine and has no record of {strays.length === 1 ? "it" : "them"} any more - a service
-                    removed, or a stack recreated under another name. Nothing else on the machine is touched.
+                    Polaris put{" "}
+                    {strays.length === 1 ? "this container" : `these ${strays.length} containers`}{" "}
+                    on this machine and has no record of {strays.length === 1 ? "it" : "them"} any
+                    more - a service removed, or a stack recreated under another name. Nothing else
+                    on the machine is touched.
                 </p>
             </div>
 
@@ -415,7 +486,10 @@ function StrayContainers() {
                             <tr key={stray.id} className="border-t border-border">
                                 <td className="w-full max-w-0 px-3 py-2">
                                     <span className="flex min-w-0 items-center gap-2">
-                                        <span className="min-w-0 truncate font-medium" title={stray.name}>
+                                        <span
+                                            className="min-w-0 truncate font-medium"
+                                            title={stray.name}
+                                        >
                                             {stray.name}
                                         </span>
                                         {stray.running ? (
