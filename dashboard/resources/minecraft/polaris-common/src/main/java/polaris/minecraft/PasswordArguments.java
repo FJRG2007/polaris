@@ -4,12 +4,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A command's arguments, read the way the NeoForge mod reads them.
+ * A command's passwords, read the same way by the plugin and the NeoForge mod.
  *
- * Bukkit splits a command on spaces, so a password with a space in it would
- * arrive as two arguments. The mod takes Brigadier strings instead - a bare word,
- * or anything in double quotes with {@code \"} and {@code \\} escaped - and the
- * players of both are told the same thing, so this reads the same.
+ * A bare word is everything up to the next space - letters, digits and symbols
+ * alike - and a password with a space in it goes in double quotes, with
+ * {@code \"} and {@code \\} escaped. Brigadier's own strings are not used on the
+ * mod: an unquoted Brigadier string stops at the first symbol, so a password such
+ * as {@code Hola!23} was refused by the game before Polaris ever saw it, with an
+ * error that says nothing about passwords.
  */
 final class PasswordArguments {
     private PasswordArguments() {

@@ -8,6 +8,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -319,7 +320,7 @@ final class LoginGate {
             tell(player, "Log in with /login <password>.");
         } else {
             tell(player, "Choose a password for this server with /register <password> <password>."
-                    + " Put it in double quotes if it has spaces or symbols.");
+                    + " Put it in double quotes if it has spaces.");
         }
     }
 
@@ -379,24 +380,44 @@ final class LoginGate {
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         CommandDispatcher<CommandSourceStack> commands = event.getDispatcher();
+        // The rest of the line, split by PasswordArguments rather than by
+        // Brigadier: an unquoted Brigadier string ends at the first symbol, so
+        // "/login Hola!23" failed in the game's own words before it reached the
+        // mod, and players took it for a server that only accepts digits. The
+        // argument names are what the game shows while the command is typed.
         commands.register(Commands.literal("register")
-                .then(Commands.argument("password", StringArgumentType.string())
-                        .then(Commands.argument("confirm", StringArgumentType.string())
-                                .executes(context -> register(context.getSource().getPlayerOrException(),
-                                        text(context, "password"), text(context, "confirm"))))));
+                .then(Commands.argument("password password", StringArgumentType.greedyString())
+                        .executes(context -> {
+                            ServerPlayer player = context.getSource().getPlayerOrException();
+                            List<String> words = words(context, "password password");
+                            if (words.size() != 2) return usage(player, "/register <password> <password>");
+                            return register(player, words.get(0), words.get(1));
+                        })));
         commands.register(Commands.literal("login")
-                .then(Commands.argument("password", StringArgumentType.string())
-                        .executes(context -> login(context.getSource().getPlayerOrException(),
-                                text(context, "password")))));
+                .then(Commands.argument("password", StringArgumentType.greedyString())
+                        .executes(context -> {
+                            ServerPlayer player = context.getSource().getPlayerOrException();
+                            List<String> words = words(context, "password");
+                            if (words.size() != 1) return usage(player, "/login <password>");
+                            return login(player, words.get(0));
+                        })));
         commands.register(Commands.literal("changepassword")
-                .then(Commands.argument("current", StringArgumentType.string())
-                        .then(Commands.argument("new", StringArgumentType.string())
-                                .executes(context -> changePassword(context.getSource().getPlayerOrException(),
-                                        text(context, "current"), text(context, "new"))))));
+                .then(Commands.argument("current new", StringArgumentType.greedyString())
+                        .executes(context -> {
+                            ServerPlayer player = context.getSource().getPlayerOrException();
+                            List<String> words = words(context, "current new");
+                            if (words.size() != 2) return usage(player, "/changepassword <current> <new>");
+                            return changePassword(player, words.get(0), words.get(1));
+                        })));
     }
 
-    private static String text(CommandContext<CommandSourceStack> context, String name) {
-        return StringArgumentType.getString(context, name);
+    private static List<String> words(CommandContext<CommandSourceStack> context, String name) {
+        return PasswordArguments.split(StringArgumentType.getString(context, name));
+    }
+
+    private static int usage(ServerPlayer player, String usage) {
+        tell(player, "Use " + usage + ". Put a password in double quotes if it has spaces.");
+        return 0;
     }
 
     private int register(ServerPlayer player, String password, String confirm) {

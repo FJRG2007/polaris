@@ -11,7 +11,8 @@ Players use:
 - `/login <password>` on every join after
 - `/changepassword <old> <new>` once logged in
 
-A password with spaces or symbols goes in double quotes.
+A password can have letters, digits and symbols; one with spaces goes in double
+quotes.
 
 Until they log in, a player's screen is dark with what to type in the middle of
 it and a bar across the top counting down the seconds they have left (red for the
