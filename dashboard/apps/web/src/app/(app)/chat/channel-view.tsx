@@ -2562,6 +2562,11 @@ function TypingLine({ typists, viewerId }: { typists: readonly Typist[]; viewerI
     return (
         <p aria-live="polite" className="h-4 px-4 text-[0.6875rem] text-muted-foreground">
             {names}
+            <span aria-hidden="true" className="typing-dots">
+                <span>.</span>
+                <span>.</span>
+                <span>.</span>
+            </span>
         </p>
     );
 }
