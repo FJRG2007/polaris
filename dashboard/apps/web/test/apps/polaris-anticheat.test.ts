@@ -194,3 +194,49 @@ describe("on by default", () => {
         expect(plain.has("MODRINTH_PROJECTS")).toBe(false);
     });
 });
+
+describe("on a NeoForge server, through the Polaris mod", () => {
+    const MOD = `${BASE}/api/minecraft/mod/polaris-neoforge-1.21.4.jar`;
+    const neo = (extra: [string, string][] = []) =>
+        new Map<string, string>([["TYPE", "NEOFORGE"], ["VERSION", "1.21.4"], ...extra]);
+
+    it("counts as protected, and is wanted by default, only where the mod has a build", () => {
+        expect(anticheat.anticheatBuildFor("NEOFORGE", "1.21.4")).toEqual({
+            kind: "mod",
+            file: "polaris-neoforge-1.21.4.jar"
+        });
+        expect(anticheat.anticheatBuildFor("NEOFORGE", "1.20.1")).toBeNull();
+        expect(anticheat.anticheatBuildFor("FABRIC", "1.21.4")).toBeNull();
+        expect(anticheat.wantsDefaultAnticheat(neo())).toBe(true);
+        expect(anticheat.wantsDefaultAnticheat(neo([["POLARIS_ANTICHEAT", "off"]]))).toBe(false);
+    });
+
+    it("is on already where the login put the mod there, and off once switched off", () => {
+        const offgrid = neo([
+            ["MODS", MOD],
+            ["POLARIS_LOGIN", "on"]
+        ]);
+        expect(anticheat.anticheatActive(offgrid)).toBe(true);
+        expect(anticheat.anticheatActive(neo())).toBe(false);
+        const off = anticheat.anticheatDisableEnv(offgrid);
+        // The login still needs the mod; it is only told to stop hiding ore.
+        expect(off.get("MODS")).toBe(MOD);
+        expect(off.get("POLARIS_ANTIXRAY")).toBe("off");
+        expect(anticheat.anticheatActive(new Map([...offgrid, ...off]))).toBe(false);
+    });
+
+    it("puts the mod on the list when turned on, and takes it off again without the login", () => {
+        const on = anticheat.anticheatEnableEnv(neo([["POLARIS_ANTIXRAY", "off"]]), {
+            baseUrl: BASE,
+            installedAppId: SERVER,
+            token: "t"
+        });
+        expect(on.get("MODS")).toBe(MOD);
+        expect(on.get("POLARIS_ANTICHEAT")).toBe("on");
+        expect(on.get("POLARIS_ANTIXRAY")).toBe("");
+        const env = new Map([...neo(), ...on]);
+        expect(anticheat.anticheatActive(env)).toBe(true);
+        expect(anticheat.anticheatOn(env)).toBe(true);
+        expect(anticheat.anticheatDisableEnv(env).get("MODS")).toBe("");
+    });
+});

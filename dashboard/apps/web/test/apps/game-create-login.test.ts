@@ -92,7 +92,9 @@ describe("a new server's login", () => {
     });
 
     it("is the Modrinth guard where Polaris has no public address", async () => {
-        publicAppUrl.mockResolvedValueOnce(null);
+        // Asked for the login and again for the anti-cheat, which on NeoForge is
+        // the same mod.
+        publicAppUrl.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
         await createGameServer("owner", "actor", server("NEOFORGE", "1.21.4"));
         const { env, seed } = created();
         expect(seed).toBeUndefined();

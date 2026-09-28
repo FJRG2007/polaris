@@ -72,8 +72,11 @@ public final class AntiXray {
 
     /** On unless Polaris switched it off for this server. */
     static boolean wanted(Map<String, String> env) {
-        String value = env.getOrDefault("POLARIS_ANTIXRAY", "").trim().toLowerCase(Locale.ROOT);
-        return !value.equals("off");
+        // Its own switch, and the anti-cheat's, which the server's Anti-cheat card writes.
+        for (String key : new String[] {"POLARIS_ANTIXRAY", "POLARIS_ANTICHEAT"}) {
+            if (env.getOrDefault(key, "").trim().toLowerCase(Locale.ROOT).equals("off")) return false;
+        }
+        return true;
     }
 
     /**
