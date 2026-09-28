@@ -134,7 +134,15 @@ export function components(preset: EventPreset): Component[] {
                     : target === "debris"
                       ? ([["ancient_debris", 1]] as const)
                       : ORES;
-            return list(ores, "minecraft.mined");
+            // Minus every one of them placed during the rush: with silk touch
+            // an ore block can be put down and mined again, over and over.
+            const mined = list(ores, "minecraft.mined");
+            const placed = ores.map(([id, weight], index) => ({
+                objective: numbered(ores.length + index),
+                criterion: `minecraft.used:minecraft.${id}`,
+                weight: -weight
+            }));
+            return [...mined, ...placed];
         }
         case "mob-hunt": {
             const target = (preset.options as EventOptions<"mob-hunt">).target;
@@ -566,9 +574,35 @@ export function setRule(name: string, value: string): string {
     return `gamerule ${name} ${value}`;
 }
 
-export function daybreak(): string[] {
-    return ["time set 23500", "weather clear", `kill @e[tag=${MOB_TAG}]`];
+/**
+ * Dawn after a blood moon. A server that keeps its clock still - an operator's
+ * permanent noon - gets back the exact time it had; one whose days turn gets the
+ * sunrise.
+ */
+export function daybreak(
+    rules: Readonly<Record<string, string>> = {},
+    timeBefore: number | null = null
+): string[] {
+    const frozen = rules.doDaylightCycle === "false" && timeBefore !== null;
+    return [frozen ? `time set ${timeBefore}` : "time set 23500", "weather clear", `kill @e[tag=${MOB_TAG}]`];
 }
+
+/** The world's time of day, to put back: `The time is 6000`. */
+export const READ_DAYTIME = "time query daytime";
+export function readDaytime(output: string): number | null {
+    const match = /time is (\d+)/i.exec(output);
+    return match ? Number(match[1]) : null;
+}
+
+/** `The difficulty is Peaceful` - where hostile mobs vanish as they appear. */
+export const READ_DIFFICULTY = "difficulty";
+export function isPeaceful(output: string): boolean {
+    return /difficulty is peaceful/i.test(output);
+}
+
+/** Whoever is not playing in survival or adventure: creative mines and kills at
+ *  will, and a spectator cannot be hurt. */
+export const NOT_SURVIVAL = "execute as @a[gamemode=!survival,gamemode=!adventure] run data get entity @s Pos";
 
 export const WAVE_EVERY_MS = 40_000;
 
@@ -814,7 +848,9 @@ export function cleanup(
     place: { x: number; y: number; z: number } | null,
     target: { x: number; z: number } | null = null,
     /** Game rules the event changed, and what they were before. */
-    rules: Readonly<Record<string, string>> = {}
+    rules: Readonly<Record<string, string>> = {},
+    /** The time of day before a blood moon, for a server whose clock stands still. */
+    timeBefore: number | null = null
 ): string[] {
     const lines = [
         ...Object.entries(rules)
@@ -834,7 +870,7 @@ export function cleanup(
     for (const one of components(preset))
         lines.push(`scoreboard objectives remove ${one.objective}`);
     if (preset.kind === "world-boss") lines.push(BOSS_BANISH);
-    if (preset.kind === "blood-moon") lines.push(...daybreak());
+    if (preset.kind === "blood-moon") lines.push(...daybreak(rules, timeBefore));
     if (preset.kind === "happy-hour")
         lines.push(...happyEffectsClear(preset.options as EventOptions<"happy-hour">));
     if (preset.kind === "supply-drop" && place) lines.push(removeChest(place));

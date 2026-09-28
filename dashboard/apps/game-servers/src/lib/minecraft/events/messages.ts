@@ -167,8 +167,8 @@ export function cancelledLine(name: string, language: Language): string {
 export function disqualifiedLine(names: readonly string[], language: Language): string {
     const list = names.join(", ");
     return language === "es"
-        ? `&7Fuera del podio por el anti-cheat: &c${list}`
-        : `&7Left off the podium by the anti-cheat: &c${list}`;
+        ? `&7Fuera del podio (anti-cheat, creativo o AFK todo el evento): &c${list}`
+        : `&7Left off the podium (anti-cheat, creative, or AFK the whole time): &c${list}`;
 }
 
 export function rewardGiven(event: string, language: Language): string {

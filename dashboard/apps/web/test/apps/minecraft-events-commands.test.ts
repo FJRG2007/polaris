@@ -42,7 +42,9 @@ describe("the scoreboard", () => {
         const counted = commands.components(preset("mining-rush", { target: "diamond" }));
         expect(counted.map((one) => one.criterion)).toEqual([
             "minecraft.mined:minecraft.diamond_ore",
-            "minecraft.mined:minecraft.deepslate_diamond_ore"
+            "minecraft.mined:minecraft.deepslate_diamond_ore",
+            "minecraft.used:minecraft.diamond_ore",
+            "minecraft.used:minecraft.deepslate_diamond_ore"
         ]);
     });
 
@@ -65,7 +67,7 @@ describe("the scoreboard", () => {
     it("sets up a constant for every weight the tick multiplies by", () => {
         const setup = commands.setupScoreboard(preset("mining-rush"), "&6Mining");
         for (const line of commands.scoreTick(preset("mining-rush"))) {
-            const used = /#w(\d+)/.exec(line)?.[1];
+            const used = /#w(-?\d+)/.exec(line)?.[1];
             if (used) expect(setup).toContain(`scoreboard players set #w${used} pe_const ${used}`);
         }
     });
@@ -324,5 +326,16 @@ describe("versions", () => {
         expect(atLeast("1.21.10", [1, 21, 5])).toBe(true);
         expect(atLeast(null, [1, 21, 5])).toBe(true);
         expect(atLeast("24w14a", [1, 21, 5])).toBe(true);
+    });
+});
+
+describe("a mining rush cannot be farmed", () => {
+    it("takes off every ore block placed during it", () => {
+        const lines = commands.scoreTick(catalog.newPreset("mining-rush", "r"));
+        const placed = commands
+            .components(catalog.newPreset("mining-rush", "r"))
+            .find((one) => one.criterion === "minecraft.used:minecraft.diamond_ore");
+        expect(placed?.weight).toBe(-8);
+        expect(lines).toContain(`execute as @a run scoreboard players operation @s pe_tmp *= #w-8 pe_const`);
     });
 });

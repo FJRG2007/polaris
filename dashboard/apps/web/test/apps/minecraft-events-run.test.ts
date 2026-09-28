@@ -35,6 +35,12 @@ interface World {
     dims: Record<string, string>;
     /** The game's running damage counts, per player. */
     hurt: Record<string, number>;
+    /** Players standing perfectly still, looking the same way. */
+    still: string[];
+    /** Players in creative or spectator. */
+    creative: string[];
+    difficulty: string;
+    daylightCycle: "true" | "false";
 }
 
 const world: World = {
@@ -52,7 +58,11 @@ const world: World = {
     killerAt: [305, 70, 2],
     unknownItems: [],
     dims: {},
-    hurt: {}
+    hurt: {},
+    still: [],
+    creative: [],
+    difficulty: "Normal",
+    daylightCycle: "true"
 };
 let config: Record<string, unknown> = {};
 const held: string[] = [];
@@ -60,6 +70,12 @@ const released: string[] = [];
 
 function answer(line: string): string {
     world.sent.push(line);
+    if (line === "difficulty") return `The difficulty is ${world.difficulty}`;
+    if (line === "time query daytime") return "The time is 6000";
+    if (line === "gamerule doDaylightCycle") return `Gamerule doDaylightCycle is currently set to: ${world.daylightCycle}`;
+    if (line.startsWith("execute as @a[gamemode=!survival,gamemode=!adventure]")) {
+        return world.creative.map((name) => `${name} has the following entity data: [0.0d, 64.0d, 0.0d]`).join("\n");
+    }
     if (line === "execute as @a run data get entity @s Dimension") {
         return world.online
             .map((name) => `${name} has the following entity data: "${world.dims[name] ?? "minecraft:overworld"}"`)
@@ -79,15 +95,20 @@ function answer(line: string): string {
     }
     if (line === "execute as @a run data get entity @s Pos") {
         return world.online
-            .map(
-                (name, index) =>
-                    `${name} has the following entity data: [${index * 10 + Math.random()}d, 64.0d, 0.0d]`
+            .map((name, index) =>
+                world.still.includes(name)
+                    ? `${name} has the following entity data: [100.0d, 64.0d, 100.0d]`
+                    : `${name} has the following entity data: [${index * 10 + Math.random()}d, 64.0d, 0.0d]`
             )
             .join("\n");
     }
     if (line === "execute as @a run data get entity @s Rotation") {
         return world.online
-            .map((name) => `${name} has the following entity data: [${Math.random() * 360}f, 0.0f]`)
+            .map((name) =>
+                world.still.includes(name)
+                    ? `${name} has the following entity data: [10.0f, 0.0f]`
+                    : `${name} has the following entity data: [${Math.random() * 360}f, 0.0f]`
+            )
             .join("\n");
     }
     if (line === "execute as @a run scoreboard players get @s pe_score") {
@@ -274,6 +295,10 @@ beforeEach(() => {
     world.unknownItems = [];
     world.dims = {};
     world.hurt = {};
+    world.still = [];
+    world.creative = [];
+    world.difficulty = "Normal";
+    world.daylightCycle = "true";
     events.forgetPlayers();
     held.length = 0;
     released.length = 0;
@@ -1020,5 +1045,62 @@ describe("where the players are, and what they are doing", () => {
         world.dims = { Ben: "minecraft:the_nether" };
         await play(3 * 60_000);
         expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 4 }]);
+    });
+});
+
+describe("what the audit found", () => {
+    it("refuses an event of hostile mobs on Peaceful, and says how to fix it", async () => {
+        world.difficulty = "Peaceful";
+        setUp([{ ...catalog.newPreset("blood-moon", "moon"), minutes: 5 }]);
+        await expect(
+            events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "moon", trigger: "manual", startedBy: null })
+        ).rejects.toThrow(/Peaceful.*Easy or harder under Rules/);
+    });
+
+    it("runs one that needs no hostile mobs on Peaceful", async () => {
+        world.difficulty = "Peaceful";
+        setUp([{ ...catalog.newPreset("fishing", "fish"), minutes: 5 }]);
+        await expect(
+            events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "fish", trigger: "manual", startedBy: null })
+        ).resolves.toBeDefined();
+    });
+
+    it("leaves somebody who played it in creative off the podium", async () => {
+        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
+        setUp([rush]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "rush", trigger: "manual", startedBy: null });
+        await play(2_100);
+        world.creative = ["Ana"];
+        await play(20_000);
+        world.creative = [];
+        world.scores = { Ana: 900, Ben: 15 };
+        await play(3 * 60_000);
+        const entry = state().history[0];
+        expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 15 }]);
+        expect(entry?.disqualified).toEqual(["Ana"]);
+    });
+
+    it("leaves somebody AFK the whole time off a fishing podium", async () => {
+        world.still = ["Ana"];
+        const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 3 };
+        setUp([fish]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "fish", trigger: "manual", startedBy: null });
+        await play(2_100);
+        world.scores = { Ana: 40, Ben: 6 };
+        await play(3 * 60_000);
+        const entry = state().history[0];
+        expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 6 }]);
+        expect(entry?.disqualified).toEqual(["Ana"]);
+    });
+
+    it("gives a server whose clock stands still its own time back after a blood moon", async () => {
+        world.daylightCycle = "false";
+        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+        setUp([moon]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "moon", trigger: "manual", startedBy: null });
+        await play(3 * 60_000 + 4_000);
+        expect(world.sent).toContain("time set 6000");
+        expect(world.sent).not.toContain("time set 23500");
+        expect(world.sent).toContain("gamerule doDaylightCycle false");
     });
 });

@@ -539,6 +539,31 @@ export function needsOverworld(preset: EventPreset): boolean {
     }
 }
 
+/** The events hostile mobs are the whole of, which Peaceful takes away. */
+export function needsHostileMobs(preset: EventPreset): boolean {
+    return preset.kind === "blood-moon" || preset.kind === "world-boss" || preset.kind === "mob-hunt";
+}
+
+/**
+ * Whether being AFK all the way through is a way to win it - a fishing farm, a
+ * mob farm, a water stream, a bunker through the night - and so keeps somebody
+ * off the podium. Not where standing still is the play: holding the hill,
+ * answering in the chat.
+ */
+export function afkCounts(preset: EventPreset): boolean {
+    switch (preset.kind) {
+        case "mining-rush":
+        case "mob-hunt":
+        case "fishing":
+        case "blood-moon":
+            return true;
+        case "explorer":
+            return (preset.options as EventOptions<"explorer">).mode === "distance";
+        default:
+            return false;
+    }
+}
+
 export function runMinutes(preset: EventPreset): number {
     if (preset.kind === "trivia") {
         const options = preset.options as EventOptions<"trivia">;

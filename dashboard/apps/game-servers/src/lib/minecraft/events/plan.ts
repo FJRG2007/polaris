@@ -132,6 +132,18 @@ export function busy(one: Seen, now: number): boolean {
     return one.fightingAt !== null && now - one.fightingAt <= FIGHT_COOLDOWN_MS;
 }
 
+/**
+ * The players who did nothing at all from `since` on: never seen to move, turn or
+ * fight after it. Only players this process has actually watched - somebody it
+ * knows nothing about is not accused of anything.
+ */
+export function idleThroughout(seen: ReadonlyMap<string, Seen> | null, since: number): string[] {
+    if (!seen) return [];
+    return [...seen.values()]
+        .filter((one) => Math.max(one.movedAt ?? 0, one.fightingAt ?? 0) < since && one.since < since)
+        .map((one) => one.name);
+}
+
 /** The players who can take part in this event: active, and in the Overworld
  *  when it happens there. Somebody whose world was not read is not held back. */
 export function playersFor(

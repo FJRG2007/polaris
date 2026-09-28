@@ -149,6 +149,16 @@ function EventExplained({
             `Starts on its own only with ${needed} ${needed === 1 ? "player" : "players"} actually playing, and not while somebody is in a fight.`
         );
     }
+    if (catalog.needsHostileMobs(preset)) {
+        facts.push("Needs the server above Peaceful, where hostile mobs exist.");
+    }
+    if (info.competitive) {
+        facts.push(
+            catalog.afkCounts(preset)
+                ? "Nobody playing in creative or spectator, caught by the anti-cheat, or AFK the whole time is ranked."
+                : "Nobody playing in creative or spectator, or caught by the anti-cheat, is ranked."
+        );
+    }
     if (info.competitive) {
         const prizes = [
             ["1st", preset.rewards.first],

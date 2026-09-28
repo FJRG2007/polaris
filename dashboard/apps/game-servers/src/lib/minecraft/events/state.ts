@@ -60,6 +60,11 @@ export const runSchema = z.object({
     /** Game rules the event changed, and what each was before, so they are put
      *  back even after a restart. */
     gamerules: z.record(z.string()).default({}),
+    /** A blood moon's: the time of day before it, for a server whose clock
+     *  stands still. */
+    timeBefore: z.number().nullable().default(null),
+    /** Everybody seen in creative or spectator while it ran. */
+    offMode: z.array(z.string()).default([]),
     /** Its results are being handed out; never played again from here. */
     finishing: z.boolean().default(false)
 });

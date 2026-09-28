@@ -304,6 +304,18 @@ export async function startEvent(input: {
         const busy = plan.busyReason(seen, config.settings.afkMinutes, Date.now());
         if (busy) throw new Error(`Not now: ${busy}`);
     }
+    // Peaceful takes every hostile mob away the moment it appears: a blood moon
+    // with no mobs, a boss that is gone before anybody sees it.
+    if (catalog.needsHostileMobs(preset)) {
+        const peaceful = await withServerContainer(row.ownerId, input.installedAppId, async (server) =>
+            commands.isPeaceful(await server.say([commands.READ_DIFFICULTY]))
+        ).catch(() => false);
+        if (peaceful) {
+            throw new Error(
+                "The server is on Peaceful, where hostile mobs vanish as soon as they appear. Set the difficulty to Easy or harder under Rules first."
+            );
+        }
+    }
 
     const now = Date.now();
     const countdown = config.settings.countdownSeconds * 1000;
@@ -329,7 +341,9 @@ export async function startEvent(input: {
         closedAt: 0,
         cancelled: false,
         finishing: false,
-        gamerules: {}
+        gamerules: {},
+        timeBefore: null,
+        offMode: []
     } satisfies stored.EventRun;
 
     const stored = await updateEventState(input.installedAppId, (state) => {
@@ -470,6 +484,13 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     if (now - loop.lastSample >= SAMPLE_EVERY_MS) {
         loop.lastSample = now;
         const seen = await playing.lookAt(installedAppId, server);
+        // Creative and spectator are noted as they are seen, not only at the
+        // end: switching back for the last minute does not undo a rush mined
+        // in creative.
+        const offMode = commands.readWhere(await server.say([commands.NOT_SURVIVAL])).map((one) => one.name);
+        const noted = new Set(loop.run.offMode.map((name) => name.toLowerCase()));
+        const fresh = offMode.filter((name) => !noted.has(name.toLowerCase()));
+        if (fresh.length > 0) loop.run = { ...loop.run, offMode: [...loop.run.offMode, ...fresh] };
         const known = new Set(loop.run.participants.map((name) => name.toLowerCase()));
         const joined = [...seen.values()].filter((one) => !known.has(one.name.toLowerCase()));
         if (joined.length > 0) {
@@ -587,7 +608,12 @@ async function begin(
             before[rule] = value;
             lines.push(commands.setRule(rule, "false"));
         }
-        loop.run = { ...loop.run, gamerules: { ...before, ...loop.run.gamerules } };
+        const timeBefore = commands.readDaytime(await server.say([commands.READ_DAYTIME]));
+        loop.run = {
+            ...loop.run,
+            gamerules: { ...before, ...loop.run.gamerules },
+            timeBefore: loop.run.timeBefore ?? timeBefore
+        };
         lines.push(...commands.nightfall(seconds));
     }
     if (preset.kind === "happy-hour") {
@@ -1085,6 +1111,15 @@ async function finish(
     try {
         if (server && outcome === "finished" && run.phase === "running" && info.competitive) {
             disqualified = await disqualifiedSince(installedAppId, run.startsAt);
+            // Also off the podium: whoever played it in creative or spectator,
+            // and - where standing still all the way through is a way to win -
+            // whoever was AFK from start to finish.
+            for (const name of run.offMode) disqualified.add(name.toLowerCase());
+            if (catalog.afkCounts(preset)) {
+                for (const name of plan.idleThroughout(playing.seenOn(installedAppId), run.startsAt)) {
+                    disqualified.add(name.toLowerCase());
+                }
+            }
             const { scores, took } = await results(server, run);
             const minimum = catalog.minScoreOf(preset);
             placed = plan.podium(scores, disqualified, minimum);
@@ -1177,7 +1212,7 @@ async function finish(
                     commands.say(messages.tag(language) + messages.dawn(survivors.length, language))
                 );
             }
-            await server.sayAll([...lines, ...commands.cleanup(preset, run.place, run.target, run.gamerules)]);
+            await server.sayAll([...lines, ...commands.cleanup(preset, run.place, run.target, run.gamerules, run.timeBefore)]);
         } else {
             // The server was not answering: clean up when it is back, so a
             // chest, a boss or a loaded chunk is not left in the world for good.
@@ -1187,7 +1222,7 @@ async function finish(
         console.warn("polaris: finishing an event failed", installedAppId, String(error));
         if (server)
             await server
-                .sayAll(commands.cleanup(preset, run.place, run.target, run.gamerules))
+                .sayAll(commands.cleanup(preset, run.place, run.target, run.gamerules, run.timeBefore))
                 .catch(() => undefined);
     } finally {
         releaseSidebar(loop.ownerId, installedAppId);
@@ -1227,7 +1262,7 @@ async function cleanUpLater(
     run: stored.EventRun
 ): Promise<void> {
     await withServerContainer(ownerId, installedAppId, async (later) => {
-        if (later.running) await later.sayAll(commands.cleanup(run.preset, run.place, run.target, run.gamerules));
+        if (later.running) await later.sayAll(commands.cleanup(run.preset, run.place, run.target, run.gamerules, run.timeBefore));
     }).catch(() => undefined);
 }
 
