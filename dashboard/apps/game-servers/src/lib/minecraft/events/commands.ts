@@ -15,6 +15,7 @@
 import { stripFormatting } from "../parse";
 import { javaComponent } from "../announcement";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
+import { duelTeardown } from "./kinds/team-duel";
 import type { EventKind, EventOptions, EventPreset } from "./catalog";
 
 export const SCORE = "pe_score";
@@ -39,7 +40,8 @@ export interface Component {
     readonly weight: number;
 }
 
-const ORES: readonly (readonly [string, number])[] = [
+/** Every ore block and what one is worth to a mining rush. */
+export const ORES: readonly (readonly [string, number])[] = [
     ["coal_ore", 1],
     ["deepslate_coal_ore", 1],
     ["copper_ore", 1],
@@ -188,6 +190,9 @@ export function divisorFor(preset: EventPreset): number {
 /** Whether the event has a scoreboard on the side of the screen. */
 export function hasScoreboard(preset: EventPreset): boolean {
     if (preset.kind === "happy-hour" || preset.kind === "supply-drop") return false;
+    if (preset.kind === "rare-catch" || preset.kind === "xp-boost") return false;
+    // Who is left standing is on the boss bar; there is nothing to add up.
+    if (preset.kind === "spleef") return false;
     if (preset.kind === "explorer")
         return (preset.options as EventOptions<"explorer">).mode === "distance";
     return true;
@@ -241,7 +246,7 @@ export type BarColour = "yellow" | "red" | "purple" | "green" | "blue";
 
 export function barColour(kind: EventKind): BarColour {
     if (kind === "blood-moon" || kind === "world-boss") return "red";
-    if (kind === "happy-hour") return "green";
+    if (kind === "happy-hour" || kind === "xp-boost") return "green";
     if (kind === "trivia") return "blue";
     return "yellow";
 }
@@ -373,6 +378,12 @@ export function readScores(output: string): Map<string, number> {
     }
     return found;
 }
+
+// ------------------------------------------------------------------ the chat
+
+/** A chat line in the server log: `[12:00:01] [Server thread/INFO]: <Alice> hello`,
+ *  NeoForge's extra bracket and the "Not Secure" mark allowed for. */
+export const CHAT_LINE = /\]: (?:\[Not Secure\] )?<([A-Za-z0-9_]{1,16})> (.+)$/gm;
 
 // ------------------------------------------------------------------ who is where
 
@@ -733,7 +744,7 @@ export function pointAway(
 
 // ------------------------------------------------------------------ supply drop
 
-const LOOT: Readonly<Record<EventOptions<"supply-drop">["loot"], string>> = {
+export const LOOT: Readonly<Record<EventOptions<"supply-drop">["loot"], string>> = {
     treasure: "minecraft:chests/buried_treasure",
     dungeon: "minecraft:chests/simple_dungeon",
     bastion: "minecraft:chests/bastion_treasure",
@@ -1171,6 +1182,8 @@ export function cleanup(
     if (preset.kind === "happy-hour")
         lines.push(...happyEffectsClear(preset.options as EventOptions<"happy-hour">));
     if (preset.kind === "supply-drop" && place) lines.push(removeChest(place));
+    // Its teams and counts; the arena and the players are `closeArena`'s.
+    if (preset.kind === "team-duel") lines.push(...duelTeardown());
     lines.push(...release(preset.kind === "explorer" ? null : place, target));
     return lines;
 }

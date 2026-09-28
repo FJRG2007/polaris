@@ -8,13 +8,27 @@ import { describe, expect, it } from "vitest";
 import * as catalog from "@polaris-app/game-servers/src/lib/minecraft/events/catalog";
 import * as commands from "@polaris-app/game-servers/src/lib/minecraft/events/commands";
 import * as messages from "@polaris-app/game-servers/src/lib/minecraft/events/messages";
+import * as arena from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena";
 import * as trivia from "@polaris-app/game-servers/src/lib/minecraft/events/trivia-bank";
+import * as hunt from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/treasure-hunt";
+import * as gather from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/gathering";
+import * as rareCatch from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/rare-catch";
+import * as boost from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/xp-boost";
+import * as duel from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel";
+import * as build from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/build-battle";
 import {
     COMMAND_BYTES_MAX,
     commandBytes
 } from "@polaris-app/game-servers/src/lib/minecraft/command-size";
+import * as waves from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/waves";
+import * as chunks from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/chunks";
+import * as meteors from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/meteor-shower";
+import * as stage from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage";
+import * as parkour from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour";
+import * as spleef from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/spleef";
 import {
     atLeast,
+    chatLines,
     firstRight
 } from "@polaris-app/game-servers/src/lib/minecraft/events/events-service";
 
@@ -425,6 +439,1193 @@ describe("where an event may go", () => {
         expect(commands.headingTo({ x: 0, z: 0 }, { x: 0, z: -50 })).toBe("north");
         expect(commands.headingTo({ x: 0, z: 0 }, { x: 50, z: 0 })).toBe("east");
         expect(commands.headingTo({ x: 0, z: 0 }, { x: -50, z: 50 })).toBe("south-west");
+    });
+});
+/** The objectives a list of lines adds, and the ones it removes. */
+function objectives(lines: readonly string[], verb: "add" | "remove"): string[] {
+    return lines.flatMap((line) => {
+        const match = new RegExp(`^scoreboard objectives ${verb} (\\S+)`).exec(line);
+        return match ? [match[1] as string] : [];
+    });
+}
+
+/** Every item a line would take from a player: a `clear` without a count of 0. */
+function takes(lines: readonly string[]): string[] {
+    return lines.filter((line) => /(^|run )clear /.test(line) && !/ 0$/.test(line));
+}
+
+describe("a treasure hunt", () => {
+    const chest = (x: number, z: number, opened = false) => ({ x, y: 70, z, opened, by: null });
+
+    it("asks whether a spot is air before anything goes there", () => {
+        expect(hunt.airAt({ x: 10, y: 70, z: -4 })).toBe(
+            "execute in minecraft:overworld if block 10 70 -4 minecraft:air"
+        );
+    });
+
+    it("puts a chest down only where there is air, and never over anything", () => {
+        expect(hunt.hideChest({ x: 10, y: 70, z: -4 }, "dungeon")).toBe(
+            'execute in minecraft:overworld if block 10 70 -4 minecraft:air run setblock 10 70 -4 minecraft:chest{LootTable:"minecraft:chests/simple_dungeon"} keep'
+        );
+    });
+
+    it("takes away only the chests nobody opened, and only while they are still unopened chests", () => {
+        const lines = hunt.huntCleanup(
+            [chest(100, 100), chest(300, 0, true)],
+            [
+                { x: 101, z: 99 },
+                { x: 300, z: 0 }
+            ]
+        );
+        const removals = lines.filter((line) => line.includes("setblock"));
+        expect(removals).toEqual([commands.removeChest(chest(100, 100))]);
+        expect(removals[0]).toContain("if block 100 70 100 minecraft:chest if data block 100 70 100 LootTable");
+        // Each chunk let go once: the column tried and the chest share one.
+        expect(lines.filter((line) => line.includes("forceload remove"))).toEqual([
+            commands.forceloadRemove(100, 100),
+            commands.forceloadRemove(300, 0)
+        ]);
+        expect(lines.join("\n")).not.toMatch(/\bfill\b|minecraft:air replace minecraft:(?!chest)/);
+    });
+
+    it("keeps every chest's chunk loaded", () => {
+        expect(hunt.holdChests([{ x: 5, z: 5 }, { x: 6, z: 7 }, { x: 40, z: 5 }])).toEqual([
+            commands.forceload(6, 7),
+            commands.forceload(40, 5)
+        ]);
+    });
+
+    it("tells the clues in three steps, and none for a chest already opened", () => {
+        const chests = [chest(0, -300), chest(200, 0, true)];
+        const origin = { x: 0, z: 0 };
+        const far = hunt.clues(chests, 1, origin, "en");
+        expect(far).toHaveLength(1);
+        expect(far[0]).toContain("Treasure 1");
+        expect(far[0]).toContain("about 300 m north");
+        const area = hunt.clues([chest(123, -277)], 2, origin, "es");
+        expect(area[0]).toContain("X 100, Z -300");
+        const exact = hunt.clues([chest(123, -277)], 3, origin, "en");
+        expect(exact[0]).toContain("X 123 Y 70 Z -277");
+        for (const line of [...far, ...area, ...exact]) expect(line).not.toMatch(/[{}]/);
+    });
+
+    it("says the clue that is due, and brings the beams on only at the end", () => {
+        expect(hunt.clueDue(0)).toBe(1);
+        expect(hunt.clueDue(0.4)).toBe(2);
+        expect(hunt.clueDue(0.7)).toBe(3);
+        expect(hunt.beamsOn(600, 600)).toBe(false);
+        expect(hunt.beamsOn(119, 600)).toBe(true);
+        expect(hunt.beamsOn(60, 180)).toBe(false);
+        expect(hunt.beamsOn(40, 180)).toBe(true);
+    });
+
+    it("points a player who is close at the nearest chest, and tells the rest how many are left", () => {
+        const lines = hunt.guides(
+            [
+                { name: "Ana", x: 0.5, z: 30.5 },
+                { name: "Ben", x: 900, z: 900 }
+            ],
+            [chest(0, 0), chest(0, 500), chest(50, 50, true)],
+            "en"
+        );
+        expect(lines[0]).toMatch(/^title Ana actionbar /);
+        expect(lines[0]).toContain("30 m ");
+        expect(lines[0]).toContain('"north"');
+        expect(lines[1]).toContain("2 of 3");
+    });
+
+    it("keeps its chests apart and spreads them out", () => {
+        expect(hunt.tooClose({ x: 5, y: 70, z: 5 }, [chest(0, 0)])).toBe(true);
+        expect(hunt.tooClose({ x: 30, y: 70, z: 0 }, [chest(0, 0)])).toBe(false);
+        const options = { chests: 5, distance: 300, loot: "dungeon" as const };
+        expect(hunt.huntDistance(options, () => 0)).toBe(105);
+        expect(hunt.huntDistance(options, () => 0.999)).toBeLessThanOrEqual(300);
+        expect(hunt.centreOf([{ x: 0, z: 0 }, { x: 10, z: -20 }])).toEqual({ x: 5, z: -10 });
+        expect(hunt.centreOf([])).toBeNull();
+    });
+});
+
+describe("a gathering", () => {
+    it("counts what everybody holds without taking a single item, for every material", () => {
+        for (const material of catalog.GATHER_MATERIALS) {
+            const lines = [...gather.gatheringSetup(material), ...gather.gatheringTick(material)];
+            expect(lines.some((line) => line.includes(" run clear @s "))).toBe(true);
+            expect(takes(lines)).toEqual([]);
+        }
+    });
+
+    it("takes where each player starts once, and never counts more than they gathered", () => {
+        const lines = gather.gatheringTick("logs");
+        expect(lines[0]).toBe(
+            "execute as @a unless score @s pe_seen matches 1 store result score @s pe_base run clear @s #minecraft:logs 0"
+        );
+        expect(lines).toContain(
+            "execute as @a store result score @s pe_have run clear @s #minecraft:logs 0"
+        );
+        expect(lines).toContain("execute as @a run scoreboard players operation @s pe_cap += @s pe_gp0");
+        expect(lines).toContain("execute as @a run scoreboard players operation @s pe_cap -= @s pe_gd0");
+        expect(lines).toContain("execute as @a run scoreboard players operation @s pe_prog < @s pe_cap");
+        const setup = gather.gatheringSetup("logs");
+        expect(setup).toContain("scoreboard objectives add pe_gp0 minecraft.picked_up:minecraft.oak_log");
+        expect(setup).toContain("scoreboard objectives add pe_gd10 minecraft.dropped:minecraft.warped_stem");
+        // Only iron is made rather than found: smelting it counts.
+        expect(gather.gatheringSetup("iron_ingot")).toContain(
+            "scoreboard objectives add pe_gc0 minecraft.crafted:minecraft.iron_ingot"
+        );
+        expect(setup.some((line) => line.includes("minecraft.crafted"))).toBe(false);
+    });
+
+    it("draws a material from the list, and reads a stored one back", () => {
+        expect(gather.drawMaterial({ material: "kelp" }, () => 0.5)).toBe("kelp");
+        expect(gather.drawMaterial({ material: "random" }, () => 0)).toBe("wheat");
+        expect(gather.drawMaterial({ material: "random" }, () => 0.999)).toBe("pumpkin");
+        expect(gather.materialOf("bamboo", { material: "random" })).toBe("bamboo");
+        expect(gather.materialOf("nonsense", { material: "sand" })).toBe("sand");
+        expect(gather.materialOf(null, { material: "random" })).toBe("wheat");
+    });
+
+    it("takes every objective any gathering makes back out", () => {
+        const removed = new Set(objectives(gather.gatheringCleanup(), "remove"));
+        for (const material of catalog.GATHER_MATERIALS) {
+            for (const objective of objectives(gather.gatheringSetup(material), "add"))
+                expect(removed.has(objective)).toBe(true);
+        }
+        for (const objective of removed) {
+            expect(objective.startsWith("pe_")).toBe(true);
+            expect(objective.length).toBeLessThanOrEqual(16);
+        }
+    });
+});
+
+describe("a rare catch", () => {
+    it("never touches anybody's inventory", () => {
+        const options = { treasure: "any" as const };
+        const lines = [
+            ...rareCatch.catchSetup(options),
+            ...rareCatch.catchLook(options),
+            rareCatch.READ_CATCHERS,
+            ...rareCatch.catchCommit(),
+            ...rareCatch.catchCleanup()
+        ];
+        expect(lines.filter((line) => /(^|run )clear /.test(line))).toEqual([]);
+    });
+
+    it("counts the treasure picked up, less dropped, and the rod reeled in", () => {
+        const setup = rareCatch.catchSetup({ treasure: "saddle" });
+        expect(setup).toContain("scoreboard objectives add pe_rp1 minecraft.picked_up:minecraft.saddle");
+        expect(setup).toContain("scoreboard objectives add pe_rd1 minecraft.dropped:minecraft.saddle");
+        expect(setup).toContain("scoreboard objectives add pe_rod minecraft.used:minecraft.fishing_rod");
+        expect(setup.some((line) => line.includes("name_tag"))).toBe(false);
+        expect(rareCatch.catches({ treasure: "any" })).toEqual(catalog.RARE_CATCHES);
+        const look = rareCatch.catchLook({ treasure: "saddle" });
+        expect(look).toContain("execute as @a run scoreboard players operation @s pe_rcnt -= @s pe_rd1");
+        expect(look).toContain(
+            `scoreboard players set @a[scores={pe_rdf=1..}] pe_rfr ${rareCatch.RECENT_LOOKS}`
+        );
+        expect(rareCatch.READ_CATCHERS).toBe(
+            "execute as @a[scores={pe_rdc=1..,pe_rfr=1..}] run data get entity @s Pos"
+        );
+    });
+
+    it("takes every objective it makes back out", () => {
+        const removed = new Set(objectives(rareCatch.catchCleanup(), "remove"));
+        for (const objective of objectives(rareCatch.catchSetup({ treasure: "any" }), "add")) {
+            expect(removed.has(objective)).toBe(true);
+            expect(objective.length).toBeLessThanOrEqual(16);
+        }
+    });
+});
+
+describe("an experience boost", () => {
+    const options = { perKill: 5, perOre: 3 };
+
+    it("pays what is owed in powers of two, only ever adding experience", () => {
+        const lines = boost.boostTick(options);
+        expect(lines).toContain("execute as @a[scores={pe_xd=32..}] run xp add @s 160 points");
+        expect(lines).toContain("execute as @a[scores={pe_xd=1..}] run xp add @s 5 points");
+        expect(lines).toContain("execute as @a[scores={pe_xd=1..}] run xp add @s 3 points");
+        expect(lines).toContain("scoreboard players add @a[scores={pe_xd=4..}] pe_xkp 4");
+        for (const line of lines.filter((one) => one.includes(" xp ")))
+            expect(line).toMatch(/run xp add @s \d+ points$/);
+        expect(lines.join("\n")).not.toMatch(/xp (set|remove)|xp add @s -/);
+        // An ore put down is taken off the ores mined.
+        expect(lines).toContain("execute as @a run scoreboard players operation @s pe_xo -= @s pe_xu0");
+    });
+
+    it("counts only what it rewards", () => {
+        const kills = boost.boostSetup({ perKill: 4, perOre: 0 });
+        expect(kills).toContain("scoreboard objectives add pe_xk minecraft.custom:minecraft.mob_kills");
+        expect(kills.some((line) => line.includes("minecraft.mined"))).toBe(false);
+        expect(boost.boostTick({ perKill: 0, perOre: 2 }).some((line) => line.includes("pe_xk "))).toBe(
+            false
+        );
+    });
+
+    it("pays what is still owed before taking its objectives back out", () => {
+        const lines = boost.boostCleanup(options);
+        const lastPay = lines.findLastIndex((line) => line.includes("xp add"));
+        const firstRemove = lines.findIndex((line) => line.startsWith("scoreboard objectives remove"));
+        expect(lastPay).toBeGreaterThan(0);
+        expect(firstRemove).toBeGreaterThan(lastPay);
+        const removed = new Set(objectives(lines, "remove"));
+        for (const objective of objectives(boost.boostSetup(options), "add")) {
+            expect(removed.has(objective)).toBe(true);
+            expect(objective.length).toBeLessThanOrEqual(16);
+        }
+    });
+});
+
+describe("the new kinds in the catalog", () => {
+    it("reads each with its defaults and keeps the limits", () => {
+        expect(catalog.newPreset("treasure-hunt", "t").options).toEqual({
+            chests: 5,
+            distance: 300,
+            loot: "dungeon"
+        });
+        expect(catalog.newPreset("gathering", "g").options).toEqual({ material: "random" });
+        expect(catalog.newPreset("rare-catch", "r").options).toEqual({ treasure: "any" });
+        expect(catalog.newPreset("xp-boost", "x").options).toEqual({ perKill: 5, perOre: 3 });
+        const none = { ...catalog.newPreset("xp-boost", "x"), options: { perKill: 0, perOre: 0 } };
+        expect(catalog.presetSchema.safeParse(none).success).toBe(false);
+        const many = {
+            ...catalog.newPreset("treasure-hunt", "t"),
+            options: { chests: 11, distance: 300, loot: "dungeon" }
+        };
+        expect(catalog.presetSchema.safeParse(many).success).toBe(false);
+    });
+
+    it("ranks, places and judges each the way it is played", () => {
+        const of = (kind: catalog.EventKind) => catalog.newPreset(kind, kind);
+        expect(catalog.needsOverworld(of("treasure-hunt"))).toBe(true);
+        expect(catalog.needsOverworld(of("gathering"))).toBe(false);
+        expect(catalog.hasMinScore(of("rare-catch"))).toBe(false);
+        expect(catalog.hasMinScore(of("gathering"))).toBe(true);
+        expect(catalog.afkCounts(of("rare-catch"))).toBe(true);
+        expect(catalog.afkCounts(of("treasure-hunt"))).toBe(false);
+        expect(catalog.KIND_INFO["xp-boost"].competitive).toBe(false);
+        expect(catalog.awardsPrizes(of("xp-boost"))).toBe(false);
+        expect(commands.hasScoreboard(of("treasure-hunt"))).toBe(true);
+        expect(commands.hasScoreboard(of("rare-catch"))).toBe(false);
+        expect(commands.hasScoreboard(of("xp-boost"))).toBe(false);
+    });
+
+    it("has every new line in both languages, and no braces", () => {
+        const lines = (["en", "es"] as const).flatMap((language) => [
+            messages.huntNear(12, "south-west", language),
+            messages.huntLeftBar(2, 5, language),
+            messages.huntUnfound(1, language),
+            messages.huntUnfound(3, language),
+            messages.huntOpened("Ana", 0, language),
+            messages.huntBeams(language),
+            ...catalog.GATHER_MATERIALS.map((material) => messages.gatherTarget(material, language)),
+            messages.gatherBar("wheat", 12, language),
+            ...(["any", ...catalog.RARE_CATCHES] as const).map((one) =>
+                messages.catchTarget(one, language)
+            ),
+            messages.catchBar("any", language),
+            messages.catchWon("Ana", language),
+            messages.catchMissed(language),
+            messages.boostBar(5, 0, language),
+            messages.boostOver(language)
+        ]);
+        for (const line of lines) expect(line).not.toMatch(/[{}]/);
+        expect(messages.gatherTarget("wheat", "es")).toContain("Trigo");
+        expect(messages.boostBar(5, 3, "en")).toContain("+5 a mob, +3 an ore");
+    });
+});
+
+describe("a horde defence", () => {
+    const point = { x: 300, y: 70, z: 0 };
+
+    it("summons only monsters that cannot break a block, all of them tagged and kept", () => {
+        for (const mix of catalog.WAVE_MIXES) {
+            const lines = waves.summonWave(point, mix, 12, 0, 600);
+            const summons = lines.filter((line) => line.includes(" run summon "));
+            expect(summons).toHaveLength(12);
+            for (const line of summons) {
+                expect(line).toContain('Tags:["pe_mob","pe_wnew"]');
+                expect(line).toContain("PersistenceRequired:1b");
+                expect(line).toContain("CanBreakDoors:0b");
+                expect(line).toContain("CanPickUpLoot:0b");
+                expect(line).not.toMatch(
+                    /creeper|enderman|ravager|silverfish|blaze|slime|ghast|wither /
+                );
+            }
+            expect(lines.at(-1)).toBe("tag @e[tag=pe_wnew] remove pe_wnew");
+        }
+    });
+
+    it("spreads a wave inside the ring, arms the archers and stops zombies calling for help", () => {
+        const lines = waves.summonWave(point, "undead", 8, 0, 600);
+        expect(lines).toContain(
+            "execute in minecraft:overworld run spreadplayers 300 0 2 12 false @e[tag=pe_wnew]"
+        );
+        expect(lines).toContain(
+            "item replace entity @e[tag=pe_wnew,type=minecraft:stray] weapon.mainhand with minecraft:bow"
+        );
+        expect(lines).toContain(
+            "replaceitem entity @e[tag=pe_wnew,type=minecraft:skeleton] weapon.mainhand minecraft:bow"
+        );
+        expect(lines).toContain(
+            "execute as @e[tag=pe_wnew,type=minecraft:husk] run attribute @s minecraft:spawn_reinforcements base set 0"
+        );
+        expect(lines).toContain(
+            "execute as @e[tag=pe_wnew,type=minecraft:zombie] run attribute @s minecraft:zombie.spawn_reinforcements base set 0"
+        );
+        expect(lines).toContain("effect give @e[tag=pe_wnew] minecraft:fire_resistance 600 0 true");
+    });
+
+    it("grows with every wave and every defender, never past the cap", () => {
+        expect(waves.waveSize(4, 0, 1)).toBe(4);
+        expect(waves.waveSize(4, 2, 1)).toBe(8);
+        expect(waves.waveSize(4, 0, 3)).toBe(8);
+        expect(waves.waveSize(12, 9, 20)).toBe(waves.WAVE_CAP);
+        expect(waves.waveEffects(0)).toEqual([]);
+        expect(waves.waveEffects(4).map((one) => one.effect)).toEqual(["strength", "resistance"]);
+    });
+
+    it("counts kills and hits near the point only while a wave is on", () => {
+        const open = waves.wavesTick(point, "classic", true);
+        expect(open).toContain(
+            "execute in minecraft:overworld positioned 300.5 70 0.5 as @a[distance=..40] run scoreboard players operation @s pe_wkill += @s pe_wk0"
+        );
+        expect(open.at(-1)).toBe(
+            "execute as @a[scores={pe_wkill=1..}] run scoreboard players operation @s pe_score = @s pe_wkill"
+        );
+        const closed = waves.wavesTick(point, "classic", false);
+        expect(closed.some((line) => line.includes("+="))).toBe(false);
+        expect(closed).toContain("scoreboard players set @a pe_wk0 0");
+    });
+
+    it("reads how many are left", () => {
+        expect(waves.readAlive("Test passed, count: 7")).toBe(7);
+        expect(waves.readAlive("Test failed")).toBe(0);
+        expect(waves.readAlive("")).toBeNull();
+    });
+
+    it("brings strays back onto the point, and draws it without scoring anybody", () => {
+        expect(waves.leash(point)).toBe(
+            "execute in minecraft:overworld positioned 300.5 70 0.5 as @e[tag=pe_mob,distance=24..] run tp @s 300.5 70 0.5"
+        );
+        const marks = waves.wavesMarks(point);
+        expect(marks.some((line) => line.includes("particle minecraft:end_rod"))).toBe(true);
+        expect(marks.some((line) => line.includes("scoreboard"))).toBe(false);
+    });
+
+    it("takes back every monster and every objective it made, and nothing else", () => {
+        const made = waves.wavesSetup("mixed").flatMap((line) => {
+            const match = /^scoreboard objectives add (\S+)/.exec(line);
+            return match ? [match[1] as string] : [];
+        });
+        const cleanup = waves.wavesCleanup("mixed");
+        expect(cleanup[0]).toBe("kill @e[tag=pe_mob]");
+        for (const objective of made)
+            expect(cleanup).toContain(`scoreboard objectives remove ${objective}`);
+        expect(
+            made.every((objective) => objective.startsWith("pe_") && objective.length <= 16)
+        ).toBe(true);
+    });
+
+    it("lasts as long as its waves can", () => {
+        const preset = catalog.newPreset("waves", "w");
+        expect(catalog.runMinutes(preset)).toBe(Math.ceil((45 + 5 * 140 + 60) / 60));
+        expect(catalog.needsHostileMobs(preset)).toBe(true);
+        expect(catalog.needsOverworld(preset)).toBe(true);
+    });
+});
+
+describe("chunks an event holds", () => {
+    it("reads which chunks are already held", () => {
+        expect(
+            chunks.readForced(
+                "3 force loaded chunks were found in minecraft:overworld at: [0, 0], [1, -2], [18, 0]"
+            )
+        ).toEqual(new Set(["0,0", "1,-2", "18,0"]));
+        expect(
+            chunks.readForced("No force loaded chunks were found in minecraft:overworld")
+        ).toEqual(new Set());
+        expect(chunks.readForced("")).toBeNull();
+    });
+
+    it("holds only the chunks nobody held before, and lets go of exactly those", () => {
+        const around = chunks.chunksAround(300, 0, 32);
+        expect(around).toHaveLength(25);
+        const mine = chunks.notHeld(around, new Set(["18,0"]));
+        expect(mine).toHaveLength(24);
+        expect(mine.some((chunk) => chunk.x === 18 && chunk.z === 0)).toBe(false);
+        expect(chunks.notHeld(around, null)).toHaveLength(25);
+        expect(chunks.holdChunk({ x: 18, z: -1 })).toBe(
+            "execute in minecraft:overworld run forceload add 288 -16"
+        );
+        expect(chunks.releaseChunk({ x: 18, z: -1 })).toBe(
+            "execute in minecraft:overworld run forceload remove 288 -16"
+        );
+    });
+});
+
+describe("a meteor shower", () => {
+    const point = { x: 120, y: 64, z: -40 };
+    const always = () => 0;
+
+    it("heaps a meteor of the size asked for, of the ores asked for", () => {
+        const cells = meteors.meteorCells(point, 6, "precious", Math.random);
+        expect(cells).toHaveLength(6);
+        expect(cells[0]).toMatchObject({ x: 120, y: 64, z: -40 });
+        for (const cell of cells) {
+            expect([
+                "minecraft:gold_ore",
+                "minecraft:lapis_ore",
+                "minecraft:diamond_ore",
+                "minecraft:emerald_ore"
+            ]).toContain(cell.block);
+        }
+        expect(
+            meteors
+                .meteorCells(point, 12, "diamond", always)
+                .every((cell) => cell.block === "minecraft:diamond_ore")
+        ).toBe(true);
+        expect(
+            new Set(
+                meteors
+                    .meteorCells(point, 12, "debris", always)
+                    .map((cell) => `${cell.x} ${cell.y} ${cell.z}`)
+            ).size
+        ).toBe(12);
+    });
+
+    it("only ever fills air, and only takes back its own ore", () => {
+        const block = { x: 121, y: 64, z: -40, block: "minecraft:diamond_ore" };
+        expect(meteors.airTest(block)).toBe(
+            "execute in minecraft:overworld if block 121 64 -40 minecraft:air"
+        );
+        expect(meteors.placeBlock(block)).toBe(
+            "execute in minecraft:overworld run setblock 121 64 -40 minecraft:diamond_ore keep"
+        );
+        expect(meteors.removeIfOurs(block)).toBe(
+            "execute in minecraft:overworld if block 121 64 -40 minecraft:diamond_ore run setblock 121 64 -40 minecraft:air"
+        );
+    });
+
+    it("brings the meteors down over the first three quarters of the event", () => {
+        expect(meteors.dueMeteors(0, 4)).toBe(1);
+        expect(meteors.dueMeteors(0.2, 4)).toBe(2);
+        expect(meteors.dueMeteors(0.74, 4)).toBe(4);
+        expect(meteors.dueMeteors(1, 4)).toBe(4);
+    });
+
+    it("counts ore mined near a meteor and takes off ore placed near one", () => {
+        const lines = meteors.meteorTick([point], "diamond");
+        expect(lines.slice(0, 2)).toEqual([
+            "scoreboard players add @a pe_mo0 0",
+            "scoreboard players add @a pe_mu0 0"
+        ]);
+        expect(lines).toContain(
+            "execute in minecraft:overworld positioned 120.5 64 -39.5 as @a[distance=..10] run scoreboard players operation @s pe_mtot += @s pe_mraw"
+        );
+        expect(lines).toContain(
+            "execute in minecraft:overworld positioned 120.5 64 -39.5 as @a[distance=..20] run scoreboard players operation @s pe_mtot -= @s pe_mused"
+        );
+        expect(lines).toContain("scoreboard players set @a pe_mo0 0");
+        expect(lines.at(-1)).toBe(
+            "execute as @a[scores={pe_mtot=1..}] run scoreboard players operation @s pe_score = @s pe_mtot"
+        );
+        // Before any meteor is down, whatever is mined anywhere is let go.
+        expect(
+            meteors.meteorTick([], "diamond").some((line) => line.includes("+= @s pe_mraw"))
+        ).toBe(false);
+    });
+
+    it("takes back exactly its blocks and every objective it made", () => {
+        const made = meteors.meteorSetup("common").flatMap((line) => {
+            const match = /^scoreboard objectives add (\S+)/.exec(line);
+            return match ? [match[1] as string] : [];
+        });
+        const cleanup = meteors.meteorCleanup(
+            [
+                {
+                    ...point,
+                    blocks: [
+                        { x: 120, y: 64, z: -40, block: "minecraft:iron_ore" },
+                        { x: 121, y: 64, z: -40, block: "minecraft:iron_ore run kill @a" }
+                    ]
+                }
+            ],
+            "common"
+        );
+        expect(cleanup.filter((line) => line.includes("setblock"))).toEqual([
+            "execute in minecraft:overworld if block 120 64 -40 minecraft:iron_ore run setblock 120 64 -40 minecraft:air"
+        ]);
+        for (const objective of made)
+            expect(cleanup).toContain(`scoreboard objectives remove ${objective}`);
+        expect(
+            made.every((objective) => objective.startsWith("pe_") && objective.length <= 16)
+        ).toBe(true);
+    });
+});
+
+// ------------------------------------------------------------------ parkour and spleef
+
+const inside = (box: stage.Volume, volume: stage.Volume) =>
+    box.x1 >= volume.x1 &&
+    box.x2 <= volume.x2 &&
+    box.y1 >= volume.y1 &&
+    box.y2 <= volume.y2 &&
+    box.z1 >= volume.z1 &&
+    box.z2 <= volume.z2;
+
+const overlaps = (left: stage.Volume, right: stage.Volume) =>
+    left.x1 <= right.x2 &&
+    right.x1 <= left.x2 &&
+    left.y1 <= right.y2 &&
+    right.y1 <= left.y2 &&
+    left.z1 <= right.z2 &&
+    right.z1 <= left.z2;
+
+/** The empty edge-to-edge distance between two platforms, level-wise. */
+function gapBetween(a: parkour.Platform, b: parkour.Platform): number {
+    const dx = Math.max(0, Math.max(a.x, b.x) - Math.min(a.x + a.size, b.x + b.size));
+    const dz = Math.max(0, Math.max(a.z, b.z) - Math.min(a.z + a.size, b.z + b.size));
+    return Math.hypot(dx, dz);
+}
+
+describe("a parkour course", () => {
+    const shapes = (["easy", "medium", "hard"] as const).flatMap((difficulty) =>
+        [10, 23, 40].flatMap((jumps) =>
+            ["a", "b", "c", "d"].map((seed) => ({ difficulty, jumps, seed }))
+        )
+    );
+
+    it("has the jumps asked for, a checkpoint every few and the finish last", () => {
+        for (const { difficulty, jumps, seed } of shapes) {
+            const course = parkour.course(
+                { place: { mode: "players" }, jumps, difficulty, height: 30 },
+                seed,
+                { x: 100, z: -40 },
+                90
+            );
+            expect(course.platforms).toHaveLength(jumps + 1);
+            expect(course.platforms[0]?.role).toBe("start");
+            expect(course.platforms.at(-1)?.role).toBe("finish");
+            expect(course.checkpoints.at(-1)).toBe(jumps);
+            expect(course.checkpoints.length).toBeGreaterThanOrEqual(
+                Math.floor(jumps / parkour.CHECK_EVERY)
+            );
+        }
+    });
+
+    it("only asks for jumps a player can make, and only ever one block up", () => {
+        const widest = { easy: 2, medium: 2, hard: 3 };
+        for (const { difficulty, jumps, seed } of shapes) {
+            const course = parkour.course(
+                { place: { mode: "players" }, jumps, difficulty, height: 30 },
+                seed,
+                { x: 0, z: 0 },
+                80
+            );
+            for (let index = 1; index < course.platforms.length; index += 1) {
+                const before = course.platforms[index - 1]!;
+                const next = course.platforms[index]!;
+                const rise = next.y - before.y;
+                expect(rise === 0 || rise === 1).toBe(true);
+                const gap = gapBetween(before, next);
+                expect(gap).toBeGreaterThanOrEqual(1);
+                expect(gap).toBeLessThanOrEqual(rise === 1 ? 1 : Math.hypot(widest[difficulty], 1));
+            }
+        }
+    });
+
+    it("climbs row by row, so no later row can be jumped to from an earlier one", () => {
+        for (const { difficulty, jumps, seed } of shapes) {
+            const course = parkour.course(
+                { place: { mode: "players" }, jumps, difficulty, height: 30 },
+                seed,
+                { x: 0, z: 0 },
+                80
+            );
+            // Every height a row stands at is one stretch of the course: a
+            // player who reaches it has come through every platform before.
+            const byHeight = new Map<number, number[]>();
+            course.platforms.forEach((one, index) =>
+                byHeight.set(one.y, [...(byHeight.get(one.y) ?? []), index])
+            );
+            for (const indexes of byHeight.values()) {
+                expect(indexes.at(-1)! - indexes[0]!).toBe(indexes.length - 1);
+            }
+        }
+    });
+
+    it("leaves head room over every platform and keeps everything in its volume, net at the bottom", () => {
+        for (const { difficulty, jumps, seed } of shapes) {
+            const course = parkour.course(
+                { place: { mode: "players" }, jumps, difficulty, height: 30 },
+                seed,
+                { x: 7, z: 7 },
+                100
+            );
+            for (const box of course.boxes) {
+                expect(inside(box, course.volume)).toBe(true);
+                expect(stage.volumeOf(box)).toBeLessThanOrEqual(stage.FILL_LIMIT);
+            }
+            expect(course.boxes[0]?.block).toBe("minecraft:white_stained_glass");
+            expect(course.boxes[0]?.y1).toBe(96);
+            course.platforms.forEach((one, index) => {
+                const room = {
+                    x1: one.x,
+                    y1: one.y + 1,
+                    z1: one.z,
+                    x2: one.x + one.size - 1,
+                    y2: one.y + 2,
+                    z2: one.z + one.size - 1
+                };
+                const inTheWay = course.boxes.filter(
+                    (box) =>
+                        overlaps(box, room) &&
+                        !(
+                            index === course.platforms.length - 1 &&
+                            box.block.endsWith("pressure_plate")
+                        )
+                );
+                expect(inTheWay).toEqual([]);
+            });
+            // Small enough to sit over a patch of ground a site can be checked for.
+            expect(course.reach).toBeLessThanOrEqual(40);
+        }
+    });
+
+    it("is the same course every time for the same run, centred over its site", () => {
+        const options = {
+            place: { mode: "players" as const },
+            jumps: 20,
+            difficulty: "medium" as const,
+            height: 30
+        };
+        const one = parkour.course(options, "run-1", { x: 500, z: 500 }, 100);
+        expect(parkour.course(options, "run-1", { x: 500, z: 500 }, 100)).toEqual(one);
+        expect(Math.abs((one.volume.x1 + one.volume.x2) / 2 - 500)).toBeLessThanOrEqual(1);
+        expect(Math.abs((one.volume.z1 + one.volume.z2) / 2 - 500)).toBeLessThanOrEqual(1);
+        expect(parkour.course(options, "run-2", { x: 500, z: 500 }, 100)).not.toEqual(one);
+    });
+
+    it("knows which platform somebody is standing on, and scores a finish above any progress", () => {
+        const course = parkour.course(
+            { place: { mode: "players" }, jumps: 12, difficulty: "easy", height: 30 },
+            "x",
+            { x: 0, z: 0 },
+            100
+        );
+        const checkpoint = course.checkpoints[0]!;
+        const one = course.platforms[checkpoint]!;
+        expect(
+            parkour.platformUnder(course, { x: one.x + 1.5, y: one.y + 1, z: one.z + 1.5 })
+        ).toBe(checkpoint);
+        expect(
+            parkour.platformUnder(course, { x: one.x + 1.5, y: one.y - 3, z: one.z + 1.5 })
+        ).toBeNull();
+        expect(parkour.checkpointsBy(course, checkpoint)).toBe(1);
+        const spot = parkour.spotOn(course, 0);
+        expect(spot.y).toBe(101);
+        expect(parkour.isFinish(parkour.finishScore(95))).toBe(true);
+        expect(parkour.finishScore(60)).toBeGreaterThan(parkour.finishScore(95));
+        expect(parkour.isFinish(40)).toBe(false);
+    });
+});
+
+describe("a spleef floor", () => {
+    it("is a snow square walled with glass, a net under it, all inside its volume", () => {
+        const floor = spleef.arena(
+            { place: { mode: "players" }, size: 8, height: 30 },
+            { x: 10, z: -20 },
+            110
+        );
+        const snow = floor.boxes.find((box) => box.block === spleef.FLOOR)!;
+        expect(snow).toMatchObject({ x1: 2, x2: 18, z1: -28, z2: -12, y1: 110, y2: 110 });
+        expect(floor.boxes[0]).toMatchObject({ y1: 106, block: "minecraft:white_stained_glass" });
+        const walls = floor.boxes.filter(
+            (box) => box.block === "minecraft:light_blue_stained_glass"
+        );
+        expect(walls).toHaveLength(4);
+        for (const wall of walls) {
+            expect(wall.y1).toBe(111);
+            expect(wall.y2).toBe(113);
+            expect(overlaps(wall, snow)).toBe(false);
+        }
+        for (const box of floor.boxes) expect(inside(box, floor.volume)).toBe(true);
+        expect(spleef.fell(floor, 111)).toBe(false);
+        expect(spleef.fell(floor, 108)).toBe(true);
+    });
+
+    it("spreads players over the snow, never onto a wall", () => {
+        const floor = spleef.arena(
+            { place: { mode: "players" }, size: 5, height: 30 },
+            { x: 0, z: 0 },
+            100
+        );
+        const spots = spleef.spots(floor, 12);
+        expect(spots).toHaveLength(12);
+        for (const spot of spots) {
+            expect(Math.abs(spot.x - 0.5)).toBeLessThanOrEqual(5);
+            expect(Math.abs(spot.z - 0.5)).toBeLessThanOrEqual(5);
+            expect(spot.y).toBe(101);
+        }
+    });
+});
+
+describe("what an arena sends", () => {
+    const box: stage.Box = {
+        x1: 1,
+        y1: 100,
+        z1: 2,
+        x2: 3,
+        y2: 100,
+        z2: 4,
+        block: "minecraft:snow_block"
+    };
+
+    it("builds into air only, and takes down only its own block inside its own box", () => {
+        expect(stage.buildLine(box)).toBe(
+            "execute in minecraft:overworld run fill 1 100 2 3 100 4 minecraft:snow_block keep"
+        );
+        expect(stage.removeLine(box)).toBe(
+            "execute in minecraft:overworld run fill 1 100 2 3 100 4 minecraft:air replace minecraft:snow_block"
+        );
+    });
+
+    it("proves a volume empty with a block nobody builds with, a slab at a time", () => {
+        const probes = stage.probeBoxes({ x1: 0, y1: 60, z1: 0, x2: 59, y2: 99, z2: 59 });
+        expect(probes.every((one) => one.block === "minecraft:structure_void")).toBe(true);
+        expect(probes.every((one) => stage.volumeOf(one) <= stage.FILL_LIMIT)).toBe(true);
+        expect(probes.reduce((sum, one) => sum + stage.volumeOf(one), 0)).toBe(60 * 40 * 60);
+        expect(probes[0]?.y1).toBe(60);
+        expect(probes.at(-1)?.y2).toBe(99);
+    });
+
+    it("reads how many blocks a fill changed, and never mistakes a refusal for none", () => {
+        expect(stage.fillCount("Successfully filled 25 block(s)")).toBe(25);
+        expect(stage.fillCount("Successfully filled 1 blocks")).toBe(1);
+        expect(stage.fillCount("No blocks were filled")).toBe(0);
+        expect(stage.fillCount("That position is not loaded")).toBeNull();
+        expect(
+            stage.fillCount(
+                "Too many blocks in the specified area (maximum 32768, specified 40000)"
+            )
+        ).toBeNull();
+        expect(stage.fillCount("")).toBeNull();
+    });
+
+    it("hears join and leave in either language, and nothing else", () => {
+        const log = [
+            "[20:00:01] [Server thread/INFO]: <Ana> join",
+            "[20:00:02] [Server thread/INFO]: <Ben> !Unirse",
+            "[20:00:03] [Server thread/INFO]: [Not Secure] <Cy> Join.",
+            "[20:00:04] [Server thread/INFO]: <Dee> join me later",
+            "[20:00:05] [Server thread/INFO]: <Ana> salir",
+            "[20:00:06] [Server thread/INFO]: Eve joined the game"
+        ].join("\n");
+        expect(stage.readCalls(log)).toEqual([
+            { name: "Ana", call: "join" },
+            { name: "Ben", call: "join" },
+            { name: "Cy", call: "join" },
+            { name: "Ana", call: "leave" }
+        ]);
+    });
+
+    it("keeps where a player was, and leaves out anybody in creative or spectator", () => {
+        const where = [
+            { name: "Ana", x: 1.5, y: 64, z: -2.25 },
+            { name: "Ben", x: 0, y: 70, z: 0 }
+        ];
+        const facing = new Map([["Ana", { yaw: 45, pitch: 10 }]]);
+        const dims = new Map([["Ana", "minecraft:the_nether"]]);
+        const modes = new Map([
+            ["Ana", 0],
+            ["Ben", 1]
+        ]);
+        expect(stage.savedFrom("ana", where, facing, dims, modes)).toEqual({
+            name: "Ana",
+            dimension: "minecraft:the_nether",
+            x: 1.5,
+            y: 64,
+            z: -2.25,
+            yaw: 45,
+            pitch: 10,
+            mode: "survival"
+        });
+        expect(stage.savedFrom("Ben", where, facing, dims, modes)).toBeNull();
+        expect(stage.savedFrom("Cy", where, facing, dims, modes)).toBeNull();
+    });
+
+    it("sends a player back exactly where they were, and takes only what the event gave", () => {
+        const saved: stage.Saved = {
+            name: "Ana",
+            dimension: "minecraft:the_nether",
+            x: 1.5,
+            y: 64,
+            z: -2.25,
+            yaw: 45,
+            pitch: 10,
+            mode: "adventure"
+        };
+        expect(stage.returnLine(saved)).toBe(
+            "execute in minecraft:the_nether run tp Ana 1.500 64.000 -2.250 45.0 10.0"
+        );
+        const after = stage.afterReturnLines(saved, "components", "&7Back");
+        expect(after).toContain("clear Ana *[minecraft:custom_data={polaris_event:1b}]");
+        expect(after).toContain("gamemode adventure Ana");
+        expect(after).toContain("tag Ana remove pe_in");
+        expect(after).toContain("effect give Ana minecraft:resistance 10 4 true");
+        expect(stage.clearMarked("Ana", "nbt")).toBe(
+            "clear Ana minecraft:iron_shovel{polaris_event:1b}"
+        );
+        expect(stage.returned("Teleported Ana to 1.5, 64.0, -2.25")).toBe(true);
+        expect(stage.returned("No entity was found")).toBe(false);
+    });
+
+    it("brings a player in protected, in adventure mode, and tagged", () => {
+        expect(stage.admitLines("Ana", { x: 10.5, y: 101, z: -3.5, yaw: -90 })).toEqual([
+            "effect give Ana minecraft:resistance 10 4 true",
+            "execute in minecraft:overworld run tp Ana 10.500 101.000 -3.500 -90.0 0.0",
+            "gamemode adventure Ana",
+            "tag Ana add pe_in"
+        ]);
+    });
+
+    it("marks the shovel it hands out, in the syntax of each era", () => {
+        const modern = stage.markedShovel("Ana", "components");
+        expect(modern).toContain("minecraft:custom_data={polaris_event:1b}");
+        expect(modern).toContain('minecraft:can_break={blocks:"minecraft:snow_block"}');
+        expect(modern).toContain("correct_for_drops:false");
+        expect(stage.markedShovel("Ana", "nbt")).toBe(
+            'give Ana minecraft:iron_shovel{polaris_event:1b,CanDestroy:["minecraft:snow_block"]} 1'
+        );
+    });
+
+    it("lets anything that is not a player float down from it, never fall", () => {
+        const bounds = stage.boundsOf([box, { ...box, x1: -4, y1: 96, y2: 96 }])!;
+        expect(bounds).toEqual({ x1: -4, y1: 96, z1: 2, x2: 3, y2: 103, z2: 4 });
+        expect(stage.floatDown(bounds, 60)).toBe(
+            "execute in minecraft:overworld run effect give @e[type=!player,x=-4,y=96,z=2,dx=7,dy=7,dz=2] minecraft:slow_falling 60 0 true"
+        );
+        expect(stage.boundsOf([])).toBeNull();
+    });
+
+    it("keeps a run's leftovers apart, and forgets them once nothing is left", () => {
+        expect(stage.leftoverOf("r", null)).toBeNull();
+        expect(stage.leftoverOf("r", stage.EMPTY_STAGE)).toBeNull();
+        const left = stage.leftoverOf("r", { ...stage.EMPTY_STAGE, boxes: [box] })!;
+        expect(stage.withLeftover([], left)).toEqual([left]);
+        expect(stage.withLeftover([left], { ...left, boxes: [] })).toEqual([
+            { ...left, boxes: [] }
+        ]);
+        expect(stage.withLeftover([left], null)).toEqual([left]);
+    });
+
+    it("says every line players read without asking for a game variable", () => {
+        const lines = (["en", "es"] as const).flatMap((language) => [
+            messages.joinHint(language),
+            messages.joinedYou(language),
+            messages.joinedBar(3, language),
+            messages.notEnoughJoined(1, 2, language),
+            messages.parkourBar(1, 3, 7, 20, language),
+            messages.finishedLine("Ana", "1:02", 1, language),
+            messages.spleefOut("Ben", 2, language),
+            messages.spleefBar(2, language),
+            messages.lastStanding("Ana", language)
+        ]);
+        for (const line of lines) expect(line).not.toMatch(/[{}]/);
+    });
+});
+
+// ------------------------------------------------------------------ arenas
+
+type TestBox = { x1: number; y1: number; z1: number; x2: number; y2: number; z2: number };
+
+const insideOf = (outer: TestBox) => (box: TestBox) =>
+    box.x1 >= outer.x1 &&
+    box.x2 <= outer.x2 &&
+    box.y1 >= outer.y1 &&
+    box.y2 <= outer.y2 &&
+    box.z1 >= outer.z1 &&
+    box.z2 <= outer.z2;
+
+const ANA = {
+    name: "Ana",
+    uuid: [1, -2, 3, 4],
+    dimension: "minecraft:the_nether",
+    x: 10.25,
+    y: 64,
+    z: -3.5,
+    yaw: 90,
+    pitch: 10,
+    gamemode: "survival" as const,
+    side: 0,
+    away: true
+};
+
+describe("an arena is built only into air and taken down only where it is ours", () => {
+    it("reads join in either language, and nothing else", () => {
+        expect(arena.wantsToJoin("join")).toBe(true);
+        expect(arena.wantsToJoin(" Unirse! ")).toBe(true);
+        expect(arena.wantsToJoin("!join")).toBe(true);
+        expect(arena.wantsToJoin("i will join later")).toBe(false);
+        expect(
+            chatLines(
+                "[20:00:05] [Server thread/INFO]: <Ana> join\n[20:00:06] [Server thread/INFO]: Ben joined the game\n"
+            )
+        ).toEqual([{ name: "Ana", text: "join" }]);
+    });
+
+    it("counts what is not air in a box by comparing it with itself", () => {
+        const box = { x1: 0, y1: 100, z1: 0, x2: 16, y2: 107, z2: 22 };
+        expect(arena.solidCount(box)).toBe(
+            "execute in minecraft:overworld if blocks 0 100 0 16 107 22 0 100 0 masked"
+        );
+        expect(arena.readCount("Test passed, count: 0")).toBe(0);
+        expect(arena.readCount("Test passed, count: 12")).toBe(12);
+        expect(arena.readCount("That position is not loaded")).toBe("unloaded");
+        expect(arena.readCount("That position is out of this world!")).toBeNull();
+    });
+
+    it("cuts a box too big for one command into pieces that cover it exactly", () => {
+        const box = { x1: 0, y1: 0, z1: 0, x2: 64, y2: 17, z2: 48 };
+        const pieces = arena.slices(box);
+        expect(pieces.length).toBeGreaterThan(1);
+        expect(pieces.every((piece) => arena.volume(piece) <= arena.VOLUME_MAX)).toBe(true);
+        expect(pieces.reduce((sum, piece) => sum + arena.volume(piece), 0)).toBe(
+            arena.volume(box)
+        );
+    });
+
+    it("builds a duel arena with keep only, inside its own box", () => {
+        const box = duel.duelBox({ x: 100, z: 200 }, 100);
+        const fills = duel.duelFills(box);
+        expect(fills.every((one) => insideOf(box)(one.box))).toBe(true);
+        const lines = fills.map((one) => arena.fillKeep(one.box, one.block));
+        expect(
+            lines.every(
+                (line) =>
+                    line.startsWith("execute in minecraft:overworld run fill ") &&
+                    line.endsWith(" keep")
+            )
+        ).toBe(true);
+        expect(new Set(fills.map((one) => one.block))).toEqual(new Set(duel.DUEL_BLOCKS));
+        // Everybody stands on its glass, in its air.
+        for (const side of [0, 1]) {
+            for (let index = 0; index < 8; index += 1) {
+                const spot = duel.sideSpot(box, side, index);
+                expect(spot.y).toBe(box.y1 + 2);
+                expect(spot.x).toBeGreaterThan(box.x1);
+                expect(spot.x).toBeLessThan(box.x2);
+                expect(spot.z).toBeGreaterThan(box.z1);
+                expect(spot.z).toBeLessThan(box.z2);
+            }
+        }
+    });
+
+    it("takes it down by replacing only its own kinds of block with air, in its own box", () => {
+        const box = duel.duelBox({ x: 100, z: 200 }, 100);
+        expect(arena.teardown({ box, blocks: duel.DUEL_BLOCKS })).toEqual(
+            duel.DUEL_BLOCKS.map(
+                (block) =>
+                    `execute in minecraft:overworld run fill 92 100 189 108 107 211 minecraft:air replace ${block}`
+            )
+        );
+        // A block name that could carry a second command is never sent.
+        expect(arena.teardown({ box, blocks: ["minecraft:barrier run say hi"] })).toEqual([]);
+    });
+
+    it("lays out build plots in their own cells, the glass floor inside the walls", () => {
+        const box = build.platformBox({ x: 0, z: 0 }, 100, 5, 11);
+        const fills = build.platformFills(box, 5, 11);
+        expect(fills.every((one) => insideOf(box)(one.box))).toBe(true);
+        expect(fills.filter((one) => one.block === build.FLOOR)).toHaveLength(5);
+        const spots = [0, 1, 2, 3, 4].map((index) => build.plotSpot(box, index, 11, 5));
+        expect(new Set(spots.map((spot) => `${spot.x},${spot.z}`)).size).toBe(5);
+        for (const spot of spots) {
+            expect(spot.y).toBe(box.y1 + 2);
+            expect(arena.contains(box, spot)).toBe(true);
+        }
+        // Twelve of the largest still fit the commands, in pieces.
+        const biggest = build.platformBox({ x: 0, z: 0 }, 100, build.MAX_PLOTS, 15);
+        expect(
+            arena.slices(biggest).every((piece) => arena.volume(piece) <= arena.VOLUME_MAX)
+        ).toBe(true);
+    });
+});
+
+describe("the kit is marked, and only it is taken back", () => {
+    it("marks it with item components from 1.20.5 and a tag before", () => {
+        expect(arena.giveMarked("Ana", "minecraft:stone_sword", 1, "components")).toBe(
+            "give Ana minecraft:stone_sword[minecraft:custom_data={polaris_event:1b}] 1"
+        );
+        expect(arena.giveMarked("Ana", "minecraft:stone_sword", 1, "tag")).toBe(
+            "give Ana minecraft:stone_sword{polaris_event:1b} 1"
+        );
+        expect(arena.clearMarked("Ana", "minecraft:shield", "components")).toBe(
+            "clear Ana minecraft:shield[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(arena.clearMarked("Ana", "minecraft:shield", "tag")).toBe(
+            "clear Ana minecraft:shield{polaris_event:1b}"
+        );
+    });
+
+    it("never clears an item without the marker, and sends the player back exactly", () => {
+        for (const marker of ["components", "tag"] as const) {
+            const lines = arena.homeward(ANA, marker, build.KIT_IDS);
+            const clears = lines.filter((line) => line.startsWith("clear "));
+            expect(clears).toHaveLength(build.KIT_IDS.length);
+            expect(clears.every((line) => line.includes("polaris_event:1b"))).toBe(true);
+            expect(lines.at(-1)).toBe("gamemode survival Ana");
+        }
+        expect(arena.sendHome(ANA)).toBe(
+            "execute in minecraft:the_nether run tp Ana 10.250 64.000 -3.500 90.0 10.0"
+        );
+        expect(arena.wentHome("Teleported Ana to 10.25, 64.0, -3.5")).toBe(true);
+        expect(arena.wentHome("No player was found")).toBe(false);
+        expect(arena.commandable(ANA)).toBe(true);
+        expect(arena.commandable({ ...ANA, dimension: "minecraft:x run op Bob" })).toBe(false);
+    });
+
+    it("lets the kit's glass go only on the plot and on itself, and its brush break only the glass", () => {
+        for (const marker of ["components", "tag"] as const) {
+            const lines = build.kitCommands("Ana", marker);
+            expect(lines).toHaveLength(build.KIT_IDS.length);
+            expect(lines.every((line) => commandBytes(line) <= COMMAND_BYTES_MAX)).toBe(true);
+            const glass = lines[0]!;
+            expect(glass).toContain(
+                marker === "components" ? "minecraft:can_place_on={blocks:[" : "CanPlaceOn:["
+            );
+            expect(glass).toContain(`"${build.FLOOR}"`);
+            const brush = lines.at(-1)!;
+            expect(brush).toContain(
+                marker === "components" ? "minecraft:can_break={blocks:[" : "CanDestroy:["
+            );
+            expect(brush).not.toContain(`"${build.FLOOR}"`);
+        }
+        expect(build.KIT_BLOCKS).not.toContain(build.FLOOR);
+    });
+
+    it("keeps what a player drops theirs, and sends it after them", () => {
+        const box = { x1: 0, y1: 100, z1: 0, x2: 16, y2: 107, z2: 22 };
+        expect(arena.keepThrown(box)[0]).toBe(
+            "execute in minecraft:overworld as @e[type=minecraft:item,x=0,y=100,z=0,dx=16,dy=7,dz=22] if data entity @s Thrower run data modify entity @s Owner set from entity @s Thrower"
+        );
+        expect(arena.sendThrown(box, ANA)).toBe(
+            "execute in minecraft:overworld as @e[type=minecraft:item,x=0,y=100,z=0,dx=16,dy=7,dz=22,nbt={Thrower:[I;1,-2,3,4]}] run tp @s Ana"
+        );
+        expect(arena.killMarkedDrops(box, "components")).toContain(
+            'nbt={Item:{components:{"minecraft:custom_data":{polaris_event:1b}}}}'
+        );
+        expect(arena.killMarkedDrops(box, "tag")).toContain("nbt={Item:{tag:{polaris_event:1b}}}");
+    });
+
+    it("reads each player's game mode and id", () => {
+        expect(
+            arena.readGamemodes(
+                "Ana has the following entity data: 0\nBen has the following entity data: 1"
+            )
+        ).toEqual(
+            new Map([
+                ["Ana", "survival"],
+                ["Ben", "creative"]
+            ])
+        );
+        expect(arena.readUuids("Ana has the following entity data: [I; 1, -2, 3, 4]")).toEqual(
+            new Map([["Ana", [1, -2, 3, 4]]])
+        );
+    });
+});
+
+describe("a team duel and a build battle", () => {
+    it("puts a player on a side's team only when they are on none", () => {
+        expect(duel.joinTeam("Ana", 1)).toBe(
+            "execute if entity @a[name=Ana,team=] run team join pe_blue Ana"
+        );
+        const setup = duel.duelSetup(["Red", "Blue"]);
+        expect(setup).toContain("team modify pe_red friendlyFire false");
+        expect(setup).toContain("scoreboard objectives add pe_hp health");
+        expect(commands.cleanup(preset("team-duel"), null)).toEqual(
+            expect.arrayContaining(duel.duelTeardown())
+        );
+    });
+
+    it("credits a real kill first, then the rival who struck last", () => {
+        const now = 100_000;
+        expect(
+            duel.creditFor(["Ben", "Cy"], new Map([["Cy", 1]]), new Map([["Ben", now]]), now)
+        ).toBe("Cy");
+        expect(
+            duel.creditFor(
+                ["Ben", "Cy"],
+                new Map(),
+                new Map([
+                    ["Ben", now - 4_000],
+                    ["Cy", now - 1_000]
+                ]),
+                now
+            )
+        ).toBe("Cy");
+        expect(duel.creditFor(["Ben"], new Map(), new Map([["Ben", now - 20_000]]), now)).toBeNull();
+    });
+
+    it("takes one vote per player, never for their own plot", () => {
+        const owners = new Map([
+            [1, "Ana"],
+            [2, "Ben"]
+        ]);
+        let votes: Record<string, string> = {};
+        const cast = (voter: string, plot: number) => {
+            const result = build.castVote(votes, voter, plot, owners);
+            votes = result.votes;
+            return result.outcome;
+        };
+        expect(cast("Ana", 1)).toBe("own");
+        expect(cast("Ana", 2)).toBe("counted");
+        expect(cast("ana", 2)).toBe("again");
+        expect(cast("Cy", 7)).toBe("none");
+        expect(cast("Cy", 1)).toBe("counted");
+        expect(build.countVotes(votes)).toEqual(
+            new Map([
+                ["Ben", 1],
+                ["Ana", 1]
+            ])
+        );
+        expect(build.readVote("#3")).toBe(3);
+        expect(build.readVote(" 12 ")).toBe(12);
+        expect(build.readVote("plot 3")).toBeNull();
+    });
+
+    it("draws the same theme for the same run, in the players' language", () => {
+        const options = catalog.optionsSchemas["build-battle"].parse({});
+        const english = build.themeFor(options, "run-1", "en");
+        expect(build.themeFor(options, "run-1", "en")).toBe(english);
+        expect(build.THEMES.find((one) => one.en === english)?.es).toBe(
+            build.themeFor(options, "run-1", "es")
+        );
+        const mine = catalog.optionsSchemas["build-battle"].parse({
+            themeMode: "mine",
+            themes: ["Our town"]
+        });
+        expect(build.themeFor(mine, "run-1", "en")).toBe("Our town");
+        expect(
+            catalog.optionsSchemas["build-battle"].safeParse({ themeMode: "mine", themes: [] })
+                .success
+        ).toBe(false);
+        expect(
+            catalog.optionsSchemas["build-battle"].safeParse({ themes: ["{player}"] }).success
+        ).toBe(false);
+    });
+
+    it("gives a join event time to type join, and a build battle its vote", () => {
+        const settings = catalog.settingsSchema.parse({ countdownSeconds: 0 });
+        expect(catalog.countdownSecondsFor(preset("team-duel"), settings)).toBe(catalog.JOIN_SECONDS);
+        expect(catalog.countdownSecondsFor(preset("fishing"), settings)).toBe(0);
+        expect(catalog.runMinutes({ ...preset("build-battle"), minutes: 5 })).toBe(6);
+        expect(catalog.needsPvp(preset("team-duel"))).toBe(true);
+        expect(catalog.needsPvp(preset("build-battle"))).toBe(false);
+        for (const kind of ["team-duel", "build-battle"] as const) {
+            expect(messages.rules(kind, "es")).not.toBe(messages.rules(kind, "en"));
+            expect(messages.kindName(kind, "es").length).toBeGreaterThan(0);
+        }
     });
 });
 

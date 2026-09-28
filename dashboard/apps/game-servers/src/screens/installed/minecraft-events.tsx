@@ -10,15 +10,17 @@
  * event appears here without a reload.
  */
 
+import * as ui from "@polaris/ui";
 import * as actions from "./events-actions";
 import { EventEditor } from "./event-editor";
 import { hostUi } from "@polaris/app-host/client";
+import { CATCH_LABELS } from "./event-options-rare-catch";
+import { MATERIAL_LABELS } from "./event-options-gathering";
 import * as catalog from "../../lib/minecraft/events/catalog";
 import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
 import type { EventsView } from "../../lib/minecraft/events/events-service";
-import { Copy, FastForward, Info, Loader2, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import * as ui from "@polaris/ui";
+import { Copy, FastForward, Info, Loader2, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
 
 const { useConfirm } = hostUi.confirmDialog;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -128,7 +130,7 @@ function EventExplained({
     const facts: string[] = [
         preset.kind === "trivia"
             ? `${(preset.options as catalog.EventOptions<"trivia">).rounds} rounds of ${(preset.options as catalog.EventOptions<"trivia">).seconds} seconds.`
-            : `Lasts ${preset.minutes} minutes.`
+            : `Lasts ${catalog.runMinutes(preset)} minutes.`
     ];
     if (preset.kind === "happy-hour") {
         const options = preset.options as catalog.EventOptions<"happy-hour">;
@@ -142,7 +144,92 @@ function EventExplained({
             `Everybody on gets ${effects.join(", ")} until it ends, including whoever joins meanwhile.`
         );
     }
-    if (catalog.needsOverworld(preset))
+    if (preset.kind === "treasure-hunt") {
+        const options = preset.options as catalog.EventOptions<"treasure-hunt">;
+        facts.push(
+            `${options.chests} ${options.chests === 1 ? "chest" : "chests"} hidden up to ${options.distance} blocks from the players, on open natural ground well away from anybody's bed.`,
+            "Clues come in three steps: how far and which way, then the area, then the exact spot; a beam of light marks the ones left in the last minutes. A player close to one sees the way in their action bar.",
+            "A chest is only put where there is air, and one nobody opened is taken away at the end. An opened chest stays: what is inside is the finder's."
+        );
+    }
+    if (preset.kind === "gathering") {
+        const options = preset.options as catalog.EventOptions<"gathering">;
+        facts.push(
+            options.material === "random"
+                ? "The material is drawn from the list each time and announced when the countdown starts."
+                : `The material: ${MATERIAL_LABELS[options.material].toLowerCase()}.`,
+            "Scored by what each player holds at the end minus what they held when it began, and never more than they picked up during it - a stack taken out of a chest does not count. Nothing is taken from anybody."
+        );
+    }
+    if (preset.kind === "rare-catch") {
+        const options = preset.options as catalog.EventOptions<"rare-catch">;
+        facts.push(
+            `The first player to fish up ${CATCH_LABELS[options.treasure].toLowerCase()} wins, and keeps it. Taking one out of a chest, or dropping one and picking it up, does not count.`
+        );
+    }
+    if (preset.kind === "xp-boost") {
+        const options = preset.options as catalog.EventOptions<"xp-boost">;
+        const extra = [
+            options.perKill > 0 && `${options.perKill} extra experience per mob killed`,
+            options.perOre > 0 && `${options.perOre} per ore block mined`
+        ].filter(Boolean);
+        facts.push(
+            `Everybody on gets ${extra.join(" and ")} until it ends. Nothing is ever taken away; an ore block placed during it is not paid for again.`
+        );
+    }
+    if (preset.kind === "waves") {
+        const options = preset.options as catalog.EventOptions<"waves">;
+        facts[0] = `${options.waves} waves, ${catalog.runMinutes(preset)} minutes at most. A wave ends when all of it is killed, or after two minutes.`;
+        facts.push(
+            "The point is on open, flat ground the world made, at least 96 blocks from any online player's bed. Only monsters that cannot break blocks come - no creepers, endermen or ravagers - and every one of them is removed when it ends.",
+            "Keep inventory is on while it runs, so dying costs nothing; the server's own setting comes back afterwards. Java 1.17 or later."
+        );
+    }
+    if (preset.kind === "meteor-shower") {
+        const options = preset.options as catalog.EventOptions<"meteor-shower">;
+        facts.push(
+            `${options.meteors} meteors of ${options.size} ore blocks each, landing over the first three quarters of it. Each block mined near a meteor scores 1; ore placed near one is taken off.`,
+            "Meteors land on open, flat ground the world made, at least 48 blocks from any online player's bed, and ore is only ever put where there was air. What nobody mined is taken away at the end - only blocks still exactly the meteor's ore - and nothing else is touched.",
+            "Diamond and emerald ore need an iron pickaxe, ancient debris a diamond one."
+        );
+    }
+    if (catalog.playsOnStage(preset)) {
+        const options = preset.options as { height: number };
+        facts.push(
+            preset.kind === "parkour"
+                ? `${(preset.options as catalog.EventOptions<"parkour">).jumps} jumps, ${(preset.options as catalog.EventOptions<"parkour">).difficulty}, built about ${options.height} blocks up. A fall lands on a net and goes back to the last checkpoint.`
+                : `A ${(preset.options as catalog.EventOptions<"spleef">).size * 2 + 1} by ${(preset.options as catalog.EventOptions<"spleef">).size * 2 + 1} snow floor about ${options.height} blocks up. Falling through it is being out; the last one on it wins.`,
+            `Only players who type join (or unirse) in the chat during the countdown - at least ${catalog.JOIN_SECONDS} seconds - take part. They are taken there and brought back to exactly where they were when it ends, even after a restart.`,
+            "It is built only in empty air, over open ground away from everybody's bed, and taken down block by block afterwards - only what it placed. Inside, nobody can take damage and everybody is in adventure mode; their game mode is given back after.",
+            preset.kind === "spleef"
+                ? "Players get a marked shovel that only breaks the snow; it is cleared at the end, and nothing else of theirs is touched. Needs Java 1.14.4 or newer; before 1.20.5 the snow drops snowballs when dug."
+                : "Nobody's items are touched. Needs Java 1.14.4 or newer."
+        );
+    }
+    if (preset.kind === "team-duel") {
+        const options = preset.options as catalog.EventOptions<"team-duel">;
+        facts.push(
+            "Only players who type join (or unirse) in the chat during the countdown take part. They are split into two teams and taken to an arena built 30 blocks up, over open ground away from anybody's bed.",
+            `Everybody gets the same ${options.kit} sword and a shield. A player down to ${options.downHearts} ${options.downHearts === 1 ? "heart" : "hearts"} is out: the other team scores, the rival who brought them down gets the elimination, and they are sent back to their side, healed. The team with more wins; the podium goes by eliminations.`,
+            "Keep inventory is on while it lasts and put back after, so even a death in the arena keeps everything.",
+            "Needs Player versus player allowed in Settings, and Minecraft 1.16 or later. Up to 16 players."
+        );
+    }
+    if (preset.kind === "build-battle") {
+        const options = preset.options as catalog.EventOptions<"build-battle">;
+        facts.push(
+            "Only players who type join (or unirse) in the chat during the countdown take part. Each gets a plot on a platform built 30 blocks up, over open ground away from anybody's bed.",
+            `${options.themeMode === "mine" ? "A theme from your list" : "A built-in theme"}, a ${options.plotSize} by ${options.plotSize} plot, 16 kinds of glass and a brush; ${preset.minutes} minutes to build, then ${options.voteSeconds} seconds touring the plots and voting in the chat - one vote each, not for your own plot. Most votes wins.`,
+            "Only the kit's glass can be placed: builders play in adventure mode, where their own blocks cannot be put down at all, so nothing of theirs is used or left on a plot. Glass broken by hand drops nothing, so no kit leaves a plot either.",
+            "Needs Minecraft 1.16 or later. Up to 12 builders."
+        );
+    }
+    if (catalog.playsInArena(preset)) {
+        facts.push(
+            "Nothing of anybody's is touched. The arena goes only where the air was empty, and comes down block kind by block kind; only the event's own marked kit is taken back; each player is sent back to exactly where they stood, in their own game mode, with whatever they dropped. Somebody offline at the end finds it still standing when they log in, and is sent back then."
+        );
+    }
+    if (catalog.needsOverworld(preset) && !catalog.playsOnStage(preset))
         facts.push("Happens in the Overworld; only players there take part.");
     if (catalog.hasMinScore(preset)) {
         facts.push(

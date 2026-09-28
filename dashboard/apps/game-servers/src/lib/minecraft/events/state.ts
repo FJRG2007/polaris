@@ -15,12 +15,73 @@ import {
     rewardSchema,
     type EventPreset
 } from "./catalog";
+import { stageSchema, stageLeftoverSchema } from "./kinds/stage";
 
 export const TRIGGERS = ["manual", "scheduled", "random"] as const;
 export type EventTrigger = (typeof TRIGGERS)[number];
 
 const pointSchema = z.object({ x: z.number(), y: z.number(), z: z.number() });
 export type Point = z.infer<typeof pointSchema>;
+
+/** A treasure hunt's chest: where it is, and who opened it once somebody has. */
+const chestSchema = z.object({
+    x: z.number(),
+    y: z.number(),
+    z: z.number(),
+    opened: z.boolean().default(false),
+    by: z.string().nullable().default(null)
+});
+export type HiddenChest = z.infer<typeof chestSchema>;
+
+/** A box of blocks in the Overworld, both corners included. */
+export const boxSchema = z.object({
+    x1: z.number().int(),
+    y1: z.number().int(),
+    z1: z.number().int(),
+    x2: z.number().int(),
+    y2: z.number().int(),
+    z2: z.number().int()
+});
+export type Box = z.infer<typeof boxSchema>;
+
+/**
+ * What an event built: a box that was nothing but air when it was checked, and
+ * every kind of block it put there. Taking it down replaces only those kinds,
+ * only inside the box - so nothing that was there before, and nothing anybody
+ * else put down, is touched.
+ */
+export const arenaSchema = z.object({ box: boxSchema, blocks: z.array(z.string()) });
+export type Arena = z.infer<typeof arenaSchema>;
+
+export const GAMEMODES = ["survival", "creative", "adventure", "spectator"] as const;
+
+/**
+ * A player an event took somewhere, and everything needed to put them back:
+ * where they stood, which way they faced, in which world, and the game mode
+ * they played in. Written down before they are moved, and never again.
+ */
+export const entrantSchema = z.object({
+    name: z.string(),
+    /** For finding what they dropped while they were away; null when unread. */
+    uuid: z.array(z.number().int()).length(4).nullable(),
+    dimension: z.string(),
+    x: z.number(),
+    y: z.number(),
+    z: z.number(),
+    yaw: z.number(),
+    pitch: z.number(),
+    gamemode: z.enum(GAMEMODES),
+    /** Their team in a duel (0 or 1), their plot in a build battle. */
+    side: z.number().int(),
+    /** Moved by the event and not yet put back. */
+    away: z.boolean().default(true)
+});
+export type Entrant = z.infer<typeof entrantSchema>;
+
+/** How the items an event hands out are marked: item components from 1.20.5,
+ *  a tag on the item before. */
+export const MARKERS = ["components", "tag"] as const;
+export type Marker = (typeof MARKERS)[number];
 
 export const runSchema = z.object({
     id: z.string(),
@@ -66,7 +127,64 @@ export const runSchema = z.object({
     /** Everybody seen in creative or spectator while it ran. */
     offMode: z.array(z.string()).default([]),
     /** Its results are being handed out; never played again from here. */
-    finishing: z.boolean().default(false)
+    finishing: z.boolean().default(false),
+    /** Treasure hunt: every chest it put down, and who opened each. Kept so the
+     *  ones still unopened are taken away, and their chunks let go of, even
+     *  after a restart. */
+    chests: z.array(chestSchema).default([]),
+    /** Treasure hunt: the columns kept loaded for the chests. */
+    held: z.array(z.object({ x: z.number(), z: z.number() })).default([]),
+    /** Treasure hunt: every chest there will be is down. */
+    hidden: z.boolean().default(false),
+    /** Treasure hunt: where the players were when the chests were hidden, which
+     *  the first clue is told from. */
+    origin: z.object({ x: z.number(), z: z.number() }).nullable().default(null),
+    /** Gathering: the material this one is for, drawn when it was set off. */
+    material: z.string().nullable().default(null),
+    /** Horde defence: the waves each player was at the point for when they
+     *  ended, by name. The wave itself is `round` (from 0), open until
+     *  `roundEndsAt`, and the last one closed at `closedAt`. */
+    survived: z.record(z.number()).default({}),
+    /** Chunks the event holds loaded besides its place's own - by chunk
+     *  coordinates, only ones nobody held before it - let go at the end. */
+    chunks: z.array(z.object({ x: z.number().int(), z: z.number().int() })).default([]),
+    /** Meteor shower: every meteor that landed, with each ore block of it the
+     *  event placed into air and that is still there as far as it knows - the
+     *  only blocks the end may take away. */
+    meteors: z
+        .array(
+            pointSchema.extend({
+                blocks: z.array(pointSchema.extend({ block: z.string() })).default([])
+            })
+        )
+        .default([]),
+    /** Meteor shower: how many of its meteors have come down, or been given up on. */
+    landings: z.number().int().default(0),
+    /** Parkour and spleef: who joined, what was built and where everybody was. */
+    stage: stageSchema.nullable().default(null),
+    /** An event players join: who typed `join`, in the order they did - and,
+     *  once `enrolled`, who of them is taking part, their order their side. */
+    joined: z.array(z.string()).default([]),
+    enrolled: z.boolean().default(false),
+    /** The ground kept loaded under an arena being put up, before it is built. */
+    site: boxSchema.nullable().default(null),
+    /** What it built, once it has. */
+    arena: arenaSchema.nullable().default(null),
+    /** Who it moved, and where each came from. */
+    entrants: z.array(entrantSchema).default([]),
+    /** How the kit it handed out is marked, and which items it was. */
+    marker: z.enum(MARKERS).nullable().default(null),
+    kit: z.array(z.string()).default([]),
+    /** When everybody was in place and the playing itself began. */
+    readyAt: z.number().nullable().default(null),
+    /** A team duel's points by team (`0`, `1`). */
+    tally: z.record(z.number()).default({}),
+    /** A build battle's votes: who voted, for whose plot. */
+    votes: z.record(z.string()).default({}),
+    /** A build battle's theme, in the players' language. */
+    theme: z.string().nullable().default(null),
+    /** A build battle: the building is over and the vote is on. */
+    voting: z.boolean().default(false)
 });
 
 export type EventRun = z.infer<typeof runSchema> & { preset: EventPreset };
@@ -105,6 +223,27 @@ const pendingSchema = z.object({
 
 export type PendingReward = z.infer<typeof pendingSchema>;
 
+/**
+ * An arena an event has ended with and not yet been able to take down, because
+ * somebody who was in it is not online to be taken back: logging in, they are
+ * in it, enclosed and safe, rather than in the air where it was. The sweep puts
+ * them back when they are on, and takes it down once nobody is left in it.
+ */
+const arenaLeftoverSchema = z.object({
+    id: z.string(),
+    kind: z.enum(EVENT_KINDS),
+    arena: arenaSchema.nullable(),
+    site: boxSchema.nullable().default(null),
+    marker: z.enum(MARKERS).nullable(),
+    kit: z.array(z.string()),
+    entrants: z.array(entrantSchema),
+    /** Game rules still to put back, when the server was not answering at the end. */
+    gamerules: z.record(z.string()).default({}),
+    createdAt: z.number()
+});
+
+export type ArenaLeftover = z.infer<typeof arenaLeftoverSchema>;
+
 export const eventStateSchema = z.object({
     run: runSchema.nullable().default(null),
     history: z.array(historySchema).default([]),
@@ -123,7 +262,12 @@ export const eventStateSchema = z.object({
     wins: z
         .record(z.object({ name: z.string(), count: z.number().int() }))
         .nullable()
-        .default(null)
+        .default(null),
+    /** What a parkour or spleef left to undo when it ended - blocks still up,
+     *  players still owed their trip back - settled by the sweep. */
+    stageLeftovers: z.array(stageLeftoverSchema).default([]),
+    /** Arenas still standing for somebody to be taken back from. */
+    arenaLeftovers: z.array(arenaLeftoverSchema).default([])
 });
 
 export type EventState = z.infer<typeof eventStateSchema> & { run: EventRun | null };
@@ -143,7 +287,9 @@ export const EMPTY_EVENT_STATE: EventState = {
     waiting: null,
     lastKind: null,
     scheduleRuns: {},
-    wins: null
+    wins: null,
+    stageLeftovers: [],
+    arenaLeftovers: []
 };
 
 export function readEventState(config: Record<string, unknown>): EventState {

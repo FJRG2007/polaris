@@ -25,6 +25,11 @@ import {
     Textarea
 } from "@polaris/ui";
 import * as catalog from "../../lib/minecraft/events/catalog";
+import { TreasureHuntOptions } from "./event-options-treasure-hunt";
+import { GatheringOptions } from "./event-options-gathering";
+import { RareCatchOptions } from "./event-options-rare-catch";
+import { XpBoostOptions } from "./event-options-xp-boost";
+import { BuildBattleFields, TeamDuelFields } from "./event-options-arena";
 
 const MINING_LABELS: Readonly<Record<(typeof catalog.MINING_TARGETS)[number], string>> = {
     "any-ore": "Any ore, rarer worth more",
@@ -41,7 +46,7 @@ const HUNT_LABELS: Readonly<Record<(typeof catalog.HUNT_TARGETS)[number], string
     enderman: "Endermen"
 };
 
-const LOOT_LABELS: Readonly<Record<(typeof catalog.LOOT_TABLES)[number], string>> = {
+export const LOOT_LABELS: Readonly<Record<(typeof catalog.LOOT_TABLES)[number], string>> = {
     treasure: "Buried treasure",
     dungeon: "Dungeon",
     bastion: "Bastion treasure (1.16+)",
@@ -62,25 +67,44 @@ const INTENSITY_LABELS: Readonly<Record<(typeof catalog.INTENSITIES)[number], st
     high: "High"
 };
 
+const WAVE_MIX_LABELS: Readonly<Record<(typeof catalog.WAVE_MIXES)[number], string>> = {
+    classic: "Zombies, skeletons and spiders",
+    undead: "The undead: zombies, husks, skeletons, strays",
+    mixed: "Everything above, and witches"
+};
+
+const METEOR_ORE_LABELS: Readonly<Record<(typeof catalog.METEOR_ORES)[number], string>> = {
+    common: "Common: coal, iron, copper (1.17+), gold, redstone, lapis",
+    precious: "Precious: gold, lapis, diamond, emerald",
+    diamond: "Diamond ore only",
+    debris: "Ancient debris only (1.16+)"
+};
+
 const TRIVIA_LABELS: Readonly<Record<(typeof catalog.TRIVIA_MODES)[number], string>> = {
     questions: "Questions",
     scramble: "Scrambled words",
     mixed: "Both, taking turns"
 };
 
-function options<T extends string>(
+const DIFFICULTY_LABELS: Readonly<Record<(typeof catalog.PARKOUR_DIFFICULTIES)[number], string>> = {
+    easy: "Easy",
+    medium: "Medium",
+    hard: "Hard"
+};
+
+export function options<T extends string>(
     labels: Readonly<Record<T, string>>
 ): { value: T; label: string }[] {
     return (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
 }
 
 /** A number typed into a field, or NaN - which the schema then names. */
-function numberOf(text: string): number {
+export function numberOf(text: string): number {
     return text.trim() === "" ? Number.NaN : Number(text);
 }
 
 /** The first problem the schema has with a path, if any. */
-function problemAt(
+export function problemAt(
     issues: readonly { path: (string | number)[]; message: string }[],
     ...path: (string | number)[]
 ): string | null {
@@ -88,7 +112,7 @@ function problemAt(
     return found?.message ?? null;
 }
 
-function Field({
+export function Field({
     label,
     hint,
     problem,
@@ -113,7 +137,7 @@ function Field({
 }
 
 /** Where an event happens: around the players, or at a point the operator set. */
-function PlaceField({
+export function PlaceField({
     value,
     onChange,
     what,
@@ -652,6 +676,294 @@ function OptionsFields({
                 </>
             );
         }
+        case "treasure-hunt":
+            return (
+                <TreasureHuntOptions
+                    value={preset.options as catalog.EventOptions<"treasure-hunt">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "gathering":
+            return (
+                <GatheringOptions
+                    value={preset.options as catalog.EventOptions<"gathering">}
+                    onChange={onChange}
+                />
+            );
+        case "rare-catch":
+            return (
+                <RareCatchOptions
+                    value={preset.options as catalog.EventOptions<"rare-catch">}
+                    onChange={onChange}
+                />
+            );
+        case "xp-boost":
+            return (
+                <XpBoostOptions
+                    value={preset.options as catalog.EventOptions<"xp-boost">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "waves": {
+            const value = preset.options as catalog.EventOptions<"waves">;
+            return (
+                <>
+                    <PlaceField
+                        value={value.place}
+                        onChange={(place) => onChange({ ...value, place })}
+                        what="The point is marked about 50 blocks"
+                        issues={issues}
+                        path={["options", "place"]}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                        <Field
+                            label="Waves"
+                            hint="3 to 10"
+                            problem={problemAt(issues, "options", "waves")}
+                        >
+                            <Input
+                                type="number"
+                                min={3}
+                                max={10}
+                                value={Number.isFinite(value.waves) ? value.waves : ""}
+                                onChange={(event) =>
+                                    onChange({ ...value, waves: numberOf(event.target.value) })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label="First wave size"
+                            hint="2 to 12 for one defender; each wave and each defender adds more."
+                            problem={problemAt(issues, "options", "size")}
+                        >
+                            <Input
+                                type="number"
+                                min={2}
+                                max={12}
+                                value={Number.isFinite(value.size) ? value.size : ""}
+                                onChange={(event) =>
+                                    onChange({ ...value, size: numberOf(event.target.value) })
+                                }
+                            />
+                        </Field>
+                    </div>
+                    <Field
+                        label="Monsters"
+                        hint="Never creepers, endermen or anything else that breaks blocks."
+                    >
+                        <Select
+                            value={value.mix}
+                            onValueChange={(mix) =>
+                                onChange({ ...value, mix: mix as typeof value.mix })
+                            }
+                            options={options(WAVE_MIX_LABELS)}
+                            aria-label="Monsters"
+                        />
+                    </Field>
+                </>
+            );
+        }
+        case "meteor-shower": {
+            const value = preset.options as catalog.EventOptions<"meteor-shower">;
+            return (
+                <>
+                    <PlaceField
+                        value={value.place}
+                        onChange={(place) => onChange({ ...value, place })}
+                        what="Each meteor lands up to the distance below"
+                        issues={issues}
+                        path={["options", "place"]}
+                    />
+                    <Field
+                        label="How far (blocks)"
+                        hint="Between 50 and 1000. Around the players, or around the coordinates."
+                        problem={problemAt(issues, "options", "distance")}
+                    >
+                        <Input
+                            type="number"
+                            min={50}
+                            max={1000}
+                            value={Number.isFinite(value.distance) ? value.distance : ""}
+                            onChange={(event) =>
+                                onChange({ ...value, distance: numberOf(event.target.value) })
+                            }
+                        />
+                    </Field>
+                    <div className="grid grid-cols-2 gap-3">
+                        <Field
+                            label="Meteors"
+                            hint="2 to 8"
+                            problem={problemAt(issues, "options", "meteors")}
+                        >
+                            <Input
+                                type="number"
+                                min={2}
+                                max={8}
+                                value={Number.isFinite(value.meteors) ? value.meteors : ""}
+                                onChange={(event) =>
+                                    onChange({ ...value, meteors: numberOf(event.target.value) })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label="Blocks in each"
+                            hint="3 to 12"
+                            problem={problemAt(issues, "options", "size")}
+                        >
+                            <Input
+                                type="number"
+                                min={3}
+                                max={12}
+                                value={Number.isFinite(value.size) ? value.size : ""}
+                                onChange={(event) =>
+                                    onChange({ ...value, size: numberOf(event.target.value) })
+                                }
+                            />
+                        </Field>
+                    </div>
+                    <Field label="Made of">
+                        <Select
+                            value={value.ores}
+                            onValueChange={(ores) =>
+                                onChange({ ...value, ores: ores as typeof value.ores })
+                            }
+                            options={options(METEOR_ORE_LABELS)}
+                            aria-label="Made of"
+                        />
+                    </Field>
+                </>
+            );
+        }
+        case "parkour": {
+            const value = preset.options as catalog.EventOptions<"parkour">;
+            return (
+                <>
+                    <PlaceField
+                        value={value.place}
+                        onChange={(place) => onChange({ ...value, place })}
+                        what="It is built over open ground"
+                        issues={issues}
+                        path={["options", "place"]}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                        <Field
+                            label="Jumps"
+                            hint="10 to 40, a checkpoint every 6."
+                            problem={problemAt(issues, "options", "jumps")}
+                        >
+                            <Input
+                                type="number"
+                                min={10}
+                                max={40}
+                                value={Number.isFinite(value.jumps) ? value.jumps : ""}
+                                onChange={(event) =>
+                                    onChange({ ...value, jumps: numberOf(event.target.value) })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label="Height (blocks)"
+                            hint="25 to 40 above the ground."
+                            problem={problemAt(issues, "options", "height")}
+                        >
+                            <Input
+                                type="number"
+                                min={25}
+                                max={40}
+                                value={Number.isFinite(value.height) ? value.height : ""}
+                                onChange={(event) =>
+                                    onChange({ ...value, height: numberOf(event.target.value) })
+                                }
+                            />
+                        </Field>
+                    </div>
+                    <Field
+                        label="Difficulty"
+                        hint="Easy: wide platforms, short gaps. Hard: single blocks, gaps of up to three."
+                    >
+                        <SegmentedControl
+                            value={value.difficulty}
+                            onValueChange={(difficulty) =>
+                                onChange({
+                                    ...value,
+                                    difficulty: difficulty as typeof value.difficulty
+                                })
+                            }
+                            options={options(DIFFICULTY_LABELS)}
+                            aria-label="Difficulty"
+                        />
+                    </Field>
+                </>
+            );
+        }
+        case "spleef": {
+            const value = preset.options as catalog.EventOptions<"spleef">;
+            return (
+                <>
+                    <PlaceField
+                        value={value.place}
+                        onChange={(place) => onChange({ ...value, place })}
+                        what="It is built over open ground"
+                        issues={issues}
+                        path={["options", "place"]}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                        <Field
+                            label="Floor size (blocks from the middle)"
+                            hint={
+                                Number.isFinite(value.size)
+                                    ? `5 to 15: this one is ${value.size * 2 + 1} by ${value.size * 2 + 1}.`
+                                    : "5 to 15."
+                            }
+                            problem={problemAt(issues, "options", "size")}
+                        >
+                            <Input
+                                type="number"
+                                min={5}
+                                max={15}
+                                value={Number.isFinite(value.size) ? value.size : ""}
+                                onChange={(event) =>
+                                    onChange({ ...value, size: numberOf(event.target.value) })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label="Height (blocks)"
+                            hint="25 to 40 above the ground."
+                            problem={problemAt(issues, "options", "height")}
+                        >
+                            <Input
+                                type="number"
+                                min={25}
+                                max={40}
+                                value={Number.isFinite(value.height) ? value.height : ""}
+                                onChange={(event) =>
+                                    onChange({ ...value, height: numberOf(event.target.value) })
+                                }
+                            />
+                        </Field>
+                    </div>
+                </>
+            );
+        }
+        case "team-duel":
+            return (
+                <TeamDuelFields
+                    value={preset.options as catalog.EventOptions<"team-duel">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "build-battle":
+            return (
+                <BuildBattleFields
+                    value={preset.options as catalog.EventOptions<"build-battle">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
         default:
             return null;
     }
@@ -697,9 +1009,11 @@ export function EventEditor({
                                 onChange={(event) => change({ name: event.target.value })}
                             />
                         </Field>
-                        {draft.kind !== "trivia" && (
+                        {draft.kind !== "trivia" && draft.kind !== "waves" && (
                             <Field
-                                label="Minutes"
+                                label={
+                                    draft.kind === "build-battle" ? "Minutes to build" : "Minutes"
+                                }
                                 problem={problemAt(issues, "minutes")}
                                 hint={`${catalog.DURATION.min} to ${catalog.DURATION.max}`}
                             >
@@ -786,13 +1100,20 @@ export function EventEditor({
                                     hint={
                                         draft.kind === "blood-moon"
                                             ? "Everybody who survived the night with a kill."
-                                            : draft.kind === "supply-drop" ||
-                                                (draft.kind === "explorer" &&
-                                                    (
-                                                        draft.options as catalog.EventOptions<"explorer">
-                                                    ).mode === "race")
-                                              ? "Nobody but the winner, in this one."
-                                              : "Everybody who scored at all."
+                                            : draft.kind === "waves"
+                                              ? "Everybody who held the point through a wave and fought."
+                                              : draft.kind === "parkour"
+                                                ? "Everybody who joined and cleared at least one jump."
+                                                : draft.kind === "spleef"
+                                                  ? "Everybody who joined."
+                                                  : draft.kind === "supply-drop" ||
+                                                      draft.kind === "rare-catch" ||
+                                                      (draft.kind === "explorer" &&
+                                                          (
+                                                              draft.options as catalog.EventOptions<"explorer">
+                                                          ).mode === "race")
+                                                    ? "Nobody but the winner, in this one."
+                                                    : "Everybody who scored at all."
                                     }
                                     value={rewards.everyone}
                                     issues={issues}

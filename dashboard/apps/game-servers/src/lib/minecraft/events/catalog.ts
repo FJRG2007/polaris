@@ -24,7 +24,17 @@ export const EVENT_KINDS = [
     "trivia",
     "explorer",
     "happy-hour",
-    "king-of-the-hill"
+    "king-of-the-hill",
+    "treasure-hunt",
+    "gathering",
+    "rare-catch",
+    "xp-boost",
+    "waves",
+    "meteor-shower",
+    "parkour",
+    "spleef",
+    "team-duel",
+    "build-battle"
 ] as const;
 
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -98,6 +108,34 @@ export const BOSS_KINDS = ["wither-skeleton", "ravager", "vindicator", "husk"] a
 export const INTENSITIES = ["low", "medium", "high"] as const;
 export const TRIVIA_MODES = ["questions", "scramble", "mixed"] as const;
 export const LANGUAGES = ["en", "es"] as const;
+/** What a gathering can ask for. `logs` is every kind of log and stem. */
+export const GATHER_MATERIALS = [
+    "wheat",
+    "logs",
+    "cobblestone",
+    "iron_ingot",
+    "coal",
+    "kelp",
+    "bamboo",
+    "sugar_cane",
+    "potato",
+    "carrot",
+    "sand",
+    "pumpkin"
+] as const;
+export type GatherMaterial = (typeof GATHER_MATERIALS)[number];
+/** What a rare catch can be for: the fishing treasures. `any` is whichever of them. */
+export const RARE_CATCHES = ["name_tag", "saddle", "nautilus_shell", "enchanted_book", "bow"] as const;
+export type RareCatch = (typeof RARE_CATCHES)[number];
+/** Which monsters a horde defence sends: only ones that cannot break a block. */
+export const WAVE_MIXES = ["classic", "undead", "mixed"] as const;
+/** What a meteor is made of. */
+export const METEOR_ORES = ["common", "precious", "diamond", "debris"] as const;
+export const PARKOUR_DIFFICULTIES = ["easy", "medium", "hard"] as const;
+/** The sword a team duel hands everybody, alike for all. */
+export const DUEL_KITS = ["wood", "stone", "iron"] as const;
+/** Where a build battle's theme comes from: the built-in list or the operator's. */
+export const THEME_MODES = ["random", "mine"] as const;
 
 export type Language = (typeof LANGUAGES)[number];
 
@@ -153,7 +191,92 @@ export const optionsSchemas = {
     "king-of-the-hill": z.object({
         place: placeSchema.default({ mode: "players" }),
         radius: z.number().int().min(3).max(20).default(6)
-    })
+    }),
+    "treasure-hunt": z.object({
+        chests: z.number().int().min(1, "At least one").max(10, "At most 10").default(5),
+        /** How far from the players the chests are hidden, at most. */
+        distance: z.number().int().min(50).max(1000).default(300),
+        loot: z.enum(LOOT_TABLES).default("dungeon")
+    }),
+    gathering: z.object({
+        /** Drawn when the event is set off, from the list, when `random`. */
+        material: z.enum([...GATHER_MATERIALS, "random"]).default("random")
+    }),
+    "rare-catch": z.object({
+        treasure: z.enum([...RARE_CATCHES, "any"]).default("any")
+    }),
+    "xp-boost": z
+        .object({
+            /** Experience points on top of the game's own, per mob killed. */
+            perKill: z.number().int().min(0).max(100, "At most 100").default(5),
+            /** And per ore block mined. */
+            perOre: z.number().int().min(0).max(100, "At most 100").default(3)
+        })
+        .refine((value) => value.perKill > 0 || value.perOre > 0, {
+            message: "Give something for kills, ores or both"
+        }),
+    waves: z.object({
+        place: placeSchema.default({ mode: "players" }),
+        waves: z.number().int().min(3, "At least 3 waves").max(10, "At most 10 waves").default(5),
+        /** Monsters in the first wave for one defender; later waves and more
+         *  defenders bring more. */
+        size: z.number().int().min(2, "At least 2").max(12, "At most 12").default(4),
+        mix: z.enum(WAVE_MIXES).default("classic")
+    }),
+    "meteor-shower": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        distance: z.number().int().min(50, "At least 50").max(1000, "At most 1000").default(150),
+        meteors: z.number().int().min(2, "At least 2").max(8, "At most 8").default(4),
+        /** Ore blocks in each meteor. */
+        size: z.number().int().min(3, "At least 3").max(12, "At most 12").default(6),
+        ores: z.enum(METEOR_ORES).default("precious")
+    }),
+    parkour: z.object({
+        place: placeSchema.default({ mode: "players" }),
+        jumps: z.number().int().min(10, "At least 10").max(40, "At most 40").default(20),
+        difficulty: z.enum(PARKOUR_DIFFICULTIES).default("medium"),
+        /** How far above the ground it is built. */
+        height: z.number().int().min(25, "At least 25").max(40, "At most 40").default(30)
+    }),
+    spleef: z.object({
+        place: placeSchema.default({ mode: "players" }),
+        /** Blocks from the middle of the floor to its edge. */
+        size: z.number().int().min(5, "At least 5").max(15, "At most 15").default(8),
+        height: z.number().int().min(25, "At least 25").max(40, "At most 40").default(30)
+    }),
+    "team-duel": z.object({
+        /** The arena is built in the air above ground found here. */
+        place: placeSchema.default({ mode: "players" }),
+        kit: z.enum(DUEL_KITS).default("stone"),
+        /** Hearts left at which a player is out of the fight and sent back to
+         *  their side, before the next blow can kill them. */
+        downHearts: z.number().int().min(1).max(6).default(3)
+    }),
+    "build-battle": z
+        .object({
+            place: placeSchema.default({ mode: "players" }),
+            /** Each plot's floor, in blocks a side; it is as tall as it is wide. */
+            plotSize: z.number().int().min(7).max(15).default(11),
+            /** How long the vote lasts, after the building time (`minutes`). */
+            voteSeconds: z.number().int().min(30).max(180).default(60),
+            themeMode: z.enum(THEME_MODES).default("random"),
+            /** Written by the operator; one is drawn when the mode is `mine`. */
+            themes: z
+                .array(
+                    z
+                        .string()
+                        .trim()
+                        .min(2, "At least two characters")
+                        .max(40, "At most 40 characters")
+                        .regex(/^[^{}&]+$/, "No braces or & in a theme")
+                )
+                .max(50, "At most 50 themes")
+                .default([])
+        })
+        .refine((value) => value.themeMode === "random" || value.themes.length > 0, {
+            message: "Write at least one theme",
+            path: ["themes"]
+        })
 } as const satisfies Record<EventKind, z.ZodTypeAny>;
 
 export type EventOptions<K extends EventKind> = z.output<(typeof optionsSchemas)[K]>;
@@ -205,6 +328,25 @@ export const presetSchema = z
         presetBase.extend({
             kind: z.literal("king-of-the-hill"),
             options: optionsSchemas["king-of-the-hill"]
+        }),
+        presetBase.extend({
+            kind: z.literal("treasure-hunt"),
+            options: optionsSchemas["treasure-hunt"]
+        }),
+        presetBase.extend({ kind: z.literal("gathering"), options: optionsSchemas.gathering }),
+        presetBase.extend({ kind: z.literal("rare-catch"), options: optionsSchemas["rare-catch"] }),
+        presetBase.extend({ kind: z.literal("xp-boost"), options: optionsSchemas["xp-boost"] }),
+        presetBase.extend({ kind: z.literal("waves"), options: optionsSchemas.waves }),
+        presetBase.extend({
+            kind: z.literal("meteor-shower"),
+            options: optionsSchemas["meteor-shower"]
+        }),
+        presetBase.extend({ kind: z.literal("parkour"), options: optionsSchemas.parkour }),
+        presetBase.extend({ kind: z.literal("spleef"), options: optionsSchemas.spleef }),
+        presetBase.extend({ kind: z.literal("team-duel"), options: optionsSchemas["team-duel"] }),
+        presetBase.extend({
+            kind: z.literal("build-battle"),
+            options: optionsSchemas["build-battle"]
         })
     ])
     .transform((value) => value as EventPreset);
@@ -387,6 +529,76 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
             "A marked circle appears. The longest time spent inside it wins - so it is worth defending.",
         unit: "seconds",
         competitive: true
+    },
+    "treasure-hunt": {
+        label: "Treasure hunt",
+        summary:
+            "Loot chests are hidden on open ground around the players, told in clues that get sharper as it goes. Whoever opens the most wins, and keeps what is inside.",
+        unit: "chests",
+        competitive: true
+    },
+    gathering: {
+        label: "Gathering",
+        summary:
+            "One material is announced - wheat, logs, cobblestone, iron... Whoever gathers the most of it wins. Nothing is taken from anybody.",
+        unit: "items",
+        competitive: true
+    },
+    "rare-catch": {
+        label: "Rare catch",
+        summary:
+            "A fishing race for one treasure - a name tag, a saddle, an enchanted book... The first to fish it up wins, and keeps it.",
+        unit: "",
+        competitive: true
+    },
+    "xp-boost": {
+        label: "Experience boost",
+        summary:
+            "Extra experience for every mob killed and every ore mined, for everybody, for a while. No winner - a good filler between competitions.",
+        unit: "",
+        competitive: false
+    },
+    waves: {
+        label: "Horde defence",
+        summary:
+            "A defence point is marked away from every home and waves of monsters come for it, each bigger and stronger than the last. Everybody who holds the point is rewarded; the podium goes to the most kills.",
+        unit: "kills",
+        competitive: true
+    },
+    "meteor-shower": {
+        label: "Meteor shower",
+        summary:
+            "Meteors of ore fall one after another on open ground away from every home, each marked by a beam of light. Whoever mines the most meteor blocks wins.",
+        unit: "blocks",
+        competitive: true
+    },
+    parkour: {
+        label: "Parkour race",
+        summary:
+            "A jump course is built high in the air. Players type join in the chat to take part and are taken to the start; the fastest to the finish wins, and a fall only sends you back to your last checkpoint.",
+        unit: "jumps",
+        competitive: true
+    },
+    spleef: {
+        label: "Spleef",
+        summary:
+            "The floor is lava: a snow floor is built high in the air and players who type join get a shovel that only breaks that snow. Dig it out from under the others - whoever falls through is out and sent back - and the last one standing wins.",
+        unit: "points",
+        competitive: true
+    },
+    "team-duel": {
+        label: "Team duel",
+        summary:
+            "Players who type join are split into two teams in an arena built in the sky, each given the same sword and shield. The team with more eliminations wins; the podium goes by each player's own. Nobody loses anything: a player low on health is sent back to their side, and inventories are kept whatever happens.",
+        unit: "eliminations",
+        competitive: true
+    },
+    "build-battle": {
+        label: "Build battle",
+        summary:
+            "Players who type join each get a plot in the sky, a theme and a kit of coloured glass. When the time is up everybody tours the plots and votes for the best in the chat. Only the kit can be built with; nothing of anybody's is used or taken.",
+        unit: "votes",
+        competitive: true
     }
 };
 
@@ -406,7 +618,12 @@ export function newPreset(kind: EventKind, id: string): EventPreset {
         kind,
         name: KIND_INFO[kind].label,
         enabled: true,
-        minutes: kind === "happy-hour" ? 20 : kind === "trivia" ? 5 : 10,
+        minutes:
+            kind === "happy-hour" || kind === "xp-boost" || kind === "rare-catch"
+                ? 20
+                : kind === "trivia"
+                  ? 5
+                  : 10,
         minScore: DEFAULT_MIN_SCORE[kind],
         options,
         rewards: KIND_INFO[kind].competitive
@@ -508,13 +725,26 @@ export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
     trivia: 1,
     explorer: 250,
     "happy-hour": 1,
-    "king-of-the-hill": 30
+    "king-of-the-hill": 30,
+    "treasure-hunt": 1,
+    gathering: 16,
+    "rare-catch": 1,
+    "xp-boost": 1,
+    waves: 3,
+    "meteor-shower": 2,
+    parkour: 1,
+    spleef: 1,
+    "team-duel": 1,
+    "build-battle": 1
 };
 
 /** Whether the minimum is something an operator can set for this event. A
- *  supply drop and a race have one winner and nothing to count. */
+ *  supply drop, a rare catch and a race have one winner and nothing to count. */
 export function hasMinScore(preset: EventPreset): boolean {
-    if (!KIND_INFO[preset.kind].competitive || preset.kind === "supply-drop") return false;
+    if (!KIND_INFO[preset.kind].competitive) return false;
+    if (preset.kind === "supply-drop" || preset.kind === "rare-catch") return false;
+    // Ranked by the finish and by who is left standing: anybody who took part at all is.
+    if (playsOnStage(preset)) return false;
     return !(
         preset.kind === "explorer" && (preset.options as EventOptions<"explorer">).mode === "race"
     );
@@ -537,6 +767,11 @@ export function needsOverworld(preset: EventPreset): boolean {
         case "world-boss":
         case "blood-moon":
         case "king-of-the-hill":
+        case "treasure-hunt":
+        case "waves":
+        case "meteor-shower":
+        case "parkour":
+        case "spleef":
             return true;
         case "explorer":
             return (preset.options as EventOptions<"explorer">).mode === "race";
@@ -548,7 +783,10 @@ export function needsOverworld(preset: EventPreset): boolean {
 /** The events hostile mobs are the whole of, which Peaceful takes away. */
 export function needsHostileMobs(preset: EventPreset): boolean {
     return (
-        preset.kind === "blood-moon" || preset.kind === "world-boss" || preset.kind === "mob-hunt"
+        preset.kind === "blood-moon" ||
+        preset.kind === "world-boss" ||
+        preset.kind === "mob-hunt" ||
+        preset.kind === "waves"
     );
 }
 
@@ -564,6 +802,9 @@ export function afkCounts(preset: EventPreset): boolean {
         case "mob-hunt":
         case "fishing":
         case "blood-moon":
+        case "gathering":
+        case "rare-catch":
+        case "waves":
             return true;
         case "explorer":
             return (preset.options as EventOptions<"explorer">).mode === "distance";
@@ -577,8 +818,74 @@ export function runMinutes(preset: EventPreset): number {
         const options = preset.options as EventOptions<"trivia">;
         return Math.ceil((options.rounds * (options.seconds + ROUND_PAUSE_SECONDS)) / 60);
     }
+    if (preset.kind === "waves") {
+        // Time to reach the point, every wave fought to its limit with the
+        // breath after it, and a minute to find the place.
+        const options = preset.options as EventOptions<"waves">;
+        const seconds =
+            WAVE_TIMING.firstSeconds +
+            options.waves * (WAVE_TIMING.limitSeconds + WAVE_TIMING.pauseSeconds) +
+            60;
+        return Math.ceil(seconds / 60);
+    }
+    if (preset.kind === "build-battle") {
+        const options = preset.options as EventOptions<"build-battle">;
+        return preset.minutes + Math.ceil(options.voteSeconds / 60);
+    }
     return preset.minutes;
 }
 
+/** A horde defence's clock: how long before the first wave, how long a wave
+ *  may last before it is called over, and the breath between two. */
+export const WAVE_TIMING = { firstSeconds: 45, limitSeconds: 120, pauseSeconds: 20 } as const;
+
 /** The breath between one trivia round and the next. */
 export const ROUND_PAUSE_SECONDS = 6;
+
+// ------------------------------------------------------------------ taking part by choice
+
+/**
+ * The events a player takes part in only by saying so - `join` in the chat
+ * during the countdown - because they are taken somewhere to play them and
+ * brought back after. Nobody is moved who did not ask to be.
+ */
+export function takesJoiners(preset: EventPreset): boolean {
+    return playsOnStage(preset) || playsInArena(preset);
+}
+
+/** Played on a stage built in the sky for each to play alone - a parkour
+ *  course, a spleef floor (`kinds/stage-service.ts`). */
+export function playsOnStage(preset: EventPreset): boolean {
+    return preset.kind === "parkour" || preset.kind === "spleef";
+}
+
+/** Played in an arena built in the sky, by sides - two teams, a plot each - with
+ *  a marked kit (`kinds/arena-service.ts`). */
+export function playsInArena(preset: EventPreset): boolean {
+    return preset.kind === "team-duel" || preset.kind === "build-battle";
+}
+
+/** The least countdown an event asked to join gets, whatever the settings say:
+ *  time to read the line and type the word. */
+export const JOIN_SECONDS = 30;
+
+/** How long the warning before an event is, in seconds. */
+export function countdownSecondsFor(preset: EventPreset, settings: EventSettings): number {
+    return takesJoiners(preset)
+        ? Math.max(settings.countdownSeconds, JOIN_SECONDS)
+        : settings.countdownSeconds;
+}
+
+/** How many must join for it to go ahead: two for what one player cannot play -
+ *  a spleef, a duel, a build battle voted on by the others - and for any
+ *  competition with prizes. */
+export function joinersNeeded(preset: EventPreset): number {
+    return preset.kind === "spleef" || playsInArena(preset) || awardsPrizes(preset)
+        ? PRIZE_COMPETITION_FLOOR
+        : 1;
+}
+
+/** The events players fight each other in, which a server with PvP off cannot run. */
+export function needsPvp(preset: EventPreset): boolean {
+    return preset.kind === "team-duel";
+}

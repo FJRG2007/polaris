@@ -18,16 +18,28 @@ import * as plan from "./plan";
 import * as stored from "./state";
 import { readXray } from "../xray";
 import { prisma } from "@polaris/db";
-import { withTimeout } from "@polaris/core";
 import * as catalog from "./catalog";
+import * as waves from "./kinds/waves";
+import * as meteors from "./kinds/meteor-shower";
 import * as commands from "./commands";
 import * as messages from "./messages";
-import * as trivia from "./trivia-bank";
-import { host } from "@polaris/app-host";
-import { readSchedule } from "../schedule";
-import { holdSidebar, releaseSidebar } from "../live-display-service";
+import * as stage from "./kinds/stage";
+import * as stageService from "./kinds/stage-service";
+import * as arenaService from "./kinds/arena-service";
+import * as duel from "./kinds/team-duel";
+import { parseProperties } from "../parse";
 import * as playing from "../activity";
-import { containerFileSize, readContainerRange } from "../../container-files";
+import * as trivia from "./trivia-bank";
+import * as chunks from "./kinds/chunks";
+import { host } from "@polaris/app-host";
+import * as boost from "./kinds/xp-boost";
+import { readSchedule } from "../schedule";
+import { withTimeout } from "@polaris/core";
+import * as gather from "./kinds/gathering";
+import * as hunt from "./kinds/treasure-hunt";
+import * as rareCatch from "./kinds/rare-catch";
+import { holdSidebar, releaseSidebar } from "../live-display-service";
+import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
 import {
     editionOf,
     openServerContainer,
@@ -50,6 +62,7 @@ const PLACE_TRIES = 6;
 const SPOT_RADIUS = 3;
 const WRITE_TRIES = 5;
 const LOG_FILE = "/data/logs/latest.log";
+const SERVER_PROPERTIES = "/data/server.properties";
 
 interface Loop {
     readonly ownerId: string;
@@ -76,6 +89,8 @@ interface Loop {
     announced: boolean;
     language: catalog.Language;
     countdown: number;
+    /** Parkour and spleef: how this server spells marked items, and its build limit. */
+    flavour: stage.Flavour | null;
 }
 
 const loops = new Map<string, Loop>();
@@ -273,11 +288,13 @@ async function currentStandings(
     installedAppId: string,
     run: stored.EventRun
 ): Promise<{ name: string; score: number }[]> {
-    if (run.preset.kind === "trivia") {
+    if (run.preset.kind === "trivia" || run.preset.kind === "treasure-hunt") {
         return Object.entries(run.points)
             .map(([name, score]) => ({ name, score }))
             .sort((left, right) => right.score - left.score);
     }
+    if (catalog.playsOnStage(run.preset)) return stageService.standings(run).slice(0, 10);
+    if (catalog.playsInArena(run.preset)) return arenaService.standings(run);
     if (!commands.hasScoreboard(run.preset)) return [];
     const loop = loops.get(installedAppId);
     const output = loop?.link
@@ -349,9 +366,36 @@ export async function startEvent(input: {
             );
         }
     }
+    // Players who cannot hurt each other have nothing to duel with. Read from
+    // the server's own settings file, which is what the game goes by.
+    if (catalog.needsPvp(preset)) {
+        const properties = await withServerContainer(row.ownerId, input.installedAppId, (server) =>
+            readContainerFile(server, SERVER_PROPERTIES)
+        ).catch(() => null);
+        if (properties !== null && parseProperties(properties).pvp === "false") {
+            throw new Error(
+                "Player versus player is Blocked on this server, and a duel needs it. Allow it under Settings first."
+            );
+        }
+    }
+    // The kit's marker, and what a dropped item remembers of who threw it, are
+    // read the way 1.16 and later write them.
+    if (catalog.playsInArena(preset)) {
+        const version = await withServerContainer(
+            row.ownerId,
+            input.installedAppId,
+            versionOf
+        ).catch(() => null);
+        if (!atLeast(version, [1, 16])) {
+            throw new Error(
+                `${catalog.KIND_INFO[preset.kind].label} needs Minecraft 1.16 or later; this server runs ${version}.`
+            );
+        }
+    }
 
     const now = Date.now();
-    const countdown = config.settings.countdownSeconds * 1000;
+    // Long enough to type `join` in, for an event players join.
+    const countdown = catalog.countdownSecondsFor(preset, config.settings) * 1000;
     const run = {
         id: `${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
         trigger: input.trigger,
@@ -376,7 +420,35 @@ export async function startEvent(input: {
         finishing: false,
         gamerules: {},
         timeBefore: null,
-        offMode: []
+        offMode: [],
+        chests: [],
+        held: [],
+        hidden: false,
+        origin: null,
+        material:
+            preset.kind === "gathering"
+                ? gather.drawMaterial(
+                      preset.options as catalog.EventOptions<"gathering">,
+                      Math.random
+                  )
+                : null,
+        survived: {},
+        chunks: [],
+        meteors: [],
+        landings: 0,
+        stage: null,
+        joined: [],
+        enrolled: false,
+        site: null,
+        arena: null,
+        entrants: [],
+        marker: null,
+        kit: [],
+        readyAt: null,
+        tally: {},
+        votes: {},
+        theme: null,
+        voting: false
     } satisfies stored.EventRun;
 
     const stored = await updateEventState(input.installedAppId, (state) => {
@@ -483,7 +555,8 @@ function startLoop(
         // Resumed after a restart: the countdown was already said.
         announced: run.phase === "running",
         language: settings.language,
-        countdown: settings.countdownSeconds
+        countdown: catalog.countdownSecondsFor(run.preset, settings),
+        flavour: null
     };
     loop.timer.unref?.();
     loops.set(installedAppId, loop);
@@ -567,8 +640,10 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     try {
         done = await play(installedAppId, loop, server, now);
     } catch (error) {
-        if (error instanceof PlaceNotFound)
+        if (error instanceof PlaceNotFound || error instanceof arenaService.EventStopped)
             return finish(installedAppId, loop, server, "failed", error.message);
+        if (error instanceof stageService.CalledOff)
+            return finish(installedAppId, loop, server, "cancelled", error.message);
         throw error;
     }
     if (done) return finish(installedAppId, loop, server, "finished", done);
@@ -601,6 +676,10 @@ async function countdown(
             commands.say(
                 `${messages.tag(language)}&f${messages.rules(preset.kind, language, isRace(preset))}`
             ),
+            ...targetLines(loop.run, language),
+            ...(catalog.takesJoiners(preset)
+                ? [commands.say(messages.tag(language) + messages.joinHint(language))]
+                : []),
             commands.sound(commands.SOUNDS.tick)
         ]);
     }
@@ -608,7 +687,7 @@ async function countdown(
         const lines = commands.barUpdate(
             messages.startsInBar(title, left, language),
             left,
-            Math.max(1, loop.countdown)
+            Math.max(1, loop.countdown, catalog.takesJoiners(preset) ? catalog.JOIN_SECONDS : 0)
         );
         const mark = Math.ceil(left);
         if ([30, 10, 5, 4, 3, 2, 1].includes(mark) && !loop.sounded.has(mark)) {
@@ -616,10 +695,36 @@ async function countdown(
             lines.push(commands.sound(commands.SOUNDS.tick));
             if (mark <= 5) lines.push(`title @a actionbar ${commands.text(`&e${mark}`)}`);
         }
+        // Who has typed `join` so far, read off the chat.
+        if (catalog.playsOnStage(preset))
+            await stageService.countdownTick(loop, stageTools(installedAppId, loop, server), lines);
+        if (catalog.playsInArena(preset)) {
+            lines.push(
+                ...(await arenaService.joinTick(kindContext(installedAppId, loop, server, now)))
+            );
+            if (left > 5) lines.push(arenaService.joinBar(loop.run, language));
+        }
         await server.sayAll(lines);
         return;
     }
     await begin(installedAppId, loop, server, now);
+}
+
+/** What a gathering or a rare catch is for, said with the rules. */
+function targetLines(run: stored.EventRun, language: catalog.Language): string[] {
+    const { preset } = run;
+    if (preset.kind === "gathering") {
+        const material = gather.materialOf(
+            run.material,
+            preset.options as catalog.EventOptions<"gathering">
+        );
+        return [commands.say(messages.tag(language) + messages.gatherTarget(material, language))];
+    }
+    if (preset.kind === "rare-catch") {
+        const { treasure } = preset.options as catalog.EventOptions<"rare-catch">;
+        return [commands.say(messages.tag(language) + messages.catchTarget(treasure, language))];
+    }
+    return [];
 }
 
 function isRace(preset: catalog.EventPreset): boolean {
@@ -651,9 +756,26 @@ async function begin(
         commands.say(
             `${messages.tag(language)}&f${messages.rules(preset.kind, language, isRace(preset))}`
         ),
+        ...targetLines(loop.run, language),
         commands.say(messages.tag(language) + messages.lasts(catalog.runMinutes(preset), language)),
         commands.sound(preset.kind === "blood-moon" ? commands.SOUNDS.horn : commands.SOUNDS.start)
     ];
+    if (preset.kind === "gathering") {
+        // Counted from now: what everybody holds at this moment is where they start.
+        const material = gather.materialOf(
+            loop.run.material,
+            preset.options as catalog.EventOptions<"gathering">
+        );
+        lines.push(...gather.gatheringSetup(material), ...gather.gatheringTick(material));
+    }
+    if (preset.kind === "rare-catch") {
+        lines.push(
+            ...rareCatch.catchSetup(preset.options as catalog.EventOptions<"rare-catch">)
+        );
+    }
+    if (preset.kind === "xp-boost") {
+        lines.push(...boost.boostSetup(preset.options as catalog.EventOptions<"xp-boost">));
+    }
     if (preset.kind === "world-boss") {
         lines.push(
             ...commands.bossScoreboard((preset.options as catalog.EventOptions<"world-boss">).boss)
@@ -686,6 +808,53 @@ async function begin(
             ...commands.happyEffects(preset.options as catalog.EventOptions<"happy-hour">, seconds)
         );
     }
+    if (preset.kind === "waves") {
+        // Nobody loses what they carry to a wave: keepInventory on for
+        // exactly the event. What it was is written down before it is
+        // changed, so even a restart right after puts it back.
+        const before: Record<string, string> = {};
+        for (const rule of waves.KEEP_INVENTORY) {
+            const value = commands.readRuleValue(await server.say([commands.readRule(rule)]));
+            if (value === null) continue;
+            before[rule] = value;
+            break;
+        }
+        loop.run = { ...loop.run, gamerules: { ...before, ...loop.run.gamerules } };
+        await persist(installedAppId, loop);
+        lines.push(
+            ...Object.keys(before).map((rule) => commands.setRule(rule, "true")),
+            ...waves.wavesSetup((preset.options as catalog.EventOptions<"waves">).mix)
+        );
+    }
+    if (preset.kind === "meteor-shower") {
+        lines.push(
+            ...meteors.meteorSetup((preset.options as catalog.EventOptions<"meteor-shower">).ores)
+        );
+    }
+    if (catalog.playsInArena(preset)) lines.push(...arenaService.beginLines(preset, language));
+    if (catalog.needsPvp(preset)) {
+        // Nobody loses what they carry to a fight: a death keeps all of it, for
+        // exactly as long as the duel lasts, and the rule is put back after.
+        const before: Record<string, string> = {};
+        for (const rule of duel.KEEP_INVENTORY) {
+            const value = commands.readRuleValue(await server.say([commands.readRule(rule)]));
+            if (value === null) continue;
+            before[rule] = value;
+            lines.push(commands.setRule(rule, "true"));
+            break;
+        }
+        // A rule it cannot read is one it cannot hold or give back: no fight.
+        if (Object.keys(before).length === 0) {
+            return finish(
+                installedAppId,
+                loop,
+                server,
+                "failed",
+                "The server would not say whether it keeps inventories, so the duel could not promise nobody loses anything"
+            );
+        }
+        loop.run = { ...loop.run, gamerules: { ...before, ...loop.run.gamerules } };
+    }
     await server.sayAll(lines);
     loop.run = { ...loop.run, phase: "running", startsAt: now };
     await persist(installedAppId, loop);
@@ -707,7 +876,8 @@ async function play(
     const total = (loop.run.endsAt - loop.run.startsAt) / 1000;
     const lines: string[] = [];
 
-    if (preset.kind !== "world-boss") {
+    // The boss's bar shows its health, and a horde defence's the wave.
+    if (preset.kind !== "world-boss" && preset.kind !== "waves") {
         lines.push(...commands.barUpdate(messages.barName(preset.name, left), left, total));
     }
     // Every other tick: the game adds the statistics up faster than anybody
@@ -753,6 +923,45 @@ async function play(
         case "trivia":
             decided = await triviaTick(installedAppId, loop, server, now, lines);
             break;
+        case "treasure-hunt":
+            decided = await treasureHunt(installedAppId, loop, server, now, lines);
+            break;
+        case "gathering":
+            await gathering(loop, server, lines);
+            break;
+        case "rare-catch":
+            decided = await rareCatchTick(loop, server, lines);
+            break;
+        case "xp-boost": {
+            const options = preset.options as catalog.EventOptions<"xp-boost">;
+            if (loop.ticks % 2 === 0) lines.push(...boost.boostTick(options));
+            lines.push(
+                `title @a actionbar ${commands.text(
+                    messages.boostBar(options.perKill, options.perOre, loop.language)
+                )}`
+            );
+            break;
+        }
+        case "waves":
+            decided = await hordeDefence(installedAppId, loop, server, now, lines);
+            break;
+        case "meteor-shower":
+            decided = await meteorShower(installedAppId, loop, server, now, lines);
+            break;
+        case "parkour":
+        case "spleef":
+            decided = await stageService.stageTick(
+                loop,
+                server,
+                stageTools(installedAppId, loop, server),
+                now,
+                lines
+            );
+            break;
+        case "team-duel":
+        case "build-battle":
+            decided = await arenaService.arenaTick(kindContext(installedAppId, loop, server, now), lines);
+            break;
         default:
             break;
     }
@@ -779,9 +988,14 @@ async function findPlace(
     server: ServerContainer,
     place: catalog.EventPlace,
     distance: number,
-    radius: number
+    radius: number,
+    /** How far from every bed; further for what should not come near a home. */
+    clearance = commands.HOME_CLEARANCE,
+    /** Whether a fixed point is where it happens, or only where to look round
+     *  - for an event of many places, which must not all be the one spot. */
+    asGiven = true
 ): Promise<stored.Point | "failed" | null> {
-    const chosen = place.mode === "fixed" && loop.run.placeTries === 0;
+    const chosen = asGiven && place.mode === "fixed" && loop.run.placeTries === 0;
     if (!loop.run.target) {
         const centre = await centreFor(server, place);
         if (!centre) return "failed";
@@ -791,7 +1005,7 @@ async function findPlace(
                 commands.HOMES.map((line) => server.say([line]).catch(() => ""))
             );
             const homes = commands.readHomes(spawnX ?? "", spawnZ ?? "", respawn ?? "");
-            point = commands.clearPoint(centre, distance, homes, Math.random);
+            point = commands.clearPoint(centre, distance, homes, Math.random, clearance);
         }
         if (!point) {
             loop.run = { ...loop.run, placeTries: loop.run.placeTries + 1 };
@@ -934,6 +1148,62 @@ async function centreFor(
 }
 
 // ------------------------------------------------------------------ each kind
+
+/** What an event players join is lent for one tick: the loop's own tools. */
+function kindContext(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number
+): arenaService.KindContext {
+    return {
+        server,
+        language: loop.language,
+        now,
+        get run() {
+            return loop.run;
+        },
+        set run(next: stored.EventRun) {
+            loop.run = next;
+        },
+        persist: () => persist(installedAppId, loop),
+        findPlace: (place, distance, radius) =>
+            findPlace(installedAppId, loop, server, place, distance, radius),
+        giveUpPlace: (point) => retryPlace(installedAppId, loop, server, point),
+        chat: () => chatSince(loop, server),
+        atLeast: async (wanted) => atLeast(await versionOf(server), wanted),
+        owed: async () => {
+            const row = await readRow(installedAppId);
+            return row ? owedNames(stored.readEventState(row.config)) : new Set<string>();
+        }
+    };
+}
+
+/**
+ * Who, in lower case, is still owed a trip back from an earlier stage or arena
+ * - logged out inside it - and so is not taken anywhere else until they are
+ * back where they started.
+ */
+function owedNames(state: stored.EventState): Set<string> {
+    return new Set([
+        ...arenaService.owedNames(state.arenaLeftovers),
+        ...state.stageLeftovers.flatMap((one) => one.saved.map((saved) => saved.name.toLowerCase()))
+    ]);
+}
+
+/**
+ * What was said in the chat since this was last asked, line by line. Null the
+ * first time after the loop started - or started again after a restart - which
+ * only marks where the log is: what was said while nobody was reading is not
+ * taken.
+ */
+async function chatSince(
+    loop: Loop,
+    server: ServerContainer
+): Promise<{ name: string; text: string }[] | null> {
+    const said = await newChat(server, loop);
+    return said === null ? null : chatLines(said);
+}
 
 async function supplyDrop(
     installedAppId: string,
@@ -1145,6 +1415,216 @@ async function race(
     return `${winner} reached the finish first`;
 }
 
+/**
+ * A treasure hunt's tick: the chests hidden first, a couple of tries a tick;
+ * then the clues as they fall due, every chest checked for being opened, each
+ * player pointed at the nearest one once they are close, and the beams in the
+ * last minutes.
+ */
+async function treasureHunt(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number,
+    lines: string[]
+): Promise<string | null> {
+    const options = loop.run.preset.options as catalog.EventOptions<"treasure-hunt">;
+    const language = loop.language;
+    if (!loop.run.hidden) {
+        await hideTreasure(installedAppId, loop, server, options);
+        if (!loop.run.hidden) {
+            lines.push(
+                ...hunt.holdChests(loop.run.held),
+                `title @a actionbar ${commands.text(messages.huntHiding(language))}`
+            );
+            return null;
+        }
+    }
+    lines.push(...hunt.holdChests(loop.run.held));
+    const total = (loop.run.endsAt - loop.run.startsAt) / 1000;
+    const left = (loop.run.endsAt - now) / 1000;
+    const due = hunt.clueDue((total - left) / Math.max(1, total));
+    if (loop.run.reveals < due && loop.run.origin) {
+        for (const line of hunt.clues(loop.run.chests, due, loop.run.origin, language)) {
+            lines.push(commands.say(messages.tag(language) + line));
+        }
+        lines.push(commands.sound(commands.SOUNDS.tick));
+        loop.run = { ...loop.run, reveals: due };
+        await persist(installedAppId, loop);
+    }
+
+    // Opened since the last look: the chest keeps its loot table until then.
+    let changed = false;
+    const chests = [...loop.run.chests];
+    const points = { ...loop.run.points };
+    for (const [index, chest] of chests.entries()) {
+        if (chest.opened) continue;
+        const answer = commands.readTest(await server.say([commands.chestUnopened(chest)]));
+        if (answer !== "failed") continue;
+        const by =
+            commands.readWhere(await server.say([commands.nearest(chest, hunt.OPENER_REACH)]))[0]
+                ?.name ?? null;
+        chests[index] = { ...chest, opened: true, by };
+        changed = true;
+        const remaining = chests.filter((one) => !one.opened).length;
+        lines.push(
+            commands.say(messages.tag(language) + messages.huntOpened(by ?? "?", remaining, language)),
+            commands.sound(commands.SOUNDS.win)
+        );
+        if (by) {
+            points[by] = (points[by] ?? 0) + 1;
+            lines.push(commands.setScore(by, points[by] ?? 1));
+        }
+    }
+    if (changed) {
+        loop.run = { ...loop.run, chests, points };
+        await persist(installedAppId, loop);
+    }
+    const unopened = chests.filter((one) => !one.opened);
+    if (unopened.length === 0) {
+        return `All ${chests.length} ${chests.length === 1 ? "treasure" : "treasures"} found`;
+    }
+
+    if (hunt.beamsOn(left, total)) {
+        if (loop.run.reveals < 4) {
+            lines.push(commands.say(messages.tag(language) + messages.huntBeams(language)));
+            loop.run = { ...loop.run, reveals: 4 };
+        }
+        for (const chest of unopened) lines.push(commands.beam(chest));
+    }
+    const players = commands.readWhere(await server.say([commands.IN_OVERWORLD]));
+    lines.push(...hunt.guides(players, chests, language));
+    return null;
+}
+
+/**
+ * Hide the chests, one place at a time, each through `findPlace` - so on dry,
+ * open, natural ground away from every bed - and only into air. A place that
+ * will not take one is given up for another; when no more can be found, the hunt
+ * goes on with the ones that are down, and fails only if none are.
+ */
+async function hideTreasure(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    options: catalog.EventOptions<"treasure-hunt">
+): Promise<void> {
+    if (!loop.run.origin) {
+        const origin = hunt.centreOf(
+            commands.readWhere(await server.say([commands.IN_OVERWORLD]))
+        );
+        if (!origin) throw new PlaceNotFound();
+        loop.run = { ...loop.run, origin };
+    }
+    // No more places to be had: the hunt goes on with the chests already down.
+    const enough = async () => {
+        if (loop.run.chests.length === 0) throw new PlaceNotFound();
+        await server.sayAll([
+            commands.CLEAR_MARK,
+            ...commands.release(loop.run.place, loop.run.target),
+            ...hunt.holdChests(loop.run.held)
+        ]);
+        loop.run = { ...loop.run, place: null, target: null, placeTries: 0, hidden: true };
+        await persist(installedAppId, loop);
+    };
+    // Two steps a tick: a column chosen, then the ground there judged.
+    for (let step = 0; step < 2 && !loop.run.hidden; step += 1) {
+        const found = await findPlace(
+            installedAppId,
+            loop,
+            server,
+            { mode: "players" },
+            hunt.huntDistance(options, Math.random),
+            SPOT_RADIUS
+        );
+        if (found === "failed") return enough();
+        if (!found) continue;
+        const target = loop.run.target;
+        let placed = false;
+        // Air first, so a chest that was already there is never counted as
+        // one of the hunt's - and never taken away at the end.
+        const air =
+            !hunt.tooClose(found, loop.run.chests) &&
+            commands.readTest(await server.say([hunt.airAt(found)])) === "passed";
+        if (air) {
+            await server.sayAll([hunt.hideChest(found, options.loot), commands.CLEAR_MARK]);
+            // Down, and unopened: a protected area that refused the block reads
+            // as nothing there.
+            placed =
+                commands.readTest(await server.say([commands.chestUnopened(found)])) === "passed";
+        }
+        if (!placed) {
+            // Given up without taking the chunks of the chests already down.
+            await server.sayAll([
+                commands.CLEAR_MARK,
+                ...commands.release(found, target),
+                ...hunt.holdChests(loop.run.held)
+            ]);
+            loop.run = {
+                ...loop.run,
+                place: null,
+                target: null,
+                placeTries: loop.run.placeTries + 1
+            };
+            await persist(installedAppId, loop);
+            if (loop.run.placeTries >= PLACE_TRIES) return enough();
+            continue;
+        }
+        const chests = [...loop.run.chests, { ...found, opened: false, by: null }];
+        loop.run = {
+            ...loop.run,
+            chests,
+            held: [...loop.run.held, ...(target ? [target] : []), { x: found.x, z: found.z }],
+            place: null,
+            target: null,
+            placeTries: 0,
+            hidden: chests.length >= options.chests
+        };
+        await persist(installedAppId, loop);
+    }
+}
+
+/** A gathering's tick: everybody's count brought up to date, and shown to them. */
+async function gathering(loop: Loop, server: ServerContainer, lines: string[]): Promise<void> {
+    const options = loop.run.preset.options as catalog.EventOptions<"gathering">;
+    const material = gather.materialOf(loop.run.material, options);
+    await server.sayAll(gather.gatheringTick(material));
+    const counts = commands.readScores(await server.say([gather.READ_PROGRESS]));
+    for (const [name, count] of counts) {
+        lines.push(
+            commands.actionbarFor(name, messages.gatherBar(material, Math.max(0, count), loop.language))
+        );
+    }
+}
+
+/** A rare catch's tick: whoever landed the treasure off a line since the last look wins. */
+async function rareCatchTick(
+    loop: Loop,
+    server: ServerContainer,
+    lines: string[]
+): Promise<string | null> {
+    const options = loop.run.preset.options as catalog.EventOptions<"rare-catch">;
+    await server.sayAll(rareCatch.catchLook(options));
+    const caught = commands.readWhere(await server.say([rareCatch.READ_CATCHERS]));
+    await server.sayAll(rareCatch.catchCommit());
+    const winner = caught[0]?.name ?? null;
+    if (!winner) {
+        lines.push(
+            `title @a actionbar ${commands.text(messages.catchBar(options.treasure, loop.language))}`
+        );
+        return null;
+    }
+    loop.run = { ...loop.run, decidedBy: winner };
+    lines.push(
+        commands.say(messages.tag(loop.language) + messages.catchWon(winner, loop.language)),
+        ...commands.titleCommands(
+            messages.winnerTitle(winner, loop.language),
+            `&e${messages.catchName(options.treasure, loop.language)}`
+        )
+    );
+    return `Caught by ${winner}`;
+}
+
 /** The round being played, what it asks and what counts as right. */
 function roundOf(
     run: stored.EventRun,
@@ -1276,21 +1756,441 @@ async function triviaTick(
     return null;
 }
 
-/** A chat line in the server log: `[12:00:01] [Server thread/INFO]: <Alice> hello`,
- *  NeoForge's extra bracket and the "Not Secure" mark allowed for. */
-const CHAT_LINE = /\]: (?:\[Not Secure\] )?<([A-Za-z0-9_]{1,16})> (.+)$/gm;
+
+/** Every chat line in a stretch of log, oldest first: who said it, and what. */
+export function chatLines(log: string): { name: string; text: string }[] {
+    return [...log.matchAll(commands.CHAT_LINE)].map((match) => ({
+        name: match[1] as string,
+        text: (match[2] as string).trim()
+    }));
+}
 
 /** Whoever said a right answer first in a stretch of log. */
 export function firstRight(log: string, accepted: readonly string[]): string | null {
-    for (const match of log.matchAll(CHAT_LINE)) {
+    for (const match of log.matchAll(commands.CHAT_LINE)) {
         if (trivia.answers(match[2] as string, accepted)) return match[1] as string;
     }
     return null;
 }
 
+// ------------------------------------------------------------------ horde defence
+
+/**
+ * A horde defence: the point found and marked, then wave after wave summoned
+ * round it once somebody is there to meet it. A wave ends when none of its
+ * monsters is left, or when its time is up (what is left of it is taken away);
+ * whoever is at the point then has held it. Decided when the last wave ends.
+ */
+async function hordeDefence(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number,
+    lines: string[]
+): Promise<string | null> {
+    const options = loop.run.preset.options as catalog.EventOptions<"waves">;
+    const language = loop.language;
+    const timing = catalog.WAVE_TIMING;
+    // Players die in this one. Without keepInventory held on, a death would
+    // cost what they carry, so it does not go ahead at all.
+    if (!waves.KEEP_INVENTORY.some((rule) => loop.run.gamerules[rule] !== undefined)) {
+        throw new CannotRun("The server would not say whether it keeps inventories on death");
+    }
+    if (!loop.run.place) {
+        const found = await findPlace(
+            installedAppId,
+            loop,
+            server,
+            options.place,
+            48,
+            waves.DEFENCE_RADIUS,
+            waves.CLEARANCE
+        );
+        if (found === "failed") throw new PlaceNotFound();
+        if (!found) return null;
+        // The ground round it held loaded, so no monster is ever out of reach
+        // of the end - only the chunks nobody held already, and written down
+        // before they are, so the end lets go of exactly those.
+        const held = chunks.readForced(await server.say([chunks.READ_FORCED]));
+        const hold = chunks.notHeld(chunks.chunksAround(found.x, found.z, waves.LOAD_REACH), held);
+        loop.run = { ...loop.run, chunks: hold, round: -1, roundEndsAt: null, closedAt: now };
+        await persist(installedAppId, loop);
+        await server.sayAll([
+            ...hold.map(chunks.holdChunk),
+            commands.CLEAR_MARK,
+            ...commands.titleCommands(
+                messages.wavesPointTitle(language),
+                `&fX ${found.x} Y ${found.y} Z ${found.z}`
+            ),
+            commands.say(
+                messages.tag(language) + messages.wavesPointAt(found.x, found.y, found.z, language)
+            ),
+            commands.sound(commands.SOUNDS.horn)
+        ]);
+        return null;
+    }
+    const place = loop.run.place;
+    const open = loop.run.roundEndsAt !== null;
+    lines.push(
+        ...waves.wavesMarks(place),
+        waves.leash(place),
+        ...waves.wavesTick(place, options.mix, open)
+    );
+    /** Monsters of the wave on now still about, as far as is known. */
+    let left: number | null = null;
+    if (open) {
+        const wave = loop.run.round;
+        const alive = waves.readAlive(await server.say([waves.WAVE_ALIVE]));
+        const timedOut = now >= (loop.run.roundEndsAt ?? now);
+        left = alive;
+        if (alive === 0 || timedOut) {
+            const at = commands
+                .readWhere(await server.say([waves.defenders(place)]))
+                .map((one) => one.name);
+            const survived = { ...loop.run.survived };
+            for (const name of at) survived[name] = (survived[name] ?? 0) + 1;
+            loop.run = { ...loop.run, survived, roundEndsAt: null, closedAt: now };
+            await persist(installedAppId, loop);
+            const cleared = alive === 0;
+            lines.push(
+                // What is left of a wave out of time goes, so the next one
+                // starts clean.
+                ...(cleared ? [] : [`kill @e[tag=${commands.MOB_TAG}]`]),
+                ...commands.titleCommands(
+                    cleared
+                        ? messages.waveCleared(wave + 1, language)
+                        : messages.waveOver(wave + 1, language),
+                    messages.waveHeldBy(at.length, language)
+                ),
+                commands.sound(cleared ? commands.SOUNDS.win : commands.SOUNDS.tick)
+            );
+            if (wave + 1 >= options.waves) return `All ${options.waves} waves were fought`;
+        }
+    } else if (
+        now - loop.run.closedAt >=
+        (loop.run.round < 0 ? timing.firstSeconds : timing.pauseSeconds) * 1000
+    ) {
+        // Due: it comes as soon as somebody is at the point to meet it.
+        const at = commands.readWhere(await server.say([waves.defenders(place)]));
+        if (at.length > 0) {
+            const wave = loop.run.round + 1;
+            const count = waves.waveSize(options.size, wave, at.length);
+            loop.run = { ...loop.run, round: wave, roundEndsAt: now + timing.limitSeconds * 1000 };
+            // Written down before anything is summoned: a restart then knows
+            // a wave is out, and the end takes it away.
+            await persist(installedAppId, loop);
+            left = count;
+            lines.push(
+                ...waves.summonWave(
+                    place,
+                    options.mix,
+                    count,
+                    wave,
+                    (loop.run.endsAt - now) / 1000 + 60
+                ),
+                ...commands.titleCommands(
+                    messages.waveTitle(wave + 1, options.waves, language),
+                    messages.waveSubtitle(count, language)
+                ),
+                commands.sound(commands.SOUNDS.horn)
+            );
+        }
+    }
+
+    // Where the defence stands, on the bar and at the point; the way to it
+    // for everybody further off.
+    const run = loop.run;
+    const fighting = run.roundEndsAt !== null;
+    const number = (fighting ? run.round : run.round + 1) + 1;
+    const wait = (run.round < 0 ? timing.firstSeconds : timing.pauseSeconds) * 1000;
+    let status: string;
+    let bar: { value: number; max: number };
+    if (fighting) {
+        const seconds = ((run.roundEndsAt ?? now) - now) / 1000;
+        status = `${messages.waveFighting(number, options.waves, left ?? 0, language)} &7${messages.clock(seconds)}`;
+        bar = { value: seconds, max: timing.limitSeconds };
+    } else if (now - run.closedAt >= wait) {
+        status = messages.waveWaiting(number, options.waves, language);
+        bar = { value: 1, max: 1 };
+    } else {
+        const seconds = (wait - (now - run.closedAt)) / 1000;
+        status = messages.waveComing(number, options.waves, seconds, language);
+        bar = { value: seconds, max: wait / 1000 };
+    }
+    lines.push(...commands.barUpdate(status, bar.value, bar.max));
+    for (const one of commands.readWhere(await server.say([commands.IN_OVERWORLD]))) {
+        const centre = { x: place.x + 0.5, z: place.z + 0.5 };
+        const away = Math.hypot(one.x - centre.x, one.z - centre.z);
+        lines.push(
+            commands.actionbarFor(
+                one.name,
+                away <= waves.AREA
+                    ? status
+                    : messages.wavesGuide(
+                          Math.round(away),
+                          commands.headingTo(one, centre),
+                          language
+                      )
+            )
+        );
+    }
+    return null;
+}
+
+// ------------------------------------------------------------------ meteor shower
+
+/**
+ * A meteor shower: the meteors brought down one after another over the first
+ * part of the event, each where `findPlace` finds open ground, then raced to.
+ * A meteor with a player near it is looked at block by block, and any block no
+ * longer its ore is forgotten for good. Decided once every meteor is down and
+ * mined out.
+ */
+async function meteorShower(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number,
+    lines: string[]
+): Promise<string | null> {
+    const options = loop.run.preset.options as catalog.EventOptions<"meteor-shower">;
+    const language = loop.language;
+    const share = (now - loop.run.startsAt) / Math.max(1, loop.run.endsAt - loop.run.startsAt);
+    if (loop.run.landings < meteors.dueMeteors(share, options.meteors)) {
+        const found = await findPlace(
+            installedAppId,
+            loop,
+            server,
+            options.place,
+            options.distance,
+            meteors.RADIUS,
+            commands.HOME_CLEARANCE,
+            false
+        );
+        if (found === "failed") {
+            // Nowhere for this one: it is let go, and the next looked for afresh.
+            loop.run = { ...loop.run, landings: loop.run.landings + 1, placeTries: 0 };
+            await persist(installedAppId, loop);
+        } else if (found) {
+            await landMeteor(installedAppId, loop, server, found, options);
+        }
+    }
+
+    // Whatever of a meteor somebody near it has mined is forgotten: it is no
+    // longer the event's to take away, whatever is put there after.
+    let emptied = 0;
+    const checked: stored.EventRun["meteors"] = [];
+    for (const meteor of loop.run.meteors) {
+        const near =
+            meteor.blocks.length > 0 &&
+            commands.readTest(await server.say([meteors.playerNear(meteor)])) === "passed";
+        if (!near) {
+            checked.push(meteor);
+            continue;
+        }
+        const kept: typeof meteor.blocks = [];
+        for (const block of meteor.blocks) {
+            if (commands.readTest(await server.say([meteors.isOurs(block)])) !== "failed")
+                kept.push(block);
+        }
+        if (kept.length === 0) emptied += 1;
+        checked.push({ ...meteor, blocks: kept });
+    }
+    if (
+        checked.some((meteor, at) => meteor.blocks.length !== loop.run.meteors[at]?.blocks.length)
+    ) {
+        loop.run = { ...loop.run, meteors: checked };
+        await persist(installedAppId, loop);
+    }
+    if (emptied > 0)
+        lines.push(commands.say(messages.tag(language) + messages.meteorMinedOut(language)));
+
+    const live = loop.run.meteors.filter((meteor) => meteor.blocks.length > 0);
+    lines.push(...meteors.meteorTick(loop.run.meteors, options.ores), ...live.map(commands.beam));
+    // Each player pointed at the latest meteor still to mine.
+    const latest = live.at(-1);
+    for (const one of commands.readWhere(await server.say([commands.IN_OVERWORLD]))) {
+        if (!latest) {
+            lines.push(commands.actionbarFor(one.name, messages.meteorWaiting(language)));
+            continue;
+        }
+        const centre = { x: latest.x + 0.5, z: latest.z + 0.5 };
+        lines.push(
+            commands.actionbarFor(
+                one.name,
+                messages.meteorGuide(
+                    Math.round(Math.hypot(one.x - centre.x, one.z - centre.z)),
+                    commands.headingTo(one, centre),
+                    latest.blocks.length,
+                    language
+                )
+            )
+        );
+    }
+
+    if (loop.run.landings < options.meteors || live.length > 0) return null;
+    // Every one down and mined out - unless none could come down at all.
+    if (loop.run.meteors.length === 0) throw new PlaceNotFound();
+    return "Every meteor was mined out";
+}
+
+/**
+ * One meteor down on a place just found: the cells that are air now written
+ * down first, then filled with ore - `keep`, so only air is ever filled - and
+ * then only the cells that really hold that ore kept as the meteor's.
+ */
+async function landMeteor(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    found: stored.Point,
+    options: catalog.EventOptions<"meteor-shower">
+): Promise<void> {
+    const language = loop.language;
+    const cells = meteors.meteorCells(found, options.size, options.ores, Math.random);
+    const free: meteors.MeteorBlock[] = [];
+    for (const cell of cells) {
+        if (commands.readTest(await server.say([meteors.airTest(cell)])) === "passed")
+            free.push(cell);
+    }
+    // The chunks it lies across held until the end, so it can still be taken
+    // away: the place's own and the column's, which finding it loaded, and the
+    // ones round it nobody held already.
+    const held = chunks.readForced(await server.say([chunks.READ_FORCED]));
+    const known = new Set(loop.run.chunks.map((chunk) => `${chunk.x},${chunk.z}`));
+    const added = [
+        ...chunks.notHeld(chunks.chunksAround(found.x, found.z, 1), held),
+        { x: found.x >> 4, z: found.z >> 4 },
+        ...(loop.run.target ? [{ x: loop.run.target.x >> 4, z: loop.run.target.z >> 4 }] : [])
+    ].filter((chunk) => {
+        const key = `${chunk.x},${chunk.z}`;
+        if (known.has(key)) return false;
+        known.add(key);
+        return true;
+    });
+    const index = loop.run.meteors.length;
+    loop.run = {
+        ...loop.run,
+        meteors: [...loop.run.meteors, { x: found.x, y: found.y, z: found.z, blocks: free }],
+        chunks: [...loop.run.chunks, ...added],
+        // The place and the column tried are the meteor's now, let go with
+        // its chunks; the next one is looked for afresh.
+        place: null,
+        target: null,
+        placeTries: 0,
+        landings: loop.run.landings + 1
+    };
+    // Written down before a block is placed, so an end at any moment after
+    // knows what to take away.
+    await persist(installedAppId, loop);
+    await server.sayAll([
+        ...added.map(chunks.holdChunk),
+        ...free.map(meteors.placeBlock),
+        commands.CLEAR_MARK
+    ]);
+    const ours: meteors.MeteorBlock[] = [];
+    for (const block of free) {
+        if (commands.readTest(await server.say([meteors.isOurs(block)])) === "passed")
+            ours.push(block);
+    }
+    // A meteor none of whose blocks took is no meteor: forgotten, its chunks
+    // still let go at the end.
+    loop.run = {
+        ...loop.run,
+        meteors:
+            ours.length > 0
+                ? loop.run.meteors.map((meteor, at) =>
+                      at === index ? { ...meteor, blocks: ours } : meteor
+                  )
+                : loop.run.meteors.filter((_, at) => at !== index)
+    };
+    await persist(installedAppId, loop);
+    if (ours.length === 0) return;
+    await server.sayAll([
+        ...meteors.landingEffects(found),
+        ...commands.titleCommands(
+            messages.meteorTitle(language),
+            `&fX ${found.x} Y ${found.y} Z ${found.z}`
+        ),
+        commands.say(
+            messages.tag(language) +
+                messages.meteorAt(found.x, found.y, found.z, ours.length, language)
+        )
+    ]);
+}
+
+/**
+ * What a parkour race or a spleef needs from the loop: saving, the same place
+ * rules as every other event (wider, for something this big), the chat, and
+ * how this server's version spells things.
+ */
+function stageTools(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer
+): stageService.StageTools {
+    return {
+        persist: () => persist(installedAppId, loop),
+        findSite: async (place, radius) => {
+            const found = await findPlace(
+                installedAppId,
+                loop,
+                server,
+                place,
+                commands.HOME_CLEARANCE + radius,
+                radius,
+                commands.HOME_CLEARANCE + radius
+            );
+            if (found === "failed") throw new PlaceNotFound();
+            return found;
+        },
+        giveUpSite: (point) => retryPlace(installedAppId, loop, server, point),
+        chat: () => newChat(server, loop),
+        owed: async () => {
+            const row = await readRow(installedAppId);
+            return row ? owedNames(stored.readEventState(row.config)) : new Set<string>();
+        },
+        flavour: async () => loop.flavour ?? (loop.flavour = await stageFlavour(server)),
+        itemsWork: (items) => {
+            if (loop.flavour) loop.flavour = { ...loop.flavour, items };
+        }
+    };
+}
+
+/** What was written in the server log since the last look; null the first time,
+ *  which only notes where the log is now. */
+async function newChat(server: ServerContainer, loop: Loop): Promise<string | null> {
+    const size = await containerFileSize(server, LOG_FILE);
+    if (size === null) return null;
+    if (loop.logFrom === null) {
+        loop.logFrom = size;
+        return null;
+    }
+    const from = size < loop.logFrom ? 0 : loop.logFrom;
+    loop.logFrom = size;
+    return size > from ? readContainerRange(server, LOG_FILE, from, size).catch(() => null) : null;
+}
+
+async function stageFlavour(server: ServerContainer): Promise<stage.Flavour> {
+    const version = await versionOf(server);
+    return {
+        items: atLeast(version, [1, 20, 5]) ? "components" : "nbt",
+        top: atLeast(version, [1, 18]) ? 319 : 255
+    };
+}
+
 class PlaceNotFound extends Error {
     constructor() {
         super("No dry ground was found for it near the players");
+    }
+}
+
+/** Something the event needs that this server will not give it: it fails, and
+ *  says why, the same way as when there is nowhere to hold it. */
+class CannotRun extends PlaceNotFound {
+    constructor(reason: string) {
+        super();
+        this.message = reason;
     }
 }
 
@@ -1328,6 +2228,11 @@ async function finish(
     let disqualified = new Set<string>();
     const pending: stored.PendingReward[] = [];
     const lines: string[] = [];
+    /** A parkour's or spleef's blocks and players, until they are all put back. */
+    let stageLeftover = stage.leftoverOf(run.id, run.stage);
+    /** What of a team duel's or build battle's arena and its players is still
+     *  to undo once this is over. */
+    let arenaLeftover: stored.ArenaLeftover | null | undefined;
 
     try {
         if (server && outcome === "finished" && run.phase === "running" && info.competitive) {
@@ -1348,9 +2253,10 @@ async function finish(
             const minimum = catalog.minScoreOf(preset);
             placed = plan.podium(scores, disqualified, minimum);
             // Taking part is reaching the minimum too - one zombie is not taking part
-            // in a hunt. A blood moon's is surviving it with a kill, its own bar.
+            // in a hunt. A blood moon's is surviving it with a kill, and a horde
+            // defence's holding the point, which are their own bars.
             const counted =
-                preset.kind === "blood-moon"
+                preset.kind === "blood-moon" || preset.kind === "waves"
                     ? took
                     : took.filter((name) => (scores.get(name) ?? 0) >= minimum);
             const owed = plan.prizes(placed, counted, preset.rewards, disqualified);
@@ -1378,6 +2284,7 @@ async function finish(
                     });
             }
             lines.push(commands.say(messages.resultsHeader(preset.name, language)));
+            if (catalog.playsInArena(preset)) lines.push(...arenaService.resultLines(run, language));
             if (preset.kind === "world-boss" && !run.decidedBy) {
                 lines.push(
                     commands.say(
@@ -1392,6 +2299,22 @@ async function finish(
                 );
             } else if (preset.kind === "supply-drop" && !run.decidedBy) {
                 lines.push(commands.say(messages.dropLost(language)));
+            } else if (preset.kind === "rare-catch" && !run.decidedBy) {
+                lines.push(commands.say(messages.catchMissed(language)));
+            } else if (preset.kind === "treasure-hunt") {
+                const unfound = run.chests.filter((one) => !one.opened).length;
+                if (unfound > 0) lines.push(commands.say(messages.huntUnfound(unfound, language)));
+            } else if (preset.kind === "waves") {
+                const fought = run.roundEndsAt === null ? run.round + 1 : run.round;
+                lines.push(
+                    commands.say(
+                        messages.wavesHeld(
+                            Math.max(0, fought),
+                            (preset.options as catalog.EventOptions<"waves">).waves,
+                            language
+                        )
+                    )
+                );
             }
             if (placed.length === 0) lines.push(commands.say(messages.nobodyScored(language)));
             for (const one of placed) {
@@ -1400,7 +2323,7 @@ async function finish(
                         messages.podiumLine(
                             one.place,
                             one.name,
-                            scoreText(preset, one.score),
+                            scoreText(preset, one.score, language),
                             language
                         )
                     )
@@ -1426,6 +2349,8 @@ async function finish(
             );
         } else if (server && outcome === "finished" && preset.kind === "happy-hour") {
             lines.push(commands.say(messages.tag(language) + messages.happyHourOver(language)));
+        } else if (server && outcome === "finished" && preset.kind === "xp-boost") {
+            lines.push(commands.say(messages.tag(language) + messages.boostOver(language)));
         } else if (server && (outcome === "cancelled" || outcome === "failed")) {
             lines.push(
                 commands.say(messages.tag(language) + messages.cancelledLine(preset.name, language))
@@ -1438,23 +2363,31 @@ async function finish(
                     commands.say(messages.tag(language) + messages.dawn(survivors.length, language))
                 );
             }
-            await server.sayAll([
-                ...lines,
-                ...commands.cleanup(preset, run.place, run.target, run.gamerules, run.timeBefore)
-            ]);
+            // Everybody back where they were, and every block of the stage or
+            // the arena out, before the results are read to them and before
+            // the rules they held are put back. Whatever cannot be done now is
+            // kept, and the sweep finishes it.
+            if (stageLeftover) {
+                const flavour = loop.flavour ?? (await stageFlavour(server));
+                stageLeftover = await stageService.settle(server, stageLeftover, flavour, language);
+            }
+            if (catalog.playsInArena(preset)) {
+                const open = arenaService.leftoverOf(run);
+                arenaLeftover = open ? await arenaService.closeArena(server, open, language) : null;
+            }
+            await server.sayAll([...lines, ...cleanupOf(run)]);
         } else {
             // The server was not answering: clean up when it is back, so a
             // chest, a boss or a loaded chunk is not left in the world for good.
+            if (catalog.playsInArena(preset))
+                arenaLeftover = arenaService.leftoverOf(run, run.gamerules);
             await cleanUpLater(loop.ownerId, installedAppId, run);
         }
     } catch (error) {
         console.warn("polaris: finishing an event failed", installedAppId, String(error));
-        if (server)
-            await server
-                .sayAll(
-                    commands.cleanup(preset, run.place, run.target, run.gamerules, run.timeBefore)
-                )
-                .catch(() => undefined);
+        if (arenaLeftover === undefined && catalog.playsInArena(preset))
+            arenaLeftover = arenaService.leftoverOf(run, run.gamerules);
+        if (server) await server.sayAll(cleanupOf(run)).catch(() => undefined);
     } finally {
         releaseSidebar(loop.ownerId, installedAppId);
         await dropLink(loop);
@@ -1480,11 +2413,60 @@ async function finish(
             entry
         ),
         lastKind: preset.kind,
-        pending: stored.livePending([...state.pending, ...pending], Date.now())
+        pending: stored.livePending([...state.pending, ...pending], Date.now()),
+        stageLeftovers: stage.withLeftover(state.stageLeftovers, stageLeftover),
+        arenaLeftovers: arenaLeftover
+            ? [...state.arenaLeftovers, arenaLeftover]
+            : state.arenaLeftovers
     })).catch((error: unknown) =>
         console.warn("polaris: recording an event failed", installedAppId, String(error))
     );
     if (loops.get(installedAppId) === loop) loops.delete(installedAppId);
+}
+
+/**
+ * Everything a run put into the world, taken out, built from the stored run
+ * alone so it is the same after a restart: what its own kind put there first -
+ * while the chunks it lies in are still held - then what every event leaves
+ * (`commands.cleanup`), then what its kind tidies after that, then the chunks
+ * it held besides its place.
+ */
+export function cleanupOf(run: stored.EventRun): string[] {
+    const before: string[] = [];
+    const after: string[] = [];
+    switch (run.preset.kind) {
+        case "waves":
+            before.push(
+                ...waves.wavesCleanup((run.preset.options as catalog.EventOptions<"waves">).mix)
+            );
+            break;
+        case "meteor-shower": {
+            const ores = (run.preset.options as catalog.EventOptions<"meteor-shower">).ores;
+            before.push(...meteors.meteorCleanup(run.meteors, ores));
+            break;
+        }
+        case "xp-boost":
+            // The last payout, before the shared cleanup takes its objectives away.
+            before.push(
+                ...boost.boostCleanup(run.preset.options as catalog.EventOptions<"xp-boost">)
+            );
+            break;
+        case "treasure-hunt":
+            after.push(...hunt.huntCleanup(run.chests, run.held));
+            break;
+        case "gathering":
+            after.push(...gather.gatheringCleanup());
+            break;
+        case "rare-catch":
+            after.push(...rareCatch.catchCleanup());
+            break;
+    }
+    return [
+        ...before,
+        ...commands.cleanup(run.preset, run.place, run.target, run.gamerules, run.timeBefore),
+        ...after,
+        ...run.chunks.map(chunks.releaseChunk)
+    ];
 }
 
 async function cleanUpLater(
@@ -1493,10 +2475,7 @@ async function cleanUpLater(
     run: stored.EventRun
 ): Promise<void> {
     await withServerContainer(ownerId, installedAppId, async (later) => {
-        if (later.running)
-            await later.sayAll(
-                commands.cleanup(run.preset, run.place, run.target, run.gamerules, run.timeBefore)
-            );
+        if (later.running) await later.sayAll(cleanupOf(run));
     }).catch(() => undefined);
 }
 
@@ -1527,16 +2506,63 @@ async function abandon(
         podium: [],
         disqualified: []
     };
+    // An arena and whoever is in it are the minute sweep's to undo from here.
+    const arenaLeftover = catalog.playsInArena(run.preset)
+        ? arenaService.leftoverOf(run, run.gamerules)
+        : null;
     await updateEventState(installedAppId, (state) =>
         state.run?.id === run.id
-            ? { ...stored.withHistory({ ...state, run: null }, entry), lastKind: run.preset.kind }
+            ? {
+                  ...stored.withHistory({ ...state, run: null }, entry),
+                  lastKind: run.preset.kind,
+                  // Its stage or arena, if it had one, is undone by the sweep from here.
+                  stageLeftovers: stage.withLeftover(
+                      state.stageLeftovers,
+                      stage.leftoverOf(run.id, state.run.stage)
+                  ),
+                  arenaLeftovers: arenaLeftover
+                      ? [...state.arenaLeftovers, arenaLeftover]
+                      : state.arenaLeftovers
+              }
             : state
     );
 }
 
+/**
+ * Arenas still standing for somebody to be taken back from, tried again: who
+ * is on now is sent back, and an arena nobody is left in comes down.
+ */
+async function settleArenaLeftovers(
+    ownerId: string,
+    installedAppId: string,
+    leftovers: readonly stored.ArenaLeftover[],
+    language: catalog.Language
+): Promise<void> {
+    const settled = new Map<string, stored.ArenaLeftover | null>();
+    await withServerContainer(ownerId, installedAppId, async (server) => {
+        if (!server.running) return;
+        for (const one of leftovers) {
+            settled.set(one.id, await arenaService.closeArena(server, one, language));
+        }
+    }).catch((error: unknown) =>
+        console.warn("polaris: settling an event's arena failed", installedAppId, String(error))
+    );
+    if (settled.size === 0) return;
+    await updateEventState(installedAppId, (state) => ({
+        ...state,
+        arenaLeftovers: state.arenaLeftovers.flatMap((one) => {
+            if (!settled.has(one.id)) return [one];
+            const next = settled.get(one.id);
+            return next ? [next] : [];
+        })
+    }));
+}
+
 /** A score the way the podium says it: `12 points`, `3:20` for time on the hill. */
-function scoreText(preset: catalog.EventPreset, score: number): string {
-    if (preset.kind === "supply-drop") return "";
+function scoreText(preset: catalog.EventPreset, score: number, language: catalog.Language): string {
+    if (preset.kind === "supply-drop" || preset.kind === "rare-catch") return "";
+    const stageText = stageService.scoreText(preset.kind, score, language);
+    if (stageText !== null) return stageText;
     if (preset.kind === "king-of-the-hill") return messages.clock(score);
     const unit = catalog.KIND_INFO[preset.kind].unit;
     return unit ? `${score} ${unit}` : String(score);
@@ -1551,17 +2577,41 @@ async function results(
     run: stored.EventRun
 ): Promise<{ scores: Map<string, number>; took: string[] }> {
     const { preset } = run;
-    if (preset.kind === "trivia") {
+    if (preset.kind === "trivia" || preset.kind === "treasure-hunt") {
         const scores = new Map(Object.entries(run.points));
         return { scores, took: [...scores.keys()] };
     }
-    if (preset.kind === "supply-drop" || (preset.kind === "explorer" && isRace(preset))) {
+    if (catalog.playsInArena(preset)) return arenaService.arenaResults(run);
+    if (
+        preset.kind === "supply-drop" ||
+        preset.kind === "rare-catch" ||
+        (preset.kind === "explorer" && isRace(preset))
+    ) {
         const scores = new Map<string, number>(run.decidedBy ? [[run.decidedBy, 1]] : []);
         return { scores, took: [] };
     }
     if (preset.kind === "world-boss" && !run.decidedBy) return { scores: new Map(), took: [] };
+    if (catalog.takesJoiners(preset)) return stageService.results(run);
     // One last count first, so the final seconds are in it.
     await server.sayAll(commands.scoreTick(preset));
+    if (preset.kind === "gathering") {
+        await server.sayAll(
+            gather.gatheringTick(
+                gather.materialOf(
+                    run.material,
+                    preset.options as catalog.EventOptions<"gathering">
+                )
+            )
+        );
+    }
+    if (preset.kind === "waves" && run.place) {
+        const mix = (preset.options as catalog.EventOptions<"waves">).mix;
+        await server.sayAll(waves.wavesTick(run.place, mix, run.roundEndsAt !== null));
+    }
+    if (preset.kind === "meteor-shower") {
+        const ores = (preset.options as catalog.EventOptions<"meteor-shower">).ores;
+        await server.sayAll(meteors.meteorTick(run.meteors, ores));
+    }
     if (preset.kind === "world-boss") await server.sayAll(commands.bossDamageTick());
     const scores = commands.readScores(await server.say([commands.READ_SCORES]));
     const known = new Set([...scores.keys()].map((name) => name.toLowerCase()));
@@ -1572,6 +2622,20 @@ async function results(
         )) {
             scores.set(who, score);
         }
+    }
+    if (preset.kind === "waves") {
+        // Took part: at the point when a wave ended, and fought - a kill, or
+        // at least a hit - rather than only stood there.
+        const hits = commands.readScores(await server.say([waves.READ_HITS]));
+        const held = (name: string) =>
+            Object.entries(run.survived).some(
+                ([who, count]) => who.toLowerCase() === name.toLowerCase() && count > 0
+            );
+        const fought = (name: string) =>
+            [...scores, ...hits].some(
+                ([who, value]) => who.toLowerCase() === name.toLowerCase() && value > 0
+            );
+        return { scores, took: run.participants.filter((name) => held(name) && fought(name)) };
     }
     if (preset.kind === "blood-moon") {
         const alive = new Set((await survivorsOf(server, run)).map((name) => name.toLowerCase()));
@@ -1642,11 +2706,16 @@ async function give(
 
 /** How this server's version writes names into entities, and its attribute ids. */
 async function modernity(server: ServerContainer): Promise<{ text: boolean; ids: boolean }> {
+    const version = await versionOf(server);
+    return { text: atLeast(version, [1, 21, 5]), ids: atLeast(version, [1, 21, 2]) };
+}
+
+/** The version the server said it started as, out of its log; null when unread. */
+async function versionOf(server: ServerContainer): Promise<string | null> {
     const result = await server
         .run(["sh", "-c", `grep -m1 -o 'Starting minecraft server version [^ ]*' ${LOG_FILE}`])
         .catch(() => null);
-    const version = /version (\S+)/.exec(result?.output ?? "")?.[1] ?? null;
-    return { text: atLeast(version, [1, 21, 5]), ids: atLeast(version, [1, 21, 2]) };
+    return /version (\S+)/.exec(result?.output ?? "")?.[1] ?? null;
 }
 
 /** Whether a version is at least another. A snapshot or an unreadable one is
@@ -1712,6 +2781,28 @@ async function sweepOne(
 ): Promise<boolean> {
     const settings = settingsOf(config);
     const state = stored.readEventState(config);
+    // A parkour or spleef that ended with blocks still up or players still owed
+    // their trip back: tried again every minute until it is all done.
+    if (state.stageLeftovers.some((one) => one.runId !== state.run?.id)) {
+        await settleStageLeftovers(ownerId, installedAppId, settings.settings.language).catch(
+            (error: unknown) =>
+                console.warn(
+                    "polaris: undoing an event's arena failed",
+                    installedAppId,
+                    String(error)
+                )
+        );
+    }
+    // Arenas somebody is still to be taken back from, whatever else is on -
+    // but not while an end is being handed out, which settles its own.
+    if (state.arenaLeftovers.length > 0 && !loops.get(installedAppId)?.finishing) {
+        await settleArenaLeftovers(
+            ownerId,
+            installedAppId,
+            state.arenaLeftovers,
+            settings.settings.language
+        );
+    }
     if (state.run) {
         if (loops.has(installedAppId)) return false;
         if (state.run.finishing) await abandon(ownerId, installedAppId, state.run);
@@ -1826,6 +2917,34 @@ async function sweepOne(
         }));
         return false;
     }
+}
+
+/** Every arena left from an event that is over, settled as far as it can be now. */
+async function settleStageLeftovers(
+    ownerId: string,
+    installedAppId: string,
+    language: catalog.Language
+): Promise<void> {
+    const settled = await withServerContainer(ownerId, installedAppId, async (server) => {
+        if (!server.running) return null;
+        const current = stored.readEventState((await readRow(installedAppId))?.config ?? {});
+        const due = current.stageLeftovers.filter((one) => one.runId !== current.run?.id);
+        if (due.length === 0) return null;
+        const flavour = await stageFlavour(server);
+        const after = new Map<string, stage.Leftover | null>();
+        for (const one of due)
+            after.set(one.runId, await stageService.settle(server, one, flavour, language));
+        return after;
+    });
+    if (!settled) return;
+    await updateEventState(installedAppId, (state) => ({
+        ...state,
+        stageLeftovers: state.stageLeftovers.flatMap((one) => {
+            if (!settled.has(one.runId)) return [one];
+            const rest = settled.get(one.runId);
+            return rest ? [rest] : [];
+        })
+    }));
 }
 
 async function skip(
