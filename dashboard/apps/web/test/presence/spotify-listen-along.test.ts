@@ -11,7 +11,10 @@
  *   listener may not see refuses exactly like an empty one, and says what to do
  *   when they have linked nothing or have no Premium;
  * - a host's next song is put on every listener, a pause pauses them, and a host
- *   who stops being visible to a listener ends that listener's session;
+ *   who stops being visible to a listener ends that listener's session - paused
+ *   or not, and a pause that outlasts its bound or a host who unlinks ends it too;
+ * - only Spotify refusing the listener ends it: a blip is tried again;
+ * - a song's position is worked out when it was read, not when the pass began;
  * - a listener is only taken to have taken their Spotify back after two
  *   sightings of something else, apart by the grace, so the moment between two
  *   songs does not end it.
@@ -32,6 +35,9 @@ const fake = vi.hoisted(() => ({
     plays: [] as { token: string; uri: string; position: number }[],
     pauses: [] as string[],
     refuse: new Set<string>(),
+    blip: new Set<string>(),
+    refreshRefused: new Set<string>(),
+    slow: 0,
     rateLimited: false,
     asked: [] as string[]
 }));
@@ -101,12 +107,14 @@ vi.mock("@/lib/connections/spotify", async (original) => {
     return {
         ...real,
         getSpotifyOAuthClient: async () => ({ clientId: "c", clientSecret: "s" }),
-        spotifyAccessToken: async (_client: unknown, credential: { accessToken: string }) => ({
-            accessToken: credential.accessToken,
-            refreshed: null
-        }),
+        spotifyAccessToken: async (_client: unknown, credential: { accessToken: string }) => {
+            if (fake.refreshRefused.has(credential.accessToken)) throw new real.SpotifyUnauthorized();
+            if (fake.blip.has(credential.accessToken)) throw new Error("Spotify timed out");
+            return { accessToken: credential.accessToken, refreshed: null };
+        },
         readSpotifyPlaying: async (token: string) => {
             fake.asked.push(token);
+            if (fake.slow) await new Promise((resolve) => setTimeout(resolve, fake.slow));
             if (fake.rateLimited) throw new real.SpotifyRateLimited(20_000);
             return fake.playing.get(token) ?? null;
         },
@@ -135,6 +143,10 @@ vi.mock("@/lib/presence-service", () => ({
                 ];
             })
         )
+}));
+vi.mock("@/lib/privacy-service", () => ({
+    allowedBy: async (_viewer: unknown, _field: string, ids: string[]) =>
+        new Set(ids.filter((id) => fake.visible.has(id)))
 }));
 vi.mock("@/lib/presence-activity/live", () => ({ announceActivity: async () => undefined }));
 
@@ -173,6 +185,9 @@ beforeEach(() => {
     fake.plays = [];
     fake.pauses = [];
     fake.refuse.clear();
+    fake.blip.clear();
+    fake.refreshRefused.clear();
+    fake.slow = 0;
     fake.rateLimited = false;
     fake.asked = [];
 });
@@ -222,6 +237,30 @@ describe("a pass", () => {
         expect(fake.activity).toEqual([]);
     });
 
+    it("dates a song from when it was read, not from when the pass began", async () => {
+        fake.here = new Set([ANA, BOB]);
+        fake.playing.set("token-bob-link", song("s1", 10_000));
+        fake.slow = 60;
+        await poll.pollSpotify(1_000_000);
+        const bob = fake.activity.find((row) => row.userId === BOB) as unknown as { startedAt: Date } | undefined;
+        expect(bob?.startedAt.getTime()).toBeGreaterThanOrEqual(1_000_000 - 10_000 + 100);
+    });
+
+    it("waits out a refresh that timed out rather than shelving the link", async () => {
+        fake.blip.add("token-ana-link");
+        await poll.pollSpotify(1_000_000);
+        fake.blip.clear();
+        await poll.pollSpotify(1_000_000 + 5 * 60_000);
+        expect(fake.asked).toEqual(["token-ana-link"]);
+    });
+
+    it("ends following a host who unlinked Spotify", async () => {
+        fake.links = [{ id: "bob-link", userId: BOB }];
+        fake.along = [{ listenerId: BOB, hostId: ANA, trackId: "s1", syncedAt: new Date(0), startedAt: new Date(0) }];
+        await poll.pollSpotify(1_000_000);
+        expect(fake.along).toEqual([]);
+    });
+
     it("stops everything on a 429 until Spotify's own wait is over", async () => {
         fake.here = new Set([ANA, BOB]);
         fake.rateLimited = true;
@@ -269,6 +308,32 @@ describe("listening along", () => {
         await along.followHost(ANA, null, true, 110_000);
         expect(fake.pauses).toEqual(["token-bob-link"]);
         expect(fake.along[0]?.trackId).toBe("");
+    });
+
+    it("ends with a paused host who is no longer visible, or paused too long", async () => {
+        fake.along = [{ listenerId: BOB, hostId: ANA, trackId: "s1", syncedAt: new Date(0), startedAt: new Date(0) }];
+        await along.followHost(ANA, null, true, 100_000);
+        expect(fake.along).toEqual([]);
+        expect(fake.pauses).toEqual([]);
+
+        fake.visible.set(ANA, { key: "s1", startedAt: new Date().toISOString() });
+        fake.along = [{ listenerId: BOB, hostId: ANA, trackId: "", syncedAt: new Date(100_000), startedAt: new Date(0) }];
+        await along.followHost(ANA, null, true, 100_000 + 14 * 60_000);
+        expect(fake.along).toHaveLength(1);
+        await along.followHost(ANA, null, true, 100_000 + 15 * 60_000);
+        expect(fake.along).toEqual([]);
+    });
+
+    it("keeps following through a blip, and ends when Spotify refuses the listener", async () => {
+        fake.along = [{ listenerId: BOB, hostId: ANA, trackId: "s1", syncedAt: new Date(0), startedAt: new Date(0) }];
+        fake.visible.set(ANA, { key: "s2", startedAt: new Date().toISOString() });
+        fake.blip.add("token-bob-link");
+        await along.followHost(ANA, song("s2"), true, 100_000);
+        expect(fake.along).toHaveLength(1);
+        fake.blip.clear();
+        fake.refreshRefused.add("token-bob-link");
+        await along.followHost(ANA, song("s2"), true, 110_000);
+        expect(fake.along).toEqual([]);
     });
 
     it("leaves a listener already on the right song alone", async () => {

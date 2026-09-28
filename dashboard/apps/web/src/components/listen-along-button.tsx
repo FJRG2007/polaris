@@ -6,6 +6,8 @@
  * Who this account is following is one answer shared by every card on the
  * screen, asked once and kept for a short while (`FRESH_MS`), so a member list
  * full of people listening to music is one request rather than one per card.
+ * While any button is on screen it is asked again every `FRESH_MS` and when the
+ * window comes back into focus, since the server ends a listen-along on its own.
  *
  * Every refusal is a sentence from the server - no Premium, no Spotify open, no
  * account linked - shown under the button, with the way to fix it where there
@@ -37,17 +39,41 @@ function publish(hostId: string | null): void {
     for (const listener of listeners) listener();
 }
 
-function subscribe(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
+let stopWatching: (() => void) | null = null;
+
+function watch(): () => void {
+    const timer = window.setInterval(() => refresh(true), FRESH_MS);
+    const onFocus = () => {
+        if (document.visibilityState === "visible") refresh(true);
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+        window.clearInterval(timer);
+        window.removeEventListener("focus", onFocus);
+        document.removeEventListener("visibilitychange", onFocus);
+    };
 }
 
-function refresh(): void {
-    if (held.asking || Date.now() - held.at < FRESH_MS) return;
+function subscribe(listener: () => void): () => void {
+    listeners.add(listener);
+    stopWatching ??= watch();
+    return () => {
+        listeners.delete(listener);
+        if (listeners.size === 0 && stopWatching) {
+            stopWatching();
+            stopWatching = null;
+        }
+    };
+}
+
+function refresh(force = false): void {
+    if (held.asking || (!force && Date.now() - held.at < FRESH_MS)) return;
+    const asked = held.at;
     held.asking = fetch(PATH, { cache: "no-store" })
         .then((response) => (response.ok ? response.json() : null))
         .then((body: { hostId?: unknown } | null) => {
-            if (body) publish(typeof body.hostId === "string" ? body.hostId : null);
+            if (body && held.at === asked) publish(typeof body.hostId === "string" ? body.hostId : null);
         })
         .catch(() => undefined)
         .finally(() => {
@@ -64,7 +90,7 @@ export function ListenAlongButton({ hostId }: { hostId: string }) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<{ text: string; link: boolean } | null>(null);
 
-    useEffect(refresh, []);
+    useEffect(() => refresh(), []);
 
     const mine = following === hostId;
 

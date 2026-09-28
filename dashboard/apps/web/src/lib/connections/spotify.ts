@@ -119,7 +119,13 @@ async function postToken(
         body: new URLSearchParams(grant),
         signal: AbortSignal.timeout(TIMEOUT_MS)
     });
-    if (!response.ok) throw new Error(await refusalMessage(response, "Spotify refused the token request"));
+    if (!response.ok) {
+        if (grant.grant_type === "refresh_token") {
+            if (response.status === 429) throw new SpotifyRateLimited(retryAfter(response));
+            if (response.status === 400 || response.status === 401) throw new SpotifyUnauthorized();
+        }
+        throw new Error(await refusalMessage(response, "Spotify refused the token request"));
+    }
     return tokenSchema.parse(await response.json());
 }
 
@@ -180,7 +186,9 @@ export async function identifySpotifyAccount(
 /**
  * An access token for this link that is good right now, and the credential to
  * write back when it had to be refreshed. Null when there is nothing to refresh
- * with, which is a link that has to be made again.
+ * with, which is a link that has to be made again. A refresh Spotify refuses
+ * throws `SpotifyUnauthorized`, a 429 `SpotifyRateLimited`, and anything else -
+ * a timeout, a 5xx - a plain error, which is a blip and not a revoked link.
  */
 export async function spotifyAccessToken(
     client: SpotifyOAuthClient,

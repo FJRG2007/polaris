@@ -23,6 +23,7 @@
 
 import { prisma } from "@polaris/db";
 import type * as core from "@polaris/core";
+import { sourceSharedWith } from "./service";
 import { presenceFor } from "@/lib/presence-service";
 import { readCredential, updateCredential } from "@/lib/connections/store";
 import {
@@ -33,6 +34,7 @@ import {
     spotifyPlay,
     SpotifyPlayerRefusal,
     SpotifyRateLimited,
+    SpotifyUnauthorized,
     type SpotifyTrack
 } from "@/lib/connections/spotify";
 
@@ -53,6 +55,10 @@ export class ListenAlongError extends Error {
  *  host poll, which is at most this. */
 const TAKEOVER_GRACE_MS = 20_000;
 
+/** How long a listener waits on a paused host before it is over: a host who
+ *  paused is still read every few seconds for as long as somebody follows. */
+const PAUSED_MOST_MS = 15 * 60_000;
+
 /** A listener whose Spotify was seen playing something else, and since when. A
  *  single sighting is the moment between two songs; two in a row, apart by the
  *  grace, is somebody who picked something of their own. */
@@ -65,7 +71,8 @@ function strays(): Map<string, number> {
 }
 
 /** The listener's link, and a token for it that is good now. Null when they have
- *  linked no Spotify, or the one they linked no longer works. */
+ *  linked no Spotify, or the one they linked no longer works; a blip on the way
+ *  to Spotify throws. */
 async function listenerToken(
     userId: string
 ): Promise<{ connectionId: string; accessToken: string } | null> {
@@ -79,7 +86,10 @@ async function listenerToken(
     if (!link) return null;
     const credential = await readCredential(link.id);
     if (!credential) return null;
-    const token = await spotifyAccessToken(client, credential).catch(() => null);
+    const token = await spotifyAccessToken(client, credential).catch((caught: unknown) => {
+        if (caught instanceof SpotifyUnauthorized) return null;
+        throw caught;
+    });
     if (!token) return null;
     if (token.refreshed) await updateCredential(link.id, token.refreshed);
     return { connectionId: link.id, accessToken: token.accessToken };
@@ -93,6 +103,14 @@ async function visibleTrack(
 ): Promise<core.ActivityView | null> {
     const found = await presenceFor(listener, [hostId]);
     return found.get(hostId)?.activity.find((one) => one.source === "spotify") ?? null;
+}
+
+/** Whether the host is still somebody this listener may see listening, with
+ *  nothing playing to see: here to them, and sharing Spotify with them. */
+async function hostVisible(listener: { id: string; isAdmin: boolean }, hostId: string): Promise<boolean> {
+    const found = await presenceFor(listener, [hostId]);
+    if ((found.get(hostId)?.status ?? "offline") === "offline") return false;
+    return (await sourceSharedWith(listener, [hostId], "spotify")).has(hostId);
 }
 
 function trackUri(id: string): string {
@@ -111,7 +129,13 @@ export async function startListenAlong(
     if (hostId === listener.id) throw new ListenAlongError("That is your own music.");
     const track = await visibleTrack(listener, hostId);
     if (!track) throw new ListenAlongError("They are not playing anything you can see right now.");
-    const token = await listenerToken(listener.id);
+    let token: Awaited<ReturnType<typeof listenerToken>>;
+    try {
+        token = await listenerToken(listener.id);
+    } catch (caught) {
+        if (caught instanceof SpotifyRateLimited) throw new ListenAlongError("Spotify is busy. Try again in a moment.");
+        throw new ListenAlongError("Spotify could not be reached. Try again in a moment.");
+    }
     if (!token) {
         throw new ListenAlongError(
             "Link your Spotify account under Connected accounts first.",
@@ -137,7 +161,7 @@ export async function startListenAlong(
     // skip matters for.
     const { pollSoon } = await import("./spotify-poll");
     const host = await prisma.userConnection.findFirst({
-        where: { userId: hostId, provider: SPOTIFY_PROVIDER },
+        where: { userId: hostId, provider: SPOTIFY_PROVIDER, encryptedToken: { not: null } },
         orderBy: { linkedAt: "asc" },
         select: { id: true }
     });
@@ -174,14 +198,20 @@ export async function followHost(
 ): Promise<void> {
     const rows = await prisma.spotifyListenAlong.findMany({
         where: { hostId },
-        select: { listenerId: true, trackId: true, listener: { select: { isAdmin: true } } }
+        select: { listenerId: true, trackId: true, syncedAt: true, listener: { select: { isAdmin: true } } }
     });
     for (const row of rows) {
         const listener = { id: row.listenerId, isAdmin: row.listener.isAdmin };
         try {
             if (!track) {
                 // The host paused or stopped. The listener pauses with them and
-                // stays following, so the host pressing play brings them back.
+                // stays following, so the host pressing play brings them back -
+                // while the host is still somebody they may see, and not for ever.
+                const waited = row.trackId === "" && now - row.syncedAt.getTime() >= PAUSED_MOST_MS;
+                if (waited || !(await hostVisible(listener, hostId))) {
+                    await stopListenAlong(listener.id);
+                    continue;
+                }
                 if (row.trackId) {
                     const token = await listenerToken(listener.id);
                     if (!token) {
@@ -215,9 +245,15 @@ export async function followHost(
             strays().delete(listener.id);
         } catch (caught) {
             if (caught instanceof SpotifyRateLimited) throw caught;
-            // No Premium any more, a revoked link, a device that went away for
-            // good: whatever it is, this listener can no longer be followed.
-            await stopListenAlong(listener.id).catch(() => undefined);
+            // No Premium any more, or a revoked link: this listener can no
+            // longer be followed. A timeout, a 5xx or a phone that went quiet
+            // for a moment is tried again on the host's next read, and a
+            // listener who closed Spotify for good ends through their own poll.
+            const refused =
+                caught instanceof SpotifyUnauthorized ||
+                (caught instanceof SpotifyPlayerRefusal && caught.kind === "premium");
+            if (refused) await stopListenAlong(listener.id).catch(() => undefined);
+            else console.error("polaris: could not keep a listener in step:", caught);
         }
     }
 }

@@ -37,7 +37,7 @@ import {
     type SpotifyOAuthClient,
     type SpotifyTrack
 } from "@/lib/connections/spotify";
-import { followHost, noticeListener } from "./listen-along";
+import { followHost, noticeListener, stopListenAlong } from "./listen-along";
 
 /** How recently a session has to have been seen for its owner to count as here.
  *  The same window the presence dot uses. */
@@ -125,25 +125,32 @@ export async function pollSpotify(now: number = Date.now()): Promise<SpotifyPass
     const client = await getSpotifyOAuthClient();
     if (!client) return { asked: 0, skipped: "no Spotify application is connected" };
 
-    const links = await prisma.userConnection.findMany({
-        where: { provider: SPOTIFY_PROVIDER, encryptedToken: { not: null } },
-        select: { id: true, userId: true },
-        orderBy: { linkedAt: "asc" }
-    });
-    if (links.length === 0) return { asked: 0 };
+    const [links, along] = await Promise.all([
+        prisma.userConnection.findMany({
+            where: { provider: SPOTIFY_PROVIDER, encryptedToken: { not: null } },
+            select: { id: true, userId: true },
+            orderBy: { linkedAt: "asc" }
+        }),
+        prisma.spotifyListenAlong.findMany({ select: { listenerId: true, hostId: true } })
+    ]);
     // One link per account is the default limit; where an operator allowed more,
     // the first is the one that speaks for them.
     const byUser = new Map<string, string>();
     for (const link of links) if (!byUser.has(link.userId)) byUser.set(link.userId, link.id);
+    // A host who unlinked is never read again, so nothing else would end
+    // following them.
+    for (const row of along) {
+        if (!byUser.has(row.hostId)) await stopListenAlong(row.listenerId).catch(() => undefined);
+    }
+    if (byUser.size === 0) return { asked: 0 };
     const userIds = [...byUser.keys()];
 
-    const [here, settings, along] = await Promise.all([
+    const [here, settings] = await Promise.all([
         prisma.sessionState.findMany({
             where: { userId: { in: userIds }, lastSeenAt: { gt: new Date(now - HERE_MS) } },
             select: { userId: true }
         }),
-        activitySettingsFor(userIds),
-        prisma.spotifyListenAlong.findMany({ select: { listenerId: true, hostId: true } })
+        activitySettingsFor(userIds)
     ]);
     const present = new Set(here.map((row) => row.userId));
     const hosts = new Set(along.map((row) => row.hostId));
@@ -170,6 +177,11 @@ export async function pollSpotify(now: number = Date.now()): Promise<SpotifyPass
     }
     due.sort((a, b) => a.at - b.at);
 
+    // Each account is read later in the pass than the one before it, and a
+    // position worked out against the pass's start would put every song early.
+    const started = Date.now();
+    const clock = () => now + Date.now() - started;
+
     let asked = 0;
     for (const entry of due.slice(0, MOST_PER_PASS)) {
         asked += 1;
@@ -181,7 +193,7 @@ export async function pollSpotify(now: number = Date.now()): Promise<SpotifyPass
                 shares,
                 hosting: hosts.has(entry.userId),
                 listening: listeners.has(entry.userId),
-                now
+                clock
             });
         } catch (caught) {
             if (caught instanceof SpotifyRateLimited) {
@@ -201,17 +213,17 @@ export async function pollSpotify(now: number = Date.now()): Promise<SpotifyPass
 async function askOne(
     client: SpotifyOAuthClient,
     entry: { userId: string; connectionId: string },
-    role: { shares: boolean; hosting: boolean; listening: boolean; now: number }
+    role: { shares: boolean; hosting: boolean; listening: boolean; clock: () => number }
 ): Promise<void> {
     const held = schedule();
     const credential = await readCredential(entry.connectionId);
     if (!credential) throw new SpotifyUnauthorized();
-    const token = await spotifyAccessToken(client, credential).catch(() => null);
+    const token = await spotifyAccessToken(client, credential);
     if (!token) throw new SpotifyUnauthorized();
     if (token.refreshed) await updateCredential(entry.connectionId, token.refreshed);
 
     const track = await readSpotifyPlaying(token.accessToken);
-    const now = role.now;
+    const now = role.clock();
 
     let moved = false;
     if (role.shares && track) {

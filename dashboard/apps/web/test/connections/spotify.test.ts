@@ -11,6 +11,8 @@
  *   nobody else can play would be a button that fails;
  * - a refresh answer without a new refresh token keeps the old one, or the link
  *   dies an hour later;
+ * - only a refresh Spotify refuses is a dead link: a 429 is a wait, and a 5xx is
+ *   a blip that is tried again;
  * - Spotify's refusals become the sentence somebody can act on: Premium, or no
  *   device open, and a 429 carries how long to wait.
  */
@@ -121,6 +123,19 @@ describe("linking an account", () => {
         const got = await spotify.spotifyAccessToken(CLIENT, { accessToken: "old", refreshToken: "r1", expiresAt: 0 });
         expect(got?.accessToken).toBe("a2");
         expect(got?.refreshed).toMatchObject({ accessToken: "a2", refreshToken: "r1" });
+    });
+
+    it("tells a refused refresh apart from a busy or broken Spotify", async () => {
+        const stale = { accessToken: "old", refreshToken: "r1", expiresAt: 0 };
+        state.responses.push({ status: 400, body: { error: "invalid_grant" } });
+        await expect(spotify.spotifyAccessToken(CLIENT, stale)).rejects.toBeInstanceOf(spotify.SpotifyUnauthorized);
+        state.responses.push({ status: 429, body: {}, headers: { "retry-after": "7" } });
+        await expect(spotify.spotifyAccessToken(CLIENT, stale)).rejects.toMatchObject({ retryAfterMs: 7_000 });
+        state.responses.push({ status: 503, body: {} });
+        const blip = await spotify.spotifyAccessToken(CLIENT, stale).catch((caught: unknown) => caught);
+        expect(blip).toBeInstanceOf(Error);
+        expect(blip).not.toBeInstanceOf(spotify.SpotifyUnauthorized);
+        expect(blip).not.toBeInstanceOf(spotify.SpotifyRateLimited);
     });
 
     it("does not refresh a token that is still good", async () => {
