@@ -15,6 +15,7 @@
  */
 
 import * as plan from "./plan";
+import * as stored from "./state";
 import { readXray } from "../xray";
 import { prisma } from "@polaris/db";
 import * as catalog from "./catalog";
@@ -23,10 +24,9 @@ import * as messages from "./messages";
 import * as trivia from "./trivia-bank";
 import { host } from "@polaris/app-host";
 import { readSchedule } from "../schedule";
-import { readContainerRange } from "../../container-files";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
+import { containerFileSize, readContainerRange } from "../../container-files";
 import { editionOf, openServerContainer, withServerContainer, type ServerContainer } from "../service";
-import * as stored from "./state";
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -51,8 +51,10 @@ interface Loop {
     ticks: number;
     lastSample: number;
     lastSave: number;
-    /** Where the event is looking for a place, and how far it has got. */
-    target: { x: number; z: number; loaded: boolean } | null;
+    /** Its results are being handed out: no tick, sweep or Cancel plays it again. */
+    finishing: boolean;
+    /** World boss: where it was last seen standing. */
+    bossAt: stored.Point | null;
     /** How this server writes a name into an entity, and its attribute ids. */
     modern: { text: boolean; ids: boolean } | null;
     /** Trivia: how long the log was when the round was asked. */
@@ -283,16 +285,17 @@ export async function startEvent(input: {
         endsAt: now + countdown + catalog.runMinutes(preset) * 60_000,
         participants: [...seen.values()].map((one) => one.name),
         place: null,
+        target: null,
         placeTries: 0,
         reveals: 0,
         round: -1,
-        question: -1,
         roundEndsAt: null,
         points: {},
         decidedBy: null,
         lastWaveAt: 0,
         closedAt: 0,
-        cancelled: false
+        cancelled: false,
+        finishing: false
     } satisfies stored.EventRun;
 
     const stored = await updateEventState(input.installedAppId, (state) => {
@@ -338,9 +341,10 @@ function startLoop(
 ): void {
     const running = loops.get(installedAppId);
     if (running) {
-        running.run = run;
+        if (!running.finishing) running.run = run;
         return;
     }
+    if (run.finishing) return;
     const loop: Loop = {
         ownerId,
         timer: setInterval(() => {
@@ -363,7 +367,8 @@ function startLoop(
         ticks: 0,
         lastSample: 0,
         lastSave: Date.now(),
-        target: null,
+        finishing: false,
+        bossAt: null,
         modern: null,
         logFrom: null,
         sounded: new Set(),
@@ -393,7 +398,12 @@ async function serverFor(installedAppId: string, loop: Loop): Promise<ServerCont
 async function persist(installedAppId: string, loop: Loop): Promise<void> {
     const run = loop.run;
     await updateEventState(installedAppId, (state) =>
-        state.run && state.run.id === run.id ? { ...state, run: { ...run, cancelled: state.run.cancelled || run.cancelled } } : state
+        state.run && state.run.id === run.id
+            ? {
+                  ...state,
+                  run: { ...run, cancelled: state.run.cancelled || run.cancelled, finishing: state.run.finishing || run.finishing }
+              }
+            : state
     );
     loop.lastSave = Date.now();
 }
@@ -568,15 +578,18 @@ async function findPlace(
     place: catalog.EventPlace,
     distance: number
 ): Promise<stored.Point | "failed" | null> {
-    if (!loop.target) {
+    if (!loop.run.target) {
         const centre = await centreFor(server, place);
         if (!centre) return "failed";
         const point = place.mode === "fixed" && loop.run.placeTries === 0 ? centre : commands.pointAway(centre, distance, Math.random);
-        loop.target = { x: point.x, z: point.z, loaded: false };
+        // Written down before the chunk is loaded, so whatever ends the event
+        // knows which one to let go of.
+        loop.run = { ...loop.run, target: { x: point.x, z: point.z } };
+        await persist(installedAppId, loop);
         await server.sayAll([commands.forceload(point.x, point.z)]);
         return null;
     }
-    const { x, z } = loop.target;
+    const { x, z } = loop.run.target;
     let output = "";
     for (const line of commands.markSurface(x, z)) output = await server.say([line]);
     if (commands.spreadWorked(output)) {
@@ -588,17 +601,16 @@ async function findPlace(
         }
     }
     await server.sayAll([commands.CLEAR_MARK, commands.forceloadRemove(x, z)]);
-    loop.target = null;
-    loop.run = { ...loop.run, placeTries: loop.run.placeTries + 1 };
+    loop.run = { ...loop.run, target: null, placeTries: loop.run.placeTries + 1 };
+    await persist(installedAppId, loop);
     return loop.run.placeTries >= PLACE_TRIES ? "failed" : null;
 }
 
 /** A place that was found and then would not take what was put there: undone,
  *  and another looked for, within the same number of tries. */
 async function retryPlace(installedAppId: string, loop: Loop, server: ServerContainer, point: stored.Point): Promise<void> {
-    await server.sayAll([commands.CLEAR_MARK, commands.forceloadRemove(point.x, point.z)]);
-    loop.target = null;
-    loop.run = { ...loop.run, place: null, placeTries: loop.run.placeTries + 1 };
+    await server.sayAll([commands.CLEAR_MARK, ...commands.release(point, loop.run.target)]);
+    loop.run = { ...loop.run, place: null, target: null, placeTries: loop.run.placeTries + 1 };
     await persist(installedAppId, loop);
     if (loop.run.placeTries >= PLACE_TRIES) throw new PlaceNotFound();
 }
@@ -706,10 +718,18 @@ async function worldBoss(
         commands.bossBarHealth(),
         ...commands.bossDamageTick()
     );
-    if (commands.readTest(await server.say([commands.BOSS_ALIVE])) !== "failed") return null;
-    // Gone from the world: killed, if somebody has a kill of its kind since it
-    // came - otherwise it is only out of reach, somewhere nobody is.
-    const killers = commands.readWhere(await server.say([commands.BOSS_KILLERS]));
+    if (commands.readTest(await server.say([commands.BOSS_ALIVE])) !== "failed") {
+        loop.bossAt = commands.readPoint(await server.say([commands.BOSS_WHERE])) ?? loop.bossAt;
+        lines.push(commands.BOSS_KILLS_RESET);
+        return null;
+    }
+    // Gone from the world: killed, if somebody where it was last seen has a
+    // kill of its kind since then - otherwise it is only out of reach,
+    // somewhere nobody is.
+    const last = loop.bossAt ?? loop.run.place;
+    const killers = commands
+        .readWhere(await server.say([commands.BOSS_KILLERS]))
+        .filter((one) => Math.hypot(one.x - last.x, one.y - last.y, one.z - last.z) <= commands.BOSS_REACH);
     if (killers.length === 0) return null;
     const by = killers[0]!.name;
     loop.run = { ...loop.run, decidedBy: by };
@@ -784,7 +804,7 @@ async function triviaTick(
         const round = loop.run.round + 1;
         if (round >= options.rounds) return "All rounds played";
         loop.run = { ...loop.run, round, roundEndsAt: now + options.seconds * 1000 };
-        loop.logFrom = await logLength(server);
+        loop.logFrom = await containerFileSize(server, LOG_FILE);
         const asked = roundOf(loop.run, language);
         lines.push(
             commands.say(
@@ -800,7 +820,7 @@ async function triviaTick(
     }
 
     const asked = roundOf(loop.run, language);
-    const size = await logLength(server);
+    const size = await containerFileSize(server, LOG_FILE);
     // A restart lost where the log was when the round was asked: from now is
     // the fair answer, since nobody can have answered while nobody was looking.
     if (loop.logFrom === null) {
@@ -841,12 +861,6 @@ export function firstRight(log: string, accepted: readonly string[]): string | n
     return null;
 }
 
-async function logLength(server: ServerContainer): Promise<number | null> {
-    const result = await server.run(["stat", "-c", "%s", LOG_FILE]).catch(() => null);
-    const size = result && result.code === 0 ? Number(result.output.trim()) : Number.NaN;
-    return Number.isFinite(size) && size >= 0 ? size : null;
-}
-
 class PlaceNotFound extends Error {
     constructor() {
         super("No dry ground was found for it near the players");
@@ -868,10 +882,16 @@ async function finish(
     note: string
 ): Promise<void> {
     // Off the timer first, so no tick runs into the end; the connection is
-    // kept until everything below has been said through it.
+    // kept until everything below has been said through it. The loop stays
+    // known, and the run marked, until the end is written down, so nothing
+    // picks the same run up again and hands its prizes out twice.
+    if (loop.finishing) return;
+    loop.finishing = true;
     clearInterval(loop.timer);
-    loops.delete(installedAppId);
     const run = loop.run;
+    await updateEventState(installedAppId, (state) =>
+        state.run?.id === run.id ? { ...state, run: { ...state.run, finishing: true } } : state
+    ).catch((error: unknown) => console.warn("polaris: marking an event finished failed", installedAppId, String(error)));
     const { preset } = run;
     const language = loop.language;
     const info = catalog.KIND_INFO[preset.kind];
@@ -889,9 +909,9 @@ async function finish(
             const online = new Set(commands.readWhere(await server.say([commands.WHERE])).map((one) => one.name.toLowerCase()));
             for (const { name, reward } of owed) {
                 if (!catalog.PLAYER_NAME.test(name)) continue;
-                const given = online.has(name.toLowerCase()) && (await give(server, name, reward));
-                if (given) lines.push(`tellraw ${name} ${commands.text(messages.rewardGiven(preset.name, language))}`);
-                else pending.push({ id: `${run.id}-${name}`, player: name, reward, event: preset.name, createdAt: Date.now() });
+                const left = online.has(name.toLowerCase()) ? await give(server, name, reward) : reward;
+                if (!left) lines.push(`tellraw ${name} ${commands.text(messages.rewardGiven(preset.name, language))}`);
+                else pending.push({ id: `${run.id}-${name}`, player: name, reward: left, event: preset.name, createdAt: Date.now() });
             }
             lines.push(commands.say(messages.resultsHeader(preset.name, language)));
             if (preset.kind === "world-boss" && !run.decidedBy) {
@@ -923,17 +943,15 @@ async function finish(
                 const survivors = await survivorsOf(server, run);
                 lines.unshift(commands.say(messages.tag(language) + messages.dawn(survivors.length, language)));
             }
-            await server.sayAll([...lines, ...commands.cleanup(preset, run.place)]);
-        } else if (run.place || commands.hasScoreboard(preset)) {
+            await server.sayAll([...lines, ...commands.cleanup(preset, run.place, run.target)]);
+        } else {
             // The server was not answering: clean up when it is back, so a
-            // chest or a boss is not left in the world for good.
-            await withServerContainer(loop.ownerId, installedAppId, async (later) => {
-                if (later.running) await later.sayAll(commands.cleanup(preset, run.place));
-            }).catch(() => undefined);
+            // chest, a boss or a loaded chunk is not left in the world for good.
+            await cleanUpLater(loop.ownerId, installedAppId, run);
         }
     } catch (error) {
         console.warn("polaris: finishing an event failed", installedAppId, String(error));
-        if (server) await server.sayAll(commands.cleanup(preset, run.place)).catch(() => undefined);
+        if (server) await server.sayAll(commands.cleanup(preset, run.place, run.target)).catch(() => undefined);
     } finally {
         releaseSidebar(loop.ownerId, installedAppId);
         await dropLink(loop);
@@ -958,6 +976,41 @@ async function finish(
         lastKind: preset.kind,
         pending: stored.livePending([...state.pending, ...pending], Date.now())
     })).catch((error: unknown) => console.warn("polaris: recording an event failed", installedAppId, String(error)));
+    if (loops.get(installedAppId) === loop) loops.delete(installedAppId);
+}
+
+async function cleanUpLater(ownerId: string, installedAppId: string, run: stored.EventRun): Promise<void> {
+    await withServerContainer(ownerId, installedAppId, async (later) => {
+        if (later.running) await later.sayAll(commands.cleanup(run.preset, run.place, run.target));
+    }).catch(() => undefined);
+}
+
+/**
+ * A run whose end was begun and never written down - Polaris stopped while it
+ * handed the prizes out, or the last save failed. Not played again, which could
+ * give the same prizes twice: the world is tidied and the run put away.
+ */
+async function abandon(ownerId: string, installedAppId: string, run: stored.EventRun): Promise<void> {
+    await cleanUpLater(ownerId, installedAppId, run);
+    releaseSidebar(ownerId, installedAppId);
+    const now = Date.now();
+    const entry: stored.EventHistoryEntry = {
+        id: run.id,
+        presetId: run.preset.id,
+        kind: run.preset.kind,
+        name: run.preset.name,
+        trigger: run.trigger,
+        outcome: "failed",
+        note: "Stopped while its results were handed out",
+        startedAt: run.startsAt,
+        endedAt: now,
+        participants: run.participants.length,
+        podium: [],
+        disqualified: []
+    };
+    await updateEventState(installedAppId, (state) =>
+        state.run?.id === run.id ? { ...stored.withHistory({ ...state, run: null }, entry), lastKind: run.preset.kind } : state
+    );
 }
 
 /** A score the way the podium says it: `12 points`, `3:20` for time on the hill. */
@@ -1029,13 +1082,23 @@ async function disqualifiedSince(installedAppId: string, since: number): Promise
     return found;
 }
 
-/** Hand one player their prize. False when any of it did not arrive. */
-async function give(server: ServerContainer, name: string, reward: catalog.Reward): Promise<boolean> {
-    let all = true;
-    for (const line of commands.rewardCommands(name, reward)) {
-        if (!commands.gaveIt(await server.say([line]))) all = false;
+/**
+ * Hand one player their prize, a line at a time. Answers what of it did not
+ * arrive, to be kept for later - never what did, which would be given twice -
+ * or null when all of it did.
+ */
+async function give(server: ServerContainer, name: string, reward: catalog.Reward): Promise<catalog.Reward | null> {
+    const items: catalog.RewardItem[] = [];
+    for (const item of reward.items) {
+        for (const line of commands.rewardCommands(name, { items: [item], levels: 0 })) {
+            if (!commands.gaveIt(await server.say([line]))) items.push(item);
+        }
     }
-    return all;
+    let levels = 0;
+    for (const line of commands.rewardCommands(name, { items: [], levels: reward.levels })) {
+        if (!commands.gaveIt(await server.say([line]))) levels = reward.levels;
+    }
+    return items.length === 0 && levels === 0 ? null : { items, levels };
 }
 
 /** How this server's version writes names into entities, and its attribute ids. */
@@ -1111,7 +1174,9 @@ async function sweepOne(ownerId: string, installedAppId: string, config: Record<
     const settings = settingsOf(config);
     const state = stored.readEventState(config);
     if (state.run) {
-        if (!loops.has(installedAppId)) startLoop(ownerId, installedAppId, state.run, settings.settings);
+        if (loops.has(installedAppId)) return false;
+        if (state.run.finishing) await abandon(ownerId, installedAppId, state.run);
+        else startLoop(ownerId, installedAppId, state.run, settings.settings);
         return false;
     }
     const pending = stored.livePending(state.pending, now);
@@ -1201,22 +1266,30 @@ async function deliverPending(ownerId: string, installedAppId: string, seen: Rea
         .livePending(stored.readEventState(row.config).pending, Date.now())
         .filter((one) => seen.has(one.player.toLowerCase()));
     if (owed.length === 0) return;
-    const delivered = new Set<string>();
+    /** What is still owed after this, by pending id: null when all of it arrived. */
+    const left = new Map<string, catalog.Reward | null>();
     const language = settingsOf(row.config).settings.language;
     await withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.running) return;
         for (const one of owed) {
             if (!catalog.PLAYER_NAME.test(one.player)) continue;
-            if (await give(server, one.player, one.reward)) {
-                delivered.add(one.id);
+            const rest = await give(server, one.player, one.reward);
+            if (!rest) {
+                left.set(one.id, null);
                 await server.say([`tellraw ${one.player} ${commands.text(messages.rewardGiven(one.event, language))}`]);
+            } else if (rest.items.length !== one.reward.items.length || rest.levels !== one.reward.levels) {
+                left.set(one.id, rest);
             }
         }
     });
-    if (delivered.size === 0) return;
+    if (left.size === 0) return;
     await updateEventState(installedAppId, (current) => ({
         ...current,
-        pending: current.pending.filter((one) => !delivered.has(one.id))
+        pending: current.pending.flatMap((one) => {
+            if (!left.has(one.id)) return [one];
+            const rest = left.get(one.id);
+            return rest ? [{ ...one, reward: rest }] : [];
+        })
     }));
 }
 
@@ -1224,4 +1297,3 @@ async function deliverPending(ownerId: string, installedAppId: string, seen: Rea
 export function runningEvents(): string[] {
     return [...loops.keys()];
 }
-

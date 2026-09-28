@@ -156,6 +156,28 @@ describe("each kind's commands", () => {
         expect(commands.placeChest(point, "treasure")).toContain('minecraft:chest{LootTable:"minecraft:chests/buried_treasure"}');
     });
 
+    it("takes the chest away only while nobody has opened it", () => {
+        expect(commands.removeChest({ x: 120, y: 70, z: -40 })).toBe(
+            "execute in minecraft:overworld if block 120 70 -40 minecraft:chest if data block 120 70 -40 LootTable run setblock 120 70 -40 minecraft:air replace"
+        );
+    });
+
+    it("lets go of the column being tried as well as the place, once per chunk", () => {
+        const lines = commands.cleanup(preset("world-boss"), null, { x: 500, z: 500 });
+        expect(lines).toContain(commands.forceloadRemove(500, 500));
+        const same = commands.release({ x: 120, z: -40 }, { x: 121, z: -41 });
+        expect(same).toHaveLength(1);
+        expect(commands.release({ x: 120, z: -40 }, { x: 300, z: 0 })).toHaveLength(2);
+    });
+
+    it("takes a happy hour's effects off again", () => {
+        const happy = preset("happy-hour");
+        const cleared = commands.cleanup(happy, null).filter((line) => line.startsWith("effect clear"));
+        const given = commands.happyEffects(happy.options as catalog.EventOptions<"happy-hour">, 60).map((line) => line.split(" ")[3]);
+        expect(cleared.map((line) => line.split(" ")[3])).toEqual(given);
+        expect(cleared.length).toBeGreaterThan(0);
+    });
+
     it("takes every objective it made back out, and nothing else", () => {
         const made = commands.setupScoreboard(preset("mining-rush"), "x").flatMap((line) => {
             const match = /^scoreboard objectives add (\S+)/.exec(line);

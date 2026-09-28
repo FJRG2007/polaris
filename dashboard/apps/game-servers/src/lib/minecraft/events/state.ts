@@ -31,13 +31,14 @@ export const runSchema = z.object({
     participants: z.array(z.string()).default([]),
     /** The chest, the boss's lair, the circle or the finish line, once placed. */
     place: pointSchema.nullable().default(null),
+    /** The column being tried for a place, its chunk kept loaded until released. */
+    target: z.object({ x: z.number(), z: z.number() }).nullable().default(null),
     /** How many times a place was looked for and not found. */
     placeTries: z.number().int().default(0),
     /** How much of a supply drop's position has been told. */
     reveals: z.number().int().default(0),
-    /** Trivia: the round being played, from 0, and which question it is. */
+    /** Trivia: the round being played, from 0. */
     round: z.number().int().default(-1),
-    question: z.number().int().default(-1),
     roundEndsAt: z.number().nullable().default(null),
     /** Trivia: the points so far, by name. The scoreboard shows them too, but it
      *  is this that is read at the end. */
@@ -49,7 +50,9 @@ export const runSchema = z.object({
     /** Trivia: when the last round closed, for the breath before the next. */
     closedAt: z.number().default(0),
     /** Somebody pressed Cancel; the loop ends it on its next tick. */
-    cancelled: z.boolean().default(false)
+    cancelled: z.boolean().default(false),
+    /** Its results are being handed out; never played again from here. */
+    finishing: z.boolean().default(false)
 });
 
 export type EventRun = z.infer<typeof runSchema> & { preset: EventPreset };

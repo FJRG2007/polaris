@@ -460,8 +460,10 @@ export function nearest(point: { x: number; y: number; z: number }, within: numb
     return `execute in minecraft:overworld positioned ${point.x} ${point.y} ${point.z} as @a[distance=..${within},sort=nearest,limit=1] run data get entity @s Pos`;
 }
 
+/** The chest taken away, only while nobody has opened it: once found, what is inside is the finder's. */
 export function removeChest(point: { x: number; y: number; z: number }): string {
-    return `execute in minecraft:overworld if block ${point.x} ${point.y} ${point.z} minecraft:chest run setblock ${point.x} ${point.y} ${point.z} minecraft:air replace`;
+    const at = `${point.x} ${point.y} ${point.z}`;
+    return `execute in minecraft:overworld if block ${at} minecraft:chest if data block ${at} LootTable run setblock ${at} minecraft:air replace`;
 }
 
 /** A column of light over a point, seen from far off. */
@@ -626,8 +628,20 @@ export function bossScoreboard(boss: EventOptions<"world-boss">["boss"]): string
     ];
 }
 
-/** Whoever killed a mob of the boss's kind since it appeared. */
+/** Where the boss is, while it is loaded. */
+export const BOSS_WHERE = `data get entity @e[tag=${BOSS_TAG},limit=1] Pos`;
+
+/**
+ * Kills of the boss's kind counted from now, only while the boss still stands:
+ * one command, so a kill is either before it (and the boss is gone) or after.
+ */
+export const BOSS_KILLS_RESET = `execute if entity @e[tag=${BOSS_TAG}] run scoreboard players set @a ${KILLS} 0`;
+
+/** Whoever killed a mob of the boss's kind since it was last seen standing. */
 export const BOSS_KILLERS = `execute as @a[scores={${KILLS}=1..}] run data get entity @s Pos`;
+
+/** How far from where the boss was last seen its killer can be. */
+export const BOSS_REACH = 48;
 
 /** Out of the world, without a drop: an escaped boss leaves nothing behind. */
 export const BOSS_BANISH = `execute as @e[tag=${BOSS_TAG}] at @s run tp @s ~ -1000 ~`;
@@ -649,14 +663,26 @@ export function hillTick(point: { x: number; y: number; z: number }, radius: num
 
 // ------------------------------------------------------------------ happy hour
 
+/** Each effect the hour can give, and its amplifier. */
+const HAPPY_EFFECTS = [
+    ["haste", 1],
+    ["luck", 0],
+    ["speed", 0],
+    ["regeneration", 0]
+] as const;
+
+function happyChosen(options: EventOptions<"happy-hour">) {
+    return HAPPY_EFFECTS.filter(([effect]) => options[effect]);
+}
+
 export function happyEffects(options: EventOptions<"happy-hour">, seconds: number): string[] {
     const time = Math.max(1, Math.ceil(seconds));
-    const lines: string[] = [];
-    if (options.haste) lines.push(`effect give @a minecraft:haste ${time} 1 true`);
-    if (options.luck) lines.push(`effect give @a minecraft:luck ${time} 0 true`);
-    if (options.speed) lines.push(`effect give @a minecraft:speed ${time} 0 true`);
-    if (options.regeneration) lines.push(`effect give @a minecraft:regeneration ${time} 0 true`);
-    return lines;
+    return happyChosen(options).map(([effect, level]) => `effect give @a minecraft:${effect} ${time} ${level} true`);
+}
+
+/** The hour's effects taken off again. */
+export function happyEffectsClear(options: EventOptions<"happy-hour">): string[] {
+    return happyChosen(options).map(([effect]) => `effect clear @a minecraft:${effect}`);
 }
 
 // ------------------------------------------------------------------ rewards
@@ -675,12 +701,26 @@ export function gaveIt(output: string): boolean {
 
 // ------------------------------------------------------------------ the end
 
+/** The chunks kept loaded for a place and the column tried for it, let go of. */
+export function release(place: { x: number; z: number } | null, target: { x: number; z: number } | null): string[] {
+    const chunks = new Map<string, { x: number; z: number }>();
+    for (const point of [target, place]) {
+        if (point) chunks.set(`${point.x >> 4},${point.z >> 4}`, point);
+    }
+    return [...chunks.values()].map((point) => forceloadRemove(point.x, point.z));
+}
+
 /**
  * Everything an event leaves in the world taken out again: its objectives, the
  * bar, the markers, anything it summoned that is still about, the chunk it kept
- * loaded. Each line fails harmlessly when there is nothing to remove.
+ * loaded. Each line fails harmlessly when there is nothing to remove. A chest
+ * somebody opened stays: what is inside is theirs.
  */
-export function cleanup(preset: EventPreset, place: { x: number; y: number; z: number } | null): string[] {
+export function cleanup(
+    preset: EventPreset,
+    place: { x: number; y: number; z: number } | null,
+    target: { x: number; z: number } | null = null
+): string[] {
     const lines = [
         `bossbar remove ${BAR}`,
         `scoreboard objectives remove ${SCORE}`,
@@ -696,7 +736,8 @@ export function cleanup(preset: EventPreset, place: { x: number; y: number; z: n
     for (const one of components(preset)) lines.push(`scoreboard objectives remove ${one.objective}`);
     if (preset.kind === "world-boss") lines.push(BOSS_BANISH);
     if (preset.kind === "blood-moon") lines.push(...daybreak());
+    if (preset.kind === "happy-hour") lines.push(...happyEffectsClear(preset.options as EventOptions<"happy-hour">));
     if (preset.kind === "supply-drop" && place) lines.push(removeChest(place));
-    if (place && preset.kind !== "explorer") lines.push(forceloadRemove(place.x, place.z));
+    lines.push(...release(preset.kind === "explorer" ? null : place, target));
     return lines;
 }

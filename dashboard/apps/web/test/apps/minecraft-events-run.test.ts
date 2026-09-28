@@ -27,6 +27,10 @@ interface World {
     arrived: boolean;
     /** Every column tried is water. */
     allWater: boolean;
+    /** Where whoever has a kill of the boss's kind is standing. */
+    killerAt: [number, number, number];
+    /** Item ids the server does not know. */
+    unknownItems: string[];
 }
 
 const world: World = {
@@ -40,7 +44,9 @@ const world: World = {
     bossAlive: true,
     deaths: {},
     arrived: false,
-    allWater: false
+    allWater: false,
+    killerAt: [305, 70, 2],
+    unknownItems: []
 };
 let config: Record<string, unknown> = {};
 const held: string[] = [];
@@ -76,13 +82,18 @@ function answer(line: string): string {
     }
     if (line.includes("sort=nearest")) return `${world.online[0]} has the following entity data: [301.0d, 70.0d, 1.0d]`;
     if (line.startsWith("give ")) {
-        const name = line.split(" ")[1] as string;
+        const [, name, item] = line.split(" ") as [string, string, string];
+        if (world.unknownItems.includes(item)) return `Unknown item '${item}'`;
         return world.online.includes(name) ? `Gave 1 [Item] to ${name}` : "No player was found";
     }
     if (line.startsWith("xp add ")) return "Gave 10 experience levels to somebody";
     if (line === "execute if entity @e[tag=pe_boss]") return world.bossAlive ? "Test passed, count: 1" : "Test failed";
+    if (line === "data get entity @e[tag=pe_boss,limit=1] Pos") {
+        return world.bossAlive ? "Wither Skeleton has the following entity data: [310.5d, 70.0d, 4.5d]" : "No entity was found";
+    }
     if (line.startsWith("execute as @a[scores={pe_kill=1..}]")) {
-        return world.bossAlive ? "" : `${world.online[0]} has the following entity data: [1.0d, 64.0d, 1.0d]`;
+        const [x, y, z] = world.killerAt;
+        return world.bossAlive ? "" : `${world.online[0]} has the following entity data: [${x}.0d, ${y}.0d, ${z}.0d]`;
     }
     if (line.includes("dx=12,dy=384,dz=12")) {
         return world.arrived ? `${world.online[1]} has the following entity data: [1.0d, 64.0d, 1.0d]` : "";
@@ -155,7 +166,8 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/live-display-service", () =
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
-    readContainerRange: async (_server: unknown, _file: string, from: number, to: number) => world.log.slice(from, to)
+    readContainerRange: async (_server: unknown, _file: string, from: number, to: number) => world.log.slice(from, to),
+    containerFileSize: async () => world.log.length
 }));
 
 const SERVER = "00000000-0000-4000-8000-000000000001";
@@ -193,6 +205,8 @@ beforeEach(() => {
     world.deaths = {};
     world.arrived = false;
     world.allWater = false;
+    world.killerAt = [305, 70, 2];
+    world.unknownItems = [];
     held.length = 0;
     released.length = 0;
 });
@@ -271,8 +285,26 @@ describe("a supply drop", () => {
         expect(after.history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 1 }]);
         expect(after.history[0]?.note).toBe("Found by Ana");
         expect(world.sent).toContain("give Ana minecraft:diamond 5");
-        // Released, and the chest taken away if it is still standing.
+        // Released; the chest stays, since what is inside is the finder's.
         expect(world.sent).toContain("execute in minecraft:overworld run forceload remove 300 0");
+        const removals = world.sent.filter((line) => line.includes("setblock 300 70 0 minecraft:air"));
+        expect(removals.length).toBeGreaterThan(0);
+        expect(removals.every((line) => line.includes("if data block 300 70 0 LootTable"))).toBe(true);
+    });
+
+    it("lets go of the chunk it was trying when it is called off before landing", async () => {
+        const drop = { ...catalog.newPreset("supply-drop", "drop"), minutes: 10 };
+        setUp([drop]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "drop", trigger: "manual", startedBy: null });
+        await play(4_100);
+        const added = world.sent.filter((line) => line.includes("run forceload add"));
+        expect(added.length).toBeGreaterThan(0);
+        expect(state().run?.target).not.toBeNull();
+        expect(state().run?.place).toBeNull();
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().run).toBeNull();
+        for (const line of added) expect(world.sent).toContain(line.replace("forceload add", "forceload remove"));
     });
 });
 
@@ -348,6 +380,20 @@ describe("the minute sweep", () => {
         expect(world.sent).toContain("give Ana minecraft:emerald 2");
         expect(state().pending).toEqual([]);
     });
+
+    it("keeps only what did not arrive, so nothing is given twice", async () => {
+        setUp([catalog.newPreset("fishing", "fish")], { random: { ...catalog.settingsSchema.parse({}).random } });
+        world.unknownItems = ["minecraft:diamnd"];
+        const reward = { items: [{ id: "minecraft:emerald", count: 2 }, { id: "minecraft:diamnd", count: 1 }], levels: 5 };
+        config[catalog.EVENT_STATE_KEY] = {
+            pending: [{ id: "p1", player: "Ana", reward, event: "Fishing contest", createdAt: Date.now() }]
+        };
+        await events.sweepEvents();
+        await events.sweepEvents();
+        expect(world.sent.filter((line) => line === "give Ana minecraft:emerald 2")).toHaveLength(1);
+        expect(world.sent.filter((line) => line === "xp add Ana 5 levels")).toHaveLength(1);
+        expect(state().pending.map((one) => one.reward)).toEqual([{ items: [{ id: "minecraft:diamnd", count: 1 }], levels: 0 }]);
+    });
 });
 
 describe("trivia", () => {
@@ -398,6 +444,20 @@ describe("a world boss", () => {
         expect(after.history[0]?.note).toBe("Defeated; the final blow by Ana");
         expect(after.history[0]?.podium.map((one) => one.name)).toEqual(["Ana", "Ben"]);
         expect(world.sent).toContain("execute as @e[tag=pe_boss] at @s run tp @s ~ -1000 ~");
+    });
+
+    it("is not taken as felled when it is out of reach and somebody far off kills its kind", async () => {
+        const boss = { ...catalog.newPreset("world-boss", "boss"), minutes: 10 };
+        setUp([boss]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "boss", trigger: "manual", startedBy: null });
+        await play(10_100);
+        expect(world.sent).toContain("execute if entity @e[tag=pe_boss] run scoreboard players set @a pe_kill 0");
+        world.bossAlive = false;
+        world.killerAt = [-2000, 40, 900];
+        await play(6_100);
+        expect(state().run).not.toBeNull();
+        expect(state().run?.decidedBy).toBeNull();
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
     });
 
     it("gives nobody a prize when it got away", async () => {
@@ -468,6 +528,19 @@ describe("the others", () => {
         const after = state();
         expect(after.history[0]).toMatchObject({ outcome: "finished", podium: [] });
         expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+        expect(world.sent).toContain("effect clear @a minecraft:haste");
+    });
+
+    it("a happy hour called off takes its effects back", async () => {
+        const happy = { ...catalog.newPreset("happy-hour", "happy"), minutes: 60 };
+        setUp([happy]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "happy", trigger: "manual", startedBy: null });
+        await play(2_100);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled" });
+        expect(world.sent).toContain("effect clear @a minecraft:haste");
+        expect(world.sent).toContain("effect clear @a minecraft:luck");
     });
 });
 
@@ -509,5 +582,63 @@ describe("when things go wrong", () => {
         await play(62_000);
         expect(state().history[0]).toMatchObject({ id: "resumed", outcome: "finished" });
         expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 3 }]);
+    });
+
+    it("never plays a run again whose end had already begun", async () => {
+        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 10 };
+        setUp([rush]);
+        const now = Date.now();
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "half-ended",
+                trigger: "manual",
+                startedBy: null,
+                preset: rush,
+                phase: "running",
+                createdAt: now - 11 * 60_000,
+                startsAt: now - 10 * 60_000,
+                endsAt: now - 1_000,
+                participants: ["Ana"],
+                finishing: true
+            }
+        };
+        world.scores = { Ana: 9 };
+        await events.sweepEvents();
+        await play(10_000);
+        expect(events.runningEvents()).not.toContain(SERVER);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ id: "half-ended", outcome: "failed" });
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+        expect(world.sent).toContain("scoreboard objectives remove pe_score");
+    });
+
+    it("is not picked up again by the sweep while its end is being written", async () => {
+        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
+        setUp([rush]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "rush", trigger: "manual", startedBy: null });
+        await play(2_100);
+        world.scores = { Ana: 4 };
+        const say = server.say;
+        let swept = false;
+        server.say = async (argv) => {
+            if (argv.join(" ").startsWith("give ") && !swept) {
+                swept = true;
+                expect(state().run?.finishing).toBe(true);
+                await events.sweepEvents();
+                await events.cancelEvent("owner", SERVER).catch(() => undefined);
+            }
+            return say(argv);
+        };
+        try {
+            await play(3 * 60_000);
+        } finally {
+            server.say = say;
+        }
+        expect(swept).toBe(true);
+        expect(world.sent.filter((line) => line === "give Ana minecraft:diamond 5")).toHaveLength(1);
+        const id = state().history[0]?.id;
+        expect(state().history.filter((one) => one.id === id)).toHaveLength(1);
+        expect(state().run).toBeNull();
+        expect(events.runningEvents()).not.toContain(SERVER);
     });
 });
