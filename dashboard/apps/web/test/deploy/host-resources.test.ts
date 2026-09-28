@@ -138,6 +138,23 @@ describe("the advice on a volume", () => {
         );
     });
 
+    it("says a volume was used only when a use was seen, not because the notes are new", () => {
+        const neverSeen = volumeVerdict({
+            ...base,
+            madeByPolaris: true,
+            note: note({ ownerDeletedAt: null, lastUsedAt: null, firstSeenAt: daysAgo(3) })
+        });
+        expect(neverSeen.verdict).toBe("review");
+        expect(neverSeen.reason).not.toMatch(/used it|used recently/);
+        expect(neverSeen.reason).toContain("3 days Polaris has been watching");
+        const seen = volumeVerdict({
+            ...base,
+            madeByPolaris: true,
+            note: note({ ownerDeletedAt: null, lastUsedAt: daysAgo(2), firstSeenAt: daysAgo(3) })
+        });
+        expect(seen.reason).toContain("Something used it 2 days ago");
+    });
+
     it("never calls something Polaris did not make safe", () => {
         const judged = volumeVerdict({ ...base, createdAt: daysAgo(400) });
         expect(judged.verdict).toBe("review");

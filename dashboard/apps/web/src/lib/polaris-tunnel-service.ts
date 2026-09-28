@@ -173,6 +173,21 @@ export async function getPolarisTunnelStatus(): Promise<PolarisTunnelStatus> {
     }
 }
 
+/**
+ * Whether the connector exists at all, and whether it forwards where it should.
+ * "stale" is a container that is there but raised against an older origin, or
+ * stopped - the one that answers every request with a gateway error.
+ */
+export async function polarisTunnelPresence(): Promise<"none" | "serving" | "stale"> {
+    const ports = new HostdPorts();
+    try {
+        if (await isServing(ports)) return "serving";
+        return (await ports.inspect(SERVICE).then(() => true, () => false)) ? "stale" : "none";
+    } finally {
+        await ports.dispose();
+    }
+}
+
 /** Tear the tunnel down and forget its URL. */
 export async function stopPolarisTunnel(): Promise<void> {
     const ports = new HostdPorts();

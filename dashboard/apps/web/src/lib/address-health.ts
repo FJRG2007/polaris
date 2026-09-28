@@ -32,6 +32,7 @@ import { notifyOperators } from "@/lib/notifications/operators";
 import { reachableAddresses, type DeploymentAddress } from "@/lib/deployment-addresses";
 import { getPolarisTunnelStatus, stopPolarisTunnel } from "@/lib/polaris-tunnel-service";
 import { hasInternet } from "@/lib/internet-reach";
+import { settleShareTunnel } from "@/lib/public-reach";
 
 /** Who hears about an address going down - the people who can fix one. */
 const ADDRESS_PERMISSION: Permission = "system.manage";
@@ -305,6 +306,9 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
  * connections out of the box at once for.
  */
 export async function sweepAddresses(): Promise<void> {
+    await settleShareTunnel().catch((error) =>
+        console.error("polaris: settling the public tunnel failed:", error)
+    );
     const addresses = (await reachableAddresses()).filter(checkable);
     await forgetMissing(addresses.map((address) => address.host));
     for (const address of addresses) {
