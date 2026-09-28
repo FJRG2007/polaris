@@ -102,7 +102,7 @@ export async function openOfficeLinkAction(
     const env = loadEnv();
     (await cookies()).set(
         links.linkPassCookie(visit.documentId),
-        links.signLinkPass(visit.documentId, visit.linkId, visit.role),
+        links.signLinkPass(visit.documentId, visit.linkId, visit.role, visit.passwordHash),
         {
             httpOnly: true,
             sameSite: "lax",

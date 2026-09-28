@@ -30,6 +30,7 @@ import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import {
     linkUsability,
+    passwordVersion,
     signMarker,
     signUnlock,
     unlockCookieName,
@@ -320,28 +321,31 @@ export function linkPassCookie(documentId: string): string {
  *  none of it. */
 export const LINK_PASS_TTL_SECONDS = 60 * 60 * 12;
 
-/** The message a pass signs: its role, the document, the link it came from and
- *  when it stops. The link is in it so revoking that link ends every pass it
- *  handed out. The prefix is its own namespace, apart from the unlock cookie's,
- *  so one is never read as the other. */
+/** The message a pass signs: its role, the document, the link it came from, the
+ *  password that link had and when it stops. The link is in it so revoking that
+ *  link ends every pass it handed out, and the password so changing it does too.
+ *  The prefix is its own namespace, apart from the unlock cookie's, so one is
+ *  never read as the other. */
 function passMessage(
     role: core.OfficeRole,
     documentId: string,
     linkId: string,
+    passwordHash: string | null,
     expiresAt: number
 ): string {
-    return `unlock:${OFFICE_LINK_SCOPE}pass:${role}:${documentId}:${linkId}:${expiresAt}`;
+    return `unlock:${OFFICE_LINK_SCOPE}pass:${role}:${documentId}:${linkId}:${passwordVersion(passwordHash)}:${expiresAt}`;
 }
 
 export function signLinkPass(
     documentId: string,
     linkId: string,
     role: core.OfficeRole,
+    passwordHash: string | null,
     now: number = Date.now()
 ): string {
     const expiresAt = Math.floor(now / 1000) + LINK_PASS_TTL_SECONDS;
     const signature = signMarker(
-        passMessage(role, documentId, linkId, expiresAt),
+        passMessage(role, documentId, linkId, passwordHash, expiresAt),
         loadEnv().POLARIS_AUTH_SECRET
     );
     return `${role}.${linkId}.${expiresAt}.${signature}`;
@@ -353,28 +357,43 @@ export interface LinkPass {
     readonly linkId: string;
 }
 
-/**
- * What a browser's pass says it may do here, or null.
- *
- * The role, the link and the expiry are all inside the signature rather than
- * beside it, so a visitor cannot promote a viewer's cookie to an editor's, move
- * it to another link, or stretch its life by editing the parts in front of it.
- * Whether the link is still live is `linkPassStanding`'s question, not this one.
- */
-export function readLinkPass(
-    documentId: string,
+const LINK_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The parts of a pass that is well formed and not yet expired, unverified. */
+function passParts(
     value: string | undefined,
-    now: number = Date.now()
-): LinkPass | null {
+    now: number
+): { role: core.OfficeRole; linkId: string; expiresAt: number; signature: string } | null {
     if (!value) return null;
     const parts = value.split(".");
     if (parts.length !== 4) return null;
     const [role, linkId, expiry, signature] = parts as [string, string, string, string];
-    if (!core.isOfficeRole(role) || !linkId || !/^\d{1,12}$/.test(expiry)) return null;
+    if (!core.isOfficeRole(role) || !LINK_ID_PATTERN.test(linkId) || !/^\d{1,12}$/.test(expiry)) return null;
     const expiresAt = Number(expiry);
     if (expiresAt * 1000 <= now) return null;
+    return { role, linkId, expiresAt, signature };
+}
+
+/**
+ * What a browser's pass says it may do here, or null.
+ *
+ * The role, the link, the link's password and the expiry are all inside the
+ * signature rather than beside it, so a visitor cannot promote a viewer's cookie
+ * to an editor's, move it to another link, or stretch its life by editing the
+ * parts in front of it. Whether the link is still live is `linkPassStanding`'s
+ * question, not this one.
+ */
+export function readLinkPass(
+    documentId: string,
+    value: string | undefined,
+    passwordHash: string | null,
+    now: number = Date.now()
+): LinkPass | null {
+    const parts = passParts(value, now);
+    if (!parts) return null;
+    const { role, linkId, expiresAt, signature } = parts;
     const signed = verifyMarker(
-        passMessage(role, documentId, linkId, expiresAt),
+        passMessage(role, documentId, linkId, passwordHash, expiresAt),
         signature,
         loadEnv().POLARIS_AUTH_SECRET
     );
@@ -385,21 +404,24 @@ export function readLinkPass(
  * The role a pass is worth right now, or null.
  *
  * The signature only proves the pass was issued; this asks whether the link that
- * issued it still stands. A revoked or expired link ends every pass it handed
- * out, on the next request rather than whenever the cookie happens to lapse.
- * Uses are not counted here: the opening was spent when the pass was made.
+ * issued it still stands. A revoked or expired link, or one whose password has
+ * changed, ends every pass it handed out, on the next request rather than
+ * whenever the cookie happens to lapse. Uses are not counted here: the opening
+ * was spent when the pass was made.
  */
 export async function linkPassStanding(
     documentId: string,
     value: string | undefined
 ): Promise<core.OfficeRole | null> {
-    const pass = readLinkPass(documentId, value);
-    if (!pass) return null;
+    const parts = passParts(value, Date.now());
+    if (!parts) return null;
     const row = await prisma.officeLink.findFirst({
-        where: { id: pass.linkId, documentId },
-        select: { role: true, revokedAt: true, expiresAt: true }
+        where: { id: parts.linkId, documentId },
+        select: { role: true, revokedAt: true, expiresAt: true, passwordHash: true }
     });
-    if (!row || row.role !== pass.role) return null;
+    if (!row) return null;
+    const pass = readLinkPass(documentId, value, row.passwordHash);
+    if (!pass || row.role !== pass.role) return null;
     const usable = linkUsability({
         revokedAt: row.revokedAt,
         startsAt: null,

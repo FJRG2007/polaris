@@ -38,3 +38,4 @@ lib/safe-redirect.ts resolves against a placeholder origin and keeps only same-o
 ## History
 - 2026-09-28: discovered by Helio (source audit), status open.
 - 2026-09-28: fixed in dashboard/apps/web/src/lib/safe-redirect.ts, post-login-target.ts, two-factor-view.tsx, lib/connections/link-flow.ts; test test/access/post-login-target.test.ts.
+- 2026-09-28: safeRedirect also refuses a resolved path that starts with two slashes, since dot segments such as `/.//host` normalize to `//host`.

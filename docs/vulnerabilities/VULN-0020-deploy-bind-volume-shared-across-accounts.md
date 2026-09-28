@@ -38,3 +38,4 @@ bindSourceClaimed() refuses a source at, inside, or above another account's bind
 ## History
 - 2026-09-28: discovered by Helio (source audit), status open.
 - 2026-09-28: fixed in dashboard/apps/web/src/lib/deploy-volume-service.ts, lib/deploy-service.ts; test test/deploy/bind-source.test.ts.
+- 2026-09-28: the clash check is limited to volumes on the same host (DeployTarget.hostId, null for the local one), since a bind source is a folder on that host's volume root and two accounts on different servers never share it.

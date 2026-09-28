@@ -7,7 +7,7 @@ a regression. Entries are sorted open/regressed first, then by severity.
 
 | ID | Title | Severity | Status | Location | CWE | Discovered |
 |----|-------|----------|--------|----------|-----|------------|
-| VULN-0003 | Game server player lookup exposes any user's session IP addresses | Medium | Fixed | dashboard/apps/game-servers/src/screens/installed/minecraft-actions.ts | CWE-359 | 2026-09-28 |
+| VULN-0003 | Game server player lookup exposes any user's session IP addresses | Medium | Accepted risk | dashboard/apps/game-servers/src/screens/installed/minecraft-actions.ts | CWE-359 | 2026-09-28 |
 | VULN-0006 | Sign-in approval gate bypassed through better-auth HTTP endpoints (2FA enable, revoke-other-sessions) | High | Fixed | dashboard/packages/auth/src/auth.ts:869 | CWE-863 | 2026-09-28 |
 | VULN-0007 | Organization members with people.manage or roles.manage can grant themselves admin | High | Fixed | dashboard/apps/web/src/app/(app)/account/organizations/actions.ts | CWE-269 | 2026-09-28 |
 | VULN-0008 | Unauthenticated stored XSS through vault website icons served from the Polaris origin | High | Fixed | dashboard/apps/web/src/lib/vault/icons.ts:121 | CWE-79 | 2026-09-28 |

@@ -24,5 +24,6 @@ export function safeRedirect(target: string | null | undefined): string {
         return "/";
     }
     if (resolved.origin !== PLACEHOLDER_ORIGIN) return "/";
+    if (/^[\\/]{2}/.test(resolved.pathname)) return "/";
     return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }

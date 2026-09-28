@@ -67,12 +67,14 @@ function bindAncestors(source: string): string[] {
 
 /**
  * Whether another account already has a server folder at, inside, or above this
- * source. The volume root is one folder for everybody on the host and project
- * slugs are only unique per owner, so two accounts can name the same path - and
- * the second would mount the first one's data.
+ * source on the same host. The volume root is one folder for everybody on the
+ * host and project slugs are only unique per owner, so two accounts can name the
+ * same path - and the second would mount the first one's data. A null host is
+ * the local one.
  */
 export async function bindSourceClaimed(
     ownerId: string,
+    hostId: string | null,
     source: string,
     exceptId?: string,
     claimedBefore?: Date
@@ -80,7 +82,7 @@ export async function bindSourceClaimed(
     const clash = await prisma.volume.findFirst({
         where: {
             kind: "bind",
-            target: { ownerId: { not: ownerId } },
+            target: { ownerId: { not: ownerId }, hostId },
             ...(exceptId ? { id: { not: exceptId } } : {}),
             ...(claimedBefore ? { createdAt: { lt: claimedBefore } } : {}),
             OR: [{ source }, { source: { startsWith: `${source}/` } }, { source: { in: bindAncestors(source) } }]
@@ -185,7 +187,13 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
 
     const app = await prisma.application.findFirst({
         where: { id: parsed.applicationId, environment: { project: { ownerId } } },
-        select: { id: true, targetId: true, slug: true, environment: { select: { project: { select: { slug: true } } } } }
+        select: {
+            id: true,
+            targetId: true,
+            slug: true,
+            target: { select: { hostId: true } },
+            environment: { select: { project: { select: { slug: true } } } }
+        }
     });
     if (!app) throw new Error("Application not found");
 
@@ -217,12 +225,12 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
     }
     if (parsed.kind === "bind" && !bindSourceAllowed(source, app.environment.project.slug))
         throw new Error("That server folder belongs to Polaris or to another project. Choose a different path.");
-    if (parsed.kind === "bind" && (await bindSourceClaimed(ownerId, source))) {
+    if (parsed.kind === "bind" && (await bindSourceClaimed(ownerId, app.target.hostId, source))) {
         // Another account's project shares this slug. A generated path steps
         // aside into a folder of its own; a typed one is that account's data.
         if (explicit) throw new Error("That server folder is in use by another account. Choose a different path.");
         source = normalizeVolumeSource("bind", `${generated}-${app.id.slice(-8).toLowerCase()}`);
-        if (await bindSourceClaimed(ownerId, source))
+        if (await bindSourceClaimed(ownerId, app.target.hostId, source))
             throw new Error("That server folder is in use by another account. Choose a different path.");
     }
 
@@ -281,6 +289,7 @@ export async function updateVolume(ownerId: string, input: DeployVolumeUpdateInp
             source: true,
             connectionId: true,
             mountPath: true,
+            target: { select: { hostId: true } },
             application: { select: { environment: { select: { project: { select: { slug: true } } } } } }
         }
     });
@@ -314,7 +323,7 @@ export async function updateVolume(ownerId: string, input: DeployVolumeUpdateInp
         const projectSlug = existing.application?.environment.project.slug ?? "";
         if (kind === "bind" && (!projectSlug || !bindSourceAllowed(source, projectSlug)))
             throw new Error("That server folder belongs to Polaris or to another project. Choose a different path.");
-        if (kind === "bind" && (await bindSourceClaimed(ownerId, source, existing.id)))
+        if (kind === "bind" && (await bindSourceClaimed(ownerId, existing.target.hostId, source, existing.id)))
             throw new Error("That server folder is in use by another account. Choose a different path.");
     }
 

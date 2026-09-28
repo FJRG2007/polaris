@@ -38,3 +38,4 @@ The pass is role.linkId.exp.sig; expiry is enforced server-side and linkPassStan
 ## History
 - 2026-09-28: discovered by Helio (source audit), status open.
 - 2026-09-28: fixed in dashboard/apps/web/src/lib/office/links.ts, lib/office/reader.ts, app/od/actions.ts; test test/office/link-pass.test.ts.
+- 2026-09-28: the pass is also signed over the link's password hash, so changing the password ends every pass issued under the old one.

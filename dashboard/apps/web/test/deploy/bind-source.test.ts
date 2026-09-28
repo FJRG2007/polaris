@@ -40,10 +40,10 @@ describe("bind sources", () => {
 describe("bind sources other accounts hold", () => {
     it("asks only about other accounts' folders at, inside, or above the path", async () => {
         findFirst.mockResolvedValueOnce({ id: "v2" });
-        expect(await bindSourceClaimed("owner-a", "polaris/deploy/shop/web/data")).toBe(true);
+        expect(await bindSourceClaimed("owner-a", null, "polaris/deploy/shop/web/data")).toBe(true);
         const where = findFirst.mock.calls[0]![0].where;
         expect(where.kind).toBe("bind");
-        expect(where.target).toEqual({ ownerId: { not: "owner-a" } });
+        expect(where.target).toEqual({ ownerId: { not: "owner-a" }, hostId: null });
         expect(where.OR).toEqual([
             { source: "polaris/deploy/shop/web/data" },
             { source: { startsWith: "polaris/deploy/shop/web/data/" } },
@@ -54,10 +54,11 @@ describe("bind sources other accounts hold", () => {
     it("lets a folder nobody else holds through, and limits a deploy-time check to earlier claims", async () => {
         findFirst.mockResolvedValueOnce(null);
         const before = new Date("2026-01-01T00:00:00Z");
-        expect(await bindSourceClaimed("owner-a", "data/uploads", "v1", before)).toBe(false);
+        expect(await bindSourceClaimed("owner-a", "host-1", "data/uploads", "v1", before)).toBe(false);
         const where = findFirst.mock.calls.at(-1)![0].where;
         expect(where.id).toEqual({ not: "v1" });
         expect(where.createdAt).toEqual({ lt: before });
+        expect(where.target).toEqual({ ownerId: { not: "owner-a" }, hostId: "host-1" });
         expect(where.OR[2]).toEqual({ source: { in: ["data"] } });
     });
 });

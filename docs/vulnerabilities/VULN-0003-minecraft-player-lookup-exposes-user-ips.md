@@ -1,7 +1,7 @@
 ---
 id: VULN-0003
 title: Game server player lookup exposes any user's session IP addresses
-status: fixed
+status: accepted-risk
 severity: medium
 cwe: CWE-359
 stride: Information Disclosure
@@ -14,7 +14,7 @@ exploitability: EASY
 confidence: 85
 discovered: 2026-09-28
 last_seen: 2026-09-28
-fixed: 2026-09-28
+fixed: null
 fix_commit: null
 ---
 
@@ -40,3 +40,4 @@ An instance setting, Management > Security > "Show player addresses to game serv
 - 2026-09-28: left open pending a product decision; see Remediation.
 - 2026-09-28: fixed as an administrator decision: lib/apps/player-address-policy.ts, the gate in minecraft-actions.ts, the notice in minecraft-player-dialogs.tsx and the card under app/(app)/admin/security; test test/apps/minecraft-player-addresses.test.ts.
 - 2026-09-29: carried onto the game-servers app. Its player list now also shows linked players' sign-in addresses to anybody with games.read, so the same setting masks session-sourced rules through forViewer() in lib/minecraft/player-access.ts on every screen that receives the list; enforcement reads the rows directly and is unchanged. Setting helper moved to dashboard/apps/web/src/lib/player-address-policy.ts.
+- 2026-09-28: recorded as accepted-risk rather than fixed. The setting is on by default, so out of the box a game server manager still receives other accounts' session addresses; an administrator has to turn it off to close the exposure.

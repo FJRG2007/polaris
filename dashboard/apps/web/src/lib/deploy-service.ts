@@ -2463,7 +2463,7 @@ async function buildAppPlan(
     // the same folder as another account's; the one that came second yields.
     for (const volume of app.volumes) {
         if (volume.kind !== "bind" || !volume.source) continue;
-        if (await bindSourceClaimed(ownerId, volume.source, volume.id, volume.createdAt))
+        if (await bindSourceClaimed(ownerId, app.target.hostId, volume.source, volume.id, volume.createdAt))
             throw new Error(`The server folder of volume ${volume.name} is in use by another account. Choose a different path.`);
     }
     const nasConnectionIds = [
