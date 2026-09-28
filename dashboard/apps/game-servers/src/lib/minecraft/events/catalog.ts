@@ -43,7 +43,11 @@ export const PLAYER_NAME = /^[A-Za-z0-9_]{1,16}$/;
 const ITEM_ID = /^[a-z0-9_.-]+:[a-z0-9_./-]+$/;
 
 export const rewardItemSchema = z.object({
-    id: z.string().trim().toLowerCase().regex(ITEM_ID, "Write the item as namespace:id, like minecraft:diamond"),
+    id: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .regex(ITEM_ID, "Write the item as namespace:id, like minecraft:diamond"),
     count: z.number().int().min(1, "At least one").max(256, "At most 256")
 });
 
@@ -81,7 +85,14 @@ export const placeSchema = z.discriminatedUnion("mode", [
 export type EventPlace = z.infer<typeof placeSchema>;
 
 export const MINING_TARGETS = ["any-ore", "diamond", "debris"] as const;
-export const HUNT_TARGETS = ["hostile", "zombie", "skeleton", "creeper", "spider", "enderman"] as const;
+export const HUNT_TARGETS = [
+    "hostile",
+    "zombie",
+    "skeleton",
+    "creeper",
+    "spider",
+    "enderman"
+] as const;
 export const LOOT_TABLES = ["treasure", "dungeon", "bastion", "end-city", "ancient-city"] as const;
 export const BOSS_KINDS = ["wither-skeleton", "ravager", "vindicator", "husk"] as const;
 export const INTENSITIES = ["low", "medium", "high"] as const;
@@ -170,16 +181,25 @@ const presetBase = z.object({
 
 export const presetSchema = z
     .discriminatedUnion("kind", [
-        presetBase.extend({ kind: z.literal("mining-rush"), options: optionsSchemas["mining-rush"] }),
+        presetBase.extend({
+            kind: z.literal("mining-rush"),
+            options: optionsSchemas["mining-rush"]
+        }),
         presetBase.extend({ kind: z.literal("mob-hunt"), options: optionsSchemas["mob-hunt"] }),
-        presetBase.extend({ kind: z.literal("supply-drop"), options: optionsSchemas["supply-drop"] }),
+        presetBase.extend({
+            kind: z.literal("supply-drop"),
+            options: optionsSchemas["supply-drop"]
+        }),
         presetBase.extend({ kind: z.literal("blood-moon"), options: optionsSchemas["blood-moon"] }),
         presetBase.extend({ kind: z.literal("world-boss"), options: optionsSchemas["world-boss"] }),
         presetBase.extend({ kind: z.literal("fishing"), options: optionsSchemas.fishing }),
         presetBase.extend({ kind: z.literal("trivia"), options: optionsSchemas.trivia }),
         presetBase.extend({ kind: z.literal("explorer"), options: optionsSchemas.explorer }),
         presetBase.extend({ kind: z.literal("happy-hour"), options: optionsSchemas["happy-hour"] }),
-        presetBase.extend({ kind: z.literal("king-of-the-hill"), options: optionsSchemas["king-of-the-hill"] })
+        presetBase.extend({
+            kind: z.literal("king-of-the-hill"),
+            options: optionsSchemas["king-of-the-hill"]
+        })
     ])
     .transform((value) => value as EventPreset);
 
@@ -206,11 +226,26 @@ export const randomSchema = z
         days: daysSchema.default([]),
         from: z.string().regex(TIME, "Write the time as HH:MM").default("18:00"),
         to: z.string().regex(TIME, "Write the time as HH:MM").default("23:00"),
-        minGap: z.number().int().min(15).max(24 * 60).default(60),
-        maxGap: z.number().int().min(15).max(24 * 60).default(120),
+        minGap: z
+            .number()
+            .int()
+            .min(15)
+            .max(24 * 60)
+            .default(60),
+        maxGap: z
+            .number()
+            .int()
+            .min(15)
+            .max(24 * 60)
+            .default(120),
         /** Which events it draws from, and how often each comes up. */
         pool: z
-            .array(z.object({ presetId: z.string().min(1).max(64), weight: z.number().int().min(1).max(10) }))
+            .array(
+                z.object({
+                    presetId: z.string().min(1).max(64),
+                    weight: z.number().int().min(1).max(10)
+                })
+            )
             .max(50)
             .default([])
     })
@@ -410,7 +445,10 @@ export function readEventsConfig(config: Record<string, unknown>, timezone = "UT
     return {
         settings: {
             ...read,
-            random: { ...read.random, pool: read.random.pool.filter((entry) => ids.has(entry.presetId)) }
+            random: {
+                ...read.random,
+                pool: read.random.pool.filter((entry) => ids.has(entry.presetId))
+            }
         },
         presets,
         schedules

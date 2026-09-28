@@ -9,9 +9,15 @@ import * as catalog from "@polaris-app/game-servers/src/lib/minecraft/events/cat
 import * as commands from "@polaris-app/game-servers/src/lib/minecraft/events/commands";
 import * as messages from "@polaris-app/game-servers/src/lib/minecraft/events/messages";
 import * as trivia from "@polaris-app/game-servers/src/lib/minecraft/events/trivia-bank";
-import { atLeast, firstRight } from "@polaris-app/game-servers/src/lib/minecraft/events/events-service";
+import {
+    atLeast,
+    firstRight
+} from "@polaris-app/game-servers/src/lib/minecraft/events/events-service";
 
-const preset = <K extends catalog.EventKind>(kind: K, options: Partial<catalog.EventOptions<K>> = {}): catalog.EventPreset => {
+const preset = <K extends catalog.EventKind>(
+    kind: K,
+    options: Partial<catalog.EventOptions<K>> = {}
+): catalog.EventPreset => {
     const made = catalog.newPreset(kind, kind);
     return { ...made, options: { ...made.options, ...options } } as catalog.EventPreset;
 };
@@ -19,8 +25,15 @@ const preset = <K extends catalog.EventKind>(kind: K, options: Partial<catalog.E
 describe("the scoreboard", () => {
     it("counts every ore by its worth for a mining rush", () => {
         const counted = commands.components(preset("mining-rush"));
-        expect(counted.find((one) => one.criterion === "minecraft.mined:minecraft.deepslate_diamond_ore")?.weight).toBe(8);
-        expect(counted.find((one) => one.criterion === "minecraft.mined:minecraft.ancient_debris")?.weight).toBe(10);
+        expect(
+            counted.find(
+                (one) => one.criterion === "minecraft.mined:minecraft.deepslate_diamond_ore"
+            )?.weight
+        ).toBe(8);
+        expect(
+            counted.find((one) => one.criterion === "minecraft.mined:minecraft.ancient_debris")
+                ?.weight
+        ).toBe(10);
         expect(new Set(counted.map((one) => one.objective)).size).toBe(counted.length);
         expect(counted.every((one) => one.objective.length <= 16)).toBe(true);
     });
@@ -35,12 +48,18 @@ describe("the scoreboard", () => {
 
     it("gives every player a zero before adding up, and weights what is worth more", () => {
         const lines = commands.scoreTick(preset("mining-rush"));
-        const first = lines.findIndex((line) => line.startsWith("scoreboard players add @a pe_c0 0"));
+        const first = lines.findIndex((line) =>
+            line.startsWith("scoreboard players add @a pe_c0 0")
+        );
         const firstSum = lines.findIndex((line) => line.includes("pe_sum += @s pe_tmp"));
         expect(first).toBeGreaterThanOrEqual(0);
         expect(first).toBeLessThan(firstSum);
-        expect(lines).toContain("execute as @a run scoreboard players operation @s pe_tmp *= #w8 pe_const");
-        expect(lines.at(-1)).toBe("execute as @a[scores={pe_sum=1..}] run scoreboard players operation @s pe_score = @s pe_sum");
+        expect(lines).toContain(
+            "execute as @a run scoreboard players operation @s pe_tmp *= #w8 pe_const"
+        );
+        expect(lines.at(-1)).toBe(
+            "execute as @a[scores={pe_sum=1..}] run scoreboard players operation @s pe_score = @s pe_sum"
+        );
     });
 
     it("sets up a constant for every weight the tick multiplies by", () => {
@@ -53,7 +72,9 @@ describe("the scoreboard", () => {
 
     it("shows distance in metres", () => {
         const lines = commands.scoreTick(preset("explorer", { mode: "distance" }));
-        expect(lines).toContain("execute as @a run scoreboard players operation @s pe_sum /= #w100 pe_const");
+        expect(lines).toContain(
+            "execute as @a run scoreboard players operation @s pe_sum /= #w100 pe_const"
+        );
     });
 
     it("puts no scoreboard up for a happy hour, a supply drop or a race", () => {
@@ -71,7 +92,8 @@ describe("the scoreboard", () => {
 
 describe("reading what the server says", () => {
     it("reads scores, and ignores somebody who has none", () => {
-        const output = "Ana has 12 [pe_score]Ben has 3 [pe_score]\nCan't get value of pe_score for Cai; none is set";
+        const output =
+            "Ana has 12 [pe_score]Ben has 3 [pe_score]\nCan't get value of pe_score for Cai; none is set";
         expect([...commands.readScores(output)]).toEqual([
             ["Ana", 12],
             ["Ben", 3]
@@ -79,19 +101,31 @@ describe("reading what the server says", () => {
     });
 
     it("reads positions and facings", () => {
-        expect(commands.readWhere("Ana has the following entity data: [1.5d, -58.0d, 30.25d]")).toEqual([
-            { name: "Ana", x: 1.5, y: -58, z: 30.25 }
-        ]);
-        expect(commands.readFacing("Ana has the following entity data: [-179.5f, 12.0f]").get("Ana")).toEqual({ yaw: -179.5, pitch: 12 });
+        expect(
+            commands.readWhere("Ana has the following entity data: [1.5d, -58.0d, 30.25d]")
+        ).toEqual([{ name: "Ana", x: 1.5, y: -58, z: 30.25 }]);
+        expect(
+            commands.readFacing("Ana has the following entity data: [-179.5f, 12.0f]").get("Ana")
+        ).toEqual({ yaw: -179.5, pitch: 12 });
     });
 
     it("reads a marker's spot in whole blocks", () => {
-        expect(commands.readPoint("Armor Stand has the following entity data: [100.5d, 71.0d, -20.7d]")).toEqual({ x: 100, y: 71, z: -21 });
+        expect(
+            commands.readPoint("Armor Stand has the following entity data: [100.5d, 71.0d, -20.7d]")
+        ).toEqual({ x: 100, y: 71, z: -21 });
     });
 
     it("tells a surface found from one refused", () => {
-        expect(commands.spreadWorked("Spread 1 entity around 100.5, 30.5 with an average distance of 0 blocks apart")).toBe(true);
-        expect(commands.spreadWorked("Could not spread 1 entity around 100, 30 (too many entities for space - try using spread of at most 0.0)")).toBe(false);
+        expect(
+            commands.spreadWorked(
+                "Spread 1 entity around 100.5, 30.5 with an average distance of 0 blocks apart"
+            )
+        ).toBe(true);
+        expect(
+            commands.spreadWorked(
+                "Could not spread 1 entity around 100, 30 (too many entities for space - try using spread of at most 0.0)"
+            )
+        ).toBe(false);
     });
 
     it("knows a prize that reached somebody from one that did not", () => {
@@ -109,7 +143,9 @@ describe("the text players read", () => {
 
     it("never asks for a game variable by accident", () => {
         const every = [
-            ...catalog.EVENT_KINDS.flatMap((kind) => (["en", "es"] as const).map((language) => messages.rules(kind, language))),
+            ...catalog.EVENT_KINDS.flatMap((kind) =>
+                (["en", "es"] as const).map((language) => messages.rules(kind, language))
+            ),
             messages.startsIn("X", 60, "es"),
             messages.dropArea(100, 200, 50, "en"),
             messages.bossAppeared("B", 1, 2, 3, "es"),
@@ -130,21 +166,35 @@ describe("each kind's commands", () => {
     it("spreads a wave onto the surface around each player in survival", () => {
         const lines = commands.wave({ intensity: "low", creepers: false }, 0);
         expect(lines.filter((line) => line.includes("summon"))).toHaveLength(2);
-        expect(lines.some((line) => line.includes("spreadplayers ~ ~ 4 16 false @e[tag=pe_new,distance=..1]"))).toBe(true);
+        expect(
+            lines.some((line) =>
+                line.includes("spreadplayers ~ ~ 4 16 false @e[tag=pe_new,distance=..1]")
+            )
+        ).toBe(true);
         expect(lines.at(-1)).toBe("tag @e[tag=pe_new] remove pe_new");
         expect(lines.join("\n")).not.toContain("creeper");
     });
 
     it("names a boss the way each version reads a name", () => {
-        expect(commands.bossNameCommand("The Warlord", true)).toContain('{CustomName:{text:"The Warlord",color:"red",bold:1b}}');
+        expect(commands.bossNameCommand("The Warlord", true)).toContain(
+            '{CustomName:{text:"The Warlord",color:"red",bold:1b}}'
+        );
         const legacy = commands.bossNameCommand("The Warlord", false);
         expect(legacy).toMatch(/\{CustomName:'\[.*The Warlord.*\]'\}/);
     });
 
     it("tries the attribute ids of both eras", () => {
-        expect(commands.bossAttributes(400, true)[0]).toContain("minecraft:max_health base set 400");
-        expect(commands.bossAttributes(400, false)[0]).toContain("minecraft:generic.max_health base set 400");
-        expect(commands.attributeWorked("Set base value of attribute Max Health for entity Warlord to 400.0")).toBe(true);
+        expect(commands.bossAttributes(400, true)[0]).toContain(
+            "minecraft:max_health base set 400"
+        );
+        expect(commands.bossAttributes(400, false)[0]).toContain(
+            "minecraft:generic.max_health base set 400"
+        );
+        expect(
+            commands.attributeWorked(
+                "Set base value of attribute Max Health for entity Warlord to 400.0"
+            )
+        ).toBe(true);
         expect(commands.attributeWorked("Unknown attribute: minecraft:max_health")).toBe(false);
     });
 
@@ -153,7 +203,9 @@ describe("each kind's commands", () => {
         const cleanup = commands.cleanup(preset("supply-drop"), point);
         expect(cleanup).toContain(commands.forceloadRemove(120, -40));
         expect(cleanup).toContain(commands.removeChest(point));
-        expect(commands.placeChest(point, "treasure")).toContain('minecraft:chest{LootTable:"minecraft:chests/buried_treasure"}');
+        expect(commands.placeChest(point, "treasure")).toContain(
+            'minecraft:chest{LootTable:"minecraft:chests/buried_treasure"}'
+        );
     });
 
     it("takes the chest away only while nobody has opened it", () => {
@@ -172,8 +224,12 @@ describe("each kind's commands", () => {
 
     it("takes a happy hour's effects off again", () => {
         const happy = preset("happy-hour");
-        const cleared = commands.cleanup(happy, null).filter((line) => line.startsWith("effect clear"));
-        const given = commands.happyEffects(happy.options as catalog.EventOptions<"happy-hour">, 60).map((line) => line.split(" ")[3]);
+        const cleared = commands
+            .cleanup(happy, null)
+            .filter((line) => line.startsWith("effect clear"));
+        const given = commands
+            .happyEffects(happy.options as catalog.EventOptions<"happy-hour">, 60)
+            .map((line) => line.split(" ")[3]);
         expect(cleared.map((line) => line.split(" ")[3])).toEqual(given);
         expect(cleared.length).toBeGreaterThan(0);
     });
@@ -183,19 +239,23 @@ describe("each kind's commands", () => {
             const match = /^scoreboard objectives add (\S+)/.exec(line);
             return match ? [match[1] as string] : [];
         });
-        const removed = new Set(commands.cleanup(preset("mining-rush"), null).flatMap((line) => {
-            const match = /^scoreboard objectives remove (\S+)/.exec(line);
-            return match ? [match[1] as string] : [];
-        }));
+        const removed = new Set(
+            commands.cleanup(preset("mining-rush"), null).flatMap((line) => {
+                const match = /^scoreboard objectives remove (\S+)/.exec(line);
+                return match ? [match[1] as string] : [];
+            })
+        );
         for (const objective of made) expect(removed.has(objective)).toBe(true);
         for (const objective of removed) expect(objective.startsWith("pe_")).toBe(true);
     });
 
     it("gives a prize as the game's own commands", () => {
-        expect(commands.rewardCommands("Ana", { items: [{ id: "minecraft:diamond", count: 5 }], levels: 10 })).toEqual([
-            "give Ana minecraft:diamond 5",
-            "xp add Ana 10 levels"
-        ]);
+        expect(
+            commands.rewardCommands("Ana", {
+                items: [{ id: "minecraft:diamond", count: 5 }],
+                levels: 10
+            })
+        ).toEqual(["give Ana minecraft:diamond 5", "xp add Ana 10 levels"]);
     });
 
     it("counts a finish as a box from bedrock to the sky", () => {
@@ -227,8 +287,12 @@ describe("trivia", () => {
     });
 
     it("asks in the same order after a restart", () => {
-        const one = trivia.shuffled(trivia.QUESTIONS.en, trivia.seeded("event-1")).map((q) => q.question);
-        const again = trivia.shuffled(trivia.QUESTIONS.en, trivia.seeded("event-1")).map((q) => q.question);
+        const one = trivia
+            .shuffled(trivia.QUESTIONS.en, trivia.seeded("event-1"))
+            .map((q) => q.question);
+        const again = trivia
+            .shuffled(trivia.QUESTIONS.en, trivia.seeded("event-1"))
+            .map((q) => q.question);
         expect(again).toEqual(one);
     });
 
@@ -237,7 +301,15 @@ describe("trivia", () => {
             for (const question of trivia.QUESTIONS[language]) {
                 expect(question.answers.length).toBeGreaterThan(0);
                 expect(question.question).not.toMatch(/[{}]/);
-                expect(catalog.presetSchema.safeParse({ ...catalog.newPreset("trivia", "t"), options: { ...catalog.newPreset("trivia", "t").options, questions: [question] } }).success).toBe(true);
+                expect(
+                    catalog.presetSchema.safeParse({
+                        ...catalog.newPreset("trivia", "t"),
+                        options: {
+                            ...catalog.newPreset("trivia", "t").options,
+                            questions: [question]
+                        }
+                    }).success
+                ).toBe(true);
             }
             for (const word of trivia.WORDS[language]) expect(word).toMatch(/^[a-z]+$/);
         }

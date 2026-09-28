@@ -8,7 +8,13 @@
  */
 
 import { z } from "zod";
-import { EVENT_KINDS, EVENT_STATE_KEY, presetSchema, rewardSchema, type EventPreset } from "./catalog";
+import {
+    EVENT_KINDS,
+    EVENT_STATE_KEY,
+    presetSchema,
+    rewardSchema,
+    type EventPreset
+} from "./catalog";
 
 export const TRIGGERS = ["manual", "scheduled", "random"] as const;
 export type EventTrigger = (typeof TRIGGERS)[number];

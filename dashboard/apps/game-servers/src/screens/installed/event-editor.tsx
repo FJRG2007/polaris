@@ -68,7 +68,9 @@ const TRIVIA_LABELS: Readonly<Record<(typeof catalog.TRIVIA_MODES)[number], stri
     mixed: "Both, taking turns"
 };
 
-function options<T extends string>(labels: Readonly<Record<T, string>>): { value: T; label: string }[] {
+function options<T extends string>(
+    labels: Readonly<Record<T, string>>
+): { value: T; label: string }[] {
     return (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
 }
 
@@ -78,12 +80,25 @@ function numberOf(text: string): number {
 }
 
 /** The first problem the schema has with a path, if any. */
-function problemAt(issues: readonly { path: (string | number)[]; message: string }[], ...path: (string | number)[]): string | null {
+function problemAt(
+    issues: readonly { path: (string | number)[]; message: string }[],
+    ...path: (string | number)[]
+): string | null {
     const found = issues.find((issue) => path.every((part, index) => issue.path[index] === part));
     return found?.message ?? null;
 }
 
-function Field({ label, hint, problem, children }: { label: string; hint?: string; problem?: string | null; children: React.ReactNode }) {
+function Field({
+    label,
+    hint,
+    problem,
+    children
+}: {
+    label: string;
+    hint?: string;
+    problem?: string | null;
+    children: React.ReactNode;
+}) {
     return (
         <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium">{label}</span>
@@ -116,7 +131,9 @@ function PlaceField({
             <span className="font-medium">Where</span>
             <SegmentedControl
                 value={value.mode}
-                onValueChange={(mode) => onChange(mode === "fixed" ? { mode: "fixed", x: 0, z: 0 } : { mode: "players" })}
+                onValueChange={(mode) =>
+                    onChange(mode === "fixed" ? { mode: "fixed", x: 0, z: 0 } : { mode: "players" })
+                }
                 options={[
                     { value: "players", label: "Near the players" },
                     { value: "fixed", label: "At set coordinates" }
@@ -129,14 +146,18 @@ function PlaceField({
                         <Input
                             type="number"
                             value={Number.isFinite(value.x) ? value.x : ""}
-                            onChange={(event) => onChange({ ...value, x: numberOf(event.target.value) })}
+                            onChange={(event) =>
+                                onChange({ ...value, x: numberOf(event.target.value) })
+                            }
                         />
                     </Field>
                     <Field label="Z" problem={problemAt(issues, ...path, "z")}>
                         <Input
                             type="number"
                             value={Number.isFinite(value.z) ? value.z : ""}
-                            onChange={(event) => onChange({ ...value, z: numberOf(event.target.value) })}
+                            onChange={(event) =>
+                                onChange({ ...value, z: numberOf(event.target.value) })
+                            }
                         />
                     </Field>
                 </div>
@@ -180,12 +201,16 @@ function RewardEditor({
                             onChange={(event) =>
                                 onChange({
                                     ...value,
-                                    items: value.items.map((one, at) => (at === index ? { ...one, id: event.target.value } : one))
+                                    items: value.items.map((one, at) =>
+                                        at === index ? { ...one, id: event.target.value } : one
+                                    )
                                 })
                             }
                         />
                         {problemAt(issues, ...path, "items", index, "id") && (
-                            <span className="text-xs text-danger">{problemAt(issues, ...path, "items", index, "id")}</span>
+                            <span className="text-xs text-danger">
+                                {problemAt(issues, ...path, "items", index, "id")}
+                            </span>
                         )}
                     </div>
                     <Input
@@ -199,7 +224,9 @@ function RewardEditor({
                             onChange({
                                 ...value,
                                 items: value.items.map((one, at) =>
-                                    at === index ? { ...one, count: numberOf(event.target.value) } : one
+                                    at === index
+                                        ? { ...one, count: numberOf(event.target.value) }
+                                        : one
                                 )
                             })
                         }
@@ -209,7 +236,12 @@ function RewardEditor({
                         size="icon"
                         aria-label="Remove this item"
                         title="Remove this item"
-                        onClick={() => onChange({ ...value, items: value.items.filter((_, at) => at !== index) })}
+                        onClick={() =>
+                            onChange({
+                                ...value,
+                                items: value.items.filter((_, at) => at !== index)
+                            })
+                        }
                     >
                         <Trash2 className="size-4" />
                     </Button>
@@ -220,7 +252,12 @@ function RewardEditor({
                     <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => onChange({ ...value, items: [...value.items, { id: "minecraft:diamond", count: 1 }] })}
+                        onClick={() =>
+                            onChange({
+                                ...value,
+                                items: [...value.items, { id: "minecraft:diamond", count: 1 }]
+                            })
+                        }
                     >
                         <Plus className="size-4" />
                         Item
@@ -234,7 +271,9 @@ function RewardEditor({
                         min={0}
                         max={100}
                         value={Number.isFinite(value.levels) ? value.levels : ""}
-                        onChange={(event) => onChange({ ...value, levels: numberOf(event.target.value) })}
+                        onChange={(event) =>
+                            onChange({ ...value, levels: numberOf(event.target.value) })
+                        }
                     />
                 </label>
             </div>
@@ -277,7 +316,9 @@ function OptionsFields({
     issues: readonly { path: (string | number)[]; message: string }[];
 }) {
     const [questionsText, setQuestionsText] = useState(() =>
-        preset.kind === "trivia" ? writeQuestions((preset.options as catalog.EventOptions<"trivia">).questions) : ""
+        preset.kind === "trivia"
+            ? writeQuestions((preset.options as catalog.EventOptions<"trivia">).questions)
+            : ""
     );
     switch (preset.kind) {
         case "mining-rush": {
@@ -286,7 +327,9 @@ function OptionsFields({
                 <Field label="What counts">
                     <Select
                         value={value.target}
-                        onValueChange={(target) => onChange({ ...value, target: target as typeof value.target })}
+                        onValueChange={(target) =>
+                            onChange({ ...value, target: target as typeof value.target })
+                        }
                         options={options(MINING_LABELS)}
                         aria-label="What counts"
                     />
@@ -299,7 +342,9 @@ function OptionsFields({
                 <Field label="What counts">
                     <Select
                         value={value.target}
-                        onValueChange={(target) => onChange({ ...value, target: target as typeof value.target })}
+                        onValueChange={(target) =>
+                            onChange({ ...value, target: target as typeof value.target })
+                        }
                         options={options(HUNT_LABELS)}
                         aria-label="What counts"
                     />
@@ -317,19 +362,27 @@ function OptionsFields({
                         issues={issues}
                         path={["options", "place"]}
                     />
-                    <Field label="How far (blocks)" hint="Between 100 and 3000. Around the players, or around the coordinates." problem={problemAt(issues, "options", "distance")}>
+                    <Field
+                        label="How far (blocks)"
+                        hint="Between 100 and 3000. Around the players, or around the coordinates."
+                        problem={problemAt(issues, "options", "distance")}
+                    >
                         <Input
                             type="number"
                             min={100}
                             max={3000}
                             value={Number.isFinite(value.distance) ? value.distance : ""}
-                            onChange={(event) => onChange({ ...value, distance: numberOf(event.target.value) })}
+                            onChange={(event) =>
+                                onChange({ ...value, distance: numberOf(event.target.value) })
+                            }
                         />
                     </Field>
                     <Field label="What is inside">
                         <Select
                             value={value.loot}
-                            onValueChange={(loot) => onChange({ ...value, loot: loot as typeof value.loot })}
+                            onValueChange={(loot) =>
+                                onChange({ ...value, loot: loot as typeof value.loot })
+                            }
                             options={options(LOOT_LABELS)}
                             aria-label="What is inside"
                         />
@@ -341,10 +394,18 @@ function OptionsFields({
             const value = preset.options as catalog.EventOptions<"blood-moon">;
             return (
                 <>
-                    <Field label="How hard" hint="How many mobs rise around each player every 40 seconds: 2, 3 or 5.">
+                    <Field
+                        label="How hard"
+                        hint="How many mobs rise around each player every 40 seconds: 2, 3 or 5."
+                    >
                         <SegmentedControl
                             value={value.intensity}
-                            onValueChange={(intensity) => onChange({ ...value, intensity: intensity as typeof value.intensity })}
+                            onValueChange={(intensity) =>
+                                onChange({
+                                    ...value,
+                                    intensity: intensity as typeof value.intensity
+                                })
+                            }
                             options={options(INTENSITY_LABELS)}
                             aria-label="How hard"
                         />
@@ -352,9 +413,15 @@ function OptionsFields({
                     <label className="flex items-center justify-between gap-3 text-sm">
                         <span>
                             <span className="font-medium">Creepers too</span>
-                            <span className="block text-xs text-muted-foreground">They blow holes in whatever is built nearby.</span>
+                            <span className="block text-xs text-muted-foreground">
+                                They blow holes in whatever is built nearby.
+                            </span>
                         </span>
-                        <Switch checked={value.creepers} onChange={(creepers) => onChange({ ...value, creepers })} aria-label="Creepers too" />
+                        <Switch
+                            checked={value.creepers}
+                            onChange={(creepers) => onChange({ ...value, creepers })}
+                            aria-label="Creepers too"
+                        />
                     </label>
                 </>
             );
@@ -366,18 +433,26 @@ function OptionsFields({
                     <Field label="Which boss">
                         <Select
                             value={value.boss}
-                            onValueChange={(boss) => onChange({ ...value, boss: boss as typeof value.boss })}
+                            onValueChange={(boss) =>
+                                onChange({ ...value, boss: boss as typeof value.boss })
+                            }
                             options={options(BOSS_LABELS)}
                             aria-label="Which boss"
                         />
                     </Field>
-                    <Field label="Health" hint="Between 100 and 1024. A player with iron gear deals about 8 a hit." problem={problemAt(issues, "options", "health")}>
+                    <Field
+                        label="Health"
+                        hint="Between 100 and 1024. A player with iron gear deals about 8 a hit."
+                        problem={problemAt(issues, "options", "health")}
+                    >
                         <Input
                             type="number"
                             min={100}
                             max={1024}
                             value={Number.isFinite(value.health) ? value.health : ""}
-                            onChange={(event) => onChange({ ...value, health: numberOf(event.target.value) })}
+                            onChange={(event) =>
+                                onChange({ ...value, health: numberOf(event.target.value) })
+                            }
                         />
                     </Field>
                     <PlaceField
@@ -395,29 +470,43 @@ function OptionsFields({
             return (
                 <>
                     <div className="grid grid-cols-2 gap-3">
-                        <Field label="Rounds" problem={problemAt(issues, "options", "rounds")} hint="3 to 15">
+                        <Field
+                            label="Rounds"
+                            problem={problemAt(issues, "options", "rounds")}
+                            hint="3 to 15"
+                        >
                             <Input
                                 type="number"
                                 min={3}
                                 max={15}
                                 value={Number.isFinite(value.rounds) ? value.rounds : ""}
-                                onChange={(event) => onChange({ ...value, rounds: numberOf(event.target.value) })}
+                                onChange={(event) =>
+                                    onChange({ ...value, rounds: numberOf(event.target.value) })
+                                }
                             />
                         </Field>
-                        <Field label="Seconds a round" problem={problemAt(issues, "options", "seconds")} hint="15 to 90">
+                        <Field
+                            label="Seconds a round"
+                            problem={problemAt(issues, "options", "seconds")}
+                            hint="15 to 90"
+                        >
                             <Input
                                 type="number"
                                 min={15}
                                 max={90}
                                 value={Number.isFinite(value.seconds) ? value.seconds : ""}
-                                onChange={(event) => onChange({ ...value, seconds: numberOf(event.target.value) })}
+                                onChange={(event) =>
+                                    onChange({ ...value, seconds: numberOf(event.target.value) })
+                                }
                             />
                         </Field>
                     </div>
                     <Field label="Rounds of">
                         <SegmentedControl
                             value={value.mode}
-                            onValueChange={(mode) => onChange({ ...value, mode: mode as typeof value.mode })}
+                            onValueChange={(mode) =>
+                                onChange({ ...value, mode: mode as typeof value.mode })
+                            }
                             options={options(TRIVIA_LABELS)}
                             aria-label="Rounds of"
                         />
@@ -433,7 +522,10 @@ function OptionsFields({
                             placeholder="What is the name of our spawn town? | Northwatch; north watch"
                             onChange={(event) => {
                                 setQuestionsText(event.target.value);
-                                onChange({ ...value, questions: readQuestions(event.target.value) });
+                                onChange({
+                                    ...value,
+                                    questions: readQuestions(event.target.value)
+                                });
                             }}
                         />
                     </Field>
@@ -447,7 +539,9 @@ function OptionsFields({
                     <Field label="The goal">
                         <SegmentedControl
                             value={value.mode}
-                            onValueChange={(mode) => onChange({ ...value, mode: mode as typeof value.mode })}
+                            onValueChange={(mode) =>
+                                onChange({ ...value, mode: mode as typeof value.mode })
+                            }
                             options={[
                                 { value: "distance", label: "Farthest travelled" },
                                 { value: "race", label: "Race to a point" }
@@ -464,13 +558,22 @@ function OptionsFields({
                                 issues={issues}
                                 path={["options", "place"]}
                             />
-                            <Field label="How far (blocks)" hint="Between 200 and 3000." problem={problemAt(issues, "options", "distance")}>
+                            <Field
+                                label="How far (blocks)"
+                                hint="Between 200 and 3000."
+                                problem={problemAt(issues, "options", "distance")}
+                            >
                                 <Input
                                     type="number"
                                     min={200}
                                     max={3000}
                                     value={Number.isFinite(value.distance) ? value.distance : ""}
-                                    onChange={(event) => onChange({ ...value, distance: numberOf(event.target.value) })}
+                                    onChange={(event) =>
+                                        onChange({
+                                            ...value,
+                                            distance: numberOf(event.target.value)
+                                        })
+                                    }
                                 />
                             </Field>
                         </>
@@ -480,19 +583,32 @@ function OptionsFields({
         }
         case "happy-hour": {
             const value = preset.options as catalog.EventOptions<"happy-hour">;
-            const effects: { key: "haste" | "luck" | "speed" | "regeneration"; label: string; hint: string }[] = [
+            const effects: {
+                key: "haste" | "luck" | "speed" | "regeneration";
+                label: string;
+                hint: string;
+            }[] = [
                 { key: "haste", label: "Haste II", hint: "Mining and digging faster." },
                 { key: "luck", label: "Luck", hint: "Better fishing and chest loot." },
                 { key: "speed", label: "Speed", hint: "Moving faster." },
-                { key: "regeneration", label: "Regeneration", hint: "Health comes back on its own." }
+                {
+                    key: "regeneration",
+                    label: "Regeneration",
+                    hint: "Health comes back on its own."
+                }
             ];
             return (
                 <div className="flex flex-col gap-2">
                     {effects.map((effect) => (
-                        <label key={effect.key} className="flex items-center justify-between gap-3 text-sm">
+                        <label
+                            key={effect.key}
+                            className="flex items-center justify-between gap-3 text-sm"
+                        >
                             <span>
                                 <span className="font-medium">{effect.label}</span>
-                                <span className="block text-xs text-muted-foreground">{effect.hint}</span>
+                                <span className="block text-xs text-muted-foreground">
+                                    {effect.hint}
+                                </span>
                             </span>
                             <Switch
                                 checked={value[effect.key]}
@@ -501,7 +617,9 @@ function OptionsFields({
                             />
                         </label>
                     ))}
-                    {problemAt(issues, "options") && <span className="text-xs text-danger">{problemAt(issues, "options")}</span>}
+                    {problemAt(issues, "options") && (
+                        <span className="text-xs text-danger">{problemAt(issues, "options")}</span>
+                    )}
                 </div>
             );
         }
@@ -516,13 +634,19 @@ function OptionsFields({
                         issues={issues}
                         path={["options", "place"]}
                     />
-                    <Field label="Circle radius (blocks)" hint="Between 3 and 20." problem={problemAt(issues, "options", "radius")}>
+                    <Field
+                        label="Circle radius (blocks)"
+                        hint="Between 3 and 20."
+                        problem={problemAt(issues, "options", "radius")}
+                    >
                         <Input
                             type="number"
                             min={3}
                             max={20}
                             value={Number.isFinite(value.radius) ? value.radius : ""}
-                            onChange={(event) => onChange({ ...value, radius: numberOf(event.target.value) })}
+                            onChange={(event) =>
+                                onChange({ ...value, radius: numberOf(event.target.value) })
+                            }
                         />
                     </Field>
                 </>
@@ -549,7 +673,8 @@ export function EventEditor({
     const issues = checked.success ? [] : checked.error.issues;
     const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
     const info = catalog.KIND_INFO[draft.kind];
-    const change = (patch: Partial<catalog.EventPreset>) => setDraft((current) => ({ ...current, ...patch }) as catalog.EventPreset);
+    const change = (patch: Partial<catalog.EventPreset>) =>
+        setDraft((current) => ({ ...current, ...patch }) as catalog.EventPreset);
     const rewards = draft.rewards;
 
     return (
@@ -561,48 +686,107 @@ export function EventEditor({
                         <DialogDescription>{info.summary}</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
-                        <Field label="Name" hint="What players see in titles and on the scoreboard." problem={problemAt(issues, "name")}>
-                            <Input value={draft.name} maxLength={40} onChange={(event) => change({ name: event.target.value })} />
+                        <Field
+                            label="Name"
+                            hint="What players see in titles and on the scoreboard."
+                            problem={problemAt(issues, "name")}
+                        >
+                            <Input
+                                value={draft.name}
+                                maxLength={40}
+                                onChange={(event) => change({ name: event.target.value })}
+                            />
                         </Field>
                         {draft.kind !== "trivia" && (
-                            <Field label="Minutes" problem={problemAt(issues, "minutes")} hint={`${catalog.DURATION.min} to ${catalog.DURATION.max}`}>
+                            <Field
+                                label="Minutes"
+                                problem={problemAt(issues, "minutes")}
+                                hint={`${catalog.DURATION.min} to ${catalog.DURATION.max}`}
+                            >
                                 <Input
                                     type="number"
                                     min={catalog.DURATION.min}
                                     max={catalog.DURATION.max}
                                     value={Number.isFinite(draft.minutes) ? draft.minutes : ""}
-                                    onChange={(event) => change({ minutes: numberOf(event.target.value) })}
+                                    onChange={(event) =>
+                                        change({ minutes: numberOf(event.target.value) })
+                                    }
                                 />
                             </Field>
                         )}
                     </div>
 
-                    <OptionsFields preset={draft} issues={issues} onChange={(next) => change({ options: next } as Partial<catalog.EventPreset>)} />
+                    <OptionsFields
+                        preset={draft}
+                        issues={issues}
+                        onChange={(next) =>
+                            change({ options: next } as Partial<catalog.EventPreset>)
+                        }
+                    />
 
                     {info.competitive && (
                         <div className="flex flex-col gap-2">
                             <p className="text-sm font-medium">Prizes</p>
                             <p className="text-xs text-muted-foreground">
-                                Given when it ends. Anybody offline by then gets theirs the next time they are on. Players caught by the anti-cheat during it get nothing.
+                                Given when it ends. Anybody offline by then gets theirs the next
+                                time they are on. Players caught by the anti-cheat during it get
+                                nothing.
                             </p>
                             <div className="grid gap-2 sm:grid-cols-2">
-                                <RewardEditor label="First place" hint="Ties share a place." value={rewards.first} issues={issues} path={["rewards", "first"]} onChange={(first) => change({ rewards: { ...rewards, first } })} />
-                                <RewardEditor label="Second place" hint="" value={rewards.second} issues={issues} path={["rewards", "second"]} onChange={(second) => change({ rewards: { ...rewards, second } })} />
-                                <RewardEditor label="Third place" hint="" value={rewards.third} issues={issues} path={["rewards", "third"]} onChange={(third) => change({ rewards: { ...rewards, third } })} />
+                                <RewardEditor
+                                    label="First place"
+                                    hint="Ties share a place."
+                                    value={rewards.first}
+                                    issues={issues}
+                                    path={["rewards", "first"]}
+                                    onChange={(first) => change({ rewards: { ...rewards, first } })}
+                                />
+                                <RewardEditor
+                                    label="Second place"
+                                    hint=""
+                                    value={rewards.second}
+                                    issues={issues}
+                                    path={["rewards", "second"]}
+                                    onChange={(second) =>
+                                        change({ rewards: { ...rewards, second } })
+                                    }
+                                />
+                                <RewardEditor
+                                    label="Third place"
+                                    hint=""
+                                    value={rewards.third}
+                                    issues={issues}
+                                    path={["rewards", "third"]}
+                                    onChange={(third) => change({ rewards: { ...rewards, third } })}
+                                />
                                 <RewardEditor
                                     label="Everybody who took part"
-                                    hint={draft.kind === "blood-moon" ? "Everybody who survived the night." : draft.kind === "supply-drop" || (draft.kind === "explorer" && (draft.options as catalog.EventOptions<"explorer">).mode === "race") ? "Nobody but the winner, in this one." : "Everybody who scored at all."}
+                                    hint={
+                                        draft.kind === "blood-moon"
+                                            ? "Everybody who survived the night."
+                                            : draft.kind === "supply-drop" ||
+                                                (draft.kind === "explorer" &&
+                                                    (
+                                                        draft.options as catalog.EventOptions<"explorer">
+                                                    ).mode === "race")
+                                              ? "Nobody but the winner, in this one."
+                                              : "Everybody who scored at all."
+                                    }
                                     value={rewards.everyone}
                                     issues={issues}
                                     path={["rewards", "everyone"]}
-                                    onChange={(everyone) => change({ rewards: { ...rewards, everyone } })}
+                                    onChange={(everyone) =>
+                                        change({ rewards: { ...rewards, everyone } })
+                                    }
                                 />
                             </div>
                         </div>
                     )}
 
                     <div className="flex items-center justify-end gap-2">
-                        {!checked.success && issues[0] && <span className="mr-auto text-xs text-danger">{issues[0].message}</span>}
+                        {!checked.success && issues[0] && (
+                            <span className="mr-auto text-xs text-danger">{issues[0].message}</span>
+                        )}
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>

@@ -47,33 +47,53 @@ describe("the stored settings", () => {
 
     it("refuse a longest wait shorter than the shortest", () => {
         const config = catalog.defaultEventsConfig();
-        const bad = { ...config, settings: { ...config.settings, random: { ...config.settings.random, minGap: 90, maxGap: 30 } } };
+        const bad = {
+            ...config,
+            settings: {
+                ...config.settings,
+                random: { ...config.settings.random, minGap: 90, maxGap: 30 }
+            }
+        };
         expect(catalog.eventsConfigSchema.safeParse(bad).success).toBe(false);
     });
 
     it("refuse a schedule for an event that is not there", () => {
         const config = catalog.defaultEventsConfig();
-        const bad = { ...config, schedules: [{ id: "x", presetId: "nope", enabled: true, days: [], at: "20:00" }] };
+        const bad = {
+            ...config,
+            schedules: [{ id: "x", presetId: "nope", enabled: true, days: [], at: "20:00" }]
+        };
         const parsed = catalog.eventsConfigSchema.safeParse(bad);
         expect(parsed.success).toBe(false);
         expect(parsed.error?.issues[0]?.message).toBe("That event no longer exists");
     });
 
     it("refuse a happy hour with no effect in it", () => {
-        const preset = { ...catalog.newPreset("happy-hour", "h"), options: { haste: false, luck: false, speed: false, regeneration: false } };
+        const preset = {
+            ...catalog.newPreset("happy-hour", "h"),
+            options: { haste: false, luck: false, speed: false, regeneration: false }
+        };
         expect(catalog.presetSchema.safeParse(preset).success).toBe(false);
     });
 
     it("refuse a prize written as something that is not an item id", () => {
         const preset = catalog.newPreset("fishing", "f");
-        const bad = { ...preset, rewards: { ...preset.rewards, first: { items: [{ id: "diamond sword", count: 1 }], levels: 0 } } };
+        const bad = {
+            ...preset,
+            rewards: {
+                ...preset.rewards,
+                first: { items: [{ id: "diamond sword", count: 1 }], levels: 0 }
+            }
+        };
         expect(catalog.presetSchema.safeParse(bad).success).toBe(false);
     });
 
     it("run trivia for its rounds rather than its minutes", () => {
         const preset = catalog.newPreset("trivia", "t");
         const options = preset.options as catalog.EventOptions<"trivia">;
-        expect(catalog.runMinutes(preset)).toBe(Math.ceil((options.rounds * (options.seconds + catalog.ROUND_PAUSE_SECONDS)) / 60));
+        expect(catalog.runMinutes(preset)).toBe(
+            Math.ceil((options.rounds * (options.seconds + catalog.ROUND_PAUSE_SECONDS)) / 60)
+        );
     });
 });
 
@@ -90,20 +110,35 @@ describe("who counts as playing", () => {
         const first = plan.observe(new Map(), still, facing, 0);
         const moved = plan.observe(first, [{ name: "Ana", x: 14, y: 64, z: 10 }], facing, 60_000);
         expect(plan.activePlayers(moved, 5, 60_000).map((one) => one.name)).toEqual(["Ana"]);
-        const turned = plan.observe(first, still, new Map([["Ana", { yaw: 150, pitch: 0 }]]), 60_000);
+        const turned = plan.observe(
+            first,
+            still,
+            new Map([["Ana", { yaw: 150, pitch: 0 }]]),
+            60_000
+        );
         expect(plan.activePlayers(turned, 5, 60_000)).toHaveLength(1);
     });
 
     it("is not somebody standing still past the idle time", () => {
         const first = plan.observe(new Map(), still, facing, 0);
         const moved = plan.observe(first, [{ name: "Ana", x: 14, y: 64, z: 10 }], facing, 60_000);
-        const idle = plan.observe(moved, [{ name: "Ana", x: 14.1, y: 64, z: 10 }], facing, 7 * 60_000);
+        const idle = plan.observe(
+            moved,
+            [{ name: "Ana", x: 14.1, y: 64, z: 10 }],
+            facing,
+            7 * 60_000
+        );
         expect(plan.activePlayers(idle, 5, 7 * 60_000)).toHaveLength(0);
     });
 
     it("treats a turn across north as a small one", () => {
         const first = plan.observe(new Map(), still, new Map([["Ana", { yaw: 179, pitch: 0 }]]), 0);
-        const next = plan.observe(first, still, new Map([["Ana", { yaw: -179, pitch: 0 }]]), 60_000);
+        const next = plan.observe(
+            first,
+            still,
+            new Map([["Ana", { yaw: -179, pitch: 0 }]]),
+            60_000
+        );
         expect(plan.activePlayers(next, 5, 60_000)).toHaveLength(0);
     });
 });
@@ -119,8 +154,12 @@ describe("a scheduled event", () => {
     });
 
     it("fires once for its minute", () => {
-        expect(plan.schedulesDue(settings(), [entry], { e: at("20:01") }, at("20:03"))).toHaveLength(0);
-        expect(plan.schedulesDue(settings(), [entry], { e: at("20:01", "2026-09-27") }, at("20:01"))).toHaveLength(1);
+        expect(
+            plan.schedulesDue(settings(), [entry], { e: at("20:01") }, at("20:03"))
+        ).toHaveLength(0);
+        expect(
+            plan.schedulesDue(settings(), [entry], { e: at("20:01", "2026-09-27") }, at("20:01"))
+        ).toHaveLength(1);
     });
 
     it("is read in the server's zone", () => {
@@ -131,8 +170,12 @@ describe("a scheduled event", () => {
     });
 
     it("keeps to its days", () => {
-        expect(plan.schedulesDue(settings(), [{ ...entry, days: [2] }], {}, at("20:00"))).toHaveLength(0);
-        expect(plan.schedulesDue(settings(), [{ ...entry, days: [1] }], {}, at("20:00"))).toHaveLength(1);
+        expect(
+            plan.schedulesDue(settings(), [{ ...entry, days: [2] }], {}, at("20:00"))
+        ).toHaveLength(0);
+        expect(
+            plan.schedulesDue(settings(), [{ ...entry, days: [1] }], {}, at("20:00"))
+        ).toHaveLength(1);
     });
 });
 
@@ -154,7 +197,14 @@ describe("the random draw", () => {
             ]
         }
     });
-    const base = { settings: on, presets: [fishing, mining], lastKind: null, running: false, active: 3, random: always(0) };
+    const base = {
+        settings: on,
+        presets: [fishing, mining],
+        lastKind: null,
+        running: false,
+        active: 3,
+        random: always(0)
+    };
 
     it("arms itself a gap away rather than starting on the spot", () => {
         const decided = plan.decideRandom({ ...base, nextRandomAt: null, now: at("19:00") });
@@ -163,7 +213,9 @@ describe("the random draw", () => {
     });
 
     it("waits while it is not due", () => {
-        expect(plan.decideRandom({ ...base, nextRandomAt: at("20:00"), now: at("19:30") }).start).toBeNull();
+        expect(
+            plan.decideRandom({ ...base, nextRandomAt: at("20:00"), now: at("19:30") }).start
+        ).toBeNull();
     });
 
     it("waits outside its hours, across midnight too", () => {
@@ -175,33 +227,76 @@ describe("the random draw", () => {
     });
 
     it("waits for enough players who are playing, and says how many", () => {
-        const decided = plan.decideRandom({ ...base, active: 1, nextRandomAt: at("20:00"), now: at("20:00") });
+        const decided = plan.decideRandom({
+            ...base,
+            active: 1,
+            nextRandomAt: at("20:00"),
+            now: at("20:00")
+        });
         expect(decided.start).toBeNull();
         expect(decided.waiting).toBe("Waiting for 2 active players (1 now)");
     });
 
     it("waits while another event is on", () => {
-        expect(plan.decideRandom({ ...base, running: true, nextRandomAt: at("20:00"), now: at("20:00") }).start).toBeNull();
+        expect(
+            plan.decideRandom({
+                ...base,
+                running: true,
+                nextRandomAt: at("20:00"),
+                now: at("20:00")
+            }).start
+        ).toBeNull();
     });
 
     it("never draws the same kind twice in a row when there is another", () => {
-        const decided = plan.decideRandom({ ...base, lastKind: "fishing", nextRandomAt: at("20:00"), now: at("20:00") });
+        const decided = plan.decideRandom({
+            ...base,
+            lastKind: "fishing",
+            nextRandomAt: at("20:00"),
+            now: at("20:00")
+        });
         expect(decided.start?.id).toBe("mine");
         // Next one after this one ends plus the gap.
         expect(decided.nextRandomAt).toBe(at("20:00") + 10 * 60_000 + 60 * 60_000);
     });
 
     it("draws by weight", () => {
-        const weighted = { ...on, random: { ...on.random, pool: [{ presetId: "fish", weight: 1 }, { presetId: "mine", weight: 9 }] } };
-        const low = plan.decideRandom({ ...base, settings: weighted, nextRandomAt: at("20:00"), now: at("20:00"), random: always(0.05) });
-        const high = plan.decideRandom({ ...base, settings: weighted, nextRandomAt: at("20:00"), now: at("20:00"), random: always(0.5) });
+        const weighted = {
+            ...on,
+            random: {
+                ...on.random,
+                pool: [
+                    { presetId: "fish", weight: 1 },
+                    { presetId: "mine", weight: 9 }
+                ]
+            }
+        };
+        const low = plan.decideRandom({
+            ...base,
+            settings: weighted,
+            nextRandomAt: at("20:00"),
+            now: at("20:00"),
+            random: always(0.05)
+        });
+        const high = plan.decideRandom({
+            ...base,
+            settings: weighted,
+            nextRandomAt: at("20:00"),
+            now: at("20:00"),
+            random: always(0.5)
+        });
         expect(low.start?.id).toBe("fish");
         expect(high.start?.id).toBe("mine");
     });
 
     it("leaves out an event that is switched off", () => {
         const off = { ...fishing, enabled: false };
-        const decided = plan.decideRandom({ ...base, presets: [off, mining], nextRandomAt: at("20:00"), now: at("20:00") });
+        const decided = plan.decideRandom({
+            ...base,
+            presets: [off, mining],
+            nextRandomAt: at("20:00"),
+            now: at("20:00")
+        });
         expect(decided.start?.id).toBe("mine");
     });
 });
@@ -226,7 +321,13 @@ describe("the podium and the prizes", () => {
     });
 
     it("leaves the disqualified off it", () => {
-        const placed = plan.podium(new Map([["Ana", 10], ["Ben", 8]]), new Set(["ana"]));
+        const placed = plan.podium(
+            new Map([
+                ["Ana", 10],
+                ["Ben", 8]
+            ]),
+            new Set(["ana"])
+        );
         expect(placed).toEqual([{ place: 1, name: "Ben", score: 8 }]);
     });
 
@@ -237,7 +338,15 @@ describe("the podium and the prizes", () => {
             third: catalog.NO_REWARD,
             everyone: { items: [{ id: "minecraft:bread", count: 3 }], levels: 0 }
         };
-        const owed = plan.prizes([{ place: 1, name: "Ana", score: 3 }, { place: 2, name: "Ben", score: 2 }], ["Ana", "Ben", "Cheat"], rewards, new Set(["cheat"]));
+        const owed = plan.prizes(
+            [
+                { place: 1, name: "Ana", score: 3 },
+                { place: 2, name: "Ben", score: 2 }
+            ],
+            ["Ana", "Ben", "Cheat"],
+            rewards,
+            new Set(["cheat"])
+        );
         expect(owed).toEqual([
             {
                 name: "Ana",

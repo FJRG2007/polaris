@@ -60,7 +60,10 @@ export async function startEventAction(input: z.input<typeof startSchema>): Prom
     const parsed = startSchema.safeParse(input);
     if (!parsed.success) return { error: "That event is not here" };
     try {
-        const { user, access } = await requireGameServer("games.console", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.console",
+            parsed.data.installedAppId
+        );
         const run = await events.startEvent({
             ownerId: access.ownerId,
             installedAppId: parsed.data.installedAppId,

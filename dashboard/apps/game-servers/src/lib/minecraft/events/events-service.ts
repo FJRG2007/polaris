@@ -26,7 +26,12 @@ import { host } from "@polaris/app-host";
 import { readSchedule } from "../schedule";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
 import { containerFileSize, readContainerRange } from "../../container-files";
-import { editionOf, openServerContainer, withServerContainer, type ServerContainer } from "../service";
+import {
+    editionOf,
+    openServerContainer,
+    withServerContainer,
+    type ServerContainer
+} from "../service";
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -85,7 +90,12 @@ async function readRow(installedAppId: string): Promise<Row | null> {
         select: { ownerId: true, name: true, catalogId: true, status: true, config: true }
     });
     if (!row || row.status === "removed" || !row.catalogId.startsWith("minecraft")) return null;
-    return { ownerId: row.ownerId, name: row.name, catalogId: row.catalogId, config: readInstallConfig(row.config) };
+    return {
+        ownerId: row.ownerId,
+        name: row.name,
+        catalogId: row.catalogId,
+        config: readInstallConfig(row.config)
+    };
 }
 
 /** The settings as the screen sees them, with the schedule's zone as the default. */
@@ -121,7 +131,10 @@ export async function updateEventState(
 
 /** Save the events set up on the screen. Checked again here: this is the one
  *  that decides. */
-export async function saveEventsConfig(installedAppId: string, input: unknown): Promise<catalog.EventsConfig> {
+export async function saveEventsConfig(
+    installedAppId: string,
+    input: unknown
+): Promise<catalog.EventsConfig> {
     const parsed = catalog.eventsConfigSchema.safeParse(input);
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Check the events");
     const value = parsed.data;
@@ -140,7 +153,11 @@ export async function saveEventsConfig(installedAppId: string, input: unknown): 
             // The draw is armed again from the new settings: a gap shortened
             // or the draw switched on takes effect from now, not from whenever
             // the old one would have come round.
-            await updateEventState(installedAppId, (state) => ({ ...state, nextRandomAt: null, waiting: null }));
+            await updateEventState(installedAppId, (state) => ({
+                ...state,
+                nextRandomAt: null,
+                waiting: null
+            }));
             return value;
         }
     }
@@ -209,7 +226,10 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
                   active: plan.activePlayers(seen, config.settings.afkMinutes, Date.now()).length
               }
             : null,
-        refusal: editionOf(row.catalogId) === "bedrock" ? "Events run on Java servers; Bedrock has no scoreboard statistics or boss bars to play them with" : null
+        refusal:
+            editionOf(row.catalogId) === "bedrock"
+                ? "Events run on Java servers; Bedrock has no scoreboard statistics or boss bars to play them with"
+                : null
     };
 }
 
@@ -227,7 +247,9 @@ async function currentStandings(
     const loop = loops.get(installedAppId);
     const output = loop?.link
         ? await loop.link.server.say([commands.READ_SCORES])
-        : await withServerContainer(ownerId, installedAppId, (server) => server.say([commands.READ_SCORES]));
+        : await withServerContainer(ownerId, installedAppId, (server) =>
+              server.say([commands.READ_SCORES])
+          );
     return [...commands.readScores(output).entries()]
         .map(([name, score]) => ({ name, score }))
         .sort((left, right) => right.score - left.score)
@@ -258,7 +280,8 @@ export async function startEvent(input: {
     const config = settingsOf(row.config);
     const preset = config.presets.find((one) => one.id === input.presetId);
     if (!preset) throw new Error("That event no longer exists");
-    if (!preset.enabled && input.trigger !== "manual") throw new Error("That event is switched off");
+    if (!preset.enabled && input.trigger !== "manual")
+        throw new Error("That event is switched off");
 
     const seen = await sample(row.ownerId, input.installedAppId);
     if (seen === null) throw new Error("The server is not running");
@@ -401,7 +424,11 @@ async function persist(installedAppId: string, loop: Loop): Promise<void> {
         state.run && state.run.id === run.id
             ? {
                   ...state,
-                  run: { ...run, cancelled: state.run.cancelled || run.cancelled, finishing: state.run.finishing || run.finishing }
+                  run: {
+                      ...run,
+                      cancelled: state.run.cancelled || run.cancelled,
+                      finishing: state.run.finishing || run.finishing
+                  }
               }
             : state
     );
@@ -415,7 +442,13 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     const server = await serverFor(installedAppId, loop).catch(() => null);
     if (!server) {
         if (now > run.endsAt + GIVE_UP_AFTER_MS || run.cancelled) {
-            await finish(installedAppId, loop, null, "failed", "The server stopped during the event");
+            await finish(
+                installedAppId,
+                loop,
+                null,
+                "failed",
+                "The server stopped during the event"
+            );
         }
         return;
     }
@@ -429,7 +462,10 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
         const known = new Set(loop.run.participants.map((name) => name.toLowerCase()));
         const joined = [...seen.values()].filter((one) => !known.has(one.name.toLowerCase()));
         if (joined.length > 0) {
-            loop.run = { ...loop.run, participants: [...loop.run.participants, ...joined.map((one) => one.name)] };
+            loop.run = {
+                ...loop.run,
+                participants: [...loop.run.participants, ...joined.map((one) => one.name)]
+            };
         }
     }
 
@@ -437,15 +473,22 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     try {
         done = await play(installedAppId, loop, server, now);
     } catch (error) {
-        if (error instanceof PlaceNotFound) return finish(installedAppId, loop, server, "failed", error.message);
+        if (error instanceof PlaceNotFound)
+            return finish(installedAppId, loop, server, "failed", error.message);
         throw error;
     }
     if (done) return finish(installedAppId, loop, server, "finished", done);
-    if (now >= loop.run.endsAt) return finish(installedAppId, loop, server, "finished", "Ran its full time");
+    if (now >= loop.run.endsAt)
+        return finish(installedAppId, loop, server, "finished", "Ran its full time");
     if (now - loop.lastSave >= SAVE_EVERY_MS) await persist(installedAppId, loop);
 }
 
-async function countdown(installedAppId: string, loop: Loop, server: ServerContainer, now: number): Promise<void> {
+async function countdown(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number
+): Promise<void> {
     const { preset } = loop.run;
     const language = loop.language;
     const left = (loop.run.startsAt - now) / 1000;
@@ -455,15 +498,24 @@ async function countdown(installedAppId: string, loop: Loop, server: ServerConta
     if (!loop.announced) {
         loop.announced = true;
         await server.sayAll([
-            ...commands.barCreate(messages.startsInBar(title, left, language), commands.barColour(preset.kind)),
+            ...commands.barCreate(
+                messages.startsInBar(title, left, language),
+                commands.barColour(preset.kind)
+            ),
             ...commands.titleCommands(messages.startsSoonTitle(language), `&e${title}`),
             commands.say(messages.tag(language) + messages.startsIn(title, left, language)),
-            commands.say(`${messages.tag(language)}&f${messages.rules(preset.kind, language, isRace(preset))}`),
+            commands.say(
+                `${messages.tag(language)}&f${messages.rules(preset.kind, language, isRace(preset))}`
+            ),
             commands.sound(commands.SOUNDS.tick)
         ]);
     }
     if (now < loop.run.startsAt) {
-        const lines = commands.barUpdate(messages.startsInBar(title, left, language), left, Math.max(1, loop.countdown));
+        const lines = commands.barUpdate(
+            messages.startsInBar(title, left, language),
+            left,
+            Math.max(1, loop.countdown)
+        );
         const mark = Math.ceil(left);
         if ([30, 10, 5, 4, 3, 2, 1].includes(mark) && !loop.sounded.has(mark)) {
             loop.sounded.add(mark);
@@ -477,30 +529,47 @@ async function countdown(installedAppId: string, loop: Loop, server: ServerConta
 }
 
 function isRace(preset: catalog.EventPreset): boolean {
-    return preset.kind === "explorer" && (preset.options as catalog.EventOptions<"explorer">).mode === "race";
+    return (
+        preset.kind === "explorer" &&
+        (preset.options as catalog.EventOptions<"explorer">).mode === "race"
+    );
 }
 
 /** The start: the scoreboard up, the world changed where the event changes it. */
-async function begin(installedAppId: string, loop: Loop, server: ServerContainer, now: number): Promise<void> {
+async function begin(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number
+): Promise<void> {
     const { preset } = loop.run;
     const language = loop.language;
     const seconds = (loop.run.endsAt - now) / 1000;
     if (commands.hasScoreboard(preset)) holdSidebar(installedAppId);
     const lines: string[] = [
-        ...commands.barCreate(messages.barName(preset.name, seconds), commands.barColour(preset.kind)),
+        ...commands.barCreate(
+            messages.barName(preset.name, seconds),
+            commands.barColour(preset.kind)
+        ),
         ...commands.setupScoreboard(preset, `&6&l${preset.name}`),
         ...commands.titleCommands(messages.startedTitle(language), `&e${preset.name}`),
         commands.say(messages.tag(language) + `&e&l${preset.name}`),
-        commands.say(`${messages.tag(language)}&f${messages.rules(preset.kind, language, isRace(preset))}`),
+        commands.say(
+            `${messages.tag(language)}&f${messages.rules(preset.kind, language, isRace(preset))}`
+        ),
         commands.say(messages.tag(language) + messages.lasts(catalog.runMinutes(preset), language)),
         commands.sound(preset.kind === "blood-moon" ? commands.SOUNDS.horn : commands.SOUNDS.start)
     ];
     if (preset.kind === "world-boss") {
-        lines.push(...commands.bossScoreboard((preset.options as catalog.EventOptions<"world-boss">).boss));
+        lines.push(
+            ...commands.bossScoreboard((preset.options as catalog.EventOptions<"world-boss">).boss)
+        );
     }
     if (preset.kind === "blood-moon") lines.push(...commands.nightfall(seconds));
     if (preset.kind === "happy-hour") {
-        lines.push(...commands.happyEffects(preset.options as catalog.EventOptions<"happy-hour">, seconds));
+        lines.push(
+            ...commands.happyEffects(preset.options as catalog.EventOptions<"happy-hour">, seconds)
+        );
     }
     await server.sayAll(lines);
     loop.run = { ...loop.run, phase: "running", startsAt: now };
@@ -512,7 +581,12 @@ async function begin(installedAppId: string, loop: Loop, server: ServerContainer
  * its time is up - the chest found, the boss down, the last round played - and
  * null while it goes on.
  */
-async function play(installedAppId: string, loop: Loop, server: ServerContainer, now: number): Promise<string | null> {
+async function play(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number
+): Promise<string | null> {
     const { preset } = loop.run;
     const left = (loop.run.endsAt - now) / 1000;
     const total = (loop.run.endsAt - loop.run.startsAt) / 1000;
@@ -530,7 +604,9 @@ async function play(installedAppId: string, loop: Loop, server: ServerContainer,
         case "blood-moon": {
             if (now - loop.run.lastWaveAt >= commands.WAVE_EVERY_MS) {
                 const number = Math.floor((now - loop.run.startsAt) / commands.WAVE_EVERY_MS);
-                lines.push(...commands.wave(preset.options as catalog.EventOptions<"blood-moon">, number));
+                lines.push(
+                    ...commands.wave(preset.options as catalog.EventOptions<"blood-moon">, number)
+                );
                 loop.run = { ...loop.run, lastWaveAt: now };
             }
             break;
@@ -538,7 +614,12 @@ async function play(installedAppId: string, loop: Loop, server: ServerContainer,
         case "happy-hour": {
             // Again every half minute, for whoever joined since.
             if (loop.ticks % 15 === 0) {
-                lines.push(...commands.happyEffects(preset.options as catalog.EventOptions<"happy-hour">, left));
+                lines.push(
+                    ...commands.happyEffects(
+                        preset.options as catalog.EventOptions<"happy-hour">,
+                        left
+                    )
+                );
             }
             break;
         }
@@ -581,7 +662,10 @@ async function findPlace(
     if (!loop.run.target) {
         const centre = await centreFor(server, place);
         if (!centre) return "failed";
-        const point = place.mode === "fixed" && loop.run.placeTries === 0 ? centre : commands.pointAway(centre, distance, Math.random);
+        const point =
+            place.mode === "fixed" && loop.run.placeTries === 0
+                ? centre
+                : commands.pointAway(centre, distance, Math.random);
         // Written down before the chunk is loaded, so whatever ends the event
         // knows which one to let go of.
         loop.run = { ...loop.run, target: { x: point.x, z: point.z } };
@@ -608,7 +692,12 @@ async function findPlace(
 
 /** A place that was found and then would not take what was put there: undone,
  *  and another looked for, within the same number of tries. */
-async function retryPlace(installedAppId: string, loop: Loop, server: ServerContainer, point: stored.Point): Promise<void> {
+async function retryPlace(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    point: stored.Point
+): Promise<void> {
     await server.sayAll([commands.CLEAR_MARK, ...commands.release(point, loop.run.target)]);
     loop.run = { ...loop.run, place: null, target: null, placeTries: loop.run.placeTries + 1 };
     await persist(installedAppId, loop);
@@ -616,7 +705,10 @@ async function retryPlace(installedAppId: string, loop: Loop, server: ServerCont
 }
 
 /** Where to look from: the fixed point, or one of the players in the Overworld. */
-async function centreFor(server: ServerContainer, place: catalog.EventPlace): Promise<{ x: number; z: number } | null> {
+async function centreFor(
+    server: ServerContainer,
+    place: catalog.EventPlace
+): Promise<{ x: number; z: number } | null> {
     if (place.mode === "fixed") return { x: place.x, z: place.z };
     const here = commands.readWhere(await server.say([commands.IN_OVERWORLD]));
     if (here.length === 0) return null;
@@ -637,7 +729,13 @@ async function supplyDrop(
     const language = loop.language;
     let place = loop.run.place;
     if (!place) {
-        const found = await findPlace(installedAppId, loop, server, options.place, options.distance);
+        const found = await findPlace(
+            installedAppId,
+            loop,
+            server,
+            options.place,
+            options.distance
+        );
         if (found === "failed") throw new PlaceNotFound();
         if (!found) return null;
         await server.sayAll([commands.placeChest(found, options.loot), commands.CLEAR_MARK]);
@@ -659,7 +757,12 @@ async function supplyDrop(
                 messages.tag(language) +
                     (step === 0
                         ? messages.dropExact(place.x, place.y, place.z, language)
-                        : messages.dropArea(commands.roughly(place.x, step), commands.roughly(place.z, step), step, language))
+                        : messages.dropArea(
+                              commands.roughly(place.x, step),
+                              commands.roughly(place.z, step),
+                              step,
+                              language
+                          ))
             ),
             commands.sound(commands.SOUNDS.tick)
         );
@@ -669,7 +772,8 @@ async function supplyDrop(
     lines.push(commands.beam(place));
     const answer = commands.readTest(await server.say([commands.chestUnopened(place)]));
     if (answer !== "failed") return null;
-    const opener = commands.readWhere(await server.say([commands.nearest(place, 8)]))[0]?.name ?? null;
+    const opener =
+        commands.readWhere(await server.say([commands.nearest(place, 8)]))[0]?.name ?? null;
     loop.run = { ...loop.run, decidedBy: opener };
     lines.push(commands.say(messages.tag(language) + messages.dropFound(opener ?? "?", language)));
     return opener ? `Found by ${opener}` : "Opened";
@@ -706,7 +810,10 @@ async function worldBoss(
             commands.bossNameCommand(name, modern.text),
             commands.CLEAR_MARK,
             `bossbar set ${commands.BAR} max ${options.health}`,
-            commands.say(messages.tag(language) + messages.bossAppeared(name, found.x, found.y, found.z, language)),
+            commands.say(
+                messages.tag(language) +
+                    messages.bossAppeared(name, found.x, found.y, found.z, language)
+            ),
             commands.sound(commands.SOUNDS.boss)
         ]);
         return null;
@@ -729,7 +836,10 @@ async function worldBoss(
     const last = loop.bossAt ?? loop.run.place;
     const killers = commands
         .readWhere(await server.say([commands.BOSS_KILLERS]))
-        .filter((one) => Math.hypot(one.x - last.x, one.y - last.y, one.z - last.z) <= commands.BOSS_REACH);
+        .filter(
+            (one) =>
+                Math.hypot(one.x - last.x, one.y - last.y, one.z - last.z) <= commands.BOSS_REACH
+        );
     if (killers.length === 0) return null;
     const by = killers[0]!.name;
     loop.run = { ...loop.run, decidedBy: by };
@@ -737,7 +847,12 @@ async function worldBoss(
     return `Defeated; the final blow by ${by}`;
 }
 
-async function kingOfTheHill(installedAppId: string, loop: Loop, server: ServerContainer, lines: string[]): Promise<string | null> {
+async function kingOfTheHill(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    lines: string[]
+): Promise<string | null> {
     const options = loop.run.preset.options as catalog.EventOptions<"king-of-the-hill">;
     if (!loop.run.place) {
         const found = await findPlace(installedAppId, loop, server, options.place, 32);
@@ -745,7 +860,10 @@ async function kingOfTheHill(installedAppId: string, loop: Loop, server: ServerC
         if (!found) return null;
         await server.sayAll([
             commands.CLEAR_MARK,
-            commands.say(messages.tag(loop.language) + messages.circleAt(found.x, found.y, found.z, loop.language))
+            commands.say(
+                messages.tag(loop.language) +
+                    messages.circleAt(found.x, found.y, found.z, loop.language)
+            )
         ]);
         return null;
     }
@@ -753,7 +871,12 @@ async function kingOfTheHill(installedAppId: string, loop: Loop, server: ServerC
     return null;
 }
 
-async function race(installedAppId: string, loop: Loop, server: ServerContainer, lines: string[]): Promise<string | null> {
+async function race(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    lines: string[]
+): Promise<string | null> {
     const options = loop.run.preset.options as catalog.EventOptions<"explorer">;
     if (!loop.run.place) {
         // A finish line needs no ground to stand on: only the column is checked.
@@ -762,10 +885,16 @@ async function race(installedAppId: string, loop: Loop, server: ServerContainer,
         const point = commands.pointAway(centre, options.distance, Math.random);
         loop.run = { ...loop.run, place: { x: point.x, y: 0, z: point.z } };
         await persist(installedAppId, loop);
-        lines.push(commands.say(messages.tag(loop.language) + messages.raceTarget(point.x, point.z, loop.language)));
+        lines.push(
+            commands.say(
+                messages.tag(loop.language) + messages.raceTarget(point.x, point.z, loop.language)
+            )
+        );
         return null;
     }
-    const there = commands.readWhere(await server.say([commands.arrived(loop.run.place.x, loop.run.place.z)]));
+    const there = commands.readWhere(
+        await server.say([commands.arrived(loop.run.place.x, loop.run.place.z)])
+    );
     if (there.length === 0) return null;
     const winner = there[0]!.name;
     loop.run = { ...loop.run, decidedBy: winner };
@@ -774,15 +903,26 @@ async function race(installedAppId: string, loop: Loop, server: ServerContainer,
 }
 
 /** The round being played, what it asks and what counts as right. */
-function roundOf(run: stored.EventRun, language: catalog.Language): { kind: "question" | "scramble"; asked: string; accepted: string[] } {
+function roundOf(
+    run: stored.EventRun,
+    language: catalog.Language
+): { kind: "question" | "scramble"; asked: string; accepted: string[] } {
     const options = run.preset.options as catalog.EventOptions<"trivia">;
     const random = trivia.seeded(run.id);
-    const questions = [...options.questions, ...trivia.shuffled(trivia.QUESTIONS[language], random)];
+    const questions = [
+        ...options.questions,
+        ...trivia.shuffled(trivia.QUESTIONS[language], random)
+    ];
     const words = trivia.shuffled(trivia.WORDS[language], random);
-    const scrambleRound = options.mode === "scramble" || (options.mode === "mixed" && run.round % 2 === 1);
+    const scrambleRound =
+        options.mode === "scramble" || (options.mode === "mixed" && run.round % 2 === 1);
     if (scrambleRound) {
         const word = words[run.round % words.length] as string;
-        return { kind: "scramble", asked: trivia.scramble(word, trivia.seeded(`${run.id}-${run.round}`)), accepted: [word] };
+        return {
+            kind: "scramble",
+            asked: trivia.scramble(word, trivia.seeded(`${run.id}-${run.round}`)),
+            accepted: [word]
+        };
     }
     const question = questions[run.round % questions.length]!;
     return { kind: "question", asked: question.question, accepted: [...question.answers] };
@@ -800,7 +940,8 @@ async function triviaTick(
     const open = loop.run.roundEndsAt !== null;
 
     if (!open) {
-        if (loop.run.round >= 0 && now - loop.run.closedAt < catalog.ROUND_PAUSE_SECONDS * 1000) return null;
+        if (loop.run.round >= 0 && now - loop.run.closedAt < catalog.ROUND_PAUSE_SECONDS * 1000)
+            return null;
         const round = loop.run.round + 1;
         if (round >= options.rounds) return "All rounds played";
         loop.run = { ...loop.run, round, roundEndsAt: now + options.seconds * 1000 };
@@ -827,7 +968,15 @@ async function triviaTick(
         loop.logFrom = size;
         return null;
     }
-    const said = size === null ? null : await readContainerRange(server, LOG_FILE, size < loop.logFrom ? 0 : loop.logFrom, size).catch(() => null);
+    const said =
+        size === null
+            ? null
+            : await readContainerRange(
+                  server,
+                  LOG_FILE,
+                  size < loop.logFrom ? 0 : loop.logFrom,
+                  size
+              ).catch(() => null);
     if (size !== null) loop.logFrom = size;
     const winner = said ? firstRight(said, asked.accepted) : null;
     if (winner) {
@@ -835,7 +984,10 @@ async function triviaTick(
         loop.run = { ...loop.run, points, roundEndsAt: null, closedAt: now };
         lines.push(
             commands.setScore(winner, points[winner] ?? 1),
-            commands.say(messages.tag(language) + messages.roundWon(winner, asked.accepted[0] ?? "", language)),
+            commands.say(
+                messages.tag(language) +
+                    messages.roundWon(winner, asked.accepted[0] ?? "", language)
+            ),
             commands.sound(commands.SOUNDS.win)
         );
         await persist(installedAppId, loop);
@@ -843,7 +995,11 @@ async function triviaTick(
     }
     if (now >= (loop.run.roundEndsAt ?? now)) {
         loop.run = { ...loop.run, roundEndsAt: null, closedAt: now };
-        lines.push(commands.say(messages.tag(language) + messages.roundMissed(asked.accepted[0] ?? "", language)));
+        lines.push(
+            commands.say(
+                messages.tag(language) + messages.roundMissed(asked.accepted[0] ?? "", language)
+            )
+        );
         await persist(installedAppId, loop);
     }
     return null;
@@ -891,7 +1047,9 @@ async function finish(
     const run = loop.run;
     await updateEventState(installedAppId, (state) =>
         state.run?.id === run.id ? { ...state, run: { ...state.run, finishing: true } } : state
-    ).catch((error: unknown) => console.warn("polaris: marking an event finished failed", installedAppId, String(error)));
+    ).catch((error: unknown) =>
+        console.warn("polaris: marking an event finished failed", installedAppId, String(error))
+    );
     const { preset } = run;
     const language = loop.language;
     const info = catalog.KIND_INFO[preset.kind];
@@ -906,42 +1064,89 @@ async function finish(
             const { scores, took } = await results(server, run);
             placed = plan.podium(scores, disqualified);
             const owed = plan.prizes(placed, took, preset.rewards, disqualified);
-            const online = new Set(commands.readWhere(await server.say([commands.WHERE])).map((one) => one.name.toLowerCase()));
+            const online = new Set(
+                commands
+                    .readWhere(await server.say([commands.WHERE]))
+                    .map((one) => one.name.toLowerCase())
+            );
             for (const { name, reward } of owed) {
                 if (!catalog.PLAYER_NAME.test(name)) continue;
-                const left = online.has(name.toLowerCase()) ? await give(server, name, reward) : reward;
-                if (!left) lines.push(`tellraw ${name} ${commands.text(messages.rewardGiven(preset.name, language))}`);
-                else pending.push({ id: `${run.id}-${name}`, player: name, reward: left, event: preset.name, createdAt: Date.now() });
+                const left = online.has(name.toLowerCase())
+                    ? await give(server, name, reward)
+                    : reward;
+                if (!left)
+                    lines.push(
+                        `tellraw ${name} ${commands.text(messages.rewardGiven(preset.name, language))}`
+                    );
+                else
+                    pending.push({
+                        id: `${run.id}-${name}`,
+                        player: name,
+                        reward: left,
+                        event: preset.name,
+                        createdAt: Date.now()
+                    });
             }
             lines.push(commands.say(messages.resultsHeader(preset.name, language)));
             if (preset.kind === "world-boss" && !run.decidedBy) {
-                lines.push(commands.say(messages.bossEscaped(messages.bossName((preset.options as catalog.EventOptions<"world-boss">).boss, language), language)));
+                lines.push(
+                    commands.say(
+                        messages.bossEscaped(
+                            messages.bossName(
+                                (preset.options as catalog.EventOptions<"world-boss">).boss,
+                                language
+                            ),
+                            language
+                        )
+                    )
+                );
             } else if (preset.kind === "supply-drop" && !run.decidedBy) {
                 lines.push(commands.say(messages.dropLost(language)));
             }
             if (placed.length === 0) lines.push(commands.say(messages.nobodyScored(language)));
             for (const one of placed) {
-                lines.push(commands.say(messages.podiumLine(one.place, one.name, scoreText(preset, one.score), language)));
+                lines.push(
+                    commands.say(
+                        messages.podiumLine(
+                            one.place,
+                            one.name,
+                            scoreText(preset, one.score),
+                            language
+                        )
+                    )
+                );
             }
             if (disqualified.size > 0) {
-                const names = run.participants.filter((name) => disqualified.has(name.toLowerCase()));
-                if (names.length > 0) lines.push(commands.say(messages.disqualifiedLine(names, language)));
+                const names = run.participants.filter((name) =>
+                    disqualified.has(name.toLowerCase())
+                );
+                if (names.length > 0)
+                    lines.push(commands.say(messages.disqualifiedLine(names, language)));
             }
             if (pending.length > 0) lines.push(commands.say(messages.rewardWaiting(language)));
             const winner = placed[0];
             lines.push(
-                ...commands.titleCommands(winner ? messages.winnerTitle(winner.name, language) : messages.endedTitle(language), `&e${preset.name}`),
+                ...commands.titleCommands(
+                    winner
+                        ? messages.winnerTitle(winner.name, language)
+                        : messages.endedTitle(language),
+                    `&e${preset.name}`
+                ),
                 commands.sound(commands.SOUNDS.win)
             );
         } else if (server && outcome === "finished" && preset.kind === "happy-hour") {
             lines.push(commands.say(messages.tag(language) + messages.happyHourOver(language)));
         } else if (server && (outcome === "cancelled" || outcome === "failed")) {
-            lines.push(commands.say(messages.tag(language) + messages.cancelledLine(preset.name, language)));
+            lines.push(
+                commands.say(messages.tag(language) + messages.cancelledLine(preset.name, language))
+            );
         }
         if (server) {
             if (preset.kind === "blood-moon" && outcome === "finished") {
                 const survivors = await survivorsOf(server, run);
-                lines.unshift(commands.say(messages.tag(language) + messages.dawn(survivors.length, language)));
+                lines.unshift(
+                    commands.say(messages.tag(language) + messages.dawn(survivors.length, language))
+                );
             }
             await server.sayAll([...lines, ...commands.cleanup(preset, run.place, run.target)]);
         } else {
@@ -951,7 +1156,10 @@ async function finish(
         }
     } catch (error) {
         console.warn("polaris: finishing an event failed", installedAppId, String(error));
-        if (server) await server.sayAll(commands.cleanup(preset, run.place, run.target)).catch(() => undefined);
+        if (server)
+            await server
+                .sayAll(commands.cleanup(preset, run.place, run.target))
+                .catch(() => undefined);
     } finally {
         releaseSidebar(loop.ownerId, installedAppId);
         await dropLink(loop);
@@ -972,14 +1180,23 @@ async function finish(
         disqualified: run.participants.filter((name) => disqualified.has(name.toLowerCase()))
     };
     await updateEventState(installedAppId, (state) => ({
-        ...stored.withHistory({ ...state, run: state.run?.id === run.id ? null : state.run }, entry),
+        ...stored.withHistory(
+            { ...state, run: state.run?.id === run.id ? null : state.run },
+            entry
+        ),
         lastKind: preset.kind,
         pending: stored.livePending([...state.pending, ...pending], Date.now())
-    })).catch((error: unknown) => console.warn("polaris: recording an event failed", installedAppId, String(error)));
+    })).catch((error: unknown) =>
+        console.warn("polaris: recording an event failed", installedAppId, String(error))
+    );
     if (loops.get(installedAppId) === loop) loops.delete(installedAppId);
 }
 
-async function cleanUpLater(ownerId: string, installedAppId: string, run: stored.EventRun): Promise<void> {
+async function cleanUpLater(
+    ownerId: string,
+    installedAppId: string,
+    run: stored.EventRun
+): Promise<void> {
     await withServerContainer(ownerId, installedAppId, async (later) => {
         if (later.running) await later.sayAll(commands.cleanup(run.preset, run.place, run.target));
     }).catch(() => undefined);
@@ -990,7 +1207,11 @@ async function cleanUpLater(ownerId: string, installedAppId: string, run: stored
  * handed the prizes out, or the last save failed. Not played again, which could
  * give the same prizes twice: the world is tidied and the run put away.
  */
-async function abandon(ownerId: string, installedAppId: string, run: stored.EventRun): Promise<void> {
+async function abandon(
+    ownerId: string,
+    installedAppId: string,
+    run: stored.EventRun
+): Promise<void> {
     await cleanUpLater(ownerId, installedAppId, run);
     releaseSidebar(ownerId, installedAppId);
     const now = Date.now();
@@ -1009,7 +1230,9 @@ async function abandon(ownerId: string, installedAppId: string, run: stored.Even
         disqualified: []
     };
     await updateEventState(installedAppId, (state) =>
-        state.run?.id === run.id ? { ...stored.withHistory({ ...state, run: null }, entry), lastKind: run.preset.kind } : state
+        state.run?.id === run.id
+            ? { ...stored.withHistory({ ...state, run: null }, entry), lastKind: run.preset.kind }
+            : state
     );
 }
 
@@ -1025,7 +1248,10 @@ function scoreText(preset: catalog.EventPreset, score: number): string {
  * The final scores, and everybody who took part in the event's own sense:
  * scored at all - or, on a blood moon, lived to see the dawn.
  */
-async function results(server: ServerContainer, run: stored.EventRun): Promise<{ scores: Map<string, number>; took: string[] }> {
+async function results(
+    server: ServerContainer,
+    run: stored.EventRun
+): Promise<{ scores: Map<string, number>; took: string[] }> {
     const { preset } = run;
     if (preset.kind === "trivia") {
         const scores = new Map(Object.entries(run.points));
@@ -1043,16 +1269,27 @@ async function results(server: ServerContainer, run: stored.EventRun): Promise<{
     const known = new Set([...scores.keys()].map((name) => name.toLowerCase()));
     for (const name of run.participants) {
         if (known.has(name.toLowerCase()) || !catalog.PLAYER_NAME.test(name)) continue;
-        for (const [who, score] of commands.readScores(await server.say([commands.readScoreCommand(name)]))) {
+        for (const [who, score] of commands.readScores(
+            await server.say([commands.readScoreCommand(name)])
+        )) {
             scores.set(who, score);
         }
     }
     if (preset.kind === "blood-moon") {
         const alive = new Set((await survivorsOf(server, run)).map((name) => name.toLowerCase()));
-        for (const name of [...scores.keys()]) if (!alive.has(name.toLowerCase())) scores.delete(name);
-        return { scores, took: [...alive].map((key) => run.participants.find((name) => name.toLowerCase() === key) ?? key) };
+        for (const name of [...scores.keys()])
+            if (!alive.has(name.toLowerCase())) scores.delete(name);
+        return {
+            scores,
+            took: [...alive].map(
+                (key) => run.participants.find((name) => name.toLowerCase() === key) ?? key
+            )
+        };
     }
-    return { scores, took: [...scores.entries()].filter(([, score]) => score > 0).map(([name]) => name) };
+    return {
+        scores,
+        took: [...scores.entries()].filter(([, score]) => score > 0).map(([name]) => name)
+    };
 }
 
 /** Everybody on at dawn who did not die during the night. */
@@ -1072,7 +1309,8 @@ async function disqualifiedSince(installedAppId: string, since: number): Promise
     const row = await readRow(installedAppId);
     if (row) {
         for (const evidence of Object.values(readXray(row.config).evidence)) {
-            if (evidence.hits.some((hit) => hit.at >= since)) found.add(evidence.name.toLowerCase());
+            if (evidence.hits.some((hit) => hit.at >= since))
+                found.add(evidence.name.toLowerCase());
         }
     }
     const flagged = await prisma.minecraftAnticheatFlag
@@ -1087,7 +1325,11 @@ async function disqualifiedSince(installedAppId: string, since: number): Promise
  * arrive, to be kept for later - never what did, which would be given twice -
  * or null when all of it did.
  */
-async function give(server: ServerContainer, name: string, reward: catalog.Reward): Promise<catalog.Reward | null> {
+async function give(
+    server: ServerContainer,
+    name: string,
+    reward: catalog.Reward
+): Promise<catalog.Reward | null> {
     const items: catalog.RewardItem[] = [];
     for (const item of reward.items) {
         for (const line of commands.rewardCommands(name, { items: [item], levels: 0 })) {
@@ -1128,7 +1370,10 @@ export function atLeast(version: string | null, wanted: readonly number[]): bool
 
 /** Look at who is on and which way they are facing, and remember it. Null when
  *  the server is not running. */
-async function sample(ownerId: string, installedAppId: string): Promise<Map<string, plan.Seen> | null> {
+async function sample(
+    ownerId: string,
+    installedAppId: string
+): Promise<Map<string, plan.Seen> | null> {
     const loop = loops.get(installedAppId);
     if (loop?.link?.server.running) return look(installedAppId, loop.link.server);
     return withServerContainer(ownerId, installedAppId, async (server) =>
@@ -1136,10 +1381,18 @@ async function sample(ownerId: string, installedAppId: string): Promise<Map<stri
     );
 }
 
-async function look(installedAppId: string, server: ServerContainer): Promise<Map<string, plan.Seen>> {
+async function look(
+    installedAppId: string,
+    server: ServerContainer
+): Promise<Map<string, plan.Seen>> {
     const positions = commands.readWhere(await server.say([commands.WHERE]));
     const facing = commands.readFacing(await server.say([commands.FACING]));
-    const seen = plan.observe(activity.get(installedAppId) ?? new Map(), positions, facing, Date.now());
+    const seen = plan.observe(
+        activity.get(installedAppId) ?? new Map(),
+        positions,
+        facing,
+        Date.now()
+    );
     activity.set(installedAppId, seen);
     return seen;
 }
@@ -1170,7 +1423,12 @@ export async function sweepEvents(now = Date.now()): Promise<{ running: number; 
     return { running: loops.size, started };
 }
 
-async function sweepOne(ownerId: string, installedAppId: string, config: Record<string, unknown>, now: number): Promise<boolean> {
+async function sweepOne(
+    ownerId: string,
+    installedAppId: string,
+    config: Record<string, unknown>,
+    now: number
+): Promise<boolean> {
     const settings = settingsOf(config);
     const state = stored.readEventState(config);
     if (state.run) {
@@ -1181,7 +1439,9 @@ async function sweepOne(ownerId: string, installedAppId: string, config: Record<
     }
     const pending = stored.livePending(state.pending, now);
     const wantsPlayers =
-        pending.length > 0 || settings.settings.random.enabled || settings.schedules.some((entry) => entry.enabled);
+        pending.length > 0 ||
+        settings.settings.random.enabled ||
+        settings.schedules.some((entry) => entry.enabled);
     if (!wantsPlayers) return false;
 
     const seen = await sample(ownerId, installedAppId).catch(() => null);
@@ -1199,14 +1459,30 @@ async function sweepOne(ownerId: string, installedAppId: string, config: Record<
         const preset = settings.presets.find((one) => one.id === entry.presetId);
         if (!preset) continue;
         if (active < settings.settings.minActive) {
-            await skip(installedAppId, preset, "scheduled", `Skipped: ${active} active of the ${settings.settings.minActive} it waits for`);
+            await skip(
+                installedAppId,
+                preset,
+                "scheduled",
+                `Skipped: ${active} active of the ${settings.settings.minActive} it waits for`
+            );
             continue;
         }
         try {
-            await startEvent({ ownerId, installedAppId, presetId: preset.id, trigger: "scheduled", startedBy: null });
+            await startEvent({
+                ownerId,
+                installedAppId,
+                presetId: preset.id,
+                trigger: "scheduled",
+                startedBy: null
+            });
             return true;
         } catch (error) {
-            await skip(installedAppId, preset, "scheduled", `Skipped: ${error instanceof Error ? error.message : "it could not start"}`);
+            await skip(
+                installedAppId,
+                preset,
+                "scheduled",
+                `Skipped: ${error instanceof Error ? error.message : "it could not start"}`
+            );
         }
     }
 
@@ -1227,7 +1503,13 @@ async function sweepOne(ownerId: string, installedAppId: string, config: Record<
     );
     if (!decision.start) return false;
     try {
-        await startEvent({ ownerId, installedAppId, presetId: decision.start.id, trigger: "random", startedBy: null });
+        await startEvent({
+            ownerId,
+            installedAppId,
+            presetId: decision.start.id,
+            trigger: "random",
+            startedBy: null
+        });
         return true;
     } catch (error) {
         await updateEventState(installedAppId, (current) => ({
@@ -1238,7 +1520,12 @@ async function sweepOne(ownerId: string, installedAppId: string, config: Record<
     }
 }
 
-async function skip(installedAppId: string, preset: catalog.EventPreset, trigger: stored.EventTrigger, note: string): Promise<void> {
+async function skip(
+    installedAppId: string,
+    preset: catalog.EventPreset,
+    trigger: stored.EventTrigger,
+    note: string
+): Promise<void> {
     const now = Date.now();
     await updateEventState(installedAppId, (state) =>
         stored.withHistory(state, {
@@ -1259,7 +1546,11 @@ async function skip(installedAppId: string, preset: catalog.EventPreset, trigger
 }
 
 /** Prizes handed to whoever is owed one and is on now. */
-async function deliverPending(ownerId: string, installedAppId: string, seen: ReadonlyMap<string, plan.Seen>): Promise<void> {
+async function deliverPending(
+    ownerId: string,
+    installedAppId: string,
+    seen: ReadonlyMap<string, plan.Seen>
+): Promise<void> {
     const row = await readRow(installedAppId);
     if (!row) return;
     const owed = stored
@@ -1276,8 +1567,13 @@ async function deliverPending(ownerId: string, installedAppId: string, seen: Rea
             const rest = await give(server, one.player, one.reward);
             if (!rest) {
                 left.set(one.id, null);
-                await server.say([`tellraw ${one.player} ${commands.text(messages.rewardGiven(one.event, language))}`]);
-            } else if (rest.items.length !== one.reward.items.length || rest.levels !== one.reward.levels) {
+                await server.say([
+                    `tellraw ${one.player} ${commands.text(messages.rewardGiven(one.event, language))}`
+                ]);
+            } else if (
+                rest.items.length !== one.reward.items.length ||
+                rest.levels !== one.reward.levels
+            ) {
                 left.set(one.id, rest);
             }
         }

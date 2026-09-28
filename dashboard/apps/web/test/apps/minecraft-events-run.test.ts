@@ -54,11 +54,21 @@ const released: string[] = [];
 
 function answer(line: string): string {
     world.sent.push(line);
-    if (line === "execute as @a run data get entity @s Pos" || line.includes("as @a[distance=0..] run data get entity @s Pos")) {
-        return world.online.map((name, index) => `${name} has the following entity data: [${index * 10 + Math.random()}d, 64.0d, 0.0d]`).join("\n");
+    if (
+        line === "execute as @a run data get entity @s Pos" ||
+        line.includes("as @a[distance=0..] run data get entity @s Pos")
+    ) {
+        return world.online
+            .map(
+                (name, index) =>
+                    `${name} has the following entity data: [${index * 10 + Math.random()}d, 64.0d, 0.0d]`
+            )
+            .join("\n");
     }
     if (line === "execute as @a run data get entity @s Rotation") {
-        return world.online.map((name) => `${name} has the following entity data: [${Math.random() * 360}f, 0.0f]`).join("\n");
+        return world.online
+            .map((name) => `${name} has the following entity data: [${Math.random() * 360}f, 0.0f]`)
+            .join("\n");
     }
     if (line === "execute as @a run scoreboard players get @s pe_score") {
         return world.online
@@ -69,38 +79,53 @@ function answer(line: string): string {
     const one = /^scoreboard players get (\S+) pe_score$/.exec(line);
     if (one) {
         const name = one[1] as string;
-        return world.scores[name] !== undefined ? `${name} has ${world.scores[name]} [pe_score]` : `Can't get value of pe_score for ${name}; none is set`;
+        return world.scores[name] !== undefined
+            ? `${name} has ${world.scores[name]} [pe_score]`
+            : `Can't get value of pe_score for ${name}; none is set`;
     }
     if (line.includes("spreadplayers") && line.includes("pe_mark") && world.allWater) {
         return "Could not spread 1 entity around 300, 0 (too many entities for space - try using spread of at most 0.0)";
     }
-    if (line.includes("spreadplayers") && line.includes("pe_mark")) return "Spread 1 entity around 300.5, 0.5 with an average distance of 0 blocks apart";
-    if (line.startsWith("data get entity @e[tag=pe_mark")) return "Armor Stand has the following entity data: [300.5d, 70.0d, 0.5d]";
+    if (line.includes("spreadplayers") && line.includes("pe_mark"))
+        return "Spread 1 entity around 300.5, 0.5 with an average distance of 0 blocks apart";
+    if (line.startsWith("data get entity @e[tag=pe_mark"))
+        return "Armor Stand has the following entity data: [300.5d, 70.0d, 0.5d]";
     if (line.includes("if data block") && line.includes("LootTable")) {
         world.chestChecks += 1;
         return world.chestChecks > world.chestOpenedAfter ? "Test failed" : "Test passed";
     }
-    if (line.includes("sort=nearest")) return `${world.online[0]} has the following entity data: [301.0d, 70.0d, 1.0d]`;
+    if (line.includes("sort=nearest"))
+        return `${world.online[0]} has the following entity data: [301.0d, 70.0d, 1.0d]`;
     if (line.startsWith("give ")) {
         const [, name, item] = line.split(" ") as [string, string, string];
         if (world.unknownItems.includes(item)) return `Unknown item '${item}'`;
         return world.online.includes(name) ? `Gave 1 [Item] to ${name}` : "No player was found";
     }
     if (line.startsWith("xp add ")) return "Gave 10 experience levels to somebody";
-    if (line === "execute if entity @e[tag=pe_boss]") return world.bossAlive ? "Test passed, count: 1" : "Test failed";
+    if (line === "execute if entity @e[tag=pe_boss]")
+        return world.bossAlive ? "Test passed, count: 1" : "Test failed";
     if (line === "data get entity @e[tag=pe_boss,limit=1] Pos") {
-        return world.bossAlive ? "Wither Skeleton has the following entity data: [310.5d, 70.0d, 4.5d]" : "No entity was found";
+        return world.bossAlive
+            ? "Wither Skeleton has the following entity data: [310.5d, 70.0d, 4.5d]"
+            : "No entity was found";
     }
     if (line.startsWith("execute as @a[scores={pe_kill=1..}]")) {
         const [x, y, z] = world.killerAt;
-        return world.bossAlive ? "" : `${world.online[0]} has the following entity data: [${x}.0d, ${y}.0d, ${z}.0d]`;
+        return world.bossAlive
+            ? ""
+            : `${world.online[0]} has the following entity data: [${x}.0d, ${y}.0d, ${z}.0d]`;
     }
     if (line.includes("dx=12,dy=384,dz=12")) {
-        return world.arrived ? `${world.online[1]} has the following entity data: [1.0d, 64.0d, 1.0d]` : "";
+        return world.arrived
+            ? `${world.online[1]} has the following entity data: [1.0d, 64.0d, 1.0d]`
+            : "";
     }
-    if (line.startsWith("attribute ")) return "Set base value of attribute Max Health for entity Boss to 400.0";
+    if (line.startsWith("attribute "))
+        return "Set base value of attribute Max Health for entity Boss to 400.0";
     if (line === "execute as @a run scoreboard players get @s pe_death") {
-        return Object.entries(world.deaths).map(([name, count]) => `${name} has ${count} [pe_death]`).join("\n");
+        return Object.entries(world.deaths)
+            .map(([name, count]) => `${name} has ${count} [pe_death]`)
+            .join("\n");
     }
     return "";
 }
@@ -133,8 +158,16 @@ vi.mock("@polaris/db", () => ({
                 status: "running",
                 config: JSON.stringify(config)
             }),
-            findMany: async () => [{ id: SERVER, ownerId: "owner", config: JSON.stringify(config) }],
-            updateMany: async ({ where, data }: { where: { config: string }; data: { config: string } }) => {
+            findMany: async () => [
+                { id: SERVER, ownerId: "owner", config: JSON.stringify(config) }
+            ],
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: { config: string };
+                data: { config: string };
+            }) => {
                 if (where.config !== JSON.stringify(config)) return { count: 0 };
                 config = JSON.parse(data.config) as Record<string, unknown>;
                 return { count: 1 };
@@ -149,7 +182,8 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@polaris/app-host", () => ({
     host: {
         appsInstallConfig: {
-            readInstallConfig: (raw: string | null) => (raw ? (JSON.parse(raw) as Record<string, unknown>) : {})
+            readInstallConfig: (raw: string | null) =>
+                raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
         }
     }
 }));
@@ -157,7 +191,11 @@ vi.mock("@polaris/app-host", () => ({
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     editionOf: (catalogId: string) => (catalogId.includes("bedrock") ? "bedrock" : "java"),
     openServerContainer: async () => ({ server, close: async () => undefined }),
-    withServerContainer: async (_owner: string, _id: string, work: (s: typeof server) => Promise<unknown>) => work(server)
+    withServerContainer: async (
+        _owner: string,
+        _id: string,
+        work: (s: typeof server) => Promise<unknown>
+    ) => work(server)
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/live-display-service", () => ({
@@ -166,7 +204,8 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/live-display-service", () =
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
-    readContainerRange: async (_server: unknown, _file: string, from: number, to: number) => world.log.slice(from, to),
+    readContainerRange: async (_server: unknown, _file: string, from: number, to: number) =>
+        world.log.slice(from, to),
     containerFileSize: async () => world.log.length
 }));
 
@@ -175,7 +214,11 @@ const catalog = await import("@polaris-app/game-servers/src/lib/minecraft/events
 const events = await import("@polaris-app/game-servers/src/lib/minecraft/events/events-service");
 const { readEventState } = await import("@polaris-app/game-servers/src/lib/minecraft/events/state");
 
-function setUp(presets: catalog.EventPreset[], settings: Partial<catalog.EventSettings> = {}, schedules: catalog.EventScheduleEntry[] = []) {
+function setUp(
+    presets: catalog.EventPreset[],
+    settings: Partial<catalog.EventSettings> = {},
+    schedules: catalog.EventScheduleEntry[] = []
+) {
     config = {
         [catalog.EVENTS_KEY]: {
             settings: { ...catalog.settingsSchema.parse({}), countdownSeconds: 0, ...settings },
@@ -223,14 +266,24 @@ describe("a mining rush, from start to podium", () => {
     it("counts, ranks, hands prizes to who is on and keeps the rest", async () => {
         const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
         setUp([rush]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "rush", trigger: "manual", startedBy: "u1" });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "rush",
+            trigger: "manual",
+            startedBy: "u1"
+        });
         expect(state().run?.phase).toBe("countdown");
 
         await play(2_100);
         expect(state().run?.phase).toBe("running");
         expect(held).toContain(SERVER);
         expect(world.sent).toContain("scoreboard objectives setdisplay sidebar pe_score");
-        expect(world.sent.some((line) => line.startsWith("scoreboard objectives add pe_c0 minecraft.mined:"))).toBe(true);
+        expect(
+            world.sent.some((line) =>
+                line.startsWith("scoreboard objectives add pe_c0 minecraft.mined:")
+            )
+        ).toBe(true);
 
         world.scores = { Ana: 12, Ben: 4 };
         // Ben leaves before the end; his score is still read, by name.
@@ -249,7 +302,10 @@ describe("a mining rush, from start to podium", () => {
         expect(world.sent).toContain("xp add Ana 15 levels");
         // Ben is owed second place and taking part, kept for when he is back.
         expect(after.pending.map((one) => one.player)).toEqual(["Ben"]);
-        expect(after.pending[0]?.reward.items.map((item) => item.id)).toEqual(["minecraft:diamond", "minecraft:experience_bottle"]);
+        expect(after.pending[0]?.reward.items.map((item) => item.id)).toEqual([
+            "minecraft:diamond",
+            "minecraft:experience_bottle"
+        ]);
         // Everything the event made is taken down, and the side panel given back.
         expect(world.sent).toContain("scoreboard objectives remove pe_score");
         expect(world.sent).toContain("bossbar remove polaris:event");
@@ -259,7 +315,13 @@ describe("a mining rush, from start to podium", () => {
     it("leaves somebody the anti-cheat caught off the podium and the prizes", async () => {
         const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
         setUp([rush]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "rush", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "rush",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(2_100);
         world.scores = { Ana: 50, Ben: 4 };
         world.flagged = ["ana"];
@@ -275,11 +337,27 @@ describe("a supply drop", () => {
     it("lands on dry ground, is told in steps, and goes to whoever opens it", async () => {
         const drop = { ...catalog.newPreset("supply-drop", "drop"), minutes: 10 };
         setUp([drop]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "drop", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "drop",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(30_000);
 
-        expect(world.sent.some((line) => line.startsWith("execute in minecraft:overworld run forceload add"))).toBe(true);
-        expect(world.sent.some((line) => line.includes('setblock 300 70 0 minecraft:chest{LootTable:"minecraft:chests/buried_treasure"}'))).toBe(true);
+        expect(
+            world.sent.some((line) =>
+                line.startsWith("execute in minecraft:overworld run forceload add")
+            )
+        ).toBe(true);
+        expect(
+            world.sent.some((line) =>
+                line.includes(
+                    'setblock 300 70 0 minecraft:chest{LootTable:"minecraft:chests/buried_treasure"}'
+                )
+            )
+        ).toBe(true);
         const after = state();
         expect(after.run).toBeNull();
         expect(after.history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 1 }]);
@@ -287,15 +365,25 @@ describe("a supply drop", () => {
         expect(world.sent).toContain("give Ana minecraft:diamond 5");
         // Released; the chest stays, since what is inside is the finder's.
         expect(world.sent).toContain("execute in minecraft:overworld run forceload remove 300 0");
-        const removals = world.sent.filter((line) => line.includes("setblock 300 70 0 minecraft:air"));
+        const removals = world.sent.filter((line) =>
+            line.includes("setblock 300 70 0 minecraft:air")
+        );
         expect(removals.length).toBeGreaterThan(0);
-        expect(removals.every((line) => line.includes("if data block 300 70 0 LootTable"))).toBe(true);
+        expect(removals.every((line) => line.includes("if data block 300 70 0 LootTable"))).toBe(
+            true
+        );
     });
 
     it("lets go of the chunk it was trying when it is called off before landing", async () => {
         const drop = { ...catalog.newPreset("supply-drop", "drop"), minutes: 10 };
         setUp([drop]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "drop", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "drop",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(4_100);
         const added = world.sent.filter((line) => line.includes("run forceload add"));
         expect(added.length).toBeGreaterThan(0);
@@ -304,7 +392,8 @@ describe("a supply drop", () => {
         await events.cancelEvent("owner", SERVER);
         await play(2_100);
         expect(state().run).toBeNull();
-        for (const line of added) expect(world.sent).toContain(line.replace("forceload add", "forceload remove"));
+        for (const line of added)
+            expect(world.sent).toContain(line.replace("forceload add", "forceload remove"));
     });
 });
 
@@ -312,7 +401,13 @@ describe("calling one off", () => {
     it("ends it with nobody winning and cleans up", async () => {
         const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 10 };
         setUp([hunt]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hunt", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hunt",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(4_100);
         world.scores = { Ana: 9 };
         await events.cancelEvent("owner", SERVER);
@@ -326,9 +421,21 @@ describe("calling one off", () => {
 
     it("refuses a second event while one is on", async () => {
         setUp([{ ...catalog.newPreset("fishing", "fish"), minutes: 10 }]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "fish", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "fish",
+            trigger: "manual",
+            startedBy: null
+        });
         await expect(
-            events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "fish", trigger: "manual", startedBy: null })
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "fish",
+                trigger: "manual",
+                startedBy: null
+            })
         ).rejects.toThrow(/another event is on/i);
     });
 
@@ -336,7 +443,13 @@ describe("calling one off", () => {
         world.online = [];
         setUp([{ ...catalog.newPreset("fishing", "fish"), minutes: 10 }]);
         await expect(
-            events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "fish", trigger: "manual", startedBy: null })
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "fish",
+                trigger: "manual",
+                startedBy: null
+            })
         ).rejects.toThrow(/nobody is on/i);
     });
 });
@@ -346,7 +459,15 @@ describe("the minute sweep", () => {
         const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 5 };
         setUp([fish], {
             minActive: 2,
-            random: { enabled: true, days: [], from: "00:00", to: "23:59", minGap: 15, maxGap: 15, pool: [{ presetId: "fish", weight: 1 }] }
+            random: {
+                enabled: true,
+                days: [],
+                from: "00:00",
+                to: "23:59",
+                minGap: 15,
+                maxGap: 15,
+                pool: [{ presetId: "fish", weight: 1 }]
+            }
         });
         // Armed on the first pass, a gap away.
         await events.sweepEvents();
@@ -361,7 +482,9 @@ describe("the minute sweep", () => {
     it("skips a scheduled event when too few are playing, and says so", async () => {
         const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 5 };
         world.online = ["Ana"];
-        setUp([fish], { minActive: 2 }, [{ id: "at8", presetId: "fish", enabled: true, days: [], at: "20:00" }]);
+        setUp([fish], { minActive: 2 }, [
+            { id: "at8", presetId: "fish", enabled: true, days: [], at: "20:00" }
+        ]);
         await events.sweepEvents();
         const entry = state().history[0];
         expect(entry).toMatchObject({ outcome: "skipped", trigger: "scheduled" });
@@ -372,9 +495,19 @@ describe("the minute sweep", () => {
     });
 
     it("hands a waiting prize to somebody who is back", async () => {
-        setUp([catalog.newPreset("fishing", "fish")], { random: { ...catalog.settingsSchema.parse({}).random } });
+        setUp([catalog.newPreset("fishing", "fish")], {
+            random: { ...catalog.settingsSchema.parse({}).random }
+        });
         config[catalog.EVENT_STATE_KEY] = {
-            pending: [{ id: "p1", player: "Ana", reward: { items: [{ id: "minecraft:emerald", count: 2 }], levels: 0 }, event: "Fishing contest", createdAt: Date.now() }]
+            pending: [
+                {
+                    id: "p1",
+                    player: "Ana",
+                    reward: { items: [{ id: "minecraft:emerald", count: 2 }], levels: 0 },
+                    event: "Fishing contest",
+                    createdAt: Date.now()
+                }
+            ]
         };
         await events.sweepEvents();
         expect(world.sent).toContain("give Ana minecraft:emerald 2");
@@ -382,17 +515,31 @@ describe("the minute sweep", () => {
     });
 
     it("keeps only what did not arrive, so nothing is given twice", async () => {
-        setUp([catalog.newPreset("fishing", "fish")], { random: { ...catalog.settingsSchema.parse({}).random } });
+        setUp([catalog.newPreset("fishing", "fish")], {
+            random: { ...catalog.settingsSchema.parse({}).random }
+        });
         world.unknownItems = ["minecraft:diamnd"];
-        const reward = { items: [{ id: "minecraft:emerald", count: 2 }, { id: "minecraft:diamnd", count: 1 }], levels: 5 };
+        const reward = {
+            items: [
+                { id: "minecraft:emerald", count: 2 },
+                { id: "minecraft:diamnd", count: 1 }
+            ],
+            levels: 5
+        };
         config[catalog.EVENT_STATE_KEY] = {
-            pending: [{ id: "p1", player: "Ana", reward, event: "Fishing contest", createdAt: Date.now() }]
+            pending: [
+                { id: "p1", player: "Ana", reward, event: "Fishing contest", createdAt: Date.now() }
+            ]
         };
         await events.sweepEvents();
         await events.sweepEvents();
-        expect(world.sent.filter((line) => line === "give Ana minecraft:emerald 2")).toHaveLength(1);
+        expect(world.sent.filter((line) => line === "give Ana minecraft:emerald 2")).toHaveLength(
+            1
+        );
         expect(world.sent.filter((line) => line === "xp add Ana 5 levels")).toHaveLength(1);
-        expect(state().pending.map((one) => one.reward)).toEqual([{ items: [{ id: "minecraft:diamnd", count: 1 }], levels: 0 }]);
+        expect(state().pending.map((one) => one.reward)).toEqual([
+            { items: [{ id: "minecraft:diamnd", count: 1 }], levels: 0 }
+        ]);
     });
 });
 
@@ -408,10 +555,22 @@ describe("trivia", () => {
             }
         };
         setUp([quiz]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "quiz", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "quiz",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(4_100);
-        expect(world.sent.some((line) => line.startsWith("tellraw @a") && line.includes("Which green mob explodes?"))).toBe(true);
-        world.log += "[20:00:05] [Server thread/INFO]: <Ana> zombie\n[20:00:06] [Server thread/INFO]: <Ben> Creeper!\n";
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") && line.includes("Which green mob explodes?")
+            )
+        ).toBe(true);
+        world.log +=
+            "[20:00:05] [Server thread/INFO]: <Ana> zombie\n[20:00:06] [Server thread/INFO]: <Ben> Creeper!\n";
         await play(2_100);
         expect(state().run?.points).toEqual({ Ben: 1 });
         expect(world.sent).toContain("scoreboard players set Ben pe_score 1");
@@ -428,13 +587,36 @@ describe("a world boss", () => {
     it("appears with its health and name, counts damage near it, and falls", async () => {
         const boss = { ...catalog.newPreset("world-boss", "boss"), minutes: 10 };
         setUp([boss]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "boss", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "boss",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(8_100);
-        expect(world.sent.some((line) => line.includes("summon minecraft:wither_skeleton") && line.includes("pe_boss"))).toBe(true);
-        expect(world.sent).toContain("attribute @e[tag=pe_boss,limit=1] minecraft:max_health base set 400");
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.includes("summon minecraft:wither_skeleton") && line.includes("pe_boss")
+            )
+        ).toBe(true);
+        expect(world.sent).toContain(
+            "attribute @e[tag=pe_boss,limit=1] minecraft:max_health base set 400"
+        );
         // 1.21.4: the name is still written as JSON in a string.
-        expect(world.sent.some((line) => line.startsWith("data merge entity @e[tag=pe_boss,limit=1] {CustomName:'"))).toBe(true);
-        expect(world.sent.some((line) => line.startsWith("execute store result bossbar polaris:event value run data get entity @e[tag=pe_boss"))).toBe(true);
+        expect(
+            world.sent.some((line) =>
+                line.startsWith("data merge entity @e[tag=pe_boss,limit=1] {CustomName:'")
+            )
+        ).toBe(true);
+        expect(
+            world.sent.some((line) =>
+                line.startsWith(
+                    "execute store result bossbar polaris:event value run data get entity @e[tag=pe_boss"
+                )
+            )
+        ).toBe(true);
 
         world.scores = { Ana: 180, Ben: 60 };
         world.bossAlive = false;
@@ -449,9 +631,17 @@ describe("a world boss", () => {
     it("is not taken as felled when it is out of reach and somebody far off kills its kind", async () => {
         const boss = { ...catalog.newPreset("world-boss", "boss"), minutes: 10 };
         setUp([boss]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "boss", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "boss",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(10_100);
-        expect(world.sent).toContain("execute if entity @e[tag=pe_boss] run scoreboard players set @a pe_kill 0");
+        expect(world.sent).toContain(
+            "execute if entity @e[tag=pe_boss] run scoreboard players set @a pe_kill 0"
+        );
         world.bossAlive = false;
         world.killerAt = [-2000, 40, 900];
         await play(6_100);
@@ -463,7 +653,13 @@ describe("a world boss", () => {
     it("gives nobody a prize when it got away", async () => {
         const boss = { ...catalog.newPreset("world-boss", "boss"), minutes: 3 };
         setUp([boss]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "boss", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "boss",
+            trigger: "manual",
+            startedBy: null
+        });
         world.scores = { Ana: 40 };
         await play(3 * 60_000 + 4_000);
         const after = state();
@@ -476,10 +672,18 @@ describe("a blood moon", () => {
     it("brings night and waves, and only the survivors stand on the podium", async () => {
         const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
         setUp([moon]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "moon", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "moon",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(4_100);
         expect(world.sent).toContain("time set 13000");
-        expect(world.sent.filter((line) => line.includes("run summon minecraft:")).length).toBeGreaterThan(0);
+        expect(
+            world.sent.filter((line) => line.includes("run summon minecraft:")).length
+        ).toBeGreaterThan(0);
         world.scores = { Ana: 7, Ben: 12 };
         world.deaths = { Ben: 1 };
         await play(3 * 60_000);
@@ -492,9 +696,19 @@ describe("a blood moon", () => {
 
 describe("the others", () => {
     it("a race is won by whoever reaches the finish first", async () => {
-        const race = { ...catalog.newPreset("explorer", "race"), minutes: 10, options: { mode: "race" as const, distance: 500, place: { mode: "players" as const } } };
+        const race = {
+            ...catalog.newPreset("explorer", "race"),
+            minutes: 10,
+            options: { mode: "race" as const, distance: 500, place: { mode: "players" as const } }
+        };
         setUp([race]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "race", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "race",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(4_100);
         expect(state().run?.place).not.toBeNull();
         world.arrived = true;
@@ -509,9 +723,21 @@ describe("the others", () => {
     it("the hill counts the time spent inside the circle", async () => {
         const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hill", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(8_100);
-        expect(world.sent.some((line) => line.includes("positioned 300.5 70 0.5 as @a[distance=..6,gamemode=!spectator] run scoreboard players add @s pe_score 2"))).toBe(true);
+        expect(
+            world.sent.some((line) =>
+                line.includes(
+                    "positioned 300.5 70 0.5 as @a[distance=..6,gamemode=!spectator] run scoreboard players add @s pe_score 2"
+                )
+            )
+        ).toBe(true);
         world.scores = { Ana: 95 };
         await play(3 * 60_000);
         expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 95 }]);
@@ -520,10 +746,22 @@ describe("the others", () => {
     it("a happy hour gives its effects for exactly as long as it lasts, and no prizes", async () => {
         const happy = { ...catalog.newPreset("happy-hour", "happy"), minutes: 20 };
         setUp([happy]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "happy", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "happy",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(2_100);
-        expect(world.sent.some((line) => /^effect give @a minecraft:haste (119\d|1200) 1 true$/.test(line))).toBe(true);
-        expect(world.sent.some((line) => line.startsWith("effect give @a minecraft:luck"))).toBe(true);
+        expect(
+            world.sent.some((line) =>
+                /^effect give @a minecraft:haste (119\d|1200) 1 true$/.test(line)
+            )
+        ).toBe(true);
+        expect(world.sent.some((line) => line.startsWith("effect give @a minecraft:luck"))).toBe(
+            true
+        );
         await play(20 * 60_000);
         const after = state();
         expect(after.history[0]).toMatchObject({ outcome: "finished", podium: [] });
@@ -534,7 +772,13 @@ describe("the others", () => {
     it("a happy hour called off takes its effects back", async () => {
         const happy = { ...catalog.newPreset("happy-hour", "happy"), minutes: 60 };
         setUp([happy]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "happy", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "happy",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(2_100);
         await events.cancelEvent("owner", SERVER);
         await play(2_100);
@@ -549,12 +793,23 @@ describe("when things go wrong", () => {
         world.allWater = true;
         const drop = { ...catalog.newPreset("supply-drop", "drop"), minutes: 10 };
         setUp([drop]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "drop", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "drop",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(40_000);
         const after = state();
         expect(after.run).toBeNull();
-        expect(after.history[0]).toMatchObject({ outcome: "failed", note: "No dry ground was found for it near the players" });
-        expect(world.sent.some((line) => line.startsWith("tellraw @a") && line.includes("called off"))).toBe(true);
+        expect(after.history[0]).toMatchObject({
+            outcome: "failed",
+            note: "No dry ground was found for it near the players"
+        });
+        expect(
+            world.sent.some((line) => line.startsWith("tellraw @a") && line.includes("called off"))
+        ).toBe(true);
         expect(world.sent.some((line) => line.includes("minecraft:chest"))).toBe(false);
     });
 
@@ -615,7 +870,13 @@ describe("when things go wrong", () => {
     it("is not picked up again by the sweep while its end is being written", async () => {
         const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
         setUp([rush]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "rush", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "rush",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(2_100);
         world.scores = { Ana: 4 };
         const say = server.say;
@@ -635,7 +896,9 @@ describe("when things go wrong", () => {
             server.say = say;
         }
         expect(swept).toBe(true);
-        expect(world.sent.filter((line) => line === "give Ana minecraft:diamond 5")).toHaveLength(1);
+        expect(world.sent.filter((line) => line === "give Ana minecraft:diamond 5")).toHaveLength(
+            1
+        );
         const id = state().history[0]?.id;
         expect(state().history.filter((one) => one.id === id)).toHaveLength(1);
         expect(state().run).toBeNull();

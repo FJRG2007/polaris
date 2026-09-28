@@ -8,7 +8,14 @@
  */
 
 import { parseTime, zonedMoment } from "../schedule";
-import { runMinutes, type EventPreset, type EventSettings, type EventScheduleEntry, type Reward, type Rewards } from "./catalog";
+import {
+    runMinutes,
+    type EventPreset,
+    type EventSettings,
+    type EventScheduleEntry,
+    type Reward,
+    type Rewards
+} from "./catalog";
 
 // ------------------------------------------------------------------ who is playing
 
@@ -74,7 +81,11 @@ function angleBetween(left: number, right: number): number {
 }
 
 /** The players who moved within the last `afkMinutes`. */
-export function activePlayers(seen: ReadonlyMap<string, Seen>, afkMinutes: number, now: number): Seen[] {
+export function activePlayers(
+    seen: ReadonlyMap<string, Seen>,
+    afkMinutes: number,
+    now: number
+): Seen[] {
     return [...seen.values()].filter(
         (one) => one.movedAt !== null && now - one.movedAt <= afkMinutes * 60_000
     );
@@ -128,7 +139,11 @@ export function randomWindowOpen(settings: EventSettings, now: number): boolean 
     if (from === null || to === null) return false;
     if (from === to) return random.days.length === 0 || random.days.includes(day);
     if (from < to) {
-        return (random.days.length === 0 || random.days.includes(day)) && minutes >= from && minutes < to;
+        return (
+            (random.days.length === 0 || random.days.includes(day)) &&
+            minutes >= from &&
+            minutes < to
+        );
     }
     // Past midnight: the late part belongs to the day it started on.
     if (minutes >= from) return random.days.length === 0 || random.days.includes(day);
@@ -144,7 +159,11 @@ export function nextGap(settings: EventSettings, random: () => number): number {
 
 export type RandomDecision =
     | { readonly start: EventPreset; readonly nextRandomAt: number; readonly waiting: null }
-    | { readonly start: null; readonly nextRandomAt: number | null; readonly waiting: string | null };
+    | {
+          readonly start: null;
+          readonly nextRandomAt: number | null;
+          readonly waiting: string | null;
+      };
 
 /**
  * Whether the draw starts an event now, and when it looks again.
@@ -178,9 +197,14 @@ export function decideRandom(input: {
     if (input.nextRandomAt === null) {
         return { start: null, nextRandomAt: now + nextGap(settings, random), waiting: null };
     }
-    if (now < input.nextRandomAt) return { start: null, nextRandomAt: input.nextRandomAt, waiting: null };
+    if (now < input.nextRandomAt)
+        return { start: null, nextRandomAt: input.nextRandomAt, waiting: null };
     if (!randomWindowOpen(settings, now)) {
-        return { start: null, nextRandomAt: input.nextRandomAt, waiting: "Outside the hours events are drawn in" };
+        return {
+            start: null,
+            nextRandomAt: input.nextRandomAt,
+            waiting: "Outside the hours events are drawn in"
+        };
     }
     if (input.running) {
         return { start: null, nextRandomAt: input.nextRandomAt, waiting: "Another event is on" };
@@ -250,12 +274,19 @@ export function prizes(
     rewards: Rewards,
     disqualified: ReadonlySet<string>
 ): { name: string; reward: Reward }[] {
-    const byPlace: Readonly<Record<number, Reward>> = { 1: rewards.first, 2: rewards.second, 3: rewards.third };
+    const byPlace: Readonly<Record<number, Reward>> = {
+        1: rewards.first,
+        2: rewards.second,
+        3: rewards.third
+    };
     const owed = new Map<string, Reward>();
     const add = (name: string, reward: Reward) => {
         if (reward.items.length === 0 && reward.levels === 0) return;
         const held = owed.get(name) ?? { items: [], levels: 0 };
-        owed.set(name, { items: [...held.items, ...reward.items], levels: held.levels + reward.levels });
+        owed.set(name, {
+            items: [...held.items, ...reward.items],
+            levels: held.levels + reward.levels
+        });
     };
     for (const one of placed) add(one.name, byPlace[one.place] ?? { items: [], levels: 0 });
     for (const name of took) if (!disqualified.has(name.toLowerCase())) add(name, rewards.everyone);

@@ -93,7 +93,9 @@ export function rules(kind: EventKind, language: Language, race = false): string
 
 export function startsIn(name: string, seconds: number, language: Language): string {
     const when = clock(seconds);
-    return language === "es" ? `&e${name}&f empieza en &e${when}&f.` : `&e${name}&f starts in &e${when}&f.`;
+    return language === "es"
+        ? `&e${name}&f empieza en &e${when}&f.`
+        : `&e${name}&f starts in &e${when}&f.`;
 }
 
 export function startsSoonTitle(language: Language): string {
@@ -125,7 +127,9 @@ export function clock(seconds: number): string {
     const hours = Math.floor(total / 3600);
     const minutes = Math.floor((total % 3600) / 60);
     const rest = String(total % 60).padStart(2, "0");
-    return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
+    return hours > 0
+        ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}`
+        : `${minutes}:${rest}`;
 }
 
 export function resultsHeader(name: string, language: Language): string {
@@ -194,7 +198,9 @@ export function dropExact(x: number, y: number, z: number, language: Language): 
 }
 
 export function dropFound(name: string, language: Language): string {
-    return language === "es" ? `&a${name} ha encontrado el suministro.` : `&a${name} found the supply drop.`;
+    return language === "es"
+        ? `&a${name} ha encontrado el suministro.`
+        : `&a${name} found the supply drop.`;
 }
 
 export function dropLost(language: Language): string {
@@ -205,14 +211,21 @@ export function dropLost(language: Language): string {
 
 // ------------------------------------------------------------------ world boss
 
-export function bossAppeared(boss: string, x: number, y: number, z: number, language: Language): string {
+export function bossAppeared(
+    boss: string,
+    x: number,
+    y: number,
+    z: number,
+    language: Language
+): string {
     return language === "es"
         ? `&c${boss}&f ha aparecido en &eX ${x} Y ${y} Z ${z}&f.`
         : `&c${boss}&f has appeared at &eX ${x} Y ${y} Z ${z}&f.`;
 }
 
 export function bossFell(boss: string, by: string | null, language: Language): string {
-    if (language === "es") return by ? `&a${by} ha dado el golpe final a ${boss}.` : `&a${boss} ha caído.`;
+    if (language === "es")
+        return by ? `&a${by} ha dado el golpe final a ${boss}.` : `&a${boss} ha caído.`;
     return by ? `&a${by} landed the final blow on ${boss}.` : `&a${boss} has fallen.`;
 }
 
@@ -230,25 +243,35 @@ export function dawn(survivors: number, language: Language): string {
 
 // ------------------------------------------------------------------ trivia
 
-export function questionLine(round: number, rounds: number, question: string, language: Language): string {
+export function questionLine(
+    round: number,
+    rounds: number,
+    question: string,
+    language: Language
+): string {
     const label = language === "es" ? "Pregunta" : "Question";
     return `&b${label} ${round}/${rounds}: &f${question}`;
 }
 
-export function scrambleLine(round: number, rounds: number, word: string, language: Language): string {
+export function scrambleLine(
+    round: number,
+    rounds: number,
+    word: string,
+    language: Language
+): string {
     return language === "es"
         ? `&bRonda ${round}/${rounds}: &fordena la palabra &e${word}`
         : `&bRound ${round}/${rounds}: &funscramble &e${word}`;
 }
 
 export function roundWon(name: string, answer: string, language: Language): string {
-    return language === "es"
-        ? `&a${name} acertó: &f${answer}`
-        : `&a${name} got it: &f${answer}`;
+    return language === "es" ? `&a${name} acertó: &f${answer}` : `&a${name} got it: &f${answer}`;
 }
 
 export function roundMissed(answer: string, language: Language): string {
-    return language === "es" ? `&7Nadie acertó. Era &f${answer}` : `&7Nobody got it. It was &f${answer}`;
+    return language === "es"
+        ? `&7Nadie acertó. Era &f${answer}`
+        : `&7Nobody got it. It was &f${answer}`;
 }
 
 // ------------------------------------------------------------------ explorer, king of the hill

@@ -15,14 +15,23 @@ let answerRead: (value: unknown) => void = () => undefined;
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
         confirmDialog: { useConfirm: () => [async () => true, null] },
-        displayFormat: { useDisplayFormat: () => ({ dateTime: (at: number) => new Date(at).toISOString() }) },
-        snapshotCache: { readSnapshot: () => null, writeSnapshot: () => undefined, dropSnapshots: () => undefined }
+        displayFormat: {
+            useDisplayFormat: () => ({ dateTime: (at: number) => new Date(at).toISOString() })
+        },
+        snapshotCache: {
+            readSnapshot: () => null,
+            writeSnapshot: () => undefined,
+            dropSnapshots: () => undefined
+        }
     }
 }));
 
 const catalog = await import("@polaris-app/game-servers/src/lib/minecraft/events/catalog");
 
-const config = { ...catalog.defaultEventsConfig(), presets: [catalog.newPreset("fishing", "fish"), catalog.newPreset("mining-rush", "rush")] };
+const config = {
+    ...catalog.defaultEventsConfig(),
+    presets: [catalog.newPreset("fishing", "fish"), catalog.newPreset("mining-rush", "rush")]
+};
 const view = {
     config,
     run: null,
@@ -63,7 +72,9 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/events-actions", () => 
     forgetPrizeAction: async () => ({ view })
 }));
 
-const { MinecraftEvents } = await import("@polaris-app/game-servers/src/screens/installed/minecraft-events");
+const { MinecraftEvents } = await import(
+    "@polaris-app/game-servers/src/screens/installed/minecraft-events"
+);
 
 afterEach(() => {
     cleanup();
@@ -96,7 +107,9 @@ describe("the Events tab", () => {
         await waitFor(() => expect(screen.getByLabelText("Run Fishing contest now")).toBeTruthy());
         fireEvent.click(screen.getByLabelText("Fishing contest can come round on its own"));
         await waitFor(() => expect(screen.getByText("Unsaved changes.")).toBeTruthy());
-        expect((screen.getByLabelText("Run Fishing contest now") as HTMLButtonElement).disabled).toBe(true);
+        expect(
+            (screen.getByLabelText("Run Fishing contest now") as HTMLButtonElement).disabled
+        ).toBe(true);
     });
 
     it("says what is wrong in the editor beside the field, and holds Done", async () => {
@@ -106,17 +119,30 @@ describe("the Events tab", () => {
         fireEvent.click(screen.getByLabelText("Edit Fishing contest"));
         const name = await screen.findByDisplayValue("Fishing contest");
         fireEvent.change(name, { target: { value: "  " } });
-        await waitFor(() => expect(screen.getAllByText("Give it a name").length).toBeGreaterThan(0));
+        await waitFor(() =>
+            expect(screen.getAllByText("Give it a name").length).toBeGreaterThan(0)
+        );
         expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
         fireEvent.change(name, { target: { value: "Friday fishing" } });
-        await waitFor(() => expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false));
+        await waitFor(() =>
+            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+        );
     });
 
     it("lets somebody without the grant look but not change anything", async () => {
-        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage={false} />);
+        render(
+            <MinecraftEvents
+                installedAppId="00000000-0000-4000-8000-000000000001"
+                canManage={false}
+            />
+        );
         answerRead({ view });
         await waitFor(() => expect(screen.getByLabelText("Run Fishing contest now")).toBeTruthy());
-        expect((screen.getByLabelText("Run Fishing contest now") as HTMLButtonElement).disabled).toBe(true);
-        expect((screen.getByLabelText("Edit Fishing contest") as HTMLButtonElement).disabled).toBe(true);
+        expect(
+            (screen.getByLabelText("Run Fishing contest now") as HTMLButtonElement).disabled
+        ).toBe(true);
+        expect((screen.getByLabelText("Edit Fishing contest") as HTMLButtonElement).disabled).toBe(
+            true
+        );
     });
 });

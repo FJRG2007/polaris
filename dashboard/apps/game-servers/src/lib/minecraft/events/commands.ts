@@ -151,7 +151,13 @@ export function components(preset: EventPreset): Component[] {
             );
         }
         case "fishing":
-            return [{ objective: numbered(0), criterion: "minecraft.custom:minecraft.fish_caught", weight: 1 }];
+            return [
+                {
+                    objective: numbered(0),
+                    criterion: "minecraft.custom:minecraft.fish_caught",
+                    weight: 1
+                }
+            ];
         case "explorer":
             return (preset.options as EventOptions<"explorer">).mode === "distance"
                 ? TRAVEL.map((id, index) => ({
@@ -173,7 +179,8 @@ export function divisorFor(preset: EventPreset): number {
 /** Whether the event has a scoreboard on the side of the screen. */
 export function hasScoreboard(preset: EventPreset): boolean {
     if (preset.kind === "happy-hour" || preset.kind === "supply-drop") return false;
-    if (preset.kind === "explorer") return (preset.options as EventOptions<"explorer">).mode === "distance";
+    if (preset.kind === "explorer")
+        return (preset.options as EventOptions<"explorer">).mode === "distance";
     return true;
 }
 
@@ -189,7 +196,10 @@ export function text(line: string): string {
 }
 
 export function asciiJson(json: string): string {
-    return json.replace(/[\u0080-￿]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
+    return json.replace(
+        /[\u0080-￿]/g,
+        (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`
+    );
 }
 
 export function say(line: string): string {
@@ -274,10 +284,14 @@ export function setupScoreboard(preset: EventPreset, title: string): string[] {
         );
         const weights = new Set(components(preset).map((one) => one.weight));
         weights.add(divisorFor(preset));
-        for (const weight of weights) lines.push(`scoreboard players set #w${weight} ${CONST} ${weight}`);
+        for (const weight of weights)
+            lines.push(`scoreboard players set #w${weight} ${CONST} ${weight}`);
     }
     if (preset.kind === "blood-moon") {
-        lines.push(`scoreboard objectives remove ${DEATHS}`, `scoreboard objectives add ${DEATHS} deathCount`);
+        lines.push(
+            `scoreboard objectives remove ${DEATHS}`,
+            `scoreboard objectives add ${DEATHS} deathCount`
+        );
     }
     return lines;
 }
@@ -298,17 +312,25 @@ export function scoreTick(preset: EventPreset): string[] {
     for (const one of counted) lines.push(`scoreboard players add @a ${one.objective} 0`);
     lines.push(`scoreboard players set @a ${SUM} 0`);
     for (const one of counted) {
-        lines.push(`execute as @a run scoreboard players operation @s ${TMP} = @s ${one.objective}`);
+        lines.push(
+            `execute as @a run scoreboard players operation @s ${TMP} = @s ${one.objective}`
+        );
         if (one.weight !== 1) {
-            lines.push(`execute as @a run scoreboard players operation @s ${TMP} *= #w${one.weight} ${CONST}`);
+            lines.push(
+                `execute as @a run scoreboard players operation @s ${TMP} *= #w${one.weight} ${CONST}`
+            );
         }
         lines.push(`execute as @a run scoreboard players operation @s ${SUM} += @s ${TMP}`);
     }
     const divisor = divisorFor(preset);
     if (divisor !== 1) {
-        lines.push(`execute as @a run scoreboard players operation @s ${SUM} /= #w${divisor} ${CONST}`);
+        lines.push(
+            `execute as @a run scoreboard players operation @s ${SUM} /= #w${divisor} ${CONST}`
+        );
     }
-    lines.push(`execute as @a[scores={${SUM}=1..}] run scoreboard players operation @s ${SCORE} = @s ${SUM}`);
+    lines.push(
+        `execute as @a[scores={${SUM}=1..}] run scoreboard players operation @s ${SCORE} = @s ${SUM}`
+    );
     return lines;
 }
 
@@ -342,12 +364,14 @@ export const WHERE = "execute as @a run data get entity @s Pos";
 /** Which way everybody is looking - a player who only turns around is not idle. */
 export const FACING = "execute as @a run data get entity @s Rotation";
 /** Everybody who is in the Overworld, by the same answer. */
-export const IN_OVERWORLD = "execute in minecraft:overworld as @a[distance=0..] run data get entity @s Pos";
+export const IN_OVERWORLD =
+    "execute in minecraft:overworld as @a[distance=0..] run data get entity @s Pos";
 
 /** Positions out of a `WHERE` answer. */
 export function readWhere(output: string): { name: string; x: number; y: number; z: number }[] {
     const found: { name: string; x: number; y: number; z: number }[] = [];
-    const pattern = /([A-Za-z0-9_]{1,16}) has the following entity data: \[(-?[\d.E-]+)d, (-?[\d.E-]+)d, (-?[\d.E-]+)d\]/g;
+    const pattern =
+        /([A-Za-z0-9_]{1,16}) has the following entity data: \[(-?[\d.E-]+)d, (-?[\d.E-]+)d, (-?[\d.E-]+)d\]/g;
     for (const match of stripFormatting(output).matchAll(pattern)) {
         const [x, y, z] = [match[2], match[3], match[4]].map(Number) as [number, number, number];
         if ([x, y, z].every(Number.isFinite)) found.push({ name: match[1] as string, x, y, z });
@@ -358,23 +382,28 @@ export function readWhere(output: string): { name: string; x: number; y: number;
 /** Facings out of a `FACING` answer: `[yaw, pitch]` in floats. */
 export function readFacing(output: string): Map<string, { yaw: number; pitch: number }> {
     const found = new Map<string, { yaw: number; pitch: number }>();
-    const pattern = /([A-Za-z0-9_]{1,16}) has the following entity data: \[(-?[\d.E-]+)f, (-?[\d.E-]+)f\]/g;
+    const pattern =
+        /([A-Za-z0-9_]{1,16}) has the following entity data: \[(-?[\d.E-]+)f, (-?[\d.E-]+)f\]/g;
     for (const match of stripFormatting(output).matchAll(pattern)) {
         const yaw = Number(match[2]);
         const pitch = Number(match[3]);
-        if (Number.isFinite(yaw) && Number.isFinite(pitch)) found.set(match[1] as string, { yaw, pitch });
+        if (Number.isFinite(yaw) && Number.isFinite(pitch))
+            found.set(match[1] as string, { yaw, pitch });
     }
     return found;
 }
 
 /** A single entity's position, for a marker: `... has the following entity data: [..]`. */
 export function readPoint(output: string): { x: number; y: number; z: number } | null {
-    const match = /has the following entity data: \[(-?[\d.E-]+)d, (-?[\d.E-]+)d, (-?[\d.E-]+)d\]/.exec(
-        stripFormatting(output)
-    );
+    const match =
+        /has the following entity data: \[(-?[\d.E-]+)d, (-?[\d.E-]+)d, (-?[\d.E-]+)d\]/.exec(
+            stripFormatting(output)
+        );
     if (!match) return null;
     const [x, y, z] = [match[1], match[2], match[3]].map(Number) as [number, number, number];
-    return [x, y, z].every(Number.isFinite) ? { x: Math.floor(x), y: Math.floor(y), z: Math.floor(z) } : null;
+    return [x, y, z].every(Number.isFinite)
+        ? { x: Math.floor(x), y: Math.floor(y), z: Math.floor(z) }
+        : null;
 }
 
 /** `Test passed` / `Test failed` - or neither, when the game could not say. */
@@ -446,7 +475,10 @@ const LOOT: Readonly<Record<EventOptions<"supply-drop">["loot"], string>> = {
     "ancient-city": "minecraft:chests/ancient_city"
 };
 
-export function placeChest(point: { x: number; y: number; z: number }, loot: EventOptions<"supply-drop">["loot"]): string {
+export function placeChest(
+    point: { x: number; y: number; z: number },
+    loot: EventOptions<"supply-drop">["loot"]
+): string {
     return `execute in minecraft:overworld run setblock ${point.x} ${point.y} ${point.z} minecraft:chest{LootTable:"${LOOT[loot]}"} replace`;
 }
 
@@ -654,7 +686,11 @@ export function arrived(x: number, z: number): string {
 }
 
 /** The circle drawn in the air, and everybody inside it given the time. */
-export function hillTick(point: { x: number; y: number; z: number }, radius: number, seconds: number): string[] {
+export function hillTick(
+    point: { x: number; y: number; z: number },
+    radius: number,
+    seconds: number
+): string[] {
     return [
         `execute in minecraft:overworld run particle minecraft:happy_villager ${point.x + 0.5} ${point.y + 1} ${point.z + 0.5} ${radius / 2} 0.2 ${radius / 2} 0 ${Math.min(80, radius * 8)} force`,
         `execute in minecraft:overworld positioned ${point.x + 0.5} ${point.y} ${point.z + 0.5} as @a[distance=..${radius},gamemode=!spectator] run scoreboard players add @s ${SCORE} ${seconds}`
@@ -677,7 +713,9 @@ function happyChosen(options: EventOptions<"happy-hour">) {
 
 export function happyEffects(options: EventOptions<"happy-hour">, seconds: number): string[] {
     const time = Math.max(1, Math.ceil(seconds));
-    return happyChosen(options).map(([effect, level]) => `effect give @a minecraft:${effect} ${time} ${level} true`);
+    return happyChosen(options).map(
+        ([effect, level]) => `effect give @a minecraft:${effect} ${time} ${level} true`
+    );
 }
 
 /** The hour's effects taken off again. */
@@ -688,7 +726,10 @@ export function happyEffectsClear(options: EventOptions<"happy-hour">): string[]
 // ------------------------------------------------------------------ rewards
 
 /** A prize for one player, as commands. The name is checked before it gets here. */
-export function rewardCommands(name: string, reward: { items: readonly { id: string; count: number }[]; levels: number }): string[] {
+export function rewardCommands(
+    name: string,
+    reward: { items: readonly { id: string; count: number }[]; levels: number }
+): string[] {
     const lines = reward.items.map((item) => `give ${name} ${item.id} ${item.count}`);
     if (reward.levels > 0) lines.push(`xp add ${name} ${reward.levels} levels`);
     return lines;
@@ -702,7 +743,10 @@ export function gaveIt(output: string): boolean {
 // ------------------------------------------------------------------ the end
 
 /** The chunks kept loaded for a place and the column tried for it, let go of. */
-export function release(place: { x: number; z: number } | null, target: { x: number; z: number } | null): string[] {
+export function release(
+    place: { x: number; z: number } | null,
+    target: { x: number; z: number } | null
+): string[] {
     const chunks = new Map<string, { x: number; z: number }>();
     for (const point of [target, place]) {
         if (point) chunks.set(`${point.x >> 4},${point.z >> 4}`, point);
@@ -733,10 +777,12 @@ export function cleanup(
         `scoreboard objectives remove ${DAMAGE}`,
         CLEAR_MARK
     ];
-    for (const one of components(preset)) lines.push(`scoreboard objectives remove ${one.objective}`);
+    for (const one of components(preset))
+        lines.push(`scoreboard objectives remove ${one.objective}`);
     if (preset.kind === "world-boss") lines.push(BOSS_BANISH);
     if (preset.kind === "blood-moon") lines.push(...daybreak());
-    if (preset.kind === "happy-hour") lines.push(...happyEffectsClear(preset.options as EventOptions<"happy-hour">));
+    if (preset.kind === "happy-hour")
+        lines.push(...happyEffectsClear(preset.options as EventOptions<"happy-hour">));
     if (preset.kind === "supply-drop" && place) lines.push(removeChest(place));
     lines.push(...release(preset.kind === "explorer" ? null : place, target));
     return lines;
