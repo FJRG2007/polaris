@@ -91,12 +91,10 @@ vi.mock("@polaris/app-host", () => ({
     }
 }));
 
-const { GET, POST } = await import(
-    "@polaris-app/game-servers/src/routes/api/minecraft/anticheat/[id]/route"
-);
-const { engineCheckLabel, engineScore } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/suspicion"
-);
+const { GET, POST } =
+    await import("@polaris-app/game-servers/src/routes/api/minecraft/anticheat/[id]/route");
+const { engineCheckLabel, engineScore } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/suspicion");
 
 function report(body: unknown, token = "the-token", id = SERVER) {
     return POST(
@@ -222,6 +220,17 @@ describe("handing the plugin the honeypots", () => {
     it("tells nobody without the server's token, and nothing to a server with the engine off", async () => {
         expect((await traps("wrong")).status).toBe(401);
         fake.env.set("POLARIS_ANTICHEAT", "off");
+        expect((await traps()).status).toBe(401);
+    });
+
+    it("answers the NeoForge mod on a server with Polaris login instead of the engine", async () => {
+        fake.env = new Map([
+            ["MODS", "https://polaris.example/api/minecraft/mod/polaris-neoforge-1.21.4.jar"],
+            ["POLARIS_LOGIN", "on"]
+        ]);
+        expect((await traps()).status).toBe(200);
+        expect((await report({ flags: [flag({ check: "XRayProbe" })] })).status).toBe(200);
+        fake.env.set("POLARIS_LOGIN", "off");
         expect((await traps()).status).toBe(401);
     });
 

@@ -1,0 +1,16 @@
+{
+    "required": false,
+    "minVersion": "0.8",
+    "package": "polaris.minecraft.mixin",
+    "compatibilityLevel": "JAVA_21",
+    "server": [
+        "ChunkPacketDataMixin",
+        "PacketSendMixin",
+        "PlayerActionMixin",
+        "SectionBlocksUpdateAccessor",
+        "ServerLevelMixin"
+    ],
+    "injectors": {
+        "defaultRequire": 0
+    }
+}

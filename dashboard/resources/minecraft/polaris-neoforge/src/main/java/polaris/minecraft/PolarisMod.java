@@ -11,9 +11,10 @@ import org.slf4j.Logger;
  * Polaris on a NeoForge server.
  *
  * Loaded on dedicated servers only: everything it does happens on the server, and
- * a player joins with an unmodified client. It stays idle unless the server's
- * environment switches it on, which is what makes a jar left in the mods folder
- * after the switch was turned off harmless.
+ * a player joins with an unmodified client. The login stays idle unless the
+ * server's environment switches it on, which is what makes a jar left in the mods
+ * folder after the switch was turned off harmless. The anti-xray runs unless the
+ * environment switches it off (POLARIS_ANTIXRAY=off).
  */
 @Mod(value = PolarisMod.ID, dist = Dist.DEDICATED_SERVER)
 public final class PolarisMod {
@@ -22,6 +23,10 @@ public final class PolarisMod {
 
     public PolarisMod(ModContainer container) {
         PolarisConfig config = PolarisConfig.fromEnvironment(System.getenv());
+        if (AntiXray.wanted(System.getenv())) {
+            AntiXrayLink.start(config);
+            NeoForge.EVENT_BUS.register(new AntiXray());
+        }
         switch (config.state()) {
             case OFF -> {
                 LOG.info("Polaris login is installed but switched off for this server.");
