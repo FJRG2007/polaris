@@ -587,9 +587,12 @@ export function daybreak(
     rules: Readonly<Record<string, string>> = {},
     timeBefore: number | null = null
 ): string[] {
-    const frozen =
-        FROZEN_RULES[0].some((name) => rules[name] === "false") && timeBefore !== null;
-    return [frozen ? `time set ${timeBefore}` : "time set 23500", "weather clear", `kill @e[tag=${MOB_TAG}]`];
+    const frozen = FROZEN_RULES[0].some((name) => rules[name] === "false") && timeBefore !== null;
+    return [
+        frozen ? `time set ${timeBefore}` : "time set 23500",
+        "weather clear",
+        `kill @e[tag=${MOB_TAG}]`
+    ];
 }
 
 /** The world's time of day, to put back: `The time is 6000`. */
@@ -607,7 +610,8 @@ export function isPeaceful(output: string): boolean {
 
 /** Whoever is not playing in survival or adventure: creative mines and kills at
  *  will, and a spectator cannot be hurt. */
-export const NOT_SURVIVAL = "execute as @a[gamemode=!survival,gamemode=!adventure] run data get entity @s Pos";
+export const NOT_SURVIVAL =
+    "execute as @a[gamemode=!survival,gamemode=!adventure] run data get entity @s Pos";
 
 export const WAVE_EVERY_MS = 40_000;
 
@@ -859,7 +863,10 @@ export function cleanup(
 ): string[] {
     const lines = [
         ...Object.entries(rules)
-            .filter(([name, value]) => /^[A-Za-z:_]+$/.test(name) && (value === "true" || value === "false"))
+            .filter(
+                ([name, value]) =>
+                    /^[A-Za-z:_]+$/.test(name) && (value === "true" || value === "false")
+            )
             .map(([name, value]) => setRule(name, value)),
         `bossbar remove ${BAR}`,
         `scoreboard objectives remove ${SCORE}`,

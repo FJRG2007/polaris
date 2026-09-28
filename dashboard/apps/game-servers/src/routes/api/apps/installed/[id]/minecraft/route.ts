@@ -118,7 +118,11 @@ export async function GET(
                 wantsRoster && online.length > 0
                     ? withServerContainer(server.ownerId, id, async (container) =>
                           container.running
-                              ? idleSince(await lookIfDue(id, container), await afkMinutesFor(id), Date.now())
+                              ? idleSince(
+                                    await lookIfDue(id, container),
+                                    await afkMinutesFor(id),
+                                    Date.now()
+                                )
                               : null
                       ).catch(() => null)
                     : null

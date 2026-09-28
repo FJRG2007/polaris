@@ -137,11 +137,16 @@ function EventExplained({
             options.speed && "Speed (moving faster)",
             options.regeneration && "Regeneration (health comes back on its own)"
         ].filter(Boolean);
-        facts.push(`Everybody on gets ${effects.join(", ")} until it ends, including whoever joins meanwhile.`);
+        facts.push(
+            `Everybody on gets ${effects.join(", ")} until it ends, including whoever joins meanwhile.`
+        );
     }
-    if (catalog.needsOverworld(preset)) facts.push("Happens in the Overworld; only players there take part.");
+    if (catalog.needsOverworld(preset))
+        facts.push("Happens in the Overworld; only players there take part.");
     if (catalog.hasMinScore(preset)) {
-        facts.push(`Ranked from ${catalog.minScoreOf(preset)} ${info.unit}; below that, no podium and no prize.`);
+        facts.push(
+            `Ranked from ${catalog.minScoreOf(preset)} ${info.unit}; below that, no podium and no prize.`
+        );
     }
     if (settings) {
         const needed = catalog.activeNeeded(preset, settings);
@@ -234,17 +239,20 @@ export function MinecraftEvents({
     useEffect(() => {
         let alive = true;
         const read = () =>
-            void actions.readEventsAction(installedAppId).then((answer) => {
-                if (!alive) return;
-                if (answer.view) {
-                    setView(answer.view);
-                    writeSnapshot(snapshotKey(installedAppId), answer.view);
-                    setDraft((current) => current ?? answer.view!.config);
-                } else setError(answer.error ?? "The events could not be read");
-            }).catch(() => {
-                // A read that did not come back - a restart, a dropped
-                // connection - is tried again on the next beat.
-            });
+            void actions
+                .readEventsAction(installedAppId)
+                .then((answer) => {
+                    if (!alive) return;
+                    if (answer.view) {
+                        setView(answer.view);
+                        writeSnapshot(snapshotKey(installedAppId), answer.view);
+                        setDraft((current) => current ?? answer.view!.config);
+                    } else setError(answer.error ?? "The events could not be read");
+                })
+                .catch(() => {
+                    // A read that did not come back - a restart, a dropped
+                    // connection - is tried again on the next beat.
+                });
         read();
         const timer = setInterval(read, running ? 5_000 : 30_000);
         return () => {
@@ -495,7 +503,9 @@ export function MinecraftEvents({
                                                 })
                                             }
                                         >
-                                            <span className="text-sm">{catalog.KIND_INFO[kind].label}</span>
+                                            <span className="text-sm">
+                                                {catalog.KIND_INFO[kind].label}
+                                            </span>
                                             <span className="line-clamp-2 text-xs text-muted-foreground">
                                                 {catalog.KIND_INFO[kind].summary}
                                             </span>
@@ -519,110 +529,117 @@ export function MinecraftEvents({
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                             {presets.map((preset) => (
                                 <li key={preset.id} className="flex flex-col px-3 py-2">
-                                <div className="flex flex-wrap items-center gap-3">
-                                    <div className="min-w-0 flex-1">
-                                        <p
-                                            className="truncate text-sm font-medium"
-                                            title={preset.name}
-                                        >
-                                            {preset.name}
-                                        </p>
-                                        <p className="truncate text-xs text-muted-foreground">
-                                            {catalog.KIND_INFO[preset.kind].label}
-                                            {" - "}
-                                            {preset.kind === "trivia"
-                                                ? `${(preset.options as catalog.EventOptions<"trivia">).rounds} rounds`
-                                                : `${preset.minutes} min`}
-                                            {catalog.KIND_INFO[preset.kind].competitive
-                                                ? ` - first place: ${rewardText(preset.rewards.first)}`
-                                                : ""}
-                                        </p>
-                                    </div>
-                                    <ui.Switch
-                                        checked={preset.enabled}
-                                        disabled={locked}
-                                        aria-label={`${preset.name} can come round on its own`}
-                                        onChange={(enabled) =>
-                                            change({
-                                                presets: presets.map((one) =>
-                                                    one.id === preset.id ? { ...one, enabled } : one
-                                                )
-                                            })
-                                        }
-                                    />
-                                    <div className="flex items-center gap-1">
-                                        <ui.Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label={`What ${preset.name} is`}
-                                            title={`What ${preset.name} is`}
-                                            aria-expanded={explained.has(preset.id)}
-                                            onClick={() => explain(preset.id)}
-                                        >
-                                            <Info className="size-4" />
-                                        </ui.Button>
-                                        <ui.Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label={`Run ${preset.name} now`}
-                                            title={dirty ? "Save first" : `Run ${preset.name} now`}
-                                            disabled={
-                                                locked ||
-                                                pending ||
-                                                running ||
-                                                dirty ||
-                                                !view?.config.presets.some(
-                                                    (one) => one.id === preset.id
-                                                )
-                                            }
-                                            onClick={() => run(preset)}
-                                        >
-                                            <Play className="size-4" />
-                                        </ui.Button>
-                                        <ui.Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label={`Edit ${preset.name}`}
-                                            title={`Edit ${preset.name}`}
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <div className="min-w-0 flex-1">
+                                            <p
+                                                className="truncate text-sm font-medium"
+                                                title={preset.name}
+                                            >
+                                                {preset.name}
+                                            </p>
+                                            <p className="truncate text-xs text-muted-foreground">
+                                                {catalog.KIND_INFO[preset.kind].label}
+                                                {" - "}
+                                                {preset.kind === "trivia"
+                                                    ? `${(preset.options as catalog.EventOptions<"trivia">).rounds} rounds`
+                                                    : `${preset.minutes} min`}
+                                                {catalog.KIND_INFO[preset.kind].competitive
+                                                    ? ` - first place: ${rewardText(preset.rewards.first)}`
+                                                    : ""}
+                                            </p>
+                                        </div>
+                                        <ui.Switch
+                                            checked={preset.enabled}
                                             disabled={locked}
-                                            onClick={() => setEditing({ preset, isNew: false })}
-                                        >
-                                            <Pencil className="size-4" />
-                                        </ui.Button>
-                                        <ui.Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label={`Duplicate ${preset.name}`}
-                                            title={`Duplicate ${preset.name}`}
-                                            disabled={locked}
-                                            onClick={() =>
-                                                setEditing({
-                                                    preset: {
-                                                        ...preset,
-                                                        id: newId(),
-                                                        name: `${preset.name} 2`.slice(0, 40)
-                                                    },
-                                                    isNew: true
+                                            aria-label={`${preset.name} can come round on its own`}
+                                            onChange={(enabled) =>
+                                                change({
+                                                    presets: presets.map((one) =>
+                                                        one.id === preset.id
+                                                            ? { ...one, enabled }
+                                                            : one
+                                                    )
                                                 })
                                             }
-                                        >
-                                            <Copy className="size-4" />
-                                        </ui.Button>
-                                        <ui.Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label={`Delete ${preset.name}`}
-                                            title={`Delete ${preset.name}`}
-                                            disabled={locked}
-                                            onClick={() => void remove(preset)}
-                                        >
-                                            <Trash2 className="size-4" />
-                                        </ui.Button>
+                                        />
+                                        <div className="flex items-center gap-1">
+                                            <ui.Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label={`What ${preset.name} is`}
+                                                title={`What ${preset.name} is`}
+                                                aria-expanded={explained.has(preset.id)}
+                                                onClick={() => explain(preset.id)}
+                                            >
+                                                <Info className="size-4" />
+                                            </ui.Button>
+                                            <ui.Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label={`Run ${preset.name} now`}
+                                                title={
+                                                    dirty ? "Save first" : `Run ${preset.name} now`
+                                                }
+                                                disabled={
+                                                    locked ||
+                                                    pending ||
+                                                    running ||
+                                                    dirty ||
+                                                    !view?.config.presets.some(
+                                                        (one) => one.id === preset.id
+                                                    )
+                                                }
+                                                onClick={() => run(preset)}
+                                            >
+                                                <Play className="size-4" />
+                                            </ui.Button>
+                                            <ui.Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label={`Edit ${preset.name}`}
+                                                title={`Edit ${preset.name}`}
+                                                disabled={locked}
+                                                onClick={() => setEditing({ preset, isNew: false })}
+                                            >
+                                                <Pencil className="size-4" />
+                                            </ui.Button>
+                                            <ui.Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label={`Duplicate ${preset.name}`}
+                                                title={`Duplicate ${preset.name}`}
+                                                disabled={locked}
+                                                onClick={() =>
+                                                    setEditing({
+                                                        preset: {
+                                                            ...preset,
+                                                            id: newId(),
+                                                            name: `${preset.name} 2`.slice(0, 40)
+                                                        },
+                                                        isNew: true
+                                                    })
+                                                }
+                                            >
+                                                <Copy className="size-4" />
+                                            </ui.Button>
+                                            <ui.Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label={`Delete ${preset.name}`}
+                                                title={`Delete ${preset.name}`}
+                                                disabled={locked}
+                                                onClick={() => void remove(preset)}
+                                            >
+                                                <Trash2 className="size-4" />
+                                            </ui.Button>
+                                        </div>
                                     </div>
-                                </div>
-                                {explained.has(preset.id) && (
-                                    <EventExplained preset={preset} settings={settings ?? null} />
-                                )}
+                                    {explained.has(preset.id) && (
+                                        <EventExplained
+                                            preset={preset}
+                                            settings={settings ?? null}
+                                        />
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -802,7 +819,9 @@ export function MinecraftEvents({
                                                 />
                                             </label>
                                             <label className="flex flex-col gap-1 text-sm">
-                                                <span className="font-medium">and at most (min)</span>
+                                                <span className="font-medium">
+                                                    and at most (min)
+                                                </span>
                                                 <ui.Input
                                                     type="number"
                                                     min={15}
@@ -1050,7 +1069,10 @@ export function MinecraftEvents({
                             >
                                 Discard
                             </ui.Button>
-                            <ui.Button disabled={pending || problem !== null || locked} onClick={save}>
+                            <ui.Button
+                                disabled={pending || problem !== null || locked}
+                                onClick={save}
+                            >
                                 {pending && <Loader2 className="size-4 animate-spin" />}
                                 Save
                             </ui.Button>

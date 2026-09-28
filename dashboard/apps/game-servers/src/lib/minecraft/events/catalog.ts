@@ -471,7 +471,9 @@ export function readEventsConfig(config: Record<string, unknown>, timezone = "UT
 export function awardsPrizes(preset: EventPreset): boolean {
     if (!KIND_INFO[preset.kind].competitive) return false;
     const { first, second, third, everyone } = preset.rewards;
-    return [first, second, third, everyone].some((reward) => reward.items.length > 0 || reward.levels > 0);
+    return [first, second, third, everyone].some(
+        (reward) => reward.items.length > 0 || reward.levels > 0
+    );
 }
 
 /**
@@ -486,7 +488,9 @@ export function awardsPrizes(preset: EventPreset): boolean {
 export const PRIZE_COMPETITION_FLOOR = 2;
 
 export function activeNeeded(preset: EventPreset, settings: EventSettings): number {
-    return awardsPrizes(preset) ? Math.max(settings.minActive, PRIZE_COMPETITION_FLOOR) : settings.minActive;
+    return awardsPrizes(preset)
+        ? Math.max(settings.minActive, PRIZE_COMPETITION_FLOOR)
+        : settings.minActive;
 }
 
 /**
@@ -511,7 +515,9 @@ export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
  *  supply drop and a race have one winner and nothing to count. */
 export function hasMinScore(preset: EventPreset): boolean {
     if (!KIND_INFO[preset.kind].competitive || preset.kind === "supply-drop") return false;
-    return !(preset.kind === "explorer" && (preset.options as EventOptions<"explorer">).mode === "race");
+    return !(
+        preset.kind === "explorer" && (preset.options as EventOptions<"explorer">).mode === "race"
+    );
 }
 
 export function minScoreOf(preset: EventPreset): number {
@@ -541,7 +547,9 @@ export function needsOverworld(preset: EventPreset): boolean {
 
 /** The events hostile mobs are the whole of, which Peaceful takes away. */
 export function needsHostileMobs(preset: EventPreset): boolean {
-    return preset.kind === "blood-moon" || preset.kind === "world-boss" || preset.kind === "mob-hunt";
+    return (
+        preset.kind === "blood-moon" || preset.kind === "world-boss" || preset.kind === "mob-hunt"
+    );
 }
 
 /**

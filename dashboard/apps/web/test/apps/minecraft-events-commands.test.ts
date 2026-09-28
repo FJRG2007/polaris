@@ -336,6 +336,8 @@ describe("a mining rush cannot be farmed", () => {
             .components(catalog.newPreset("mining-rush", "r"))
             .find((one) => one.criterion === "minecraft.used:minecraft.diamond_ore");
         expect(placed?.weight).toBe(-8);
-        expect(lines).toContain(`execute as @a run scoreboard players operation @s pe_tmp *= #w-8 pe_const`);
+        expect(lines).toContain(
+            `execute as @a run scoreboard players operation @s pe_tmp *= #w-8 pe_const`
+        );
     });
 });

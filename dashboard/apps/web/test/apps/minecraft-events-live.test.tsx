@@ -12,8 +12,14 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
         confirmDialog: { useConfirm: () => [async () => true, null] },
-        displayFormat: { useDisplayFormat: () => ({ dateTime: (at: number) => new Date(at).toISOString() }) },
-        snapshotCache: { readSnapshot: () => null, writeSnapshot: () => undefined, dropSnapshots: () => undefined }
+        displayFormat: {
+            useDisplayFormat: () => ({ dateTime: (at: number) => new Date(at).toISOString() })
+        },
+        snapshotCache: {
+            readSnapshot: () => null,
+            writeSnapshot: () => undefined,
+            dropSnapshots: () => undefined
+        }
     }
 }));
 
@@ -78,7 +84,9 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/events-actions", () => 
     forgetPrizeAction: async () => ({ view: base })
 }));
 
-const { MinecraftEvents } = await import("@polaris-app/game-servers/src/screens/installed/minecraft-events");
+const { MinecraftEvents } = await import(
+    "@polaris-app/game-servers/src/screens/installed/minecraft-events"
+);
 
 afterEach(() => {
     cleanup();

@@ -54,15 +54,7 @@ import {
     TeleportDialog,
     type PlayerDialog
 } from "./minecraft-player-dialogs";
-import {
-    Badge,
-    Button,
-    Card,
-    CardBody,
-    Skeleton,
-    Switch,
-    cn
-} from "@polaris/ui";
+import { Badge, Button, Card, CardBody, Skeleton, Switch, cn } from "@polaris/ui";
 import {
     Backpack,
     Ban,
@@ -914,165 +906,186 @@ function PlayerRow({
     // Everything this row can do, in one list: the icons at its end, and the
     // longer set behind the `...`. The right button gets both, which is what
     // anybody who has used a file manager tries first on a table of names.
-    const quick = quickEntries({ player, bedrock, live, pending, onModerate, onModerateWithConfirm, onRevoke });
-    const more = moreEntries({ player, bedrock, live, onOpen, onModerateWithConfirm, onGamemode, onResetPassword });
+    const quick = quickEntries({
+        player,
+        bedrock,
+        live,
+        pending,
+        onModerate,
+        onModerateWithConfirm,
+        onRevoke
+    });
+    const more = moreEntries({
+        player,
+        bedrock,
+        live,
+        onOpen,
+        onModerateWithConfirm,
+        onGamemode,
+        onResetPassword
+    });
 
     return (
         <RowContextMenu entries={[...quick, { kind: "separator" } as const, ...more]}>
-        <tr
-            className={cn(
-                "border-t border-border hover:bg-card-hover",
-                player.banned && "opacity-60"
-            )}
-        >
-            <td className="px-3 py-2">
-                <p className="flex items-center gap-1.5 truncate font-medium" title={name}>
-                    {player.operator && <Crown className="size-3.5 shrink-0 text-warning" />}
-                    {name}
-                </p>
-                {(player.note ?? player.banReason) && (
-                    <p
-                        className="truncate text-xs text-muted-foreground"
-                        title={player.banReason ?? player.note ?? undefined}
-                    >
-                        {player.banReason ?? player.note}
-                    </p>
+            <tr
+                className={cn(
+                    "border-t border-border hover:bg-card-hover",
+                    player.banned && "opacity-60"
                 )}
-            </td>
-            {/* Only the players who are standing on the server have a level to
+            >
+                <td className="px-3 py-2">
+                    <p className="flex items-center gap-1.5 truncate font-medium" title={name}>
+                        {player.operator && <Crown className="size-3.5 shrink-0 text-warning" />}
+                        {name}
+                    </p>
+                    {(player.note ?? player.banReason) && (
+                        <p
+                            className="truncate text-xs text-muted-foreground"
+                            title={player.banReason ?? player.note ?? undefined}
+                        >
+                            {player.banReason ?? player.note}
+                        </p>
+                    )}
+                </td>
+                {/* Only the players who are standing on the server have a level to
                 report: it is read out of the running world, not out of a file. For
                 somebody who is away it is the one they were last seen on, muted and
                 dated, and a dash only when Polaris has never seen one. */}
-            {!bedrock && (
-                <td className="px-3 py-2 tabular-nums">
-                    {level === null && lastLevel !== null ? (
-                        <span
-                            className="text-muted-foreground"
-                            title={`Level ${lastLevel.level} when last seen, ${format.dateTime(lastLevel.at)}`}
-                        >
-                            {lastLevel.level}
-                        </span>
-                    ) : level === null ? (
-                        <span
-                            className="text-muted-foreground"
-                            title={
-                                player.online
-                                    ? "The server has not answered for this player yet."
-                                    : "Only players who are on the server report a level."
-                            }
-                        >
-                            -
-                        </span>
-                    ) : (
-                        level
-                    )}
-                </td>
-            )}
-            <td className="px-3 py-2">
-                {read ? (
-                    <StatusCell player={player} idleSince={idleSince} now={now} onOpen={onOpen} />
-                ) : (
-                    <Skeleton className="h-5 w-16" />
-                )}
-            </td>
-            <td className="px-3 py-2">
-                <div className="flex flex-wrap items-center gap-1">
-                    {player.linkedTo && (
-                        <Badge
-                            title={`Joins from wherever ${player.linkedTo.name} is signed in to Polaris`}
-                        >
-                            linked
-                        </Badge>
-                    )}
-                    {player.addresses.length > 0 && (
-                        <Badge variant="primary">{playerStanding.allowed}</Badge>
-                    )}
-                    {player.operator && <Badge>{playerStanding.operator}</Badge>}
-                    {player.whitelisted && <Badge>whitelisted</Badge>}
-                    {/* Whether they can get past Polaris login, on the servers that
-                        ask for it. Somebody without one sets it on their next join. */}
-                    {passwords &&
-                        (player.password ? (
-                            <Badge
-                                variant="success"
+                {!bedrock && (
+                    <td className="px-3 py-2 tabular-nums">
+                        {level === null && lastLevel !== null ? (
+                            <span
+                                className="text-muted-foreground"
+                                title={`Level ${lastLevel.level} when last seen, ${format.dateTime(lastLevel.at)}`}
+                            >
+                                {lastLevel.level}
+                            </span>
+                        ) : level === null ? (
+                            <span
+                                className="text-muted-foreground"
                                 title={
-                                    player.password.lastLoginAt
-                                        ? `Last logged in ${new Date(player.password.lastLoginAt).toLocaleString()}`
-                                        : "Has not logged in since registering"
+                                    player.online
+                                        ? "The server has not answered for this player yet."
+                                        : "Only players who are on the server report a level."
                                 }
                             >
-                                <KeyRound className="size-3" />
-                                password set
-                            </Badge>
+                                -
+                            </span>
                         ) : (
-                            <Badge title="Sets one on their next join">no password yet</Badge>
-                        ))}
-                    {player.banned &&
-                        (timeout ? (
-                            <Badge
-                                variant="danger"
-                                title={`Lifts ${new Date(timeout.until).toLocaleString()}`}
-                            >
-                                <Timer className="size-3" />
-                                timed out, {timeoutRemaining(timeout.until)}
-                            </Badge>
-                        ) : (
-                            <Badge variant="danger">
-                                <Ban className="size-3" />
-                                {playerStanding.banned}
-                            </Badge>
-                        ))}
-                    {/* A name the game knows and Polaris does not is the gap that
-                        lets somebody in on the username alone. */}
-                    {player.addresses.length === 0 && !player.banned && (
-                        <Badge variant="warning">{playerStanding.notAllowed}</Badge>
+                            level
+                        )}
+                    </td>
+                )}
+                <td className="px-3 py-2">
+                    {read ? (
+                        <StatusCell
+                            player={player}
+                            idleSince={idleSince}
+                            now={now}
+                            onOpen={onOpen}
+                        />
+                    ) : (
+                        <Skeleton className="h-5 w-16" />
                     )}
-                    {/* Something was decided about them that the server has not
+                </td>
+                <td className="px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-1">
+                        {player.linkedTo && (
+                            <Badge
+                                title={`Joins from wherever ${player.linkedTo.name} is signed in to Polaris`}
+                            >
+                                linked
+                            </Badge>
+                        )}
+                        {player.addresses.length > 0 && (
+                            <Badge variant="primary">{playerStanding.allowed}</Badge>
+                        )}
+                        {player.operator && <Badge>{playerStanding.operator}</Badge>}
+                        {player.whitelisted && <Badge>whitelisted</Badge>}
+                        {/* Whether they can get past Polaris login, on the servers that
+                        ask for it. Somebody without one sets it on their next join. */}
+                        {passwords &&
+                            (player.password ? (
+                                <Badge
+                                    variant="success"
+                                    title={
+                                        player.password.lastLoginAt
+                                            ? `Last logged in ${new Date(player.password.lastLoginAt).toLocaleString()}`
+                                            : "Has not logged in since registering"
+                                    }
+                                >
+                                    <KeyRound className="size-3" />
+                                    password set
+                                </Badge>
+                            ) : (
+                                <Badge title="Sets one on their next join">no password yet</Badge>
+                            ))}
+                        {player.banned &&
+                            (timeout ? (
+                                <Badge
+                                    variant="danger"
+                                    title={`Lifts ${new Date(timeout.until).toLocaleString()}`}
+                                >
+                                    <Timer className="size-3" />
+                                    timed out, {timeoutRemaining(timeout.until)}
+                                </Badge>
+                            ) : (
+                                <Badge variant="danger">
+                                    <Ban className="size-3" />
+                                    {playerStanding.banned}
+                                </Badge>
+                            ))}
+                        {/* A name the game knows and Polaris does not is the gap that
+                        lets somebody in on the username alone. */}
+                        {player.addresses.length === 0 && !player.banned && (
+                            <Badge variant="warning">{playerStanding.notAllowed}</Badge>
+                        )}
+                        {/* Something was decided about them that the server has not
                         been told yet. Said on the row rather than only in the list
                         below, because the row is where somebody wonders why their
                         last action appears to have done nothing. */}
-                    {waiting > 0 && (
-                        <Badge title="Waiting to reach them">
-                            <Clock className="size-3" />
-                            {waiting} waiting
-                        </Badge>
-                    )}
-                </div>
-            </td>
-            <td className="hidden px-3 py-2 text-xs text-muted-foreground md:table-cell">
-                {/* Every place they play from, not the first one written down.
+                        {waiting > 0 && (
+                            <Badge title="Waiting to reach them">
+                                <Clock className="size-3" />
+                                {waiting} waiting
+                            </Badge>
+                        )}
+                    </div>
+                </td>
+                <td className="hidden px-3 py-2 text-xs text-muted-foreground md:table-cell">
+                    {/* Every place they play from, not the first one written down.
                     Wrapped rather than truncated: which address is missing is the
                     whole question when somebody cannot get in. */}
-                {player.addresses.length === 0 ? (
-                    "-"
-                ) : (
-                    <span className="flex flex-wrap gap-1">
-                        {player.addresses.map((address) => (
-                            <Badge key={address}>{address}</Badge>
-                        ))}
-                    </span>
-                )}
-            </td>
-            <td className="px-3 py-2">
-                <div className="flex justify-end gap-1">
-                    {/* The same verbs the right button offers, as icons. Both are
-                        drawn from `quick` so a verb added to one is in the other. */}
-                    {quick.map((entry, index) =>
-                        entry.kind === "item" ? (
-                            <PlayerIconAction
-                                key={index}
-                                label={entry.text}
-                                icon={entry.icon}
-                                danger={entry.danger}
-                                disabled={entry.disabled}
-                                onClick={entry.onSelect}
-                            />
-                        ) : null
+                    {player.addresses.length === 0 ? (
+                        "-"
+                    ) : (
+                        <span className="flex flex-wrap gap-1">
+                            {player.addresses.map((address) => (
+                                <Badge key={address}>{address}</Badge>
+                            ))}
+                        </span>
                     )}
-                    <RowMenuButton entries={more} label={playerAction.more(name)} />
-                </div>
-            </td>
-        </tr>
+                </td>
+                <td className="px-3 py-2">
+                    <div className="flex justify-end gap-1">
+                        {/* The same verbs the right button offers, as icons. Both are
+                        drawn from `quick` so a verb added to one is in the other. */}
+                        {quick.map((entry, index) =>
+                            entry.kind === "item" ? (
+                                <PlayerIconAction
+                                    key={index}
+                                    label={entry.text}
+                                    icon={entry.icon}
+                                    danger={entry.danger}
+                                    disabled={entry.disabled}
+                                    onClick={entry.onSelect}
+                                />
+                            ) : null
+                        )}
+                        <RowMenuButton entries={more} label={playerAction.more(name)} />
+                    </div>
+                </td>
+            </tr>
         </RowContextMenu>
     );
 }
@@ -1108,14 +1121,14 @@ function StatusCell({
             {playerPresence.afk}
         </Badge>
     ) : player.presence === "playing" ? (
-            <Badge variant="success">{playerPresence.playing}</Badge>
-        ) : player.presence === "connecting" ? (
-            <Badge variant="warning">{playerPresence.connecting}</Badge>
-        ) : player.presence === "never" ? (
-            <Badge>{playerPresence.never}</Badge>
-        ) : (
-            <Badge>{playerPresence.offline}</Badge>
-        );
+        <Badge variant="success">{playerPresence.playing}</Badge>
+    ) : player.presence === "connecting" ? (
+        <Badge variant="warning">{playerPresence.connecting}</Badge>
+    ) : player.presence === "never" ? (
+        <Badge>{playerPresence.never}</Badge>
+    ) : (
+        <Badge>{playerPresence.offline}</Badge>
+    );
 
     return (
         <div className="flex flex-col items-start gap-0.5">

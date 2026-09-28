@@ -206,9 +206,11 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
     if (run && run.phase === "running" && catalog.KIND_INFO[run.preset.kind].competitive) {
         // Bounded: the screen asks every few seconds, and a server slow to answer
         // must not hold the rest of what it shows.
-        standings = await withTimeout(sharedStandings(row.ownerId, installedAppId, run), 3_000, "slow").catch(
-            () => []
-        );
+        standings = await withTimeout(
+            sharedStandings(row.ownerId, installedAppId, run),
+            3_000,
+            "slow"
+        ).catch(() => []);
     }
     const seen = playing.seenOn(installedAppId);
     return {
@@ -254,7 +256,9 @@ function sharedStandings(
 ): Promise<{ name: string; score: number }[]> {
     const pending = standingsReads.get(installedAppId);
     if (pending) return pending;
-    const read = currentStandings(ownerId, installedAppId, run).finally(() => standingsReads.delete(installedAppId));
+    const read = currentStandings(ownerId, installedAppId, run).finally(() =>
+        standingsReads.delete(installedAppId)
+    );
     standingsReads.set(installedAppId, read);
     return read;
 }
@@ -329,8 +333,10 @@ export async function startEvent(input: {
     // Peaceful takes every hostile mob away the moment it appears: a blood moon
     // with no mobs, a boss that is gone before anybody sees it.
     if (catalog.needsHostileMobs(preset)) {
-        const peaceful = await withServerContainer(row.ownerId, input.installedAppId, async (server) =>
-            commands.isPeaceful(await server.say([commands.READ_DIFFICULTY]))
+        const peaceful = await withServerContainer(
+            row.ownerId,
+            input.installedAppId,
+            async (server) => commands.isPeaceful(await server.say([commands.READ_DIFFICULTY]))
         ).catch(() => false);
         if (peaceful) {
             throw new Error(
@@ -509,7 +515,9 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
         // Creative and spectator are noted as they are seen, not only at the
         // end: switching back for the last minute does not undo a rush mined
         // in creative.
-        const offMode = commands.readWhere(await server.say([commands.NOT_SURVIVAL])).map((one) => one.name);
+        const offMode = commands
+            .readWhere(await server.say([commands.NOT_SURVIVAL]))
+            .map((one) => one.name);
         const noted = new Set(loop.run.offMode.map((name) => name.toLowerCase()));
         const fresh = offMode.filter((name) => !noted.has(name.toLowerCase()));
         if (fresh.length > 0) loop.run = { ...loop.run, offMode: [...loop.run.offMode, ...fresh] };
@@ -1141,7 +1149,10 @@ async function finish(
             // whoever was AFK from start to finish.
             for (const name of run.offMode) disqualified.add(name.toLowerCase());
             if (catalog.afkCounts(preset)) {
-                for (const name of plan.idleThroughout(playing.seenOn(installedAppId), run.startsAt)) {
+                for (const name of plan.idleThroughout(
+                    playing.seenOn(installedAppId),
+                    run.startsAt
+                )) {
                     disqualified.add(name.toLowerCase());
                 }
             }
@@ -1151,7 +1162,9 @@ async function finish(
             // Taking part is reaching the minimum too - one zombie is not taking part
             // in a hunt. A blood moon's is surviving it, which is its own bar.
             const counted =
-                preset.kind === "blood-moon" ? took : took.filter((name) => (scores.get(name) ?? 0) >= minimum);
+                preset.kind === "blood-moon"
+                    ? took
+                    : took.filter((name) => (scores.get(name) ?? 0) >= minimum);
             const owed = plan.prizes(placed, counted, preset.rewards, disqualified);
             const online = new Set(
                 commands
@@ -1237,7 +1250,10 @@ async function finish(
                     commands.say(messages.tag(language) + messages.dawn(survivors.length, language))
                 );
             }
-            await server.sayAll([...lines, ...commands.cleanup(preset, run.place, run.target, run.gamerules, run.timeBefore)]);
+            await server.sayAll([
+                ...lines,
+                ...commands.cleanup(preset, run.place, run.target, run.gamerules, run.timeBefore)
+            ]);
         } else {
             // The server was not answering: clean up when it is back, so a
             // chest, a boss or a loaded chunk is not left in the world for good.
@@ -1247,7 +1263,9 @@ async function finish(
         console.warn("polaris: finishing an event failed", installedAppId, String(error));
         if (server)
             await server
-                .sayAll(commands.cleanup(preset, run.place, run.target, run.gamerules, run.timeBefore))
+                .sayAll(
+                    commands.cleanup(preset, run.place, run.target, run.gamerules, run.timeBefore)
+                )
                 .catch(() => undefined);
     } finally {
         releaseSidebar(loop.ownerId, installedAppId);
@@ -1287,7 +1305,10 @@ async function cleanUpLater(
     run: stored.EventRun
 ): Promise<void> {
     await withServerContainer(ownerId, installedAppId, async (later) => {
-        if (later.running) await later.sayAll(commands.cleanup(run.preset, run.place, run.target, run.gamerules, run.timeBefore));
+        if (later.running)
+            await later.sayAll(
+                commands.cleanup(run.preset, run.place, run.target, run.gamerules, run.timeBefore)
+            );
     }).catch(() => undefined);
 }
 
@@ -1472,7 +1493,6 @@ async function sample(
     );
 }
 
-
 // ------------------------------------------------------------------ the sweep
 
 /**
@@ -1542,7 +1562,10 @@ async function sweepOne(
         // Somebody fighting: the event waits a minute at a time within its
         // few minutes' grace, and is skipped only if the fight outlasts them.
         if (busy && stillDue.has(entry.id)) {
-            await updateEventState(installedAppId, (current) => ({ ...current, waiting: `Waiting: ${busy}` }));
+            await updateEventState(installedAppId, (current) => ({
+                ...current,
+                waiting: `Waiting: ${busy}`
+            }));
             continue;
         }
         await updateEventState(installedAppId, (current) => ({

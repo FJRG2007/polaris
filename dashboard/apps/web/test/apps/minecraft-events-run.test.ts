@@ -79,29 +79,44 @@ function answer(line: string): string {
     world.sent.push(line);
     if (line === "difficulty") return `The difficulty is ${world.difficulty}`;
     if (line === "time query daytime") return "The time is 6000";
-    if (world.renamedRules && /^gamerule do\w+$/.test(line)) return "Unknown or incomplete command, see below for error";
+    if (world.renamedRules && /^gamerule do\w+$/.test(line))
+        return "Unknown or incomplete command, see below for error";
     if (line === "gamerule advance_time" || line === "gamerule advance_weather") {
-        return world.renamedRules ? `Gamerule ${line.slice(9)} is currently set to: ${world.daylightCycle}` : "Unknown or incomplete command, see below for error";
+        return world.renamedRules
+            ? `Gamerule ${line.slice(9)} is currently set to: ${world.daylightCycle}`
+            : "Unknown or incomplete command, see below for error";
     }
-    if (line === "gamerule doDaylightCycle") return `Gamerule doDaylightCycle is currently set to: ${world.daylightCycle}`;
+    if (line === "gamerule doDaylightCycle")
+        return `Gamerule doDaylightCycle is currently set to: ${world.daylightCycle}`;
     if (line.startsWith("execute as @a[gamemode=!survival,gamemode=!adventure]")) {
-        return world.creative.map((name) => `${name} has the following entity data: [0.0d, 64.0d, 0.0d]`).join("\n");
+        return world.creative
+            .map((name) => `${name} has the following entity data: [0.0d, 64.0d, 0.0d]`)
+            .join("\n");
     }
     if (line === "execute as @a run data get entity @s Dimension") {
         return world.online
-            .map((name) => `${name} has the following entity data: "${world.dims[name] ?? "minecraft:overworld"}"`)
+            .map(
+                (name) =>
+                    `${name} has the following entity data: "${world.dims[name] ?? "minecraft:overworld"}"`
+            )
             .join("\n");
     }
     const counted = /^execute as @a run scoreboard players get @s (pe_hurt|pe_hit)$/.exec(line);
     if (counted) {
         return world.online
-            .map((name) => `${name} has ${counted[1] === "pe_hurt" ? (world.hurt[name] ?? 0) : 0} [${counted[1]}]`)
+            .map(
+                (name) =>
+                    `${name} has ${counted[1] === "pe_hurt" ? (world.hurt[name] ?? 0) : 0} [${counted[1]}]`
+            )
             .join("\n");
     }
     if (line.includes("as @a[distance=0..] run data get entity @s Pos")) {
         return world.online
             .filter((name) => (world.dims[name] ?? "minecraft:overworld") === "minecraft:overworld")
-            .map((name, index) => `${name} has the following entity data: [${index * 10 + step}d, 64.0d, 0.0d]`)
+            .map(
+                (name, index) =>
+                    `${name} has the following entity data: [${index * 10 + step}d, 64.0d, 0.0d]`
+            )
             .join("\n");
     }
     if (line === "execute as @a run data get entity @s Pos") {
@@ -980,7 +995,13 @@ describe("the least to be ranked", () => {
         const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 3 };
         expect(catalog.minScoreOf(hunt)).toBe(5);
         setUp([hunt]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hunt", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hunt",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(2_100);
         world.scores = { Ana: 7, Ben: 1 };
         await play(3 * 60_000);
@@ -991,7 +1012,13 @@ describe("the least to be ranked", () => {
     it("means nobody wins when nobody reaches it", async () => {
         const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 3 };
         setUp([hunt]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "hunt", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hunt",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(2_100);
         world.scores = { Ana: 2, Ben: 1 };
         await play(3 * 60_000);
@@ -1052,7 +1079,13 @@ describe("where the players are, and what they are doing", () => {
     it("does not count a night sat out in the Nether as surviving it", async () => {
         const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3, minScore: 1 };
         setUp([moon]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "moon", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "moon",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(4_100);
         world.scores = { Ana: 4, Ben: 9 };
         world.dims = { Ben: "minecraft:the_nether" };
@@ -1066,7 +1099,13 @@ describe("what the audit found", () => {
         world.difficulty = "Peaceful";
         setUp([{ ...catalog.newPreset("blood-moon", "moon"), minutes: 5 }]);
         await expect(
-            events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "moon", trigger: "manual", startedBy: null })
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "moon",
+                trigger: "manual",
+                startedBy: null
+            })
         ).rejects.toThrow(/Peaceful.*Easy or harder under Rules/);
     });
 
@@ -1074,14 +1113,26 @@ describe("what the audit found", () => {
         world.difficulty = "Peaceful";
         setUp([{ ...catalog.newPreset("fishing", "fish"), minutes: 5 }]);
         await expect(
-            events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "fish", trigger: "manual", startedBy: null })
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "fish",
+                trigger: "manual",
+                startedBy: null
+            })
         ).resolves.toBeDefined();
     });
 
     it("leaves somebody who played it in creative off the podium", async () => {
         const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
         setUp([rush]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "rush", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "rush",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(2_100);
         world.creative = ["Ana"];
         await play(20_000);
@@ -1097,7 +1148,13 @@ describe("what the audit found", () => {
         world.still = ["Ana"];
         const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 3 };
         setUp([fish]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "fish", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "fish",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(2_100);
         world.scores = { Ana: 40, Ben: 6 };
         await play(3 * 60_000);
@@ -1110,7 +1167,13 @@ describe("what the audit found", () => {
         world.still = ["Ana"];
         const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
         setUp([moon]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "moon", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "moon",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(2_100);
         for (let tick = 1; tick <= 8; tick += 1) {
             world.hurt = { Ana: tick * 4 };
@@ -1128,21 +1191,35 @@ describe("what the audit found", () => {
         world.daylightCycle = "false";
         const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
         setUp([moon]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "moon", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "moon",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(4_100);
         expect(world.sent).toContain("gamerule advance_time false");
         expect(world.sent).toContain("gamerule advance_weather false");
         expect(world.sent).not.toContain("gamerule doDaylightCycle false");
         await play(3 * 60_000);
         expect(world.sent).toContain("time set 6000");
-        expect(world.sent.filter((line) => line.startsWith("gamerule advance_time")).at(-1)).toBe("gamerule advance_time false");
+        expect(world.sent.filter((line) => line.startsWith("gamerule advance_time")).at(-1)).toBe(
+            "gamerule advance_time false"
+        );
     });
 
     it("gives a server whose clock stands still its own time back after a blood moon", async () => {
         world.daylightCycle = "false";
         const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
         setUp([moon]);
-        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "moon", trigger: "manual", startedBy: null });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "moon",
+            trigger: "manual",
+            startedBy: null
+        });
         await play(3 * 60_000 + 4_000);
         expect(world.sent).toContain("time set 6000");
         expect(world.sent).not.toContain("time set 23500");

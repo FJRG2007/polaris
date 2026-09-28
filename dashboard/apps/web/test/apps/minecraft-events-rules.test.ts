@@ -368,7 +368,12 @@ describe("a competition with prizes, on its own", () => {
     const happy = { ...catalog.newPreset("happy-hour", "happy"), minutes: 10 };
     const unrewarded = {
         ...catalog.newPreset("mining-rush", "free"),
-        rewards: { first: catalog.NO_REWARD, second: catalog.NO_REWARD, third: catalog.NO_REWARD, everyone: catalog.NO_REWARD }
+        rewards: {
+            first: catalog.NO_REWARD,
+            second: catalog.NO_REWARD,
+            third: catalog.NO_REWARD,
+            everyone: catalog.NO_REWARD
+        }
     };
     const loose = settings({ minActive: 1 });
 
@@ -388,7 +393,16 @@ describe("a competition with prizes, on its own", () => {
     it("is left out of the draw for one player alone, who still gets the rest", () => {
         const draw = {
             ...loose,
-            random: { ...loose.random, enabled: true, from: "00:00", to: "00:00", pool: [{ presetId: "fish", weight: 9 }, { presetId: "happy", weight: 1 }] }
+            random: {
+                ...loose.random,
+                enabled: true,
+                from: "00:00",
+                to: "00:00",
+                pool: [
+                    { presetId: "fish", weight: 9 },
+                    { presetId: "happy", weight: 1 }
+                ]
+            }
         };
         const decided = plan.decideRandom({
             settings: draw,
@@ -404,7 +418,16 @@ describe("a competition with prizes, on its own", () => {
     });
 
     it("waits, and says for how many, when it is all the draw has", () => {
-        const draw = { ...loose, random: { ...loose.random, enabled: true, from: "00:00", to: "00:00", pool: [{ presetId: "fish", weight: 1 }] } };
+        const draw = {
+            ...loose,
+            random: {
+                ...loose.random,
+                enabled: true,
+                from: "00:00",
+                to: "00:00",
+                pool: [{ presetId: "fish", weight: 1 }]
+            }
+        };
         const decided = plan.decideRandom({
             settings: draw,
             presets: [fishing],
@@ -432,13 +455,25 @@ describe("the least to be ranked", () => {
 
     it("is not asked of a supply drop or a race, which have one winner", () => {
         expect(catalog.hasMinScore(catalog.newPreset("supply-drop", "e"))).toBe(false);
-        const race = { ...catalog.newPreset("explorer", "f"), options: { mode: "race" as const, distance: 500, place: { mode: "players" as const } } };
+        const race = {
+            ...catalog.newPreset("explorer", "f"),
+            options: { mode: "race" as const, distance: 500, place: { mode: "players" as const } }
+        };
         expect(catalog.hasMinScore(race)).toBe(false);
         expect(catalog.minScoreOf(race)).toBe(1);
     });
 
     it("keeps anybody under it off the podium", () => {
-        expect(plan.podium(new Map([["Ana", 6], ["Ben", 4]]), new Set(), 5)).toEqual([{ place: 1, name: "Ana", score: 6 }]);
+        expect(
+            plan.podium(
+                new Map([
+                    ["Ana", 6],
+                    ["Ben", 4]
+                ]),
+                new Set(),
+                5
+            )
+        ).toEqual([{ place: 1, name: "Ana", score: 6 }]);
     });
 });
 
@@ -448,7 +483,9 @@ describe("fights and worlds", () => {
 
     it("sees a fight in the damage counts going up, and lets it go after a while", () => {
         const first = plan.observe(new Map(), here, facing, 0, { hurt: new Map([["Ana", 10]]) });
-        const second = plan.observe(first, [{ name: "Ana", x: 5, y: 64, z: 0 }], facing, 60_000, { hurt: new Map([["Ana", 30]]) });
+        const second = plan.observe(first, [{ name: "Ana", x: 5, y: 64, z: 0 }], facing, 60_000, {
+            hurt: new Map([["Ana", 30]])
+        });
         const ana = second.get("ana")!;
         expect(plan.busy(ana, 60_000)).toBe(true);
         expect(plan.busy(ana, 60_000 + plan.FIGHT_COOLDOWN_MS + 1)).toBe(false);
@@ -456,14 +493,22 @@ describe("fights and worlds", () => {
     });
 
     it("takes the End for a fight with the dragon", () => {
-        const seen = plan.observe(new Map(), here, facing, 0, { dimensions: new Map([["Ana", "minecraft:the_end"]]) });
+        const seen = plan.observe(new Map(), here, facing, 0, {
+            dimensions: new Map([["Ana", "minecraft:the_end"]])
+        });
         expect(plan.busy(seen.get("ana")!, 0)).toBe(true);
     });
 
     it("counts only the Overworld for what happens there", () => {
-        const first = plan.observe(new Map(), here, facing, 0, { dimensions: new Map([["Ana", "minecraft:the_nether"]]) });
+        const first = plan.observe(new Map(), here, facing, 0, {
+            dimensions: new Map([["Ana", "minecraft:the_nether"]])
+        });
         const moved = plan.observe(first, [{ name: "Ana", x: 9, y: 64, z: 0 }], facing, 60_000);
-        expect(plan.playersFor(catalog.newPreset("supply-drop", "d"), moved, 5, 60_000)).toHaveLength(0);
-        expect(plan.playersFor(catalog.newPreset("mining-rush", "m"), moved, 5, 60_000)).toHaveLength(1);
+        expect(
+            plan.playersFor(catalog.newPreset("supply-drop", "d"), moved, 5, 60_000)
+        ).toHaveLength(0);
+        expect(
+            plan.playersFor(catalog.newPreset("mining-rush", "m"), moved, 5, 60_000)
+        ).toHaveLength(1);
     });
 });

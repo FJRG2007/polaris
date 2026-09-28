@@ -27,8 +27,12 @@ describe("who is AFK, and since when", () => {
     });
 
     it("does not start again when they fight standing still", () => {
-        const first = plan.observe(new Map(), at("Ana", 0), looking("Ana", 0), 0, { hit: new Map([["Ana", 5]]) });
-        const hitting = plan.observe(first, at("Ana", 0), looking("Ana", 0), 60_000, { hit: new Map([["Ana", 9]]) });
+        const first = plan.observe(new Map(), at("Ana", 0), looking("Ana", 0), 0, {
+            hit: new Map([["Ana", 5]])
+        });
+        const hitting = plan.observe(first, at("Ana", 0), looking("Ana", 0), 60_000, {
+            hit: new Map([["Ana", 9]])
+        });
         expect(idleSince(hitting, 5, 5 * 60_000)).toEqual({ Ana: 0 });
     });
 

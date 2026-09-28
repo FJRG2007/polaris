@@ -159,7 +159,11 @@ export function playersFor(
 }
 
 /** Why an automatic event should wait: the active players who are busy. */
-export function busyReason(seen: ReadonlyMap<string, Seen>, afkMinutes: number, now: number): string | null {
+export function busyReason(
+    seen: ReadonlyMap<string, Seen>,
+    afkMinutes: number,
+    now: number
+): string | null {
     const names = activePlayers(seen, afkMinutes, now)
         .filter((one) => busy(one, now))
         .map((one) => one.name);
@@ -314,7 +318,9 @@ export function decideRandom(input: {
         return { start: null, nextRandomAt: input.nextRandomAt, waiting: `Waiting: ${input.busy}` };
     }
     const count = input.activeFor ?? (() => input.active);
-    const startable = pool.filter((entry) => count(entry.preset) >= activeNeeded(entry.preset, settings));
+    const startable = pool.filter(
+        (entry) => count(entry.preset) >= activeNeeded(entry.preset, settings)
+    );
     if (startable.length === 0) {
         // Said for the event closest to starting: what it needs, where, and
         // how many of those there are.
@@ -369,7 +375,10 @@ export function podium(
     minScore = 1
 ): Placed[] {
     const ranked = [...scores.entries()]
-        .filter(([name, score]) => score >= Math.max(1, minScore) && !disqualified.has(name.toLowerCase()))
+        .filter(
+            ([name, score]) =>
+                score >= Math.max(1, minScore) && !disqualified.has(name.toLowerCase())
+        )
         .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
     const placed: Placed[] = [];
     ranked.forEach(([name, score], index) => {
