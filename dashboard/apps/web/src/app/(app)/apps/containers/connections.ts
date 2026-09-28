@@ -66,8 +66,10 @@ export async function containerHosts(user: SessionUser): Promise<ContainerHosts>
                   hostdVersion: caps.hostd.version,
                   dockerReported: caps.docker,
                   reason: !caps.hostd.present
-                      ? "polaris-hostd (the privileged host daemon) is not answering, so Polaris is in the limited edition. The local Docker host needs the full edition: re-run the installer (full is the default) and check that a `polaris-hostd` service shows in `docker compose ps` - if it is missing, COMPOSE_PROFILES=full is not set in your .env."
-                      : "The host daemon is running but reports no Docker socket. Make sure /var/run/docker.sock is mounted into the polaris-hostd container (it is by default in docker/docker-compose.yml)."
+                      ? // Said in what the reader can see and do from here: no screen
+                        // in Polaris asks for a terminal, a file or a container.
+                        "This Polaris runs without its host daemon, so it cannot manage the containers on the machine it runs on. Connect a server to manage its containers instead."
+                      : "The host daemon is running but cannot reach Docker on this machine, so its containers cannot be listed. Connect a server to manage its containers instead."
               }
             : null;
 
