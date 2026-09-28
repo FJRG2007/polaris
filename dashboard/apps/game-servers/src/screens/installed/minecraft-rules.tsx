@@ -21,7 +21,7 @@
  * switches that would fail and a 1.21 one is not short of them.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorldRules } from "../../lib/minecraft/rules-service";
 import { AlertTriangle, Info, Loader2, RefreshCw } from "lucide-react";
 import { Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
@@ -40,6 +40,12 @@ import {
 import { hostUi } from "@polaris/app-host/client";
 
 const { RelativeTime } = hostUi.relativeTime;
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old the kept rules may be and still paint first on a revisit. */
+const KEPT_RULES_MS = 24 * 3_600_000;
 
 /** What a control says when its position is Polaris's note of an earlier reading
  *  and the control still works, which is the one case where it would otherwise
@@ -66,13 +72,36 @@ export function MinecraftRules({
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
+    // What this tab last showed paints first of all, dated as the remembered
+    // reading it is - never passed off as the server answering just now.
+    const rulesKey = `world-rules:${installedAppId}`;
+    useKeptSnapshot<WorldRules>(rulesKey, KEPT_RULES_MS, (kept) => {
+        setRules(
+            (current) =>
+                current ?? { ...kept.value, asOf: kept.value.asOf ?? new Date(kept.at).toISOString() }
+        );
+        setLoading(false);
+    });
+    useEffect(() => {
+        if (rules) writeSnapshot(rulesKey, rules);
+    }, [rulesKey, rules]);
+    // Whether this visit has heard from Polaris's note or the server itself. The
+    // kept copy only paints: nothing is set on its strength, and the note - which
+    // any viewer's last reading updated - replaces it when it lands.
+    const [heard, setHeard] = useState(false);
+    /** Whether the server's own answer is in, after which the note has no say. */
+    const serverRead = useRef(false);
+
     const load = useCallback(async () => {
         setChecking(true);
         const result = await readWorldRulesAction(installedAppId);
         setLoading(false);
         setChecking(false);
-        if (result.rules) {
-            setRules(result.rules);
+        const found = result.rules;
+        if (found) {
+            serverRead.current = true;
+            setRules((current) => mergeUnchanged(current, found));
+            setHeard(true);
             setError(null);
         } else {
             setError(result.error ?? "The rules could not be read");
@@ -86,7 +115,8 @@ export function MinecraftRules({
         void storedWorldRulesAction(installedAppId).then((result) => {
             if (!live || !result.rules) return;
             const stored = result.rules;
-            setRules((current) => current ?? stored);
+            setRules((current) => (serverRead.current ? current : stored));
+            setHeard(true);
             setLoading(false);
         });
         void load();
@@ -243,7 +273,9 @@ export function MinecraftRules({
                         <Select
                             className="w-40"
                             aria-label="Difficulty"
-                            disabled={!canManage || busy === "difficulty" || !rules.changeable}
+                            disabled={
+                                !canManage || !heard || busy === "difficulty" || !rules.changeable
+                            }
                             value={rules.difficulty ?? ""}
                             onValueChange={(value) => void applyDifficulty(value)}
                             options={[
@@ -304,7 +336,7 @@ export function MinecraftRules({
                                         failure={rules?.failures[rule.id] ?? null}
                                         first={index === 0}
                                         busy={busy === rule.id}
-                                        disabled={!canManage || !rules?.changeable}
+                                        disabled={!canManage || !heard || !rules?.changeable}
                                         onChange={(value) => void apply(rule, value)}
                                     />
                                 ))}

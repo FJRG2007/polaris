@@ -18,6 +18,7 @@
  */
 
 import { CopyButton } from "@polaris/ui";
+import { hostUi } from "@polaris/app-host/client";
 import { ProjectIcon } from "./minecraft-project-icon";
 import * as modrinth from "../../lib/minecraft/modrinth";
 import { updateClientModsAction } from "./minecraft-actions";
@@ -27,6 +28,24 @@ import { Badge, Button, Card, CardBody, Input, Skeleton } from "@polaris/ui";
 import { Download, ExternalLink, Loader2, Plus, Search, Trash2 } from "lucide-react";
 
 const SEARCH_DEBOUNCE_MS = 400;
+
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old a kept answer from Modrinth may be and still paint first on a revisit. */
+const KEPT_CLIENT_MS = 24 * 3_600_000;
+
+/** Where the answer for one list is kept. Keyed by the list itself: an answer for
+ *  another list is not this one. */
+function rowsKey(subject: string, wanted: readonly string[]): string {
+    return `client-mods:${subject}:${wanted.join(",")}`;
+}
+
+/** Where the pack for one pair of lists is kept. */
+function packKey(subject: string, player: readonly string[], server: readonly string[]): string {
+    return `client-pack:${subject}:${player.join(",")}|${server.join(",")}`;
+}
 
 /** What each command is for, in the order somebody scans for their own machine. */
 const SYSTEMS = [
@@ -66,6 +85,23 @@ export function MinecraftClientMods({
     const [saving, setSaving] = useState(0);
     /** What the server holds, so a save that fails puts the list back to it. */
     const saved = useRef<string[]>([...entries]);
+    // What this tab last read for these same lists paints first, so a revisit is
+    // not a skeleton while Modrinth is asked again; the reads replace what moved.
+    const subject = `${installedAppId}:${loader ?? ""}:${version}`;
+    useKeptSnapshot<modrinth.InstalledProject[]>(rowsKey(subject, list), KEPT_CLIENT_MS, (kept) =>
+        setRows((current) => current ?? kept.value)
+    );
+    /** Whether the pack has been answered, after which the kept copy has no say. */
+    const packHeard = useRef(false);
+    useKeptSnapshot<{ pack: PackEntry[]; serverOnly: { key: string; title: string }[] }>(
+        packKey(subject, list, serverEntries),
+        KEPT_CLIENT_MS,
+        (kept) => {
+            if (packHeard.current) return;
+            setPack(kept.value.pack);
+            setServerOnly(kept.value.serverOnly);
+        }
+    );
     /** Saves in the order they were made, so an earlier one cannot land last. */
     const queue = useRef<Promise<void>>(Promise.resolve());
     /** Bumped by a save that fails, so the saves queued on top of it are dropped
@@ -96,7 +132,9 @@ export function MinecraftClientMods({
                 );
                 if (!response.ok) throw new Error("unread");
                 const data = (await response.json()) as { projects?: modrinth.InstalledProject[] };
-                setRows(data.projects ?? []);
+                const projects = data.projects ?? [];
+                setRows((current) => (current === null ? projects : mergeUnchanged(current, projects)));
+                writeSnapshot(rowsKey(subject, wanted), projects);
             } catch {
                 if (signal.aborted) return;
                 // Drawn as themselves rather than left on skeletons: the list is
@@ -121,7 +159,7 @@ export function MinecraftClientMods({
                 );
             }
         },
-        [installedAppId, loader, query_]
+        [installedAppId, loader, subject, query_]
     );
 
     /** Everything the install command hands out for these two lists, read from
@@ -139,13 +177,18 @@ export function MinecraftClientMods({
                     pack?: PackEntry[];
                     serverOnly?: { key: string; title: string }[];
                 };
-                setPack(data.pack ?? []);
-                setServerOnly(data.serverOnly ?? []);
+                const answer = { pack: data.pack ?? [], serverOnly: data.serverOnly ?? [] };
+                packHeard.current = true;
+                setPack(answer.pack);
+                setServerOnly(answer.serverOnly);
+                writeSnapshot(packKey(subject, player, server), answer);
             } catch {
-                if (!signal.aborted) setPack("unread");
+                if (signal.aborted) return;
+                packHeard.current = true;
+                setPack("unread");
             }
         },
-        [installedAppId, loader, query_]
+        [installedAppId, loader, subject, query_]
     );
 
     /**

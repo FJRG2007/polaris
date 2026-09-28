@@ -22,6 +22,7 @@
  */
 
 import { ChevronDown, Search } from "lucide-react";
+import { hostUi } from "@polaris/app-host/client";
 import * as world from "../lib/minecraft/world";
 import { useEffect, useMemo, useState } from "react";
 import { Input, Select, Skeleton, cn } from "@polaris/ui";
@@ -49,6 +50,13 @@ import { blueprintVersionsAction, type BlueprintVersions } from "../screens/acti
  * twice.
  */
 const answered = new Map<string, BlueprintVersions>();
+
+const { readSnapshot, writeSnapshot } = hostUi.snapshotCache;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old an answer kept from an earlier visit may be and still paint first. It
+ *  is asked again either way; this only saves the skeleton while that happens. */
+const KEPT_VERSIONS_MS = 24 * 3_600_000;
 
 /** What the operator picked, which is everything both dialogs need to build a
  *  server: the game it plays and the map it plays it on. */
@@ -130,6 +138,9 @@ export function BlueprintFields({
     /** Null until the releases are known, which is a wait worth showing rather
      *  than a list that silently starts as one entry and grows. */
     const [offered, setOffered] = useState<BlueprintVersions | null>(null);
+    /** Whether `offered` was answered on this page rather than kept from an
+     *  earlier visit. A kept list is only shown: nothing is picked from it. */
+    const [offeredFresh, setOfferedFresh] = useState(false);
 
     const blueprints = useMemo(() => blueprintsFor(edition), [edition]);
     const blueprint = blueprints.find((entry) => entry.id === value.blueprintId);
@@ -167,15 +178,22 @@ export function BlueprintFields({
         let active = true;
         const key = `${value.blueprintId}|${crossplay}|${value.mapId}`;
         const known = answered.get(key);
+        const keptKey = `blueprint-versions:${key}`;
         // Straight to the answer where there is one: a skeleton drawn over a
         // field that is about to show the same list it showed a second ago is a
-        // wait invented rather than reported.
-        setOffered(known ?? null);
+        // wait invented rather than reported. One answered while this page was
+        // open is taken as it is; one kept from an earlier visit is painted and
+        // then asked again, since Modrinth may have moved since.
+        setOffered(known ?? readSnapshot<BlueprintVersions>(keptKey, KEPT_VERSIONS_MS)?.value ?? null);
+        setOfferedFresh(known !== undefined);
         if (known) return;
         void blueprintVersionsAction(value.blueprintId, crossplay, value.mapId || undefined)
             .then((answer) => {
                 answered.set(key, answer);
-                if (active) setOffered(answer);
+                writeSnapshot(keptKey, answer);
+                if (!active) return;
+                setOffered((current) => mergeUnchanged(current, answer));
+                setOfferedFresh(true);
             })
             .catch(() => undefined);
         return () => {
@@ -198,6 +216,7 @@ export function BlueprintFields({
     const unsupported =
         !isLatest &&
         !channel &&
+        offeredFresh &&
         offered !== null &&
         offered.versions.length > 0 &&
         !offered.versions.includes(value.version.trim());
@@ -335,6 +354,7 @@ export function BlueprintFields({
                                     <Select
                                         value={isLatest ? LATEST : (channel?.value ?? value.version.trim())}
                                         onValueChange={(version) => set({ version })}
+                                        disabled={!offeredFresh}
                                         options={[
                                             {
                                                 value: LATEST,

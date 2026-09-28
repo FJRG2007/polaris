@@ -17,6 +17,7 @@
  */
 
 import * as actions from "./fivem-actions";
+import { hostUi } from "@polaris/app-host/client";
 import { RestartPlanner } from "./restart-planner";
 import { useCallback, useEffect, useState } from "react";
 import type { FivemRule } from "../../lib/fivem/service";
@@ -31,6 +32,13 @@ import {
     type FivemSetting
 } from "../../lib/fivem/settings";
 
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old the kept rules may be and still paint first on a revisit. */
+const KEPT_RULES_MS = 24 * 3_600_000;
+
 export function FivemRules({
     installedAppId,
     canManage,
@@ -43,8 +51,21 @@ export function FivemRules({
      *  stopped server can be neither read nor changed. */
     running: boolean;
 }) {
+    // What this tab last read paints first, so a revisit is not a skeleton while
+    // the config is read inside the container again; the read replaces what moved.
+    const rulesKey = `fivem-rules:${installedAppId}`;
     const [rules, setRules] = useState<readonly FivemRule[] | null>(null);
     const [loading, setLoading] = useState(true);
+    useKeptSnapshot<readonly FivemRule[]>(rulesKey, KEPT_RULES_MS, (kept) => {
+        setRules((current) => current ?? kept.value);
+        setLoading(false);
+    });
+    useEffect(() => {
+        if (rules) writeSnapshot(rulesKey, rules);
+    }, [rulesKey, rules]);
+    // Whether this visit's own read has answered. The kept values only paint: no
+    // row can be typed into or switched until the config has been read again.
+    const [fresh, setFresh] = useState(false);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     /** Whether anything has been changed since this screen was opened, which is
@@ -55,8 +76,9 @@ export function FivemRules({
 
     const load = useCallback(async () => {
         const result = await actions.readFivemRulesAction(installedAppId);
-        setRules(result.rules ?? null);
+        setRules((current) => mergeUnchanged(current, result.rules ?? null));
         setError(result.error ?? null);
+        setFresh(true);
         setLoading(false);
     }, [installedAppId]);
 
@@ -185,7 +207,7 @@ export function FivemRules({
                                     first={index === 0}
                                     busy={busy === setting.key}
                                     loading={loading}
-                                    disabled={!canManage || !running || rules === null}
+                                    disabled={!canManage || !running || rules === null || !fresh}
                                     onChange={(value) => void apply(setting, value)}
                                 />
                             ))}

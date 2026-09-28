@@ -19,7 +19,7 @@
 
 import { mergeUnchanged } from "@/lib/structural-merge";
 import { useShelfScope } from "@/components/shelf-scope";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { readSnapshot, writeSnapshot, type Snapshot } from "@/lib/snapshot-cache";
 
 /** How stale a cached snapshot may be and still be worth painting. Past this it
@@ -53,6 +53,19 @@ export interface LiveResource<T> {
      * cache would otherwise introduce.
      */
     updatedAt: number | null;
+    /**
+     * True while `data` is the kept snapshot rather than an answer from this
+     * visit: from the moment the snapshot is painted until this visit's first
+     * read lands or `replace` puts a value on screen. Anything that can act on
+     * the data - a button, a link, a menu - waits for it to turn false, because
+     * the kept copy may describe something that has since changed.
+     *
+     * It stays true when that first read fails, so `kept && stale !== null` is
+     * exactly a failed first read: a screen that had nothing to show in that
+     * case before the snapshot existed treats `data` as null and `stale` as its
+     * error, and renders what it rendered then.
+     */
+    kept: boolean;
     refresh: () => void;
     /**
      * Put a value on screen and in the kept copy without asking anything - an
@@ -103,12 +116,15 @@ export function useLiveRead<T>({
     const shelf = useShelfScope();
     const cacheKey = `${shelf}:${subject}`;
 
-    // One read of the kept snapshot, seeding both the reading and its age.
-    const [seeded] = useState(() => read<T>(cacheKey) ?? initial ?? null);
-    const [data, setData] = useState<T | null>(seeded?.value ?? null);
+    // The first render is the one the server drew too: only what it was handed.
+    // The kept snapshot is folded in straight after, before the browser paints -
+    // read during render it made the hydrated page differ from the server's on
+    // every reload, which React answers by throwing the server's HTML away.
+    const [data, setData] = useState<T | null>(initial?.value ?? null);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
-    const [updatedAt, setUpdatedAt] = useState<number | null>(seeded?.at ?? null);
+    const [updatedAt, setUpdatedAt] = useState<number | null>(initial?.at ?? null);
+    const [kept, setKept] = useState(false);
     // Held in a ref so the fetch callback does not have to change identity every
     // time the data does, which would restart the interval on every tick.
     const latest = useRef<T | null>(data);
@@ -121,6 +137,16 @@ export function useLiveRead<T>({
     const started = useRef(0);
     const shown = useRef(0);
 
+    // The kept snapshot wins over `initial` when there is one, being the newer.
+    useLayoutEffect(() => {
+        const kept = read<T>(seededFor.current);
+        if (!kept || shown.current > 0) return;
+        latest.current = kept.value;
+        setData(kept.value);
+        setUpdatedAt(kept.at);
+        setKept(true);
+    }, []);
+
     useEffect(() => {
         if (seededFor.current === cacheKey) return;
         seededFor.current = cacheKey;
@@ -129,6 +155,7 @@ export function useLiveRead<T>({
         latest.current = kept?.value ?? null;
         setData(kept?.value ?? null);
         setUpdatedAt(kept?.at ?? null);
+        setKept(kept !== null);
         setError(null);
     }, [cacheKey]);
 
@@ -151,6 +178,7 @@ export function useLiveRead<T>({
                 latest.current = merged;
                 setData(merged);
                 setUpdatedAt(Date.now());
+                setKept(false);
                 setError(null);
                 writeSnapshot(cacheKey, merged);
             })
@@ -172,6 +200,7 @@ export function useLiveRead<T>({
             latest.current = value;
             setData(value);
             setUpdatedAt(Date.now());
+            setKept(false);
             setError(null);
             writeSnapshot(cacheKey, value);
         },
@@ -222,6 +251,7 @@ export function useLiveRead<T>({
         stale: data === null ? null : error,
         refreshing,
         updatedAt,
+        kept,
         refresh,
         replace
     };
@@ -276,4 +306,26 @@ export function useLiveResource<T>({
     );
 
     return useLiveRead<T>({ load, cacheKey, intervalMs, enabled, paused });
+}
+
+/**
+ * Hand the kept snapshot for `key` to `apply`, once per key, after hydration and
+ * before the browser paints.
+ *
+ * For a screen whose state is too involved for `useLiveRead`. Reading the
+ * snapshot in a `useState` initializer instead makes the browser's first render
+ * differ from the server's on every reload - the server cannot see this tab's
+ * storage - and React answers that by discarding the server's HTML.
+ */
+export function useKeptSnapshot<T>(
+    key: string,
+    maxAgeMs: number,
+    apply: (kept: Snapshot<T>) => void
+): void {
+    const applyRef = useRef(apply);
+    applyRef.current = apply;
+    useLayoutEffect(() => {
+        const kept = readSnapshot<T>(key, maxAgeMs);
+        if (kept) applyRef.current(kept);
+    }, [key, maxAgeMs]);
 }

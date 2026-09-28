@@ -18,6 +18,7 @@ vi.mock("@polaris/app-host/client", () => ({
         displayFormat: {
             useDisplayFormat: () => ({ dateTime: (at: number) => new Date(at).toISOString() })
         },
+        liveRead: { useKeptSnapshot: () => undefined },
         snapshotCache: {
             readSnapshot: () => null,
             writeSnapshot: () => undefined,

@@ -72,6 +72,8 @@ beforeEach(() => {
 afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    // The store keeps its answers for the tab; each test starts from none.
+    sessionStorage.clear();
 });
 
 function faces(...ids: string[]): ReactNode {

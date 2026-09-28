@@ -21,6 +21,7 @@
 
 import Link from "next/link";
 import * as actions from "./fivem-actions";
+import { hostUi } from "@polaris/app-host/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PlayersTable, PlayerIconAction } from "../../components/game-players-table";
 import {
@@ -44,6 +45,13 @@ import {
     Skeleton,
     cn
 } from "@polaris/ui";
+
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old a kept list may be and still paint first on a revisit. */
+const KEPT_RESOURCES_MS = 24 * 3_600_000;
 
 const COLUMNS = [
     { label: "Resource" },
@@ -76,7 +84,19 @@ export function FivemResources({
 }) {
     const [resources, setResources] = useState<readonly FivemResource[] | null>(null);
     const [loading, setLoading] = useState(true);
+    // What this tab last read paints first, so a revisit is not a skeleton while
+    // the running server is asked again; the read replaces what moved.
+    const resourcesKey = `fivem-resources:${installedAppId}`;
+    useKeptSnapshot<readonly FivemResource[]>(resourcesKey, KEPT_RESOURCES_MS, (kept) => {
+        setResources((current) => current ?? kept.value);
+        setLoading(false);
+    });
+    // Whether this visit's own read has answered. The kept rows only paint: a
+    // resource's started state resets with every server restart, so nothing is
+    // started, stopped or restarted on the strength of a kept copy.
+    const [fresh, setFresh] = useState(false);
     const [busy, setBusy] = useState<string | null>(null);
+    const locked = busy !== null || !fresh;
     const [error, setError] = useState<string | null>(null);
     const [query, setQuery] = useState("");
     const [adding, setAdding] = useState(false);
@@ -89,11 +109,14 @@ export function FivemResources({
             // point of pressing it.
             if (rescan && canManage) await actions.refreshFivemResourcesAction(installedAppId);
             const result = await actions.listFivemResourcesAction(installedAppId);
-            setResources(result.resources ?? null);
+            const found = result.resources ?? null;
+            setResources((current) => mergeUnchanged<readonly FivemResource[] | null>(current, found));
+            if (found) writeSnapshot(resourcesKey, found);
+            setFresh(true);
             setError(result.error ?? null);
             setLoading(false);
         },
-        [installedAppId, canManage]
+        [installedAppId, canManage, resourcesKey]
     );
 
     useEffect(() => {
@@ -230,14 +253,14 @@ export function FivemResources({
                                         <PlayerIconAction
                                             label={`Restart ${resource.name}`}
                                             icon={<RotateCw className="size-4" />}
-                                            disabled={!canManage || busy !== null}
+                                            disabled={!canManage || locked}
                                             onClick={() => void act(resource, "restart")}
                                         />
                                         <PlayerIconAction
                                             label={`Stop ${resource.name}`}
                                             icon={<Square className="size-4" />}
                                             disabled={
-                                                !canManage || busy !== null || resource.managed
+                                                !canManage || locked || resource.managed
                                             }
                                             danger
                                             onClick={() => void act(resource, "stop")}
@@ -247,7 +270,7 @@ export function FivemResources({
                                     <PlayerIconAction
                                         label={`Start ${resource.name}`}
                                         icon={<Play className="size-4" />}
-                                        disabled={!canManage || busy !== null}
+                                        disabled={!canManage || locked}
                                         onClick={() => void act(resource, "start")}
                                     />
                                 )}

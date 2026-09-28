@@ -13,6 +13,7 @@
  */
 
 import * as mc from "../../lib/minecraft/motd";
+import { hostUi } from "@polaris/app-host/client";
 import { McLine } from "../../components/mc-text";
 import { insertsFor } from "./minecraft-announce";
 import { SidebarLineEditor } from "./sidebar-line-editor";
@@ -53,12 +54,19 @@ import {
 } from "@polaris/ui";
 import * as side from "../../lib/minecraft/sidebar";
 import { VariablesHelp } from "../../components/variables-help";
-import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import {
     readLiveDisplayAction,
     saveLiveDisplayAction,
     type LiveDisplayState
 } from "./live-display-actions";
+
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old the kept panel may be and still paint first on a revisit. */
+const KEPT_DISPLAY_MS = 24 * 3_600_000;
 
 /** The card's name and what it is for, with the switch beside them. */
 function SidebarHeading({ control }: { control: ReactNode }) {
@@ -83,8 +91,18 @@ export function MinecraftSidebar({
     installedAppId: string;
     canManage: boolean;
 }) {
+    // What this tab last read paints first, so the panel is there at once on a
+    // revisit; the read below replaces it when it moved.
+    const stateKey = `live-display:${installedAppId}`;
     const [state, setState] = useState<LiveDisplayState | null>(null);
     const [draft, setDraft] = useState<side.SidebarConfig>(side.DEFAULT_SIDEBAR);
+    const draftNow = useRef(draft);
+    draftNow.current = draft;
+    /** Whether the server has answered, after which the kept copy has no say.
+     *  Until then the kept panel is shown but cannot be changed or saved: a draft
+     *  is only ever started from what the server holds. */
+    const [heard, setHeard] = useState(false);
+    const answered = useRef(false);
     /** The "several leaderboards, taking turns" dialog, while it is open. */
     const [rotating, setRotating] = useState<Rotating | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -100,19 +118,43 @@ export function MinecraftSidebar({
 
     const load = useCallback(
         (next: LiveDisplayState) => {
+            answered.current = true;
+            setHeard(true);
             setState(next);
             setDraft(next.sidebar);
             resetOrder(next.sidebar.lines.length);
+            writeSnapshot(stateKey, next);
         },
-        [resetOrder]
+        [resetOrder, stateKey]
     );
+
+    useKeptSnapshot<LiveDisplayState>(stateKey, KEPT_DISPLAY_MS, (kept) => {
+        if (answered.current) return;
+        setState(kept.value);
+        setDraft(kept.value.sidebar);
+        resetOrder(kept.value.sidebar.lines.length);
+    });
 
     useEffect(() => {
         void readLiveDisplayAction(installedAppId).then((answer) => {
-            if (answer.state) load(answer.state);
-            else setError(answer.error ?? "The panel could not be read");
+            const fresh = answer.state;
+            if (!fresh) {
+                setError(answer.error ?? "The panel could not be read");
+                return;
+            }
+            // A save already answered with a newer panel than this read.
+            if (answered.current) return;
+            answered.current = true;
+            setHeard(true);
+            setState((current) => mergeUnchanged(current, fresh));
+            writeSnapshot(stateKey, fresh);
+            // Nothing could be typed before this answer, so the draft is the kept
+            // panel and moves to the server's only where the two differ.
+            if (JSON.stringify(draftNow.current) === JSON.stringify(fresh.sidebar)) return;
+            setDraft(fresh.sidebar);
+            resetOrder(fresh.sidebar.lines.length);
         });
-    }, [installedAppId, load]);
+    }, [installedAppId, stateKey, resetOrder]);
 
     const known = state?.known;
     const problems = useMemo(() => side.sidebarProblems(draft, known), [draft, known]);
@@ -121,6 +163,9 @@ export function MinecraftSidebar({
     // that changes nothing on anybody's screen.
     const dirty = state !== null && JSON.stringify(draft) !== JSON.stringify(state.sidebar);
     const inserts = useMemo(() => insertsFor("java", "server"), []);
+    /** Changing the panel waits for the server's answer, as the form did when
+     *  it was only drawn after it. */
+    const editable = canManage && heard;
 
     const change = (patch: Partial<side.SidebarConfig>) => {
         setDraft((current) => ({ ...current, ...patch }));
@@ -191,7 +236,7 @@ export function MinecraftSidebar({
                             control={
                                 <Switch
                                     checked={draft.enabled}
-                                    disabled={!canManage || (refused !== null && !draft.enabled)}
+                                    disabled={!editable || (refused !== null && !draft.enabled)}
                                     onChange={(enabled) => change({ enabled })}
                                     aria-label="Show the side panel"
                                 />
@@ -209,13 +254,13 @@ export function MinecraftSidebar({
                                 problems={problems.title}
                                 known={known}
                                 inserts={inserts}
-                                disabled={!canManage}
+                                disabled={!editable}
                             />
                         </div>
 
                         <div
                             className="flex flex-col gap-3"
-                            {...(canManage ? order.listProps : {})}
+                            {...(editable ? order.listProps : {})}
                         >
                             <span className="flex items-baseline gap-2">
                                 <span className="text-sm font-medium">Lines</span>
@@ -230,7 +275,7 @@ export function MinecraftSidebar({
                                         "relative flex items-start gap-1 rounded-md transition-opacity",
                                         order.dragging === index && "opacity-40"
                                     )}
-                                    {...(canManage ? order.rowProps(index) : {})}
+                                    {...(editable ? order.rowProps(index) : {})}
                                 >
                                     {/* Where the dragged line would land. */}
                                     {order.dragging !== null && order.dropAt === index && (
@@ -241,7 +286,7 @@ export function MinecraftSidebar({
                                         index === draft.lines.length - 1 && (
                                             <span className="pointer-events-none absolute inset-x-0 -bottom-1.5 h-0.5 rounded-full bg-primary" />
                                         )}
-                                    {canManage && draft.lines.length > 1 && (
+                                    {editable && draft.lines.length > 1 && (
                                         <button
                                             type="button"
                                             {...order.handleProps(index, draft.lines.length)}
@@ -262,9 +307,9 @@ export function MinecraftSidebar({
                                             known={known}
                                             placeholder="Leave empty for a gap"
                                             inserts={inserts}
-                                            disabled={!canManage}
+                                            disabled={!editable}
                                         />
-                                        {canManage && rotatingBlocksAt(draft.lines, index) ? (
+                                        {editable && rotatingBlocksAt(draft.lines, index) ? (
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
@@ -285,6 +330,7 @@ export function MinecraftSidebar({
                                     <Button
                                         size="icon"
                                         variant="ghost"
+                                        disabled={!heard}
                                         onClick={() => {
                                             order.removed(index);
                                             change({
@@ -307,7 +353,9 @@ export function MinecraftSidebar({
                                 <Button
                                     variant="secondary"
                                     size="sm"
-                                    disabled={draft.lines.length >= side.SIDEBAR_LINES_MAX}
+                                    disabled={
+                                        !heard || draft.lines.length >= side.SIDEBAR_LINES_MAX
+                                    }
                                     onClick={() => addLines([...draft.lines, side.plainLine("")])}
                                 >
                                     <Plus className="size-4" /> Add a line
@@ -321,6 +369,7 @@ export function MinecraftSidebar({
                                             variant="secondary"
                                             size="sm"
                                             disabled={
+                                                !heard ||
                                                 draft.lines.length + 2 > side.SIDEBAR_LINES_MAX
                                             }
                                         >
@@ -408,7 +457,7 @@ export function MinecraftSidebar({
                                         : "Only somebody who manages this server can change it.")}
                             </span>
                             <Button
-                                disabled={!canManage || pending || invalid || !dirty}
+                                disabled={!editable || pending || invalid || !dirty}
                                 onClick={save}
                             >
                                 {pending && <Loader2 className="size-4 animate-spin" />}

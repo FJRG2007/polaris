@@ -16,13 +16,21 @@
  * the old behaviour, and is what every server keeps until somebody switches it.
  */
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { hostUi } from "@polaris/app-host/client";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Badge, Card, CardBody, Select, Skeleton } from "@polaris/ui";
 import {
     readMemoryPlanAction,
     setMemoryPlanAction,
     type MemoryPlanView
 } from "./minecraft-actions";
+
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old the kept plan may be and still paint first on a revisit. */
+const KEPT_PLAN_MS = 24 * 3_600_000;
 
 /** The ceilings worth offering. Past eight gigabytes the answer is a second
  *  server rather than a bigger heap - the pauses the collector takes on one that
@@ -43,6 +51,20 @@ export function MinecraftMemory({
     refresh?: number;
 }) {
     const [plan, setPlan] = useState<MemoryPlanView | null>(null);
+    // What this tab last read paints first, so the card is not a skeleton on a
+    // revisit; the read below replaces what moved.
+    const planKey = `memory-plan:${installedAppId}`;
+    useKeptSnapshot<MemoryPlanView>(planKey, KEPT_PLAN_MS, (kept) =>
+        setPlan((current) => current ?? kept.value)
+    );
+    useEffect(() => {
+        if (plan) writeSnapshot(planKey, plan);
+    }, [planKey, plan]);
+    /** Whether this visit's own read has answered with a plan. The kept one only
+     *  paints: a save sends the whole pair, so nothing is chosen on a copy
+     *  somebody may have changed since. */
+    const [heard, setHeard] = useState(false);
+    const heardRef = useRef(false);
     /** Null while the first read is out; a sentence when there is nothing to plan
      *  (a Bedrock server runs no JVM) or the read failed. */
     const [note, setNote] = useState<string | null>(null);
@@ -50,11 +72,17 @@ export function MinecraftMemory({
 
     const read = useCallback(async () => {
         const answer = await readMemoryPlanAction(installedAppId);
-        if (answer.plan) {
-            setPlan(answer.plan);
+        const found = answer.plan;
+        if (found) {
+            setPlan((current) => mergeUnchanged(current, found));
+            heardRef.current = true;
+            setHeard(true);
             setNote(null);
             return;
         }
+        // Before this visit has read a plan, the kept one is not one: a server that
+        // now has nothing to plan, or cannot be read, says so on its own.
+        if (!heardRef.current) setPlan(null);
         setNote(answer.error ?? "Could not read the memory plan");
     }, [installedAppId]);
 
@@ -63,7 +91,7 @@ export function MinecraftMemory({
     }, [read, refresh]);
 
     function save(next: Partial<Pick<MemoryPlanView, "mode" | "ceilingMb">>): void {
-        if (!plan) return;
+        if (!plan || !heard) return;
         const wanted = { mode: plan.mode, ceilingMb: plan.ceilingMb, ...next };
         // Shown as chosen straight away; the answer replaces it with what was
         // actually stored, including the new figure the plan settled on.
@@ -116,6 +144,7 @@ export function MinecraftMemory({
                             <span>Decided by</span>
                             <Select
                                 value={plan.mode}
+                                disabled={!heard}
                                 onValueChange={(value) =>
                                     save({ mode: value === "auto" ? "auto" : "fixed" })
                                 }
@@ -132,6 +161,7 @@ export function MinecraftMemory({
                                     <span>Never more than</span>
                                     <Select
                                         value={String(plan.ceilingMb)}
+                                        disabled={!heard}
                                         onValueChange={(value) =>
                                             save({ ceilingMb: Number.parseInt(value, 10) })
                                         }

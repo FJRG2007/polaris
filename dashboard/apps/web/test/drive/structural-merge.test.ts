@@ -86,4 +86,10 @@ describe("folding a fresh reading into the one on screen", () => {
     it("returns the fresh value when the shape changes entirely", () => {
         expect(mergeUnchanged<unknown>({ a: 1 }, "gone")).toBe("gone");
     });
+
+    it("takes a changed date rather than reading two dates as the same", () => {
+        const before = { at: new Date("2026-09-28T10:00:00Z") };
+        const after = { at: new Date("2026-09-28T11:00:00Z") };
+        expect(mergeUnchanged(before, after).at).toBe(after.at);
+    });
 });

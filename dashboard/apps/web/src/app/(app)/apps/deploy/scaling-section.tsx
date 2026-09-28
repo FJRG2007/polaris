@@ -14,7 +14,10 @@ import { Loader2 } from "lucide-react";
 import { Button, Input, Switch } from "@polaris/ui";
 import { describeServiceEvent } from "./service-history";
 import { RelativeTime } from "@/components/relative-time";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { mergeUnchanged } from "@/lib/structural-merge";
+import { useKeptSnapshot } from "@/components/use-live-resource";
+import { dropSnapshots, writeSnapshot } from "@/lib/snapshot-cache";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { ServiceScalingView } from "@/lib/deploy/scaling-service";
 import { saveServiceScalingAction, serviceScalingAction } from "./scaling-actions";
 
@@ -83,6 +86,9 @@ function parse(draft: Draft) {
         : { input: null, problem: parsed.error.issues[0]?.message ?? "Check these settings" };
 }
 
+/** How old a kept copy may be and still paint the first frame. */
+const SNAPSHOT_MAX_AGE_MS = 24 * 3_600_000;
+
 export function ScalingSection({ applicationId, onChanged }: { applicationId: string; onChanged: () => void }) {
     const [view, setView] = useState<ServiceScalingView | null>(null);
     const [draft, setDraft] = useState<Draft | null>(null);
@@ -90,26 +96,44 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
     const [note, setNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
+    // The settings as this tab last read them paint at once, read-only: every
+    // field is sent on save, so nothing can be edited or saved until the fresh
+    // answer has replaced the kept copy.
+    const cacheKey = `deploy.scaling:${applicationId}`;
+    const [kept, setKept] = useState(false);
+    // Which service has had its answer, so a kept copy never paints over it.
+    const answered = useRef<string | null>(null);
+    useKeptSnapshot<ServiceScalingView>(cacheKey, SNAPSHOT_MAX_AGE_MS, (snapshot) => {
+        if (answered.current === applicationId) return;
+        setView(snapshot.value);
+        setDraft(draftOf(snapshot.value));
+        setKept(true);
+    });
+
     useEffect(() => {
         let active = true;
         void serviceScalingAction(applicationId).then((result) => {
             if (!active) return;
-            if (result.scaling) {
-                setView(result.scaling);
-                setDraft(draftOf(result.scaling));
+            const fresh = result.scaling;
+            if (fresh) {
+                answered.current = applicationId;
+                writeSnapshot(cacheKey, fresh);
+                setView((current) => (current ? mergeUnchanged(current, fresh) : fresh));
+                setDraft(draftOf(fresh));
+                setKept(false);
             } else setError(result.error ?? "Could not read how this service is scaled");
         });
         return () => {
             active = false;
         };
-    }, [applicationId]);
+    }, [applicationId, cacheKey]);
 
     const checked = useMemo(() => (draft ? parse(draft) : null), [draft]);
     const set = (patch: Partial<Draft>) => setDraft((current) => (current ? { ...current, ...patch } : current));
     const copies = Number(draft?.autoscale ? draft.max : draft?.replicas) || 1;
 
     function save() {
-        if (!checked?.input) return;
+        if (kept || !checked?.input) return;
         const input = checked.input;
         setError(null);
         setNote(null);
@@ -119,6 +143,9 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                 setError(result.error);
                 return;
             }
+            // The kept copy is the settings before this save; the next visit reads
+            // the saved ones instead of painting the old ones first.
+            dropSnapshots(cacheKey);
             setNote(result.redeployed ? "Saved. The service is being started again with the new settings." : "Saved.");
             onChanged();
         });
@@ -127,14 +154,18 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
     return (
         <section className="flex flex-col gap-2">
             <h3 className="text-sm font-medium">Scaling</h3>
-            {!draft || !view ? (
+            {/* A failed read shows only why, as it did before anything was kept. */}
+            {!draft || !view || (kept && error) ? (
                 error ? (
                     <p className="text-sm text-danger">{error}</p>
                 ) : (
                     <div className="h-40 animate-pulse rounded-md border border-border bg-muted/40" />
                 )
             ) : (
-                <div className="flex flex-col gap-3 rounded-md border border-border p-3 text-sm">
+                <fieldset
+                    disabled={kept}
+                    className="flex min-w-0 flex-col gap-3 rounded-md border border-border p-3 text-sm"
+                >
                     {view.single && <p className="text-xs text-muted-foreground">{view.single}</p>}
                     <label className="flex flex-col gap-1">
                         <span className="font-medium">Copies</span>
@@ -341,11 +372,11 @@ export function ScalingSection({ applicationId, onChanged }: { applicationId: st
                     {error && <p className="text-sm text-danger">{error}</p>}
                     {note && <p className="text-xs text-muted-foreground">{note}</p>}
                     <div className="flex justify-end">
-                        <Button onClick={save} disabled={pending || !checked?.input}>
+                        <Button onClick={save} disabled={pending || kept || !checked?.input}>
                             {pending && <Loader2 className="size-4 animate-spin" />} Save scaling
                         </Button>
                     </div>
-                </div>
+                </fieldset>
             )}
         </section>
     );

@@ -95,12 +95,38 @@ import { hostUi } from "@polaris/app-host/client";
 const { relativeTime } = hostUi.relativeTime;
 const { CopyButton } = hostUi.copyButton;
 const { useDisplayFormat } = hostUi.displayFormat;
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
 
 /** How often the table re-reads what Polaris knows by itself - a server added,
  *  renamed or deleted somewhere else. Who is playing does not come from here: it
  *  arrives on the live stream, which pushes it as it changes. This is also the
  *  backstop if that stream cannot be held open at all. */
 const POLL_MS = 20000;
+
+/** How old a kept reading of the table may be and still paint first on a revisit. */
+const KEPT_ROWS_MS = 24 * 3_600_000;
+const FACTS_KEY = "games-facts";
+const LIVE_KEY = "games-live";
+
+/**
+ * A fresh answer folded into the rows on screen: a row that did not change keeps
+ * its reference, and a table where nothing moved keeps the whole map, so a poll
+ * that brings the same answer re-renders nothing.
+ */
+function foldRows<T extends { id: string }>(current: Map<string, T>, rows: readonly T[]): Map<string, T> {
+    let same = current.size === rows.length;
+    const next = new Map(
+        rows.map((row) => {
+            const held = current.get(row.id);
+            const merged = held ? mergeUnchanged(held, row) : row;
+            if (merged !== held) same = false;
+            return [row.id, merged];
+        })
+    );
+    return same ? current : next;
+}
 
 export function GamesView({
     servers,
@@ -118,8 +144,20 @@ export function GamesView({
 }) {
     const managerInstalled = installed;
     const router = useRouter();
+    // What this tab last read paints first, so the players, versions and addresses
+    // are on screen at once on a revisit; the polls below replace what moved.
     const [facts, setFacts] = useState<Map<string, GameServerFacts>>(new Map());
     const [live, setLive] = useState<Map<string, GameServerLive>>(new Map());
+    // Whether this visit's own read of the facts has answered. The kept copy only
+    // paints: Start and Stop act on what the server is meant to be doing, so they
+    // wait on this, as they did before anything was kept.
+    const [factsFresh, setFactsFresh] = useState(false);
+    useKeptSnapshot<GameServerFacts[]>(FACTS_KEY, KEPT_ROWS_MS, (kept) =>
+        setFacts((current) => (current.size > 0 ? current : foldRows(current, kept.value)))
+    );
+    useKeptSnapshot<GameServerLive[]>(LIVE_KEY, KEPT_ROWS_MS, (kept) =>
+        setLive((current) => (current.size > 0 ? current : foldRows(current, kept.value)))
+    );
     // Who is on each server, pushed as it changes rather than polled for. Shared
     // with every other tab on this device, and with the panels of the servers
     // themselves, so all of them agree at the same moment.
@@ -154,7 +192,10 @@ export function GamesView({
             const response = await fetch("/api/apps/games", { cache: "no-store" });
             if (!response.ok) return;
             const data = (await response.json()) as { servers?: GameServerFacts[] };
-            setFacts(new Map((data.servers ?? []).map((row) => [row.id, row])));
+            const rows = data.servers ?? [];
+            setFacts((current) => foldRows(current, rows));
+            setFactsFresh(true);
+            writeSnapshot(FACTS_KEY, rows);
         } catch {
             // Transient; the next poll retries.
         }
@@ -166,7 +207,9 @@ export function GamesView({
             const response = await fetch("/api/apps/games/live", { cache: "no-store" });
             if (!response.ok) return;
             const data = (await response.json()) as { servers?: GameServerLive[] };
-            setLive(new Map((data.servers ?? []).map((row) => [row.id, row])));
+            const rows = data.servers ?? [];
+            setLive((current) => foldRows(current, rows));
+            writeSnapshot(LIVE_KEY, rows);
         } catch {
             // Transient; the next poll retries.
         }
@@ -200,16 +243,17 @@ export function GamesView({
     // A frame is newer than anything the backstop poll fetched, so it wins.
     useEffect(() => {
         if (presence.at === 0) return;
-        setLive(
-            new Map(
-                [...presence.servers].map(([id, server]) => [
-                    id,
-                    // The row prints names; the ids beside them are for the screens
-                    // that offer a verb against one person.
-                    { ...server, players: server.players.map((player) => player.name) }
-                ])
-            )
-        );
+        const rows = [...presence.servers].map(([id, server]) => ({
+            ...server,
+            id,
+            // The row prints names; the ids beside them are for the screens
+            // that offer a verb against one person.
+            players: server.players.map((player) => player.name)
+        }));
+        setLive((current) => foldRows(current, rows));
+        // Kept too, since with the stream up the poll no longer asks: a revisit
+        // should paint who was on a moment ago, not who was on at the first read.
+        writeSnapshot(LIVE_KEY, rows);
     }, [presence]);
 
     const rows = useMemo<list.ServerView[]>(
@@ -425,6 +469,7 @@ export function GamesView({
                                         canManage={server.canManage}
                                         canRemove={server.canRemove}
                                         pending={pending}
+                                        factsFresh={factsFresh}
                                         onRun={run}
                                         onPref={(patch) => setPref(server, patch)}
                                         onDelete={() => {
@@ -632,6 +677,7 @@ function ServerRow({
     canManage,
     canRemove,
     pending,
+    factsFresh,
     onRun,
     onPref,
     onDelete
@@ -640,6 +686,8 @@ function ServerRow({
     canManage: boolean;
     canRemove: boolean;
     pending: boolean;
+    /** Whether the facts were read on this visit rather than kept from an earlier one. */
+    factsFresh: boolean;
     onRun: (action: () => Promise<{ error?: string }>) => void;
     onPref: (patch: { favorite?: boolean; archived?: boolean }) => void;
     onDelete: () => void;
@@ -652,8 +700,9 @@ function ServerRow({
     const address = facts?.address ?? null;
     // Start and stop act on what the server is meant to be doing, which is the
     // first read - so they are offered as soon as it lands rather than waiting on
-    // the containers to be asked who is playing.
-    const known = facts !== null;
+    // the containers to be asked who is playing. A kept copy is not that read: the
+    // server may have been started or stopped since.
+    const known = factsFresh && facts !== null;
     const browsable = list.canBrowseFiles(server);
     const router = useRouter();
 
@@ -714,7 +763,7 @@ function ServerRow({
                         <VersionCell facts={facts} />
                     </td>
                     <td className="px-3 py-2">
-                        <AddressCell name={server.name} facts={facts} />
+                        <AddressCell name={server.name} facts={facts} fresh={factsFresh} />
                     </td>
                     <td className="hidden px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                         {facts === null ? (
@@ -810,7 +859,7 @@ function ServerRow({
                             <span className="ml-auto pl-3 text-xs">{FILES_NEED_DEPLOY}</span>
                         </ContextMenuItem>
                     ))}
-                {address && (
+                {known && address && (
                     <ContextMenuItem onSelect={() => void navigator.clipboard?.writeText(address)}>
                         <Copy className="size-4" /> Copy address
                     </ContextMenuItem>
@@ -936,7 +985,16 @@ function VersionCell({ facts }: { facts: GameServerFacts | null }) {
 
 /** Where a player connects. The name when it has one, the machine's address when
  *  it does not, and why there is neither when there is neither. */
-function AddressCell({ name, facts }: { name: string; facts: GameServerFacts | null }) {
+function AddressCell({
+    name,
+    facts,
+    fresh
+}: {
+    name: string;
+    facts: GameServerFacts | null;
+    /** False while `facts` is the kept reading: the address is shown, not copied. */
+    fresh: boolean;
+}) {
     if (facts === null) return <Skeleton className="h-4 w-40" />;
     if (!facts.address) {
         return (
@@ -950,7 +1008,7 @@ function AddressCell({ name, facts }: { name: string; facts: GameServerFacts | n
             <code className="truncate font-mono text-xs" title={facts.address}>
                 {facts.address}
             </code>
-            <CopyButton value={facts.address} label={`the address of ${name}`} />
+            {fresh && <CopyButton value={facts.address} label={`the address of ${name}`} />}
         </div>
     );
 }

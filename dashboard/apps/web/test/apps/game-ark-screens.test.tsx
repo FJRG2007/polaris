@@ -23,6 +23,17 @@ vi.stubEnv("POLARIS_MASTER_KEY", Buffer.alloc(32, 7).toString("base64"));
 // handler. Rendering must not drag the database and the session into the test.
 vi.mock("@polaris-app/game-servers/src/screens/installed/ark-actions", () => ({}));
 
+// The kept copy of what each screen last read. Nothing is kept in a test, so the
+// first render is what a first visit gets.
+vi.mock("@polaris/app-host/client", () => ({
+    hostUi: {
+        liveRead: { useKeptSnapshot: () => undefined },
+        relativeTime: { RelativeTime: () => null },
+        snapshotCache: { readSnapshot: () => null, writeSnapshot: () => undefined, dropSnapshots: () => undefined },
+        structuralMerge: { mergeUnchanged: <T,>(_previous: T, next: T) => next }
+    }
+}));
+
 const { ArkRules } = await import("@polaris-app/game-servers/src/screens/installed/ark-rules");
 const { ArkMods } = await import("@polaris-app/game-servers/src/screens/installed/ark-mods");
 

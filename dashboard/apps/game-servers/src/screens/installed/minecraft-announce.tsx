@@ -152,6 +152,12 @@ function toLocalInput(iso: string): string {
 
 const { useConfirm } = hostUi.confirmDialog;
 const { CopyButton } = hostUi.copyButton;
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old a kept reading may be and still paint first on a revisit. */
+const KEPT_ANNOUNCE_MS = 24 * 3_600_000;
 
 /** "No sound" as a select value. An empty value is what a select reads as
  *  "nothing chosen", so the empty sound id rides under a name of its own. */
@@ -170,7 +176,22 @@ export function MinecraftAnnounce({
     players: readonly string[];
 }) {
     const [draft, setDraft] = useState<Announcement>(BLANK_ANNOUNCEMENT);
+    // What this tab last read paints first - the saved templates and what is
+    // pinned - so a revisit does not wait on either; the reads replace what moved.
+    const templatesKey = `announce-templates:${installedAppId}`;
     const [templates, setTemplates] = useState<readonly AnnouncementTemplate[]>([]);
+    useKeptSnapshot<readonly AnnouncementTemplate[]>(templatesKey, KEPT_ANNOUNCE_MS, (kept) =>
+        setTemplates((current) => (current.length > 0 ? current : kept.value))
+    );
+    // Whether this visit's own list has answered. The kept templates only paint:
+    // one may have been changed or deleted since, so none is loaded, saved into or
+    // deleted until then.
+    const [templatesHeard, setTemplatesHeard] = useState(false);
+    // Every list the server hands back is kept, including the one a save or a
+    // delete returns, so a deleted template never comes back on a revisit.
+    useEffect(() => {
+        if (templatesHeard) writeSnapshot(templatesKey, templates);
+    }, [templatesHeard, templatesKey, templates]);
     /** The template the draft came from, so saving can update it in place. */
     const [from, setFrom] = useState<AnnouncementTemplate | null>(null);
     const [naming, setNaming] = useState<{ id?: string; name: string } | null>(null);
@@ -179,7 +200,15 @@ export function MinecraftAnnounce({
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
     const [hearing, setHearing] = useState(false);
+    const liveKey = `live-display:${installedAppId}`;
     const [live, setLive] = useState<LiveDisplayState | null>(null);
+    useKeptSnapshot<LiveDisplayState>(liveKey, KEPT_ANNOUNCE_MS, (kept) =>
+        setLive((current) => current ?? kept.value)
+    );
+    /** Whether this visit's own read of what is on screen has answered. Until it
+     *  has, the kept one is only drawn: nothing is taken down on its strength,
+     *  and the values it knows do not judge the draft. */
+    const [liveHeard, setLiveHeard] = useState(false);
     const [heardError, setHeardError] = useState<string | null>(null);
     const playing = useRef<HTMLAudioElement | null>(null);
 
@@ -212,16 +241,23 @@ export function MinecraftAnnounce({
     }
 
     useEffect(() => {
-        void listAnnouncementTemplatesAction(installedAppId).then((answer) =>
-            setTemplates(answer.templates)
-        );
+        void listAnnouncementTemplatesAction(installedAppId).then((answer) => {
+            setTemplates((current) =>
+                mergeUnchanged<readonly AnnouncementTemplate[]>(current, answer.templates)
+            );
+            setTemplatesHeard(true);
+        });
     }, [installedAppId]);
 
     const readLive = useCallback(() => {
         void readLiveDisplayAction(installedAppId).then((answer) => {
-            if (answer.state) setLive(answer.state);
+            const fresh = answer.state;
+            if (!fresh) return;
+            setLive((current) => mergeUnchanged(current, fresh));
+            setLiveHeard(true);
+            writeSnapshot(liveKey, fresh);
         });
-    }, [installedAppId]);
+    }, [installedAppId, liveKey]);
     useEffect(readLive, [readLive]);
 
     function stopPinned(): void {
@@ -263,7 +299,7 @@ export function MinecraftAnnounce({
     }, [edition, draft]);
     // The same check the server runs, on every keystroke: the button is never
     // live for something that is then refused.
-    const known = live?.known;
+    const known = liveHeard ? live?.known : undefined;
     const problems = useMemo(
         () => announcementProblems(draft, edition, Date.now(), known),
         [draft, edition, known]
@@ -318,6 +354,7 @@ export function MinecraftAnnounce({
                 return;
             }
             setTemplates(result.templates);
+            setTemplatesHeard(true);
             setFrom(result.templates.find((one) => one.id === result.id) ?? null);
             setNaming(null);
             setNote("Template saved.");
@@ -334,7 +371,10 @@ export function MinecraftAnnounce({
         if (!agreed) return;
         startTransition(async () => {
             const result = await deleteAnnouncementTemplateAction(installedAppId, template.id);
-            if (result.templates) setTemplates(result.templates);
+            if (result.templates) {
+                setTemplates(result.templates);
+                setTemplatesHeard(true);
+            }
             if (from?.id === template.id) setFrom(null);
         });
     }
@@ -375,7 +415,7 @@ export function MinecraftAnnounce({
                                 <Button
                                     size="sm"
                                     variant="secondary"
-                                    disabled={pending}
+                                    disabled={pending || !liveHeard}
                                     onClick={stopPinned}
                                 >
                                     Take it down
@@ -406,6 +446,7 @@ export function MinecraftAnnounce({
                                     >
                                         <button
                                             type="button"
+                                            disabled={!templatesHeard}
                                             onClick={() => {
                                                 setDraft({
                                                     ...BLANK_ANNOUNCEMENT,
@@ -415,7 +456,7 @@ export function MinecraftAnnounce({
                                                 setError(null);
                                                 setNote(null);
                                             }}
-                                            className="max-w-48 truncate px-2 py-1 text-xs transition-colors hover:bg-muted"
+                                            className="max-w-48 truncate px-2 py-1 text-xs transition-colors hover:bg-muted disabled:opacity-50"
                                             title={`Load "${template.name}"`}
                                         >
                                             {template.name}
@@ -426,7 +467,8 @@ export function MinecraftAnnounce({
                                                     type="button"
                                                     aria-label={`More for ${template.name}`}
                                                     title={`More for ${template.name}`}
-                                                    className="border-l border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                    disabled={!templatesHeard}
+                                                    className="border-l border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                                 >
                                                     <MoreHorizontal className="size-3.5" />
                                                 </button>

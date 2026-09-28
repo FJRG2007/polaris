@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 /**
  * What a server's page shows where its CPU, memory and disk go, on the way in.
  *
@@ -11,13 +13,17 @@
  * a machine that has stopped answering must not keep looking healthy behind its
  * last good numbers. Both are pinned here alongside the instant paint.
  *
- * Rendered to static markup: the assertion is the first paint, before the probe
- * that never resolves here could have answered.
+ * Rendered in the browser and read back at once: the assertion is the first
+ * paint, before the probe that never resolves here could have answered. The kept
+ * reading goes in after hydration and before that paint, so the server's markup,
+ * which cannot see the tab's storage, is never contradicted.
  */
 
 import { writeSnapshot } from "@/lib/snapshot-cache";
 // A kept reading is kept per shelf - see `shelf-scope` - so the keys below
 // name one. `personal` is where a component rendered outside a shelf is.
+import type { ReactElement } from "react";
+import { cleanup, render } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ServerMetrics } from "@/lib/server-probe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -53,6 +59,11 @@ vi.mock("../../src/app/(app)/apps/servers/actions", () => ({
 
 const { ServerUsage } = await import("../../src/app/(app)/apps/servers/server-usage");
 
+/** What the browser shows first. */
+function paint(element: ReactElement): string {
+    return render(element).container.innerHTML;
+}
+
 const metrics: ServerMetrics = {
     os: "Ubuntu 26.04 LTS",
     kernel: "6.14.0-generic",
@@ -73,6 +84,7 @@ describe("A server's usage panel", () => {
     });
 
     afterEach(() => {
+        cleanup();
         vi.useRealTimers();
         vi.unstubAllGlobals();
     });
@@ -80,7 +92,7 @@ describe("A server's usage panel", () => {
     it("paints the last reading of this machine before the probe answers", () => {
         writeSnapshot("personal:servers.usage.host-a", metrics);
 
-        const markup = renderToStaticMarkup(<ServerUsage hostId="host-a" />);
+        const markup = paint(<ServerUsage hostId="host-a" />);
 
         expect(markup).toContain("0.62 load of 16");
         expect(markup).toContain("2.8 GB of 29 GB");
@@ -94,15 +106,24 @@ describe("A server's usage panel", () => {
         writeSnapshot("personal:servers.usage.host-a", metrics);
         vi.advanceTimersByTime(5 * 60_000);
 
-        const markup = renderToStaticMarkup(<ServerUsage hostId="host-a" />);
+        const markup = paint(<ServerUsage hostId="host-a" />);
 
         expect(markup).toContain("read 5m ago");
+    });
+
+    it("leaves the kept reading out of the server's markup, which hydration has to match", () => {
+        writeSnapshot("personal:servers.usage.host-a", metrics);
+
+        const markup = renderToStaticMarkup(<ServerUsage hostId="host-a" />);
+
+        expect(markup).not.toContain("polaris-web-110");
+        expect(markup).toContain("animate-pulse");
     });
 
     it("does not paint another machine's figures under this one", () => {
         writeSnapshot("personal:servers.usage.host-a", metrics);
 
-        const markup = renderToStaticMarkup(<ServerUsage hostId="host-b" />);
+        const markup = paint(<ServerUsage hostId="host-b" />);
 
         expect(markup).not.toContain("polaris-web-110");
         expect(markup).toContain("animate-pulse");
@@ -112,7 +133,7 @@ describe("A server's usage panel", () => {
     // nothing, so without this the panel opens on skeletons however recently the
     // server itself read the machine.
     it("paints what the server already read when the tab is holding nothing", () => {
-        const markup = renderToStaticMarkup(
+        const markup = paint(
             <ServerUsage
                 hostId="host-a"
                 initial={{ at: Date.now() - 5 * 60_000, value: metrics }}
@@ -131,7 +152,7 @@ describe("A server's usage panel", () => {
             consumers: [{ kind: "process", name: "postgres", cpuPercent: 1.2, memoryBytes: 174_000_000 }]
         });
 
-        const markup = renderToStaticMarkup(
+        const markup = paint(
             <ServerUsage hostId="host-a" initial={{ at: Date.now() - 5 * 60_000, value: metrics }} />
         );
 

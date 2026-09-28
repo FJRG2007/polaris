@@ -68,6 +68,8 @@ beforeEach(() => {
 afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    // The store keeps its answers for the tab; each test starts from none.
+    sessionStorage.clear();
 });
 
 function drawn(children: ReactNode) {
@@ -103,6 +105,16 @@ describe("the name a screen shows", () => {
         );
         expect(await screen.findByText("Ada")).toBeTruthy();
         expect(screen.queryByText("Dad")).toBeNull();
+    });
+
+    it("is drawn from what the tab kept on a reload, before the server answers", async () => {
+        drawn(<PersonName id={ADA} name="Ada Lovelace" />);
+        await screen.findByText("Dad");
+        cleanup();
+        // The next load of the tab, with a server that has not answered yet.
+        vi.stubGlobal("fetch", () => new Promise(() => undefined));
+        drawn(<PersonName id={ADA} name="Ada Lovelace" />);
+        expect(screen.getByText("Dad")).toBeTruthy();
     });
 
     it("survives its subject renaming themselves", async () => {

@@ -74,6 +74,9 @@ import type { AppHostTypes } from "@polaris/app-host";
 const { CopyButton } = hostUi.copyButton;
 const { canOpenGameTab, gameTabHref, isGameTab, visibleGameTabs } = hostUi.appAppsInstalledIdTabs;
 const { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS } = hostUi.metricsHistory;
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
 type InstalledAppSetting = AppHostTypes["InstalledAppSetting"];
 type GameReachAdvice = AppHostTypes["GameReachAdvice"];
 
@@ -100,6 +103,13 @@ const SECURITY_GROUP = "Security";
  * inside the container.
  */
 const POLL_MS = 12000;
+/** How old the last reading kept in this tab may be and still paint the screen
+ *  while the first poll is out: players online, the badge, the machine. */
+const KEPT_READING_MS = 24 * 3_600_000;
+
+/** What of a reading is kept between visits: only what the card and the overview
+ *  draw. The roster and everything a verb acts on come from the page and the poll. */
+type KeptReading = Pick<ServerReading, "status" | "reach">;
 /** How often Polaris login's state is read again. The mod checks in every minute. */
 const LOGIN_REFRESH_MS = 60_000;
 
@@ -206,6 +216,7 @@ export function MinecraftPanel({
     // The roster is Polaris's own note of what the server last said, dated, so
     // the crown and every row's standing paint with the page; the poll replaces
     // it with the server's answer as soon as there is one.
+    const readingKey = `minecraft-reading:${installedAppId}`;
     const [reading, setReading] = useState<ServerReading>({
         status: null,
         reach: null,
@@ -223,6 +234,16 @@ export function MinecraftPanel({
         lastLevels: game?.lastLevels ?? {},
         pending: []
     });
+    // And what this tab last read of the server paints the card and the overview
+    // while the first poll is out, so the badge and who is online are there at
+    // once on a revisit. Only painted: until the poll answers, the header, the
+    // console, the players screen and every button act on what they did before
+    // anything was kept.
+    const [kept, setKept] = useState<KeptReading | null>(null);
+    useKeptSnapshot<KeptReading>(readingKey, KEPT_READING_MS, (value) => setKept(value.value));
+    useEffect(() => {
+        if (reading.status) writeSnapshot(readingKey, { status: reading.status, reach: reading.reach });
+    }, [readingKey, reading.status, reading.reach]);
     const [error, setError] = useState<string | null>(null);
     /** What Polaris last said it intends the server to do, so the page can re-read
      *  itself when that changes underneath it. */
@@ -260,7 +281,7 @@ export function MinecraftPanel({
                 return;
             }
             setError(null);
-            setReading((current) => ({
+            setReading((current) => mergeUnchanged(current, {
                 status: data.status ?? null,
                 // Kept when a poll could not work it out, rather than dropped back
                 // to the page's: the warning would flicker on every failed read.
@@ -368,8 +389,23 @@ export function MinecraftPanel({
                 reading.status,
                 streamed && Date.now() - presence.at < PRESENCE_STALE_MS ? streamed : null
             ),
-        [reading.status, streamed, presence.at]
+        // `reading.now` moves on every poll even when the status does not, and
+        // the stream's staleness is only judged here: without it, a stream that
+        // died over an unchanged status would be believed for good.
+        [reading.status, reading.now, streamed, presence.at]
     );
+    // What the card and the overview draw: the poll's reading once there is one,
+    // and the kept one until then. Never handed to anything that acts.
+    const shownStatus = useMemo(
+        () =>
+            status ??
+            withPresence(
+                kept?.status ?? null,
+                streamed && Date.now() - presence.at < PRESENCE_STALE_MS ? streamed : null
+            ),
+        [status, kept, reading.now, streamed, presence.at]
+    );
+    const shownReach = reading.status ? reading.reach : (kept?.reach ?? null);
     // What the poll knows beats what the page was rendered with: the second is a
     // snapshot from whenever it was opened, and reading them together is how a
     // server that had just been started kept saying it was stopped.
@@ -406,13 +442,14 @@ export function MinecraftPanel({
     return (
         <div className="flex flex-col gap-4">
             <ConnectCard
-                status={status}
+                status={shownStatus}
+                heard={status !== null}
                 address={status?.address ?? game?.address ?? null}
                 running={isRunning}
                 settings={settings}
                 installedAppId={installedAppId}
                 applicationId={applicationId}
-                reach={reading.reach}
+                reach={shownReach}
                 access={reading.access}
                 canSaveWorld={held.includes("games.moderate")}
                 onOpenPlayers={() => openTab("players")}
@@ -466,11 +503,12 @@ export function MinecraftPanel({
 
             {tab === "" && (
                 <OverviewTab
-                    status={status}
+                    status={shownStatus}
                     settings={settings}
                     blueprintId={game?.blueprintId ?? null}
                     mapId={game?.mapId ?? null}
                     onOpenPlayers={() => openTab("players")}
+                    heard={status !== null}
                 />
             )}
             {tab === "console" && (
@@ -723,6 +761,7 @@ export function MinecraftPanel({
  *  this page came for - plus what the server is doing right now. */
 function ConnectCard({
     status,
+    heard,
     address,
     running,
     settings,
@@ -734,7 +773,11 @@ function ConnectCard({
     onOpenPlayers,
     onOpenConsole
 }: {
+    /** The poll's reading, or the one kept from an earlier visit until it answers. */
     status: MinecraftStatus | null;
+    /** Whether the poll has answered on this visit. A kept reading only paints:
+     *  nothing on the card acts on it. */
+    heard: boolean;
     /** What players type. Known from Polaris's own records before the server is
      *  asked anything, so it paints with the page. */
     address: string | null;
@@ -800,7 +843,7 @@ function ConnectCard({
                             </code>
                             <CopyButton value={address} label="Copy the server address" />
                         </div>
-                    ) : status === null ? (
+                    ) : !heard ? (
                         <Skeleton className="h-7 w-48" />
                     ) : (
                         <span className="text-sm text-muted-foreground">
@@ -832,7 +875,7 @@ function ConnectCard({
                             size="sm"
                             variant="secondary"
                             onClick={() => void saveWorld()}
-                            disabled={saving || !(status?.answering ?? false)}
+                            disabled={saving || !heard || !(status?.answering ?? false)}
                             title="Write the world to disk now"
                         >
                             {saving ? (
@@ -851,7 +894,7 @@ function ConnectCard({
                     is the same word a server three minutes into its first boot
                     reports - so this is above everything else on the card, because
                     nothing else on it is true while this is. */}
-                {status?.crashLoop && (
+                {heard && status?.crashLoop && (
                     <div className="flex w-full items-start gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2">
                         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-danger" />
                         <div className="flex flex-col items-start gap-1 text-xs">
@@ -940,7 +983,7 @@ function ConnectCard({
                                     ))}
                                 </ul>
                             )}
-                            {reach.forward && (
+                            {heard && reach.forward && (
                                 <Link
                                     href="/admin/domains#game-ports"
                                     className="w-fit text-primary hover:underline"
@@ -1035,7 +1078,8 @@ function OverviewTab({
     settings,
     blueprintId,
     mapId,
-    onOpenPlayers
+    onOpenPlayers,
+    heard
 }: {
     status: MinecraftStatus | null;
     settings: InstalledAppSetting[];
@@ -1044,6 +1088,8 @@ function OverviewTab({
     /** The map it is standing on, which is somebody's work and is credited. */
     mapId: string | null;
     onOpenPlayers: () => void;
+    /** Whether the poll has answered on this visit: a kept reading only paints. */
+    heard: boolean;
 }) {
     const shown = useMemo(
         () =>
@@ -1122,6 +1168,7 @@ function OverviewTab({
                                 <button
                                     key={player}
                                     type="button"
+                                    disabled={!heard}
                                     onClick={onOpenPlayers}
                                     title={`Manage ${player}`}
                                     className="rounded-md border border-border px-2 py-1 text-sm transition-colors hover:border-primary/50"

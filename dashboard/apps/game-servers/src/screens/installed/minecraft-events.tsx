@@ -22,7 +22,8 @@ import * as ui from "@polaris/ui";
 
 const { useConfirm } = hostUi.confirmDialog;
 const { useDisplayFormat } = hostUi.displayFormat;
-const { readSnapshot, writeSnapshot } = hostUi.snapshotCache;
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
 
 const SNAPSHOT_MS = 30_000;
 const snapshotKey = (installedAppId: string) => `minecraft-events:${installedAppId}`;
@@ -198,10 +199,13 @@ export function MinecraftEvents({
     canManage: boolean;
 }) {
     const display = useDisplayFormat();
-    const [view, setView] = useState<EventsView | null>(
-        () => readSnapshot<EventsView>(snapshotKey(installedAppId), SNAPSHOT_MS)?.value ?? null
-    );
-    const [draft, setDraft] = useState<catalog.EventsConfig | null>(() => view?.config ?? null);
+    const [view, setView] = useState<EventsView | null>(null);
+    const [draft, setDraft] = useState<catalog.EventsConfig | null>(null);
+    // What this tab last read, before the paint and never over a live answer.
+    useKeptSnapshot<EventsView>(snapshotKey(installedAppId), SNAPSHOT_MS, (kept) => {
+        setView((current) => current ?? kept.value);
+        setDraft((current) => current ?? kept.value.config);
+    });
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
     /** The events whose explanation is open under their row. */
@@ -439,7 +443,11 @@ export function MinecraftEvents({
                         {view?.run && canManage && !view.run.cancelling && (
                             <div className="flex flex-wrap gap-2">
                                 {view.run.phase === "countdown" && (
-                                    <ui.Button size="sm" disabled={pending} onClick={startNow}>
+                                    <ui.Button
+                                        size="sm"
+                                        disabled={pending}
+                                        onClick={startNow}
+                                    >
                                         <FastForward className="size-4" />
                                         Start now
                                     </ui.Button>

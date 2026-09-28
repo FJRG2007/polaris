@@ -163,6 +163,10 @@ const EAGER_UI = [
     "confirmDialog.useConfirm",
     "copyButton.CopyButton",
     "gameLogo.GameLogo",
+    // The kept-reading hooks and the merge under them: hooks cannot be drawn
+    // later, and the shell's own screens load the module anyway.
+    "liveRead.useKeptSnapshot",
+    "liveRead.useLiveRead",
     "metricsHistory.CONSUMPTION_METRICS",
     "metricsHistory.PLAYER_METRICS",
     "relativeTime.RelativeTime",
@@ -172,6 +176,7 @@ const EAGER_UI = [
     "snapshotCache.dropSnapshots",
     "snapshotCache.readSnapshot",
     "snapshotCache.writeSnapshot",
+    "structuralMerge.mergeUnchanged",
     "toolbarSwitch.ToolbarSwitch",
     // Not pieces at all but calls, each a wrapper that loads its server action
     // the first time it is made - which is the point the dynamic pieces make.

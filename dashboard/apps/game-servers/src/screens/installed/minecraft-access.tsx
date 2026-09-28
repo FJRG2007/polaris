@@ -41,6 +41,12 @@ const { useDisplayFormat } = hostUi.displayFormat;
 const { installAccessAction, revokeInstallAccessAction, shareInstallAction } = hostUi.appAppsInstalledIdAccessActions;
 type InstallAccessEntry = AppHostTypes["InstallAccessEntry"];
 type InstallAccessView = AppHostTypes["InstallAccessView"];
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old the kept list may be and still paint first on a revisit. */
+const KEPT_ACCESS_MS = 24 * 3_600_000;
 
 /** How long access may last, in the shape somebody actually thinks about it. */
 const DURATIONS: { value: string; label: string; days: number | null }[] = [
@@ -51,7 +57,17 @@ const DURATIONS: { value: string; label: string; days: number | null }[] = [
 ];
 
 export function MinecraftAccess({ installedAppId }: { installedAppId: string }) {
+    // What this tab last read paints first, so the list is there at once on a
+    // revisit; the read below replaces what moved.
+    const viewKey = `install-access:${installedAppId}`;
     const [view, setView] = useState<InstallAccessView | null>(null);
+    useKeptSnapshot<InstallAccessView>(viewKey, KEPT_ACCESS_MS, (kept) =>
+        setView((current) => current ?? kept.value)
+    );
+    // Whether this visit's own read has answered. The kept list only paints: what
+    // this viewer may share, and whose access is still there, are read again
+    // before anything is given or taken away.
+    const [heard, setHeard] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [sharing, setSharing] = useState(false);
     const [removing, setRemoving] = useState<InstallAccessEntry | null>(null);
@@ -65,9 +81,12 @@ export function MinecraftAccess({ installedAppId }: { installedAppId: string }) 
                 return;
             }
             setError(null);
-            setView(result.view ?? null);
+            const found = result.view ?? null;
+            setView((current) => mergeUnchanged(current, found));
+            setHeard(true);
+            if (found) writeSnapshot(viewKey, found);
         });
-    }, [installedAppId]);
+    }, [installedAppId, viewKey]);
 
     useEffect(() => load(), [load]);
 
@@ -81,7 +100,7 @@ export function MinecraftAccess({ installedAppId }: { installedAppId: string }) 
                             Access given here applies to this server only. It does not open anything else in Polaris.
                         </p>
                     </div>
-                    {view?.canShare && (
+                    {heard && view?.canShare && (
                         <Button size="sm" onClick={() => setSharing(true)}>
                             <UserPlus className="size-4" /> Give access
                         </Button>
@@ -101,7 +120,7 @@ export function MinecraftAccess({ installedAppId }: { installedAppId: string }) 
                             <AccessRow
                                 key={entry.grantId ?? "owner"}
                                 entry={entry}
-                                pending={pending}
+                                pending={pending || !heard}
                                 onRemove={() => {
                                     setRemoveError(null);
                                     setRemoving(entry);
@@ -121,7 +140,7 @@ export function MinecraftAccess({ installedAppId }: { installedAppId: string }) 
                 )}
             </CardBody>
 
-            {view && (
+            {heard && view && (
                 <ShareDialog
                     open={sharing}
                     onOpenChange={setSharing}

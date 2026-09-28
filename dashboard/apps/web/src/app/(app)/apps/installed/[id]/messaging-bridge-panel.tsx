@@ -8,7 +8,8 @@
  * live status, and sends the operator to the Inbox to add or manage them.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useLiveRead } from "@/components/use-live-resource";
 import Link from "next/link";
 import { Hash, Loader2, MessageCircle, MessagesSquare, Plus, Send, Slack, type LucideIcon } from "lucide-react";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
@@ -36,17 +37,13 @@ function platformLabel(channel: ChannelView): string {
 }
 
 export function MessagingBridgePanel() {
-    const [channels, setChannels] = useState<ChannelView[] | null>(null);
-
-    useEffect(() => {
-        let active = true;
-        void inboxStateAction()
-            .then((state) => active && setChannels(state.channels))
-            .catch(() => active && setChannels([]));
-        return () => {
-            active = false;
-        };
-    }, []);
+    // The channels as this tab last saw them paint at once; the fresh list replaces
+    // only what moved. Names and statuses only - no channel's token is in it.
+    const load = useCallback(
+        () => inboxStateAction().then((state) => state.channels).catch((): ChannelView[] => []),
+        []
+    );
+    const { data: channels } = useLiveRead<ChannelView[]>({ load, cacheKey: "installed.messaging-channels" });
 
     return (
         <Card>

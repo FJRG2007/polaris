@@ -40,11 +40,13 @@
  */
 
 import * as core from "@polaris/core";
+import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import {
     createContext,
     useCallback,
     useContext,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState,
@@ -69,6 +71,48 @@ const GATHER_MS = 60;
  * it asks the moment it is looked at again.
  */
 const REVALIDATE_MS = 45_000;
+
+/**
+ * Where the last answers are kept for this tab, so a reload draws every face it
+ * already knew as it was - ring, plate and name - instead of plain and then
+ * growing them. Every face is still asked about in full on its first draw (a
+ * kept answer is never counted as `known`), and a full answer covers everybody
+ * it was asked about, so whatever changed since is replaced within a tick.
+ */
+const KEPT_KEY = "profile-styles";
+const KEPT_MAX_AGE_MS = 24 * 3_600_000;
+
+interface Kept {
+    readonly people: Record<string, unknown>;
+    readonly names: Record<string, string>;
+    readonly called: Record<string, string>;
+}
+
+/** The kept answers, read once per provider. */
+function readKept(): {
+    people: ReadonlyMap<string, core.ProfileStyle>;
+    names: ReadonlyMap<string, string>;
+    called: ReadonlyMap<string, string>;
+} {
+    const kept = readSnapshot<Kept>(KEPT_KEY, KEPT_MAX_AGE_MS)?.value;
+    const strings = (from: unknown): Map<string, string> =>
+        new Map(
+            Object.entries(typeof from === "object" && from !== null ? from : {}).filter(
+                (entry): entry is [string, string] => typeof entry[1] === "string" && entry[1] !== ""
+            )
+        );
+    const people = new Map<string, core.ProfileStyle>();
+    if (kept && typeof kept.people === "object" && kept.people !== null) {
+        // Through the same reader as a live answer: this ends up in a `style`
+        // attribute, and nothing reaches one without being recognised first.
+        for (const [id, style] of Object.entries(kept.people)) {
+            if (typeof style === "object" && style !== null) {
+                people.set(id, core.readProfileStyle(style as Record<string, unknown>));
+            }
+        }
+    }
+    return { people, names: strings(kept?.names), called: strings(kept?.called) };
+}
 
 interface Store {
     readonly people: ReadonlyMap<string, core.ProfileStyle>;
@@ -452,6 +496,25 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
             window.removeEventListener(CHANGED, onTold);
         };
     }, [ask, revalidate]);
+
+    // The kept answers, after hydration and before the paint: the server drew
+    // every face plain, and the first render here has to match it. Only where
+    // nothing live has arrived yet.
+    useLayoutEffect(() => {
+        const kept = readKept();
+        setPeople((current) => (current.size > 0 ? current : kept.people));
+        setNames((current) => (current.size > 0 ? current : kept.names));
+        setCalled((current) => (current.size > 0 ? current : kept.called));
+    }, []);
+
+    // Kept after every change, for the next load of this tab to draw from.
+    useEffect(() => {
+        writeSnapshot<Kept>(KEPT_KEY, {
+            people: Object.fromEntries(people),
+            names: Object.fromEntries(names),
+            called: Object.fromEntries(called)
+        });
+    }, [people, names, called]);
 
     const store = useMemo<Store>(
         () => ({ people, names, called, watch, refresh }),

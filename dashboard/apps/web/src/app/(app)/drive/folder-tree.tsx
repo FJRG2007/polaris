@@ -15,6 +15,7 @@
 import { cn } from "@polaris/ui";
 import type { DriveEntry } from "./types";
 import { readListing, writeListing } from "./listing-cache";
+import { mergeUnchanged } from "@/lib/structural-merge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, Folder, FolderOpen, Loader2, Lock } from "lucide-react";
 
@@ -90,12 +91,11 @@ export function FolderTree({
         async (path: string) => {
             if (requested.current.has(path)) return;
             requested.current.add(path);
+            // A kept listing paints the branch at once; the live one is still
+            // asked for behind it, and only a branch that changed re-renders.
             const cached = readListing(connectionId, path);
-            if (cached) {
-                setChildren((prev) => ({ ...prev, [path]: branchOf(cached) }));
-                return;
-            }
-            setLoading((prev) => new Set(prev).add(path));
+            if (cached) setChildren((prev) => ({ ...prev, [path]: branchOf(cached) }));
+            else setLoading((prev) => new Set(prev).add(path));
             const controller = new AbortController();
             pending.current.push(controller);
             try {
@@ -116,9 +116,15 @@ export function FolderTree({
                 }
                 const entries: DriveEntry[] = Array.isArray(body.entries) ? body.entries : [];
                 writeListing(connectionId, path, entries);
-                setChildren((prev) => ({ ...prev, [path]: branchOf(entries) }));
+                setChildren((prev) => {
+                    const next = mergeUnchanged(prev[path] ?? [], branchOf(entries));
+                    return next === prev[path] ? prev : { ...prev, [path]: next };
+                });
             } catch {
                 if (controller.signal.aborted) return;
+                // A branch painted from the kept listing stays as it was: an
+                // unreachable device is not a folder with nothing in it.
+                if (cached) return;
                 setChildren((prev) => ({ ...prev, [path]: [] }));
                 if (path === root) setError("Could not list this location");
             } finally {

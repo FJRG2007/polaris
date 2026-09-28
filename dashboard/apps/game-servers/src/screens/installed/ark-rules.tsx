@@ -19,6 +19,7 @@
  */
 
 import * as actions from "./ark-actions";
+import { hostUi } from "@polaris/app-host/client";
 import { RestartPlanner } from "./restart-planner";
 import { useCallback, useEffect, useState } from "react";
 import type { ArkRules } from "../../lib/ark/settings-service";
@@ -32,6 +33,13 @@ import {
     type ArkSetting
 } from "../../lib/ark/settings";
 
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old the kept settings may be and still paint first on a revisit. */
+const KEPT_RULES_MS = 24 * 3_600_000;
+
 export function ArkRules({
     installedAppId,
     canManage,
@@ -44,8 +52,21 @@ export function ArkRules({
      *  so a stopped server can be neither read nor changed. */
     running: boolean;
 }) {
+    // What this tab last read paints first, so a revisit is not a skeleton while
+    // the file is read inside the container again; the read replaces what moved.
+    const rulesKey = `ark-rules:${installedAppId}`;
     const [rules, setRules] = useState<ArkRules | null>(null);
     const [loading, setLoading] = useState(true);
+    useKeptSnapshot<ArkRules>(rulesKey, KEPT_RULES_MS, (kept) => {
+        setRules((current) => current ?? kept.value);
+        setLoading(false);
+    });
+    useEffect(() => {
+        if (rules) writeSnapshot(rulesKey, rules);
+    }, [rulesKey, rules]);
+    // Whether this visit's own read has answered. The kept values only paint: no
+    // row can be typed into or switched until the file has been read again.
+    const [fresh, setFresh] = useState(false);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     /** Whether anything has been changed since this screen was opened, which is
@@ -79,7 +100,8 @@ export function ArkRules({
 
     const load = useCallback(async () => {
         const result = await actions.readArkRulesAction(installedAppId);
-        setRules(result);
+        setRules((current) => mergeUnchanged(current, result));
+        setFresh(true);
         setLoading(false);
     }, [installedAppId]);
 
@@ -198,7 +220,7 @@ export function ArkRules({
                                     first={index === 0}
                                     busy={busy === setting.key}
                                     loading={loading}
-                                    disabled={!canManage || !running}
+                                    disabled={!canManage || !running || !fresh}
                                     onChange={(value) => void apply(setting, value)}
                                 />
                             ))}

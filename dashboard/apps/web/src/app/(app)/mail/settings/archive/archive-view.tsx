@@ -20,7 +20,8 @@ import { Download, Upload } from "lucide-react";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailFolderView } from "@/lib/mailbox/views";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useLiveRead } from "@/components/use-live-resource";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { Button, EmptyState, Select, useToast } from "@polaris/ui";
 import { exportSizeAction, importBatchAction, openImportAction } from "@/app/(app)/mail/actions";
@@ -58,24 +59,24 @@ export function ArchiveView({
     const [folderId, setFolderId] = useState("");
     const target = folderId || mine.find((one) => one.role === "archive")?.id || mine[0]?.id || "";
     /** How many messages the download would carry. Null until it is known, so
-     *  the line under the button appears rather than flickering through nought. */
-    const [exportCount, setExportCount] = useState<number | null>(null);
-
-    // Asked whenever the scope changes, because a download of a whole mailbox is
-    // the one on this screen somebody should be able to size up before starting.
-    useEffect(() => {
-        if (!account) return;
-        let current = true;
-        setExportCount(null);
-        void exportSizeAction({ accountId: account.id, folderId: folderId || null }).then(
-            (answer) => {
-                if (current && "count" in answer) setExportCount(answer.count);
-            }
-        );
-        return () => {
-            current = false;
-        };
-    }, [account, folderId]);
+     *  the line under the button appears rather than flickering through nought.
+     *  Asked whenever the scope changes, because a download of a whole mailbox
+     *  is the one on this screen somebody should be able to size up before
+     *  starting - and kept per scope, so coming back paints the last count. */
+    const scopeAccount = account?.id ?? "";
+    const countExport = useCallback(async (): Promise<number> => {
+        const answer = await exportSizeAction({ accountId: scopeAccount, folderId: folderId || null });
+        if (!("count" in answer)) throw new Error(answer.error);
+        return answer.count;
+    }, [scopeAccount, folderId]);
+    const size = useLiveRead({
+        load: countExport,
+        cacheKey: `mail.export-size:${scopeAccount}:${folderId}`,
+        enabled: scopeAccount !== ""
+    });
+    // A kept count whose fresh read failed is not known either: the line goes,
+    // as it did when nothing was kept.
+    const exportCount = size.kept && size.stale !== null ? null : size.data;
 
     if (!account) {
         return (

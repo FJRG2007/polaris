@@ -82,6 +82,12 @@ import { hostUi } from "@polaris/app-host/client";
 
 const { useRuntimeLog } = hostUi.appAppsInstalledIdUseRuntimeLog;
 const { LogViewer } = hostUi.logViewer;
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old the kept commands may be and still paint first on a revisit. */
+const KEPT_COMMANDS_MS = 24 * 3_600_000;
 
 /** One command and what the server said back. */
 interface Reply {
@@ -163,7 +169,22 @@ export function GameConsole({
     /** Which suggestion is highlighted, or none - when none, the arrows walk the
      *  history instead, which is what they did before any of this. */
     const [choice, setChoice] = useState<number | null>(null);
+    // The kept commands this tab last read paint first, so their buttons are there
+    // at once on a revisit; the read below replaces them when they moved.
+    const savedKey = `console-commands:${installedAppId}`;
     const [saved, setSaved] = useState<readonly SavedCommand[]>([]);
+    useKeptSnapshot<readonly SavedCommand[]>(savedKey, KEPT_COMMANDS_MS, (kept) =>
+        setSaved((current) => (current.length > 0 ? current : kept.value))
+    );
+    // Whether this visit's own list has answered. The kept buttons only paint: one
+    // may have been changed or forgotten since, so none of them runs, opens or is
+    // edited until then.
+    const [heard, setHeard] = useState(false);
+    // Every list the server hands back is kept, including the one a save or a
+    // forget returns, so a command forgotten here never comes back on a revisit.
+    useEffect(() => {
+        if (heard) writeSnapshot(savedKey, saved);
+    }, [heard, savedKey, saved]);
     /** The kept command being written, or null while the dialog is shut. */
     const [keeping, setKeeping] = useState<{ id?: string; label: string; command: string } | null>(
         null
@@ -187,7 +208,10 @@ export function GameConsole({
     }, [installedAppId]);
 
     useEffect(() => {
-        void listConsoleCommandsAction(installedAppId).then((answer) => setSaved(answer.commands));
+        void listConsoleCommandsAction(installedAppId).then((answer) => {
+            setSaved((current) => mergeUnchanged<readonly SavedCommand[]>(current, answer.commands));
+            setHeard(true);
+        });
     }, [installedAppId]);
 
     // The items this server has actually been handing out, which is a far better
@@ -381,6 +405,7 @@ export function GameConsole({
                 return;
             }
             setSaved(result.commands);
+            setHeard(true);
             setKeeping(null);
         });
     }
@@ -388,7 +413,10 @@ export function GameConsole({
     function forget(id: string): void {
         startTransition(async () => {
             const result = await deleteConsoleCommandAction(installedAppId, id);
-            if (result.commands) setSaved(result.commands);
+            if (result.commands) {
+                setSaved(result.commands);
+                setHeard(true);
+            }
         });
     }
 
@@ -501,7 +529,7 @@ export function GameConsole({
                         >
                             <button
                                 type="button"
-                                disabled={!running || pending}
+                                disabled={!running || pending || !heard}
                                 onClick={() => pressSaved(entry)}
                                 title={entry.command}
                                 className="max-w-56 truncate px-2 py-1 text-xs transition-colors hover:bg-muted disabled:opacity-50"
@@ -513,7 +541,8 @@ export function GameConsole({
                                     <button
                                         type="button"
                                         aria-label={`More for ${entry.label}`}
-                                        className="border-l border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        disabled={!heard}
+                                        className="border-l border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                     >
                                         <MoreHorizontal className="size-3.5" />
                                     </button>

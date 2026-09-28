@@ -15,6 +15,7 @@
  * these is a jar the server cannot read.
  */
 
+import { hostUi } from "@polaris/app-host/client";
 import { useEffect, useState, useTransition } from "react";
 import { Download, ExternalLink, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Skeleton } from "@polaris/ui";
@@ -24,6 +25,13 @@ import {
     searchSpigotAction
 } from "./minecraft-actions";
 import { parseSpigetList, type SpigotPlugin } from "../../lib/minecraft/spiget";
+
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old a kept reading of the list may be and still paint first on a revisit. */
+const KEPT_PLUGINS_MS = 24 * 3_600_000;
 
 export function SpigotPluginsCard({
     installedAppId,
@@ -40,6 +48,12 @@ export function SpigotPluginsCard({
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<SpigotPlugin[] | null>(null);
     const [onList, setOnList] = useState<SpigotPlugin[] | null>(null);
+    // What this tab last read for this same list paints first; the read below
+    // replaces what moved. Keyed by the list: a reading of another is not this one.
+    const onListKey = `spigot-plugins:${installedAppId}:${saved.join(",")}`;
+    useKeptSnapshot<SpigotPlugin[]>(onListKey, KEPT_PLUGINS_MS, (kept) =>
+        setOnList((current) => current ?? kept.value)
+    );
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -69,7 +83,10 @@ export function SpigotPluginsCard({
             return;
         }
         void readSpigotPluginsAction(installedAppId, saved).then((answer) => {
-            if (active) setOnList(answer.plugins ?? []);
+            if (!active) return;
+            const plugins = answer.plugins ?? [];
+            setOnList((current) => (current === null ? plugins : mergeUnchanged(current, plugins)));
+            if (answer.plugins) writeSnapshot(onListKey, answer.plugins);
         });
         return () => {
             active = false;

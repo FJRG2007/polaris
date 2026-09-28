@@ -14,6 +14,8 @@
 import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { mergeUnchanged } from "@/lib/structural-merge";
+import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { Loader2, Trash2, UserPlus } from "lucide-react";
 import { PersonName, PersonRow } from "@/components/person-name";
 import type { TeamGrantView, TeamMemberView, TeamView } from "@/lib/orgs/org-service";
@@ -39,6 +41,18 @@ const ROLE_OPTIONS = core.TEAM_ROLES.map((role) => ({
     label: core.TEAM_ROLE_LABELS[role]
 }));
 
+/** What is kept of a team between openings: who is on it and what it reaches. */
+interface KeptTeam {
+    members: TeamMemberView[];
+    grants: TeamGrantView[];
+}
+
+const KEPT_MAX_AGE_MS = 24 * 3_600_000;
+
+function teamKey(teamId: string): string {
+    return `org-team:${teamId}`;
+}
+
 export function TeamPanel({
     team,
     orgName,
@@ -59,11 +73,24 @@ export function TeamPanel({
     const [grants, setGrants] = useState<TeamGrantView[]>([]);
     const [canManage, setCanManage] = useState(canAdmin);
     const [loading, setLoading] = useState(false);
+    /** Whether the server has answered for the team on screen. A kept roster is
+     *  shown before that, but nothing on it can be changed: `canManage` still
+     *  belongs to whichever team answered last. */
+    const [heard, setHeard] = useState(false);
     const [identifier, setIdentifier] = useState("");
     const [role, setRole] = useState<core.TeamRole>("member");
     const [error, setError] = useState("");
 
     const teamId = team?.id ?? null;
+
+    /** Take a fresh answer, touching only what moved, and keep it for the next
+     *  opening. Whether the viewer may manage is not kept: that is the server's
+     *  to say each time, never a remembered yes. */
+    const settle = (id: string, members: TeamMemberView[], grants: TeamGrantView[]) => {
+        setMembers((current) => mergeUnchanged(current, members));
+        setGrants((current) => mergeUnchanged(current, grants));
+        writeSnapshot<KeptTeam>(teamKey(id), { members, grants });
+    };
 
     useEffect(() => {
         if (!teamId) {
@@ -72,27 +99,43 @@ export function TeamPanel({
             return;
         }
         let live = true;
-        setLoading(true);
+        // The roster this browser last saw is shown at once; the spinner is only
+        // for a team with nothing kept.
+        const kept = readSnapshot<KeptTeam>(teamKey(teamId), KEPT_MAX_AGE_MS)?.value ?? null;
+        setMembers(kept?.members ?? []);
+        setGrants(kept?.grants ?? []);
+        setLoading(kept === null);
+        setHeard(false);
         setError("");
         void (async () => {
             const result = await runAction(() => teamDetailAction(teamId), setError);
             if (!live) return;
             setLoading(false);
             if (result?.error) setError(result.error);
-            setMembers(result?.members ?? []);
-            setGrants(result?.grants ?? []);
+            // A failed read shows an empty roster beside its error, as it did
+            // before anything was kept, rather than the kept one as if current.
+            if (result?.members && result.grants) settle(teamId, result.members, result.grants);
+            else {
+                setMembers([]);
+                setGrants([]);
+            }
             setCanManage(result?.canManage ?? false);
+            setHeard(true);
         })();
         return () => {
             live = false;
         };
+        // `settle` only sets state and writes the kept copy.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [teamId]);
+
+    /** What the viewer may do here, once the server has said so for this team. */
+    const manage = heard && canManage;
 
     const reload = async () => {
         if (!teamId) return;
         const result = await runAction(() => teamDetailAction(teamId), setError);
-        if (result?.members) setMembers(result.members);
-        if (result?.grants) setGrants(result.grants);
+        if (result?.members && result.grants) settle(teamId, result.members, result.grants);
     };
 
     return (
@@ -156,7 +199,7 @@ export function TeamPanel({
                                                 {member.contact}
                                             </p>
                                         </div>
-                                        {canManage ? (
+                                        {manage ? (
                                             <Select
                                                 value={member.role}
                                                 options={ROLE_OPTIONS}
@@ -181,7 +224,7 @@ export function TeamPanel({
                                                 {core.TEAM_ROLE_LABELS[member.role]}
                                             </span>
                                         )}
-                                        {(canManage || member.userId === currentUserId) && (
+                                        {heard && (canManage || member.userId === currentUserId) && (
                                             <button
                                                 type="button"
                                                 aria-label={
@@ -216,7 +259,7 @@ export function TeamPanel({
                             )}
                         </div>
 
-                        {canManage && (
+                        {manage && (
                             <form
                                 className="border-border flex flex-wrap items-end gap-2 border-t pt-3"
                                 onSubmit={async (event) => {

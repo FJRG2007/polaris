@@ -22,6 +22,7 @@
 
 import Image from "next/image";
 import * as actions from "./ark-actions";
+import { hostUi } from "@polaris/app-host/client";
 import { RestartPlanner } from "./restart-planner";
 import { useCallback, useEffect, useState } from "react";
 import type { ArkModsView } from "../../lib/ark/mods-service";
@@ -41,6 +42,19 @@ import {
     Trash2
 } from "lucide-react";
 
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old a kept list may be and still paint first on a revisit. */
+const KEPT_MODS_MS = 24 * 3_600_000;
+
+/** The suggested mods, grouped, each with what Steam says about it. */
+type ModShelves = readonly {
+    group: string;
+    entries: { suggestion: ArkModSuggestion; item: WorkshopItem | null }[];
+}[];
+
 /** Steam gives sizes in bytes and mods are measured in hundreds of megabytes. */
 function size(bytes: number | null): string {
     if (bytes === null || bytes <= 0) return "";
@@ -59,17 +73,35 @@ export function ArkMods({
      *  container, and the restart is only offered against one. */
     running: boolean;
 }) {
+    // What this tab last read paints first, so a revisit is not a skeleton while
+    // the server and Steam are asked again; the read replaces what moved.
+    const modsKey = `ark-mods:${installedAppId}`;
     const [mods, setMods] = useState<ArkModsView | null>(null);
     const [loading, setLoading] = useState(true);
+    useKeptSnapshot<ArkModsView>(modsKey, KEPT_MODS_MS, (kept) => {
+        setMods((current) => current ?? kept.value);
+        setLoading(false);
+    });
+    useEffect(() => {
+        if (mods) writeSnapshot(modsKey, mods);
+    }, [modsKey, mods]);
+    // Whether this visit's own read has answered. The kept list only paints: every
+    // change below writes the whole list, so none of them is offered on a copy
+    // another admin may have changed since.
+    const [fresh, setFresh] = useState(false);
     const [busy, setBusy] = useState(false);
+    const locked = busy || !fresh;
     const [error, setError] = useState<string | null>(null);
     const [changed, setChanged] = useState(false);
 
     const load = useCallback(async () => {
         const result = await actions.readArkModsAction(installedAppId);
         setLoading(false);
-        if (result.mods) setMods(result.mods);
-        else setError(result.error ?? "The mods could not be read");
+        const found = result.mods;
+        if (found) {
+            setMods((current) => mergeUnchanged(current, found));
+            setFresh(true);
+        } else setError(result.error ?? "The mods could not be read");
     }, [installedAppId]);
 
     useEffect(() => {
@@ -157,7 +189,7 @@ export function ArkMods({
             {canManage && (
                 <AddMod
                     installedAppId={installedAppId}
-                    busy={busy}
+                    busy={locked}
                     onAdd={(id) => void save(withMod(ids, id))}
                     onSetMap={(id) => void setMap(id)}
                 />
@@ -169,7 +201,7 @@ export function ArkMods({
             {canManage && (
                 <ModShelves
                     installedAppId={installedAppId}
-                    busy={busy}
+                    busy={locked}
                     installedIds={[...ids, ...(mods?.mapModId ? [mods.mapModId] : [])]}
                     onAdd={(id) => void save(withMod(ids, id))}
                     onSetMap={(id) => void setMap(id)}
@@ -194,7 +226,7 @@ export function ArkMods({
                                 installed={mods.installed.includes(mods.mapModId)}
                                 knowsDisk={running}
                                 first
-                                busy={busy}
+                                busy={locked}
                                 canManage={canManage}
                                 onRemove={() => void setMap(null)}
                             />
@@ -232,7 +264,7 @@ export function ArkMods({
                                     knowsDisk={running}
                                     first={index === 0}
                                     position={index + 1}
-                                    busy={busy}
+                                    busy={locked}
                                     canManage={canManage}
                                     onUp={
                                         index > 0
@@ -301,19 +333,21 @@ function ModShelves({
     onAdd: (id: string) => void;
     onSetMap: (id: string) => void;
 }) {
-    const [shelves, setShelves] = useState<
-        readonly {
-            group: string;
-            entries: { suggestion: ArkModSuggestion; item: WorkshopItem | null }[];
-        }[]
-    >([]);
+    const shelvesKey = `ark-mod-shelves:${installedAppId}`;
+    const [shelves, setShelves] = useState<ModShelves>([]);
+    useKeptSnapshot<ModShelves>(shelvesKey, KEPT_MODS_MS, (kept) =>
+        setShelves((current) => (current.length > 0 ? current : kept.value))
+    );
     const [open, setOpen] = useState(true);
 
     useEffect(() => {
         void actions
             .readArkModShelvesAction(installedAppId)
-            .then((answer) => setShelves(answer.shelves));
-    }, [installedAppId]);
+            .then((answer) => {
+                setShelves((current) => mergeUnchanged<ModShelves>(current, answer.shelves));
+                writeSnapshot(shelvesKey, answer.shelves);
+            });
+    }, [installedAppId, shelvesKey]);
 
     const shown = shelves
         .map((shelf) => ({

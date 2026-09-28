@@ -19,7 +19,7 @@
 import { Eraser, Loader2 } from "lucide-react";
 import { hostUi } from "@polaris/app-host/client";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
-import { useEffect, useMemo, useState, useTransition, type ComponentProps } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ComponentProps } from "react";
 import { Badge, Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
 import {
     BAN_HITS_MIN,
@@ -48,6 +48,12 @@ import { AnticheatEngineCard } from "./anticheat-engine-card";
 
 const { useConfirm } = hostUi.confirmDialog;
 const { useDisplayFormat } = hostUi.displayFormat;
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old a kept reading may be and still paint first on a revisit. */
+const KEPT_XRAY_MS = 24 * 3_600_000;
 
 const ACTIONS: readonly { readonly value: XrayAction; readonly label: string }[] = [
     { value: "notify", label: "Tell me, and do nothing else" },
@@ -157,12 +163,38 @@ export function MinecraftXray({
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
 
+    // What this tab last read paints first, so the settings and the tables are
+    // there at once on a revisit; the read below replaces what moved.
+    const viewKey = `xray-view:${installedAppId}`;
+    /** Whether the server has answered, after which the kept copy has no say.
+     *  Until then the kept settings and tables are shown but cannot be changed,
+     *  saved or cleared: a draft is only ever started from what the server holds. */
+    const [heard, setHeard] = useState(false);
+    const answered = useRef(false);
+    useKeptSnapshot<XrayView>(viewKey, KEPT_XRAY_MS, (kept) => {
+        if (answered.current) return;
+        setView(kept.value);
+        setDraft(kept.value.settings);
+    });
+    useEffect(() => {
+        if (view) writeSnapshot(viewKey, view);
+    }, [viewKey, view]);
+
     useEffect(() => {
         void readXrayAction(installedAppId).then((answer) => {
-            if (answer.view) {
-                setView(answer.view);
-                setDraft(answer.view.settings);
-            } else setError(answer.error ?? "Anti-cheat could not be read");
+            const fresh = answer.view;
+            if (!fresh) {
+                setError(answer.error ?? "Anti-cheat could not be read");
+                return;
+            }
+            // A save or a clear already answered with a newer view than this read.
+            if (answered.current) return;
+            answered.current = true;
+            setHeard(true);
+            setView((current) => mergeUnchanged(current, fresh));
+            // Nothing could be typed before this answer, so the form simply takes
+            // the server's settings.
+            setDraft((current) => mergeUnchanged(current, fresh.settings));
         });
     }, [installedAppId]);
 
@@ -208,6 +240,8 @@ export function MinecraftXray({
     };
 
     function keepView(next: XrayView): void {
+        answered.current = true;
+        setHeard(true);
         // The figures are only read on open; a save or a clear keeps them.
         setView((current) => ({ ...next, mining: current?.mining ?? next.mining }));
         setDraft(next.settings);
@@ -250,6 +284,9 @@ export function MinecraftXray({
     // and the tables wait. The reading goes into the container for the players'
     // stats files and the player list, which is the slow part of this tab.
     const loaded = view !== null;
+    /** Changing anything waits for the server's answer, as the form did when it
+     *  was only drawn after it. */
+    const editable = canManage && heard;
     const reading = loaded ? "loaded" : error ? "failed" : "reading";
 
     return (
@@ -270,7 +307,7 @@ export function MinecraftXray({
                         <LoadedSwitch
                             state={reading}
                             checked={draft.enabled}
-                            disabled={!canManage || view?.refusal != null}
+                            disabled={!editable || view?.refusal != null}
                             onChange={(enabled) => change({ enabled })}
                             aria-label="Hide honeypots"
                         />
@@ -293,7 +330,7 @@ export function MinecraftXray({
                                         min={4}
                                         max={40}
                                         value={draft.perDimension}
-                                        disabled={!canManage}
+                                        disabled={!editable}
                                         onChange={(event) =>
                                             change({
                                                 perDimension: Math.round(
@@ -310,7 +347,7 @@ export function MinecraftXray({
                                     <span>Ancient debris in the Nether too</span>
                                     <Switch
                                         checked={draft.nether}
-                                        disabled={!canManage}
+                                        disabled={!editable}
                                         onChange={(nether) => change({ nether })}
                                         aria-label="Hide ancient debris in the Nether"
                                     />
@@ -328,7 +365,7 @@ export function MinecraftXray({
                                         value: one.value,
                                         label: one.label
                                     }))}
-                                    disabled={!canManage}
+                                    disabled={!editable}
                                     aria-label="What happens when somebody is confirmed"
                                 />
                             </label>
@@ -339,7 +376,7 @@ export function MinecraftXray({
                                     <Input
                                         value={draft.warning}
                                         maxLength={400}
-                                        disabled={!canManage}
+                                        disabled={!editable}
                                         onChange={(event) =>
                                             change({ warning: event.target.value })
                                         }
@@ -361,7 +398,7 @@ export function MinecraftXray({
                                             min={BAN_HITS_MIN}
                                             max={10}
                                             value={draft.banHits}
-                                            disabled={!canManage}
+                                            disabled={!editable}
                                             onChange={(event) =>
                                                 change({
                                                     banHits: Math.round(
@@ -381,7 +418,7 @@ export function MinecraftXray({
                                             min={1}
                                             max={168}
                                             value={draft.banHours}
-                                            disabled={!canManage}
+                                            disabled={!editable}
                                             onChange={(event) =>
                                                 change({
                                                     banHours: Math.round(
@@ -413,7 +450,7 @@ export function MinecraftXray({
                         <LoadedSwitch
                             state={reading}
                             checked={draft.movement}
-                            disabled={!canManage || view?.refusal != null}
+                            disabled={!editable || view?.refusal != null}
                             onChange={(movement) => change({ movement })}
                             aria-label="Watch for flying and teleporting"
                         />
@@ -438,7 +475,7 @@ export function MinecraftXray({
                         </span>
                         <Button
                             disabled={
-                                !loaded || !canManage || pending || !dirty || problem !== null
+                                !loaded || !editable || pending || !dirty || problem !== null
                             }
                             onClick={save}
                         >
@@ -530,7 +567,7 @@ export function MinecraftXray({
                                         <PlayerIconAction
                                             label={`Clear ${suspect.name}`}
                                             icon={<Eraser className="size-4" />}
-                                            disabled={pending}
+                                            disabled={pending || !heard}
                                             onClick={() => void clear(suspect.name)}
                                         />
                                     )}

@@ -20,6 +20,12 @@ import { MAIL_BODY_KEEP_MAX } from "@polaris/core";
 import { useEffect, useState, useTransition } from "react";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { mailBodyHeldAction, saveMailBodyKeepAction } from "./actions";
+import { writeSnapshot } from "@/lib/snapshot-cache";
+import { useKeptSnapshot } from "@/components/use-live-resource";
+
+/** Where the last count is kept, and how old it may be and still be shown. */
+const HELD_KEY = "retention:mail-held";
+const KEPT_MAX_AGE_MS = 24 * 3_600_000;
 
 /** What the card says about the count while it is still being read, and when it
  *  could not be. Neither is an error worth the form's own error line: the
@@ -40,12 +46,18 @@ export function MailBodyForm({ kept }: { kept: number }) {
     // scan of the whole message table, and awaited on the server it stood
     // between somebody and this screen. The card is up immediately and the
     // number follows.
+    // The count last read is shown at once, and replaced when the scan lands.
     const [held, setHeld] = useState<number | null>(null);
     const [countFailed, setCountFailed] = useState(false);
+    useKeptSnapshot<number>(HELD_KEY, KEPT_MAX_AGE_MS, ({ value }) =>
+        setHeld((current) => current ?? value)
+    );
 
     useEffect(() => {
         void runAction(() => mailBodyHeldAction(), () => setCountFailed(true)).then((result) => {
-            if (result) setHeld(result.held);
+            if (!result) return;
+            setHeld(result.held);
+            writeSnapshot(HELD_KEY, result.held);
         });
     }, []);
 

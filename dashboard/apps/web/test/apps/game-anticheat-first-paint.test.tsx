@@ -18,6 +18,9 @@ const engineAsked = vi.fn();
 
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
+        liveRead: { useKeptSnapshot: () => undefined },
+        snapshotCache: { readSnapshot: () => null, writeSnapshot: () => undefined, dropSnapshots: () => undefined },
+        structuralMerge: { mergeUnchanged: <T,>(_previous: T, next: T) => next },
         confirmDialog: { useConfirm: () => [async () => true, null] },
         displayFormat: { useDisplayFormat: () => ({ dateTime: (at: number) => String(at) }) }
     }

@@ -18,6 +18,7 @@
 import Link from "next/link";
 import { GameConsole } from "./game-console";
 import { hytaleFilesAction } from "./hytale-actions";
+import { hostUi } from "@polaris/app-host/client";
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, CardBody, Skeleton } from "@polaris/ui";
 import { HYTALE_PORT, type HytaleFiles } from "../../lib/hytale/paths";
@@ -27,6 +28,12 @@ import { CheckCircle2, FolderOpen, Loader2, RefreshCw, TriangleAlert } from "luc
  *  an upload is answered by the screen before somebody goes back to it, rare
  *  enough that a server sitting unfinished for a week costs nothing. */
 const LOOK_EVERY_MS = 10_000;
+/** How old the last answer may be and still paint first on a revisit. */
+const KEPT_FILES_MS = 24 * 3_600_000;
+
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
 
 export function HytalePanel({
     installedAppId,
@@ -37,9 +44,18 @@ export function HytalePanel({
     applicationId: string | null;
     running: boolean;
 }) {
+    // What this tab last found paints first, so a revisit is not a skeleton while
+    // the volume is read again; the look below replaces it when it differs.
+    const filesKey = `hytale-files:${installedAppId}`;
     const [files, setFiles] = useState<HytaleFiles | null>(null);
+    useKeptSnapshot<HytaleFiles>(filesKey, KEPT_FILES_MS, (kept) =>
+        setFiles((current) => current ?? kept.value)
+    );
     const [error, setError] = useState<string | null>(null);
     const [looking, setLooking] = useState(false);
+    // Whether this visit has had an answer. The kept files only paint: the poll
+    // below starts from what this visit found, as it did before anything was kept.
+    const [lookedOnce, setLookedOnce] = useState(false);
 
     const look = useCallback(async () => {
         setLooking(true);
@@ -50,8 +66,11 @@ export function HytalePanel({
             return;
         }
         setError(null);
-        setFiles(result.files ?? null);
-    }, [installedAppId]);
+        setLookedOnce(true);
+        const found = result.files ?? null;
+        setFiles((current) => mergeUnchanged(current, found));
+        if (found) writeSnapshot(filesKey, found);
+    }, [installedAppId, filesKey]);
 
     useEffect(() => {
         void look();
@@ -59,7 +78,7 @@ export function HytalePanel({
 
     // Only while something is missing: a server that is running has nothing left
     // for this to find, and a poll against a container costs a command each time.
-    const waiting = files !== null && files.read && !(files.jar && files.assets);
+    const waiting = lookedOnce && files !== null && files.read && !(files.jar && files.assets);
     useEffect(() => {
         if (!waiting) return;
         const timer = setInterval(() => void look(), LOOK_EVERY_MS);

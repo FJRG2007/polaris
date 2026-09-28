@@ -11,8 +11,9 @@
  */
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
 import { SettingsCard } from "../project-settings";
+import { useLiveRead } from "@/components/use-live-resource";
 import { CheckCircle2, CircleDashed, ExternalLink, Loader2 } from "lucide-react";
 import { CloudflareMark, DockerMark, GitHubMark } from "@/components/brand-icons";
 import { cloudflareAccountStatusAction, githubReposAction, listRegistryCredentialsAction } from "../actions";
@@ -24,17 +25,17 @@ interface IntegrationState {
 }
 
 export function IntegrationsSection({ projectId }: { projectId: string }) {
-    const [state, setState] = useState<IntegrationState | null>(null);
-
-    useEffect(() => {
-        let active = true;
-        void Promise.all([
-            githubReposAction().catch(() => ({ connected: false, login: null, repos: [] })),
-            cloudflareAccountStatusAction().catch(() => null),
-            listRegistryCredentialsAction().catch(() => [])
-        ]).then(([github, cloudflare, registries]) => {
-            if (!active) return;
-            setState({
+    // Instance-wide state with nothing secret in it - whether each is connected,
+    // the account names and the registry logins - so the last answer paints at
+    // once and the fresh one replaces only what moved.
+    const load = useCallback(
+        async (): Promise<IntegrationState> => {
+            const [github, cloudflare, registries] = await Promise.all([
+                githubReposAction().catch(() => ({ connected: false, login: null, repos: [] })),
+                cloudflareAccountStatusAction().catch(() => null),
+                listRegistryCredentialsAction().catch(() => [])
+            ]);
+            return {
                 github: { connected: github.connected, login: github.login, repos: github.repos.length },
                 cloudflare: {
                     connected: cloudflare?.connected ?? false,
@@ -42,12 +43,13 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                     dnsReady: cloudflare?.dnsReady ?? false
                 },
                 registries: registries.map((entry) => ({ registry: entry.registry, username: entry.username }))
-            });
-        });
-        return () => {
-            active = false;
-        };
-    }, [projectId]);
+            };
+        },
+        // Asked again when the project changes, as it always was.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [projectId]
+    );
+    const { data: state } = useLiveRead<IntegrationState>({ load, cacheKey: "deploy.integrations" });
 
     if (!state) {
         return (

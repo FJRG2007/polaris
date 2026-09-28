@@ -38,6 +38,8 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useRuntimeLog } from "@/app/(app)/apps/installed/[id]/use-runtime-log";
 import { CONSUMPTION_METRICS, PLAYER_METRICS } from "@/components/metrics-specs";
 import { dropSnapshots, readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
+import { mergeUnchanged } from "@/lib/structural-merge";
+import { useKeptSnapshot, useLiveRead } from "@/components/use-live-resource";
 
 const ShareDialog = dynamic(
     () => import("@/components/access/share-dialog").then((module) => module.ShareDialog),
@@ -110,7 +112,9 @@ export const clientHost = {
     runAction: { runAction },
     sessionScope: { useSessionScope },
     sharedStream: { subscribeSharedStream },
+    liveRead: { useKeptSnapshot, useLiveRead },
     snapshotCache: { dropSnapshots, readSnapshot, writeSnapshot },
+    structuralMerge: { mergeUnchanged },
     toolbarSwitch: { ToolbarSwitch }
 };
 

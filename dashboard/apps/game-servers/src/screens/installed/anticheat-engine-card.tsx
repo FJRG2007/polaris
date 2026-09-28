@@ -14,6 +14,12 @@ import type { AnticheatState } from "../../lib/minecraft/polaris-anticheat-servi
 import { anticheatStateAction, setAnticheatAction } from "./anticheat-engine-actions";
 
 const { useConfirm } = hostUi.confirmDialog;
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
+
+/** How old the kept switch may be and still paint first on a revisit. */
+const KEPT_STATE_MS = 24 * 3_600_000;
 
 export function AnticheatEngineCard({
     installedAppId,
@@ -22,15 +28,32 @@ export function AnticheatEngineCard({
     installedAppId: string;
     canManage: boolean;
 }) {
+    // What this tab last read paints first, so the switch is not blank on a
+    // revisit; the read below replaces it when it moved.
+    const stateKey = `anticheat-engine:${installedAppId}`;
     const [state, setState] = useState<AnticheatState | null>(null);
+    useKeptSnapshot<AnticheatState>(stateKey, KEPT_STATE_MS, (kept) =>
+        setState((current) => current ?? kept.value)
+    );
+    // Whether this visit's own read has answered. The kept switch only paints:
+    // flipping it restarts the server, so it waits on the fresh state.
+    const [heard, setHeard] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
 
     useEffect(() => {
+        if (state) writeSnapshot(stateKey, state);
+    }, [stateKey, state]);
+
+    useEffect(() => {
         void anticheatStateAction(installedAppId).then((answer) => {
-            if (answer.state) setState(answer.state);
+            const found = answer.state;
+            if (found) {
+                setState((current) => mergeUnchanged(current, found));
+                setHeard(true);
+            }
             else setError(answer.error ?? "Could not read the anti-cheat");
         });
     }, [installedAppId]);
@@ -95,6 +118,7 @@ export function AnticheatEngineCard({
                         disabled={
                             !canManage ||
                             pending ||
+                            !heard ||
                             state === null ||
                             (!state.on && (!state.supported || !state.reachable))
                         }
