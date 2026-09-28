@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { reachAdviceFor } from "../../../../../../lib/minecraft/reach";
 import { readLastSeen } from "../../../../../../lib/games-activity-service";
+import { idleSince, lookIfDue } from "../../../../../../lib/minecraft/activity";
 import { sweepWatchedGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
 import { drainQueue, pendingFor } from "../../../../../../lib/minecraft/queue-service";
 import { sweepInventorySnapshots } from "../../../../../../lib/minecraft/inventory-service";
@@ -18,7 +19,8 @@ import {
     getServerFirewall,
     getServerRoster,
     getServerStatus,
-    sharingInstallReads
+    sharingInstallReads,
+    withServerContainer
 } from "../../../../../../lib/minecraft/service";
 import { host } from "@polaris/app-host";
 
@@ -108,7 +110,15 @@ export async function GET(
                 // screen that grants them is also when the due ones are lifted.
                 wantsRoster && status.answering
                     ? sweepTimeouts(server.ownerId, id).catch(() => 0)
-                    : 0
+                    : 0,
+                // Since when each of them has not moved, turned or fought, for
+                // the AFK mark. Looked at no more often than every few seconds
+                // however many screens ask.
+                wantsRoster && online.length > 0
+                    ? withServerContainer(server.ownerId, id, async (container) =>
+                          container.running ? idleSince(await lookIfDue(id, container)) : null
+                      ).catch(() => null)
+                    : null
             ] as const);
             return {
                 status,
@@ -122,11 +132,12 @@ export async function GET(
                 pending: first[8],
                 online,
                 live: second[0],
-                levels: second[1]
+                levels: second[1],
+                idle: second[3]
             };
         });
         const { status, reach, access, firewall, sessions, timeouts, lastLevels, pending } = read;
-        const { online, live, levels } = read;
+        const { online, live, levels, idle } = read;
         /*
          * What the server last said about who may play on it.
          *
@@ -219,6 +230,7 @@ export async function GET(
             levels,
             lastLevels,
             pending,
+            idle,
             now: new Date().toISOString()
         });
     } catch (caught) {

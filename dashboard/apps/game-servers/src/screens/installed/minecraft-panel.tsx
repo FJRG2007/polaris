@@ -140,6 +140,8 @@ interface ServerReading {
     /** What experience level each player who is on right now has reached. Only the
      *  moderation screen asks for it, and only Java can answer. */
     levels: Readonly<Record<string, number>>;
+    /** Since when each player on has not moved, turned or fought, by name. */
+    idle: Readonly<Record<string, number>>;
     /** The level each player was last seen on, for the rows of players who are
      *  not on right now. */
     lastLevels: Readonly<Record<string, RememberedLevel>>;
@@ -217,6 +219,7 @@ export function MinecraftPanel({
         now: Date.now(),
         timeouts: [],
         levels: {},
+        idle: {},
         lastLevels: game?.lastLevels ?? {},
         pending: []
     });
@@ -246,6 +249,7 @@ export function MinecraftPanel({
                 seen?: Record<string, PlayerSeen>;
                 timeouts?: PlayerTimeout[];
                 levels?: Record<string, number>;
+                idle?: Record<string, number> | null;
                 lastLevels?: Record<string, RememberedLevel>;
                 pending?: QueuedAction[];
                 now?: string;
@@ -318,6 +322,7 @@ export function MinecraftPanel({
                 // Kept between polls of the same screen so the column does not
                 // blink empty on a read the server was too busy to answer.
                 levels: data.levels ?? (wantsRoster ? current.levels : {}),
+                idle: data.idle ?? (wantsRoster ? current.idle : {}),
                 lastLevels: data.lastLevels ?? current.lastLevels,
                 now: data.now ? Date.parse(data.now) : current.now
             }));
@@ -522,6 +527,7 @@ export function MinecraftPanel({
                     now={reading.now}
                     timeouts={reading.timeouts}
                     levels={reading.levels}
+                    idle={reading.idle}
                     lastLevels={reading.lastLevels}
                     pending={reading.pending}
                     passwords={loginOn ? (login.state?.players ?? []) : null}

@@ -26,6 +26,7 @@ import * as trivia from "./trivia-bank";
 import { host } from "@polaris/app-host";
 import { readSchedule } from "../schedule";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
+import * as playing from "../activity";
 import { containerFileSize, readContainerRange } from "../../container-files";
 import {
     editionOf,
@@ -73,10 +74,6 @@ interface Loop {
 }
 
 const loops = new Map<string, Loop>();
-/** Servers whose combat counters this process has made sure exist. */
-const combatReady = new Set<string>();
-/** What each server's players were last seen doing, to tell playing from idle. */
-const activity = new Map<string, Map<string, plan.Seen>>();
 
 // ------------------------------------------------------------------ storage
 
@@ -207,7 +204,7 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
             () => []
         );
     }
-    const seen = activity.get(installedAppId);
+    const seen = playing.seenOn(installedAppId);
     return {
         config,
         run: run
@@ -472,7 +469,7 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
 
     if (now - loop.lastSample >= SAMPLE_EVERY_MS) {
         loop.lastSample = now;
-        const seen = await look(installedAppId, server);
+        const seen = await playing.lookAt(installedAppId, server);
         const known = new Set(loop.run.participants.map((name) => name.toLowerCase()));
         const joined = [...seen.values()].filter((one) => !known.has(one.name.toLowerCase()));
         if (joined.length > 0) {
@@ -1409,35 +1406,12 @@ async function sample(
     installedAppId: string
 ): Promise<Map<string, plan.Seen> | null> {
     const loop = loops.get(installedAppId);
-    if (loop?.link?.server.running) return look(installedAppId, loop.link.server);
+    if (loop?.link?.server.running) return playing.lookAt(installedAppId, loop.link.server);
     return withServerContainer(ownerId, installedAppId, async (server) =>
-        server.running ? look(installedAppId, server) : null
+        server.running ? playing.lookAt(installedAppId, server) : null
     );
 }
 
-async function look(
-    installedAppId: string,
-    server: ServerContainer
-): Promise<Map<string, plan.Seen>> {
-    const positions = commands.readWhere(await server.say([commands.WHERE]));
-    const facing = commands.readFacing(await server.say([commands.FACING]));
-    const dimensions = commands.readDimensions(await server.say([commands.DIMENSIONS]));
-    // Made once per server this process has looked at; adding one that is there
-    // already is refused by the game, harmlessly.
-    if (!combatReady.has(installedAppId)) {
-        await server.sayAll(commands.COMBAT_OBJECTIVES);
-        combatReady.add(installedAppId);
-    }
-    const hurt = commands.readScores(await server.say([commands.READ_HURT]), commands.HURT);
-    const hit = commands.readScores(await server.say([commands.READ_HIT]), commands.HIT);
-    const seen = plan.observe(activity.get(installedAppId) ?? new Map(), positions, facing, Date.now(), {
-        dimensions,
-        hurt,
-        hit
-    });
-    activity.set(installedAppId, seen);
-    return seen;
-}
 
 // ------------------------------------------------------------------ the sweep
 
@@ -1659,8 +1633,7 @@ async function deliverPending(
  *  process has. A test clock that starts over would otherwise meet a fight
  *  recorded "later" by the test before it. */
 export function forgetPlayers(): void {
-    activity.clear();
-    combatReady.clear();
+    playing.forgetActivity();
 }
 
 /** For a test: what the loops hold. */

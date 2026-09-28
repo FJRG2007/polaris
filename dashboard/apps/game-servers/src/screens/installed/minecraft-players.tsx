@@ -42,6 +42,7 @@ import {
     playerConfirm,
     playerFilters,
     playerMenuItem,
+    AFK_AFTER_MS,
     playerPresence,
     playerStanding
 } from "../../lib/player-vocabulary";
@@ -99,6 +100,9 @@ const { useDisplayFormat } = hostUi.displayFormat;
  *  asks for that one. */
 const FILTERS = playerFilters({ operators: true });
 
+/** Nobody known to be idle: the screen before the first answer about it. */
+const NOBODY_IDLE: Readonly<Record<string, number>> = {};
+
 type Filter = "all" | "online" | "allowed" | "operators" | "banned";
 
 export function MinecraftPlayers({
@@ -112,6 +116,7 @@ export function MinecraftPlayers({
     now,
     timeouts,
     levels,
+    idle = NOBODY_IDLE,
     lastLevels,
     pending: waiting,
     passwords,
@@ -145,6 +150,8 @@ export function MinecraftPlayers({
     /** What experience level each player who is on has reached, by name. Only
      *  players standing on the server have one, and only Java can be asked. */
     levels: Readonly<Record<string, number>>;
+    /** Since when each player on has not moved, turned or fought, by name. */
+    idle?: Readonly<Record<string, number>>;
     /** The level each player was last seen on, for the rows of players who are
      *  not on right now. */
     lastLevels: Readonly<Record<string, RememberedLevel>>;
@@ -654,6 +661,8 @@ export function MinecraftPlayers({
                         onGamemode={setGamemode}
                         level={levels[player.name] ?? null}
                         lastLevel={remembered.get(player.name.toLowerCase()) ?? null}
+                        idleSince={idle[player.name] ?? null}
+                        now={now}
                         timeout={timeoutFor(timeouts, player.name)}
                         waiting={
                             waiting.filter(
@@ -849,6 +858,8 @@ function PlayerRow({
     timeout,
     level,
     lastLevel,
+    idleSince,
+    now,
     waiting,
     onModerate,
     onModerateWithConfirm,
@@ -874,6 +885,10 @@ function PlayerRow({
     /** The level they were on the last time they were, for somebody who is not
      *  on now. */
     lastLevel: RememberedLevel | null;
+    /** Since when they have done nothing, while they are on; null when not known. */
+    idleSince: number | null;
+    /** The server's clock. */
+    now: number;
     /** How many decisions are still waiting to reach this player. */
     waiting: number;
     onModerate: (input: Omit<MinecraftModeration, "installedAppId">) => void;
@@ -955,7 +970,7 @@ function PlayerRow({
             )}
             <td className="px-3 py-2">
                 {read ? (
-                    <StatusCell player={player} onOpen={onOpen} />
+                    <StatusCell player={player} idleSince={idleSince} now={now} onOpen={onOpen} />
                 ) : (
                     <Skeleton className="h-5 w-16" />
                 )}
@@ -1065,22 +1080,34 @@ function PlayerRow({
 /**
  * What a player is doing, in the words somebody watching the server would use.
  *
- * Only what the server actually reports. Vanilla Minecraft has no idea of
- * idleness - nothing answers it and nothing prints it - so there is no "away"
- * here: it could only be guessed from how long somebody has been quiet, and a
- * player mining in silence would be labelled away to the operator about to kick
- * them.
+ * AFK is read from outside the game, which has no idea of it: nobody who has
+ * moved, turned their head or fought in the last few minutes is AFK, so a
+ * player mining in silence is still playing - quiet in the chat is not the
+ * test. Somebody standing still and looking at one spot the whole time is.
  */
 function StatusCell({
     player,
+    idleSince,
+    now,
     onOpen
 }: {
     player: PlayerEntry;
+    /** Since when they have done nothing, while they are on. */
+    idleSince: number | null;
+    /** The server's clock, which the time above was read against. */
+    now: number;
     onOpen: (dialog: PlayerDialog) => void;
 }) {
     const format = useDisplayFormat();
-    const badge =
-        player.presence === "playing" ? (
+    const away = player.presence === "playing" && idleSince !== null && now - idleSince >= AFK_AFTER_MS;
+    const badge = away ? (
+        <Badge
+            variant="warning"
+            title={`${player.name} has not moved, turned or fought for ${Math.floor((now - idleSince) / 60_000)} minutes`}
+        >
+            {playerPresence.afk}
+        </Badge>
+    ) : player.presence === "playing" ? (
             <Badge variant="success">{playerPresence.playing}</Badge>
         ) : player.presence === "connecting" ? (
             <Badge variant="warning">{playerPresence.connecting}</Badge>
