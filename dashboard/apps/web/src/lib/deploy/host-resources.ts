@@ -88,7 +88,14 @@ export function volumeVerdict(input: {
               }
             : {
                   verdict: "review",
-                  reason: "A Polaris app that no longer exists made it. It has been used recently."
+                  // Only a use Polaris saw is called one. Never seen in use means
+                  // the notes are younger than the grace, not that anything used
+                  // it: these rows start the day Polaris began keeping them.
+                  reason: note?.lastUsedAt
+                      ? `A Polaris app that no longer exists made it. Something used it ${quiet === 0 ? "today" : `${quiet} days ago`}.`
+                      : note
+                        ? `A Polaris app that no longer exists made it. Nothing has been seen using it in the ${quiet ?? 0} days Polaris has been watching; it counts as safe after ${ORPHAN_GRACE_DAYS}.`
+                        : "A Polaris app that no longer exists made it. Polaris has never seen it in use."
               };
     }
     return {

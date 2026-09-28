@@ -78,7 +78,8 @@ function unusedFor(volume: HostVolume): string | null {
     const when = age(since);
     if (!when) return null;
     if (volume.lastUsedAt) return `Last used ${when}`;
-    return when === "today" ? "Not seen in use yet" : `Not seen in use since ${when}`;
+    // "Since 3 days ago" read as a use 3 days ago; it is when watching began.
+    return when === "today" ? "Not seen in use yet" : `Never seen in use (watched since ${when})`;
 }
 
 export function ServerStorage() {

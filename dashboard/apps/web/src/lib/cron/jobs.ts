@@ -43,6 +43,7 @@ import { pollSpotify } from "@/lib/presence-activity/spotify-poll";
 import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
+import { reapLeftoverContainers } from "@/lib/agents/leftover-containers";
 import { sealAuditChain, verifyAuditChain } from "@/lib/audit-chain";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
@@ -614,9 +615,14 @@ export async function runJobBody(job: ScheduledJob): Promise<unknown> {
  * browser they are signed in on.
  *
  * Neither failing may stop the other: they touch different machines, and a
- * daemon that will not answer about one has nothing to do with the other.
+ * daemon that will not answer about one has nothing to do with the other. A
+ * third pass takes down the containers any of them - or a Stop - ended without
+ * managing to remove.
  */
 async function sweepAgentLeftovers(): Promise<void> {
     await sweepSilentSessions().catch(() => 0);
     await sweepExpiredSignins().catch(() => 0);
+    // After both: what they ended in this pass is inside its grace and waits for
+    // the next one; what an earlier pass or a Stop failed to take down goes now.
+    await reapLeftoverContainers().catch(() => 0);
 }
