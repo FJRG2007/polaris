@@ -715,9 +715,42 @@ async function countdown(
             if (left > 5) lines.push(arenaService.joinBar(loop.run, language));
         }
         await server.sayAll(lines);
+        const max = Math.max(1, loop.countdown, catalog.takesJoiners(preset) ? catalog.JOIN_SECONDS : 0);
+        betweenTicks(loop, server, "countdown", () => {
+            const next = (loop.run.startsAt - Date.now()) / 1000;
+            if (next <= 0) return [];
+            const mark = Math.ceil(next);
+            const extra: string[] = [];
+            if (mark <= 5 && !loop.sounded.has(mark)) {
+                loop.sounded.add(mark);
+                extra.push(commands.sound(commands.SOUNDS.tick), `title @a actionbar ${commands.text(`&e${mark}`)}`);
+            }
+            return [...commands.barUpdate(messages.startsInBar(title, next, language), next, max), ...extra];
+        });
         return;
     }
     await begin(installedAppId, loop, server, now);
+}
+
+/**
+ * The boss bar moved on once more halfway to the next tick, so its clock counts
+ * down a second at a time rather than two: the loop runs every two seconds,
+ * which is right for everything else it does. Skipped if the event has moved on
+ * or ended by then.
+ */
+function betweenTicks(
+    loop: Loop,
+    server: ServerContainer,
+    phase: stored.EventRun["phase"],
+    lines: () => string[]
+): void {
+    const run = loop.run;
+    const timer = setTimeout(() => {
+        if (loop.finishing || loop.run.phase !== phase || loop.run.startsAt !== run.startsAt) return;
+        const said = lines();
+        if (said.length > 0) void server.sayAll(said).catch(() => undefined);
+    }, TICK_MS / 2);
+    timer.unref?.();
 }
 
 /** What a gathering or a rare catch is for, said with the rules. */
@@ -888,6 +921,12 @@ async function play(
     // The boss's bar shows its health, and a horde defence's the wave.
     if (preset.kind !== "world-boss" && preset.kind !== "waves") {
         lines.push(...commands.barUpdate(messages.barName(preset.name, left), left, total));
+        betweenTicks(loop, server, "running", () => {
+            const next = (loop.run.endsAt - Date.now()) / 1000;
+            return next > 0
+                ? commands.barUpdate(messages.barName(preset.name, next), next, total)
+                : [];
+        });
     }
     // Every other tick: the game adds the statistics up faster than anybody
     // reads a leaderboard, and it keeps the batch sent to the server small.
