@@ -1209,7 +1209,14 @@ async function groundAnswer(
         const output = await server.say([line]);
         const answer = commands.readTest(output);
         if (answer === "failed") return "failed";
-        if (answer !== "passed") return commands.nameRefused(output) ? "refused" : "unsure";
+        if (answer === "passed") continue;
+        if (commands.nameRefused(output)) return "refused";
+        // A chain of conditions answers nothing at all when one of them does not
+        // hold - only a chain that holds all the way says "Test passed". Silence
+        // is therefore "this is one of the world's own blocks", not a reply that
+        // never came.
+        if (commands.silent(output)) return "failed";
+        return "unsure";
     }
     return "passed";
 }

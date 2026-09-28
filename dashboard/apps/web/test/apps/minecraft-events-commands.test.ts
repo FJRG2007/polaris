@@ -1687,3 +1687,12 @@ describe("reading scores the way a real server answers", () => {
         );
     });
 });
+
+describe("a chain of conditions over RCON", () => {
+    it("reads silence as a chain that did not hold, and anything said as something said", () => {
+        expect(commands.silent("")).toBe(true);
+        expect(commands.silent("\u001b[0m \n")).toBe(true);
+        expect(commands.silent("Test passed \u001b[0m")).toBe(false);
+        expect(commands.silent("That position is not loaded")).toBe(false);
+    });
+});

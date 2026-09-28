@@ -298,7 +298,9 @@ function answer(line: string): string {
             world.unsureGround -= 1;
             return "That position is not loaded";
         }
-        return world.built ? "Test passed" : "Test failed";
+        // As Offgrid answers: a chain that holds says "Test passed"; one where any
+        // condition fails says nothing at all.
+        return world.built ? "Test passed" : "\u001b[0m\n";
     }
     if (
         line === "execute as @a run data get entity @s SpawnX" ||

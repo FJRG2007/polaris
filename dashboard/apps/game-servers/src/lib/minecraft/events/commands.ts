@@ -723,6 +723,13 @@ export function builtUnder(
     return lines;
 }
 
+/** Whether the game said nothing: RCON's reply with its colour reset and blank
+ *  space taken away. */
+export function silent(output: string): boolean {
+    // eslint-disable-next-line no-control-regex
+    return stripFormatting(output).replace(/\u001b?\[[0-9;]*m/g, "").trim().length === 0;
+}
+
 /** Whether the game refused a block name it does not know, rather than answering. */
 export function nameRefused(output: string): boolean {
     return /unknown block|<--\[HERE\]/i.test(output);
