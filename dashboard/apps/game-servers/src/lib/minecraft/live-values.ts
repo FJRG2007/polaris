@@ -15,7 +15,9 @@ import type { ServerContainer } from "./service";
 import * as events from "./player-events";
 import { linkedChannels, readChatLink, type ChatLink } from "./chat-link";
 import { searchContainerTail } from "../container-files";
+import { eventWins, readEventState } from "./events/state";
 import {
+    EVENTS_RANKING,
     INLINE_TOP,
     LEVEL_RANKING,
     STATS_RANKINGS,
@@ -136,6 +138,10 @@ export async function liveContext(
             const ranked = statsRanking(name, figures);
             list(name, ranked, ranked.slice(0, INLINE_TOP));
         }
+    }
+    if (used.has(EVENTS_RANKING)) {
+        const ranked = rankLines(eventWins(readEventState(config)));
+        list(EVENTS_RANKING, ranked, ranked.slice(0, INLINE_TOP));
     }
     if (DEATH_VARIABLES.some((name) => used.has(name))) {
         const death = await lastDeath(installedAppId, config, server ?? null);
