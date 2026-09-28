@@ -31,6 +31,7 @@ import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
 import type { ExecResult, RuntimePorts, WorldTrimOptions } from "@polaris/deploy";
+import { inRconTurn } from "./rcon-turn";
 import { audienceNames, namedByPolaris, parseTarget, type Roster } from "./announce-target";
 import { announcementCommands, announcementProblems, type Announcement } from "./announcement";
 
@@ -504,6 +505,17 @@ async function execCommand(
     return withPorts(install, ownerId, (ports) => sendGameCommand(ports, install, argv));
 }
 
+/** A command in the container, in the server's RCON turn when it talks to the game. */
+function runInContainer(
+    ports: RuntimePorts,
+    install: MinecraftInstall,
+    argv: readonly string[]
+): Promise<ExecResult> {
+    return argv.some((part) => part.includes("rcon-cli"))
+        ? inRconTurn(install.installedAppId, () => ports.runIn(install.container, argv))
+        : ports.runIn(install.container, argv);
+}
+
 /** The same, on ports that are already open. */
 async function sendGameCommand(
     ports: RuntimePorts,
@@ -513,10 +525,12 @@ async function sendGameCommand(
     assertSafeCommand(argv);
     const command =
         install.edition === "bedrock" ? ["send-command", ...argv] : ["rcon-cli", ...argv];
-    const result = await withTimeout(
-        ports.runIn(install.container, command),
-        COMMAND_TIMEOUT_MS,
-        "The server did not answer in time"
+    const result = await inRconTurn(install.installedAppId, () =>
+        withTimeout(
+            ports.runIn(install.container, command),
+            COMMAND_TIMEOUT_MS,
+            "The server did not answer in time"
+        )
     );
     if (result.code !== 0) {
         // rcon-cli fails the same way for a server that is still generating its
@@ -617,9 +631,9 @@ function containerOn(install: MinecraftInstall, ports: RuntimePorts): ServerCont
         applicationId: install.applicationId,
         edition: install.edition,
         running: install.running,
-        run: (argv) => ports.runIn(install.container, argv),
+        run: (argv) => runInContainer(ports, install, argv),
         runOk: async (argv, failure) => {
-            const result = await ports.runIn(install.container, argv);
+            const result = await runInContainer(ports, install, argv);
             if (result.code !== 0) throw new Error(containerFailure(result.output, failure));
             return result.output;
         },
@@ -658,14 +672,16 @@ async function sendGameLines(
     if (current.length > 0) batches.push(current);
     for (const batch of batches) {
         const encoded = Buffer.from(`${batch.join("\n")}\n`, "utf8").toString("base64");
-        const result = await withTimeout(
-            ports.runIn(install.container, [
-                "sh",
-                "-c",
-                `printf %s ${encoded} | base64 -d | rcon-cli`
-            ]),
-            COMMAND_TIMEOUT_MS,
-            "The server did not answer in time"
+        const result = await inRconTurn(install.installedAppId, () =>
+            withTimeout(
+                ports.runIn(install.container, [
+                    "sh",
+                    "-c",
+                    `printf %s ${encoded} | base64 -d | rcon-cli`
+                ]),
+                COMMAND_TIMEOUT_MS,
+                "The server did not answer in time"
+            )
         );
         if (result.code !== 0) {
             for (const line of batch) await sendGameCommand(ports, install, [line]);
@@ -701,7 +717,7 @@ async function readServerFile(
     const content = await withPorts(install, ownerId, (ports) =>
         readContainerFile(
             {
-                run: (argv) => ports.runIn(install.container, argv),
+                run: (argv) => runInContainer(ports, install, argv),
                 readFile: (path) => ports.readFile(install.container, path)
             },
             `${DATA_DIR}/${name}`

@@ -728,6 +728,21 @@ export function siteSamples(
 /** How far above or below the centre any of those may be and still be walked to. */
 export const SITE_STEP = 4;
 
+/**
+ * How many of a place's columns may be rough - a tree's crown, a dip, a rise past
+ * `SITE_STEP` - before the place is given up: a quarter, never the centre. A
+ * clearing in a forest or a gentle hill is still somewhere to walk to; a column
+ * on somebody's build is never allowed, however few.
+ */
+export function roughAllowed(samples: number): number {
+    return Math.floor(samples / 4);
+}
+
+/** Whether what is under a point is a tree's leaves: `Test passed` when it is. */
+export function leavesUnder(point: { x: number; y: number; z: number }): string {
+    return `execute in minecraft:overworld if block ${point.x} ${point.y - 1} ${point.z} #minecraft:leaves`;
+}
+
 /** A point `distance` away from a centre, at a random bearing, whole blocks. */
 export function pointAway(
     centre: { x: number; z: number },

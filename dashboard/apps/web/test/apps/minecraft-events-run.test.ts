@@ -1392,7 +1392,7 @@ describe("when things go wrong", () => {
             trigger: "manual",
             startedBy: null
         });
-        await play(40_000);
+        await play(70_000);
         const after = state();
         expect(after.run).toBeNull();
         expect(after.history[0]).toMatchObject({

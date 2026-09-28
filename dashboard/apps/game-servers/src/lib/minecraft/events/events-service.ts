@@ -57,7 +57,7 @@ const SAVE_EVERY_MS = 60_000;
 /** How long a server that stopped answering is waited for past an event's end. */
 const GIVE_UP_AFTER_MS = 2 * 60_000;
 /** How many places are tried before an event that needs one gives up. */
-const PLACE_TRIES = 6;
+const PLACE_TRIES = 10;
 /** How much ground a chest or a boss is judged by around where it goes. */
 const SPOT_RADIUS = 3;
 const WRITE_TRIES = 5;
@@ -1055,18 +1055,30 @@ async function siteIsOpen(
     await server.sayAll([`execute in minecraft:overworld run forceload add ${area}`]);
     let open = true;
     try {
-        for (const sample of commands.siteSamples(centre, radius)) {
+        const samples = commands.siteSamples(centre, radius);
+        let rough = 0;
+        for (const [index, sample] of samples.entries()) {
             let output = "";
             for (const line of commands.markSurface(sample.x, sample.z))
                 output = await server.say([line]);
             const ground = commands.spreadWorked(output)
                 ? commands.readPoint(await server.say([commands.READ_MARK]))
                 : null;
-            if (!ground || Math.abs(ground.y - centre.y) > commands.SITE_STEP) {
-                open = false;
-                break;
+            // Water or lava where the game would not put the marker down: never
+            // somewhere to stand, and never allowed at the centre.
+            let fine = ground !== null && Math.abs(ground.y - centre.y) <= commands.SITE_STEP;
+            if (ground && (await builtOn(loop, server, ground)) === true) {
+                // A tree's crown is rough ground; anything else is somebody's.
+                const leaves = commands.readTest(await server.say([commands.leavesUnder(ground)]));
+                if (leaves !== "passed") {
+                    open = false;
+                    break;
+                }
+                fine = false;
             }
-            if ((await builtOn(loop, server, ground)) === true) {
+            if (fine) continue;
+            rough += 1;
+            if (index === 0 || rough > commands.roughAllowed(samples.length)) {
                 open = false;
                 break;
             }
