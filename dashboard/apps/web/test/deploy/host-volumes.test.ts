@@ -46,8 +46,10 @@ vi.mock("@polaris/hostd-client", () => ({
                 Labels: { "com.docker.compose.project": "polaris-36e74d11" },
                 UsageData: { Size: 1024, RefCount: 0 }
             };
-            if (path === "/volumes") return { status: 200, body: JSON.stringify({ Volumes: [volume] }) };
-            if (path === "/system/df") return { status: 200, body: JSON.stringify({ Volumes: [volume] }) };
+            if (path === "/volumes")
+                return { status: 200, body: JSON.stringify({ Volumes: [volume] }) };
+            if (path === "/system/df")
+                return { status: 200, body: JSON.stringify({ Volumes: [volume] }) };
             return { status: 200, body: "[]" };
         }
     }
@@ -75,7 +77,9 @@ describe("removing a volume whose owner cannot be read", () => {
 
     it("still lists for a screen", async () => {
         fake.fail = true;
-        expect((await hostVolumes())?.map((volume) => volume.name)).toEqual(["polaris-36e74d11_data"]);
+        expect((await hostVolumes())?.map((volume) => volume.name)).toEqual([
+            "polaris-36e74d11_data"
+        ]);
     });
 
     it("removes it when the records say nobody owns it", async () => {

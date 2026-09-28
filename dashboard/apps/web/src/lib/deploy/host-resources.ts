@@ -109,18 +109,17 @@ export function volumeVerdict(input: {
 
 /** The notes kept for this machine's volumes, by name. */
 export async function volumeNotes(serverId = LOCAL_SERVER): Promise<Map<string, ResourceNote>> {
-    const rows = await prisma.hostResourceRecord
-        .findMany({
-            where: { serverId, kind: "volume", removedAt: null },
-            select: {
-                name: true,
-                description: true,
-                purpose: true,
-                lastUsedAt: true,
-                ownerDeletedAt: true,
-                createdAt: true
-            }
-        });
+    const rows = await prisma.hostResourceRecord.findMany({
+        where: { serverId, kind: "volume", removedAt: null },
+        select: {
+            name: true,
+            description: true,
+            purpose: true,
+            lastUsedAt: true,
+            ownerDeletedAt: true,
+            createdAt: true
+        }
+    });
     return new Map(
         rows.map((row) => [
             row.name,

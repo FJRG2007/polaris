@@ -142,11 +142,10 @@ async function read(daemon: HostdClient, path: string): Promise<unknown | null> 
  *  in. Read from its own records rather than from the daemon: a stopped app's
  *  volume looks exactly like an abandoned one to Docker. */
 async function claimed(): Promise<Map<string, string>> {
-    const rows = await prisma.volume
-        .findMany({
-            where: { kind: "volume", source: { not: null } },
-            select: { source: true, application: { select: { name: true } } }
-        });
+    const rows = await prisma.volume.findMany({
+        where: { kind: "volume", source: { not: null } },
+        select: { source: true, application: { select: { name: true } } }
+    });
     const names = new Map<string, string>();
     for (const row of rows) {
         if (row.source) names.set(row.source, row.application?.name ?? "an app on this machine");
@@ -167,14 +166,13 @@ async function claimed(): Promise<Map<string, string>> {
 async function projectOwners(): Promise<
     Map<string, { id: string; name: string; description: string }>
 > {
-    const apps = await prisma.application
-        .findMany({
-            select: {
-                id: true,
-                name: true,
-                environment: { select: { name: true, project: { select: { name: true } } } }
-            }
-        });
+    const apps = await prisma.application.findMany({
+        select: {
+            id: true,
+            name: true,
+            environment: { select: { name: true, project: { select: { name: true } } } }
+        }
+    });
     return new Map(
         apps.map((app) => [
             `polaris-${shortHash(app.id, 8)}`,
@@ -184,9 +182,12 @@ async function projectOwners(): Promise<
 }
 
 /** The volumes Polaris's own databases keep their data in, by volume name. */
-async function databaseVolumes(): Promise<Map<string, { id: string; name: string; engine: string }>> {
-    const rows = await prisma.managedDatabase
-        .findMany({ select: { id: true, name: true, engine: true, volumeName: true } });
+async function databaseVolumes(): Promise<
+    Map<string, { id: string; name: string; engine: string }>
+> {
+    const rows = await prisma.managedDatabase.findMany({
+        select: { id: true, name: true, engine: true, volumeName: true }
+    });
     return new Map(rows.filter((row) => row.volumeName).map((row) => [row.volumeName, row]));
 }
 
@@ -207,7 +208,9 @@ async function containers(daemon: HostdClient): Promise<DockerContainer[]> {
 
 /** A container's name without docker's leading slash. */
 function containerName(entry: DockerContainer): string {
-    return text(entry.Names?.[0])?.replace(/^\//, "") ?? text(entry.Id)?.slice(0, 12) ?? "a container";
+    return (
+        text(entry.Names?.[0])?.replace(/^\//, "") ?? text(entry.Id)?.slice(0, 12) ?? "a container"
+    );
 }
 
 /**
@@ -220,7 +223,9 @@ function containerName(entry: DockerContainer): string {
  * `/volumes` is what knows when each one was created and what it was labelled
  * with. A volume missing from either is still listed, with what is known.
  */
-export async function hostVolumes(options: { strict?: boolean } = {}): Promise<HostVolume[] | null> {
+export async function hostVolumes(
+    options: { strict?: boolean } = {}
+): Promise<HostVolume[] | null> {
     const daemon = new HostdClient();
     const known = <T>(lookup: () => Promise<T>, none: T): Promise<T> =>
         options.strict ? lookup() : lookup().catch(() => none);
@@ -256,12 +261,14 @@ export async function hostVolumes(options: { strict?: boolean } = {}): Promise<H
     }
 
     const meta = new Map<string, DockerVolume>();
-    for (const entry of ((listing as { Volumes?: DockerVolume[] }).Volumes ?? []) as DockerVolume[]) {
+    for (const entry of ((listing as { Volumes?: DockerVolume[] }).Volumes ??
+        []) as DockerVolume[]) {
         const name = text(entry?.Name);
         if (name) meta.set(name, entry);
     }
     const usage = new Map<string, DockerVolume>();
-    for (const entry of ((df as { Volumes?: DockerVolume[] } | null)?.Volumes ?? []) as DockerVolume[]) {
+    for (const entry of ((df as { Volumes?: DockerVolume[] } | null)?.Volumes ??
+        []) as DockerVolume[]) {
         const name = text(entry?.Name);
         if (name) usage.set(name, entry);
     }
@@ -288,15 +295,19 @@ export async function hostVolumes(options: { strict?: boolean } = {}): Promise<H
         // "Polaris has no record of this one".
         const app = owners.get(baseProject(project) ?? "") ?? null;
         const database = databases.get(name) ?? null;
-        const belongsTo =
-            owner ?? app?.name ?? (database ? `the ${database.name} database` : null);
+        const belongsTo = owner ?? app?.name ?? (database ? `the ${database.name} database` : null);
         // Noted as it is now, so that when its owner goes, what it was stays.
         const used = holders.some((holder) => holder.running);
         seen.push({
             name,
             used,
             owner: app
-                ? { kind: "application", id: app.id, description: app.description, purpose: "app-data" }
+                ? {
+                      kind: "application",
+                      id: app.id,
+                      description: app.description,
+                      purpose: "app-data"
+                  }
                 : database
                   ? {
                         kind: "managedDatabase",
@@ -331,7 +342,9 @@ export async function hostVolumes(options: { strict?: boolean } = {}): Promise<H
                     : null,
             spare: !inUse && belongsTo === null && Number.isFinite(age) && age > SETTLING_MS,
             description: app?.description ?? note?.description ?? null,
-            lastUsedAt: used ? new Date(now).toISOString() : (note?.lastUsedAt?.toISOString() ?? null),
+            lastUsedAt: used
+                ? new Date(now).toISOString()
+                : (note?.lastUsedAt?.toISOString() ?? null),
             notedSince: note?.firstSeenAt.toISOString() ?? null,
             verdict: judged.verdict,
             reason: judged.reason
@@ -369,15 +382,19 @@ export async function removeHostVolume(name: string): Promise<VolumeRemoval> {
     if (!volumes) return { ok: false, reason: "This machine would not say what it is holding." };
     const volume = volumes.find((entry) => entry.name === name);
     if (!volume) return { ok: false, reason: "That volume is not on this machine any more." };
-    if (volume.inUse) return { ok: false, reason: "Something is using it now. Nothing was removed." };
-    if (volume.owner) return { ok: false, reason: `It belongs to ${volume.owner}. Nothing was removed.` };
+    if (volume.inUse)
+        return { ok: false, reason: "Something is using it now. Nothing was removed." };
+    if (volume.owner)
+        return { ok: false, reason: `It belongs to ${volume.owner}. Nothing was removed.` };
 
     const reply = await new HostdClient()
         .dockerRequest("DELETE", `/volumes/${encodeURIComponent(name)}`)
         .catch(() => null);
     if (!reply) return { ok: false, reason: "This machine would not answer. Nothing was removed." };
     if (reply.status === 204) return { ok: true };
-    if (reply.status === 409) return { ok: false, reason: "Something is using it now. Nothing was removed." };
-    if (reply.status === 404) return { ok: false, reason: "That volume is not on this machine any more." };
+    if (reply.status === 409)
+        return { ok: false, reason: "Something is using it now. Nothing was removed." };
+    if (reply.status === 404)
+        return { ok: false, reason: "That volume is not on this machine any more." };
     return { ok: false, reason: "This machine refused to remove it." };
 }

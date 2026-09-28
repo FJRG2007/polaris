@@ -38,7 +38,11 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { diskFullness, localDisk } from "@/lib/deploy/local-disk";
 import { hostSpace, reclaimHostSpace } from "@/lib/deploy/host-space";
 import { ImageStoreBusy } from "@/lib/deploy/image-store-lock";
-import { reclaimServerSpace, serverDiskFullness, serversWithDeployments } from "@/lib/deploy/server-space";
+import {
+    reclaimServerSpace,
+    serverDiskFullness,
+    serversWithDeployments
+} from "@/lib/deploy/server-space";
 
 /** What was last reported, so a disk that is tight for a month is one message
  *  rather than a hundred and twenty. */
@@ -127,7 +131,8 @@ export async function sweepHostSpace(): Promise<HousekeepingSweep> {
     try {
         freed = (await reclaimHostSpace({ whenIdle: true })) ?? 0;
     } catch (error) {
-        if (error instanceof ImageStoreBusy) return { before, after: before, freed: 0, reclaimed: false };
+        if (error instanceof ImageStoreBusy)
+            return { before, after: before, freed: 0, reclaimed: false };
         throw error;
     }
     const settled = await localDisk();
@@ -161,10 +166,12 @@ export async function sweepServerSpace(): Promise<{ id: string; name: string; fr
         // Null is "could not ask", never "there is room". A machine that is down
         // is not a machine with a healthy disk, and pruning is not what fixes it.
         if (fullness === null || fullness < HIGH_WATER) continue;
-        const freed = await reclaimServerSpace(server.id, { whenIdle: true }).catch((error: unknown) => {
-            if (error instanceof ImageStoreBusy) return 0;
-            throw error;
-        });
+        const freed = await reclaimServerSpace(server.id, { whenIdle: true }).catch(
+            (error: unknown) => {
+                if (error instanceof ImageStoreBusy) return 0;
+                throw error;
+            }
+        );
         swept.push({ id: server.id, name: server.name, freed: freed ?? 0 });
     }
     return swept;

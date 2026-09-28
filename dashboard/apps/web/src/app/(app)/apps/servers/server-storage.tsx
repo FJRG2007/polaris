@@ -184,7 +184,9 @@ export function ServerStorage() {
                             aria-label="Remove leftovers automatically"
                         />
                         <span>
-                            <span className="block font-medium">Remove leftovers automatically</span>
+                            <span className="block font-medium">
+                                Remove leftovers automatically
+                            </span>
                             {autoRemoveUnread ? (
                                 <span className="text-danger">
                                     Could not read whether this is on.{" "}
@@ -198,8 +200,8 @@ export function ServerStorage() {
                                 </span>
                             ) : (
                                 <span className="text-muted-foreground">
-                                    The data of an app deleted over a week ago that nothing has
-                                    used since. You are told what went.
+                                    The data of an app deleted over a week ago that nothing has used
+                                    since. You are told what went.
                                 </span>
                             )}
                         </span>
@@ -223,7 +225,9 @@ export function ServerStorage() {
                             <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                 <tr>
                                     <th className="w-full max-w-0 px-3 py-2 font-medium">Volume</th>
-                                    <th className="whitespace-nowrap px-3 py-2 font-medium">Size</th>
+                                    <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                        Size
+                                    </th>
                                     <th className="hidden whitespace-nowrap px-3 py-2 font-medium md:table-cell">
                                         Created
                                     </th>
@@ -235,7 +239,10 @@ export function ServerStorage() {
                                     <tr key={volume.name} className="border-t border-border">
                                         <td className="w-full max-w-0 px-3 py-2">
                                             <span className="flex min-w-0 items-center gap-2">
-                                                <span className="min-w-0 truncate font-medium" title={volume.name}>
+                                                <span
+                                                    className="min-w-0 truncate font-medium"
+                                                    title={volume.name}
+                                                >
                                                     {volume.name}
                                                 </span>
                                                 {/* The verdict first, because it is the
@@ -275,7 +282,9 @@ export function ServerStorage() {
                                                       : volume.project
                                                         ? `Created by ${volume.project}`
                                                         : "Polaris has no record of this one"}
-                                                {volume.heldBy.length > 0 ? ` - ${holders(volume)}` : ""}
+                                                {volume.heldBy.length > 0
+                                                    ? ` - ${holders(volume)}`
+                                                    : ""}
                                                 {unusedFor(volume) ? ` - ${unusedFor(volume)}` : ""}
                                             </span>
                                             {!volume.inUse && !volume.owner ? (
@@ -338,10 +347,10 @@ export function ServerStorage() {
 
                 {spare.length > 0 ? (
                     <p className="text-muted-foreground text-xs">
-                        {spare.length === 1 ? "One volume is" : `${spare.length} volumes are`} holding{" "}
-                        {size(spareBytes)} that nothing on this machine references, that Polaris has no
-                        record of, and that has been sitting there for more than a day. Delete them one
-                        at a time, when you know what they were.
+                        {spare.length === 1 ? "One volume is" : `${spare.length} volumes are`}{" "}
+                        holding {size(spareBytes)} that nothing on this machine references, that
+                        Polaris has no record of, and that has been sitting there for more than a
+                        day. Delete them one at a time, when you know what they were.
                     </p>
                 ) : null}
 
@@ -362,14 +371,12 @@ export function ServerStorage() {
                         Files
                     </h2>
                     <p className="text-muted-foreground text-xs">
-                        What the containers on this machine are holding is above. The files people put
-                        here are Drive&apos;s side of the same disk, and it weighs its own folders.
+                        What the containers on this machine are holding is above. The files people
+                        put here are Drive&apos;s side of the same disk, and it weighs its own
+                        folders.
                     </p>
                 </div>
-                <Link
-                    href="/drive/insights"
-                    className="text-primary w-fit text-sm hover:underline"
-                >
+                <Link href="/drive/insights" className="text-primary w-fit text-sm hover:underline">
                     What is taking up room in Drive
                 </Link>
             </section>
@@ -383,7 +390,9 @@ export function ServerStorage() {
  *  minecraft-a1b2" is the answer somebody looking at a large row is after, and a
  *  number is not. */
 function holders(volume: HostVolume): string {
-    const names = volume.heldBy.map((holder) => `${holder.name}${holder.running ? "" : " (stopped)"}`);
+    const names = volume.heldBy.map(
+        (holder) => `${holder.name}${holder.running ? "" : " (stopped)"}`
+    );
     if (names.length === 1) return `held by ${names[0]}`;
     const rest = names.length - 2;
     return `held by ${names.slice(0, 2).join(", ")}${rest > 0 ? ` and ${rest} more` : ""}`;
@@ -453,9 +462,11 @@ function StrayContainers() {
                     Left behind
                 </h2>
                 <p className="text-muted-foreground text-xs">
-                    Polaris put {strays.length === 1 ? "this container" : `these ${strays.length} containers`} on
-                    this machine and has no record of {strays.length === 1 ? "it" : "them"} any more - a service
-                    removed, or a stack recreated under another name. Nothing else on the machine is touched.
+                    Polaris put{" "}
+                    {strays.length === 1 ? "this container" : `these ${strays.length} containers`}{" "}
+                    on this machine and has no record of {strays.length === 1 ? "it" : "them"} any
+                    more - a service removed, or a stack recreated under another name. Nothing else
+                    on the machine is touched.
                 </p>
             </div>
 
@@ -475,7 +486,10 @@ function StrayContainers() {
                             <tr key={stray.id} className="border-t border-border">
                                 <td className="w-full max-w-0 px-3 py-2">
                                     <span className="flex min-w-0 items-center gap-2">
-                                        <span className="min-w-0 truncate font-medium" title={stray.name}>
+                                        <span
+                                            className="min-w-0 truncate font-medium"
+                                            title={stray.name}
+                                        >
                                             {stray.name}
                                         </span>
                                         {stray.running ? (
