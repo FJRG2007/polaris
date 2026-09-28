@@ -137,13 +137,17 @@ export async function clearActivity(
     source: StoredSource,
     now: Date = new Date()
 ): Promise<void> {
+    const row = await prisma.userActivity.findUnique({
+        where: { userId_source: { userId, source } },
+        select: { expiresAt: true }
+    });
+    if (!row) return;
     const gone = await prisma.userActivity.deleteMany({
-        where: { userId, source, expiresAt: { gt: now } }
+        where: { userId, source, expiresAt: row.expiresAt }
     });
     // A row already past its lapse is tidied too, silently: no reader was being
     // shown it.
-    await prisma.userActivity.deleteMany({ where: { userId, source } });
-    if (gone.count > 0) await announceActivity([userId]);
+    if (gone.count > 0 && row.expiresAt > now) await announceActivity([userId]);
 }
 
 /** What happened to a report from the desktop app. */

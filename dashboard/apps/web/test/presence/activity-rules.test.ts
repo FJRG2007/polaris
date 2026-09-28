@@ -101,7 +101,6 @@ describe("time on a card", () => {
     it("words a card the way people say it", () => {
         expect(core.activityShortLine({ source: "game", name: "Celeste" })).toBe("Playing Celeste");
         expect(core.activityShortLine({ source: "spotify", name: "Song" })).toBe("Listening to Song");
-        expect(core.activityHeadline({ source: "spotify", name: "Song" })).toBe("Listening to Spotify");
     });
 });
 

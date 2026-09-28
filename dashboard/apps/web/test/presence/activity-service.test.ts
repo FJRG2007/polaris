@@ -65,14 +65,14 @@ vi.mock("@polaris/db", () => ({
                 if (found) Object.assign(found, update);
                 else fake.rows.push({ ...create });
             },
-            deleteMany: async ({ where }: { where: { userId: string; source: string; expiresAt?: { gt: Date } } }) => {
+            deleteMany: async ({ where }: { where: { userId: string; source: string; expiresAt?: Date } }) => {
                 const before = fake.rows.length;
                 fake.rows = fake.rows.filter(
                     (row) =>
                         !(
                             row.userId === where.userId &&
                             row.source === where.source &&
-                            (!where.expiresAt || row.expiresAt > where.expiresAt.gt)
+                            (!where.expiresAt || row.expiresAt.getTime() === where.expiresAt.getTime())
                         )
                 );
                 return { count: before - fake.rows.length };
@@ -188,6 +188,14 @@ describe("a report from the desktop app", () => {
         await reportGame("ada", { game: null }, NOW);
         expect(fake.rows).toHaveLength(0);
         expect(fake.announced).toEqual(["ada"]);
+    });
+
+    it("tidies a card past its lapse without telling anybody", async () => {
+        await reportGame("ada", game("celeste.exe", "Celeste"), NOW);
+        fake.announced = [];
+        await reportGame("ada", { game: null }, new Date(NOW.getTime() + 60 * 60_000));
+        expect(fake.rows).toHaveLength(0);
+        expect(fake.announced).toEqual([]);
     });
 });
 

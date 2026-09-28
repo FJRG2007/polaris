@@ -200,12 +200,6 @@ export interface ActivityView {
     readonly endsAt: string | null;
 }
 
-/** The line a card is headed with, the way people say it. */
-export function activityHeadline(activity: Pick<ActivityView, "source" | "name">): string {
-    if (activity.source === "spotify") return "Listening to Spotify";
-    return `Playing ${activity.name}`;
-}
-
 /** The one line a crowded row has room for: "Playing Hollow Knight", "Listening
  *  to <track>". */
 export function activityShortLine(activity: Pick<ActivityView, "source" | "name">): string {

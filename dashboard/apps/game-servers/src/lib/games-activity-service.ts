@@ -357,9 +357,14 @@ export async function closeGameSessions(
     installedAppId: string,
     at: Date = new Date()
 ): Promise<void> {
+    const open = await prisma.gamePlayerSession
+        .findMany({ where: { installedAppId, leftAt: null }, select: { id: true, name: true } })
+        .catch(() => []);
+    if (open.length === 0) return;
     await prisma.gamePlayerSession
-        .updateMany({ where: { installedAppId, leftAt: null }, data: { leftAt: at } })
+        .updateMany({ where: { id: { in: open.map((row) => row.id) } }, data: { leftAt: at } })
         .catch(() => undefined);
+    await announcePlayers(installedAppId, open.map((row) => row.name));
 }
 
 /** What every one of these servers was last seen doing, in one read. */

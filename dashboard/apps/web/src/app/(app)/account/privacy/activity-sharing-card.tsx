@@ -13,7 +13,7 @@
  * under a column of switches is a step people forget.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { Card, CardBody, Switch } from "@polaris/ui";
@@ -33,6 +33,13 @@ const SOURCES: readonly { id: "games" | "minecraft"; label: string; hint: string
     }
 ];
 
+/** One flip of a switch, applied to whatever state it lands on. */
+type Change = (state: core.ActivitySettings) => core.ActivitySettings;
+
+function same(a: core.ActivitySettings, b: core.ActivitySettings): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function ActivitySharingCard({
     settings,
     seenGames
@@ -41,20 +48,31 @@ export function ActivitySharingCard({
     /** Games the desktop app has seen, newest first. */
     seenGames: readonly core.SeenGame[];
 }) {
-    const [draft, setDraft] = useState(settings);
+    const [saved, setSaved] = useState(settings);
+    const [pending, setPending] = useState<readonly { id: number; change: Change }[]>([]);
     const [error, setError] = useState("");
+    const savedRef = useRef(settings);
+    const queue = useRef<Promise<void>>(Promise.resolve());
+    const nextId = useRef(0);
+    const draft = pending.reduce((state, entry) => entry.change(state), saved);
 
-    /** Draw it now, save it, and put it back if the save is refused. */
-    const commit = async (next: core.ActivitySettings) => {
-        const before = draft;
-        if (JSON.stringify(next) === JSON.stringify(before)) return;
-        setDraft(next);
+    /** Draw it now, save it after any earlier switch, and drop only this one if the save is refused. */
+    const commit = (change: Change) => {
+        if (same(change(draft), draft)) return;
+        const id = nextId.current++;
+        setPending((current) => [...current, { id, change }]);
         setError("");
-        const result = await runAction(() => saveActivitySettingsAction(next), setError);
-        if (!result || result.error) {
-            setDraft(before);
-            if (result?.error) setError(result.error);
-        }
+        queue.current = queue.current.then(async () => {
+            const next = change(savedRef.current);
+            if (!same(next, savedRef.current)) {
+                const result = await runAction(() => saveActivitySettingsAction(next), setError);
+                if (result && !result.error) {
+                    savedRef.current = next;
+                    setSaved(next);
+                } else if (result?.error) setError(result.error);
+            }
+            setPending((current) => current.filter((entry) => entry.id !== id));
+        });
     };
 
     // Every game this account could want to hide: the ones seen, and the ones
@@ -86,7 +104,7 @@ export function ActivitySharingCard({
                     </span>
                     <Switch
                         checked={draft.share}
-                        onChange={(share) => void commit({ ...draft, share })}
+                        onChange={(share) => commit((state) => ({ ...state, share }))}
                         aria-label="Share my activity"
                     />
                 </label>
@@ -103,7 +121,7 @@ export function ActivitySharingCard({
                             <Switch
                                 checked={!off && draft[source.id]}
                                 disabled={off}
-                                onChange={(on) => void commit({ ...draft, [source.id]: on })}
+                                onChange={(on) => commit((state) => ({ ...state, [source.id]: on }))}
                                 aria-label={source.label}
                             />
                         </li>
@@ -140,12 +158,14 @@ export function ActivitySharingCard({
                                             checked={!hidden}
                                             disabled={off || !draft.games}
                                             onChange={(shown) =>
-                                                void commit({
-                                                    ...draft,
+                                                commit((state) => ({
+                                                    ...state,
                                                     hiddenGames: shown
-                                                        ? draft.hiddenGames.filter((entry) => entry !== key)
-                                                        : [...draft.hiddenGames, key]
-                                                })
+                                                        ? state.hiddenGames.filter((entry) => entry !== key)
+                                                        : state.hiddenGames.includes(key)
+                                                          ? state.hiddenGames
+                                                          : [...state.hiddenGames, key]
+                                                }))
                                             }
                                             aria-label={`Show ${name}`}
                                         />
