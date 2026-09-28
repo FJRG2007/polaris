@@ -41,6 +41,8 @@ interface World {
     creative: string[];
     difficulty: string;
     daylightCycle: "true" | "false";
+    /** A version that knows the game rules by their new names only. */
+    renamedRules: boolean;
 }
 
 const world: World = {
@@ -62,7 +64,8 @@ const world: World = {
     still: [],
     creative: [],
     difficulty: "Normal",
-    daylightCycle: "true"
+    daylightCycle: "true",
+    renamedRules: false
 };
 let config: Record<string, unknown> = {};
 const held: string[] = [];
@@ -76,6 +79,10 @@ function answer(line: string): string {
     world.sent.push(line);
     if (line === "difficulty") return `The difficulty is ${world.difficulty}`;
     if (line === "time query daytime") return "The time is 6000";
+    if (world.renamedRules && /^gamerule do\w+$/.test(line)) return "Unknown or incomplete command, see below for error";
+    if (line === "gamerule advance_time" || line === "gamerule advance_weather") {
+        return world.renamedRules ? `Gamerule ${line.slice(9)} is currently set to: ${world.daylightCycle}` : "Unknown or incomplete command, see below for error";
+    }
     if (line === "gamerule doDaylightCycle") return `Gamerule doDaylightCycle is currently set to: ${world.daylightCycle}`;
     if (line.startsWith("execute as @a[gamemode=!survival,gamemode=!adventure]")) {
         return world.creative.map((name) => `${name} has the following entity data: [0.0d, 64.0d, 0.0d]`).join("\n");
@@ -304,6 +311,7 @@ beforeEach(() => {
     world.creative = [];
     world.difficulty = "Normal";
     world.daylightCycle = "true";
+    world.renamedRules = false;
     events.forgetPlayers();
     held.length = 0;
     released.length = 0;
@@ -1096,6 +1104,38 @@ describe("what the audit found", () => {
         const entry = state().history[0];
         expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 6 }]);
         expect(entry?.disqualified).toEqual(["Ana"]);
+    });
+
+    it("leaves somebody AFK at a mob farm off a blood moon podium, however much they are hit", async () => {
+        world.still = ["Ana"];
+        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+        setUp([moon]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "moon", trigger: "manual", startedBy: null });
+        await play(2_100);
+        for (let tick = 1; tick <= 8; tick += 1) {
+            world.hurt = { Ana: tick * 4 };
+            await play(15_000);
+        }
+        world.scores = { Ana: 30, Ben: 3 };
+        await play(3 * 60_000);
+        const entry = state().history[0];
+        expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 3 }]);
+        expect(entry?.disqualified).toEqual(["Ana"]);
+    });
+
+    it("holds the night on a version that renamed the game rules", async () => {
+        world.renamedRules = true;
+        world.daylightCycle = "false";
+        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+        setUp([moon]);
+        await events.startEvent({ ownerId: "owner", installedAppId: SERVER, presetId: "moon", trigger: "manual", startedBy: null });
+        await play(4_100);
+        expect(world.sent).toContain("gamerule advance_time false");
+        expect(world.sent).toContain("gamerule advance_weather false");
+        expect(world.sent).not.toContain("gamerule doDaylightCycle false");
+        await play(3 * 60_000);
+        expect(world.sent).toContain("time set 6000");
+        expect(world.sent.filter((line) => line.startsWith("gamerule advance_time")).at(-1)).toBe("gamerule advance_time false");
     });
 
     it("gives a server whose clock stands still its own time back after a blood moon", async () => {

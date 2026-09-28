@@ -89,10 +89,6 @@ export const playerPresence = {
     never: "Never joined"
 } as const;
 
-/** How long without moving, turning or fighting before somebody on the server
- *  is shown as AFK. The same few minutes the events use by default. */
-export const AFK_AFTER_MS = 5 * 60_000;
-
 /** What a destructive verb asks before it happens. One wording, so the same
  *  question is not answered differently depending on which game asked it. */
 export const playerConfirm = {

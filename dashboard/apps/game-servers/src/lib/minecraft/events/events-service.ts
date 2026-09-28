@@ -103,6 +103,12 @@ function settingsOf(config: Record<string, unknown>): catalog.EventsConfig {
     return catalog.readEventsConfig(config, readSchedule(config).timezone);
 }
 
+/** How long without moving before a player counts as AFK on this server. */
+export async function afkMinutesFor(installedAppId: string): Promise<number> {
+    const row = await readRow(installedAppId);
+    return settingsOf(row?.config ?? {}).settings.afkMinutes;
+}
+
 /**
  * Change what is remembered from what is stored now, never from a stale copy:
  * the write only lands if nothing changed it since it was read, and is worked
@@ -200,7 +206,7 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
     if (run && run.phase === "running" && catalog.KIND_INFO[run.preset.kind].competitive) {
         // Bounded: the screen asks every few seconds, and a server slow to answer
         // must not hold the rest of what it shows.
-        standings = await withTimeout(currentStandings(row.ownerId, installedAppId, run), 3_000, "slow").catch(
+        standings = await withTimeout(sharedStandings(row.ownerId, installedAppId, run), 3_000, "slow").catch(
             () => []
         );
     }
@@ -235,6 +241,22 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
                 ? "Events run on Java servers; Bedrock has no scoreboard statistics or boss bars to play them with"
                 : null
     };
+}
+
+/** Reads of the standings still out, one per server: a read slower than the
+ *  screen's polling is joined, not stacked behind another. */
+const standingsReads = new Map<string, Promise<{ name: string; score: number }[]>>();
+
+function sharedStandings(
+    ownerId: string,
+    installedAppId: string,
+    run: stored.EventRun
+): Promise<{ name: string; score: number }[]> {
+    const pending = standingsReads.get(installedAppId);
+    if (pending) return pending;
+    const read = currentStandings(ownerId, installedAppId, run).finally(() => standingsReads.delete(installedAppId));
+    standingsReads.set(installedAppId, read);
+    return read;
 }
 
 async function currentStandings(
@@ -602,11 +624,14 @@ async function begin(
         // event does or is slept through; the weather, or the storm clears.
         // What each was is kept, and put back when it ends.
         const before: Record<string, string> = {};
-        for (const rule of commands.FROZEN_RULES) {
-            const value = commands.readRuleValue(await server.say([commands.readRule(rule)]));
-            if (value === null) continue;
-            before[rule] = value;
-            lines.push(commands.setRule(rule, "false"));
+        for (const names of commands.FROZEN_RULES) {
+            for (const rule of names) {
+                const value = commands.readRuleValue(await server.say([commands.readRule(rule)]));
+                if (value === null) continue;
+                before[rule] = value;
+                lines.push(commands.setRule(rule, "false"));
+                break;
+            }
         }
         const timeBefore = commands.readDaytime(await server.say([commands.READ_DAYTIME]));
         loop.run = {

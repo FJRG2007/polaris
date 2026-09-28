@@ -133,14 +133,15 @@ export function busy(one: Seen, now: number): boolean {
 }
 
 /**
- * The players who did nothing at all from `since` on: never seen to move, turn or
- * fight after it. Only players this process has actually watched - somebody it
- * knows nothing about is not accused of anything.
+ * The players who did nothing at all from `since` on: never seen to move or turn
+ * after it. Fighting does not count, since mobs walk into a player at a farm who
+ * never touches the keyboard. Only players this process has actually watched -
+ * somebody it knows nothing about is not accused of anything.
  */
 export function idleThroughout(seen: ReadonlyMap<string, Seen> | null, since: number): string[] {
     if (!seen) return [];
     return [...seen.values()]
-        .filter((one) => Math.max(one.movedAt ?? 0, one.fightingAt ?? 0) < since && one.since < since)
+        .filter((one) => (one.movedAt ?? 0) < since && one.since < since)
         .map((one) => one.name);
 }
 

@@ -555,9 +555,13 @@ export function nightfall(seconds: number): string[] {
  * The game rules a blood moon holds still while it lasts: the clock, so the
  * night neither runs out before the event does (a Minecraft night is about eight
  * minutes) nor is slept through in a bed, and the weather, so the storm stays.
- * Put back to whatever the server had when it ends.
+ * Put back to whatever the server had when it ends. Each is listed under every
+ * name it has had; the first one the server answers to is the one it uses.
  */
-export const FROZEN_RULES = ["doDaylightCycle", "doWeatherCycle"] as const;
+export const FROZEN_RULES = [
+    ["doDaylightCycle", "advance_time"],
+    ["doWeatherCycle", "advance_weather"]
+] as const;
 
 export function readRule(name: string): string {
     return `gamerule ${name}`;
@@ -583,7 +587,8 @@ export function daybreak(
     rules: Readonly<Record<string, string>> = {},
     timeBefore: number | null = null
 ): string[] {
-    const frozen = rules.doDaylightCycle === "false" && timeBefore !== null;
+    const frozen =
+        FROZEN_RULES[0].some((name) => rules[name] === "false") && timeBefore !== null;
     return [frozen ? `time set ${timeBefore}` : "time set 23500", "weather clear", `kill @e[tag=${MOB_TAG}]`];
 }
 

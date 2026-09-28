@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { reachAdviceFor } from "../../../../../../lib/minecraft/reach";
 import { readLastSeen } from "../../../../../../lib/games-activity-service";
 import { idleSince, lookIfDue } from "../../../../../../lib/minecraft/activity";
+import { afkMinutesFor } from "../../../../../../lib/minecraft/events/events-service";
 import { sweepWatchedGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
 import { drainQueue, pendingFor } from "../../../../../../lib/minecraft/queue-service";
 import { sweepInventorySnapshots } from "../../../../../../lib/minecraft/inventory-service";
@@ -111,12 +112,14 @@ export async function GET(
                 wantsRoster && status.answering
                     ? sweepTimeouts(server.ownerId, id).catch(() => 0)
                     : 0,
-                // Since when each of them has not moved, turned or fought, for
-                // the AFK mark. Looked at no more often than every few seconds
+                // Who has not moved or turned for as long as the events call
+                // AFK, and since when. Looked at no more often than every few seconds
                 // however many screens ask.
                 wantsRoster && online.length > 0
                     ? withServerContainer(server.ownerId, id, async (container) =>
-                          container.running ? idleSince(await lookIfDue(id, container)) : null
+                          container.running
+                              ? idleSince(await lookIfDue(id, container), await afkMinutesFor(id), Date.now())
+                              : null
                       ).catch(() => null)
                     : null
             ] as const);

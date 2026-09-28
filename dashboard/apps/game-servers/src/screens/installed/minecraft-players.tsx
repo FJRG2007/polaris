@@ -42,7 +42,6 @@ import {
     playerConfirm,
     playerFilters,
     playerMenuItem,
-    AFK_AFTER_MS,
     playerPresence,
     playerStanding
 } from "../../lib/player-vocabulary";
@@ -885,7 +884,8 @@ function PlayerRow({
     /** The level they were on the last time they were, for somebody who is not
      *  on now. */
     lastLevel: RememberedLevel | null;
-    /** Since when they have done nothing, while they are on; null when not known. */
+    /** Since when they have been AFK, while they are; null while they are not or
+     *  when not known. */
     idleSince: number | null;
     /** The server's clock. */
     now: number;
@@ -1092,18 +1092,18 @@ function StatusCell({
     onOpen
 }: {
     player: PlayerEntry;
-    /** Since when they have done nothing, while they are on. */
+    /** Since when they have been AFK, while they are; null while they are not. */
     idleSince: number | null;
     /** The server's clock, which the time above was read against. */
     now: number;
     onOpen: (dialog: PlayerDialog) => void;
 }) {
     const format = useDisplayFormat();
-    const away = player.presence === "playing" && idleSince !== null && now - idleSince >= AFK_AFTER_MS;
+    const away = player.presence === "playing" && idleSince !== null;
     const badge = away ? (
         <Badge
             variant="warning"
-            title={`${player.name} has not moved, turned or fought for ${Math.floor((now - idleSince) / 60_000)} minutes`}
+            title={`${player.name} has not moved or turned for ${Math.floor((now - idleSince) / 60_000)} minutes`}
         >
             {playerPresence.afk}
         </Badge>

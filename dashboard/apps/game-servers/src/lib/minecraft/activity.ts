@@ -66,16 +66,21 @@ export async function lookIfDue(
 }
 
 /**
- * Since when each player on now has done nothing, by the name the game gives
- * them. Counted from the first look for somebody never seen to move - so a
- * player standing still from the moment Polaris started watching becomes AFK
- * after the same few minutes as anybody else.
+ * The players on now who are AFK by the events' own rule - not moved or turned
+ * for `afkMinutes` - and since when, by the name the game gives them. Counted
+ * from the first look for somebody never seen to move, so a player standing
+ * still from the moment Polaris started watching becomes AFK after the same few
+ * minutes as anybody else.
  */
-export function idleSince(seen: ReadonlyMap<string, plan.Seen>): Record<string, number> {
+export function idleSince(
+    seen: ReadonlyMap<string, plan.Seen>,
+    afkMinutes: number,
+    now: number
+): Record<string, number> {
     const found: Record<string, number> = {};
     for (const one of seen.values()) {
-        const acted = Math.max(one.movedAt ?? 0, one.fightingAt ?? 0);
-        found[one.name] = acted > 0 ? acted : one.since;
+        const acted = one.movedAt ?? one.since;
+        if (now - acted >= afkMinutes * 60_000) found[one.name] = acted;
     }
     return found;
 }
