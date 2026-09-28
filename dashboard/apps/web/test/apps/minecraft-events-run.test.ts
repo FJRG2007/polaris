@@ -173,14 +173,14 @@ function answer(line: string): string {
     if (line === "execute as @a run scoreboard players get @s pe_score") {
         return world.online
             .filter((name) => world.scores[name] !== undefined)
-            .map((name) => `${name} has ${world.scores[name]} [pe_score]`)
+            .map((name) => `${name} has ${world.scores[name]} [Event title]`)
             .join("\n");
     }
     const one = /^scoreboard players get (\S+) pe_score$/.exec(line);
     if (one) {
         const name = one[1] as string;
         return world.scores[name] !== undefined
-            ? `${name} has ${world.scores[name]} [pe_score]`
+            ? `${name} has ${world.scores[name]} [Event title]`
             : `Can't get value of pe_score for ${name}; none is set`;
     }
     if (line.includes("spreadplayers") && line.includes("pe_mark") && world.allWater) {
@@ -864,11 +864,16 @@ describe("a blood moon", () => {
         expect(
             world.sent.filter((line) => line.includes("run summon minecraft:")).length
         ).toBeGreaterThan(0);
-        world.scores = { Ana: 7, Ben: 12 };
+        world.online = ["Ana", "Ben", "Cai"];
+        world.scores = { Ana: 7, Ben: 12, Cai: 0 };
         world.deaths = { Ben: 1 };
         await play(3 * 60_000);
         const after = state();
         expect(after.history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 7 }]);
+        // First place is paid; seeing the dawn without a single kill is not taking part.
+        expect(world.sent).toContain("give Ana minecraft:diamond 5");
+        expect(world.sent.some((line) => line.startsWith("give Cai "))).toBe(false);
+        expect(world.sent.some((line) => line.startsWith("give Ben "))).toBe(false);
         expect(world.sent).toContain("time set 23500");
         // And the server gets back what it had.
         expect(world.sent).toContain("gamerule doDaylightCycle true");

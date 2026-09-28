@@ -41,8 +41,8 @@ export async function lookAt(
         await server.sayAll(commands.COMBAT_OBJECTIVES);
         combatReady.add(installedAppId);
     }
-    const hurt = commands.readScores(await server.say([commands.READ_HURT]), commands.HURT);
-    const hit = commands.readScores(await server.say([commands.READ_HIT]), commands.HIT);
+    const hurt = commands.readScores(await server.say([commands.READ_HURT]));
+    const hit = commands.readScores(await server.say([commands.READ_HIT]));
     const now = Date.now();
     const seen = plan.observe(activity.get(installedAppId) ?? new Map(), positions, facing, now, {
         dimensions,

@@ -356,10 +356,18 @@ export function readScoreCommand(name: string): string {
     return `scoreboard players get ${name} ${SCORE}`;
 }
 
-/** `Alice has 12 [pe_score]`, once per player. */
-export function readScores(output: string, objective = SCORE): Map<string, number> {
+/**
+ * `Alice has 12 [Blood moon]`, once per player, from one objective's read.
+ *
+ * The bracket holds the objective's DISPLAY name, not its id - the event's own
+ * title for the side panel - so it is not matched on: every read asks about a
+ * single objective, and whatever the brackets say is that one. Matching the id
+ * there read every score on a real server as nothing, and left every podium
+ * empty.
+ */
+export function readScores(output: string): Map<string, number> {
     const found = new Map<string, number>();
-    const pattern = new RegExp(`([A-Za-z0-9_]{1,16}) has (-?\\d+) \\[${objective}\\]`, "g");
+    const pattern = /([A-Za-z0-9_]{1,16}) has (-?\d+) \[[^\n]*?\]/g;
     for (const match of stripFormatting(output).matchAll(pattern)) {
         found.set(match[1] as string, Number(match[2]));
     }
@@ -870,7 +878,7 @@ export function wave(options: EventOptions<"blood-moon">, number: number): strin
 /** Who died during the night - their deaths counted from when it fell. */
 export const READ_DEATHS = `execute as @a run scoreboard players get @s ${DEATHS}`;
 export function readDeaths(output: string): Map<string, number> {
-    return readScores(output, DEATHS);
+    return readScores(output);
 }
 
 // ------------------------------------------------------------------ world boss

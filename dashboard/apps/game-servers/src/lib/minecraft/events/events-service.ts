@@ -1577,11 +1577,12 @@ async function results(
         const alive = new Set((await survivorsOf(server, run)).map((name) => name.toLowerCase()));
         for (const name of [...scores.keys()])
             if (!alive.has(name.toLowerCase())) scores.delete(name);
+        // Taking part is fighting through the night and seeing the dawn: alive
+        // and at least one kill. Somebody who sat it out indoors saw the dawn
+        // too, and was being handed the prize for it.
         return {
             scores,
-            took: [...alive].map(
-                (key) => run.participants.find((name) => name.toLowerCase() === key) ?? key
-            )
+            took: [...scores.entries()].filter(([, score]) => score > 0).map(([name]) => name)
         };
     }
     return {
