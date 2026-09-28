@@ -52,10 +52,7 @@ export const CHAT_RULE_SCOPE_NOTES: Record<ChatRuleScope, string> = {
  * same answer the server will reach: a field that let somebody type a message
  * the send would then refuse is a field that wastes the message.
  */
-export function chatRuleScopeOf(channel: {
-    spaceId: string | null;
-    kind: string;
-}): ChatRuleScope {
+export function chatRuleScopeOf(channel: { spaceId: string | null; kind: string }): ChatRuleScope {
     if (channel.spaceId) return "space";
     return channel.kind === "group" ? "group" : "dm";
 }

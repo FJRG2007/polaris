@@ -45,8 +45,13 @@ export async function requireNotSpam(input: {
     if (!rules.spamGuard) return;
     const now = input.now ?? Date.now();
 
-    const people = extractReferences(body).filter((ref) => ref.kind === "user" || ref.kind === "team");
-    if (rules.maxMentionsPerMessage !== core.CHAT_NO_LIMIT && people.length > rules.maxMentionsPerMessage) {
+    const people = extractReferences(body).filter(
+        (ref) => ref.kind === "user" || ref.kind === "team"
+    );
+    if (
+        rules.maxMentionsPerMessage !== core.CHAT_NO_LIMIT &&
+        people.length > rules.maxMentionsPerMessage
+    ) {
         throw new ChatRuleError(
             `One message can mention up to ${rules.maxMentionsPerMessage} people here. Split it up, or use @everyone.`
         );
@@ -64,7 +69,9 @@ export async function requireNotSpam(input: {
             }
         });
         if (same >= rules.maxRepeatedMessages) {
-            throw new ChatRuleError("You have just sent that same message several times. Give it a moment.");
+            throw new ChatRuleError(
+                "You have just sent that same message several times. Give it a moment."
+            );
         }
     }
 
@@ -75,7 +82,10 @@ export async function requireNotSpam(input: {
     const mentioned = people.filter((ref) => ref.kind === "user").slice(0, CHECKED_PEOPLE);
     if (rules.maxSamePersonMentions !== core.CHAT_NO_LIMIT && mentioned.length > 0) {
         const recent = await prisma.chatMessage.findMany({
-            where: { ...mine, createdAt: { gte: new Date(now - core.CHAT_SPAM_WINDOWS.samePersonMs) } },
+            where: {
+                ...mine,
+                createdAt: { gte: new Date(now - core.CHAT_SPAM_WINDOWS.samePersonMs) }
+            },
             orderBy: { createdAt: "desc" },
             select: { body: true },
             take: RECENT_BODIES
@@ -87,7 +97,9 @@ export async function requireNotSpam(input: {
                 if (ref.kind === "user") times.set(ref.id, (times.get(ref.id) ?? 0) + 1);
             }
         }
-        if (mentioned.some((person) => (times.get(person.id) ?? 0) >= rules.maxSamePersonMentions)) {
+        if (
+            mentioned.some((person) => (times.get(person.id) ?? 0) >= rules.maxSamePersonMentions)
+        ) {
             throw new ChatRuleError(
                 "You have mentioned the same person a lot in the last few minutes. They have been told - give them a moment."
             );
@@ -118,7 +130,11 @@ export async function requireRoomMentionAllowed(input: {
             channelId: input.channelId,
             authorId: input.authorId,
             createdAt: { gte: new Date(now - core.CHAT_SPAM_WINDOWS.roomMentionsMs) },
-            OR: [{ body: { contains: "@everyone" } }, { body: { contains: "@here" } }, { body: { contains: "@all" } }]
+            OR: [
+                { body: { contains: "@everyone" } },
+                { body: { contains: "@here" } },
+                { body: { contains: "@all" } }
+            ]
         },
         select: { body: true },
         take: rules.maxRoomMentionsPerHour + 20

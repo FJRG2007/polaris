@@ -31,8 +31,10 @@ function matches(row: Row, where: Record<string, unknown>): boolean {
 vi.mock("@polaris/db", () => ({
     prisma: {
         chatMessage: {
-            count: async ({ where }: { where: Record<string, unknown> }) => rows.filter((row) => matches(row, where)).length,
-            findMany: async ({ where }: { where: Record<string, unknown> }) => rows.filter((row) => matches(row, where))
+            count: async ({ where }: { where: Record<string, unknown> }) =>
+                rows.filter((row) => matches(row, where)).length,
+            findMany: async ({ where }: { where: Record<string, unknown> }) =>
+                rows.filter((row) => matches(row, where))
         }
     }
 }));
@@ -45,9 +47,17 @@ const ANA = "0193aaaa-0000-7000-8000-000000000001";
 const rules = core.DEFAULT_CHAT_RULES;
 
 const said = (body: string, minutesAgo: number, authorId = "me") =>
-    rows.push({ channelId: "room", authorId, body, createdAt: new Date(NOW - minutesAgo * 60_000) });
+    rows.push({
+        channelId: "room",
+        authorId,
+        body,
+        createdAt: new Date(NOW - minutesAgo * 60_000)
+    });
 
-const send = (body: string, options: { moderator?: boolean; editing?: boolean; with?: core.ChatRules } = {}) =>
+const send = (
+    body: string,
+    options: { moderator?: boolean; editing?: boolean; with?: core.ChatRules } = {}
+) =>
     requireNotSpam({
         rules: options.with ?? rules,
         channelId: "room",
@@ -75,7 +85,9 @@ describe("@everyone and @here", () => {
         said("@everyone one", 50);
         said("@here two", 30);
         said("@all three", 10);
-        await expect(send("@everyone four")).rejects.toThrow("@everyone and @here can be used 3 times an hour per person here");
+        await expect(send("@everyone four")).rejects.toThrow(
+            "@everyone and @here can be used 3 times an hour per person here"
+        );
     });
 
     it("do not count once the hour has passed, or somebody else's, or one in code", async () => {
@@ -93,34 +105,50 @@ describe("@everyone and @here", () => {
 
     it("hold an edit that adds one, just like a send", async () => {
         for (let index = 0; index < 3; index += 1) said(`@here ${index}`, index);
-        await expect(requireRoomMentionAllowed({ rules, channelId: "room", authorId: "me", now: NOW })).rejects.toThrow(/an hour/);
+        await expect(
+            requireRoomMentionAllowed({ rules, channelId: "room", authorId: "me", now: NOW })
+        ).rejects.toThrow(/an hour/);
     });
 });
 
 describe("mentioning people", () => {
     it("allows a long list, not a phone book", async () => {
         const many = (count: number) =>
-            Array.from({ length: count }, (_, index) => mention(`0193aaaa-0000-7000-8000-${String(index).padStart(12, "0")}`, `P${index}`)).join(" ");
+            Array.from({ length: count }, (_, index) =>
+                mention(`0193aaaa-0000-7000-8000-${String(index).padStart(12, "0")}`, `P${index}`)
+            ).join(" ");
         await expect(send(many(20))).resolves.toBeUndefined();
-        await expect(send(many(21))).rejects.toThrow("One message can mention up to 20 people here");
+        await expect(send(many(21))).rejects.toThrow(
+            "One message can mention up to 20 people here"
+        );
         // And an edit cannot get round it.
         await expect(send(many(21), { editing: true })).rejects.toThrow(/up to 20/);
     });
 
     it("stops the same person being mentioned over and over", async () => {
         for (let index = 0; index < 5; index += 1) said(`${mention(ANA)} ping ${index}`, index);
-        await expect(send(`${mention(ANA)} ping again`)).rejects.toThrow("mentioned the same person a lot");
+        await expect(send(`${mention(ANA)} ping again`)).rejects.toThrow(
+            "mentioned the same person a lot"
+        );
         // Somebody else is fine, and so is Ana ten minutes later.
-        await expect(send(mention("0193aaaa-0000-7000-8000-000000000002", "Ben"))).resolves.toBeUndefined();
+        await expect(
+            send(mention("0193aaaa-0000-7000-8000-000000000002", "Ben"))
+        ).resolves.toBeUndefined();
         rows.length = 0;
-        for (let index = 0; index < 5; index += 1) said(`${mention(ANA)} ping ${index}`, 11 + index);
+        for (let index = 0; index < 5; index += 1)
+            said(`${mention(ANA)} ping ${index}`, 11 + index);
         await expect(send(`${mention(ANA)} hi`)).resolves.toBeUndefined();
     });
 
     it("counts a mention however its address is cased", async () => {
-        for (let index = 0; index < 5; index += 1) said(`[@Ana](POLARIS:user/${ANA.toUpperCase()}) ping ${index}`, index);
-        await expect(send(`${mention(ANA)} again`)).rejects.toThrow("mentioned the same person a lot");
-        await expect(send(`[@Ana](polaris:USER/${ANA.toUpperCase()}) again`)).rejects.toThrow("mentioned the same person a lot");
+        for (let index = 0; index < 5; index += 1)
+            said(`[@Ana](POLARIS:user/${ANA.toUpperCase()}) ping ${index}`, index);
+        await expect(send(`${mention(ANA)} again`)).rejects.toThrow(
+            "mentioned the same person a lot"
+        );
+        await expect(send(`[@Ana](polaris:USER/${ANA.toUpperCase()}) again`)).rejects.toThrow(
+            "mentioned the same person a lot"
+        );
     });
 
     it("does not count an address inside code", async () => {
@@ -143,11 +171,15 @@ describe("the same message again", () => {
 describe("the operator's switch", () => {
     it("turns every one of these off at once", async () => {
         for (let index = 0; index < 10; index += 1) said("@everyone spam", 0);
-        await expect(send("@everyone spam", { with: { ...rules, spamGuard: false } })).resolves.toBeUndefined();
+        await expect(
+            send("@everyone spam", { with: { ...rules, spamGuard: false } })
+        ).resolves.toBeUndefined();
     });
 
     it("turns a single limit off with zero", async () => {
         for (let index = 0; index < 10; index += 1) said(`@everyone ${index}`, index);
-        await expect(send("@everyone more", { with: { ...rules, maxRoomMentionsPerHour: 0 } })).resolves.toBeUndefined();
+        await expect(
+            send("@everyone more", { with: { ...rules, maxRoomMentionsPerHour: 0 } })
+        ).resolves.toBeUndefined();
     });
 });
