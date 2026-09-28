@@ -310,16 +310,16 @@ final class LoginGate {
     /** The title for what this player has to do next, sent again before it fades. */
     private static void titleFor(ServerPlayer player, Held waiting) {
         if (waiting.registered == null) return;
-        if (waiting.registered) title(player, "Log in", "/login <passcode>");
-        else title(player, "Choose a password", "/register <passcode> <passcode>");
+        if (waiting.registered) title(player, "Log in", "/login <password>");
+        else title(player, "Choose a password", "/register <password> <password>");
     }
 
     private void prompt(ServerPlayer player, Held waiting) {
         titleFor(player, waiting);
         if (Boolean.TRUE.equals(waiting.registered)) {
-            tell(player, "Log in with /login <passcode>.");
+            tell(player, "Log in with /login <password>.");
         } else {
-            tell(player, "Choose a password for this server with /register <passcode> <passcode>."
+            tell(player, "Choose a password for this server with /register <password> <password>."
                     + " Put it in double quotes if it has spaces.");
         }
     }
@@ -386,19 +386,19 @@ final class LoginGate {
         // mod, and players took it for a server that only accepts digits. The
         // argument names are what the game shows while the command is typed.
         commands.register(Commands.literal("register")
-                .then(Commands.argument("passcode passcode", StringArgumentType.greedyString())
+                .then(Commands.argument("password password", StringArgumentType.greedyString())
                         .executes(context -> {
                             ServerPlayer player = context.getSource().getPlayerOrException();
-                            List<String> words = words(context, "passcode passcode");
-                            if (words.size() != 2) return usage(player, "/register <passcode> <passcode>");
+                            List<String> words = words(context, "password password");
+                            if (words.size() != 2) return usage(player, "/register <password> <password>");
                             return register(player, words.get(0), words.get(1));
                         })));
         commands.register(Commands.literal("login")
-                .then(Commands.argument("passcode", StringArgumentType.greedyString())
+                .then(Commands.argument("password", StringArgumentType.greedyString())
                         .executes(context -> {
                             ServerPlayer player = context.getSource().getPlayerOrException();
-                            List<String> words = words(context, "passcode");
-                            if (words.size() != 1) return usage(player, "/login <passcode>");
+                            List<String> words = words(context, "password");
+                            if (words.size() != 1) return usage(player, "/login <password>");
                             return login(player, words.get(0));
                         })));
         commands.register(Commands.literal("changepassword")
@@ -424,7 +424,7 @@ final class LoginGate {
         Held waiting = waitingFor(player);
         if (waiting == null) return 0;
         if (Boolean.TRUE.equals(waiting.registered)) {
-            tell(player, "You already have a password here. Log in with /login <passcode>.");
+            tell(player, "You already have a password here. Log in with /login <password>.");
             return 0;
         }
         if (!password.equals(confirm)) {
@@ -449,7 +449,7 @@ final class LoginGate {
                 release(current, "Password set. Welcome!");
             } else if (reply.status() == 409) {
                 waiting.registered = true;
-                tell(current, "You already have a password here. Log in with /login <passcode>.");
+                tell(current, "You already have a password here. Log in with /login <password>.");
             } else {
                 tell(current, failure(reply, "save your password"));
             }
@@ -483,7 +483,7 @@ final class LoginGate {
                 }
                 case 404 -> {
                     waiting.registered = false;
-                    tell(current, "You have no password here yet. Choose one with /register <passcode> <passcode>.");
+                    tell(current, "You have no password here yet. Choose one with /register <password> <password>.");
                 }
                 case 429 -> waiting.kick = throttled(reply);
                 default -> tell(current, failure(reply, "check your password"));
@@ -498,7 +498,7 @@ final class LoginGate {
             return 0;
         }
         if (held.containsKey(player.getUUID())) {
-            tell(player, "Log in first with /login <passcode>.");
+            tell(player, "Log in first with /login <password>.");
             return 0;
         }
         String problem = passwordProblem(next);
