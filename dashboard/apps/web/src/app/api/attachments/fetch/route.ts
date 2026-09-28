@@ -14,6 +14,7 @@
  */
 
 import { apiUser } from "@/lib/api-session";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 import { AttachRefused, fileFromAddress, fileFromDrive } from "@/lib/attachments/from-elsewhere";
 
 export const runtime = "nodejs";
@@ -49,7 +50,14 @@ export async function GET(request: Request): Promise<Response> {
                 "x-polaris-filename": encodeURIComponent(file.name),
                 "access-control-expose-headers": "x-polaris-filename",
                 "x-content-type-options": "nosniff",
-                "cache-control": "private, no-store"
+                // The bytes are somebody else's - any address at all - served
+                // from this origin. Only the picker's own fetch() reads them, so a
+                // browser opening the link directly gets a download inside a
+                // sandbox, never a page that runs as the signed-in reader.
+                "content-disposition": "attachment",
+                "content-security-policy": "default-src 'none'; sandbox",
+                "cache-control": "private, no-store",
+                ...downloadTicketHeaders(request)
             }
         });
     } catch (caught) {

@@ -951,6 +951,8 @@ export async function findMinecraftPlayerByUserAction(
     unverified?: boolean;
     name?: string;
     addresses?: string[];
+    /** The administrator keeps other accounts' addresses from this screen. */
+    addressesHidden?: boolean;
     error?: string;
 }> {
     const parsed = z.string().trim().min(1).max(120).safeParse(query);
@@ -962,13 +964,17 @@ export async function findMinecraftPlayerByUserAction(
             return { error: "Nobody here goes by that. Check the username or the email address." };
         // Only the ones a rule can be written against. A session that arrived
         // over something this build cannot parse is not an address to offer.
-        const addresses = (await userSessionAddresses(found.userId)).filter(isAddressRule);
+        // Where somebody else signs in from is theirs; an administrator decides
+        // whether the people running a server are shown it.
+        const shown = await playerAccess.viewerSeesSignInAddresses();
+        const addresses = shown ? (await userSessionAddresses(found.userId)).filter(isAddressRule) : [];
         // Somebody who has not linked Minecraft can still be tied to a name the
         // operator types, so the account comes back either way.
         return {
             userId: found.userId,
             name: found.name,
             addresses,
+            ...(shown ? {} : { addressesHidden: true }),
             ...(found.identity
                 ? {
                       username: found.identity.label,
@@ -1109,7 +1115,7 @@ export async function playerAccessAction(
 ): Promise<playerAccess.PlayerAccessView | null> {
     try {
         const { access } = await requireGameServer("games.read", installedAppId);
-        return await playerAccess.listPlayerAccess(access.ownerId, installedAppId);
+        return await playerAccess.forViewer(await playerAccess.listPlayerAccess(access.ownerId, installedAppId));
     } catch {
         return null;
     }

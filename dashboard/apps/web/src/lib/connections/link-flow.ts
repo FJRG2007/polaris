@@ -32,6 +32,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
 import { markConnectionProven } from "./proven";
 import { clientIp } from "@/lib/request-context";
+import { safeRedirect } from "@/lib/safe-redirect";
 import { rateLimit } from "@/lib/rate-limit-service";
 import * as core from "@polaris/core";
 import { findConnectionProvider, sameAddress } from "@polaris/core";
@@ -170,8 +171,9 @@ function backToLogin(origin: string, provider: string, outcome: SignInOutcome): 
  * and following it anywhere else would make this an open redirect.
  */
 function safeTarget(value: string | null): string | undefined {
-    if (!value || !value.startsWith("/") || value.startsWith("//")) return undefined;
-    return value;
+    if (!value) return undefined;
+    const target = safeRedirect(value);
+    return target === "/" && value !== "/" ? undefined : target;
 }
 
 /**

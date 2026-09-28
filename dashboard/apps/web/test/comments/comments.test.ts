@@ -38,6 +38,8 @@ vi.mock("@polaris/db", () => ({
 
 const comments = await import("../../src/lib/comments/comments");
 
+const TASK = { subjectType: "task", subjectId: "t1" } as const;
+
 const AT = new Date("2026-08-15T10:00:00.000Z");
 
 beforeEach(() => {
@@ -142,30 +144,61 @@ describe("changing what was said", () => {
     });
 
     it("narrows a delete to the author unless the caller moderates", async () => {
-        await comments.remove("u1", "c1", false);
-        expect(commentDeleteMany).toHaveBeenCalledWith({ where: { id: "c1", userId: "u1" } });
+        await comments.remove("u1", TASK, "c1", false);
+        expect(commentDeleteMany).toHaveBeenCalledWith({
+            where: { id: "c1", subjectType: "task", subjectId: "t1", userId: "u1" }
+        });
 
-        await comments.remove("u1", "c2", true);
-        expect(commentDeleteMany).toHaveBeenLastCalledWith({ where: { id: "c2" } });
+        await comments.remove("u1", TASK, "c2", true);
+        expect(commentDeleteMany).toHaveBeenLastCalledWith({
+            where: { id: "c2", subjectType: "task", subjectId: "t1" }
+        });
+    });
+
+    it("keeps a moderator's delete to the thread they were cleared for", async () => {
+        // Moderating one task's thread is not a licence over every comment on
+        // the instance: the subject is always part of the match.
+        await comments.remove("u1", { subjectType: "host", subjectId: "h1" }, "c9", true);
+        const where = (commentDeleteMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
+        expect(where).toMatchObject({ subjectType: "host", subjectId: "h1" });
+    });
+
+    it("refuses an id that is not a string before it can become a filter", async () => {
+        const filter = { not: "" } as unknown as string;
+        await expect(comments.remove("u1", TASK, filter, true)).rejects.toThrow();
+        await expect(comments.setResolved("u1", TASK, filter, true)).rejects.toThrow();
+        await expect(comments.edit("u1", filter, "x")).rejects.toThrow();
+        expect(commentDeleteMany).not.toHaveBeenCalled();
+        expect(commentUpdateMany).not.toHaveBeenCalled();
     });
 
     it("refuses a delete that matched nobody", async () => {
         commentDeleteMany.mockResolvedValueOnce({ count: 0 });
 
-        await expect(comments.remove("u2", "c1", false)).rejects.toThrow("your own");
+        await expect(comments.remove("u2", TASK, "c1", false)).rejects.toThrow("your own");
     });
 
     it("records who resolved it, and clears both on reopening", async () => {
-        await comments.setResolved("u1", "c1", true);
-        const resolved = commentUpdate.mock.calls[0]?.[0] as { data: { resolvedById: string | null } };
+        await comments.setResolved("u1", TASK, "c1", true);
+        const resolved = commentUpdateMany.mock.calls[0]?.[0] as {
+            where: Record<string, unknown>;
+            data: { resolvedById: string | null };
+        };
+        expect(resolved.where).toEqual({ id: "c1", subjectType: "task", subjectId: "t1" });
         expect(resolved.data.resolvedById).toBe("u1");
 
-        await comments.setResolved("u1", "c1", false);
-        const reopened = commentUpdate.mock.calls[1]?.[0] as {
+        await comments.setResolved("u1", TASK, "c1", false);
+        const reopened = commentUpdateMany.mock.calls[1]?.[0] as {
             data: { resolvedAt: Date | null; resolvedById: string | null };
         };
         expect(reopened.data.resolvedAt).toBeNull();
         expect(reopened.data.resolvedById).toBeNull();
+    });
+
+    it("refuses to resolve a comment from another thread", async () => {
+        commentUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+        await expect(comments.setResolved("u1", TASK, "c-elsewhere", true)).rejects.toThrow("not here");
     });
 });
 

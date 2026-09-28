@@ -4,9 +4,9 @@
  * Shares, drop points and access locks each carried their own copy of this logic
  * before it was one module, so the tests that matter are the ones that pin what
  * the merge could quietly have changed: the ORDER the verdicts come back in, and
- * the exact bytes each unlock cookie is signed over. A cookie signed over a new
- * message still verifies against itself - the refactor looks fine - while every
- * visitor who had already solved a password is silently asked again.
+ * what an unlock cookie is bound to. A cookie that names only its link still
+ * verifies against itself - everything looks fine - while it opens the link for
+ * anybody it is copied to, forever, and after the password has been changed.
  */
 
 import { createHmac } from "node:crypto";
@@ -24,6 +24,7 @@ const {
     parseStringList,
     signMarker,
     signUnlock,
+    UNLOCK_TTL_SECONDS,
     unlockCookieName,
     verifyMarker,
     verifyUnlock
@@ -101,15 +102,15 @@ describe("linkIpAllowed", () => {
 });
 
 describe("unlock markers", () => {
-    /** What the three surfaces signed before they shared one module. */
+    /** What the three surfaces signed before this format: the link and nothing
+     *  else, the same for every visitor and forever. */
     const legacy = (message: string) =>
         createHmac("sha256", SECRET).update(message).digest("base64url");
 
-    it("keeps the message every surface already had cookies in the wild for", () => {
-        expect(signUnlock("share", ID, SECRET)).toBe(legacy(`unlock:${ID}`));
-        expect(signUnlock("drop", ID, SECRET)).toBe(legacy(`drop-unlock:${ID}`));
-        expect(signUnlock("lock", ID, SECRET)).toBe(legacy(`lock-unlock:${ID}`));
-    });
+    const HASH = "scrypt$salt-one$hash-one";
+    const grant = { passwordHash: HASH };
+    const T0 = Date.parse("2026-06-01T00:00:00Z");
+    const HOUR = 60 * 60 * 1000;
 
     it("keeps the cookie names those surfaces already set", () => {
         expect(unlockCookieName("share", ID)).toBe(`polaris_share_${ID}`);
@@ -117,18 +118,80 @@ describe("unlock markers", () => {
         expect(unlockCookieName("lock", ID)).toBe(`polaris_lock_${ID}`);
     });
 
-    it("scopes every new surface, so one marker cannot satisfy another", () => {
-        expect(signUnlock("snippet", ID, SECRET)).toBe(legacy(`unlock:snippet:${ID}`));
-        expect(verifyUnlock("send", ID, signUnlock("snippet", ID, SECRET), SECRET)).toBe(false);
+    it("verifies a fresh unlock for the link and password it was signed for", () => {
+        for (const scope of ["share", "drop", "lock", "snippet"]) {
+            const marker = signUnlock(scope, ID, grant, SECRET, T0);
+            expect(verifyUnlock(scope, ID, marker, grant, SECRET, T0 + HOUR)).toBe(true);
+        }
     });
 
-    it("verifies its own marker and refuses everything else", () => {
-        const marker = signUnlock("snippet", ID, SECRET);
-        expect(verifyUnlock("snippet", ID, marker, SECRET)).toBe(true);
-        expect(verifyUnlock("snippet", ID, marker, "other-secret")).toBe(false);
-        expect(verifyUnlock("snippet", "another-id", marker, SECRET)).toBe(false);
-        expect(verifyUnlock("snippet", ID, undefined, SECRET)).toBe(false);
-        expect(verifyUnlock("snippet", ID, "", SECRET)).toBe(false);
+    it("carries its expiry in front of the signature, and nothing else", () => {
+        const marker = signUnlock("share", ID, grant, SECRET, T0);
+        const [expiry, signature] = marker.split(".");
+        expect(Number(expiry)).toBe(T0 / 1000 + UNLOCK_TTL_SECONDS);
+        expect(signature).toMatch(/^[A-Za-z0-9_-]{43}$/);
+        expect(marker).not.toContain(HASH);
+    });
+
+    it("stops being honoured when it expires, whatever the cookie's own age says", () => {
+        const marker = signUnlock("share", ID, grant, SECRET, T0);
+        const end = T0 + UNLOCK_TTL_SECONDS * 1000;
+        expect(verifyUnlock("share", ID, marker, grant, SECRET, end - 1)).toBe(true);
+        expect(verifyUnlock("share", ID, marker, grant, SECRET, end)).toBe(false);
+        expect(verifyUnlock("share", ID, marker, grant, SECRET, end + 24 * HOUR)).toBe(false);
+    });
+
+    it("cannot have its life stretched by editing the expiry in front", () => {
+        const [expiry, signature] = signUnlock("share", ID, grant, SECRET, T0).split(".");
+        const stretched = `${Number(expiry) + 86_400}.${signature}`;
+        expect(verifyUnlock("share", ID, stretched, grant, SECRET, T0)).toBe(false);
+    });
+
+    it("refuses a tampered or malformed value", () => {
+        const marker = signUnlock("share", ID, grant, SECRET, T0);
+        const flipped = `${marker.slice(0, -1)}${marker.endsWith("A") ? "B" : "A"}`;
+        expect(verifyUnlock("share", ID, flipped, grant, SECRET, T0)).toBe(false);
+        expect(verifyUnlock("share", ID, `${marker}.x`, grant, SECRET, T0)).toBe(false);
+        expect(verifyUnlock("share", ID, `x${marker}`, grant, SECRET, T0)).toBe(false);
+        expect(verifyUnlock("share", ID, marker.split(".")[1], grant, SECRET, T0)).toBe(false);
+        expect(verifyUnlock("share", ID, undefined, grant, SECRET, T0)).toBe(false);
+        expect(verifyUnlock("share", ID, "", grant, SECRET, T0)).toBe(false);
+        expect(verifyUnlock("share", ID, marker, grant, "other-secret", T0)).toBe(false);
+    });
+
+    it("stops opening once the password changes", () => {
+        // The hash is salted, so a new password - even the same one set again -
+        // is a new hash, and that is what ends the unlock.
+        const marker = signUnlock("share", ID, grant, SECRET, T0);
+        const changed = { passwordHash: "scrypt$salt-two$hash-two" };
+        expect(verifyUnlock("share", ID, marker, changed, SECRET, T0)).toBe(false);
+    });
+
+    it("opens only the link and the kind of link it was signed for", () => {
+        const marker = signUnlock("share", ID, grant, SECRET, T0);
+        expect(verifyUnlock("share", "another-id", marker, grant, SECRET, T0)).toBe(false);
+        expect(verifyUnlock("drop", ID, marker, grant, SECRET, T0)).toBe(false);
+        expect(verifyUnlock("lock", ID, marker, grant, SECRET, T0)).toBe(false);
+    });
+
+    it("opens only for the user it was bound to, when it was bound to one", () => {
+        const mine = { passwordHash: HASH, userId: "user-one" };
+        const marker = signUnlock("lock", ID, mine, SECRET, T0);
+        expect(verifyUnlock("lock", ID, marker, mine, SECRET, T0)).toBe(true);
+        expect(verifyUnlock("lock", ID, marker, { ...mine, userId: "user-two" }, SECRET, T0)).toBe(false);
+        expect(verifyUnlock("lock", ID, marker, grant, SECRET, T0)).toBe(false);
+        // And an anonymous one does not become a bound one.
+        const anonymous = signUnlock("lock", ID, grant, SECRET, T0);
+        expect(verifyUnlock("lock", ID, anonymous, mine, SECRET, T0)).toBe(false);
+    });
+
+    it("no longer accepts a cookie in the old shape", () => {
+        // Anybody holding one is asked for the password once more - within twelve
+        // hours of the moment their browser would have dropped it anyway.
+        expect(verifyUnlock("share", ID, legacy(`unlock:${ID}`), grant, SECRET)).toBe(false);
+        expect(verifyUnlock("drop", ID, legacy(`drop-unlock:${ID}`), grant, SECRET)).toBe(false);
+        expect(verifyUnlock("lock", ID, legacy(`lock-unlock:${ID}`), grant, SECRET)).toBe(false);
+        expect(verifyUnlock("snippet", ID, legacy(`unlock:snippet:${ID}`), grant, SECRET)).toBe(false);
     });
 });
 

@@ -64,7 +64,14 @@ export async function gateNoteShareRequest(token: string): Promise<NoteShareGate
 
     if (share.passwordHash) {
         const solved = (await cookies()).get(noteUnlockCookie(share.id))?.value;
-        if (!verifyNoteUnlock(share.id, solved, loadEnv().POLARIS_AUTH_SECRET)) {
+        if (
+            !verifyNoteUnlock(
+                share.id,
+                solved,
+                share.passwordHash,
+                loadEnv().POLARIS_AUTH_SECRET
+            )
+        ) {
             return { ok: false, status: 401, reason: "password_required" };
         }
     }

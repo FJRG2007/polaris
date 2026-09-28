@@ -18,7 +18,7 @@
  * exists and work inside it; they do not create it.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { bumpRevision } from "@/lib/vault/account";
@@ -267,6 +267,22 @@ export async function deleteVault(vaultId: string): Promise<boolean> {
     return true;
 }
 
+/**
+ * Every member row but the personal vault owner's own.
+ *
+ * Whoever the owner made an administrator of their vault may manage the people
+ * in it, never the owner: that row holds the only copy of the owner's wrapped
+ * key, so removing it, re-keying it or narrowing it would lock the owner out of
+ * their own vault with no way back in.
+ */
+async function notTheOwner(orgId: string): Promise<Prisma.VaultOrgUserWhereInput> {
+    const vault = await prisma.vaultOrganization.findUnique({
+        where: { id: orgId },
+        select: { ownerUserId: true }
+    });
+    return vault?.ownerUserId ? { OR: [{ userId: null }, { userId: { not: vault.ownerUserId } }] } : {};
+}
+
 /** Invite somebody by address. They hold no key until they are confirmed. */
 export async function inviteMember(
     orgId: string,
@@ -275,6 +291,12 @@ export async function inviteMember(
 ): Promise<{ ok: boolean }> {
     const stored = address(email);
     const user = await prisma.user.findUnique({ where: { email: stored }, select: { id: true } });
+    // Re-inviting the owner would rewrite their standing in their own vault.
+    const owner = await prisma.vaultOrganization.findUnique({
+        where: { id: orgId },
+        select: { ownerUserId: true }
+    });
+    if (user && owner?.ownerUserId === user.id) return { ok: false };
     await prisma.vaultOrgUser.upsert({
         where: { orgId_email: { orgId, email: stored } },
         create: {
@@ -313,7 +335,7 @@ export async function confirmMember(
 ): Promise<boolean> {
     if (!core.isEncString(wrappedKey)) return false;
     const { count } = await prisma.vaultOrgUser.updateMany({
-        where: { id: memberId, orgId },
+        where: { id: memberId, orgId, ...(await notTheOwner(orgId)) },
         data: { key: wrappedKey, status: core.ORG_USER_CONFIRMED, accessAll: scope.accessAll }
     });
     if (count === 0) return false;
@@ -333,7 +355,7 @@ export async function setMemberScope(
     scope: core.VaultScope
 ): Promise<boolean> {
     const { count } = await prisma.vaultOrgUser.updateMany({
-        where: { id: memberId, orgId },
+        where: { id: memberId, orgId, ...(await notTheOwner(orgId)) },
         data: { accessAll: scope.accessAll }
     });
     if (count === 0) return false;
@@ -357,7 +379,7 @@ async function writeScope(
         ).map((row) => row.id)
     );
     await prisma.$transaction([
-        prisma.vaultCollectionAccess.deleteMany({ where: { orgUserId: memberId } }),
+        prisma.vaultCollectionAccess.deleteMany({ where: { orgUserId: memberId, member: { orgId } } }),
         ...(allowed.size > 0
             ? [
                   prisma.vaultCollectionAccess.createMany({
@@ -384,7 +406,7 @@ async function writeScope(
  *  for anything new, and the items stay where they are. */
 export async function removeMember(orgId: string, memberId: string): Promise<boolean> {
     const member = await prisma.vaultOrgUser.findFirst({
-        where: { id: memberId, orgId },
+        where: { id: memberId, orgId, ...(await notTheOwner(orgId)) },
         select: { userId: true }
     });
     if (!member) return false;

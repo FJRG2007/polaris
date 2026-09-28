@@ -58,7 +58,7 @@ export async function deleteServerNote(hostId: string, ownerId: string, commentI
     await requireOwnedHost(hostId, ownerId);
     // Only the server's owner gets past the check above, and the owner moderates
     // their own server's notes.
-    await comments.remove(ownerId, commentId, true);
+    await comments.remove(ownerId, { subjectType: "host", subjectId: hostId }, commentId, true);
 }
 
 export async function isFollowingServer(hostId: string, userId: string): Promise<boolean> {

@@ -15,7 +15,7 @@
 
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
-import { resolveSession } from "@/lib/session";
+import { backgroundUser } from "@/lib/session";
 import { listNotifications, NOTIFICATION_FEED_LIMIT } from "@/lib/notification-service";
 import {
     closeLiveClient,
@@ -42,7 +42,7 @@ const clientSchema = z.enum(["desktop", "browser"]);
 const soundSchema = z.enum(["on", "off"]).catch("on");
 
 export async function GET(request: Request): Promise<Response> {
-    const session = await resolveSession();
+    const session = await backgroundUser();
     // A non-200 makes EventSource give up instead of reconnecting every few
     // seconds against a session that is gone.
     if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });

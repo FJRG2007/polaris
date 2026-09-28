@@ -68,6 +68,7 @@ export async function PUT(
             !fileRequests.verifyFileRequestUnlock(
                 fileRequest.id,
                 cookieValue,
+                fileRequest.passwordHash,
                 loadEnv().POLARIS_AUTH_SECRET
             )
         ) {

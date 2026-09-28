@@ -547,7 +547,11 @@ export async function unlockNoteShareAction(
     const env = loadEnv();
     (await cookies()).set(
         share.noteUnlockCookie(link.id),
-        share.signNoteUnlock(link.id, env.POLARIS_AUTH_SECRET),
+        share.signNoteUnlock(
+            link.id,
+            link.passwordHash,
+            env.POLARIS_AUTH_SECRET
+        ),
         {
             httpOnly: true,
             sameSite: "lax",

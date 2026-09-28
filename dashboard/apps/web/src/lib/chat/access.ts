@@ -307,7 +307,7 @@ export async function reachableChannelIds(actor: ChatActor): Promise<Set<string>
     const [direct, spaces, granted] = await Promise.all([
         prisma.chatChannelMember.findMany({
             where: { userId: actor.id },
-            select: { channelId: true }
+            select: { channelId: true, channel: { select: { spaceId: true } } }
         }),
         reachableSpaceIds(actor),
         // One room handed to a team, without the space it is in going with it.
@@ -321,8 +321,14 @@ export async function reachableChannelIds(actor: ChatActor): Promise<Set<string>
           })
         : [];
 
+    // A row in a space's channel is not access on its own: reading one leaves a
+    // row behind, and it outlives leaving the organization or the space turning
+    // private. `channelAccess` asks the space first, so this does too - or search,
+    // toasts and the live stream would go on serving a room that refuses to open.
+    const member = direct.filter((row) => !row.channel.spaceId || spaces.has(row.channel.spaceId));
+
     return new Set([
-        ...direct.map((row) => row.channelId),
+        ...member.map((row) => row.channelId),
         ...open.map((row) => row.id),
         ...granted.keys()
     ]);

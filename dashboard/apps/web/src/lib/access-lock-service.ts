@@ -4,6 +4,8 @@
  * requires unlocking with the password. The unlock is remembered in a signed,
  * per-lock session cookie (the same forge-proof HMAC scheme the share and drop
  * unlock cookies use), so a user unlocks once per session rather than per file.
+ * That cookie is bound to the user, the lock's current password and a
+ * server-side expiry, so it cannot be handed on, and a new password ends it.
  *
  * The password is stretched with the same slow, salted KDF as share/link
  * passwords (scrypt) rather than a new dependency - it is the same threat (a
@@ -25,6 +27,12 @@ const LOCK_LINK_SCOPE = "lock";
 export interface LockInfo {
     id: string;
     path: string;
+}
+
+/** A lock as the gate checks it: with the hash its unlock cookies are signed
+ *  against. Server-side only - never handed to a page. */
+export interface LockGuard extends LockInfo {
+    passwordHash: string;
 }
 
 /** Every lock defined on a connection, for the management UI. */
@@ -58,11 +66,14 @@ export async function findLockForPath(
  * again for the next path. A job that authorizes three thousand files was
  * reading the whole lock table three thousand times.
  */
-export async function connectionLocks(connectionId: string): Promise<LockInfo[]> {
+export async function connectionLocks(connectionId: string): Promise<LockGuard[]> {
     // A non-UUID source (an ephemeral `container:<id>` connection) can hold no
     // locks, and its id is not a value the column can even hold.
     if (!isUuid(connectionId)) return [];
-    return prisma.accessLock.findMany({ where: { connectionId }, select: { id: true, path: true } });
+    return prisma.accessLock.findMany({
+        where: { connectionId },
+        select: { id: true, path: true, passwordHash: true }
+    });
 }
 
 /**
@@ -106,14 +117,18 @@ export async function removeLock(connectionId: string, lockId: string): Promise<
     await prisma.accessLock.deleteMany({ where: { id: lockId, connectionId } });
 }
 
-/** Constant-time check of a presented password against a lock's stored hash. */
-export async function verifyLockPassword(lockId: string, presented: string): Promise<boolean> {
+/**
+ * Constant-time check of a presented password against a lock's stored hash.
+ * Answers with that hash when the password opens the lock, so the unlock is
+ * signed against exactly the password it was checked against, or null.
+ */
+export async function verifyLockPassword(lockId: string, presented: string): Promise<string | null> {
     const lock = await prisma.accessLock.findUnique({
         where: { id: lockId },
         select: { passwordHash: true }
     });
-    if (!lock) return false;
-    return verifyLinkPassword(presented, lock.passwordHash);
+    if (!lock) return null;
+    return (await verifyLinkPassword(presented, lock.passwordHash)) ? lock.passwordHash : null;
 }
 
 /** Cookie name recording that a lock has been unlocked this session. */
@@ -121,16 +136,33 @@ export function lockUnlockCookie(lockId: string): string {
     return unlockCookieName(LOCK_LINK_SCOPE, lockId);
 }
 
-/** Sign an unlock marker so the "lock solved" cookie cannot be forged. */
-export function signLockUnlock(lockId: string, secret: string): string {
-    return signUnlock(LOCK_LINK_SCOPE, lockId, secret);
+/**
+ * Sign an unlock marker so the "lock solved" cookie cannot be forged. Bound to
+ * the user who solved it and the password they solved, and it expires on the
+ * server: a copied value opens nothing for anybody else, and changing the
+ * lock's password ends every unlock handed out before.
+ */
+export function signLockUnlock(
+    lock: Pick<LockGuard, "id" | "passwordHash">,
+    userId: string,
+    secret: string
+): string {
+    return signUnlock(LOCK_LINK_SCOPE, lock.id, { passwordHash: lock.passwordHash, userId }, secret);
 }
 
-/** Constant-time check of an unlock cookie against the expected signature. */
+/** Constant-time check of an unlock cookie: this lock, its current password,
+ *  this user, and not expired. */
 export function verifyLockUnlock(
-    lockId: string,
+    lock: Pick<LockGuard, "id" | "passwordHash">,
+    userId: string,
     value: string | undefined,
     secret: string
 ): boolean {
-    return verifyUnlock(LOCK_LINK_SCOPE, lockId, value, secret);
+    return verifyUnlock(
+        LOCK_LINK_SCOPE,
+        lock.id,
+        value,
+        { passwordHash: lock.passwordHash, userId },
+        secret
+    );
 }

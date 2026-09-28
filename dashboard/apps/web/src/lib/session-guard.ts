@@ -68,6 +68,13 @@ interface GuardInput {
     sessionId: string;
     /** When the session was issued, for the absolute-lifetime check. */
     sessionCreatedAt: Date;
+    /**
+     * Whether this request counts as somebody being here. False for a stream, a
+     * poll or a beacon: every control still applies to them, but they must not
+     * refresh the stamp the idle lock measures, or a tab nobody is sitting at
+     * would hold an unattended session open forever. Defaults to true.
+     */
+    touch?: boolean;
 }
 
 /**
@@ -187,7 +194,8 @@ async function secondFactorVerdict(hasFactor: boolean): Promise<SessionVerdict |
 export async function guardSession({
     userId,
     sessionId,
-    sessionCreatedAt
+    sessionCreatedAt,
+    touch = true
 }: GuardInput): Promise<SessionVerdict> {
     const [record, state] = await Promise.all([
         prisma.user.findUnique({
@@ -377,9 +385,10 @@ export async function guardSession({
     //    session opened before the host was recorded adopts it here, which is the
     //    only way an already-open one ever gets a name against it.
     const host = state.host ?? (await clientHost()) ?? null;
-    if (host !== state.host || now - state.lastSeenAt.getTime() >= ACTIVITY_WRITE_INTERVAL_MS) {
+    const stale = touch && now - state.lastSeenAt.getTime() >= ACTIVITY_WRITE_INTERVAL_MS;
+    if (host !== state.host || stale) {
         await prisma.sessionState
-            .update({ where: { sessionId }, data: { lastSeenAt: new Date(), host } })
+            .update({ where: { sessionId }, data: { ...(stale ? { lastSeenAt: new Date() } : {}), host } })
             .catch(() => undefined);
     }
 

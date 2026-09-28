@@ -72,6 +72,49 @@ import { host } from "@polaris/app-host";
 
 const { readAppRuntimeLog } = host.deployService;
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
+const { getSetting } = host.settingStore;
+const { requireUser } = host.session;
+
+/**
+ * The instance setting an administrator sets under Management > Security. The
+ * same key the host's `lib/player-address-policy.ts` writes; unset means
+ * shared, which is how this behaved before the setting existed.
+ */
+const PLAYER_ADDRESSES_SETTING = "games.share-player-addresses";
+
+/** What a session-followed address reads as to somebody not allowed to see it. */
+export const HIDDEN_SIGN_IN_ADDRESS = "Polaris sign-in (hidden)";
+
+/**
+ * Whether the person asking may see where other accounts sign in from. An
+ * administrator always may; anybody else only while the instance shares it. A
+ * caller that cannot be identified is shown nothing.
+ */
+export async function viewerSeesSignInAddresses(): Promise<boolean> {
+    try {
+        const user = await requireUser();
+        if (user.isAdmin) return true;
+    } catch {
+        return false;
+    }
+    return (await getSetting(PLAYER_ADDRESSES_SETTING).catch(() => null)) !== "false";
+}
+
+/**
+ * The list as the person asking may see it. Addresses the server copied from a
+ * linked account's sign-ins are that account's network location, so they are
+ * replaced with a label when the instance keeps them from the people running
+ * servers. Enforcement never goes through here - it reads the rows themselves.
+ */
+export async function forViewer(view: PlayerAccessView): Promise<PlayerAccessView> {
+    if (await viewerSeesSignInAddresses()) return view;
+    return {
+        ...view,
+        rules: view.rules.map((rule) =>
+            rule.source === "session" ? { ...rule, address: HIDDEN_SIGN_IN_ADDRESS } : rule
+        )
+    };
+}
 
 /** How much log to read back when matching joins. A join line per player is all
  *  that is wanted, and a busy server prints a lot between them. */

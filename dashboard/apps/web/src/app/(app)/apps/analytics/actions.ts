@@ -13,6 +13,7 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit-service";
 import { listProjectScopes, visibleApplication } from "@/lib/deploy-service";
+import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import type { SiteOption } from "./site-catalog";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { analyticsSettingsSchema, visitRangeSchema, type VisitRange } from "@polaris/core";
@@ -65,6 +66,30 @@ async function resolveSite(
         application.name,
         domains.map((domain) => domain.hostname.toLowerCase())
     );
+}
+
+/**
+ * The site behind a scope, when the caller may also change it.
+ *
+ * Seeing a service is not running it: an internal project is visible to every
+ * account, and a read-only member sees what they cannot touch. Switching the
+ * tracker off or rotating its key stops a site's numbers, so it takes the right
+ * to configure that service, not the right to look at it.
+ */
+async function resolveWritableSite(
+    userId: string,
+    isOperator: boolean,
+    scopeType: AnalyticsScopeType,
+    scopeId: string
+): Promise<AnalyticsSiteView | null> {
+    if (scopeType === "application") {
+        const configurable = await requireApplicationAccess(scopeId, userId, "service.configure").then(
+            () => true,
+            () => false
+        );
+        if (!configurable) return null;
+    }
+    return resolveSite(userId, isOperator, scopeType, scopeId);
 }
 
 export interface AnalyticsOverview {
@@ -135,10 +160,10 @@ export async function setTrackerEnabledAction(input: {
     const canOperate = await userHasManage(user, "system.manage");
     const scope = scopeSchema.safeParse(input);
     if (!scope.success) return { error: "That is not something Polaris measures." };
-    const site = await resolveSite(user.id, canOperate, scope.data.scopeType, scope.data.scopeId);
+    const site = await resolveWritableSite(user.id, canOperate, scope.data.scopeType, scope.data.scopeId);
     if (!site) return { error: "That is not yours to change." };
 
-    await setTrackerEnabled(site.id, input.enabled);
+    await setTrackerEnabled(site.id, input.enabled === true);
     await recordAudit({
         actorId: user.id,
         action: input.enabled ? "analytics.tracker.enable" : "analytics.tracker.disable",
@@ -157,7 +182,7 @@ export async function rotateTrackerKeyAction(input: {
     const canOperate = await userHasManage(user, "system.manage");
     const scope = scopeSchema.safeParse(input);
     if (!scope.success) return { error: "That is not something Polaris measures." };
-    const site = await resolveSite(user.id, canOperate, scope.data.scopeType, scope.data.scopeId);
+    const site = await resolveWritableSite(user.id, canOperate, scope.data.scopeType, scope.data.scopeId);
     if (!site) return { error: "That is not yours to change." };
 
     const publicKey = await rotateTrackerKey(site.id);

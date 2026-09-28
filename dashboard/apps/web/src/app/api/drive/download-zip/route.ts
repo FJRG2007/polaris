@@ -12,7 +12,7 @@ import { normalizeRelPath } from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
 import { sessionCan } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
-import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import { authorizeDrive, drivePathFilter, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { listLocks } from "@/lib/access-lock-service";
 import { recordAudit } from "@/lib/audit-service";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
@@ -71,10 +71,13 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const lockedRoots = new Set((await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean));
+    // Each requested path was authorized above; what is inside them is asked
+    // one by one, so a denied subfolder does not ride along in its parent's zip.
+    const mayInclude = await drivePathFilter(user.id, connectionId, "download");
 
     async function* sources(): AsyncGenerator<ZipSource> {
         try {
-            yield* zipSourcesFor(driver, paths, lockedRoots);
+            yield* zipSourcesFor(driver, paths, lockedRoots, mayInclude);
         } finally {
             await driver.dispose();
         }

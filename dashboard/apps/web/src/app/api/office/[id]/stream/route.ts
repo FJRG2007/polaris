@@ -23,7 +23,7 @@
 
 import { officeReader } from "@/lib/office/reader";
 import { subscribeOfficeChanges } from "@/lib/office/live";
-import { resolveSession, sessionCan } from "@/lib/session";
+import { backgroundUser, sessionCan } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export async function GET(
 ): Promise<Response> {
     // Optional, because a link is a way into one document without a session.
     // When there is one it still has to hold the app's own permission.
-    const session = await resolveSession();
+    const session = await backgroundUser();
     if (session && !(await sessionCan(session, "office.use"))) {
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }

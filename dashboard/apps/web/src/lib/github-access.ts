@@ -138,6 +138,55 @@ export async function githubCloneIdentity(
     return header ? { header, as: "the GitHub App installed on this Polaris" } : null;
 }
 
+/** Who is pointing a service at a repository. */
+export interface RepoChooser {
+    readonly id: string;
+    readonly isAdmin: boolean;
+}
+
+/**
+ * Why this person may not point a service at `repoUrl`, or null when they may.
+ *
+ * Asked only when a repository is set on a service - never at a build, a
+ * redeploy or a webhook - because the clone that follows goes out as the project
+ * owner's account or, failing that, as the App an administrator installed. Either
+ * is a credential that is not the chooser's, and without this anybody allowed to
+ * create a service could have Polaris read a private repository they cannot see
+ * on GitHub and read the source back out of the build.
+ *
+ * So the chooser has to be able to see it themselves: an administrator (who put
+ * the App there), a repository that is public, a clone that would go out as their
+ * own account anyway, or a linked account of theirs that GitHub says reaches it -
+ * the one that owns it included.
+ */
+export async function githubRepoChoiceRefusal(
+    chooser: RepoChooser,
+    ownerId: string,
+    repoUrl: string
+): Promise<string | null> {
+    const repo = parseGithubRepo(repoUrl);
+    if (!repo || chooser.isAdmin) return null;
+
+    const mine = await githubCredentialsForUser(chooser.id).catch(() => []);
+    // The owner cloning as their own account is only their own access.
+    if (chooser.id === ownerId && mine.length > 0) return null;
+    // Nothing to lend: the clone goes out as nobody, and that reads only what
+    // anybody could.
+    const lent = await githubCloneIdentity(ownerId, repo.owner).catch(() => null);
+    if (!lent) return null;
+
+    const wanted = repo.owner.toLowerCase();
+    if (mine.some((credential) => credential.login.toLowerCase() === wanted)) return null;
+    for (const credential of mine) {
+        if ((await repoAccessFor(repo.owner, repo.repo, credential.token)) === "reachable") return null;
+    }
+    if (await resolveGithubRepo(repo.owner, repo.repo, null).catch(() => null)) return null;
+
+    return mine.length > 0
+        ? `None of your connected GitHub accounts can see ${repo.owner}/${repo.repo}. Connect the account that has access to it under Connected accounts, then try again.`
+        : `${repo.owner}/${repo.repo} is private, and you have no GitHub account connected that can see it. Connect the account that has access to it under Connected accounts, then try again.`;
+}
+
 /**
  * Why a clone that went out as a connected account was refused anyway, in terms
  * of what to go and do about it - or null when there is nothing more to add.

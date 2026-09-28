@@ -13,6 +13,7 @@ import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { instanceSecuritySchema } from "@polaris/core";
 import { setInstanceSecurity } from "@/lib/instance-security";
+import { setPlayerAddressesShared } from "@/lib/player-address-policy";
 
 export async function saveInstanceSecurityAction(input: unknown): Promise<{ error?: string; ok?: string }> {
     const admin = await requireAdmin();
@@ -31,4 +32,18 @@ export async function saveInstanceSecurityAction(input: unknown): Promise<{ erro
     });
     revalidatePath("/admin/security");
     return { ok: "Saved." };
+}
+
+/** Whether the people running a game server are shown where other accounts sign in from. */
+export async function savePlayerAddressesSharedAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    if (typeof input !== "boolean") return { error: "Choose on or off." };
+    await setPlayerAddressesShared(input);
+    await recordAudit({
+        actorId: admin.id,
+        action: "instance.games.player-addresses.updated",
+        metadata: { shared: input }
+    });
+    revalidatePath("/admin/security");
+    return {};
 }

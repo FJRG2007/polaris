@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const owned = vi.hoisted(() => ({ ids: [] as string[], asked: 0 }));
 
 vi.mock("@/lib/session", () => ({
-    resolveSession: async () => ({ id: "reader" }),
+    backgroundUser: async () => ({ id: "reader" }),
     sessionCan: async () => true
 }));
 vi.mock("@/lib/mailbox/watch", () => ({ watchMailboxes: () => () => {} }));

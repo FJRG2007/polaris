@@ -177,6 +177,12 @@ async function requireService(projectId: string, id: string): Promise<Row> {
     return row;
 }
 
+/** Which environment a row is in, for a caller whose access may stop at some
+ *  of a project's environments. Refuses a row from another project. */
+export async function externalServiceEnvironment(projectId: string, id: string): Promise<string> {
+    return (await requireService(projectId, id)).environmentId;
+}
+
 /**
  * The credential behind a row, as the string a driver takes.
  *

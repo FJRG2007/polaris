@@ -16,6 +16,7 @@ import { revalidatePath } from "next/cache";
 import * as migrate from "@/lib/deploy/migrate";
 import { requirePermission } from "@/lib/session";
 import { recordDeployAudit } from "@/lib/deploy-audit";
+import { githubRepoChoiceRefusal } from "@/lib/github-access";
 import type { ProjectCapability } from "@polaris/core";
 import { listConnections } from "@/lib/connections/store";
 import * as external from "@/lib/deploy/external-services";
@@ -23,8 +24,11 @@ import { listDeployTargets } from "@/lib/deploy-target-service";
 import type { ProviderChoice } from "@/lib/deploy/providers/contract";
 import {
     accessCan,
+    accessInEnvironment,
+    requireApplicationAccess,
     requireEnvironmentAccess,
-    requireProjectAccess
+    requireProjectAccess,
+    type ProjectAccess
 } from "@/lib/deploy-project-access";
 
 const idSchema = z.string().uuid();
@@ -57,6 +61,26 @@ export async function listProviderAccountsAction(): Promise<{
     };
 }
 
+/**
+ * Clear the caller for one row on the board, in the environment it is in.
+ *
+ * A project access can stop at some of its environments - development and not
+ * production - so reaching the project is not reaching every row on it. The row's
+ * own environment is read here and checked, the same rule a service on a server
+ * is held to.
+ */
+async function requireServiceAccess(
+    projectId: string,
+    serviceId: string,
+    userId: string,
+    capability: ProjectCapability
+): Promise<ProjectAccess> {
+    const access = await requireProjectAccess(projectId, userId, capability);
+    const environmentId = await external.externalServiceEnvironment(projectId, serviceId);
+    if (!accessInEnvironment(access, environmentId)) throw new Error("Service not found");
+    return access;
+}
+
 /** What one linked account holds, so somebody can point at one of them. */
 export async function listProviderChoicesAction(
     connectionId: string
@@ -79,7 +103,10 @@ export async function addExternalServiceAction(
     const parsed = addSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        await requireProjectAccess(projectId, user.id, "service.create");
+        // Through the environment it lands in, which the form names: an access
+        // limited to development cannot put a row in production.
+        const access = await requireEnvironmentAccess(parsed.data.environmentId, user.id, "service.create");
+        if (access.projectId !== projectId) return { error: "Project not found" };
         const service = await external.addExternalService(user.id, projectId, parsed.data);
         revalidatePath(`/apps/deploy/${projectId}/elsewhere`);
         return { service };
@@ -98,7 +125,7 @@ export async function refreshExternalServiceAction(
     const parsed = idSchema.safeParse(id);
     if (!parsed.success) return { error: "Unknown service" };
     try {
-        await requireProjectAccess(projectId, user.id, "project.read");
+        await requireServiceAccess(projectId, parsed.data, user.id, "project.read");
         return { service: await external.refreshExternalService(projectId, parsed.data) };
     } catch (caught) {
         return { error: refusal(caught) };
@@ -114,7 +141,7 @@ export async function deployExternalServiceAction(
     const parsed = idSchema.safeParse(id);
     if (!parsed.success) return { error: "Unknown service" };
     try {
-        await requireProjectAccess(projectId, user.id, "deploy.run");
+        await requireServiceAccess(projectId, parsed.data, user.id, "deploy.run");
         return { service: await external.deployExternalService(projectId, parsed.data) };
     } catch (caught) {
         return { error: refusal(caught) };
@@ -132,7 +159,7 @@ export async function renameExternalServiceAction(
     const named = z.string().trim().min(1, "Give it a name").max(60).safeParse(name);
     if (!named.success) return { error: named.error.issues[0]?.message ?? "Give it a name" };
     try {
-        await requireProjectAccess(projectId, user.id, "service.configure");
+        await requireServiceAccess(projectId, parsed.data, user.id, "service.configure");
         return { service: await external.renameExternalService(projectId, parsed.data, named.data) };
     } catch (caught) {
         return { error: refusal(caught) };
@@ -149,7 +176,7 @@ export async function removeExternalServiceAction(
     const parsed = idSchema.safeParse(id);
     if (!parsed.success) return { error: "Unknown service" };
     try {
-        await requireProjectAccess(projectId, user.id, "service.delete");
+        await requireServiceAccess(projectId, parsed.data, user.id, "service.delete");
         await external.removeExternalService(projectId, parsed.data);
         revalidatePath(`/apps/deploy/${projectId}/elsewhere`);
         return {};
@@ -209,7 +236,11 @@ export async function moveOutPlanAction(
     const parsed = idSchema.safeParse(applicationId);
     if (!parsed.success) return { error: "Unknown service" };
     try {
-        const access = await requireProjectAccess(projectId, user.id, "project.read");
+        // Through the service itself, so its environment is checked as well as
+        // the project: the names of production's variables are not a development
+        // access's to read.
+        const access = await requireApplicationAccess(parsed.data, user.id, "project.read");
+        if (access.projectId !== projectId) return { error: "Unknown service" };
         const canCopyVariables = accessCan(access, COPY_OUT);
         const plan = await migrate.moveOutPlan(projectId, parsed.data);
         // The count travels either way; the names only to somebody who may read
@@ -255,6 +286,11 @@ export async function moveOutAction(
         );
         if (access.projectId !== projectId) return { error: "Project not found" };
         if (!accessCan(access, "service.configure")) return { error: "Project not found" };
+        // And the service being moved, in the environment it is in: the row lands
+        // where the form says, but the secrets read and the service stopped are
+        // this one's, which may be in an environment the access does not reach.
+        const moving = await requireApplicationAccess(service.data, user.id, "service.configure");
+        if (moving.projectId !== projectId) return { error: "Unknown service" };
         if (parsed.data.copyVariables && !accessCan(access, COPY_OUT)) {
             return {
                 error: "Copying the variables needs access to them. Move it without them, or ask for that access."
@@ -298,7 +334,7 @@ export async function moveHomePlanAction(
     const parsed = idSchema.safeParse(serviceId);
     if (!parsed.success) return { error: "Unknown service" };
     try {
-        const access = await requireProjectAccess(projectId, user.id, "project.read");
+        const access = await requireServiceAccess(projectId, parsed.data, user.id, "project.read");
         const [plan, targets] = await Promise.all([
             migrate.moveHomePlan(projectId, parsed.data),
             listDeployTargets(access.ownerId)
@@ -343,6 +379,13 @@ export async function moveHomeAction(
                 error: "Copying the variables needs access to them. Bring it over without them, or ask for that access."
             };
         }
+        // The row being brought home is read at the provider with its account's
+        // token, so it has to be in an environment this access reaches too.
+        await requireServiceAccess(projectId, service.data, user.id, "project.read");
+        // Built here, the clone goes out as the owner's account or the
+        // instance's App, so the repository has to be one this person can see.
+        const refusal = await githubRepoChoiceRefusal(user, access.ownerId, parsed.data.repoUrl);
+        if (refusal) return { error: refusal };
         const result = await migrate.moveHome(user.id, projectId, service.data, parsed.data);
         await recordDeployAudit({
             actorId: user.id,

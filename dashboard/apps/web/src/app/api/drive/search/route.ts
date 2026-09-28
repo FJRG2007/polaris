@@ -12,7 +12,7 @@ import { normalizeRelPath } from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
 import { sessionCan } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
-import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import { authorizeDrive, drivePathFilter, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { listLocks } from "@/lib/access-lock-service";
 import { getMetaMap } from "@/lib/drive-meta-service";
 import { isReservedRootPath } from "@/lib/system-paths";
@@ -74,6 +74,8 @@ export async function GET(request: Request): Promise<Response> {
     // gated content. Skip any folder that is a lock root (and, since we do not
     // recurse into it, everything beneath it).
     const lockedRoots = new Set((await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean));
+    // The base was authorized; a denied folder under it is neither searched nor named.
+    const mayRead = await drivePathFilter(user.id, connectionId, "read");
 
     /** Whether an entry satisfies the whole query (structured plus fuzzy words).
      *  In path mode the fuzzy words are matched against the full relative path. */
@@ -105,6 +107,7 @@ export async function GET(request: Request): Promise<Response> {
             }
             for (const entry of listing.entries) {
                 if (isReservedRootPath(entry.path)) continue;
+                if (!(await mayRead(entry.path))) continue;
                 if (entry.kind === "dir" && !lockedRoots.has(entry.path)) queue.push(entry.path);
                 if (matches(entry.name, entry.path)) {
                     if (results.length >= MAX_RESULTS) {

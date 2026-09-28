@@ -307,19 +307,26 @@ export function shareUnlockCookie(shareId: string): string {
 /**
  * Sign an unlock marker for a share with the app secret so the "password solved"
  * cookie cannot be forged: only the server, holding POLARIS_AUTH_SECRET, can mint
- * a value the download path will accept.
+ * a value the download path will accept. Signed against the share's current
+ * password hash, so changing the password ends every unlock handed out before.
  */
-export function signShareUnlock(shareId: string, secret: string): string {
-    return signUnlock(SHARE_LINK_SCOPE, shareId, secret);
+export function signShareUnlock(
+    shareId: string,
+    passwordHash: string | null,
+    secret: string
+): string {
+    return signUnlock(SHARE_LINK_SCOPE, shareId, { passwordHash }, secret);
 }
 
-/** Constant-time check of an unlock cookie value against the expected signature. */
+/** Constant-time check of an unlock cookie: this share, its current password,
+ *  and not expired. */
 export function verifyShareUnlock(
     shareId: string,
     value: string | undefined,
+    passwordHash: string | null,
     secret: string
 ): boolean {
-    return verifyUnlock(SHARE_LINK_SCOPE, shareId, value, secret);
+    return verifyUnlock(SHARE_LINK_SCOPE, shareId, value, { passwordHash }, secret);
 }
 
 /**

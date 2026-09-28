@@ -24,12 +24,12 @@ import {
     TWO_FACTOR_METHOD_INFO,
     type TwoFactorMethod
 } from "@polaris/core";
+import { safeRedirect } from "@/lib/safe-redirect";
 import { CodeInput, isWholeCode } from "@/components/code-input";
 
 /** Post-verification destination: a safe same-origin redirect, else the drive. */
 function target(): string {
-    const redirect = new URLSearchParams(window.location.search).get("redirect");
-    return redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
+    return safeRedirect(new URLSearchParams(window.location.search).get("redirect"));
 }
 
 const METHOD_ICON: Record<TwoFactorMethod, ComponentType<{ className?: string }>> = {

@@ -441,9 +441,22 @@ export async function createAutomation(
     });
 }
 
-export async function updateAutomation(automationId: string, input: core.AutomationInput): Promise<void> {
-    await prisma.taskAutomation.update({
-        where: { id: automationId },
+/**
+ * The writes below take the space the caller was cleared for and keep to it. A
+ * rule id alone says nothing about which space it is in, so matching on it alone
+ * would let an admin of one space rewrite every other space's rules.
+ */
+function ruleNotInSpace(): Error {
+    return new Error("That rule is not in this space");
+}
+
+export async function updateAutomation(
+    spaceId: string,
+    automationId: string,
+    input: core.AutomationInput
+): Promise<void> {
+    const { count } = await prisma.taskAutomation.updateMany({
+        where: { id: automationId, spaceId },
         data: {
             listId: input.listId,
             name: input.name,
@@ -453,12 +466,18 @@ export async function updateAutomation(automationId: string, input: core.Automat
             enabled: input.enabled
         }
     });
+    if (count === 0) throw ruleNotInSpace();
 }
 
-export async function setAutomationEnabled(automationId: string, enabled: boolean): Promise<void> {
-    await prisma.taskAutomation.update({ where: { id: automationId }, data: { enabled } });
+export async function setAutomationEnabled(spaceId: string, automationId: string, enabled: boolean): Promise<void> {
+    const { count } = await prisma.taskAutomation.updateMany({
+        where: { id: automationId, spaceId },
+        data: { enabled: enabled === true }
+    });
+    if (count === 0) throw ruleNotInSpace();
 }
 
-export async function deleteAutomation(automationId: string): Promise<void> {
-    await prisma.taskAutomation.delete({ where: { id: automationId } });
+export async function deleteAutomation(spaceId: string, automationId: string): Promise<void> {
+    const { count } = await prisma.taskAutomation.deleteMany({ where: { id: automationId, spaceId } });
+    if (count === 0) throw ruleNotInSpace();
 }

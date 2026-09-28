@@ -16,6 +16,7 @@ const ENC = "2.AAAA|BBBB|CCCC";
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const VAULT_ID = "vorg-1";
 const REFUSED = "You cannot administer that vault.";
+const MEMBER_ID = "22222222-2222-4222-8222-222222222222";
 
 const requirePermission = vi.fn(
     async () =>
@@ -400,7 +401,7 @@ describe("member scope", () => {
 
     it("refuses a scope that is not one, before handing over any key", async () => {
         vaultById.mockResolvedValue(ownVault);
-        const result = await actions.confirmVaultMemberAction(VAULT_ID, "m1", ENC, {
+        const result = await actions.confirmVaultMemberAction(VAULT_ID, MEMBER_ID, ENC, {
             accessAll: "yes"
         });
         expect(result.error).toBe("Say what they should reach.");
@@ -409,7 +410,7 @@ describe("member scope", () => {
 
     it("refuses to hand the key over for a scope that reaches nothing", async () => {
         vaultById.mockResolvedValue(ownVault);
-        const result = await actions.confirmVaultMemberAction(VAULT_ID, "m1", ENC, {
+        const result = await actions.confirmVaultMemberAction(VAULT_ID, MEMBER_ID, ENC, {
             accessAll: false,
             collections: []
         });
@@ -419,14 +420,14 @@ describe("member scope", () => {
 
     it("passes the scope through when it is one", async () => {
         vaultById.mockResolvedValue(ownVault);
-        expect(await actions.confirmVaultMemberAction(VAULT_ID, "m1", ENC, scope)).toEqual({});
-        expect(confirmMember).toHaveBeenCalledWith(VAULT_ID, "m1", ENC, scope);
+        expect(await actions.confirmVaultMemberAction(VAULT_ID, MEMBER_ID, ENC, scope)).toEqual({});
+        expect(confirmMember).toHaveBeenCalledWith(VAULT_ID, MEMBER_ID, ENC, scope);
     });
 
     it("does let a scope be narrowed to nothing afterwards, which is how access is cut", async () => {
         vaultById.mockResolvedValue(ownVault);
         expect(
-            await actions.setMemberScopeAction(VAULT_ID, "m1", {
+            await actions.setMemberScopeAction(VAULT_ID, MEMBER_ID, {
                 accessAll: false,
                 collections: []
             })
@@ -434,9 +435,23 @@ describe("member scope", () => {
         expect(setMemberScope).toHaveBeenCalled();
     });
 
+    it("refuses a member id that is not an id, before it can become a query filter", async () => {
+        // A server action takes whatever is posted. An object here would reach
+        // Prisma as `{ not: ... }` and match members - and their collection rows -
+        // well beyond the one this screen was about.
+        vaultById.mockResolvedValue(ownVault);
+        const filter = { not: MEMBER_ID } as unknown as string;
+        expect((await actions.setMemberScopeAction(VAULT_ID, filter, scope)).error).toBeTruthy();
+        expect((await actions.confirmVaultMemberAction(VAULT_ID, filter, ENC, scope)).error).toBeTruthy();
+        expect((await actions.removeVaultMemberAction(VAULT_ID, filter)).error).toBeTruthy();
+        expect(setMemberScope).not.toHaveBeenCalled();
+        expect(confirmMember).not.toHaveBeenCalled();
+        expect(removeMember).not.toHaveBeenCalled();
+    });
+
     it("refuses to change a scope in a vault this account does not administer", async () => {
         vaultById.mockResolvedValue({ ...ownVault, ownerUserId: "u2" });
-        const result = await actions.setMemberScopeAction(VAULT_ID, "m1", scope);
+        const result = await actions.setMemberScopeAction(VAULT_ID, MEMBER_ID, scope);
         expect(result.error).toBe(REFUSED);
         expect(setMemberScope).not.toHaveBeenCalled();
     });

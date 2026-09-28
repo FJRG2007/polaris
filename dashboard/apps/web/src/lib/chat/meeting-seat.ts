@@ -21,7 +21,7 @@
  */
 
 import { cookies } from "next/headers";
-import { resolveSession } from "@/lib/session";
+import { backgroundUser } from "@/lib/session";
 import { seatForGuestKey, seatForUser, type MeetingSeat } from "./meetings";
 
 /** Where a guest's key lives. Named for what it is, so a person reading their
@@ -41,7 +41,7 @@ export const GUEST_COOKIE_MAX_AGE = 6 * 60 * 60;
  * once were.
  */
 export async function resolveSeat(meetingId: string): Promise<MeetingSeat | null> {
-    const session = await resolveSession();
+    const session = await backgroundUser();
     if (session) {
         const seat = await seatForUser(session.id, meetingId);
         if (seat) return seat;

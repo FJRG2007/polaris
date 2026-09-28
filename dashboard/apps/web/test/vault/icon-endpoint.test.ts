@@ -55,6 +55,9 @@ describe("icon", () => {
         const response = await misc.icon(context());
         expect(response.status).toBe(200);
         expect(response.headers.get("content-type")).toBe("image/png");
+        // Somebody else's bytes on this origin, so never a page when opened.
+        expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+        expect(response.headers.get("content-security-policy")).toBe("default-src 'none'; sandbox");
         expect(rateLimit).not.toHaveBeenCalled();
         expect(fetchIcon).not.toHaveBeenCalled();
     });

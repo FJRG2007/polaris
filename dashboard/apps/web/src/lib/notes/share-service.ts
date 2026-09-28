@@ -301,16 +301,21 @@ export function noteUnlockCookie(shareId: string): string {
     return unlockCookieName(NOTE_LINK_SCOPE, shareId);
 }
 
-export function signNoteUnlock(shareId: string, secret: string): string {
-    return signUnlock(NOTE_LINK_SCOPE, shareId, secret);
+export function signNoteUnlock(
+    shareId: string,
+    passwordHash: string | null,
+    secret: string
+): string {
+    return signUnlock(NOTE_LINK_SCOPE, shareId, { passwordHash }, secret);
 }
 
 export function verifyNoteUnlock(
     shareId: string,
     value: string | undefined,
+    passwordHash: string | null,
     secret: string
 ): boolean {
-    return verifyUnlock(NOTE_LINK_SCOPE, shareId, value, secret);
+    return verifyUnlock(NOTE_LINK_SCOPE, shareId, value, { passwordHash }, secret);
 }
 
 /** Whether a password opens this link. Wrong and unset both answer false: a link

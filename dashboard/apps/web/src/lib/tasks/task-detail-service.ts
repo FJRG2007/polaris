@@ -88,13 +88,23 @@ export async function editComment(actorId: string, commentId: string, body: stri
     await comments.edit(actorId, commentId, body);
 }
 
-export async function deleteComment(actorId: string, commentId: string, canModerate: boolean): Promise<void> {
-    await comments.remove(actorId, commentId, canModerate);
+export async function deleteComment(
+    actorId: string,
+    taskId: string,
+    commentId: string,
+    canModerate: boolean
+): Promise<void> {
+    await comments.remove(actorId, { subjectType: "task", subjectId: taskId }, commentId, canModerate);
 }
 
 /** Mark a comment dealt with, or reopen it. */
-export async function setCommentResolved(actorId: string, commentId: string, resolved: boolean): Promise<void> {
-    await comments.setResolved(actorId, commentId, resolved);
+export async function setCommentResolved(
+    actorId: string,
+    taskId: string,
+    commentId: string,
+    resolved: boolean
+): Promise<void> {
+    await comments.setResolved(actorId, { subjectType: "task", subjectId: taskId }, commentId, resolved);
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +179,8 @@ export async function moveChecklist(
         move
     );
     if (order === null) throw new Error("That spot has moved. Try again");
-    await prisma.taskChecklist.update({ where: { id: checklistId }, data: { order } });
+    const { count } = await prisma.taskChecklist.updateMany({ where: { id: checklistId, taskId }, data: { order } });
+    if (count === 0) throw new Error("That checklist no longer exists");
 }
 
 /**
@@ -219,11 +230,20 @@ export async function moveChecklistItem(
     });
 }
 
-export async function deleteChecklist(checklistId: string): Promise<void> {
-    await prisma.taskChecklist.delete({ where: { id: checklistId } });
+/*
+ * Every write below names the task the caller was authorized for and keeps to
+ * it. A checklist, step or link id says nothing about which task it is on, so an
+ * id alone would let somebody cleared for one task reach into any other.
+ */
+
+export async function deleteChecklist(taskId: string, checklistId: string): Promise<void> {
+    const { count } = await prisma.taskChecklist.deleteMany({ where: { id: checklistId, taskId } });
+    if (count === 0) throw new Error("That checklist no longer exists");
 }
 
-export async function addChecklistItem(checklistId: string, name: string): Promise<string> {
+export async function addChecklistItem(taskId: string, checklistId: string, name: string): Promise<string> {
+    const checklist = await prisma.taskChecklist.findFirst({ where: { id: checklistId, taskId }, select: { id: true } });
+    if (!checklist) throw new Error("That checklist no longer exists");
     const last = await prisma.taskChecklistItem.findFirst({
         where: { checklistId },
         orderBy: { order: "desc" },
@@ -236,19 +256,21 @@ export async function addChecklistItem(checklistId: string, name: string): Promi
     return item.id;
 }
 
-export async function setChecklistItemDone(itemId: string, done: boolean): Promise<void> {
-    await prisma.taskChecklistItem.update({
-        where: { id: itemId },
-        data: { done, doneAt: done ? new Date() : null }
+export async function setChecklistItemDone(taskId: string, itemId: string, done: boolean): Promise<void> {
+    const { count } = await prisma.taskChecklistItem.updateMany({
+        where: { id: itemId, checklist: { taskId } },
+        data: { done: done === true, doneAt: done === true ? new Date() : null }
     });
+    if (count === 0) throw new Error("That step no longer exists");
 }
 
 export async function updateChecklistItem(
+    taskId: string,
     itemId: string,
     input: { name?: string; assigneeId?: string | null }
 ): Promise<void> {
-    await prisma.taskChecklistItem.update({
-        where: { id: itemId },
+    await prisma.taskChecklistItem.updateMany({
+        where: { id: itemId, checklist: { taskId } },
         data: {
             ...(input.name !== undefined ? { name: input.name } : {}),
             ...(input.assigneeId !== undefined ? { assigneeId: input.assigneeId } : {})
@@ -256,8 +278,9 @@ export async function updateChecklistItem(
     });
 }
 
-export async function deleteChecklistItem(itemId: string): Promise<void> {
-    await prisma.taskChecklistItem.delete({ where: { id: itemId } });
+export async function deleteChecklistItem(taskId: string, itemId: string): Promise<void> {
+    const { count } = await prisma.taskChecklistItem.deleteMany({ where: { id: itemId, checklist: { taskId } } });
+    if (count === 0) throw new Error("That step no longer exists");
 }
 
 /**
@@ -266,14 +289,16 @@ export async function deleteChecklistItem(itemId: string): Promise<void> {
  * the two copies drift apart.
  */
 export async function promoteChecklistItem(
+    taskId: string,
     itemId: string,
     create: (name: string) => Promise<{ id: string }>
 ): Promise<string | null> {
+    if (typeof itemId !== "string") return null;
     const item = await prisma.taskChecklistItem.findUnique({
         where: { id: itemId },
         select: { name: true, checklist: { select: { taskId: true } } }
     });
-    if (!item) return null;
+    if (!item || item.checklist.taskId !== taskId) return null;
     const created = await create(item.name);
     await prisma.taskChecklistItem.delete({ where: { id: itemId } });
     return created.id;
@@ -315,8 +340,10 @@ export async function addDependency(spaceId: string, input: core.DependencyInput
         .catch(() => undefined);
 }
 
-export async function removeDependency(dependencyId: string): Promise<void> {
-    await prisma.taskDependency.deleteMany({ where: { id: dependencyId } });
+export async function removeDependency(taskId: string, dependencyId: string): Promise<void> {
+    await prisma.taskDependency.deleteMany({
+        where: { id: dependencyId, OR: [{ blockerId: taskId }, { blockedId: taskId }] }
+    });
 }
 
 // ---------------------------------------------------------------------------

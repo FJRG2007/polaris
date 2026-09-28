@@ -27,6 +27,69 @@ import {
     type StorageProviderKind
 } from "@polaris/core";
 
+/**
+ * Top-level folders under the host volume root that Polaris keeps for itself:
+ * every account's coding-agent home (its sign-ins) and every database's
+ * point-in-time archive. The volume root is one folder shared by everybody who
+ * can deploy, so a server folder pointed at one of these would hand a service
+ * somebody else's credentials or data. Never a service's to mount.
+ */
+const RESERVED_BIND_ROOTS = ["agent-homes", "pitr"];
+
+/** Where Polaris keeps the server folders of Deploy's own services. */
+const DEPLOY_BIND_ROOT = "polaris/deploy";
+
+/** True when a normalized bind source falls under a folder Polaris reserves. */
+export function isReservedBindSource(source: string): boolean {
+    const first = source.split("/")[0] ?? "";
+    return RESERVED_BIND_ROOTS.includes(first);
+}
+
+/**
+ * Whether a service in `projectSlug` may use this normalized bind source. Refuses
+ * the reserved folders, and anything in Deploy's own tree that is not this
+ * project's: the tree's ancestors would mount every project's folders at once,
+ * and another project's branch is that project's data.
+ */
+export function bindSourceAllowed(source: string, projectSlug: string): boolean {
+    if (isReservedBindSource(source)) return false;
+    const own = `${DEPLOY_BIND_ROOT}/${projectSlug}`;
+    if (source === "polaris" || source === DEPLOY_BIND_ROOT) return false;
+    if (source.startsWith(`${DEPLOY_BIND_ROOT}/`)) return source === own || source.startsWith(`${own}/`);
+    return true;
+}
+
+/** Every folder a normalized bind source sits inside, nearest last. */
+function bindAncestors(source: string): string[] {
+    const parts = source.split("/");
+    return parts.slice(1).map((_, index) => parts.slice(0, index + 1).join("/"));
+}
+
+/**
+ * Whether another account already has a server folder at, inside, or above this
+ * source. The volume root is one folder for everybody on the host and project
+ * slugs are only unique per owner, so two accounts can name the same path - and
+ * the second would mount the first one's data.
+ */
+export async function bindSourceClaimed(
+    ownerId: string,
+    source: string,
+    exceptId?: string,
+    claimedBefore?: Date
+): Promise<boolean> {
+    const clash = await prisma.volume.findFirst({
+        where: {
+            kind: "bind",
+            target: { ownerId: { not: ownerId } },
+            ...(exceptId ? { id: { not: exceptId } } : {}),
+            ...(claimedBefore ? { createdAt: { lt: claimedBefore } } : {}),
+            OR: [{ source }, { source: { startsWith: `${source}/` } }, { source: { in: bindAncestors(source) } }]
+        },
+        select: { id: true }
+    });
+    return clash !== null;
+}
+
 export interface VolumeView {
     id: string;
     name: string;
@@ -143,16 +206,24 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
     // path the user typed or picked; when omitted, generate a structured one under
     // polaris/deploy/<project>/<app>/<name> so volumes stay organized on the NAS/host.
     const explicit = parsed.source?.trim();
-    const raw =
-        parsed.kind === "volume"
-            ? parsed.name
-            : explicit || `polaris/deploy/${app.environment.project.slug}/${app.slug}/${slugify(parsed.name)}`;
+    const generated = `polaris/deploy/${app.environment.project.slug}/${app.slug}/${slugify(parsed.name)}`;
+    const raw = parsed.kind === "volume" ? parsed.name : explicit || generated;
     let source: string;
     try {
         source = normalizeVolumeSource(parsed.kind, raw);
     } catch (error) {
         if (error instanceof UnsafePathError) throw new Error("The volume source path is invalid");
         throw error;
+    }
+    if (parsed.kind === "bind" && !bindSourceAllowed(source, app.environment.project.slug))
+        throw new Error("That server folder belongs to Polaris or to another project. Choose a different path.");
+    if (parsed.kind === "bind" && (await bindSourceClaimed(ownerId, source))) {
+        // Another account's project shares this slug. A generated path steps
+        // aside into a folder of its own; a typed one is that account's data.
+        if (explicit) throw new Error("That server folder is in use by another account. Choose a different path.");
+        source = normalizeVolumeSource("bind", `${generated}-${app.id.slice(-8).toLowerCase()}`);
+        if (await bindSourceClaimed(ownerId, source))
+            throw new Error("That server folder is in use by another account. Choose a different path.");
     }
 
     const duplicate = await prisma.volume.findFirst({
@@ -203,7 +274,15 @@ export async function updateVolume(ownerId: string, input: DeployVolumeUpdateInp
 
     const existing = await prisma.volume.findFirst({
         where: { id: patch.id, target: { ownerId } },
-        select: { id: true, kind: true, applicationId: true, source: true, connectionId: true, mountPath: true }
+        select: {
+            id: true,
+            kind: true,
+            applicationId: true,
+            source: true,
+            connectionId: true,
+            mountPath: true,
+            application: { select: { environment: { select: { project: { select: { slug: true } } } } } }
+        }
     });
     if (!existing) throw new Error("Volume not found");
     const kind = existing.kind === "bind" ? "bind" : existing.kind === "nas" ? "nas" : "volume";
@@ -232,6 +311,11 @@ export async function updateVolume(ownerId: string, input: DeployVolumeUpdateInp
             if (error instanceof UnsafePathError) throw new Error("The volume source path is invalid");
             throw error;
         }
+        const projectSlug = existing.application?.environment.project.slug ?? "";
+        if (kind === "bind" && (!projectSlug || !bindSourceAllowed(source, projectSlug)))
+            throw new Error("That server folder belongs to Polaris or to another project. Choose a different path.");
+        if (kind === "bind" && (await bindSourceClaimed(ownerId, source, existing.id)))
+            throw new Error("That server folder is in use by another account. Choose a different path.");
     }
 
     // A moved mount path must not collide with another volume on the same service.

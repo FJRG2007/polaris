@@ -5,6 +5,7 @@
  * token. The API is meant for the internal network only, never public.
  */
 
+import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { capabilitiesFor, connectChannelSchema, sendMessageSchema } from "@polaris/messaging";
 import type { AdapterRegistry } from "./registry.js";
@@ -26,6 +27,13 @@ function reply(res: ServerResponse, status: number, body: unknown): void {
     res.end(JSON.stringify(body));
 }
 
+/** Constant-time bearer check; an empty configured token authorizes nobody. */
+function authorized(header: string | undefined, authToken: string): boolean {
+    if (!authToken || !header) return false;
+    const digest = (value: string) => createHash("sha256").update(value).digest();
+    return timingSafeEqual(digest(header), digest(`Bearer ${authToken}`));
+}
+
 export function createBridgeServer({ registry, authToken }: BridgeServerOptions): Server {
     async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
         const path = new URL(req.url ?? "/", "http://bridge").pathname;
@@ -33,7 +41,7 @@ export function createBridgeServer({ registry, authToken }: BridgeServerOptions)
             reply(res, 200, { ok: true });
             return;
         }
-        if (req.headers.authorization !== `Bearer ${authToken}`) {
+        if (!authorized(req.headers.authorization, authToken)) {
             reply(res, 401, { error: "Unauthorized" });
             return;
         }

@@ -115,8 +115,12 @@ export class DriveLockedError extends Error {
 }
 
 /** The lock guarding a path if it is currently gated (not unlocked), else null. */
-async function lockedGate(connectionId: string, path: string): Promise<LockInfo | null> {
-    const gate = await lockGate(connectionId);
+async function lockedGate(
+    userId: string,
+    connectionId: string,
+    path: string
+): Promise<LockInfo | null> {
+    const gate = await lockGate(userId, connectionId);
     return gate(path);
 }
 
@@ -132,16 +136,21 @@ async function lockedGate(connectionId: string, path: string): Promise<LockInfo 
  * deepest lock whose path covers the target, with an empty path standing for the
  * whole connection.
  */
-async function lockGate(connectionId: string): Promise<(path: string) => LockInfo | null> {
+async function lockGate(
+    userId: string,
+    connectionId: string
+): Promise<(path: string) => LockInfo | null> {
     const locks = await connectionLocks(connectionId);
     if (locks.length === 0) return () => null;
     const store = await cookies();
     const secret = loadEnv().POLARIS_AUTH_SECRET;
-    // Which locks this browser has already answered, worked out once: verifying a
-    // signature is cheap, and doing it per path per lock is not.
+    // Which locks this user has already answered in this browser, worked out once:
+    // verifying a signature is cheap, and doing it per path per lock is not.
     const open = new Set(
         locks
-            .filter((lock) => verifyLockUnlock(lock.id, store.get(lockUnlockCookie(lock.id))?.value, secret))
+            .filter((lock) =>
+                verifyLockUnlock(lock, userId, store.get(lockUnlockCookie(lock.id))?.value, secret)
+            )
             .map((lock) => lock.id)
     );
     return (path: string) => {
@@ -300,12 +309,41 @@ export async function authorizeDrivePaths(
     const check = await resolveReader(userId, connectionId, action);
     // The lock table and the cookie jar do not change between two paths of one
     // request, so they are read once and matched in memory.
-    const gate = await lockGate(connectionId);
+    const gate = await lockGate(userId, connectionId);
     for (const path of paths) {
         await checkPath(check, userId, connectionId, path, action);
         const locked = gate(path);
         if (locked) throw new DriveLockedError(locked);
     }
+}
+
+/**
+ * Which paths under an authorized folder a reader may be shown, for the routes
+ * that walk a tree - a zip, a search, the recent list.
+ *
+ * Authorizing the folder a walk starts from says nothing about what is inside
+ * it: an explicit deny on a subfolder (the folder only Legal opens) is a rule on
+ * that subfolder, and a walk that never asked would hand its files over anyway.
+ * The reader is resolved once; for an owner, an administrator or a source with no
+ * rules the answer is always yes and costs nothing per path. Locks are the
+ * walkers' own concern and are not consulted here.
+ */
+export async function drivePathFilter(
+    userId: string,
+    connectionId: string,
+    action: DriveAction
+): Promise<(path: string) => Promise<boolean>> {
+    const check = await resolveReader(userId, connectionId, action);
+    if (check.kind === "settled") return async () => true;
+    return async (path) => {
+        try {
+            await checkPath(check, userId, connectionId, path, action);
+            return true;
+        } catch (caught) {
+            if (caught instanceof DriveAccessError) return false;
+            throw caught;
+        }
+    };
 }
 
 /**
@@ -323,7 +361,7 @@ export async function authorizeDrive(
     const check = await resolveReader(userId, connectionId, action);
     await checkPath(check, userId, connectionId, path, action);
     if (!opts?.skipLock) {
-        const locked = await lockedGate(connectionId, path);
+        const locked = await lockedGate(userId, connectionId, path);
         if (locked) throw new DriveLockedError(locked);
     }
 }

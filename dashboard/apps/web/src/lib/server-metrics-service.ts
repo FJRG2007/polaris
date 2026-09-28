@@ -64,6 +64,10 @@ export async function getServerMetrics(
     ownerId: string,
     force = false
 ): Promise<ServerMetrics> {
+    // Asked before the cache, not only before a probe: a reading taken for the
+    // owner is still a reading of their machine, and answering it from memory to
+    // anybody who names the id would skip the one check this function promises.
+    if ((await prisma.host.count({ where: { id: hostId, ownerId } })) === 0) throw new Error("Host not found");
     const hit = cache.get(hostId);
     if (!force && hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.metrics;
 

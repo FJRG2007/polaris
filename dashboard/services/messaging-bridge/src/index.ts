@@ -16,7 +16,8 @@ const ingestUrl = (process.env.WEB_INGEST_URL ?? "").replace(/\/+$/, "");
 const ingestKey = process.env.WEB_INGEST_KEY ?? "";
 
 if (!authToken) {
-    console.warn("messaging-bridge: BRIDGE_TOKEN is unset; the API would be unauthenticated - refusing risky start.");
+    console.error("messaging-bridge: BRIDGE_TOKEN is unset; refusing to start an unauthenticated API.");
+    process.exit(1);
 }
 if (!ingestUrl) {
     console.warn("messaging-bridge: WEB_INGEST_URL is unset; inbound messages have nowhere to be delivered.");

@@ -117,7 +117,14 @@ const SECOND_LEVEL = new Set([
     "mil"
 ]);
 
+/** A dotted IPv4 address, which `URL` has already normalized to four decimals. */
+const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+
 export function baseDomain(host: string): string {
+    // An address is not a name: its labels are octets, and the "last two" of
+    // `192.168.1.1` are `1.1`, which every host ending in `.1.1` would match. The
+    // whole address is the only site it can mean, as Bitwarden reads it too.
+    if (IPV4.test(host) || host.includes(":")) return host.toLowerCase();
     const labels = host.toLowerCase().split(".").filter(Boolean);
     if (labels.length <= 2) return labels.join(".");
     const [secondLast] = labels.slice(-2, -1);

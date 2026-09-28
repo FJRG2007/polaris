@@ -41,4 +41,16 @@ describe("where a sign-in may send somebody", () => {
         expect(safeRedirect("javascript:alert(1)")).toBe("/");
         expect(safeRedirect("chat")).toBe("/");
     });
+
+    it("refuses a backslash or a stripped control character, which a browser turns into //host", () => {
+        expect(safeRedirect("/\\example.com")).toBe("/");
+        expect(safeRedirect("/\\/example.com")).toBe("/");
+        expect(safeRedirect("/\t/example.com")).toBe("/");
+        expect(safeRedirect("/\n/example.com")).toBe("/");
+    });
+
+    it("returns the resolved path, not the raw input", () => {
+        expect(safeRedirect("/drive#section")).toBe("/drive#section");
+        expect(safeRedirect("/a/../chat")).toBe("/chat");
+    });
 });

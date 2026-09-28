@@ -45,6 +45,24 @@ export function mimeForName(name: string): string | undefined {
 }
 
 /**
+ * Headers for serving bytes somebody else wrote from this origin.
+ *
+ * A file opened in a tab is a document on Polaris's own origin, and an SVG, an
+ * XML file or HTML a storage reports is one that can run script - with the
+ * session of whoever opened it. The sandbox takes script, forms and same-origin
+ * access away from whatever renders, and `nosniff` stops a browser from deciding
+ * a harmless type was really markup. An `<img>` or `<video>` drawing the same
+ * bytes is unaffected. PDF is left out of the sandbox because browsers refuse to
+ * draw a PDF under one, and their viewers do not run on the page's origin anyway.
+ */
+export function untrustedFileHeaders(contentType: string): Record<string, string> {
+    const essence = contentType.split(";")[0]!.trim().toLowerCase();
+    return essence === "application/pdf"
+        ? { "x-content-type-options": "nosniff" }
+        : { "x-content-type-options": "nosniff", "content-security-policy": "sandbox" };
+}
+
+/**
  * What an image actually is, read from its first bytes rather than from what
  * something said it was.
  *

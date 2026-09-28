@@ -2,6 +2,21 @@ import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { sendWebhook, type WebhookPayload } from "@/lib/notifications/webhook-sender";
 
+/**
+ * The receiving server below is on loopback, which the real `follow` refuses by
+ * design (see webhook-private.test.ts). Here it is swapped for a plain POST so
+ * what is asserted is the body each format sends.
+ */
+vi.mock("@/lib/safe-fetch", async (importActual) => ({
+    ...(await importActual<typeof import("@/lib/safe-fetch")>()),
+    follow: (url: URL, accept: string, sent: { contentType: string; body: string }) =>
+        fetch(url, {
+            method: "POST",
+            headers: { accept, "content-type": sent.contentType },
+            body: sent.body
+        }).catch(() => null)
+}));
+
 /** What each request arrived as, so the body shape can be asserted for real
  *  rather than by re-deriving it from the sender. */
 interface Received {
@@ -137,7 +152,7 @@ describe("Teams and Telegram", () => {
             );
             expect(result).toEqual({});
             const [target, init] = fetchMock.mock.calls[0] ?? [];
-            expect(target).toBe("https://api.telegram.org/bot123:abc/sendMessage");
+            expect(String(target)).toBe("https://api.telegram.org/bot123:abc/sendMessage");
             const sent = JSON.parse(String(init?.body)) as { chat_id: string; text: string };
             expect(sent.chat_id).toBe("-100");
             expect(sent.text).toContain(PAYLOAD.title);

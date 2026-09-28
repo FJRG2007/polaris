@@ -45,6 +45,9 @@ const TARGET = "vault-item";
 /** Whether this account may see the item at all. The same rule the vault itself
  *  reads by, so the log can never be more permissive than the vault. */
 async function mayReach(userId: string, cipherId: string): Promise<boolean> {
+    // An id from the browser; anything but a string would reach the query below
+    // as a filter and match items that are not this one.
+    if (typeof cipherId !== "string") return false;
     const filter = await reachableCipherFilter(userId);
     const row = await prisma.vaultCipher.findFirst({
         where: { AND: [{ id: cipherId }, filter] },

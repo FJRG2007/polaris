@@ -100,15 +100,25 @@ export async function createSprint(input: core.SprintInput): Promise<string> {
     return sprint.id;
 }
 
+/** A sprint id names no space, so every write keeps to the one the caller was
+ *  cleared for - an id alone would reach every other space's sprints. */
+function sprintNotInSpace(): Error {
+    return new Error("That sprint is not in this space");
+}
+
 /** Edits a sprint's own details. It deliberately cannot change which folder the
  *  sprint plans: that is a different sprint, and moving one would silently take
  *  its burndown out from under whoever was reading it. */
-export async function updateSprint(sprintId: string, input: Omit<core.SprintInput, "spaceId" | "folderId">): Promise<void> {
+export async function updateSprint(
+    spaceId: string,
+    sprintId: string,
+    input: Omit<core.SprintInput, "spaceId" | "folderId">
+): Promise<void> {
     if (new Date(input.endDate) <= new Date(input.startDate)) {
         throw new Error("A sprint has to end after it starts");
     }
-    await prisma.taskSprint.update({
-        where: { id: sprintId },
+    const { count } = await prisma.taskSprint.updateMany({
+        where: { id: sprintId, spaceId },
         data: {
             name: input.name,
             goal: input.goal,
@@ -116,7 +126,10 @@ export async function updateSprint(sprintId: string, input: Omit<core.SprintInpu
             endDate: new Date(input.endDate)
         }
     });
+    if (count === 0) throw sprintNotInSpace();
 }
+
+const SPRINT_STATUSES: readonly SprintView["status"][] = ["planned", "active", "completed"];
 
 /**
  * Move a sprint's state on. Starting one ends whichever sprint was already
@@ -129,24 +142,33 @@ export async function setSprintStatus(
     sprintId: string,
     status: SprintView["status"]
 ): Promise<void> {
+    if (!SPRINT_STATUSES.includes(status)) throw new Error("That is not a sprint status");
+    if (typeof sprintId !== "string") throw sprintNotInSpace();
+    const starting = await prisma.taskSprint.findFirst({
+        where: { id: sprintId, spaceId },
+        select: { folderId: true }
+    });
+    if (!starting) throw sprintNotInSpace();
     if (status === "active") {
-        const starting = await prisma.taskSprint.findUnique({
-            where: { id: sprintId },
-            select: { folderId: true }
-        });
         await prisma.taskSprint.updateMany({
-            where: { spaceId, folderId: starting?.folderId ?? null, status: "active", id: { not: sprintId } },
+            where: { spaceId, folderId: starting.folderId, status: "active", id: { not: sprintId } },
             data: { status: "completed" }
         });
     }
     await prisma.taskSprint.update({ where: { id: sprintId }, data: { status } });
 }
 
-export async function deleteSprint(sprintId: string): Promise<void> {
-    await prisma.taskSprint.delete({ where: { id: sprintId } });
+export async function deleteSprint(spaceId: string, sprintId: string): Promise<void> {
+    const { count } = await prisma.taskSprint.deleteMany({ where: { id: sprintId, spaceId } });
+    if (count === 0) throw sprintNotInSpace();
 }
 
-export async function setTaskSprint(taskId: string, sprintId: string | null): Promise<void> {
+export async function setTaskSprint(spaceId: string, taskId: string, sprintId: string | null): Promise<void> {
+    if (sprintId !== null) {
+        if (typeof sprintId !== "string") throw sprintNotInSpace();
+        const sprint = await prisma.taskSprint.findFirst({ where: { id: sprintId, spaceId }, select: { id: true } });
+        if (!sprint) throw sprintNotInSpace();
+    }
     await prisma.task.update({ where: { id: taskId }, data: { sprintId } });
 }
 

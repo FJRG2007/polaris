@@ -97,16 +97,32 @@ export async function requireUser(): Promise<SessionUser> {
  * "no session": who the page is shown to is still resolveSession's answer and is
  * decided by each account's privacy, exactly as it is for a signed-out reader.
  */
-export async function guardedUser(): Promise<SessionUser | null> {
+export async function guardedUser(options: { touch?: boolean } = {}): Promise<SessionUser | null> {
     const resolved = await resolveSession();
     if (!resolved) return null;
     const verdict = await guardSession({
         userId: resolved.id,
         sessionId: resolved.sessionId,
-        sessionCreatedAt: resolved.sessionCreatedAt
+        sessionCreatedAt: resolved.sessionCreatedAt,
+        touch: options.touch
     });
     if (!verdict.ok) return null;
     return identityFor(resolved, verdict.view);
+}
+
+/**
+ * The caller of a stream, a poll or a beacon: every control requireUser applies -
+ * a ban, a refused address, a sign-in still waiting for approval, the inactivity
+ * lock, a second factor the instance demands - and null when any of them says no.
+ *
+ * What it does not do is count as activity. A tab left open polls on its own, and
+ * if that refreshed the stamp the idle lock reads, the lock would never close.
+ * Reading resolveSession here instead, which is what these routes used to do,
+ * skipped every one of those controls: a session held for approval, or locked,
+ * could still read and write through them.
+ */
+export async function backgroundUser(): Promise<SessionUser | null> {
+    return guardedUser({ touch: false });
 }
 
 /** Which identity a cleared session is acting as. */

@@ -165,7 +165,8 @@ export async function unlockShareAction(token: string, password: string): Promis
     await resetRateLimit(limitKey);
     const env = loadEnv();
     const store = await cookies();
-    store.set(shareUnlockCookie(share.id), signShareUnlock(share.id, env.POLARIS_AUTH_SECRET), {
+    const unlock = signShareUnlock(share.id, share.passwordHash, env.POLARIS_AUTH_SECRET);
+    store.set(shareUnlockCookie(share.id), unlock, {
         httpOnly: true,
         sameSite: "lax",
         secure: env.POLARIS_SECURE_COOKIES,

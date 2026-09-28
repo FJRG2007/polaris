@@ -19,7 +19,7 @@ import * as deployService from "@/lib/deploy-service";
 import type { DomainOwner } from "@/lib/owner-domains";
 import { parseGithubRepo } from "@/lib/repo-reference";
 import { getNetworkStatus } from "@/lib/network-service";
-import { githubTokenForUser } from "@/lib/github-access";
+import { githubRepoChoiceRefusal, githubTokenForUser } from "@/lib/github-access";
 import * as environments from "@/lib/deploy/environments";
 import { guardSupportsChallenge } from "@/lib/deploy/router";
 import * as templateSetup from "@/lib/deploy/template-setup";
@@ -424,6 +424,12 @@ export async function createApplicationAction(input: {
             await requireEnvironmentAccess(input.environmentId, user.id, "databases.manage");
         }
         const owner = access.ownerId;
+        // The clone goes out as the owner's account or the instance's App, so the
+        // repository has to be one this person can see on GitHub themselves.
+        if (isGit) {
+            const refusal = await githubRepoChoiceRefusal(user, owner, sourceConfig.repoUrl as string);
+            if (refusal) return { error: refusal };
+        }
         // Resolve the chosen server: the local host by default, or a connected SSH
         // host adopted as a deploy target on first use.
         let target;

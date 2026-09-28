@@ -23,6 +23,7 @@ import { WordEditor } from "./word-editor";
 import type { WordEditorControl } from "./word-editor";
 import { EditorActions } from "./editor-actions";
 import { Loading, ViewerError } from "./status";
+import { sanitizeDocHtml } from "./doc-html";
 import { pageIsDark } from "@/lib/page-theme";
 import type { ViewerTarget } from "./types";
 
@@ -73,7 +74,9 @@ export function DocView({
                 const arrayBuffer = await response.arrayBuffer();
                 if (!alive) return;
                 const result = await mammoth.convertToHtml({ arrayBuffer });
-                if (alive) setHtml(result.value);
+                // mammoth copies link targets as written, `javascript:` included.
+                const safe = await sanitizeDocHtml(result.value);
+                if (alive) setHtml(safe);
             } catch {
                 if (alive) setError(true);
             }

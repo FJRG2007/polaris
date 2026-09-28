@@ -841,6 +841,68 @@ const PROTECTED_ENDPOINTS: ReadonlySet<string> = new Set([
     "/two-factor/generate-backup-codes"
 ]);
 
+/**
+ * The endpoints a session may not call until the dashboard has cleared it: the
+ * protected ones above, and the ones that end other sessions or change the
+ * password.
+ *
+ * Those are the dashboard's own gates, and better-auth knows nothing of them. A
+ * sign-in held for another device's approval, or a screen the inactivity timer
+ * locked, has a perfectly good better-auth session - and from it, somebody
+ * holding only the password could arm an authenticator of their own (which
+ * replaces the session with one the approval gate no longer applies to), or end
+ * every approved session so that nobody is left to approve anything. Each of
+ * those turned the approval gate into a formality. Polaris itself changes none
+ * of this through these routes - its screens use server actions, which run the
+ * full guard - so refusing them to an uncleared session costs nothing.
+ */
+const CLEARED_ONLY_ENDPOINTS: ReadonlySet<string> = new Set([
+    ...PROTECTED_ENDPOINTS,
+    "/change-password",
+    "/change-email",
+    "/update-user",
+    "/delete-user",
+    "/list-sessions",
+    "/revoke-session",
+    "/revoke-sessions",
+    "/revoke-other-sessions",
+    "/unlink-account"
+]);
+
+/**
+ * Whether the dashboard would turn this session away right now: held for
+ * approval, refused, or locked.
+ *
+ * A session the dashboard has never seen has no state row yet, and is judged the
+ * way the guard will judge it on its first page: held when the account asks for
+ * approval, has no second factor to ask instead, and has another signed-in
+ * device to ask it of. Mirrors `createSessionState` in the app's session guard,
+ * which this package cannot import.
+ */
+async function sessionHeldBack(userId: string, sessionId: string, twoFactorEnabled: boolean): Promise<boolean> {
+    const state = await prisma.sessionState.findUnique({
+        where: { sessionId },
+        select: { approval: true, lockedAt: true }
+    });
+    if (state) return state.approval !== "approved" || state.lockedAt !== null;
+    if (twoFactorEnabled) return false;
+    const security = await prisma.userSecurity.findUnique({
+        where: { userId },
+        select: { requireLoginApproval: true }
+    });
+    if (security?.requireLoginApproval !== true) return false;
+    const approver = await prisma.sessionState.findFirst({
+        where: {
+            userId,
+            approval: "approved",
+            sessionId: { not: sessionId },
+            session: { expiresAt: { gt: new Date() } }
+        },
+        select: { sessionId: true }
+    });
+    return approver !== null;
+}
+
 /** Registering a passkey is the one that also wants the password proved. The
  *  others already ask for it, or only ever take something away. */
 const NEEDS_PASSWORD: ReadonlySet<string> = new Set([
@@ -874,7 +936,7 @@ function refused(message: string, code: string): Response {
  */
 export async function refuseProtectedEndpoint(auth: Auth, request: Request): Promise<Response | null> {
     const path = new URL(request.url).pathname;
-    const endpoint = [...PROTECTED_ENDPOINTS].find((known) => path.endsWith(known));
+    const endpoint = [...CLEARED_ONLY_ENDPOINTS].find((known) => path.endsWith(known));
     if (!endpoint) return null;
 
     // No renewal here: this runs before better-auth's own handler, and a cookie
@@ -883,6 +945,15 @@ export async function refuseProtectedEndpoint(auth: Auth, request: Request): Pro
         .getSession({ headers: request.headers, query: { disableRefresh: true } })
         .catch(() => null);
     if (!session) return null;
+
+    const twoFactorEnabled = (session.user as { twoFactorEnabled?: unknown }).twoFactorEnabled === true;
+    if (await sessionHeldBack(session.user.id, session.session.id, twoFactorEnabled)) {
+        return refused(
+            "This sign-in has not been let in yet. Open Polaris to finish signing in first.",
+            "SESSION_NOT_CLEARED"
+        );
+    }
+    if (!PROTECTED_ENDPOINTS.has(endpoint)) return null;
 
     // An account its owner has shut down changes nothing, by any door. Checked
     // here as well as in the server actions because these endpoints are the

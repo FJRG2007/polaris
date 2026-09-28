@@ -89,9 +89,16 @@ export async function addTimeEntry(userId: string, input: core.TimeEntryInput): 
     });
 }
 
-export async function deleteTimeEntry(userId: string, entryId: string, canModerate: boolean): Promise<void> {
+export async function deleteTimeEntry(
+    userId: string,
+    taskId: string,
+    entryId: string,
+    canModerate: boolean
+): Promise<void> {
+    // Kept to the task the caller was cleared for: moderating one task's time
+    // is not a licence over every entry on the instance.
     const deleted = await prisma.taskTimeEntry.deleteMany({
-        where: canModerate ? { id: entryId } : { id: entryId, userId }
+        where: canModerate ? { id: entryId, taskId } : { id: entryId, taskId, userId }
     });
     if (deleted.count === 0) throw new Error("You can only remove your own entries");
 }

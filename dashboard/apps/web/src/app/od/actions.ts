@@ -59,7 +59,8 @@ export async function unlockOfficeLinkAction(
 
     await resetRateLimit(limitKey);
     const env = loadEnv();
-    (await cookies()).set(links.linkUnlockCookie(visit.linkId), links.signLinkUnlock(visit.linkId), {
+    const unlock = links.signLinkUnlock(visit.linkId, visit.passwordHash);
+    (await cookies()).set(links.linkUnlockCookie(visit.linkId), unlock, {
         httpOnly: true,
         sameSite: "lax",
         secure: env.POLARIS_SECURE_COOKIES,
@@ -87,7 +88,7 @@ export async function openOfficeLinkAction(
 
     if (visit.needsPassword) {
         const solved = (await cookies()).get(links.linkUnlockCookie(visit.linkId))?.value;
-        if (!links.linkUnlocked(visit.linkId, solved)) {
+        if (!links.linkUnlocked(visit.linkId, visit.passwordHash, solved)) {
             return { error: "This link is not available." };
         }
     }
@@ -101,7 +102,7 @@ export async function openOfficeLinkAction(
     const env = loadEnv();
     (await cookies()).set(
         links.linkPassCookie(visit.documentId),
-        links.signLinkPass(visit.documentId, visit.role),
+        links.signLinkPass(visit.documentId, visit.linkId, visit.role),
         {
             httpOnly: true,
             sameSite: "lax",

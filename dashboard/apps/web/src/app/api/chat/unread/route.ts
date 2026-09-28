@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveSession, sessionCan } from "@/lib/session";
+import { backgroundUser, sessionCan } from "@/lib/session";
 import { chatWaitingOnShelf, NO_CHAT_WAITING } from "@/lib/shelf-counts";
 
 export const runtime = "nodejs";
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  * the badge is simply absent instead of the layout having to know why.
  */
 export async function GET(): Promise<Response> {
-    const session = await resolveSession();
+    const session = await backgroundUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!(await sessionCan(session, "chat.use"))) return NextResponse.json(NO_CHAT_WAITING);
     return NextResponse.json(await chatWaitingOnShelf(session.id));

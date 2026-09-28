@@ -10,7 +10,7 @@ from packaging.version import Version, InvalidVersion
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.components import mqtt
 from homeassistant.helpers import issue_registry as ir
@@ -29,6 +29,7 @@ from .const import (
     CONF_MQTT_TLS_INSECURE,
     CONF_SCAN_INTERVAL,
     CONF_DEVICE_MODEL,
+    CONF_SSH_HOST_KEY,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_DEVICE_MODEL,
     DEFAULT_MQTT_PORT,
@@ -39,7 +40,7 @@ from .const import (
     get_mqtt_root,
     get_mqtt_topics,
 )
-from .ssh_manager import SSHManager
+from .ssh_manager import HostKeyMismatch, SSHManager
 from .mqtt_client import UNASMQTTClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,6 +58,24 @@ SSH_UNAVAILABLE_THRESHOLD = 600
 LAST_CLEANUP_VERSION_KEY = "last_cleanup_version"
 LAST_DEPLOY_VERSION_KEY = "last_deploy_version"
 PERFORM_MQTT_CLEANUP = True
+
+
+def _host_key_issue_id(entry: ConfigEntry) -> str:
+    return f"ssh_host_key_changed_{entry.entry_id}"
+
+
+@callback
+def _report_host_key_mismatch(hass: HomeAssistant, entry: ConfigEntry, err: HostKeyMismatch) -> None:
+    _LOGGER.error("%s", err)
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        _host_key_issue_id(entry),
+        is_fixable=False,
+        severity=ir.IssueSeverity.ERROR,
+        translation_key="ssh_host_key_changed",
+        translation_placeholders={"host": entry.data[CONF_HOST]},
+    )
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -160,6 +179,14 @@ async def _cleanup_old_mqtt_configs_on_upgrade(
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    @callback
+    def _pin_host_key(host_key: str) -> None:
+        # Trust on first use: entries created before host keys were recorded
+        # get theirs pinned on the first connection, with no action needed.
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, CONF_SSH_HOST_KEY: host_key}
+        )
+
     manager = SSHManager(
         host=entry.data[CONF_HOST],
         username=entry.data[CONF_USERNAME],
@@ -171,6 +198,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         mqtt_tls=entry.data.get(CONF_MQTT_TLS, False),
         mqtt_tls_insecure=entry.data.get(CONF_MQTT_TLS_INSECURE, False),
         scan_interval=entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+        host_key=entry.data.get(CONF_SSH_HOST_KEY),
+        on_host_key=_pin_host_key,
     )
 
     integration = await async_get_integration(hass, DOMAIN)
@@ -195,15 +224,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.config_entries.async_update_entry(entry, data=new_data)
 
     except Exception as err:
-        if not is_existing_installation:
-            raise ConfigEntryNotReady(
-                f"Cannot connect to UNAS at {entry.data[CONF_HOST]} for initial setup: {err}"
-            ) from err
-        _LOGGER.warning(
-            "UNAS at %s is offline, will reconnect when available: %s",
-            entry.data[CONF_HOST],
-            err,
-        )
+        if isinstance(err, HostKeyMismatch):
+            _report_host_key_mismatch(hass, entry, err)
+            if not is_existing_installation:
+                raise ConfigEntryError(str(err)) from err
+        else:
+            if not is_existing_installation:
+                raise ConfigEntryNotReady(
+                    f"Cannot connect to UNAS at {entry.data[CONF_HOST]} for initial setup: {err}"
+                ) from err
+            _LOGGER.warning(
+                "UNAS at %s is offline, will reconnect when available: %s",
+                entry.data[CONF_HOST],
+                err,
+            )
 
     pending_script_deploy = not ssh_connected and (
         last_deploy_version != current_version or is_dev_version
@@ -394,6 +428,7 @@ class UNASDataUpdateCoordinator(DataUpdateCoordinator):
                 self.ssh_failed_since = None
             ssh_issue_id = f"ssh_unavailable_{self.entry.entry_id}"
             ir.async_delete_issue(self.hass, DOMAIN, ssh_issue_id)
+            ir.async_delete_issue(self.hass, DOMAIN, _host_key_issue_id(self.entry))
 
             try:
                 result = await self.ssh_manager.execute_backup_api("GET", "/api/v1/remote-backup/tasks")
@@ -406,7 +441,10 @@ class UNASDataUpdateCoordinator(DataUpdateCoordinator):
                 data["backup_tasks"] = []
 
         except Exception as err:
-            _LOGGER.warning("SSH connection temporarily unavailable: %s", err)
+            if isinstance(err, HostKeyMismatch):
+                _report_host_key_mismatch(self.hass, self.entry, err)
+            else:
+                _LOGGER.warning("SSH connection temporarily unavailable: %s", err)
             now = time.time()
             if self.ssh_failed_since is None:
                 self.ssh_failed_since = now

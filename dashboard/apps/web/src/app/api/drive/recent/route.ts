@@ -15,7 +15,7 @@ import { apiUser } from "@/lib/api-session";
 import { prisma } from "@polaris/db";
 import { sessionCan } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
-import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import { authorizeDrive, drivePathFilter, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { listLocks } from "@/lib/access-lock-service";
 import { getMetaMap } from "@/lib/drive-meta-service";
 import { isReservedRootPath } from "@/lib/system-paths";
@@ -98,7 +98,7 @@ export async function GET(request: Request): Promise<Response> {
         if (by === "opened") {
             entries = await recentlyOpened(driver, user.id, connectionId, underLockedRoot);
         } else {
-            entries = await recentlyTouched(driver, by, lockedRoots);
+            entries = await recentlyTouched(driver, by, lockedRoots, await drivePathFilter(user.id, connectionId, "read"));
         }
 
         const meta = await getMetaMap(
@@ -123,7 +123,8 @@ export async function GET(request: Request): Promise<Response> {
 async function recentlyTouched(
     driver: Awaited<ReturnType<typeof getDriverForConnection>>,
     by: "modified" | "created",
-    lockedRoots: Set<string>
+    lockedRoots: Set<string>,
+    mayRead: (path: string) => Promise<boolean>
 ): Promise<RecentEntry[]> {
     const files: RecentEntry[] = [];
     let nodes = 0;
@@ -139,6 +140,8 @@ async function recentlyTouched(
         }
         for (const entry of listing.entries) {
             if (isReservedRootPath(entry.path)) continue;
+            // The whole storage is walked; a folder the reader is denied is not.
+            if (!(await mayRead(entry.path))) continue;
             if (entry.kind === "dir") {
                 if (!lockedRoots.has(entry.path)) queue.push(entry.path);
                 continue;

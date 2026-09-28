@@ -20,7 +20,7 @@ import { ensureLocalCa } from "./local-ca-service";
 import { getLatestCommit } from "./github-service";
 import type { DomainOwner } from "./owner-domains";
 import { parseGithubRepo } from "./repo-reference";
-import { wipeVolume } from "./deploy-volume-service";
+import { bindSourceClaimed, isReservedBindSource, wipeVolume } from "./deploy-volume-service";
 import { resolveAutoDomain } from "./network-service";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { resolveMountTarget } from "./storage-service";
@@ -2459,6 +2459,13 @@ async function buildAppPlan(
     // NAS mounts the volumes bind onto: one per distinct storage connection a nas
     // volume uses, so the deploy kernel-mounts each at `<mount_root>/<id>` before the
     // container comes up - the bind `<mount_root>/<id>/<subpath>` then lands on the NAS.
+    // A server folder saved before two accounts' paths were kept apart may be
+    // the same folder as another account's; the one that came second yields.
+    for (const volume of app.volumes) {
+        if (volume.kind !== "bind" || !volume.source) continue;
+        if (await bindSourceClaimed(ownerId, volume.source, volume.id, volume.createdAt))
+            throw new Error(`The server folder of volume ${volume.name} is in use by another account. Choose a different path.`);
+    }
     const nasConnectionIds = [
         ...new Set(
             app.volumes
@@ -2550,6 +2557,10 @@ async function buildAppPlan(
         volumes: app.volumes.map((volume) => {
             const kind = volume.kind === "bind" ? "bind" : volume.kind === "nas" ? "nas" : "volume";
             const stored = volume.source ?? volume.name;
+            // A server folder Polaris keeps for itself (an agent home, a database
+            // archive) is refused where it is written; this stops one stored before.
+            if (kind === "bind" && isReservedBindSource(stored))
+                throw new Error(`The server folder of volume ${volume.name} belongs to Polaris. Choose a different path.`);
             const source =
                 kind === "nas" && volume.connectionId ? `${volume.connectionId}/${stored}` : stored;
             return { mountPath: volume.mountPath, source, kind };
@@ -3497,7 +3508,7 @@ export async function deleteServiceComment(
     // Whoever got past the check above reaches this service's notes, and the
     // people who reach a service moderate its notes - including the ones a rule
     // left.
-    await comments.remove(actorId, commentId, true);
+    await comments.remove(actorId, { subjectType: "app", subjectId: applicationId }, commentId, true);
 }
 
 /**

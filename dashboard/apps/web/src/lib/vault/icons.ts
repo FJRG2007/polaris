@@ -118,7 +118,9 @@ async function tryFetch(url: string, host: PinnedHost): Promise<CachedIcon | nul
         });
         if (!response.ok || !response.body) return null;
         const type = response.headers.get("content-type") ?? "";
-        if (!type.startsWith("image/")) return null;
+        // Raster only. An SVG is a document that can carry script, and this
+        // answer is served from Polaris's own origin to anybody who asks.
+        if (!type.startsWith("image/") || type.toLowerCase().includes("svg")) return null;
         const declared = Number(response.headers.get("content-length") ?? "0");
         if (declared > MAX_BYTES) return null;
 
