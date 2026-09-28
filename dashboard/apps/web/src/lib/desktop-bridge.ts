@@ -5,8 +5,9 @@
  * its own and puts one object on the page, `window.polarisDesktop`, for the
  * things a browser tab cannot do: notices drawn by the operating system, a
  * folder zipped straight from the disk, a build pushed from the computer's own
- * Docker, a page opened in a window of its own. In a browser there is no such
- * object, and every caller here falls back to what the browser does.
+ * Docker, a page opened in a window of its own, and the game running on the
+ * computer. In a browser there is no such object, and every caller here falls
+ * back to what the browser does.
  *
  * The shape is kept here as well as in `desktop/src/shared/bridge.ts` - the two
  * projects share no code. Detection checks the members it uses rather than
@@ -56,6 +57,26 @@ export interface PolarisDesktop {
         readonly href?: string;
     }): Promise<DesktopOutcome>;
     openWindow(input: { readonly path: string; readonly title: string }): Promise<DesktopOutcome>;
+    /** The game running on the computer, and whether this window is the one that
+     *  reports it. Absent from an app older than game detection, which then
+     *  reports nothing. */
+    gameActivity?(): Promise<{ readonly game: DesktopGame | null; readonly reporter: boolean }>;
+    /** Hear a game start, stop, or still run (every minute). Only the app's main
+     *  window hears it. */
+    onGameActivity?(listener: (game: DesktopGame | null) => void): () => void;
+    /** Hand the app the programs this account added as games. */
+    setCustomGames?(
+        games: readonly { readonly executable: string; readonly name: string }[]
+    ): Promise<boolean>;
+    /** The programs running now, for picking one to add as a game. */
+    runningPrograms?(): Promise<readonly string[]>;
+}
+
+/** A game the desktop app saw running, as it reports it. */
+export interface DesktopGame {
+    readonly key: string;
+    readonly name: string;
+    readonly startedAt: string;
 }
 
 const METHODS = ["notify", "closeNotice", "pickFolder", "pushLocal", "openWindow"] as const;

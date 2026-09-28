@@ -69,6 +69,33 @@ export interface PolarisDesktop {
     pushLocal(input: { readonly serviceId: string; readonly name: string; readonly href?: string; }): Promise<Outcome>;
     /** Open a path of the Polaris in a window of its own - a service's logs. */
     openWindow(input: { readonly path: string; readonly title: string; }): Promise<Outcome>;
+    /** The game running on this computer now, and whether this window is the one
+     *  that reports it - only the main window does, so two windows open on the
+     *  Polaris do not both tell it. */
+    gameActivity(): Promise<{ readonly game: GameActivity | null; readonly reporter: boolean; }>;
+    /** Hear the game start, stop, and - every minute while it runs - that it is
+     *  still running. Only the main window hears it. Answers the way to stop. */
+    onGameActivity(listener: (game: GameActivity | null) => void): () => void;
+    /** The programs somebody added as games in the dashboard. */
+    setCustomGames(games: readonly CustomGameInput[]): Promise<boolean>;
+    /** The names of the programs running now, for picking one to add as a game.
+     *  Only ever handed to the page that asked, on a press. */
+    runningPrograms(): Promise<readonly string[]>;
+}
+
+/** A game running on this computer, as the dashboard is told it. */
+export interface GameActivity {
+    /** The program, lowercased, without its folder. */
+    readonly key: string;
+    readonly name: string;
+    /** When this app first saw it, as an ISO moment. */
+    readonly startedAt: string;
+}
+
+/** A program somebody said is a game. */
+export interface CustomGameInput {
+    readonly executable: string;
+    readonly name: string;
 }
 
 /** Where a push is. */
@@ -137,6 +164,10 @@ export const CHANNELS = {
     pickFolder: "desktop:pick-folder",
     pushLocal: "desktop:push-local",
     openWindow: "desktop:open-window",
+    gameActivity: "desktop:game-activity",
+    gameCurrent: "desktop:game-current",
+    gameCustom: "desktop:game-custom",
+    gamePrograms: "desktop:game-programs",
     connectState: "local:connect-state",
     connectSubmit: "local:connect-submit",
     keyState: "local:key-state",

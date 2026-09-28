@@ -53,6 +53,7 @@ import { TimeZoneReporter } from "@/components/time-zone-reporter";
 import { ServiceWorkerRegistration } from "@/components/installed-app";
 import { getReportedTimeZone, resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { PresenceReporter } from "@/components/notifications/presence-reporter";
+import { DesktopGameReporter } from "@/components/desktop-game-reporter";
 import { ChatUnreadProvider } from "@/components/chat-unread";
 import { MailUnreadProvider } from "@/components/mail-unread";
 import { adminWaiting as countAdminWaiting } from "@/lib/admin-waiting";
@@ -203,6 +204,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                     never told had changed. */}
                                                             <AccessWatcher />
                                                             <PresenceReporter />
+                                                            <DesktopGameReporter />
                                                             <TimeZoneReporter
                                                                 reported={reportedZone}
                                                             />

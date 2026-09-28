@@ -14,11 +14,12 @@
  */
 
 import { registerIpc } from "./ipc";
+import { GameWatcher } from "./game-detect";
 import { showNotice } from "./notices";
 import { dropApiKey } from "./key-flow";
 import { pushRunning } from "./push-local";
 import { watchForUpdates } from "./updates";
-import type { Outcome } from "@/shared/bridge";
+import { CHANNELS, type Outcome } from "@/shared/bridge";
 import { allowPermission } from "./permissions";
 import { handledSquirrelEvent } from "./squirrel";
 import { installScreenShare } from "./screen-share";
@@ -37,6 +38,17 @@ let current: string | null = null;
 let main: BrowserWindow | null = null;
 let connect: BrowserWindow | null = null;
 let loadError: string | null = null;
+
+/**
+ * The game running on this computer, told to the main window as it changes and
+ * every minute while it runs. Only the main window: it is the one page that
+ * reports it to Polaris, so a second window open on a log does not report it
+ * twice. A game that starts while no window is open is told to the next one as
+ * soon as it asks (`gameCurrent`).
+ */
+const games = new GameWatcher((game) => {
+    if (main && !main.isDestroyed()) main.webContents.send(CHANNELS.gameActivity, game);
+});
 
 const server = (): string | null => current;
 
@@ -160,11 +172,15 @@ function start(): void {
         registerIpc({
             server,
             showPolaris,
+            runningGame: () => games.running(),
+            isReporter: (sender) => Boolean(main && !main.isDestroyed() && main.webContents === sender),
+            setCustomGames: (list) => games.setCustomGames(list),
             connectState: () => ({ address: current, error: loadError }),
             connectSubmit
         });
 
         installScreenShare(server);
+        games.start();
 
         const menu: MenuActions = {
             changeServer: openConnect,

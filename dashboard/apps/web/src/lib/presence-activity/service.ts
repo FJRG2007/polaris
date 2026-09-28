@@ -161,10 +161,12 @@ export interface GameReportOutcome {
 /**
  * A report from the desktop app: this game is running, or nothing is.
  *
- * The game is remembered whether or not it is shown, so it can be hidden (or
- * shown again) by name from the settings screen after it has been closed. What
- * the switches say is applied here as well as on read: a game that is hidden is
- * never stored, so it cannot surface through anything that forgets to check.
+ * A game is remembered while games are shared at all - shown or hidden - so it
+ * can be hidden (or shown again) by name from the settings screen after it has
+ * been closed. With sharing off nothing is kept: somebody who said "do not share
+ * my games" did not ask for a list of them either. What the switches say is
+ * applied here as well as on read: a game that is hidden is never stored, so it
+ * cannot surface through anything that forgets to check.
  */
 export async function reportGame(
     userId: string,
@@ -176,12 +178,12 @@ export async function reportGame(
         await clearActivity(userId, "game", now);
         return { shown: false, reason: "none" };
     }
-    await rememberSeenGame(userId, game, now);
     const { settings } = await activitySettingsOf(userId);
     if (!core.activitySourceOn(settings, "game")) {
         await clearActivity(userId, "game", now);
         return { shown: false, reason: "off" };
     }
+    await rememberSeenGame(userId, game, now);
     if (settings.hiddenGames.includes(game.key)) {
         await clearActivity(userId, "game", now);
         return { shown: false, reason: "hidden" };
@@ -285,7 +287,9 @@ export async function activitiesFor(
         // computer, and one person playing one game is one card - the one that
         // knows which server.
         const onServer = new Set(
-            list.filter((view) => view.source === "minecraft").map((view) => view.name.toLowerCase())
+            list
+                .filter((view) => view.source === "minecraft")
+                .map((view) => view.name.toLowerCase())
         );
         const kept = list.filter(
             (view) => view.source !== "game" || !onServer.has(view.name.toLowerCase())
@@ -296,7 +300,11 @@ export async function activitiesFor(
     return answer;
 }
 
-function push(into: Map<string, core.ActivityView[]>, userId: string, view: core.ActivityView): void {
+function push(
+    into: Map<string, core.ActivityView[]>,
+    userId: string,
+    view: core.ActivityView
+): void {
     const list = into.get(userId);
     if (list) list.push(view);
     else into.set(userId, [view]);

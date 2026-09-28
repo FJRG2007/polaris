@@ -10,6 +10,12 @@ window and adds what a browser tab cannot do:
   the image, the way `polaris deploy --local` does, with the build and deploy log
   in a window of its own.
 - **Follow logs** of a service in a separate window.
+- **What you are playing** beside your name in Polaris: the app looks at the
+  programs running on this computer every fifteen seconds and matches them
+  against the games it knows (`src/main/known-games.ts`) and the ones you added
+  yourself under Account > Privacy. Only the matched game's name, its program
+  and when it started are sent; Polaris shows it only while game sharing is
+  switched on there, and keeps nothing of it while it is off.
 
 Nothing of Polaris runs here: the app is a client of the instance it is pointed
 at. The installable web app (Account > Preferences) stays the option with
