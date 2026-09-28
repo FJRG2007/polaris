@@ -10,8 +10,8 @@
 
 import { cn } from "@polaris/ui";
 import { Play } from "lucide-react";
-import { useEffect, useState } from "react";
 import { usableAccent } from "@/lib/chat/accent";
+import { useState, useSyncExternalStore } from "react";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { embedFor, playerAddress, type EmbedShape } from "@/lib/chat/embeds";
 
@@ -31,6 +31,12 @@ const SHAPES: Readonly<Record<EmbedShape, string>> = {
     audio: "h-[166px] w-full"
 };
 
+/** Whether the page is a secure context, for `useSyncExternalStore`: it cannot
+ *  change without a reload, so there is nothing to subscribe to. */
+const neverChanges = () => () => {};
+const isSecure = () => window.isSecureContext ?? true;
+const assumeSecure = () => true;
+
 /**
  * What a link in a message turned out to be.
  *
@@ -46,10 +52,11 @@ export function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["pr
     // Twitch plays only in a page served over HTTPS (or on localhost), which is
     // exactly what the browser calls a secure context. Polaris reached by a LAN
     // address over plain HTTP gets the card for a Twitch link rather than a
-    // play button whose player could only refuse. Read after mounting, since
-    // the server cannot know how the page was reached.
-    const [secure, setSecure] = useState(true);
-    useEffect(() => setSecure(window.isSecureContext ?? true), []);
+    // play button whose player could only refuse. The server cannot know how
+    // the page was reached and assumes it is secure; the browser's answer is
+    // read before anything is painted, so the card does not arrive as a player
+    // and then shrink.
+    const secure = useSyncExternalStore(neverChanges, isSecure, assumeSecure);
     const playable = embedFor(preview.url);
     const embed = playable && (!playable.needsParent || secure) ? playable : null;
 

@@ -312,7 +312,7 @@ export function oembedFor(address: string): string | null {
     const host = hostOf(url);
 
     const endpoint =
-        host === "youtu.be" || host.endsWith("youtube.com")
+        host === "youtu.be" || host === "youtube-nocookie.com" || host.endsWith("youtube.com")
             ? "https://www.youtube.com/oembed"
             : host === "vimeo.com" || host === "player.vimeo.com"
               ? "https://vimeo.com/api/oembed.json"
@@ -334,23 +334,24 @@ export function oembedFor(address: string): string | null {
     if (!endpoint) return null;
 
     const asked = new URL(endpoint);
-    asked.searchParams.set(
-        "url",
-        asked.hostname === "www.dailymotion.com" ? dailymotionPage(url) : url.href
-    );
+    asked.searchParams.set("url", pageOf(url, host));
     asked.searchParams.set("format", "json");
     return asked.href;
 }
 
 /**
- * The one address Dailymotion's oEmbed is sure to understand for a video: its
- * page. A link to the newer player (`geo.dailymotion.com/player.html?video=`) is
- * not a page, and asking about it as-is gets no title and no picture.
+ * The address a site's oEmbed is sure to understand for a video: its page. A
+ * player's own address - YouTube's no-cookie embed, Dailymotion's newer player
+ * (`geo.dailymotion.com/player.html?video=`) - is not a page, and asking about
+ * it as-is gets no title and no picture. Everything else is asked about as it
+ * was posted.
  */
-function dailymotionPage(url: URL): string {
+function pageOf(url: URL, host: string): string {
     const embed = embedFor(url.href);
-    const id = embed ? embed.url.split("/").pop() : null;
-    return id ? `https://www.dailymotion.com/video/${id}` : url.href;
+    const id = embed?.url.split("?")[0]!.split("/").pop();
+    if (id && host === "youtube-nocookie.com") return `https://www.youtube.com/watch?v=${id}`;
+    if (id && embed?.provider === "Dailymotion") return `https://www.dailymotion.com/video/${id}`;
+    return url.href;
 }
 
 /** A web address, or null for anything else - a scheme that is not the web is
@@ -499,7 +500,9 @@ function instagram(parts: string[]): Embed | null {
     const at = parts.findIndex(
         (part) => part === "p" || part === "reel" || part === "reels" || part === "tv"
     );
-    if (at === -1 || at > 1) return null;
+    // The code is the last part: `/reels/audio/<id>/` is a sound's page, and
+    // `audio` merely looks like a code.
+    if (at === -1 || at > 1 || parts.length !== at + 2) return null;
     const code = parts[at + 1] ?? "";
     if (!INSTAGRAM_CODE.test(code)) return null;
     const kind = parts[at] === "p" || parts[at] === "tv" ? "p" : "reel";

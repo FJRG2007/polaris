@@ -236,6 +236,8 @@ describe("Instagram", () => {
             "https://www.instagram.com/stories/someone/3200000000000000000/",
             "https://www.instagram.com/p/a%22b/",
             "https://www.instagram.com/p/",
+            // A sound's page, whose "code" is the word audio.
+            "https://www.instagram.com/reels/audio/1234567890123/",
             "https://www.instagram.com/a/b/p/CxYz123AbC_/"
         ]);
     });
@@ -492,6 +494,14 @@ describe("asking a site about its link", () => {
             expect(`${asked.origin}${asked.pathname}`, address).toBe(endpoint);
             expect(asked.searchParams.get("url")).toBe(new URL(address).href);
         }
+    });
+
+    it("asks YouTube about the watch page for a no-cookie player link", () => {
+        const asked = new URL(
+            oembedFor("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=10")!
+        );
+        expect(`${asked.origin}${asked.pathname}`).toBe("https://www.youtube.com/oembed");
+        expect(asked.searchParams.get("url")).toBe("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
     });
 
     it("asks Dailymotion about the video's page, whichever form was posted", () => {
