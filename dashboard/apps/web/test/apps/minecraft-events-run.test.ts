@@ -387,6 +387,16 @@ function answer(line: string): string {
             ? `${name} has ${world.scores[name]} [Event title]`
             : `Can't get value of pe_score for ${name}; none is set`;
     }
+    // The heightmap under the trees: water stops it too, and the ground check refuses that.
+    if (line.includes("positioned over motion_blocking_no_leaves") && line.includes("pe_mark")) {
+        if (world.allWater) return "No entity was found";
+        const over = /positioned (-?[\d.]+) 0 (-?[\d.]+) positioned over/.exec(line);
+        if (world.markFollows && over) {
+            world.markAt = [Math.floor(Number(over[1])), Math.floor(Number(over[2]))];
+            return `Teleported Armor Stand to ${over[1]}, 70.0, ${over[2]}`;
+        }
+        return "Teleported Armor Stand to 300.500000, 70.000000, 0.500000";
+    }
     if (line.includes("spreadplayers") && line.includes("pe_mark") && world.allWater) {
         return "Could not spread 1 entity around 300, 0 (too many entities for space - try using spread of at most 0.0)";
     }

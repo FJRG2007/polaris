@@ -497,6 +497,28 @@ export function markSurface(x: number, z: number): string[] {
     ];
 }
 
+/**
+ * The marker put on the ground under the trees, not on top of them.
+ *
+ * `spreadplayers` lands on the first block from the sky, which in a forest is a
+ * crown of leaves - nowhere anybody walks to, so every place in a wood was given
+ * up. The game's own heightmap that leaves out leaves does exactly this, from
+ * 1.19.4; `markSurface` is what an older server gets instead. It stops on water
+ * as well, which the ground check then refuses.
+ */
+export function markGround(x: number, z: number): string[] {
+    return [
+        `kill @e[tag=${MARK_TAG}]`,
+        `execute in minecraft:overworld run summon minecraft:armor_stand ${x} 200 ${z} {Tags:["${MARK_TAG}"],Invisible:1b,Marker:1b,NoGravity:1b,Invulnerable:1b}`,
+        `execute in minecraft:overworld positioned ${x + 0.5} 0 ${z + 0.5} positioned over motion_blocking_no_leaves run tp @e[tag=${MARK_TAG},limit=1] ~ ~ ~`
+    ];
+}
+
+/** Whether the marker was moved onto the ground. */
+export function groundWorked(output: string): boolean {
+    return /teleported/i.test(output);
+}
+
 export const READ_MARK = `data get entity @e[tag=${MARK_TAG},limit=1] Pos`;
 export const CLEAR_MARK = `kill @e[tag=${MARK_TAG}]`;
 
@@ -738,9 +760,14 @@ export function roughAllowed(samples: number): number {
     return Math.floor(samples / 4);
 }
 
-/** Whether what is under a point is a tree's leaves: `Test passed` when it is. */
-export function leavesUnder(point: { x: number; y: number; z: number }): string {
-    return `execute in minecraft:overworld if block ${point.x} ${point.y - 1} ${point.z} #minecraft:leaves`;
+/** Whether what is under a point is part of a tree - its leaves, or the top of
+ *  its trunk: `Test passed` from either when it is. */
+export function treeUnder(point: { x: number; y: number; z: number }): string[] {
+    const at = `${point.x} ${point.y - 1} ${point.z}`;
+    return [
+        `execute in minecraft:overworld if block ${at} #minecraft:leaves`,
+        `execute in minecraft:overworld if block ${at} #minecraft:logs`
+    ];
 }
 
 /** A point `distance` away from a centre, at a random bearing, whole blocks. */
@@ -1163,6 +1190,76 @@ export function release(
  * loaded. Each line fails harmlessly when there is nothing to remove. A chest
  * somebody opened stays: what is inside is theirs.
  */
+// ------------------------------------------------------------------ joining with a click
+
+/**
+ * What a player's [Join] and [Leave] buttons set: `/trigger` is the one command
+ * every player may run without being an operator, so a click in the chat can
+ * answer for them. 1 is join, 2 is leave; read and set back to 0 each tick.
+ */
+export const JOIN_TRIGGER = "pe_join";
+export const JOIN_VALUE = 1;
+export const LEAVE_VALUE = 2;
+
+/** The objective made, and everybody allowed to use it - again every tick, since
+ *  the game takes the permission away each time it is used and a player who
+ *  joins the server later has none yet. */
+export function joinTriggerLines(): string[] {
+    return [
+        `scoreboard objectives add ${JOIN_TRIGGER} trigger`,
+        `scoreboard players enable @a ${JOIN_TRIGGER}`
+    ];
+}
+
+/** Whoever pressed a button since the last look: `Alice has 1 [pe_join]`. */
+export const READ_JOIN_TRIGGER = `execute as @a[scores={${JOIN_TRIGGER}=1..}] run scoreboard players get @s ${JOIN_TRIGGER}`;
+
+/** The buttons pressed are taken back, ready for the next press. */
+export const RESET_JOIN_TRIGGER = `scoreboard players set @a[scores={${JOIN_TRIGGER}=1..}] ${JOIN_TRIGGER} 0`;
+
+/**
+ * The line that invites everybody, with a [Join] and a [Leave] button. The click
+ * is written in both spellings the game has used - `clickEvent` with `value`
+ * before 1.21.5, `click_event` with `command` from it - and each version reads
+ * its own and ignores the other.
+ */
+export function joinButtons(
+    lead: string,
+    join: { label: string; hover: string },
+    leave: { label: string; hover: string }
+): string {
+    const button = (label: { label: string; hover: string }, color: string, value: number) => {
+        const command = `/trigger ${JOIN_TRIGGER} set ${value}`;
+        return {
+            text: label.label,
+            color,
+            bold: true,
+            clickEvent: { action: "run_command", value: command },
+            click_event: { action: "run_command", command },
+            hoverEvent: { action: "show_text", contents: label.hover },
+            hover_event: { action: "show_text", value: label.hover }
+        };
+    };
+    const intro = JSON.parse(text(lead)) as unknown;
+    const parts = [
+        "",
+        ...(Array.isArray(intro) ? intro : [intro]),
+        " ",
+        button(join, "green", JOIN_VALUE),
+        " ",
+        button(leave, "gray", LEAVE_VALUE)
+    ];
+    return `tellraw @a ${asciiJson(JSON.stringify(parts))}`;
+}
+
+/** A chat line in the server log's own shape, for a button pressed: whatever
+ *  reads the chat for `join` and `leave` reads a press the same way. */
+export function pressedLine(name: string, value: number): string | null {
+    if (value === JOIN_VALUE) return `[00:00:00] [Server thread/INFO]: <${name}> join`;
+    if (value === LEAVE_VALUE) return `[00:00:00] [Server thread/INFO]: <${name}> leave`;
+    return null;
+}
+
 export function cleanup(
     preset: EventPreset,
     place: { x: number; y: number; z: number } | null,
@@ -1188,6 +1285,7 @@ export function cleanup(
         `scoreboard objectives remove ${KILLS}`,
         `scoreboard objectives remove ${RAW_DAMAGE}`,
         `scoreboard objectives remove ${DAMAGE}`,
+        `scoreboard objectives remove ${JOIN_TRIGGER}`,
         CLEAR_MARK
     ];
     for (const one of components(preset))

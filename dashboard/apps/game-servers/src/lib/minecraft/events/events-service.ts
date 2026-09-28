@@ -678,7 +678,17 @@ async function countdown(
             ),
             ...targetLines(loop.run, language),
             ...(catalog.takesJoiners(preset)
-                ? [commands.say(messages.tag(language) + messages.joinHint(language))]
+                ? (() => {
+                      const buttons = messages.joinButtonsText(language);
+                      return [
+                          ...commands.joinTriggerLines(),
+                          commands.joinButtons(
+                              messages.tag(language) + buttons.lead,
+                              buttons.join,
+                              buttons.leave
+                          )
+                      ];
+                  })()
                 : []),
             commands.sound(commands.SOUNDS.tick)
         ]);
@@ -1022,9 +1032,7 @@ async function findPlace(
         return null;
     }
     const { x, z } = loop.run.target;
-    let output = "";
-    for (const line of commands.markSurface(x, z)) output = await server.say([line]);
-    if (commands.spreadWorked(output)) {
+    if (await dropMark(server, x, z)) {
         const point = commands.readPoint(await server.say([commands.READ_MARK]));
         if (point && (chosen || (await siteIsOpen(loop, server, point, radius)))) {
             loop.run = { ...loop.run, place: point };
@@ -1058,19 +1066,20 @@ async function siteIsOpen(
         const samples = commands.siteSamples(centre, radius);
         let rough = 0;
         for (const [index, sample] of samples.entries()) {
-            let output = "";
-            for (const line of commands.markSurface(sample.x, sample.z))
-                output = await server.say([line]);
-            const ground = commands.spreadWorked(output)
+            const ground = (await dropMark(server, sample.x, sample.z))
                 ? commands.readPoint(await server.say([commands.READ_MARK]))
                 : null;
             // Water or lava where the game would not put the marker down: never
             // somewhere to stand, and never allowed at the centre.
             let fine = ground !== null && Math.abs(ground.y - centre.y) <= commands.SITE_STEP;
             if (ground && (await builtOn(loop, server, ground)) === true) {
-                // A tree's crown is rough ground; anything else is somebody's.
-                const leaves = commands.readTest(await server.say([commands.leavesUnder(ground)]));
-                if (leaves !== "passed") {
+                // A tree is rough ground; anything else - a build, water - is not
+                // somewhere to put anything.
+                let tree = false;
+                for (const line of commands.treeUnder(ground)) {
+                    if (commands.readTest(await server.say([line])) === "passed") tree = true;
+                }
+                if (!tree) {
                     open = false;
                     break;
                 }
@@ -1087,11 +1096,23 @@ async function siteIsOpen(
         // The area let go, and the centre's own chunk held again as before.
         await server.sayAll([
             `execute in minecraft:overworld run forceload remove ${area}`,
-            commands.forceload(centre.x, centre.z),
-            ...commands.markSurface(centre.x, centre.z)
+            commands.forceload(centre.x, centre.z)
         ]);
+        await dropMark(server, centre.x, centre.z);
     }
     return open;
+}
+
+/**
+ * The marker on the ground at a column, under any trees - or, on a server too old
+ * for the heightmap, wherever `spreadplayers` puts it. Answers whether it is down.
+ */
+async function dropMark(server: ServerContainer, x: number, z: number): Promise<boolean> {
+    let output = "";
+    for (const line of commands.markGround(x, z)) output = await server.say([line]);
+    if (commands.groundWorked(output)) return true;
+    for (const line of commands.markSurface(x, z)) output = await server.say([line]);
+    return commands.spreadWorked(output);
 }
 
 /**
@@ -2214,6 +2235,20 @@ function stageTools(
 /** What was written in the server log since the last look; null the first time,
  *  which only notes where the log is now. */
 async function newChat(server: ServerContainer, loop: Loop): Promise<string | null> {
+    const said = await newLog(server, loop);
+    if (!catalog.takesJoiners(loop.run.preset)) return said;
+    // A [Join] or [Leave] pressed in the chat reads as having typed it.
+    const pressed = [
+        ...commands.readScores(await server.say([commands.READ_JOIN_TRIGGER])).entries()
+    ]
+        .map(([name, value]) => commands.pressedLine(name, value))
+        .filter((line): line is string => line !== null);
+    await server.sayAll([commands.RESET_JOIN_TRIGGER, ...commands.joinTriggerLines()]);
+    if (pressed.length === 0) return said;
+    return `${said ?? ""}${said && !said.endsWith("\n") ? "\n" : ""}${pressed.join("\n")}\n`;
+}
+
+async function newLog(server: ServerContainer, loop: Loop): Promise<string | null> {
     const size = await containerFileSize(server, LOG_FILE);
     if (size === null) return null;
     if (loop.logFrom === null) {
@@ -2408,7 +2443,9 @@ async function finish(
             lines.push(commands.say(messages.tag(language) + messages.boostOver(language)));
         } else if (server && (outcome === "cancelled" || outcome === "failed")) {
             lines.push(
-                commands.say(messages.tag(language) + messages.cancelledLine(preset.name, language))
+                commands.say(
+                    messages.tag(language) + messages.cancelledLine(preset.name, language, note)
+                )
             );
         }
         if (server) {

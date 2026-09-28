@@ -211,8 +211,28 @@ export function endedTitle(language: Language): string {
     return language === "es" ? "&6Evento terminado" : "&6Event over";
 }
 
-export function cancelledLine(name: string, language: Language): string {
-    return language === "es" ? `&7${name} se ha cancelado.` : `&7${name} was called off.`;
+export function cancelledLine(name: string, language: Language, reason?: string): string {
+    const why = reason ? cancelReason(reason, language) : null;
+    if (language === "es") return `&7${name} se ha cancelado${why ? `: &f${why}` : "."}`;
+    return `&7${name} was called off${why ? `: &f${why}` : "."}`;
+}
+
+/**
+ * Why an event ended early, for the players: the sentence the history keeps,
+ * in Spanish where it is one Polaris writes itself.
+ */
+export function cancelReason(note: string, language: Language): string {
+    if (language !== "es") return note.endsWith(".") ? note : `${note}.`;
+    const only = /^Only (\d+) joined; it needs (\d+)$/.exec(note);
+    if (only) return `solo se apuntaron ${only[1]} y hacen falta ${only[2]}.`;
+    const known: Readonly<Record<string, string>> = {
+        "Called off": "lo ha cancelado un administrador.",
+        "Fewer than two players joined": "se apuntaron menos de dos jugadores.",
+        "No dry ground was found for it near the players":
+            "no se encontró un sitio libre y seguro cerca de los jugadores.",
+        "The server stopped during the event": "el servidor se paró durante el evento."
+    };
+    return known[note] ?? (note.endsWith(".") ? note : `${note}.`);
 }
 
 export function disqualifiedLine(names: readonly string[], language: Language): string {
@@ -722,6 +742,25 @@ export function boostOver(language: Language): string {
 }
 
 // ------------------------------------------------------------------ parkour, spleef
+
+/** The line with the buttons: what to press, and what each does. */
+export function joinButtonsText(language: Language): {
+    lead: string;
+    join: { label: string; hover: string };
+    leave: { label: string; hover: string };
+} {
+    return language === "es"
+        ? {
+              lead: "&ePulsa para participar (o escribe &funirse&e):",
+              join: { label: "[Unirse]", hover: "Te llevamos al empezar y te devolvemos a donde estabas" },
+              leave: { label: "[Salir]", hover: "Retirarte del evento" }
+          }
+        : {
+              lead: "&eClick to take part (or type &fjoin&e):",
+              join: { label: "[Join]", hover: "You are taken there when it starts and brought back after" },
+              leave: { label: "[Leave]", hover: "Drop out of the event" }
+          };
+}
 
 export function joinHint(language: Language): string {
     return language === "es"
