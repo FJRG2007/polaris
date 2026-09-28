@@ -19,7 +19,9 @@
  *
  * What it will never touch is volumes. They are usually the largest thing on the
  * disk and every byte of them is somebody's save file, database or upload, and
- * no timer gets to decide which of those are spare. That line is drawn in the
+ * no timer gets to decide which of those are spare. (The one exception is its own
+ * job with its own switch: `leftover-volumes`, for the data of apps that were
+ * deleted a week ago and nothing has used since.) That line is drawn in the
  * daemon's own allowlist as well as here. It also means the sweep can genuinely
  * fail to help - a disk full of volumes stays full - and the honest answer then
  * is to say so to the person who can decide, rather than to keep pruning nothing

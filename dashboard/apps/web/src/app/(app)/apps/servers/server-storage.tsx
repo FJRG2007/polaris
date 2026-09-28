@@ -30,17 +30,19 @@
  */
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ContainerStorage } from "./container-storage";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { HostVolume } from "@/lib/deploy/host-volumes";
 import type { StrayContainer } from "@/lib/deploy/host-containers";
 import { useLiveRead } from "@/components/use-live-resource";
-import { Badge, Button, EmptyState } from "@polaris/ui";
+import { Badge, Button, EmptyState, Switch } from "@polaris/ui";
 import { Boxes, HardDrive, Loader2, Trash2, FolderOpen } from "lucide-react";
 import {
     hostVolumesAction,
+    leftoverAutoRemoveAction,
     removeHostVolumeAction,
+    setLeftoverAutoRemoveAction,
     removeStrayContainerAction,
     strayContainersAction
 } from "./actions";
@@ -87,6 +89,27 @@ export function ServerStorage() {
     const [removing, setRemoving] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [freed, setFreed] = useState<{ name: string; bytes: number | null } | null>(null);
+    const [autoRemove, setAutoRemoveShown] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        void leftoverAutoRemoveAction()
+            .then(setAutoRemoveShown)
+            .catch(() => setAutoRemoveShown(null));
+    }, []);
+
+    // Shown at once and put back if the server says no.
+    const switchAutoRemove = async (on: boolean) => {
+        const before = autoRemove;
+        setAutoRemoveShown(on);
+        setError(null);
+        const result = await setLeftoverAutoRemoveAction(on).catch(() => ({
+            error: "Could not change it. Try again."
+        }));
+        if (result.error) {
+            setAutoRemoveShown(before);
+            setError(result.error);
+        }
+    };
 
     const load = useCallback(async (): Promise<HostVolume[]> => {
         const volumes = await hostVolumesAction();
@@ -135,15 +158,32 @@ export function ServerStorage() {
             <ContainerStorage />
 
             <section className="flex flex-col gap-2">
-                <div>
-                    <h2 className="flex items-center gap-1.5 text-sm font-medium">
-                        <HardDrive className="size-4 shrink-0 text-muted-foreground" />
-                        Volumes
-                    </h2>
-                    <p className="text-muted-foreground text-xs">
-                        Largest first. A volume is where an app keeps what it wrote - a database, a
-                        world, an upload - so nothing here is removed for you.
-                    </p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 className="flex items-center gap-1.5 text-sm font-medium">
+                            <HardDrive className="size-4 shrink-0 text-muted-foreground" />
+                            Volumes
+                        </h2>
+                        <p className="text-muted-foreground text-xs">
+                            Largest first. A volume is where an app keeps what it wrote - a
+                            database, a world, an upload.
+                        </p>
+                    </div>
+                    <label className="flex max-w-sm items-start gap-2 text-xs">
+                        <Switch
+                            checked={autoRemove ?? false}
+                            disabled={autoRemove === null}
+                            onChange={(on) => void switchAutoRemove(on)}
+                            aria-label="Remove leftovers automatically"
+                        />
+                        <span>
+                            <span className="block font-medium">Remove leftovers automatically</span>
+                            <span className="text-muted-foreground">
+                                The data of an app deleted over a week ago that nothing has used
+                                since. You are told what went.
+                            </span>
+                        </span>
+                    </label>
                 </div>
 
                 {volumes === null ? (

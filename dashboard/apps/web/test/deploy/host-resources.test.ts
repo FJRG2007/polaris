@@ -129,7 +129,7 @@ describe("the advice on a volume", () => {
         ).toBe("review");
     });
 
-    it("calls a Polaris volume with no owner safe after a month unused, not before", () => {
+    it("calls a Polaris volume with no owner safe after a week unused, not before", () => {
         expect(
             volumeVerdict({ ...base, madeByPolaris: true, createdAt: daysAgo(60) }).verdict
         ).toBe("safe");
