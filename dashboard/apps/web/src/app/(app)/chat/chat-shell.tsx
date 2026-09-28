@@ -19,12 +19,12 @@
 import { ServerRail } from "./server-rail";
 import { ChatSidebar } from "./chat-sidebar";
 import { usePathname } from "next/navigation";
-import { useChatStream } from "./use-chat-stream";
-import { PAGE_BLEED, ResizeHandle } from "@polaris/ui";
-import { ChatProvider, useChat, type ChatAllowances } from "./chat-context";
 import { useChatPane } from "./use-chat-pane";
+import { useChatStream } from "./use-chat-stream";
 import { resetPaneLayout } from "./pane-preferences";
+import { PAGE_BLEED, ResizeHandle } from "@polaris/ui";
 import { useCallback, type CSSProperties, type ReactNode } from "react";
+import { ChatProvider, useChat, type ChatAllowances } from "./chat-context";
 
 /**
  * What the conversation list may be narrowed and widened to.
@@ -124,13 +124,15 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 <ServerRail />
             </div>
             {/* The width rides a custom property rather than the class, because
-                the class has to stay `w-full` on a phone - where this column is
-                the whole screen and a remembered desktop width would be wrong in
-                both directions. */}
+                on a phone this column takes whatever the rail of spaces leaves
+                and a remembered desktop width would be wrong in both directions.
+                `flex-1`, not `w-full`: a full width beside the rail is the rail's
+                width wider than the screen, and the right edge of every row - when
+                the last message arrived, the unread count - went off it. */}
             <div
                 ref={measure}
                 style={{ "--chat-list": `${drawn}px` } as CSSProperties}
-                className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 w-full shrink-0 flex-col border-r border-border md:w-[var(--chat-list)]`}
+                className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-r border-border md:w-[var(--chat-list)] md:flex-none`}
             >
                 <ChatSidebar />
             </div>
