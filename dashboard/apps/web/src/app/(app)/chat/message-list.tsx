@@ -36,10 +36,10 @@ import { NicknameDialog } from "./nickname-dialog";
 import { useAppUrl } from "@/components/app-url";
 import { useOpenDirect } from "./use-open-direct";
 import { MemberMenu, type MenuPerson } from "./member-menu";
-import { usableAccent } from "@/lib/chat/accent";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { recentEmoji, rememberEmoji } from "./recents";
-import { autoplaying, embedFor } from "@/lib/chat/embeds";
+import { embedFor } from "@/lib/chat/embeds";
+import { LinkCard } from "./link-card";
 import { EditHistoryDialog } from "./edit-history-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { MessageTime } from "@/components/message-time";
@@ -162,7 +162,6 @@ import {
     MessageSquare,
     Paperclip,
     Pencil,
-    Play,
     SmilePlus,
     Star,
     Trash2,
@@ -827,7 +826,10 @@ function Message({
                                     aria-label={`View ${author}'s profile`}
                                     title={author}
                                     onClick={(event) =>
-                                        press({ id: message.authorId!, name: author }, event.currentTarget)
+                                        press(
+                                            { id: message.authorId!, name: author },
+                                            event.currentTarget
+                                        )
                                     }
                                     className="inline-flex rounded-full"
                                 >
@@ -1733,132 +1735,6 @@ function hostOf(address: string): string {
     } catch {
         return "";
     }
-}
-
-/**
- * What a link in a message turned out to be.
- *
- * Under the message rather than replacing it: the sentence somebody wrote about
- * the link is usually the point, and a card that swallowed it would lose that.
- *
- * The picture comes from Polaris rather than from the site, so scrolling past a
- * card does not announce the reader to whoever runs the page.
- */
-function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]> }) {
-    const embed = embedFor(preview.url);
-    const [playing, setPlaying] = useState(false);
-
-    // The edge takes the site's own colour when it has published a usable one,
-    // so a video reads as YouTube at a glance. Everything else keeps Polaris'
-    // accent.
-    const accent = usableAccent(preview.accent);
-    const edge = accent ? { borderLeftColor: accent } : undefined;
-
-    const details = (
-        <span className="flex min-w-0 flex-col gap-0.5">
-            {(preview.siteName || preview.author) && (
-                <span className="truncate text-[0.6875rem] text-muted-foreground">
-                    {[preview.siteName, preview.author].filter(Boolean).join(" - ")}
-                </span>
-            )}
-            <span className="truncate text-xs font-medium text-foreground">
-                {preview.title || preview.url}
-            </span>
-            {/* A video's own description is a wall of links and sponsorships,
-                and the card already says the three things somebody wants: the
-                site, who made it, and what it is called. */}
-            {preview.description && !embed && (
-                <span className="line-clamp-2 text-xs text-muted-foreground">
-                    {preview.description}
-                </span>
-            )}
-        </span>
-    );
-
-    // Something Polaris can play. The frame is built only once somebody presses
-    // play: until then nothing has been requested from the site, which is the
-    // same promise the picture already keeps.
-    if (embed) {
-        return (
-            <div
-                style={edge}
-                className="mt-1 flex max-w-lg flex-col gap-2 rounded-md border border-border border-l-2 border-l-primary bg-card p-2"
-            >
-                <a
-                    href={preview.url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="min-w-0 no-underline"
-                >
-                    {details}
-                </a>
-                {playing ? (
-                    <iframe
-                        // Starts on its own. Pressing play in Polaris and then
-                        // having to press play again in somebody else's player
-                        // is one press too many, and the press that has already
-                        // happened is what the site needs to allow the sound.
-                        src={autoplaying(embed.url)}
-                        title={preview.title || embed.provider}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture"
-                        allowFullScreen
-                        referrerPolicy="strict-origin-when-cross-origin"
-                        className={cn(
-                            "w-full rounded border-0 bg-black",
-                            embed.shape === "audio" ? "h-20" : "aspect-video"
-                        )}
-                    />
-                ) : (
-                    <button
-                        type="button"
-                        onClick={() => setPlaying(true)}
-                        aria-label={`Play this on ${embed.provider}, here`}
-                        title={`Plays here. ${embed.provider} sees you once you press it.`}
-                        className={cn(
-                            "group/play relative w-full overflow-hidden rounded bg-muted transition-colors hover:bg-card-hover",
-                            embed.shape === "audio" ? "h-20" : "aspect-video"
-                        )}
-                    >
-                        {preview.hasImage && (
-                            // eslint-disable-next-line @next/next/no-img-element -- fetched through Polaris, no loader wanted
-                            <img
-                                src={`/api/chat/links/${preview.id}/image`}
-                                alt=""
-                                loading="lazy"
-                                className="size-full object-cover"
-                            />
-                        )}
-                        <span className="absolute inset-0 flex items-center justify-center">
-                            <span className="flex size-11 items-center justify-center rounded-full bg-background/80 text-foreground transition-transform group-hover/play:scale-110">
-                                <Play className="size-5 fill-current" />
-                            </span>
-                        </span>
-                    </button>
-                )}
-            </div>
-        );
-    }
-
-    return (
-        <a
-            href={preview.url}
-            style={edge}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="mt-1 flex max-w-lg gap-3 rounded-md border border-border border-l-2 border-l-primary bg-card p-2 transition-colors hover:bg-card-hover"
-        >
-            {preview.hasImage && (
-                // eslint-disable-next-line @next/next/no-img-element -- one thumbnail, fetched through Polaris, no loader wanted
-                <img
-                    src={`/api/chat/links/${preview.id}/image`}
-                    alt=""
-                    loading="lazy"
-                    className="size-16 shrink-0 rounded object-cover"
-                />
-            )}
-            {details}
-        </a>
-    );
 }
 
 function DaySeparator({ iso }: { iso: string }) {
