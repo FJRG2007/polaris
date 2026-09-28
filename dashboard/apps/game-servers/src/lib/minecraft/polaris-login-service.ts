@@ -335,7 +335,9 @@ export async function loginState(
             on,
             health,
             running: modVersion,
-            current: currentVersion
+            current: currentVersion,
+            seenAt: checkIn?.seenAt ?? null,
+            upSince
         }),
         players: players.map((row) => ({
             name: row.displayName,
