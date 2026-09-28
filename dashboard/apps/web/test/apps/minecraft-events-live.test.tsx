@@ -80,6 +80,7 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/events-actions", () => 
     readEventsAction: () => reads(),
     saveEventsAction: async () => ({ view: base }),
     startEventAction: async () => ({ view: running("countdown") }),
+    startNowAction: async () => ({ view: base }),
     cancelEventAction: async () => ({ view: base }),
     forgetPrizeAction: async () => ({ view: base })
 }));

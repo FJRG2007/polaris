@@ -475,6 +475,43 @@ describe("a supply drop", () => {
     });
 });
 
+describe("starting one now", () => {
+    it("skips what is left of the countdown and still runs its full time", async () => {
+        const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 10 };
+        setUp([hunt], { countdownSeconds: 60 });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hunt",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(4_100);
+        expect(state().run?.phase).toBe("countdown");
+        const pressed = Date.now();
+        await events.startNow("owner", SERVER);
+        await play(2_100);
+        const run = state().run;
+        expect(run?.phase).toBe("running");
+        expect(run!.startsAt).toBeLessThanOrEqual(pressed + 2_100);
+        expect(run!.endsAt - run!.startsAt).toBeGreaterThanOrEqual(10 * 60_000 - 2_100);
+        expect(world.sent).toContain("scoreboard objectives setdisplay sidebar pe_score");
+    });
+
+    it("says so once it has already begun", async () => {
+        setUp([{ ...catalog.newPreset("mob-hunt", "hunt"), minutes: 10 }]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hunt",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(4_100);
+        await expect(events.startNow("owner", SERVER)).rejects.toThrow("It has already started");
+    });
+});
+
 describe("calling one off", () => {
     it("ends it with nobody winning and cleans up", async () => {
         const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 10 };

@@ -399,6 +399,32 @@ export async function cancelEvent(ownerId: string, installedAppId: string): Prom
     }
 }
 
+/**
+ * Skip what is left of the countdown: the event begins on the next tick and
+ * still lasts its full time, since its end moves forward by the same amount.
+ */
+export async function startNow(ownerId: string, installedAppId: string): Promise<void> {
+    const now = Date.now();
+    const skipped = (run: stored.EventRun): stored.EventRun => {
+        const early = Math.max(0, run.startsAt - now);
+        return { ...run, startsAt: run.startsAt - early, endsAt: run.endsAt - early };
+    };
+    const state = await updateEventState(installedAppId, (current) =>
+        current.run?.phase === "countdown" && !current.run.cancelled
+            ? { ...current, run: skipped(current.run) }
+            : current
+    );
+    if (!state?.run || state.run.cancelled) throw new Error("No event is on");
+    if (state.run.phase !== "countdown") throw new Error("It has already started");
+    const loop = loops.get(installedAppId);
+    if (loop) {
+        if (loop.run.phase === "countdown") loop.run = skipped(loop.run);
+    } else {
+        const row = await readRow(installedAppId);
+        if (row) startLoop(ownerId, installedAppId, state.run, settingsOf(row.config).settings);
+    }
+}
+
 /** Stop waiting to hand somebody a prize. */
 export async function forgetPending(installedAppId: string, pendingId: string): Promise<void> {
     await updateEventState(installedAppId, (state) => ({
