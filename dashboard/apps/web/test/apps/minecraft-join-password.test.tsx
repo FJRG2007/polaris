@@ -345,7 +345,7 @@ describe("Polaris login", () => {
     it("describes the mod, not the project, once it is on", async () => {
         vi.mocked(loginActions.loginStateAction).mockResolvedValue({ state: ON });
         neoforge("");
-        expect(await screen.findByText(/\/register <password> <password>/)).toBeTruthy();
+        expect(await screen.findByText(/\/register <passcode> <passcode>/)).toBeTruthy();
         expect(screen.queryByText(/\/trigger/)).toBeNull();
         expect(screen.getByText("On")).toBeTruthy();
     });

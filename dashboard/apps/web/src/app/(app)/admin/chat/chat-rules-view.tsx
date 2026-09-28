@@ -16,7 +16,16 @@ import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { setChatRulesAction } from "./actions";
-import { Button, Card, CardBody, Input, SegmentedControl, SizeField, Switch, cn } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    Input,
+    SegmentedControl,
+    SizeField,
+    Switch,
+    cn
+} from "@polaris/ui";
 
 type Rules = core.ChatRules;
 type Scope = core.ChatRuleScope;
@@ -101,7 +110,7 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
 
                     <Limit
                         label="Messages a minute"
-                        hint="Per person, per conversation. Zero for as many as they can type."
+                        hint="Per person, per conversation. Thirty stops a flood without ever meeting somebody typing. Zero for as many as they can type."
                         suffix="a minute"
                         zeroLabel="No limit."
                         value={rules.maxPerMinute}
@@ -109,6 +118,59 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                         max={core.CHAT_RATE_CEILING}
                         onChange={(value) => set("maxPerMinute", value)}
                     />
+
+                    <div className="flex flex-col gap-4 rounded-md border border-border p-3">
+                        <Toggle
+                            label="Spam protection"
+                            hint="Limits loose enough that nobody talking normally meets them, there to stop clear abuse: the whole room pinged again and again, one person mentioned over and over, the same line pasted repeatedly. Each counts one person in one conversation; zero turns a single limit off."
+                            checked={rules.spamGuard}
+                            onChange={(value) => set("spamGuard", value)}
+                        />
+                        <Limit
+                            label="@everyone and @here"
+                            hint="Messages carrying either that one person may send in an hour. Whoever moderates the room is not held by it."
+                            suffix="an hour"
+                            zeroLabel="No limit."
+                            value={rules.maxRoomMentionsPerHour}
+                            min={0}
+                            max={core.CHAT_SPAM_CEILINGS.roomMentionsPerHour}
+                            disabled={!rules.spamGuard}
+                            onChange={(value) => set("maxRoomMentionsPerHour", value)}
+                        />
+                        <Limit
+                            label="People mentioned in one message"
+                            hint="Different people or teams one message may mention."
+                            suffix="people"
+                            zeroLabel="No limit."
+                            value={rules.maxMentionsPerMessage}
+                            min={0}
+                            max={core.CHAT_SPAM_CEILINGS.mentionsPerMessage}
+                            disabled={!rules.spamGuard}
+                            onChange={(value) => set("maxMentionsPerMessage", value)}
+                        />
+                        <Limit
+                            label="Mentioning the same person"
+                            hint="Messages mentioning the same person that one account may send in ten minutes."
+                            suffix="in 10 minutes"
+                            zeroLabel="No limit."
+                            value={rules.maxSamePersonMentions}
+                            min={0}
+                            max={core.CHAT_SPAM_CEILINGS.samePersonMentions}
+                            disabled={!rules.spamGuard}
+                            onChange={(value) => set("maxSamePersonMentions", value)}
+                        />
+                        <Limit
+                            label="The same message again"
+                            hint="How many times the very same message may be sent in two minutes."
+                            suffix="in 2 minutes"
+                            zeroLabel="No limit."
+                            value={rules.maxRepeatedMessages}
+                            min={0}
+                            max={core.CHAT_SPAM_CEILINGS.repeatedMessages}
+                            disabled={!rules.spamGuard}
+                            onChange={(value) => set("maxRepeatedMessages", value)}
+                        />
+                    </div>
 
                     <Limit
                         label="Files on one message"
@@ -138,10 +200,10 @@ export function ChatRulesView({ initial }: { initial: Record<Scope, Rules> }) {
                             onChange={(value) => set("maxAttachmentMib", value)}
                         />
                         <span className="text-xs text-muted-foreground">
-                            A file this big is streamed straight to the storage Polaris writes uploads to, so
-                            what this really sets is how much of your disks one message may take. Somebody
-                            sharing a file they already have in Drive is not bound by it at all when this
-                            instance shares by link.
+                            A file this big is streamed straight to the storage Polaris writes
+                            uploads to, so what this really sets is how much of your disks one
+                            message may take. Somebody sharing a file they already have in Drive is
+                            not bound by it at all when this instance shares by link.
                         </span>
                     </label>
 

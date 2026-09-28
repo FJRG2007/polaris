@@ -139,8 +139,8 @@ export function LoginDetails({
 
             <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
                 Players register with{" "}
-                <span className="font-mono">/register &lt;password&gt; &lt;password&gt;</span>, come
-                back with <span className="font-mono">/login &lt;password&gt;</span> and change it
+                <span className="font-mono">/register &lt;passcode&gt; &lt;passcode&gt;</span>, come
+                back with <span className="font-mono">/login &lt;passcode&gt;</span> and change it
                 with <span className="font-mono">/changepassword &lt;old&gt; &lt;new&gt;</span>.
                 Letters, digits and symbols all work; a password with spaces goes in double quotes.
             </p>

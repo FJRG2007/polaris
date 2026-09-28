@@ -369,17 +369,17 @@ final class LoginGate implements Listener, CommandExecutor {
     /** The title for what this player has to do next, sent again before it fades. */
     private static void titleFor(Player player, Held waiting) {
         if (waiting.registered == null) return;
-        if (waiting.registered) title(player, "Log in", "/login <password>");
-        else title(player, "Choose a password", "/register <password> <password>");
+        if (waiting.registered) title(player, "Log in", "/login <passcode>");
+        else title(player, "Choose a password", "/register <passcode> <passcode>");
     }
 
     private void prompt(Player player, Held waiting) {
         long seconds = Math.max(0, (waiting.deadline - tick) / SECOND);
         titleFor(player, waiting);
         if (Boolean.TRUE.equals(waiting.registered)) {
-            tell(player, "Log in with /login <password>. You have " + seconds + " seconds.");
+            tell(player, "Log in with /login <passcode>. You have " + seconds + " seconds.");
         } else {
-            tell(player, "Choose a password for this server with /register <password> <password>. You have "
+            tell(player, "Choose a password for this server with /register <passcode> <passcode>. You have "
                     + seconds + " seconds. Put it in double quotes if it has spaces.");
         }
     }
@@ -438,11 +438,11 @@ final class LoginGate implements Listener, CommandExecutor {
         List<String> words = PasswordArguments.split(String.join(" ", args));
         switch (command.getName().toLowerCase(Locale.ROOT)) {
             case "register" -> {
-                if (words.size() != 2) return usage(player, "/register <password> <password>");
+                if (words.size() != 2) return usage(player, "/register <passcode> <passcode>");
                 register(player, words.get(0), words.get(1));
             }
             case "login" -> {
-                if (words.size() != 1) return usage(player, "/login <password>");
+                if (words.size() != 1) return usage(player, "/login <passcode>");
                 login(player, words.get(0));
             }
             case "changepassword" -> {
@@ -465,7 +465,7 @@ final class LoginGate implements Listener, CommandExecutor {
         Held waiting = waitingFor(player);
         if (waiting == null) return;
         if (Boolean.TRUE.equals(waiting.registered)) {
-            tell(player, "You already have a password here. Log in with /login <password>.");
+            tell(player, "You already have a password here. Log in with /login <passcode>.");
             return;
         }
         if (!password.equals(confirm)) {
@@ -490,7 +490,7 @@ final class LoginGate implements Listener, CommandExecutor {
                 release(current, "Password set. Welcome!");
             } else if (reply.status() == 409) {
                 waiting.registered = true;
-                tell(current, "You already have a password here. Log in with /login <password>.");
+                tell(current, "You already have a password here. Log in with /login <passcode>.");
             } else {
                 tell(current, failure(reply, "save your password"));
             }
@@ -523,7 +523,7 @@ final class LoginGate implements Listener, CommandExecutor {
                 }
                 case 404 -> {
                     waiting.registered = false;
-                    tell(current, "You have no password here yet. Choose one with /register <password> <password>.");
+                    tell(current, "You have no password here yet. Choose one with /register <passcode> <passcode>.");
                 }
                 case 429 -> waiting.kick = throttled(reply);
                 default -> tell(current, failure(reply, "check your password"));
@@ -537,7 +537,7 @@ final class LoginGate implements Listener, CommandExecutor {
             return;
         }
         if (held.containsKey(player.getUniqueId())) {
-            tell(player, "Log in first with /login <password>.");
+            tell(player, "Log in first with /login <passcode>.");
             return;
         }
         String problem = passwordProblem(next);

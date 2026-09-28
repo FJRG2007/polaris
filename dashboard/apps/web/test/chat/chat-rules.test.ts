@@ -39,8 +39,25 @@ describe("what an instance starts on", () => {
         expect(DEFAULT_CHAT_RULES.keepEditHistory).toBe(true);
     });
 
-    it("does not rate-limit anybody", () => {
-        expect(DEFAULT_CHAT_RULES.maxPerMinute).toBe(CHAT_NO_LIMIT);
+    it("stops a flood without ever meeting somebody typing", () => {
+        // A message every two seconds for a whole minute: more than anybody
+        // types, far less than a script or a held-down key sends.
+        expect(DEFAULT_CHAT_RULES.maxPerMinute).toBe(30);
+    });
+
+    it("guards against spam by default, loosely", () => {
+        expect(DEFAULT_CHAT_RULES.spamGuard).toBe(true);
+        expect(DEFAULT_CHAT_RULES.maxRoomMentionsPerHour).toBe(3);
+        expect(DEFAULT_CHAT_RULES.maxMentionsPerMessage).toBe(20);
+        expect(DEFAULT_CHAT_RULES.maxSamePersonMentions).toBe(5);
+        expect(DEFAULT_CHAT_RULES.maxRepeatedMessages).toBe(3);
+    });
+
+    it("keeps an operator's rules saved before these limits existed, with the limits on", () => {
+        const older = parseChatRules(JSON.stringify({ maxPerMinute: 0, keepEditHistory: false }));
+        expect(older.maxPerMinute).toBe(CHAT_NO_LIMIT);
+        expect(older.keepEditHistory).toBe(false);
+        expect(older.spamGuard).toBe(true);
     });
 
     it("allows a message as long as the schema does", () => {

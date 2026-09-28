@@ -32,6 +32,7 @@ import { mentionsReader, readerTeams } from "./notify";
 import { noticePeople, renderNotice } from "./notice-text";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { announceRoomMention, refuseRoomMention } from "./room-mentions";
+import { requireNotSpam, requireRoomMentionAllowed } from "./spam-guard";
 import { allowedBy, maySee, receiptsBetween } from "@/lib/privacy-service";
 import { channelMentions, isBlankMarkdown } from "@/components/rich-text/markdown";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
@@ -586,7 +587,7 @@ async function requireSendable(
         );
     }
 
-    if (rules.maxPerMinute !== core.CHAT_NO_LIMIT) {
+    if (rules.maxPerMinute !== core.CHAT_NO_LIMIT && options.wait !== false) {
         const recent = await prisma.chatMessage.count({
             where: {
                 channelId,
@@ -598,6 +599,15 @@ async function requireSendable(
             throw new ChatRuleError("You are sending messages too quickly. Wait a moment.");
         }
     }
+
+    await requireNotSpam({
+        rules,
+        channelId,
+        authorId: actor.id,
+        body,
+        moderator: access.mayModerate,
+        editing: options.wait === false
+    });
 
     if (options.wait === false) return;
 
@@ -684,6 +694,15 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
     // fixing a typo in it is not saying it again.
     if (channelMentions(message.body).size === 0) {
         await refuseRoomMention(actor, editable, input.body);
+        // And held to the same hourly limit a send is, or adding it by an edit
+        // would be the way around it.
+        if (!editable.mayModerate && channelMentions(input.body).size > 0) {
+            await requireRoomMentionAllowed({
+                rules: await rulesForChannel(message.channelId),
+                channelId: message.channelId,
+                authorId: actor.id
+            });
+        }
     }
     // Emptying a message is deleting it, and there is a delete for that.
     if (isBlankMarkdown(input.body)) throw new ChatRuleError("Write something first");

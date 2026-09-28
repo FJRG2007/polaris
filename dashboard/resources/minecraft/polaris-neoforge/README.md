@@ -7,8 +7,8 @@ lets nobody in.
 
 Players use:
 
-- `/register <password> <password>` on their first join
-- `/login <password>` on every join after
+- `/register <passcode> <passcode>` on their first join
+- `/login <passcode>` on every join after
 - `/changepassword <old> <new>` once logged in
 
 A password can have letters, digits and symbols; one with spaces goes in double
