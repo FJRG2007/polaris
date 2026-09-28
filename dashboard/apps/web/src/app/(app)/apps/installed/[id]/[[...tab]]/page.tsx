@@ -32,15 +32,29 @@ export default async function InstalledAppPage({
 }: {
     params: Promise<{ id: string; tab?: string[] }>;
 }) {
-    const user = await requireUser();
-    const { id, tab } = await params;
+    const [user, { id, tab }] = await Promise.all([requireUser(), params]);
+    // Everything the viewer holds on this install is asked at once. Each is its
+    // own round trip and none depends on another, so in turn they were the
+    // longest wait on the page; the answers are only acted on below, in the same
+    // order as before, so a viewer who holds nothing still gets nothing but the
+    // not-found page.
+    const [deployAccess, gameAccess, held, deployManage] = await Promise.all([
+        resourceAccess(user, installRef(id), "deploy.read"),
+        resourceAccess(user, installRef(id), "games.read"),
+        gamePermissionsFor(user, id),
+        heldOn(user, installRef(id), ["deploy.manage"])
+    ]);
     // deploy.read is the weakest thing an installed app can be reached with, and a
     // game grant carries it here rather than instance-wide. A viewer with neither
     // gets the same answer as one asking about an app that does not exist.
-    const access =
-        (await resourceAccess(user, installRef(id), "deploy.read")) ??
-        (await resourceAccess(user, installRef(id), "games.read"));
+    const access = deployAccess ?? gameAccess;
     if (!access) notFound();
+    // The settings need only the owner, so they are read beside the install
+    // rather than after it. Never a throw (see `getInstalledAppSettings`), but
+    // held as a promise so a page that redirects or is not found does not wait
+    // for them.
+    const settingsRead = getInstalledAppSettings(access.ownerId, id);
+    void settingsRead.catch(() => undefined);
     const app = await getInstalledApp(access.ownerId, id);
     if (!app) notFound();
 
@@ -51,13 +65,10 @@ export default async function InstalledAppPage({
     const opensAt = findApp(app.catalogId)?.opensAt;
     if (opensAt) redirect(opensAt);
 
-    const held = await gamePermissionsFor(user, id);
     // Starting, stopping and redeploying are the manage grant on this server, or the
     // deploy one for an app that is not a game. Removing it is nobody's but the
     // owner's: "manage this server" was never an offer to take it away.
-    const canManage =
-        held.includes("games.manage") ||
-        (await heldOn(user, installRef(id), ["deploy.manage"])).length > 0;
+    const canManage = held.includes("games.manage") || deployManage.length > 0;
     const canRemove = access.isOwner || user.isAdmin;
     // An unknown slug is a mistyped link, not an error worth a page of its own.
     // Only a game server has screens; anything else is its shell and nothing more.
@@ -76,7 +87,7 @@ export default async function InstalledAppPage({
     // manage the install, so neither may take it down: an app that cannot be
     // described is precisely the one somebody came here to stop or remove.
     const [settings, slot] = await Promise.all([
-        getInstalledAppSettings(access.ownerId, id),
+        settingsRead,
         installedPanelSlot({
             id: app.id,
             catalogId: app.catalogId,

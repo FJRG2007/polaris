@@ -59,7 +59,8 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
         throw new Error("a server that is not running must not be knocked on");
     },
     applyFirewallBans: async () => undefined,
-    editionOf: () => "java"
+    editionOf: () => "java",
+    resolveInstalls: async () => new Map()
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/ark/service", () => ({

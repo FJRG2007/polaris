@@ -176,87 +176,99 @@ export function ArkMods({
                 />
             )}
 
-            {loading ? (
-                <div className="flex flex-col gap-2">
-                    {Array.from({ length: 3 }, (_, index) => (
-                        <Skeleton key={index} className="h-16 w-full" />
-                    ))}
-                </div>
-            ) : (
-                <>
-                    <div className="flex flex-col gap-1">
-                        <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            Map
-                        </p>
-                        <Card>
-                            <CardBody className="py-0">
-                                {mods?.mapModId ? (
-                                    <ModRow
-                                        installedAppId={installedAppId}
-                                        id={mods.mapModId}
-                                        item={details(mods.mapModId)}
-                                        installed={mods.installed.includes(mods.mapModId)}
-                                        knowsDisk={running}
-                                        first
-                                        busy={busy}
-                                        canManage={canManage}
-                                        onRemove={() => void setMap(null)}
-                                    />
-                                ) : (
-                                    <p className="py-4 text-sm text-muted-foreground">
-                                        This server runs one of the maps that come with the game. A
-                                        Workshop map replaces it, and its world is kept separately from
-                                        the one you have now.
-                                    </p>
-                                )}
-                            </CardBody>
-                        </Card>
-                    </div>
+            {/* Both headings are drawn at once; only what is under them waits
+                for the server's files. */}
+            <div className="flex flex-col gap-1">
+                <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Map
+                </p>
+                <Card>
+                    <CardBody className="py-0">
+                        {loading || !mods ? (
+                            <ListPending loading={loading} rows={1} />
+                        ) : mods.mapModId ? (
+                            <ModRow
+                                installedAppId={installedAppId}
+                                id={mods.mapModId}
+                                item={details(mods.mapModId)}
+                                installed={mods.installed.includes(mods.mapModId)}
+                                knowsDisk={running}
+                                first
+                                busy={busy}
+                                canManage={canManage}
+                                onRemove={() => void setMap(null)}
+                            />
+                        ) : (
+                            <p className="py-4 text-sm text-muted-foreground">
+                                This server runs one of the maps that come with the game. A
+                                Workshop map replaces it, and its world is kept separately from
+                                the one you have now.
+                            </p>
+                        )}
+                    </CardBody>
+                </Card>
+            </div>
 
-                    <div className="flex flex-col gap-1">
-                        <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            Mods{ids.length > 0 ? ` - ${ids.length} of ${MAX_MODS}` : ""}
-                        </p>
-                        <Card>
-                            <CardBody className="py-0">
-                                {ids.length === 0 ? (
-                                    <p className="py-4 text-sm text-muted-foreground">
-                                        No mods. Paste a Workshop link above to add one.
-                                    </p>
-                                ) : (
-                                    ids.map((id, index) => (
-                                        <ModRow
-                                            key={id}
-                                            installedAppId={installedAppId}
-                                            id={id}
-                                            item={details(id)}
-                                            installed={(mods?.installed ?? []).includes(id)}
-                                            knowsDisk={running}
-                                            first={index === 0}
-                                            position={index + 1}
-                                            busy={busy}
-                                            canManage={canManage}
-                                            onUp={index > 0 ? () => void save(movedMod(ids, id, -1)) : undefined}
-                                            onDown={
-                                                index < ids.length - 1
-                                                    ? () => void save(movedMod(ids, id, 1))
-                                                    : undefined
-                                            }
-                                            onRemove={() => void save(withoutMod(ids, id))}
-                                        />
-                                    ))
-                                )}
-                            </CardBody>
-                        </Card>
-                    </div>
-                </>
-            )}
+            <div className="flex flex-col gap-1">
+                <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Mods{ids.length > 0 ? ` - ${ids.length} of ${MAX_MODS}` : ""}
+                </p>
+                <Card>
+                    <CardBody className="py-0">
+                        {loading || !mods ? (
+                            <ListPending loading={loading} rows={2} />
+                        ) : ids.length === 0 ? (
+                            <p className="py-4 text-sm text-muted-foreground">
+                                No mods. Paste a Workshop link above to add one.
+                            </p>
+                        ) : (
+                            ids.map((id, index) => (
+                                <ModRow
+                                    key={id}
+                                    installedAppId={installedAppId}
+                                    id={id}
+                                    item={details(id)}
+                                    installed={mods.installed.includes(id)}
+                                    knowsDisk={running}
+                                    first={index === 0}
+                                    position={index + 1}
+                                    busy={busy}
+                                    canManage={canManage}
+                                    onUp={index > 0 ? () => void save(movedMod(ids, id, -1)) : undefined}
+                                    onDown={
+                                        index < ids.length - 1
+                                            ? () => void save(movedMod(ids, id, 1))
+                                            : undefined
+                                    }
+                                    onRemove={() => void save(withoutMod(ids, id))}
+                                />
+                            ))
+                        )}
+                    </CardBody>
+                </Card>
+            </div>
 
             <p className="text-xs text-muted-foreground">
                 Mods load in the order above and a later one wins over an earlier one, which is what
                 decides the outcome when two of them change the same thing. Removing a mod stops the
                 server loading it; anything it added to the world goes with it.
             </p>
+        </div>
+    );
+}
+
+/** What stands in a list while it is read, and what it says once reading it has
+ *  failed - the error above says why, and "no mods" would be a claim nothing
+ *  checked. */
+function ListPending({ loading, rows }: { loading: boolean; rows: number }) {
+    if (!loading) {
+        return <p className="py-4 text-sm text-muted-foreground">Could not be read.</p>;
+    }
+    return (
+        <div className="flex flex-col gap-2 py-3" aria-busy="true">
+            {Array.from({ length: rows }, (_, index) => (
+                <Skeleton key={index} className="h-10 w-full" />
+            ))}
         </div>
     );
 }

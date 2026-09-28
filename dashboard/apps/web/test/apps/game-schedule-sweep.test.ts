@@ -23,6 +23,8 @@ let desiredState: string;
 /** What the running server answered, and how - `null` for one that is not. */
 let arkPlayers: { answering: boolean; players: { steamId: string; name: string }[] } | null;
 let ran: { applicationId: string; running: boolean }[] = [];
+/** How many times the sweep asked for applications, and how it asked. */
+let applicationQueries: string[] = [];
 let flushed: string[] = [];
 
 vi.mock("@polaris/db", () => ({
@@ -41,7 +43,14 @@ vi.mock("@polaris/db", () => ({
             }
         },
         application: {
-            findFirst: async () => ({ desiredState }),
+            findMany: async () => {
+                applicationQueries.push("findMany");
+                return [{ id: install.applicationId, desiredState }];
+            },
+            findFirst: async () => {
+                applicationQueries.push("findFirst");
+                return { desiredState };
+            },
             findUnique: async () => ({ desiredState })
         }
     }
@@ -69,7 +78,9 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     }
 }));
 
-const { sweepGameSchedules } = await import("@polaris-app/game-servers/src/lib/minecraft/schedule-service");
+const { sweepGameSchedules, sweepWatchedGameSchedules } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/schedule-service"
+);
 
 /** Sleep once nobody has played for five minutes, which is what the screen writes
  *  when somebody types 5 into "Empty for". */
@@ -92,6 +103,7 @@ function setUp(schedule: GameSchedule, config: Record<string, unknown> = {}): vo
     arkPlayers = { answering: true, players: [] };
     ran = [];
     flushed = [];
+    applicationQueries = [];
 }
 
 beforeEach(() => setUp(SLEEP));
@@ -168,5 +180,45 @@ describe("sweepGameSchedules over an ARK server", () => {
         // nothing is asked of the server and nothing is stopped.
         expect(swept).toEqual({ started: 0, stopped: 0, restarted: 0 });
         expect(JSON.parse(install.config).emptySince ?? null).toBeNull();
+    });
+});
+
+describe("the sweep a watched screen runs", () => {
+    it("reads the servers' applications in one query rather than one each", async () => {
+        await sweepGameSchedules(OWNER, new Date("2026-08-11T12:00:00Z"));
+        expect(applicationQueries).toEqual(["findMany"]);
+    });
+
+    it("runs at most once every thirty seconds for the same owner and servers", async () => {
+        // An owner of its own, because the throttle outlives a test.
+        const owner = "22222222-1111-4111-8111-111111111111";
+        vi.useFakeTimers();
+        try {
+            vi.setSystemTime(new Date("2026-08-11T12:00:00Z"));
+            expect(await sweepWatchedGameSchedules(owner, { only: INSTALL })).not.toBeNull();
+            vi.setSystemTime(new Date("2026-08-11T12:00:03Z"));
+            expect(await sweepWatchedGameSchedules(owner, { only: INSTALL })).toBeNull();
+            // A different audience is not held back by this one.
+            expect(await sweepWatchedGameSchedules(owner)).not.toBeNull();
+            vi.setSystemTime(new Date("2026-08-11T12:00:30Z"));
+            expect(await sweepWatchedGameSchedules(owner, { only: INSTALL })).not.toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("still stops an empty server, only on the throttled cadence", async () => {
+        const owner = "33333333-1111-4111-8111-111111111111";
+        vi.useFakeTimers();
+        try {
+            vi.setSystemTime(new Date("2026-08-11T12:00:00Z"));
+            await sweepWatchedGameSchedules(owner);
+            vi.setSystemTime(new Date("2026-08-11T12:06:00Z"));
+            const swept = await sweepWatchedGameSchedules(owner);
+            expect(swept?.stopped).toBe(1);
+            expect(ran).toEqual([{ applicationId: APPLICATION, running: false }]);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

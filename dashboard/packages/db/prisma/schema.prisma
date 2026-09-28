@@ -3892,7 +3892,8 @@ model MinecraftAnticheatFlag {
     at             DateTime
 
     @@index([installedAppId, at])
-    @@index([installedAppId, player])
+    // A player's newest alerts first, which is how the Anti-cheat tab reads them.
+    @@index([installedAppId, player, at])
 }
 
 // ---------------------------------------------------------------------------

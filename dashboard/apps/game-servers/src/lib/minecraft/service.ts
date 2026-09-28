@@ -18,6 +18,7 @@ import * as parse from "./parse";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { withTimeout } from "@polaris/core";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { liveContext } from "./live-values";
 import { gameServerAddress } from "./address";
 import type { AppHostTypes } from "@polaris/app-host";
@@ -122,7 +123,7 @@ export interface MinecraftRoster {
 }
 
 /** The install, its application and the target it runs on. */
-interface MinecraftInstall {
+export interface MinecraftInstall {
     readonly installedAppId: string;
     /** What Polaris calls the server: the value of `{server.name}`. */
     readonly name: string;
@@ -143,11 +144,40 @@ interface MinecraftInstall {
     readonly config: string | null;
 }
 
+/**
+ * Installs already resolved in this scope, by owner and id.
+ *
+ * One poll of a server's page asks the same install for its status, its roster,
+ * its firewall and its log, and each of those used to resolve it on its own -
+ * the same three queries four times over for one answer. Inside a scope opened
+ * by `sharingInstallReads` the first resolution is handed to the rest. Outside
+ * one nothing is shared, so a verb never acts on a reading older than itself.
+ */
+const sharedInstalls = new AsyncLocalStorage<Map<string, Promise<MinecraftInstall>>>();
+
+/** Run `work` with every install it resolves resolved once. For a poll that
+ *  gathers several answers about the same server at the same moment, and the
+ *  upkeep that rides on it - never around a change somebody asked for, which has
+ *  to see the state it is changing. */
+export function sharingInstallReads<T>(work: () => Promise<T>): Promise<T> {
+    return sharedInstalls.run(new Map(), work);
+}
+
 /** Resolve an installed app to the container its server runs in, asserting the
  *  caller owns it. Throws a client-safe message when it has no deployment yet. */
 async function resolveInstall(ownerId: string, installedAppId: string): Promise<MinecraftInstall> {
+    const shared = sharedInstalls.getStore();
+    if (!shared) return loadInstall(ownerId, installedAppId);
+    const key = `${ownerId}|${installedAppId}`;
+    const held = shared.get(key) ?? loadInstall(ownerId, installedAppId);
+    shared.set(key, held);
+    return held;
+}
+
+async function loadInstall(ownerId: string, installedAppId: string): Promise<MinecraftInstall> {
     const install = await prisma.installedApp.findFirst({
-        where: { id: installedAppId, ownerId, status: { not: "removed" } }
+        where: { id: installedAppId, ownerId, status: { not: "removed" } },
+        select: INSTALL_FIELDS
     });
     if (!install) throw new Error("Installed app not found");
     if (!install.applicationId) throw new Error("This server has not been deployed yet");
@@ -156,7 +186,69 @@ async function resolveInstall(ownerId: string, installedAppId: string): Promise<
         include: { environment: { include: { project: true } }, target: true }
     });
     if (!app) throw new Error("This server's deployment is gone");
-    const release = await currentReleaseRef(app);
+    return installFrom(install, app, await currentReleaseRef(app));
+}
+
+/**
+ * The same for many servers at once, for the watcher that asks every one of an
+ * owner's servers who is on it every few seconds: two queries for the lot
+ * rather than two per server. A server that cannot be resolved is simply absent,
+ * and the caller asks for it on its own, which is what says why.
+ */
+export async function resolveInstalls(
+    ownerId: string,
+    installedAppIds: readonly string[]
+): Promise<Map<string, MinecraftInstall>> {
+    if (installedAppIds.length === 0) return new Map();
+    const installs = await prisma.installedApp.findMany({
+        where: { id: { in: [...installedAppIds] }, ownerId, status: { not: "removed" } },
+        select: INSTALL_FIELDS
+    });
+    const deployed = installs.filter(
+        (install): install is typeof install & { applicationId: string } =>
+            install.applicationId !== null
+    );
+    if (deployed.length === 0) return new Map();
+    const apps = await prisma.application.findMany({
+        where: {
+            id: { in: deployed.map((install) => install.applicationId) },
+            environment: { project: { ownerId } }
+        },
+        include: { environment: { include: { project: true } }, target: true }
+    });
+    const appOf = new Map(apps.map((app) => [app.id, app]));
+    const resolved = await Promise.all(
+        deployed.map(async (install) => {
+            const app = appOf.get(install.applicationId);
+            return app ? installFrom(install, app, await currentReleaseRef(app)) : null;
+        })
+    );
+    return new Map(
+        resolved
+            .filter((install): install is MinecraftInstall => install !== null)
+            .map((install) => [install.installedAppId, install])
+    );
+}
+
+/** The columns of the install row a server is resolved from. */
+const INSTALL_FIELDS = {
+    id: true,
+    name: true,
+    catalogId: true,
+    applicationId: true,
+    config: true
+} as const;
+
+function installFrom(
+    install: { id: string; name: string; catalogId: string; config: string },
+    app: {
+        id: string;
+        sourceConfig: string;
+        desiredState: string;
+        target: MinecraftInstall["target"];
+    },
+    release: { name: string; portSubject: string }
+): MinecraftInstall {
     let hostPort: number | null = null;
     try {
         const config = JSON.parse(app.sourceConfig) as { hostPort?: unknown };
@@ -187,6 +279,12 @@ async function resolveInstall(ownerId: string, installedAppId: string): Promise<
         portless,
         config: install.config
     };
+}
+
+/** The container as the host's container reader takes it, so it is not resolved
+ *  a second time there. */
+function containerOf(install: MinecraftInstall): { name: string; targetKind: string } {
+    return { name: install.container, targetKind: install.target.kind };
 }
 
 /** Open the target's ports, run one piece of work, and always close them. */
@@ -628,7 +726,7 @@ export async function getServerStatus(
     const install = await resolveInstall(ownerId, installedAppId);
     const [address, usage, live] = await Promise.all([
         serverAddress(install, ownerId),
-        readAppContainerMetricsOrNull(install.applicationId, ownerId),
+        readAppContainerMetricsOrNull(install.applicationId, ownerId, containerOf(install)),
         readLivePlayers(install, ownerId)
     ]);
     return {
@@ -656,9 +754,12 @@ export async function getServerStatus(
  */
 export async function getServerPlayers(
     ownerId: string,
-    installedAppId: string
+    installedAppId: string,
+    /** The install, when the caller resolved it along with others (see
+     *  `resolveInstalls`). */
+    resolved?: MinecraftInstall
 ): Promise<MinecraftPlayers> {
-    return readLivePlayers(await resolveInstall(ownerId, installedAppId), ownerId);
+    return readLivePlayers(resolved ?? (await resolveInstall(ownerId, installedAppId)), ownerId);
 }
 
 /**
@@ -706,7 +807,7 @@ async function readLivePlayers(
             crashLoop: halted
         };
     }
-    const runtime = await readAppContainerRuntime(install.applicationId, ownerId);
+    const runtime = await readAppContainerRuntime(install.applicationId, ownerId, containerOf(install));
     const state = runtime?.status ?? null;
     // A container being restarted over and over is the one state that looks
     // exactly like a server that is merely slow to boot, and the one nobody can

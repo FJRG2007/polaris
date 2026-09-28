@@ -135,13 +135,17 @@ export async function gameContextFor(app: {
 }): Promise<GameContext | null> {
     const game = gameOfServer(app.catalogId);
     if (!game || !app.applicationId) return null;
-    const install = await prisma.installedApp.findUnique({
+    const installRead = prisma.installedApp.findUnique({
         where: { id: app.id },
         select: { config: true, ownerId: true }
     });
-    const ownerId = app.ownerId ?? install?.ownerId ?? null;
+    // The row is only waited for up front when it is the one place the owner can
+    // come from. The page always passes the owner, so there the row is read
+    // beside everything else instead of in front of it.
+    const ownerId = app.ownerId ?? (await installRead)?.ownerId ?? null;
     const minecraft = game.id === "minecraft";
     const [
+        install,
         suffix,
         facts,
         arkAccess,
@@ -154,6 +158,7 @@ export async function gameContextFor(app: {
         login,
         packBase
     ] = await Promise.all([
+        installRead,
         // Each game's servers live under a label of their own, so the address
         // picker has to be told which one it is naming a server in.
         gameDomainSuffix(game.domainLabel).catch(() => null),

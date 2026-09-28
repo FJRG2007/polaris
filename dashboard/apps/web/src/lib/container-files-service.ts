@@ -6,8 +6,8 @@
  * follow-up; here we resolve and serve the local case.
  */
 
-import type { Readable } from "node:stream";
 import { prisma } from "@polaris/db";
+import type { Readable } from "node:stream";
 import { HostdClient } from "@polaris/hostd-client";
 import { currentReleaseRef } from "./deploy/releases";
 
@@ -15,6 +15,15 @@ export interface ContainerEntry {
     readonly name: string;
     readonly isDir: boolean;
 }
+
+/** A container a caller has already resolved - its serving release's name and
+ *  the kind of target it runs on - after checking the owner itself. */
+export interface ResolvedContainer {
+    readonly name: string;
+    readonly targetKind: string;
+}
+
+const LOCAL_ONLY = "Container file browsing is currently supported on the local host only";
 
 /** Resolve an application to its local container name, checking ownership and that
  *  the target is the local host. Throws a client-safe message otherwise. */
@@ -24,10 +33,15 @@ export async function resolveLocalContainer(applicationId: string, ownerId: stri
         include: { environment: { include: { project: true } }, target: true, volumes: { select: { id: true } } }
     });
     if (!app) throw new Error("Application not found");
-    if (app.target.kind !== "local") {
-        throw new Error("Container file browsing is currently supported on the local host only");
-    }
+    if (app.target.kind !== "local") throw new Error(LOCAL_ONLY);
     return (await currentReleaseRef(app)).name;
+}
+
+/** The same answer for a container the caller resolved itself, with the same
+ *  refusal for one that is not on the local host. */
+export function localContainerOf(resolved: ResolvedContainer): string {
+    if (resolved.targetKind !== "local") throw new Error(LOCAL_ONLY);
+    return resolved.name;
 }
 
 /** Resolve an application to its local container name WITHOUT an owner check, for

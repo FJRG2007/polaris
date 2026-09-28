@@ -317,8 +317,14 @@ export async function appReaches(appId: string, userId: string): Promise<boolean
 
 /** The panel an app draws on one of its installs' pages. */
 export async function installedPanelSlot(install: ExtensionInstall): Promise<AppSlot | null> {
-    for (const extension of extensions()) {
-        const slot = await extension.installedPanelSlot?.(install);
+    // Every app is asked at once rather than in turn, so the page waits for the
+    // slowest answer instead of the sum of them. The first in order still wins,
+    // and a failure still fails the call only if it comes before the winner: the
+    // ones after it are left to settle on their own.
+    const asked = extensions().map((extension) => extension.installedPanelSlot?.(install) ?? null);
+    for (const pending of asked) void pending?.catch(() => undefined);
+    for (const pending of asked) {
+        const slot = await pending;
         if (slot) return withBundleSlot(slot);
     }
     return null;

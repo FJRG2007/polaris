@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { reachAdviceFor } from "../../../../../../lib/minecraft/reach";
 import { readLastSeen } from "../../../../../../lib/games-activity-service";
-import { sweepGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
+import { sweepWatchedGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
 import { drainQueue, pendingFor } from "../../../../../../lib/minecraft/queue-service";
 import { sweepInventorySnapshots } from "../../../../../../lib/minecraft/inventory-service";
 import { rememberRoster, rememberedRoster } from "../../../../../../lib/minecraft/roster-memory";
@@ -17,7 +17,8 @@ import {
     getPlayerSessions,
     getServerFirewall,
     getServerRoster,
-    getServerStatus
+    getServerStatus,
+    sharingInstallReads
 } from "../../../../../../lib/minecraft/service";
 import { host } from "@polaris/app-host";
 
@@ -46,53 +47,84 @@ export async function GET(
     const { access: server } = await requireGameServer("games.read", id);
     const wantsRoster = new URL(request.url).searchParams.get("roster") === "1";
     try {
-        // The read that reaches the container runs beside the ones that do not,
-        // rather than in front of them: asking a server that is generating its
-        // world takes as long as the timeout, and everything behind it - the
-        // address, the list of who may join, the port advice - is a database row
-        // that was ready immediately.
-        const [status, reach, access] = await Promise.all([
-            getServerStatus(server.ownerId, id),
-            reachAdviceFor(id, true).catch(() => null),
-            // One indexed query, and unlike the roster it does not go near the
-            // container - so it rides on every poll rather than only the moderation
-            // screen's. The overview needs it too: a server nobody is registered on
-            // is one nobody can join, and that has to be said where the address is,
-            // not on a tab somebody has to think to open.
-            listPlayerAccess(server.ownerId, id)
-                .then(forViewer)
-                .catch(() => null)
-        ]);
-        // A server that is not answering has no roster to report, and asking for one
-        // would only stack up failing execs behind a poll.
-        // Named rather than destructured by position: this list has grown twice,
-        // and a name that silently slid onto its neighbour's result is what shipped
-        // the enforcement report to the screen as if it were the session history.
-        const online = status.answering ? status.players.players : [];
-        const gathered = await Promise.all([
-            wantsRoster && status.answering ? getServerRoster(server.ownerId, id) : null,
-            wantsRoster ? getServerFirewall(server.ownerId, id).catch(() => null) : null,
-            // What level each of them is on. Only for the screen that has a
-            // column for it, and only for players who are actually standing on
-            // the server - it is one command each, and nobody who is offline has
-            // an answer. Beside the roster rather than after it, so the table is
-            // not held for one read behind the other.
-            wantsRoster && online.length > 0
-                ? getPlayerLevels(server.ownerId, id, online).catch(() => ({}))
-                : ({} as Record<string, number>),
-            // Who arrived and who left, which only the log records. Gathered for
-            // the screen that shows it, like the roster - and unlike the roster it
-            // survives a server that has stopped answering, because a history is
-            // most wanted about a server that has just gone quiet.
-            wantsRoster ? getPlayerSessions(server.ownerId, id).catch(() => []) : [],
-            // Timeouts end by somebody coming back to lift them. The cron does
-            // that on its own schedule; an instance with no cron configured would
-            // otherwise hand out cool-offs that never end, so opening the screen
-            // that grants them is also when the due ones are lifted.
-            wantsRoster && status.answering ? sweepTimeouts(server.ownerId, id).catch(() => 0) : 0
-        ] as const);
-        const [live, firewall, levels] = gathered;
-        const sessions = gathered[3];
+        // Everything below asks about the same install, so it is resolved once
+        // for all of them rather than once per read.
+        const read = await sharingInstallReads(async () => {
+            // The read that reaches the container runs beside the ones that do
+            // not, rather than in front of them: asking a server that is
+            // generating its world takes as long as the timeout, and everything
+            // behind it - the address, the list of who may join, the port advice,
+            // the history and what was remembered - was ready immediately. Only
+            // what needs the server to be answering waits for it.
+            //
+            // Named rather than destructured by position: this list has grown
+            // more than once, and a name that silently slid onto its neighbour's
+            // result is what shipped the enforcement report to the screen as if
+            // it were the session history.
+            const first = await Promise.all([
+                getServerStatus(server.ownerId, id),
+                reachAdviceFor(id, true).catch(() => null),
+                // One indexed query, and unlike the roster it does not go near the
+                // container - so it rides on every poll rather than only the
+                // moderation screen's. The overview needs it too: a server nobody
+                // is registered on is one nobody can join, and that has to be said
+                // where the address is, not on a tab somebody has to think to open.
+                listPlayerAccess(server.ownerId, id)
+                    .then(forViewer)
+                    .catch(() => null),
+                wantsRoster ? getServerFirewall(server.ownerId, id).catch(() => null) : null,
+                // Who arrived and who left, which only the log records. Gathered
+                // for the screen that shows it, like the roster - and unlike the
+                // roster it survives a server that has stopped answering, because
+                // a history is most wanted about a server that has just gone quiet.
+                wantsRoster ? getPlayerSessions(server.ownerId, id).catch(() => []) : [],
+                // What the server last said about who may play on it, read beside
+                // the live roster rather than after it and used only when that
+                // does not arrive (see below).
+                wantsRoster ? rememberedRoster(id).catch(() => null) : null,
+                wantsRoster ? readPlayerTimeouts(id).catch(() => []) : [],
+                // The level each of them was last seen on, for the rows of players
+                // who are not on right now.
+                wantsRoster ? rememberedLevels(id).catch(() => ({})) : {},
+                wantsRoster ? pendingFor(id).catch(() => []) : []
+            ] as const);
+            const status = first[0];
+            // A server that is not answering has no roster to report, and asking
+            // for one would only stack up failing execs behind a poll.
+            const online = status.answering ? status.players.players : [];
+            const second = await Promise.all([
+                wantsRoster && status.answering ? getServerRoster(server.ownerId, id) : null,
+                // What level each of them is on. Only for the screen that has a
+                // column for it, and only for players who are actually standing on
+                // the server - it is one command each, and nobody who is offline
+                // has an answer. Beside the roster rather than after it, so the
+                // table is not held for one read behind the other.
+                wantsRoster && online.length > 0
+                    ? getPlayerLevels(server.ownerId, id, online).catch(() => ({}))
+                    : ({} as Record<string, number>),
+                // Timeouts end by somebody coming back to lift them. The cron does
+                // that on its own schedule; an instance with no cron configured
+                // would otherwise hand out cool-offs that never end, so opening the
+                // screen that grants them is also when the due ones are lifted.
+                wantsRoster && status.answering ? sweepTimeouts(server.ownerId, id).catch(() => 0) : 0
+            ] as const);
+            return {
+                status,
+                reach: first[1],
+                access: first[2],
+                firewall: first[3],
+                sessions: first[4],
+                remembered: first[5],
+                timeouts: first[6],
+                lastLevels: first[7],
+                pending: first[8],
+                online,
+                live: second[0],
+                levels: second[1]
+            };
+        });
+        const { status, reach, access, firewall, sessions, timeouts, lastLevels, pending } = read;
+        const { online, live, levels } = read;
         /*
          * What the server last said about who may play on it.
          *
@@ -106,14 +138,7 @@ export async function GET(
          * are gated on whether the server is answering, not on whether a roster
          * arrived.
          */
-        const [kept, timeouts, lastLevels, pending] = await Promise.all([
-            wantsRoster && !live ? rememberedRoster(id).catch(() => null) : null,
-            wantsRoster ? readPlayerTimeouts(id).catch(() => []) : [],
-            // The level each of them was last seen on, for the rows of players
-            // who are not on right now.
-            wantsRoster ? rememberedLevels(id).catch(() => ({})) : {},
-            wantsRoster ? pendingFor(id).catch(() => []) : []
-        ]);
+        const kept = live ? null : read.remembered;
         const roster = live ?? kept?.roster ?? null;
         // When Polaris last watched each of them, for the rows the log no longer
         // reaches back to: it holds only the tail that was asked for and starts
@@ -167,7 +192,7 @@ export async function GET(
                 await drainQueue(server.ownerId, id, online).catch(() => null);
                 await sweepInventorySnapshots(server.ownerId, id, online).catch(() => 0);
             }
-            await sweepGameSchedules(server.ownerId, new Date(), {
+            await sweepWatchedGameSchedules(server.ownerId, {
                 only: id,
                 // What this poll already found out, silence included, so the
                 // sweep never asks the same container the same question twice.

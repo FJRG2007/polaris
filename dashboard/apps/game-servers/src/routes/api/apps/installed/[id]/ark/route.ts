@@ -6,7 +6,7 @@ import { applyPendingArkRules } from "../../../../../../lib/ark/settings-service
 import { readPlayerTimeouts } from "../../../../../../lib/player-timeout-service";
 import { readLastSeen } from "../../../../../../lib/games-activity-service";
 import type { ArkProfile } from "../../../../../../lib/ark/profile";
-import { sweepGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
+import { sweepWatchedGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
 import {
     applyAllowList,
     getArkStatus,
@@ -69,7 +69,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         // schedule and the Game servers page sweeps the ones it lists; neither
         // covers somebody sitting on this page with no cron configured, which is
         // exactly where "I set a schedule and nothing happened" comes from.
-        await sweepGameSchedules(server.ownerId, new Date(), {
+        await sweepWatchedGameSchedules(server.ownerId, {
             only: id,
             // What this poll already found out, silence included, so the sweep
             // never asks the same container the same question twice.

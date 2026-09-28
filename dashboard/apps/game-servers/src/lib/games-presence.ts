@@ -18,7 +18,7 @@
  * common case and nobody needs to be told about it.
  */
 
-import { sweepGameSchedules } from "./minecraft/schedule-service";
+import { sweepWatchedGameSchedules } from "./minecraft/schedule-service";
 import { listGameServerPresence, type ServerPresence } from "./games-service";
 
 /** How long after one reading before the next. Presence is the one thing on these
@@ -106,7 +106,7 @@ async function cycle(
         // instance with no cron configured as much as on one that has it. Silence
         // is passed on as silence: nought would be a server stopped for being
         // quiet when it was only unreachable.
-        await sweepGameSchedules(ownerId, new Date(), {
+        await sweepWatchedGameSchedules(ownerId, {
             // Narrowed to what was actually read: a sweep over the rest would have
             // to ask each of those servers who is on it, which is the cost this
             // whole file exists to avoid paying more than once.

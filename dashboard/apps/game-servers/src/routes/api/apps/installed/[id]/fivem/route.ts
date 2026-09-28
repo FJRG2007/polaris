@@ -3,7 +3,7 @@ import { gameServerFacts } from "../../../../../../lib/games-service";
 import { reachAdviceFor } from "../../../../../../lib/minecraft/reach";
 import { primaryIdentifier } from "../../../../../../lib/fivem/players";
 import { readLastSeen } from "../../../../../../lib/games-activity-service";
-import { sweepGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
+import { sweepWatchedGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
 import {
     applyFivemAccess,
     applyPendingSetup,
@@ -69,7 +69,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         // schedule and the Game servers page sweeps the ones it lists; neither
         // covers somebody sitting on this page with no cron configured, which is
         // exactly where "I set a schedule and nothing happened" comes from.
-        await sweepGameSchedules(server.ownerId, new Date(), {
+        await sweepWatchedGameSchedules(server.ownerId, {
             only: id,
             known: new Map([[id, status.answering ? status.players.length : null]])
         }).catch(() => undefined);

@@ -22,6 +22,7 @@ import { flushGameWorld } from "../games-flush";
 import { broadcastToMinecraft, getServerPlayers, runConsoleLine } from "./service";
 import { readPendingRestart } from "../games-restart";
 import { runDueRestart } from "../games-restart-service";
+import { gameServerCatalogIds } from "../game-catalog";
 import {
     CHECKED_AT_KEY,
     EMPTY_SINCE_KEY,
@@ -54,6 +55,21 @@ const COUNT_TIMEOUT_MS = 15_000;
 /** How often the note saying a sweep ran is worth rewriting. Well under the
  *  minute the cron runs on, so a schedule that is being followed always says so. */
 const CHECK_NOTE_EVERY_MS = 30_000;
+
+/**
+ * How often a screen somebody is watching may sweep.
+ *
+ * The screens sweep so that an instance with no cron still has schedules that
+ * fire, and they are read every few seconds - the presence watcher every three.
+ * Nothing a sweep does needs that: a window opens or closes on the minute, the
+ * cron itself runs once a minute, and the check note above is only rewritten
+ * every thirty seconds. So a watched screen sweeps at that rate and no faster;
+ * the cron is not throttled and neither is a caller that asks directly.
+ */
+const WATCHED_SWEEP_EVERY_MS = 30_000;
+
+/** When each audience last swept, by owner and the servers it was narrowed to. */
+const watchedSweeps = new Map<string, number>();
 
 /** Whether the note is old enough to be worth writing again. */
 function staleCheck(config: Record<string, unknown>, at: Date): boolean {
@@ -114,31 +130,49 @@ export async function sweepGameSchedules(
     options: SweepOptions = {}
 ): Promise<ScheduleSweep> {
     const { known, only } = options;
+    // Game servers only: a schedule and a booked restart are both theirs, and any
+    // other app's config is a row read to be thrown away.
     const installs = await prisma.installedApp.findMany({
         where: {
             ownerId,
             status: { not: "removed" },
             applicationId: { not: null },
+            catalogId: { in: gameServerCatalogIds() },
             ...(only ? { id: typeof only === "string" ? only : { in: [...only] } } : {})
         },
         select: { id: true, applicationId: true, config: true, catalogId: true }
     });
+    // What each one has to do is decided from its own config, so the ones with
+    // nothing to do are dropped before anything else is read, and the rest have
+    // their applications read in one query rather than one each.
+    const pending = installs
+        .map((install) => {
+            const config = readInstallConfig(install.config);
+            // A restart somebody booked for later rides on this walk. It is not
+            // part of the schedule and does not need one: a server with no
+            // schedule at all still has settings that only take effect when it
+            // comes back, and this is the pass that notices the last player has
+            // left.
+            return { install, config, schedule: readSchedule(config), waiting: readPendingRestart(config) };
+        })
+        .filter((entry) => entry.schedule.enabled || entry.waiting);
+    const desired =
+        pending.length === 0
+            ? new Map<string, string>()
+            : await prisma.application
+                  .findMany({
+                      where: { id: { in: pending.map((entry) => entry.install.applicationId as string) } },
+                      select: { id: true, desiredState: true }
+                  })
+                  .then((apps) => new Map(apps.map((app) => [app.id, app.desiredState])))
+                  .catch(() => new Map<string, string>());
     let started = 0;
     let stopped = 0;
     let restarted = 0;
-    for (const install of installs) {
-        const config = readInstallConfig(install.config);
-        const schedule = readSchedule(config);
-        // A restart somebody booked for later rides on this walk. It is not part of
-        // the schedule and does not need one: a server with no schedule at all
-        // still has settings that only take effect when it comes back, and this is
-        // the pass that notices the last player has left.
-        const waiting = readPendingRestart(config);
-        if (!schedule.enabled && !waiting) continue;
-        const app = await prisma.application
-            .findFirst({ where: { id: install.applicationId as string }, select: { desiredState: true } })
-            .catch(() => null);
-        if (!app) continue;
+    for (const { install, config, schedule, waiting } of pending) {
+        const desiredState = desired.get(install.applicationId as string);
+        if (desiredState === undefined) continue;
+        const app = { desiredState };
         const running = app.desiredState === "running";
 
         // Only a running server can be asked who is on it, and only a running
@@ -190,6 +224,29 @@ export async function sweepGameSchedules(
         await patchInstallConfig(install.id, { [EMPTY_SINCE_KEY]: null }).catch(() => undefined);
     }
     return { started, stopped, restarted };
+}
+
+/**
+ * The sweep a screen runs while somebody is watching it, at most once every
+ * `WATCHED_SWEEP_EVERY_MS` for the same owner and servers. Null when it was not
+ * this caller's turn.
+ */
+export async function sweepWatchedGameSchedules(
+    ownerId: string,
+    options: SweepOptions = {}
+): Promise<ScheduleSweep | null> {
+    const now = Date.now();
+    const only = options.only;
+    const key = `${ownerId}|${only === undefined ? "*" : typeof only === "string" ? only : [...only].sort().join(",")}`;
+    const last = watchedSweeps.get(key);
+    if (last !== undefined && now - last < WATCHED_SWEEP_EVERY_MS) return null;
+    // Taken before the sweep rather than after it, so two screens arriving at
+    // once do not both sweep.
+    watchedSweeps.set(key, now);
+    for (const [held, at] of watchedSweeps) {
+        if (now - at >= WATCHED_SWEEP_EVERY_MS && held !== key) watchedSweeps.delete(held);
+    }
+    return sweepGameSchedules(ownerId, new Date(now), options);
 }
 
 /**

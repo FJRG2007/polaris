@@ -29,9 +29,8 @@ vi.mock("@polaris-app/game-servers/src/lib/games-service", () => ({
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/schedule-service", () => ({
-    sweepGameSchedules: async (
+    sweepWatchedGameSchedules: async (
         _ownerId: string,
-        _at: Date,
         options: { only?: unknown; known?: ReadonlyMap<string, number | null> }
     ) => {
         sweeps.push({ only: options.only, known: options.known });

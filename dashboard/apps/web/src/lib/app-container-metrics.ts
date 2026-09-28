@@ -10,7 +10,7 @@
 
 import { HostdClient } from "@polaris/hostd-client";
 import { localDockerDriver } from "@/lib/docker-service";
-import { resolveLocalContainer } from "@/lib/container-files-service";
+import { localContainerOf, resolveLocalContainer, type ResolvedContainer } from "@/lib/container-files-service";
 import { parseContainerState, type ContainerState } from "@polaris/deploy";
 
 export interface AppContainerMetrics {
@@ -52,22 +52,41 @@ export async function readAppContainerState(applicationId: string, ownerId: stri
  */
 export async function readAppContainerRuntime(
     applicationId: string,
-    ownerId: string
+    ownerId: string,
+    /** The container, when the caller has already resolved it and checked the
+     *  owner - a game server's page has, and resolving it again is two more
+     *  queries on a read that runs every few seconds. */
+    resolved?: ResolvedContainer
 ): Promise<ContainerState | null> {
-    return inspectContainer(applicationId, ownerId).catch(() => null);
+    return containerName(applicationId, ownerId, resolved)
+        .then(inspectContainer)
+        .catch(() => null);
 }
 
-async function inspectContainer(applicationId: string, ownerId: string): Promise<ContainerState> {
-    const container = await resolveLocalContainer(applicationId, ownerId);
+async function containerName(
+    applicationId: string,
+    ownerId: string,
+    resolved: ResolvedContainer | undefined
+): Promise<string> {
+    return resolved ? localContainerOf(resolved) : resolveLocalContainer(applicationId, ownerId);
+}
+
+async function inspectContainer(container: string): Promise<ContainerState> {
     const inspect = await new HostdClient().dockerRequest("GET", `/containers/${encodeURIComponent(container)}/json`);
     return parseContainerState(inspect.status === 200 ? JSON.parse(inspect.body) : null);
 }
 
 /** Sample one app's container. Throws for an app that is not the owner's, and for
  *  a remote target - the daemon proxy only reaches the local engine. */
-export async function readAppContainerMetrics(applicationId: string, ownerId: string): Promise<AppContainerMetrics> {
-    const container = await resolveLocalContainer(applicationId, ownerId);
-    const state = await inspectContainer(applicationId, ownerId);
+export async function readAppContainerMetrics(
+    applicationId: string,
+    ownerId: string,
+    resolved?: ResolvedContainer
+): Promise<AppContainerMetrics> {
+    // Resolved once and inspected by name: resolving it a second time for the
+    // inspect was the same two queries again for the same answer.
+    const container = await containerName(applicationId, ownerId, resolved);
+    const state = await inspectContainer(container);
     if (state.status !== "running") {
         return {
             state: state.status,
@@ -100,7 +119,8 @@ export async function readAppContainerMetrics(applicationId: string, ownerId: st
  *  missing sample is not an error worth failing the page over. */
 export async function readAppContainerMetricsOrNull(
     applicationId: string,
-    ownerId: string
+    ownerId: string,
+    resolved?: ResolvedContainer
 ): Promise<AppContainerMetrics | null> {
-    return readAppContainerMetrics(applicationId, ownerId).catch(() => null);
+    return readAppContainerMetrics(applicationId, ownerId, resolved).catch(() => null);
 }

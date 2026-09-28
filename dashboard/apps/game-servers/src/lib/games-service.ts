@@ -15,6 +15,7 @@ import { freemem, totalmem } from "node:os";
 import { RELEASE_KEY } from "./games-create";
 import type { CrashLoop } from "./crash-loop";
 import { readServerUptime } from "./games-uptime";
+import { gameServerCatalogIds } from "./game-catalog";
 import { hasCrossplay } from "./minecraft/blueprints";
 import { drainQueue } from "./minecraft/queue-service";
 import { gameServerAddress } from "./minecraft/address";
@@ -36,7 +37,13 @@ import { syncMinecraftRoutes } from "./minecraft/router-service";
 import { enforcePlayerAddresses } from "./minecraft/player-access";
 import { PROJECTS_KEY, SOFTWARE_KEY } from "./minecraft/join-guard";
 import { sweepInventorySnapshots } from "./minecraft/inventory-service";
-import { applyFirewallBans, editionOf, getServerPlayers } from "./minecraft/service";
+import {
+    applyFirewallBans,
+    editionOf,
+    getServerPlayers,
+    resolveInstalls,
+    type MinecraftInstall
+} from "./minecraft/service";
 import {
     gamePorts,
     probeListening,
@@ -203,7 +210,8 @@ export async function gameServerFacts(
     ownerId: string,
     installedAppId: string
 ): Promise<GameServerFacts | null> {
-    const servers = await listGameServerFacts(ownerId, [installedAppId]);
+    // Asked for this one alone: the rest of the list would be read to be thrown away.
+    const servers = await listGameServerFacts(ownerId, [installedAppId], [installedAppId]);
     return servers.find((server) => server.id === installedAppId) ?? null;
 }
 
@@ -216,18 +224,29 @@ function presentIds(values: readonly (string | null)[]): string[] {
  *  everything Polaris already knows about them, newest first. */
 export async function listGameServerFacts(
     ownerId: string,
-    alsoIds: readonly string[] = []
+    alsoIds: readonly string[] = [],
+    /** Only these servers, when the caller wants no others. */
+    only?: readonly string[]
 ): Promise<GameServerFacts[]> {
     const mine = { ownerId, status: { not: "removed" } };
-    const installs = (
-        await prisma.installedApp.findMany({
-            where:
-                alsoIds.length > 0
-                    ? { OR: [mine, { id: { in: [...alsoIds] }, status: { not: "removed" } }] }
-                    : mine,
-            orderBy: { createdAt: "desc" }
-        })
-    ).filter((install) => isGameServerApp(install.catalogId));
+    const installs = await prisma.installedApp.findMany({
+        where: {
+            ...(alsoIds.length > 0
+                ? { OR: [mine, { id: { in: [...alsoIds] }, status: { not: "removed" } }] }
+                : mine),
+            catalogId: { in: gameServerCatalogIds() },
+            ...(only ? { id: { in: [...only] } } : {})
+        },
+        select: {
+            id: true,
+            name: true,
+            catalogId: true,
+            applicationId: true,
+            targetId: true,
+            config: true
+        },
+        orderBy: { createdAt: "desc" }
+    });
     if (installs.length === 0) return [];
 
     const [targets, apps] = await Promise.all([
@@ -413,12 +432,28 @@ export async function listGameServerPresence(
      *  not be the reason the other five are asked every few seconds. */
     only?: readonly string[]
 ): Promise<ServerPresence[]> {
-    const servers = await listGameServerFacts(ownerId, alsoIds);
-    const wanted = only ? servers.filter((server) => only.includes(server.id)) : servers;
-    return Promise.all(wanted.map((server) => readPresence(ownerId, server)));
+    const servers = await listGameServerFacts(ownerId, alsoIds, only);
+    // Every Minecraft server that will be asked is resolved in one pass, rather
+    // than each resolving itself - this runs every few seconds for as long as
+    // anybody is watching. One that does not resolve here resolves on its own,
+    // which is what produces the sentence saying why.
+    const minecraft = await resolveInstalls(
+        ownerId,
+        servers
+            .filter((server) => server.running && server.applicationId && server.game === "minecraft")
+            .map((server) => server.id)
+    ).catch(() => new Map<string, MinecraftInstall>());
+    return Promise.all(
+        servers.map((server) => readPresence(ownerId, server, minecraft.get(server.id)))
+    );
 }
 
-async function readPresence(ownerId: string, server: GameServerFacts): Promise<ServerPresence> {
+async function readPresence(
+    ownerId: string,
+    server: GameServerFacts,
+    /** The Minecraft install, already resolved along with the rest. */
+    resolved?: MinecraftInstall
+): Promise<ServerPresence> {
     if (!server.running || !server.applicationId) {
         return {
             id: server.id,
@@ -503,7 +538,7 @@ async function readPresence(ownerId: string, server: GameServerFacts): Promise<S
             crashLoop: ark.crashLoop
         };
     }
-    const live = await getServerPlayers(ownerId, server.id).catch((caught: unknown) => ({
+    const live = await getServerPlayers(ownerId, server.id, resolved).catch((caught: unknown) => ({
         answering: false,
         containerRunning: null,
         players: { online: 0, max: 0, players: [] },
