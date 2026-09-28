@@ -34,11 +34,11 @@ a regression. Entries are sorted open/regressed first, then by severity.
 | VULN-0029 | Object as server group id deletes other owners' memberships and firewall rules | Medium | Fixed | dashboard/apps/web/src/app/(app)/apps/servers/actions.ts | CWE-943 | 2026-09-28 |
 | VULN-0002 | UniFi UNAS Home Assistant add-on does not verify the NAS SSH host key | Medium | Fixed | plugins/unifi-unas/homeassistant/custom_components/unifi_unas/ssh_manager.py:121 | CWE-295 | 2026-09-28 |
 | VULN-0004 | Private GitHub repositories can be built through the instance GitHub App by any deploy member | Medium | Fixed | dashboard/apps/web/src/lib/github-access.ts | CWE-863 | 2026-09-28 |
+| VULN-0001 | SSRF via DNS rebinding (TOCTOU) in safe-fetch link unfurl | Medium | Fixed | dashboard/apps/web/src/lib/safe-fetch.ts:118 | CWE-918 | 2026-08-16 |
 | VULN-0030 | Vault login saved for an IP address offered and filled on other IP addresses | Low | Fixed | dashboard/packages/core/src/vault-uris.ts:125 | CWE-697 | 2026-09-28 |
 | VULN-0031 | Vault item-use history readable across the instance via an object item id | Low | Fixed | dashboard/apps/web/src/lib/vault/access-log.ts | CWE-943 | 2026-09-28 |
 | VULN-0032 | Server metrics answered from cache before the ownership check | Low | Fixed | dashboard/apps/web/src/lib/server-metrics-service.ts | CWE-285 | 2026-09-28 |
 | VULN-0033 | Drive lock-password rate limit bypassed by respelling the lock id | Low | Fixed | dashboard/apps/web/src/app/(app)/drive/access-actions.ts | CWE-307 | 2026-09-28 |
 | VULN-0034 | Messaging bridge starts with an empty token and compares it in non-constant time | Low | Fixed | dashboard/services/messaging-bridge/src/server.ts:36 | CWE-306 | 2026-09-28 |
 | VULN-0035 | Inbox ingest key compared in non-constant time | Low | Fixed | dashboard/apps/web/src/app/api/inbox/ingest/route.ts | CWE-208 | 2026-09-28 |
-| VULN-0001 | SSRF via DNS rebinding (TOCTOU) in safe-fetch link unfurl | Medium | Fixed | dashboard/apps/web/src/lib/safe-fetch.ts:118 | CWE-918 | 2026-08-16 |
 | VULN-0005 | Drive lock unlock cookie never expires and survives a password change | Low | Fixed | dashboard/apps/web/src/lib/access-lock-service.ts:125 | CWE-613 | 2026-09-28 |
