@@ -39,6 +39,7 @@ import { runDesiredStatePass } from "@/lib/deploy/desired-state";
 import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
+import { pollSpotify } from "@/lib/presence-activity/spotify-poll";
 import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
@@ -340,6 +341,19 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // Leased, so two processes never both stop or start the same container.
         leaseMs: 2 * MINUTE,
         run: () => runSleepPass()
+    },
+    {
+        key: "activity-spotify",
+        // Every fifteen seconds, and almost every pass asks nothing: each linked
+        // account carries its own next moment (a track's end, at most thirty
+        // seconds on, backing off to five minutes when nothing plays), and only
+        // accounts that are here with sharing on - or listening along - are
+        // asked at all. With no Spotify app connected it reads one row.
+        everyMs: 15_000,
+        // Leased: two runners would ask Spotify everything twice, and put every
+        // listen-along song on twice.
+        leaseMs: 2 * MINUTE,
+        run: () => pollSpotify()
     },
     {
         key: "service-desired-state",

@@ -326,6 +326,8 @@ model User {
     presenceSchedules   PresenceSchedule[]
     activities          UserActivity[]
     activitySettings    UserActivitySettings?
+    listeningAlong      SpotifyListenAlong?  @relation("ListenAlongListener")
+    listenedAlongWith   SpotifyListenAlong[] @relation("ListenAlongHost")
     mailAccounts        MailAccount[]
     mailLabels          MailLabel[]
     mailUploads         MailUpload[]
@@ -8796,6 +8798,26 @@ model UserActivity {
 
     @@id([userId, source])
     @@index([expiresAt])
+}
+
+// One account's Spotify following another's: "Listen along".
+//
+// One row per listener, because somebody can follow one person at a time. The
+// track last put on the listener's device is kept so the next read of the host
+// can tell a new song from the same one still playing, and the moment it was
+// put there so the listener's own next read does not mistake the gap between
+// two songs for them taking their Spotify back. Empty while the host is paused.
+model SpotifyListenAlong {
+    listenerId String   @id @db.Uuid
+    hostId     String   @db.Uuid
+    trackId    String   @default("")
+    syncedAt   DateTime @default(now())
+    startedAt  DateTime @default(now())
+
+    listener User @relation("ListenAlongListener", fields: [listenerId], references: [id], onDelete: Cascade)
+    host     User @relation("ListenAlongHost", fields: [hostId], references: [id], onDelete: Cascade)
+
+    @@index([hostId])
 }
 
 // Whether somebody shares what they are doing at all, and from where.

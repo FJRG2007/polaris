@@ -202,6 +202,20 @@ export async function reportGame(
     return { shown: true };
 }
 
+/** Which of these people let this reader see one source of theirs at all,
+ *  whether or not anything is on it right now. */
+export async function sourceSharedWith(
+    viewer: { id: string; isAdmin: boolean },
+    ids: readonly string[],
+    source: core.ActivitySource
+): Promise<Set<string>> {
+    const allowed = [...(await allowedBy(viewer, "activity", ids))];
+    const settings = await activitySettingsFor(allowed);
+    return new Set(
+        allowed.filter((id) => core.activitySourceOn(settings.get(id) ?? core.DEFAULT_ACTIVITY_SETTINGS, source))
+    );
+}
+
 /** The order cards are drawn in: a game before music, as people expect. */
 const ORDER: Record<core.ActivitySource, number> = { minecraft: 0, game: 1, spotify: 2 };
 

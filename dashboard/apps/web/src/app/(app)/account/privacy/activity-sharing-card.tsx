@@ -14,6 +14,7 @@
  * under a column of switches is a step people forget.
  */
 
+import Link from "next/link";
 import * as core from "@polaris/core";
 import { Plus, X } from "lucide-react";
 import { useRef, useState } from "react";
@@ -21,6 +22,9 @@ import { runAction } from "@/lib/run-action";
 import { saveActivitySettingsAction } from "./actions";
 import { useDesktopBridge } from "@/components/desktop-app";
 import { Button, Card, CardBody, Input, Switch } from "@polaris/ui";
+
+/** Whether Spotify can be shown for this account, and what is missing if not. */
+export type SpotifyReadiness = "linked" | "unlinked" | "unavailable";
 
 /** A source's row: what it is and what it needs to work. */
 const SOURCES: readonly { id: "games" | "minecraft"; label: string; hint: string }[] = [
@@ -45,11 +49,14 @@ function same(a: core.ActivitySettings, b: core.ActivitySettings): boolean {
 
 export function ActivitySharingCard({
     settings,
-    seenGames
+    seenGames,
+    spotify
 }: {
     settings: core.ActivitySettings;
     /** Games the desktop app has seen, newest first. */
     seenGames: readonly core.SeenGame[];
+    /** Whether this account has a Spotify linked, or could link one here. */
+    spotify: SpotifyReadiness;
 }) {
     const [saved, setSaved] = useState(settings);
     const [pending, setPending] = useState<readonly { id: number; change: Change }[]>([]);
@@ -100,7 +107,7 @@ export function ActivitySharingCard({
                 <div>
                     <h2 className="text-sm font-medium">Activity</h2>
                     <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
-                        What you are playing, shown beside your name. Only people who can see that
+                        What you are playing or listening to, shown beside your name. Only people who can see that
                         you are here see it, and nobody sees it while you appear offline.
                     </p>
                 </div>
@@ -120,6 +127,35 @@ export function ActivitySharingCard({
                 </label>
 
                 <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
+                    <li className="flex items-center gap-3 px-3 py-2">
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-[0.8125rem]">Spotify</span>
+                            <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                                {spotify === "linked" ? (
+                                    "The song your linked Spotify is playing, while you are here. People who see it can listen along."
+                                ) : spotify === "unlinked" ? (
+                                    <>
+                                        Link your Spotify under{" "}
+                                        <Link
+                                            href="/account/connections"
+                                            className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                                        >
+                                            Connected accounts
+                                        </Link>{" "}
+                                        and the song you are playing shows here.
+                                    </>
+                                ) : (
+                                    "Not available yet: whoever runs this Polaris has not connected Spotify to it."
+                                )}
+                            </span>
+                        </span>
+                        <Switch
+                            checked={!off && draft.spotify}
+                            disabled={off}
+                            onChange={(on) => commit((state) => ({ ...state, spotify: on }))}
+                            aria-label="Spotify"
+                        />
+                    </li>
                     {SOURCES.map((source) => (
                         <li key={source.id} className="flex items-center gap-3 px-3 py-2">
                             <span className="min-w-0 flex-1">
