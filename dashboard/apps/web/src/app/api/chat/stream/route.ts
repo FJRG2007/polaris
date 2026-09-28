@@ -198,8 +198,15 @@ export async function GET(request: Request): Promise<Response> {
                     return;
                 }
 
-                // Their own writing already settled in the tab that did it.
-                if (change.actorId === actor.id) return;
+                // Their own typing and their own call are theirs already. What
+                // they posted is not: only the tab that sent a message settled
+                // it, and a line the server wrote in their name - "you started a
+                // call", "you added Ana", a scheduled message going out - was
+                // settled nowhere, so it appeared for everybody except them until
+                // they reloaded. Nor had their other devices seen it. The tab
+                // that sent it asks for what is newer than what it holds, which
+                // the send already brought, so it costs that tab one short read.
+                if (change.actorId === actor.id && change.kind !== "posted") return;
 
                 // Everything left is about one conversation and names it.
                 const channelId = change.channelId;
