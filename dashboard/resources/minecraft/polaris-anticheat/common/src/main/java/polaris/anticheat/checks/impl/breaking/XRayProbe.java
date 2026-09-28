@@ -2,6 +2,7 @@ package polaris.anticheat.checks.impl.breaking;
 
 import polaris.anticheat.antixray.AntiXray;
 import polaris.anticheat.api.storage.verbose.Verbose;
+import polaris.anticheat.bridge.PolarisTraps;
 import polaris.anticheat.checks.Check;
 import polaris.anticheat.checks.CheckData;
 import polaris.anticheat.checks.type.BlockBreakListener;
@@ -48,7 +49,7 @@ public class XRayProbe extends Check implements BlockBreakListener {
         if (!far && !isClosedIn(engine, at)) return;
 
         // START, then CANCEL or FINISH, at one position is one probe, not two.
-        long position = ((long) (at.x & 0x3FFFFFF) << 38) | ((long) (at.z & 0x3FFFFFF) << 12) | (at.y & 0xFFF);
+        long position = PolarisTraps.pack(at.x, at.y, at.z);
         if (position == lastPosition) return;
         lastPosition = position;
 
