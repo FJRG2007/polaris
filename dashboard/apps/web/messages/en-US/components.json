@@ -574,5 +574,8 @@
                 "summary": "Publishes Polaris without a port forward."
             }
         }
+    },
+    "messageTime": {
+        "yesterdayAt": "Yesterday at {time}"
     }
 }

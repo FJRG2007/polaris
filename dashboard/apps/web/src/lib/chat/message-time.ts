@@ -18,14 +18,24 @@ function dayNumber(date: Date, timeZone: string): number {
     return Date.UTC(wall.year, wall.month - 1, wall.day) / 86_400_000;
 }
 
-/** "14:05", "Yesterday at 14:05", or "31/07/2026 14:05". "-" for no date. */
-export function messageStamp(format: DisplayFormat, iso: string, now: Date = new Date()): string {
+/**
+ * "14:05", "Yesterday at 14:05", or "31/07/2026 14:05". "-" for no date.
+ *
+ * `yesterdayAt` phrases the middle case in the reader's language - "Ayer a las
+ * 14:05" - from the catalog the caller holds.
+ */
+export function messageStamp(
+    format: DisplayFormat,
+    iso: string,
+    yesterdayAt: (time: string) => string,
+    now: Date = new Date()
+): string {
     const sent = new Date(iso);
     if (Number.isNaN(sent.getTime())) return "-";
     const zone = format.preferences.timeZone;
     const days = dayNumber(now, zone) - dayNumber(sent, zone);
     const time = format.time(sent);
     if (days === 0) return time;
-    if (days === 1) return `Yesterday at ${time}`;
+    if (days === 1) return yesterdayAt(time);
     return format.dateTime(sent);
 }

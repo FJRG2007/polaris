@@ -574,5 +574,8 @@
                 "summary": "Publica Polaris sin redirigir puertos."
             }
         }
+    },
+    "messageTime": {
+        "yesterdayAt": "Ayer a las {time}"
     }
 }

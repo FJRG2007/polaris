@@ -30,9 +30,18 @@ export function relativeTime(
     const at = Date.parse(iso);
     if (Number.isNaN(at)) return absent;
     const elapsed = now - at;
-    if (elapsed < MINUTE) return "just now";
-    if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m ago`;
-    if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h ago`;
-    if (elapsed <= WEEK) return `${Math.floor(elapsed / DAY)}d ago`;
+    // Phrased by Intl in the reader's language: "3m ago" in English, "hace 3
+    // min" in Spanish. Always a number, so a day is "1d ago" rather than
+    // "yesterday" - the same shape at every step.
+    const phrase = new Intl.RelativeTimeFormat(format.preferences.language, {
+        numeric: "always",
+        style: "narrow"
+    });
+    if (elapsed < MINUTE) {
+        return new Intl.RelativeTimeFormat(format.preferences.language, { numeric: "auto" }).format(0, "second");
+    }
+    if (elapsed < HOUR) return phrase.format(-Math.floor(elapsed / MINUTE), "minute");
+    if (elapsed < DAY) return phrase.format(-Math.floor(elapsed / HOUR), "hour");
+    if (elapsed <= WEEK) return phrase.format(-Math.floor(elapsed / DAY), "day");
     return format.date(iso);
 }

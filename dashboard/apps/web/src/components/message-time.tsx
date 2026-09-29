@@ -12,6 +12,7 @@
 import { useSyncExternalStore } from "react";
 import { useDisplayFormat } from "./display-format";
 import { messageStamp } from "@/lib/chat/message-time";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** How often the day is looked at again. Coarse on purpose: a label a few
  *  minutes late at midnight is invisible, a re-render of every line each second
@@ -39,6 +40,7 @@ function subscribe(listener: () => void): () => void {
 
 export function MessageTime({ iso, className }: { iso: string; className?: string }) {
     const format = useDisplayFormat();
+    const t = useTranslations("components");
     // Read only to re-render on each tick; the stamp takes the time itself.
     useSyncExternalStore(
         subscribe,
@@ -53,7 +55,7 @@ export function MessageTime({ iso, className }: { iso: string; className?: strin
             // The server and the browser can straddle midnight.
             suppressHydrationWarning
         >
-            {messageStamp(format, iso)}
+            {messageStamp(format, iso, (time) => t("messageTime.yesterdayAt", { time }))}
         </time>
     );
 }
