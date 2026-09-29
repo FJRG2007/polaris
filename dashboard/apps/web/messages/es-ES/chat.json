@@ -25,7 +25,7 @@
                 "help": "El filtro que ha conectado tu administrador."
             },
             "off": {
-                "label": "Desactivado",
+                "label": "No",
                 "help": "Envía exactamente lo que oye el micrófono."
             }
         },
@@ -43,24 +43,24 @@
                 "help": "Sustituye la habitación por una imagen tuya. Se queda en este ordenador."
             },
             "off": {
-                "label": "Desactivado",
+                "label": "No",
                 "help": "Envía la habitación tal como la ve la cámara."
             }
         },
         "scenes": {
-            "meetingRoom": "Sala de reuniones",
-            "desk": "Escritorio junto a una ventana",
+            "meetingRoom": "Sala reunión",
+            "desk": "Mesa junto a ventana",
             "warmHallway": "Luces cálidas",
             "library": "Biblioteca",
             "shelvesWindow": "Sala de lectura",
             "shelvesPlants": "Estanterías y plantas",
-            "gradientDusk": "Atardecer",
+            "gradientDusk": "Ocaso",
             "gradientAmber": "Ámbar",
             "gradientWaves": "Ondas"
         },
         "inputModes": {
             "open": {
-                "label": "Siempre activo",
+                "label": "Siempre",
                 "note": "Tu micrófono está abierto hasta que lo silencies. Es lo que hace Polaris salvo que digas otra cosa."
             },
             "activity": {
@@ -68,7 +68,7 @@
                 "note": "Tu micrófono se abre cuando hablas y se cierra cuando paras."
             },
             "ptt": {
-                "label": "Pulsar para hablar",
+                "label": "Pulsa y habla",
                 "note": "Tu micrófono está cerrado salvo mientras mantienes pulsada una tecla."
             }
         }

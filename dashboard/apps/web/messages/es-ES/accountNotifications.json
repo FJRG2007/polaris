@@ -10,7 +10,7 @@
         "delivery": "Entrega"
     },
     "history": {
-        "allEvents": "Todos los eventos",
+        "allEvents": "Todos",
         "search": "Buscar notificaciones",
         "filterEvent": "Filtrar por evento",
         "filterState": "Filtrar por estado",
@@ -22,23 +22,23 @@
             "action": "Requiere acción"
         },
         "orders": {
-            "newest": "Más recientes primero",
-            "oldest": "Más antiguas primero",
-            "unread": "Sin leer primero"
+            "newest": "Recientes",
+            "oldest": "Antiguas",
+            "unread": "No leídas"
         },
-        "markAllRead": "Marcar todo como leído",
+        "markAllRead": "Todas leídas",
         "clearAll": "Borrar todo",
         "selected": "{count, plural, one {# seleccionada} other {# seleccionadas}}",
-        "markRead": "Marcar como leídas",
+        "markRead": "Leídas",
         "delete": "Eliminar",
         "clearSelection": "Quitar la selección",
         "noMatch": "Aquí no hay nada que coincida.",
         "empty": "No tienes notificaciones.",
-        "selectAll": "Seleccionar todo lo que aparece",
+        "selectAll": "Seleccionar todo lo listado",
         "count": "{count, plural, one {# notificación} other {# notificaciones}}",
-        "loadOlder": "Cargar anteriores",
+        "loadOlder": "Ver más",
         "selectRow": "Seleccionar {title}",
-        "markAsRead": "Marcar como leída"
+        "markAsRead": "Marcar leída"
     },
     "errors": {
         "notSaved": "No se ha podido guardar.",
@@ -57,7 +57,7 @@
         "choices": {
             "auto": "Directos",
             "all": "Todos",
-            "off": "Ninguno"
+            "off": "No"
         },
         "hints": {
             "auto": "Mensajes directos y grupos de hasta {size} personas",
@@ -68,7 +68,7 @@
         "connectedAccounts": "Cuentas conectadas"
     },
     "browser": {
-        "title": "Notificaciones del navegador",
+        "title": "Avisos del navegador",
         "standing": {
             "app": "La app de Polaris las muestra por sí misma. No hay nada que permitir.",
             "granted": "Polaris puede avisarte de esto mientras estás en otra pestaña.",
@@ -80,7 +80,7 @@
         "testSent": "Enviado. Si no ha aparecido nada, el sistema lo está reteniendo: revisa sus propios ajustes de notificaciones.",
         "testRefused": "Este navegador no ha querido mostrarlo.",
         "allowed": "Permitidas",
-        "on": "Activadas",
+        "on": "Sí",
         "blocked": "Bloqueadas",
         "allow": "Permitir",
         "showMe": "Enséñame una",
@@ -112,11 +112,11 @@
         "label": "Reproducir un sonido cuando llega una notificación",
         "volumeNotSaved": "No se ha podido guardar el volumen. Vuelve a intentarlo.",
         "volume": "Volumen",
-        "volumeLabel": "Volumen del sonido",
+        "volumeLabel": "Volumen",
         "volumeHint": "Para todos los sonidos de Polaris: avisos, mensajes y llamadas. Se guarda en tu cuenta."
     },
     "tabIcon": {
-        "title": "Icono de la pestaña",
+        "title": "Icono",
         "label": "Qué muestra el icono de la pestaña cuando hay algo pendiente",
         "styles": {
             "count": {
@@ -134,7 +134,7 @@
         }
     },
     "rules": {
-        "muted": "Silenciado",
+        "muted": "Silencio",
         "inApp": "En la app",
         "securityAlways": "Los avisos de seguridad siempre aparecen en Polaris",
         "email": "Correo",
@@ -149,26 +149,26 @@
         "working": "Funciona",
         "switchOff": "Desactivar",
         "switchOn": "Activar",
-        "test": "Enviar una prueba",
+        "test": "Probar",
         "remove": "Quitar",
         "smsNotReady": "Los mensajes de texto no se enviarán hasta que haya un remitente de SMS conectado en <link>Canales</link>.",
         "testSent": "Aviso de prueba enviado.",
         "lastUsed": "Último uso {time}",
-        "checkForm": "Revisa el formulario",
+        "checkForm": "Revisa los datos",
         "dialog": {
             "title": "Añadir un destino",
             "description": "Un sitio al que pueden ir los avisos. Dirige eventos a él cuando lo hayas añadido.",
             "kind": "Tipo",
             "webhook": "Webhook (Discord, Slack, el tuyo propio)",
-            "sms": "Mensaje de texto",
+            "sms": "SMS",
             "name": "Nombre",
             "phonePlaceholder": "Mi móvil",
-            "webhookPlaceholder": "Canal de operaciones",
-            "url": "URL del webhook",
+            "webhookPlaceholder": "Canal de ops",
+            "url": "URL webhook",
             "urlHint": "Discord, Slack, Teams, o un bot de Telegram como {example}. Cualquiera con esta URL puede publicar en el canal, así que se guarda cifrada y no se vuelve a mostrar.",
             "format": "Formato",
-            "detect": "Detectar a partir de la URL",
-            "rawJson": "JSON sin formato",
+            "detect": "Detectar por la URL",
+            "rawJson": "JSON puro",
             "number": "Número",
             "numberHint": "En formato internacional, con el prefijo del país."
         }
@@ -192,7 +192,7 @@
     },
     "events": {
         "deployFailed": {
-            "label": "Despliegue fallido",
+            "label": "Despliegue falló",
             "description": "Una compilación o un despliegue de un servicio o una base de datos no ha arrancado."
         },
         "deploySucceeded": {
@@ -200,11 +200,11 @@
             "description": "Un servicio o una base de datos ha terminado de desplegarse y está funcionando."
         },
         "cronFailed": {
-            "label": "Ha fallado una tarea programada",
+            "label": "Falló una tarea programada",
             "description": "El comando programado de un servicio falló en su último intento o se quedó sin tiempo."
         },
         "domainDown": {
-            "label": "Un dominio ha dejado de funcionar",
+            "label": "Un dominio dejó de servir",
             "description": "Un dominio que apunta a uno de tus servicios ha dejado de responder."
         },
         "domainUp": {
@@ -216,15 +216,15 @@
             "description": "Lo que ha gastado este mes una organización que gestionas ha llegado al 80 % de su presupuesto o lo ha superado."
         },
         "tasksAssigned": {
-            "label": "Te han asignado una tarea",
+            "label": "Tarea asignada",
             "description": "Alguien, o una regla, ha puesto una tarea a tu nombre."
         },
         "tasksShared": {
-            "label": "Te han enviado una tarea",
+            "label": "Te enviaron una tarea",
             "description": "Alguien te ha enviado una tarea para que la veas."
         },
         "tasksComment": {
-            "label": "Comentario sobre tu trabajo",
+            "label": "Comentan tu trabajo",
             "description": "Un comentario en una tarea que tienes asignada o que sigues."
         },
         "tasksMentioned": {
@@ -232,11 +232,11 @@
             "description": "Alguien ha escrito tu nombre en una tarea, un comentario o una página."
         },
         "tasksDue": {
-            "label": "Recordatorio de tarea",
+            "label": "Aviso de tarea",
             "description": "Un recordatorio que pusiste en una tarea, y el trabajo que vence hoy."
         },
         "watchAlarm": {
-            "label": "Alarma disparada",
+            "label": "Alarma activa",
             "description": "Un servicio, dominio o recurso vigilado ha incumplido su condición."
         },
         "watchOk": {
@@ -244,7 +244,7 @@
             "description": "Un objetivo vigilado vuelve a cumplir su condición."
         },
         "accountSignin": {
-            "label": "Inicio de sesión pendiente de aprobación",
+            "label": "Acceso por aprobar",
             "description": "Alguien ha iniciado sesión en tu cuenta y necesita tu aprobación."
         },
         "accountRecovery": {
@@ -256,7 +256,7 @@
             "description": "Se ha iniciado sesión en tu cuenta, y desde dónde."
         },
         "accountSessionClosed": {
-            "label": "Ha terminado una sesión",
+            "label": "Sesión terminada",
             "description": "Se ha cerrado la sesión de un dispositivo, porque lo hiciste tú o por otro motivo."
         },
         "accountSessionCompromised": {
@@ -272,11 +272,11 @@
             "description": "Tu dirección pertenece a un servicio con el que Polaris puede iniciar tu sesión, y vincularla demostraría la dirección y te daría una forma de entrar que no es una contraseña."
         },
         "accountFriend": {
-            "label": "Solicitudes de amistad",
+            "label": "Amistades",
             "description": "Alguien ha pedido que le añadas, o ha respondido a una solicitud que enviaste."
         },
         "chatCallMissed": {
-            "label": "Llamadas perdidas",
+            "label": "Llamada perdida",
             "description": "Alguien te ha llamado y nadie ha contestado."
         },
         "accountOrgInvite": {
@@ -284,7 +284,7 @@
             "description": "Te han invitado a una organización, o alguien ha aceptado la tuya."
         },
         "accountSecurity": {
-            "label": "Ha cambiado la seguridad de la cuenta",
+            "label": "Cambió la seguridad",
             "description": "Ha cambiado una contraseña, un segundo factor, una llave de acceso, una clave o una regla de inicio de sesión."
         },
         "accountConnectionExpired": {
@@ -300,7 +300,7 @@
             "description": "Una clave a la que pusiste fecha de fin caduca esta semana."
         },
         "accountAiKeyExpired": {
-            "label": "Ha caducado una clave de proveedor de IA",
+            "label": "Caducó una clave de IA",
             "description": "Una clave ha llegado a su fecha de fin y ya no la usa nada."
         },
         "driveDropPointReceived": {
@@ -312,7 +312,7 @@
             "description": "Se ha marcado un archivo enviado a uno de tus puntos de entrega."
         },
         "scanError": {
-            "label": "No se ha podido analizar una subida",
+            "label": "No se analizó una subida",
             "description": "El analizador no terminó. El archivo se ha conservado."
         },
         "placesSighting": {
@@ -332,15 +332,15 @@
             "description": "Una cámara se ha quedado en silencio, o ha vuelto después de estarlo."
         },
         "serverSpace": {
-            "label": "Un servidor se está quedando sin espacio",
+            "label": "Un servidor se queda sin espacio",
             "description": "Polaris ha liberado todo lo que no usaba nada y el disco sigue casi lleno."
         },
         "mailserverInbound": {
-            "label": "Un correo ha coincidido con una regla",
+            "label": "Correo según regla",
             "description": "Ha llegado un mensaje a un servidor de correo que gestionas y ha coincidido con una de sus reglas."
         },
         "mailserverAttention": {
-            "label": "Un servidor de correo necesita atención",
+            "label": "Un servidor de correo falla",
             "description": "Un servidor de correo que gestionas ha dejado de responder, o vuelve a responder."
         },
         "mailAccountRefused": {
@@ -364,7 +364,7 @@
             "description": "Algo fuera de Polaris impide que se llegue a tus servicios."
         },
         "networkAddress": {
-            "label": "Una dirección ha dejado de responder",
+            "label": "Una dirección no responde",
             "description": "Una de las direcciones en las que se llega a este Polaris se ha caído, o ha vuelto."
         },
         "integrationAttention": {
@@ -372,17 +372,17 @@
             "description": "Un servicio en el que alguien intentó conectar una cuenta ha rechazado la autorización."
         },
         "systemUpdate": {
-            "label": "Actualización disponible",
+            "label": "Hay actualización",
             "description": "Se ha publicado una nueva compilación de Polaris lista para instalar."
         },
         "systemUpdated": {
-            "label": "Actualización instalada automáticamente",
+            "label": "Actualizado automáticamente",
             "description": "Se ha ejecutado una actualización programada o automática, y cómo ha ido."
         }
     },
     "groups": {
-        "deploy": "Despliegues",
-        "watch": "Vigilancia",
+        "deploy": "Deploy",
+        "watch": "Watch",
         "tasks": "Tareas",
         "security": "Seguridad",
         "drive": "Drive",

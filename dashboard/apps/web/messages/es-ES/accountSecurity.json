@@ -11,10 +11,10 @@
         "saved": "Guardado."
     },
     "status": {
-        "on": "Activado",
-        "off": "Desactivado",
-        "set": "Configurado",
-        "notSet": "Sin configurar"
+        "on": "Sí",
+        "off": "No",
+        "set": "Activo",
+        "notSet": "Sin poner"
     },
     "duration": {
         "minutes": "{count, plural, one {# minuto} other {# minutos}}",
@@ -26,11 +26,11 @@
     },
     "view": {
         "change": "Cambiar",
-        "update": "Actualizar",
-        "setUp": "Configurar",
+        "update": "Cambiar",
+        "setUp": "Preparar",
         "turnOff": "Desactivar",
         "newDevice": {
-            "title": "Este dispositivo todavía es nuevo aquí",
+            "title": "Este equipo aún es nuevo aquí",
             "hint": "Usa un dispositivo desde el que ya hayas iniciado sesión, o espera. Cerrar sesión desde aquí sigue funcionando."
         },
         "password": {
@@ -43,18 +43,18 @@
             "description": "Un código temporal de tu móvil que se pide después de la contraseña."
         },
         "pin": {
-            "title": "PIN de desbloqueo rápido",
+            "title": "PIN rápido",
             "description": "Vuelve a abrir el panel bloqueado y confirma los inicios de sesión que permitas desde aquí.",
-            "remove": "Quitar el PIN de desbloqueo rápido",
-            "set": "Establecer PIN"
+            "remove": "Quitar el PIN rápido",
+            "set": "Fijar PIN"
         },
         "questions": {
             "title": "Preguntas de seguridad",
             "description": "Sirven para poner una contraseña nueva cuando has olvidado la actual.",
-            "remove": "Quitar las preguntas de seguridad"
+            "remove": "Quitar preguntas de seguridad"
         },
         "grace": {
-            "title": "Dispositivos nuevos",
+            "title": "Equipos nuevos",
             "description": "Haz que un navegador desde el que nunca has iniciado sesión espere antes de poder cambiar nada en esta página. Te da tiempo a darte cuenta si alguien entra con tu contraseña.",
             "label": "Espera antes de que un dispositivo nuevo pueda cambiar la seguridad",
             "hint": "Un dispositivo en espera puede leer esta página y cerrar su propia sesión. No afecta a los dispositivos que ya usas, ni a aquel desde el que abriste esta cuenta."
@@ -112,7 +112,7 @@
         "revoke": {
             "title": "¿Cerrar la sesión en este dispositivo?",
             "description": "{device} tendrá que volver a iniciar sesión.",
-            "confirm": "Cerrar sesión"
+            "confirm": "Cerrar"
         },
         "disconnect": {
             "title": "¿Desconectar esta extensión?",
@@ -134,35 +134,35 @@
         },
         "active": {
             "title": "Sesiones activas",
-            "scan": "Escanear un código",
-            "signOutOthers": "Cerrar la sesión en todos los demás sitios",
+            "scan": "Escanear",
+            "signOutOthers": "Cerrar las demás sesiones",
             "empty": "No hay nada con la sesión iniciada.",
             "nothingElse": "No hay nada más conectado. La extensión del navegador aparece aquí cuando se conecta a esta cuenta. <link>Conectar una</link>"
         },
         "approve": {
             "title": "¿Permitir este inicio de sesión?",
             "description": "{device} entrará como tú. Introduce tu PIN de desbloqueo para confirmarlo.",
-            "pin": "PIN de desbloqueo",
+            "pin": "PIN",
             "checking": "Comprobando..."
         },
         "device": {
             "couldNotOpen": "No se ha podido abrir este dispositivo.",
             "signOutHere": "{count, plural, one {Termina # sesión} other {Terminan # sesiones}}, incluida la que estás leyendo ahora.",
             "signOutElsewhere": "{count, plural, one {Termina # sesión} other {Terminan # sesiones}}, en todas las direcciones desde las que inició sesión.",
-            "signItOut": "Cerrar su sesión",
+            "signItOut": "Cerrar sesión",
             "forgetDescription": "{device} tendrá que responder al desafío la próxima vez que inicie sesión. Lo que tenga abierto sigue abierto.",
-            "fallbackTitle": "Dispositivo",
+            "fallbackTitle": "Equipo",
             "until": "Inicia sesión solo con la contraseña hasta el {date}.",
             "untilUnknown": "Inicia sesión solo con la contraseña hasta que caduque su pase.",
             "unidentified": "No se registró nada de este dispositivo cuando se recordó, así que sus sesiones y llaves de acceso no se pueden distinguir de las de otro. Iniciar sesión en él una vez lo describe.",
-            "signedIn": "Sesión iniciada",
+            "signedIn": "Con sesión",
             "signedInHint": "Todas las direcciones en las que este dispositivo tiene la sesión iniciada. Los dispositivos que se identifican igual cuentan como uno.",
             "notSignedIn": "Ahora mismo no tiene la sesión iniciada en ningún sitio.",
             "passkeysHint": "Credenciales que registró este dispositivo. Quita una desde Seguridad.",
             "noPasskeys": "No se registró ninguna desde este dispositivo.",
             "added": "añadida el {date}",
-            "signOutEverywhere": "Cerrar su sesión en todas partes",
-            "forget": "Olvidar este dispositivo"
+            "signOutEverywhere": "Cerrar en todas partes",
+            "forget": "Olvidar este equipo"
         },
         "trusted": {
             "title": "Dispositivos recordados",
@@ -174,7 +174,7 @@
             "forgetAllDescription": "Se volverá a pedir un código a {count, plural, one {# dispositivo} other {# dispositivos}}, incluido este.",
             "forgetAll": "Olvidarlos todos",
             "columns": {
-                "device": "Dispositivo",
+                "device": "Equipo",
                 "address": "Dirección",
                 "domain": "Dominio",
                 "remembered": "Recordado",
@@ -182,11 +182,11 @@
             },
             "empty": "No se recuerda nada. Todos los inicios de sesión responden al desafío.",
             "rememberedEarlier": "Recordado antes",
-            "thisDevice": "Este dispositivo",
-            "openTitle": "A qué puede llegar este dispositivo",
+            "thisDevice": "Este equipo",
+            "openTitle": "A qué llega este equipo",
             "openNamed": "Abrir {device}",
-            "openThis": "Abrir este dispositivo",
-            "forgetButton": "Volver a pedir un código a este dispositivo",
+            "openThis": "Abrir este equipo",
+            "forgetButton": "Pedir otra vez un código aquí",
             "stopNamed": "Dejar de recordar {device}",
             "stopThis": "Dejar de recordar este dispositivo"
         }
@@ -199,23 +199,23 @@
         "currentPassword": "Contraseña actual",
         "waiting": "Esperando...",
         "continue": "Continuar",
-        "accountPassword": "Contraseña de la cuenta",
+        "accountPassword": "Contraseña",
         "removing": "Quitando..."
     },
     "backupCodes": {
         "title": "Códigos de respaldo",
         "offDescription": "Códigos de un solo uso que te dejan entrar sin la app de autenticación. Vienen con ella.",
         "description": "Códigos de un solo uso que sustituyen a la app de autenticación cuando no la tienes a mano.",
-        "unknown": "Desconocido",
+        "unknown": "Sin datos",
         "unreadable": "No se ha podido leer el juego guardado. Generar uno nuevo lo sustituye.",
-        "noneLeft": "No queda ninguno",
+        "noneLeft": "Agotados",
         "allUsed": "Se han usado todos los códigos. Sin la app de autenticación no hay forma de volver a entrar.",
         "left": "{count, plural, one {Queda #} other {Quedan #}}",
         "runningLow": "Quedan pocos. Genera un juego nuevo antes de necesitarlo.",
-        "newCodes": "Códigos nuevos",
+        "newCodes": "Nuevos",
         "notGenerated": "No se han podido generar los códigos.",
-        "newTitle": "Tus nuevos códigos de respaldo",
-        "generateTitle": "Generar nuevos códigos de respaldo",
+        "newTitle": "Tus nuevos códigos",
+        "generateTitle": "Generar códigos de reserva",
         "saveNow": "Guárdalos ahora. Es la única vez que se muestran.",
         "oldStopWorking": "Tus códigos actuales dejan de funcionar al instante, también los que hayas impreso.",
         "panelLabel": "Cada código funciona una vez. Guárdalos en algún sitio al que llegues sin el móvil.",
@@ -292,7 +292,7 @@
         "notePlaceholder": "Opcional. Lo lee quien revise esto."
     },
     "passkeys": {
-        "title": "Llaves de acceso",
+        "title": "Passkeys",
         "description": "Inicia sesión con tu dispositivo en lugar de con una contraseña. Cada llave de acceso funciona en la dirección desde la que se añadió, así que añade una por cada dirección que uses.",
         "nameTooLong": "Que tenga menos de {max} caracteres.",
         "nameTaken": "Ya tienes una llave de acceso con este nombre.",
@@ -316,15 +316,15 @@
         "onIpAddress": "Estás en una dirección IP. Una llave de acceso necesita un nombre de host, así que abre Polaris en un dominio o en su nombre local para añadir una.",
         "plainHttp": "Esta dirección se sirve por HTTP sin cifrar, y los navegadores solo crean llaves de acceso por HTTPS. Abre Polaris en {host} por HTTPS para añadir una.",
         "noneHere": "Ninguna funciona en {host}. Añade una para iniciar sesión aquí con tu dispositivo.",
-        "namePlaceholder": "Pon nombre a este dispositivo",
-        "nameLabel": "Nombre de la llave de acceso",
-        "add": "Añadir una llave de acceso",
+        "namePlaceholder": "Nombre del equipo",
+        "nameLabel": "Nombre",
+        "add": "Añadir passkey",
         "confirmTitle": "Confirma tu contraseña",
         "confirmDescription": "Añadir una llave de acceso añade una forma de entrar en tu cuenta, así que primero pide tu contraseña. Después te preguntará tu dispositivo.",
         "naming": "Se llamará \"{name}\"."
     },
     "emailLink": {
-        "title": "Iniciar sesión con un enlace por correo",
+        "title": "Entrar con un enlace por correo",
         "description": "Un enlace enviado a tu dirección abre la cuenta sin tu contraseña. Funciona una vez, caduca en 10 minutos y se sigue pidiendo tu segundo paso.",
         "label": "Iniciar sesión con un enlace que me llegue por correo",
         "cannotSend": "Este Polaris todavía no puede enviar correo, así que no hay adónde mandar el enlace."
@@ -335,19 +335,19 @@
             "description": "Un código que genera tu móvil por sí solo, sin red de por medio."
         },
         "email": {
-            "label": "Código por correo",
+            "label": "Código correo",
             "description": "Un código enviado a un correo confirmado de tu cuenta."
         },
         "whatsapp": {
-            "label": "Código por WhatsApp",
+            "label": "Código WhatsApp",
             "description": "Un código enviado a tu número confirmado como mensaje de WhatsApp."
         },
         "title": "Cómo terminas de iniciar sesión",
         "description": "Después de tu contraseña, elige qué más pide la cuenta.",
-        "alwaysOn": "Siempre activado",
+        "alwaysOn": "Siempre",
         "use": "Usar {method}",
         "off": "{method} - desactivado",
-        "offerFirst": "Ofrecer primero",
+        "offerFirst": "Primero",
         "remembered": "{count, plural, one {Un dispositivo inicia sesión sin código hasta que se cumplan sus 30 días.} other {# dispositivos inician sesión sin código hasta que se cumplan sus 30 días.}}",
         "review": "Revisar",
         "noSms": "No se ofrecen mensajes de texto. Un SMS se puede leer en una pantalla bloqueada y lo puede desviar cualquiera que convenza a una operadora de mover el número, así que es una prueba más débil que el resto de esta lista.",
@@ -363,27 +363,27 @@
         }
     },
     "password": {
-        "changeTitle": "Cambiar la contraseña",
+        "changeTitle": "Cambiar contraseña",
         "minimum": "Usa al menos 10 caracteres.",
         "mismatch": "Las contraseñas nuevas no coinciden.",
         "changed": "Contraseña cambiada. Se ha cerrado la sesión en todas las demás sesiones.",
-        "new": "Contraseña nueva",
-        "confirm": "Confirma la contraseña nueva",
+        "new": "Clave nueva",
+        "confirm": "Repite la contraseña",
         "changing": "Cambiando...",
-        "recoverTitle": "Establecer una contraseña nueva",
+        "recoverTitle": "Nueva contraseña",
         "recoverDescription": "Demuestra que eres tú sin tu contraseña actual y luego elige una nueva.",
         "noWayToVerify": "Configura primero preguntas de seguridad o una app de autenticación: sin una de ellas no hay forma de verificarte aquí.",
-        "authenticator": "App de autenticación",
-        "authenticatorCode": "Código de la app de autenticación",
+        "authenticator": "Autenticador",
+        "authenticatorCode": "Código del autenticador",
         "set": "Contraseña establecida. Se ha cerrado la sesión en todas las demás sesiones.",
-        "setButton": "Establecer contraseña"
+        "setButton": "Guardar"
     },
     "pin": {
-        "setTitle": "Configurar un PIN de desbloqueo",
+        "setTitle": "Fijar un PIN",
         "changeTitle": "Cambiar tu PIN de desbloqueo",
         "description": "De 4 a 6 dígitos, solo para volver a abrir un panel bloqueado.",
         "pin": "PIN",
-        "confirm": "Confirma el PIN",
+        "confirm": "Repite el PIN",
         "save": "Guardar PIN",
         "removeTitle": "Quitar tu PIN de desbloqueo",
         "removeDescription": "Entonces un panel bloqueado pedirá tu contraseña.",
@@ -397,7 +397,7 @@
         "yourQuestion": "Tu pregunta",
         "answer": "Respuesta",
         "save": "Guardar preguntas",
-        "removeTitle": "Quitar las preguntas de seguridad",
+        "removeTitle": "Quitar preguntas de seguridad",
         "removeDescription": "Sin ellas, una contraseña olvidada solo se puede recuperar con un código de la app de autenticación.",
         "suggestions": {
             "pet": "¿Cómo se llamaba tu primera mascota?",
@@ -442,10 +442,10 @@
         "unsupportedLock": "Tiempo de bloqueo no admitido",
         "unsupportedLifetime": "Duración de sesión no admitida",
         "unsupportedWait": "Espera no admitida",
-        "answerTooShort": "La respuesta es demasiado corta",
-        "answerTooLong": "La respuesta es demasiado larga",
-        "questionTooShort": "La pregunta es demasiado corta",
-        "enterCode": "Introduce el código de 6 dígitos",
+        "answerTooShort": "Respuesta muy corta",
+        "answerTooLong": "Respuesta muy larga",
+        "questionTooShort": "Pregunta muy corta",
+        "enterCode": "Pon el código de 6 cifras",
         "answerOrCode": "Responde a tus preguntas de seguridad o usa un código de la app de autenticación",
         "methodOffDefault": "Activa el método antes de hacerlo el predeterminado",
         "phoneFormat": "Usa el formato internacional, por ejemplo +34600111222",
@@ -465,11 +465,11 @@
         },
         "scopes": {
             "off": {
-                "label": "Ningún dispositivo",
+                "label": "Ninguno",
                 "note": "Una sesión sigue funcionando desde donde se use."
             },
             "all": {
-                "label": "Todos los dispositivos",
+                "label": "Todos",
                 "note": "La opción más estricta, y con la que habrá cierres de sesión: un móvil cambia de dirección cada vez que pasa de los datos móviles al wifi."
             },
             "desktop": {
@@ -484,10 +484,10 @@
         "perSession": "Un dispositivo puede responder distinto a esto: abre Sesiones y configúralo en la propia sesión."
     },
     "usernameSignIn": {
-        "title": "Iniciar sesión con tu nombre de usuario",
+        "title": "Entrar con tu nombre de usuario",
         "descriptionNamed": "Tanto {username} como tu correo abren la cuenta. Tu nombre de usuario es público (es como la gente te menciona y te encuentra), así que dejar esto activado significa que media credencial ya se conoce. Desactivado, también hace falta tu correo, y Polaris no lo comparte.",
         "description": "Tanto tu nombre de usuario como tu correo abren la cuenta. Tu nombre de usuario es público (es como la gente te menciona y te encuentra), así que dejar esto activado significa que media credencial ya se conoce. Desactivado, también hace falta tu correo, y Polaris no lo comparte.",
-        "label": "Iniciar sesión con mi nombre de usuario"
+        "label": "Entrar con mi usuario"
     },
     "successor": {
         "title": "Sucesor",
@@ -505,20 +505,20 @@
     "authenticator": {
         "startFailed": "No se ha podido empezar la configuración. Revisa tu contraseña.",
         "codeMismatch": "Ese código no coincide. Revisa la hora de tu dispositivo y vuelve a intentarlo.",
-        "setUpTitle": "Configurar una app de autenticación",
+        "setUpTitle": "Preparar un autenticador",
         "confirmPassword": "Confirma tu contraseña para generar un secreto nuevo.",
         "addSecret": "Añade el secreto a tu app de autenticación y luego introduce el código que muestra.",
         "password": "Contraseña",
         "working": "Procesando...",
         "scan": "Escanéalo con tu app de autenticación o usa la clave de abajo.",
-        "setupKey": "Clave de configuración",
-        "copyKey": "Copiar la clave de configuración",
+        "setupKey": "Clave",
+        "copyKey": "Copiar clave",
         "openInApp": "Abrir en una app de autenticación",
         "codeFromApp": "Código de tu app",
         "verifying": "Verificando...",
         "turnOn": "Activar",
         "turnOffFailed": "No se ha podido desactivar. Revisa tu contraseña.",
-        "turnOffTitle": "Desactivar la app de autenticación",
+        "turnOffTitle": "Desactivar el autenticador",
         "turnOffDescription": "Tu cuenta quedará protegida solo por su contraseña. Tus códigos de respaldo dejan de funcionar."
     }
 }

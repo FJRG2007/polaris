@@ -1,12 +1,12 @@
 {
     "form": {
         "name": "Nombre",
-        "handle": "Identificador",
+        "handle": "Alias",
         "description": "Descripción",
         "create": "Crear",
         "save": "Guardar",
         "cancel": "Cancelar",
-        "identifier": "Correo o nombre de usuario",
+        "identifier": "Correo o usuario",
         "identifierPlaceholder": "alguien@example.com",
         "role": "Rol",
         "roleFor": "Rol de {name}",
@@ -57,8 +57,8 @@
             "domains": "Dominios",
             "services": "Servicios"
         },
-        "recently": "Recientemente",
-        "allActivity": "Toda la actividad",
+        "recently": "Reciente",
+        "allActivity": "Actividad",
         "nothingYet": "Aquí todavía no se ha hecho nada.",
         "started": "Creada en {year} por {name}."
     },
@@ -69,32 +69,32 @@
         "empty": "Aquí todavía no se ha hecho nada."
     },
     "billing": {
-        "title": "Facturación",
+        "title": "Facturas",
         "intro": "Lo que usaron cada mes los proyectos de {org}, con las tarifas de este Polaris, y el presupuesto con el que se compara.",
         "refresh": "Actualizar",
         "stale": "Se muestra el último extracto leído. {reason}",
         "empty": "Esta organización todavía no tiene proyectos. Un proyecto creado mientras es el estante abierto le pertenece."
     },
     "budget": {
-        "title": "Presupuesto mensual",
+        "title": "Presupuesto/mes",
         "noPrices": "Este Polaris no tiene precios configurados, así que el extracto solo muestra el uso y no hay nada con lo que comparar un presupuesto.",
-        "setPrices": "Configurar precios",
+        "setPrices": "Fijar precios",
         "adminsSetThem": "Los configuran sus administradores.",
         "whoIsTold": "Quienes gestionan los ajustes de esta organización reciben un aviso cuando un mes llega al {thresholds} del presupuesto.",
         "threshold": "{value} %",
         "spentOf": "{spent} de {amount}",
         "otherCurrency": "Este presupuesto se fijó en {was} y ahora los precios están en {now}. Vuelve a fijarlo en {now} para que se siga midiendo.",
-        "used": "Presupuesto usado",
+        "used": "Gastado",
         "usedShare": "{share} % usado.",
         "usedShareIn": "{share} % usado en {month}.",
         "inputLabel": "Presupuesto mensual en {currency}",
         "perMonth": "{currency} al mes",
-        "save": "Guardar presupuesto",
-        "set": "Fijar presupuesto",
+        "save": "Guardar",
+        "set": "Presupuestar",
         "remove": "Quitar el presupuesto",
         "removeTitle": "¿Quitar el presupuesto?",
         "removeBody": "Nadie recibirá un aviso cuando el gasto de esta organización supere el 80 % o el 100 % de un mes.",
-        "removeConfirm": "Quitar presupuesto"
+        "removeConfirm": "Quitar límite"
     },
     "domains": {
         "title": "Dominios",
@@ -167,7 +167,7 @@
             "reaches": "Llega a"
         },
         "empty": "Los espacios se dan a los equipos. Aquí todavía nada llega a ningún trabajo.",
-        "noGrants": "Nada todavía",
+        "noGrants": "Nada aún",
         "grants": "{count, plural, one {# concesión} other {# concesiones}}",
         "deleteLabel": "Eliminar {name}",
         "deleteTitle": "¿Eliminar {name}?",
@@ -185,7 +185,7 @@
             "description": "{description} Todos sus miembros llegan a lo que se le haya dado.",
             "defaultDescription": "Un equipo de {org}. Todos sus miembros llegan a lo que se le haya dado.",
             "nobody": "Todavía no hay nadie en este equipo.",
-            "leave": "Salir de este equipo",
+            "leave": "Dejar este equipo",
             "add": "Añadir",
             "addHint": "Tienen que estar ya en la organización. {hint}",
             "reaches": "A qué llega este equipo",
@@ -202,7 +202,7 @@
         "spaceRoles": {
             "guest": "Invitado",
             "member": "Miembro",
-            "admin": "Administrador"
+            "admin": "Admin"
         }
     },
     "roles": {
@@ -224,7 +224,7 @@
         "create": {
             "title": "Nuevo rol",
             "body": "Ponle el nombre del trabajo que la gente hace de verdad aquí. Todos los que lo tienen ven la organización; a qué más llega lo decides tú.",
-            "namePlaceholder": "Colaborador externo",
+            "namePlaceholder": "Externo",
             "handlePlaceholder": "colaborador",
             "descriptionPlaceholder": "Para qué está aquí alguien con este rol"
         },
@@ -259,7 +259,7 @@
             "descriptionPlaceholder": "A qué se dedica esta organización"
         },
         "handle": {
-            "title": "Identificador",
+            "title": "Alias",
             "confirmTitle": "¿Cambiar el identificador?",
             "confirmBody": "Todos los enlaces a /account/organizations/{slug} dejan de funcionar. Habrá que actualizar cualquier cosa que alguien haya apuntado.",
             "confirm": "Cambiarlo",
@@ -270,7 +270,7 @@
             "title": "Traspasarla",
             "nobody": "Solo se puede traspasar la organización a alguien que ya esté en la plantilla, y todavía no hay nadie más.",
             "to": "Traspasar a",
-            "newOwner": "Nuevo propietario",
+            "newOwner": "Nuevo dueño",
             "choose": "Elige a alguien",
             "confirmTitle": "¿Traspasar {org} a {name}?",
             "confirmBody": "Pasa a ser el propietario y tú sigues como administrador. Solo esa persona puede deshacerlo.",
@@ -326,19 +326,19 @@
         }
     },
     "validation": {
-        "enterName": "Escribe un nombre",
-        "handleEdges": "No puede empezar ni terminar por -",
+        "enterName": "Pon un nombre",
+        "handleEdges": "No puede empezar ni acabar en -",
         "roleHandleCharacters": "Usa letras, números o -",
-        "enterIdentifier": "Escribe un correo o un nombre de usuario",
+        "enterIdentifier": "Escribe un correo o un usuario",
         "amountLike": "Escribe una cantidad como 250",
-        "enterAmount": "Escribe una cantidad",
+        "enterAmount": "Pon una cantidad",
         "budgetPositive": "Un presupuesto tiene que ser mayor que cero",
         "budgetTooLarge": "Eso es más de lo que Polaris puede controlar"
     },
     "errors": {
         "checkDetails": "Revisa los datos y vuelve a intentarlo",
-        "checkHandle": "Revisa el identificador y vuelve a intentarlo",
-        "checkAmount": "Revisa la cantidad y vuelve a intentarlo",
+        "checkHandle": "Revisa el alias y reinténtalo",
+        "checkAmount": "Revisa la cantidad y reinténtalo",
         "checkForm": "Revisa el formulario.",
         "checkDetailsShort": "Revisa los datos.",
         "confirmFirst": "Primero confirma que eres tú",
@@ -347,24 +347,24 @@
         "createOrg": "No se ha podido crear la organización",
         "saveOrg": "No se ha podido guardar la organización",
         "saveThat": "No se ha podido guardar",
-        "changeHandle": "No se ha podido cambiar el identificador",
+        "changeHandle": "No se cambió el alias",
         "handOver": "No se ha podido traspasar la organización",
         "deleteOrg": "No se ha podido eliminar la organización",
-        "invite": "No se ha podido invitar a esa persona",
+        "invite": "No se invitó a esa persona",
         "resend": "No se ha podido reenviar esa invitación",
         "withdraw": "No se ha podido retirar esa invitación",
-        "answer": "No se ha podido responder a esa invitación",
+        "answer": "No se respondió a esa invitación",
         "changeRole": "No se ha podido cambiar ese rol",
-        "removePerson": "No se ha podido quitar a esa persona",
+        "removePerson": "No se quitó a esa persona",
         "createTeam": "No se ha podido crear el equipo",
-        "saveTeam": "No se ha podido guardar el equipo",
-        "deleteTeam": "No se ha podido eliminar el equipo",
+        "saveTeam": "No se guardó el equipo",
+        "deleteTeam": "No se eliminó el equipo",
         "addToTeam": "No se ha podido añadir a esa persona al equipo",
         "removeFromTeam": "No se ha podido quitar a esa persona del equipo",
         "createRole": "No se ha podido crear el rol",
-        "saveRole": "No se ha podido guardar el rol",
+        "saveRole": "No se guardó el rol",
         "deleteRole": "No se ha podido eliminar el rol",
-        "readTeam": "No se ha podido leer el equipo",
+        "readTeam": "No se leyó el equipo",
         "noPrices": "Este Polaris todavía no tiene precios configurados, así que un presupuesto no tiene con qué compararse.",
         "saveBudget": "No se ha podido guardar el presupuesto. Vuelve a intentarlo.",
         "removeBudget": "No se ha podido quitar el presupuesto. Vuelve a intentarlo.",

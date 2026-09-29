@@ -31,7 +31,7 @@
             }
         },
         "dateOrder": {
-            "label": "Orden de la fecha",
+            "label": "Formato fecha",
             "dmy": "Día primero",
             "mdy": "Mes primero"
         },
@@ -46,7 +46,7 @@
             "12h": "12 horas"
         },
         "weekStart": {
-            "label": "La semana empieza el",
+            "label": "Semana empieza",
             "hint": "Donde empieza cada calendario y vista semanal."
         },
         "timeZone": {
@@ -63,7 +63,7 @@
             "label": "Moneda",
             "names": {
                 "EUR": "Euro",
-                "USD": "Dólar estadounidense",
+                "USD": "Dólar EE.UU.",
                 "GBP": "Libra esterlina",
                 "CHF": "Franco suizo",
                 "SEK": "Corona sueca",
@@ -88,7 +88,7 @@
             "week": "Semana",
             "weekRange": "De {first} a {last}",
             "timeZone": "Zona horaria",
-            "thisDevice": "Este dispositivo",
+            "thisDevice": "Este equipo",
             "temperature": "Temperatura",
             "amount": "Importe"
         },
@@ -96,10 +96,10 @@
     },
     "accessibility": {
         "title": "Accesibilidad",
-        "textSize": "Tamaño del texto",
+        "textSize": "Tamaño texto",
         "pixelsShort": "{size}px",
         "pixels": "{size} píxeles",
-        "default": "Predeterminado",
+        "default": "Normal",
         "stepIsDefault": "{size} - el predeterminado aquí",
         "body": "Polaris se dibuja a este tamaño, así que las filas y los paneles alrededor del texto crecen con él. La página cambia al mover el control y se queda así al guardar.",
         "isDefault": "Este es el predeterminado aquí.",
@@ -111,7 +111,7 @@
         "body": "Las imágenes y los mensajes que alguien envió tapados se muestran directamente, sin esperar a que pulses. Solo en este navegador."
     },
     "deviceCache": {
-        "title": "Este dispositivo",
+        "title": "Este equipo",
         "body": "Polaris guarda algunas cosas en este navegador para que las pantallas abran más rápido: imágenes, el volumen de cada persona en una llamada, la velocidad de reproducción. Bórralas si algo parece desactualizado y recargar no lo ha arreglado. Tus otros dispositivos no se ven afectados y sigues con la sesión iniciada.",
         "clear": "Borrar datos en caché",
         "clearing": "Borrando"
@@ -123,14 +123,14 @@
     },
     "errors": {
         "unsupportedChoice": "Opción no admitida.",
-        "unsupportedSize": "Ese tamaño no está disponible en Polaris",
-        "notAPresence": "Ese no es un estado válido",
-        "notAWindow": "Ese no es un periodo válido",
+        "unsupportedSize": "Tamaño no disponible",
+        "notAPresence": "No es un estado válido",
+        "notAWindow": "No es un periodo válido",
         "statusNotSaved": "No se ha podido guardar el estado"
     },
     "access": {
         "page": {
-            "title": "Reglas de acceso",
+            "title": "Reglas",
             "intro": "Limita desde dónde se pueden usar tu cuenta y tus claves de API."
         },
         "summary": {
@@ -143,7 +143,7 @@
         "deleteInUse": "Está en uso; las reglas que aporta dejarán de aplicarse.",
         "deleteFinal": "Esto no se puede deshacer.",
         "signIn": {
-            "title": "Restricciones de inicio de sesión",
+            "title": "Límites de acceso",
             "description": "Déjalo todo vacío para permitir iniciar sesión desde cualquier sitio. Si no, un inicio de sesión tiene que cumplir tus reglas de dirección y tus ubicaciones permitidas.",
             "none": "Sin restricción: se puede iniciar sesión en tu cuenta desde cualquier dirección."
         },
@@ -154,11 +154,11 @@
             "description": "Conjuntos de reglas con nombre que puedes aplicar a tus inicios de sesión y a las claves de API.",
             "new": "Nuevo grupo",
             "empty": "Todavía no hay grupos. Crea uno para reutilizar la misma lista de permitidos en más de un sitio.",
-            "signIn": "Inicio de sesión",
+            "signIn": "Acceso",
             "keys": "{count, plural, one {# clave} other {# claves}}",
             "deleteNamed": "Eliminar {name}",
             "editTitle": "Editar «{name}»",
-            "newTitle": "Nuevo grupo de acceso",
+            "newTitle": "Nuevo grupo",
             "dialogDescription": "Un conjunto de direcciones y ubicaciones con nombre que puedes reutilizar donde se restrinja el acceso.",
             "namePlaceholder": "Casa",
             "optional": "Opcional",
@@ -185,11 +185,11 @@
         "emptySession": "Todavía no hay nada registrado desde esta sesión.",
         "signedOutSession": "Sesión cerrada",
         "filter": "Filtrar por sesión",
-        "allSessions": "Todas las sesiones"
+        "allSessions": "Todas"
     },
     "apiKeys": {
         "page": {
-            "title": "Claves de API",
+            "title": "Claves API",
             "intro": "Credenciales para scripts e integraciones que actúan como tú. Guárdalas en un lugar seguro: quien tenga una puede hacer lo que permita, como tú."
         },
         "environments": {
@@ -205,10 +205,10 @@
             "scopes": "{count, plural, one {# permiso} other {# permisos}}",
             "scopesLimited": "{count, plural, one {# permiso} other {# permisos}} - limitada a {limits}",
             "sorts": {
-                "createdDesc": "Creación (más reciente)",
-                "createdAsc": "Creación (más antigua)",
+                "createdDesc": "Más recientes",
+                "createdAsc": "Más antiguas",
                 "usedDesc": "Último uso",
-                "usageDesc": "Llamadas de hoy",
+                "usageDesc": "Uso de hoy",
                 "nameAsc": "Nombre"
             },
             "expiry": {
@@ -228,11 +228,11 @@
             "environment": "Entorno",
             "allEnvironments": "Todos los entornos",
             "app": "App",
-            "allApps": "Todas las apps",
+            "allApps": "Todas",
             "noApp": "Sin app",
             "expiryLabel": "Caducidad",
-            "sortBy": "Ordenar por",
-            "newKey": "Nueva clave",
+            "sortBy": "Ordenar",
+            "newKey": "Nueva",
             "none": "Todavía no hay claves.",
             "showing": "Se muestran {shown} de {total} claves",
             "count": "{count, plural, one {# clave} other {# claves}}",
@@ -268,20 +268,20 @@
             "copied": "Copiada",
             "copy": "Copiar",
             "done": "Hecho",
-            "newTitle": "Nueva clave de API",
+            "newTitle": "Nueva clave",
             "editIntro": "Todo menos el secreto en sí. Lo que use esta clave sigue funcionando.",
             "newIntro": "Una clave actúa como tú, con parte de tus permisos y solo desde donde tú permitas.",
             "what": {
                 "title": "Qué es",
                 "hint": "Cómo reconocerás esta clave dentro de un año."
             },
-            "namePlaceholder": "Script de copias de seguridad",
+            "namePlaceholder": "Script de copias",
             "description": "Descripción",
             "descriptionPlaceholder": "Para qué es esta clave y qué se rompería sin ella.",
             "environmentHint": "El entorno es una etiqueta para ordenar tus propias claves. Las dos llegan al mismo Polaris.",
             "expiryHint": "Una clave que no caduca es una clave que nadie revisa nunca.",
             "keepExpiry": "Dejarla como está",
-            "customDate": "Fecha personalizada",
+            "customDate": "Otra fecha",
             "endOfDay": "Funciona hasta el final del día elegido.",
             "permissions": {
                 "title": "Permisos",
@@ -331,9 +331,9 @@
         "badges": {
             "notGranted": "Sin conceder: {scopes}. Vuelve a conectar para aprobarlo.",
             "connectAgain": "Vuelve a conectar para aprobar lo que ahora pide Polaris.",
-            "needsApproving": "Pendiente de aprobar",
+            "needsApproving": "Por aprobar",
             "signsInTitle": "Esta cuenta puede iniciar tu sesión",
-            "signsIn": "Inicia tu sesión",
+            "signsIn": "Inicia sesión",
             "tokenTitle": "Conectada con un token de acceso personal",
             "token": "Token",
             "notVerifiedTitle": "Has escrito este nombre tú. Nada ha confirmado que la cuenta sea tuya.",
@@ -349,7 +349,7 @@
         "canSignIn": "Una cuenta que conectes también puede iniciar tu sesión: elige cuáles en <link>Seguridad</link>.",
         "connectProvider": "Conectar {provider}",
         "useToken": "Usar un token",
-        "typeUsername": "Escribir tu nombre de usuario",
+        "typeUsername": "Escribe tu usuario",
         "useReconnect": "Para aprobar lo que ahora pide Polaris, usa el botón de volver a conectar junto a la cuenta de arriba.",
         "disconnectOne": "Desconecta una para conectar otra cuenta.",
         "availableOnce": "Disponible cuando quien administra este Polaris conecte {requires} en Integraciones.",
@@ -366,16 +366,16 @@
         "aws": {
             "title": "Conectar AWS con una clave de acceso",
             "description": "Polaris pregunta a AWS de quién es la clave y conecta esa cuenta. Lee tus servicios de ECS y tus ramas de Amplify en esta región, y puede pedir otra publicación.",
-            "accessKeyId": "ID de la clave de acceso",
-            "secretAccessKey": "Clave de acceso secreta",
+            "accessKeyId": "ID de clave",
+            "secretAccessKey": "Clave secreta",
             "region": "Región",
             "regionHint": "La región en la que están tus servicios. Una clave llega a todas las regiones; lo que ve se decide aquí, y con la equivocada simplemente no aparece nada."
         },
         "minecraft": {
-            "changeTitle": "Cambiar tu nombre de usuario de Minecraft",
-            "typeTitle": "Escribir tu nombre de usuario de Minecraft",
+            "changeTitle": "Cambiar tu usuario de Minecraft",
+            "typeTitle": "Tu usuario de Minecraft",
             "description": "Exactamente como aparece en el juego, con las mismas mayúsculas y minúsculas. Un nombre escrito a mano aparece como sin verificar.",
-            "username": "Nombre de usuario",
+            "username": "Usuario",
             "hint": "Java Edition: de 3 a 16 letras, números o guiones bajos."
         },
         "token": {
@@ -391,9 +391,9 @@
             "notAccessKey": "Eso no parece una clave de acceso",
             "notSecretKey": "Eso no parece una clave secreta",
             "nameRegion": "Indica la región en la que están tus servicios",
-            "regionFormat": "Una región tiene un formato como eu-west-1",
+            "regionFormat": "Una región es como eu-west-1",
             "checkDetails": "Revisa los datos y vuelve a intentarlo",
-            "checkUsername": "Revisa el nombre de usuario y vuelve a intentarlo",
+            "checkUsername": "Revisa el usuario y reinténtalo",
             "usernameNotSaved": "No se ha podido guardar el nombre de usuario. Vuelve a intentarlo.",
             "unknownAccount": "Cuenta desconocida",
             "notLinked": "Esa cuenta no está vinculada a tu perfil"
@@ -410,7 +410,7 @@
         "headlineHint": "Una línea, bajo tu nombre. A qué te dedicas, no tu vida entera: el párrafo va en la descripción de arriba.",
         "pronouns": "Pronombres",
         "preferNot": "Prefiero no decirlo",
-        "ownWords": "Con mis propias palabras",
+        "ownWords": "Con mis palabras",
         "pronounsPlaceholder": "p. ej. elle",
         "yourPronouns": "Tus pronombres",
         "pronounsHint": "Aparecen junto a tu nombre. Si no dices nada, no aparece nada.",
@@ -420,10 +420,10 @@
             "name": "Nombre del enlace {number}",
             "address": "Dirección del enlace {number}",
             "remove": "Quitar el enlace {number}",
-            "add": "Añadir un enlace",
+            "add": "Añadir enlace",
             "hint": "Un portfolio, una web, un linktree. Basta con escribir la web (se añade https:// por ti), y una dirección sin nombre se muestra con su propio dominio.",
             "problems": {
-                "empty": "Escribe una dirección web",
+                "empty": "Escribe una web",
                 "invalid": "Eso no es una dirección web",
                 "scheme": "Solo direcciones http:// y https://",
                 "noSite": "Esa dirección no incluye ningún sitio"
@@ -484,22 +484,22 @@
         "input": {
             "title": "Entrada",
             "when": "Cuándo envía tu micrófono",
-            "modeLabel": "Modo de entrada",
+            "modeLabel": "Entrada",
             "key": "Tecla",
             "pressKey": "Pulsa una tecla...",
             "keyHint": "Mantenla pulsada para hablar. Se desactiva mientras escribes.",
             "threshold": "Qué volumen cuenta como hablar",
             "thresholdLabel": "Umbral de actividad de voz",
             "thresholdHint": "Prueba el micrófono de arriba mientras lo ajustas: la marca de la barra es donde se abre, y la barra se pone verde al pasarla.",
-            "release": "Seguir abierto al dejar de hablar",
-            "releaseLabel": "Retardo de liberación",
+            "release": "Abierto tras dejar de hablar",
+            "releaseLabel": "Retardo de cierre",
             "releaseHint": "Con cero se corta la última sílaba, y todos lo oyen."
         },
         "advanced": {
             "title": "Avanzado",
             "intro": "No toques esto salvo que algo vaya mal. Cada opción está como lo hacía Polaris antes de que existiera esta pantalla.",
             "autoGain": {
-                "label": "Control automático de ganancia",
+                "label": "Ganancia automática",
                 "note": "Deja que el navegador iguale tu volumen. Desactívalo si tu nivel sube y baja entre frases."
             },
             "betterDetection": {
@@ -548,9 +548,9 @@
         "code": "Código {code}",
         "browser": "Navegador",
         "browserOn": "{browser} en {os}",
-        "askedFrom": "Solicitado desde",
+        "askedFrom": "Pedido desde",
         "on": "En",
-        "unknown": "Desconocido",
+        "unknown": "Sin datos",
         "consent": "Si dices que sí, esta extensión actuará en nombre de tu cuenta hasta que la termines desde Sesiones. No abre tu bóveda: dejarla entrar en una es una segunda decisión, que se toma en la bóveda.",
         "working": "Procesando",
         "connect": "Conectarla",
@@ -581,15 +581,15 @@
         "turnDown": "Rechazar",
         "empty": "Todavía nadie. Mientras tanto, «solo amigos» es lo mismo que «nadie».",
         "showMore": "Mostrar más",
-        "searchPlaceholder": "Nombre, correo o nombre de usuario",
-        "add": "Añadir a alguien",
-        "askTitle": "Pedir por nombre de usuario exacto",
+        "searchPlaceholder": "Nombre, correo o usuario",
+        "add": "Añadir persona",
+        "askTitle": "Pedir por usuario exacto",
         "ask": "Pedir",
         "hint": "A alguien que no aparece en la búsqueda se le puede pedir igualmente si te ha dado su nombre de usuario exacto."
     },
     "scan": {
         "page": {
-            "title": "Escanear un código",
+            "title": "Escanear",
             "intro": "Deja pasar un inicio de sesión en un dispositivo que no puede pedirte la contraseña."
         },
         "errors": {
@@ -599,22 +599,22 @@
         "stale": "Ese código ya no es válido. Pide uno nuevo en la pantalla de inicio de sesión y vuelve a escanearlo.",
         "stopCamera": "Parar la cámara",
         "startCamera": "Escanear con la cámara",
-        "typeCode": "O escribe el código que hay bajo el QR",
+        "typeCode": "O escribe el código bajo el QR",
         "continue": "Continuar",
         "approved": "Ese dispositivo ya tiene la sesión iniciada. Puede tardar un momento en continuar.",
         "refused": "Se ha rechazado ese inicio de sesión.",
         "another": "Escanear otro código",
         "expired": "Este código ha caducado.",
         "askNew": "Pide uno nuevo en la pantalla de inicio de sesión y vuelve a escanearlo.",
-        "again": "Volver a escanear",
+        "again": "Reescanear",
         "decide": {
             "title": "¿Permitir este inicio de sesión?",
             "description": "Entrará como tú. Permítelo solo si eres tú quien está en esa pantalla.",
-            "device": "Dispositivo",
+            "device": "Equipo",
             "from": "Desde",
             "openedOn": "Abierto en",
-            "asked": "Solicitado",
-            "pin": "PIN de desbloqueo",
+            "asked": "Pedido",
+            "pin": "PIN",
             "needsPin": "Permitir un inicio de sesión así requiere un PIN de desbloqueo rápido. <link>Configura uno en Seguridad</link> y vuelve a escanear el código.",
             "refuse": "Rechazar",
             "checking": "Comprobando...",
@@ -624,11 +624,11 @@
             "title": "Códigos que has respondido",
             "description": "Cada uno inició la sesión de un dispositivo como tú, o lo rechazó.",
             "empty": "Todavía no has respondido a ningún código de inicio de sesión.",
-            "signedIn": "Sesión iniciada",
+            "signedIn": "Con sesión",
             "refused": "Rechazado",
             "readOn": "Leído en {device}",
             "readOnGone": "Leído en un dispositivo que ya no tiene la sesión iniciada",
-            "thisDevice": "Este dispositivo"
+            "thisDevice": "Este equipo"
         }
     },
     "standing": {
@@ -638,7 +638,7 @@
         },
         "yourAccount": "Tu cuenta está <word>{standing}</word>",
         "words": {
-            "good": "en buen estado",
+            "good": "todo bien",
             "limited": "limitada",
             "veryLimited": "muy limitada",
             "atRisk": "en riesgo",
@@ -680,16 +680,16 @@
         "displayNameHint": "Aparece dondequiera que aparezca tu nombre. No tiene por qué ser tu nombre.",
         "usernameLocked": "Los demás te encuentran y se dirigen a ti con él, así que solo se puede cambiar de vez en cuando. Podrás volver a cambiarlo dentro de {when}.",
         "aboutHint": "Lo ve cualquiera que abra tu perfil.",
-        "username": "Nombre de usuario",
+        "username": "Usuario",
         "usernameFree": "{username} está disponible",
         "usernameHint": "De 3 a 30 caracteres: letras, números, - o _. Se usa para iniciar sesión.",
         "try": "Prueba",
         "errors": {
             "unknownAddress": "Dirección desconocida.",
             "tooManyRequests": "Demasiadas solicitudes. Vuelve a intentarlo dentro de {minutes, plural, one {# minuto} other {# minutos}}.",
-            "notUsername": "Eso no es un nombre de usuario",
-            "usernameUnusable": "Ese nombre de usuario no se puede usar",
-            "usernameTaken": "Ese nombre de usuario ya está cogido",
+            "notUsername": "No es un nombre de usuario",
+            "usernameUnusable": "Ese nombre de usuario no vale",
+            "usernameTaken": "Ese usuario ya existe",
             "tooManyChecks": "Demasiadas comprobaciones. Espera un momento.",
             "checkPicked": "Revisa lo que has elegido",
             "checkTyped": "Revisa lo que has escrito",
@@ -700,11 +700,11 @@
     "pictures": {
         "errors": {
             "notSaved": "No se ha podido guardar",
-            "unreachable": "No se ha podido contactar con el servidor",
+            "unreachable": "Sin conexión con el servidor",
             "reopen": "No se ha podido volver a abrir esa imagen",
             "animated": "Una imagen animada no se puede reencuadrar: sustitúyela para cambiar cómo queda"
         },
-        "reframe": "Reencuadrar",
+        "reframe": "Encuadrar",
         "reframeNote": "Mover y escalar lo que ya hay",
         "replace": "Sustituir",
         "upload": "Subir {kind, select, banner {portada} other {foto}}",
@@ -741,15 +741,15 @@
             "moves": "Animada"
         },
         "nameplate": {
-            "label": "Placa de nombre",
+            "label": "Placa",
             "hint": "Donde aparece tu nombre en una lista de personas, como los miembros de una conversación."
         },
         "nameStyle": {
-            "label": "Estilo del nombre visible",
+            "label": "Estilo del nombre",
             "hint": "Qué hace la pintura y en qué colores. Nada de esto cambia el tamaño, así que un nombre nunca es más alto que su fila."
         },
         "font": {
-            "label": "Tipografía",
+            "label": "Letra",
             "hint": "Las letras con las que se escribe tu nombre visible, allí donde aparezca. Solo se descarga cuando un nombre en pantalla la usa de verdad."
         },
         "effect": {
@@ -767,14 +767,14 @@
             "prism": "Prisma"
         },
         "nameFonts": {
-            "sans": "Predeterminada",
+            "sans": "Normal",
             "caps": "Versalitas",
-            "serif": "Con serifa",
-            "mono": "Monoespaciada",
+            "serif": "Serifa",
+            "mono": "Mono",
             "rounded": "Redondeada",
             "hand": "Manuscrita",
             "comic": "Cómic",
-            "script": "Caligráfica",
+            "script": "Cursiva",
             "block": "Bloque",
             "bubble": "Burbuja",
             "techno": "Tecno",
@@ -798,13 +798,13 @@
             "cat": "Orejas de gato",
             "horns": "Cuernos",
             "wings": "Alas",
-            "flowers": "Corona de flores",
+            "flowers": "Corona floral",
             "headphones": "Auriculares",
             "halo": "Halo",
             "crown": "Corona"
         },
         "nameplates": {
-            "dusk": "Atardecer",
+            "dusk": "Ocaso",
             "tide": "Marea",
             "ember": "Brasa",
             "moss": "Musgo",
@@ -832,22 +832,22 @@
         "typedHint": "Aparecen sin tick, porque Polaris no sabe de ellas nada más que lo que has escrito."
     },
     "emails": {
-        "title": "Direcciones de correo",
+        "title": "Correos",
         "description": "La dirección con la que inicias sesión y cualquier otra de esta cuenta.",
         "linkSent": "Enlace de confirmación enviado a {email}.",
         "removeTitle": "¿Quitar esta dirección?",
         "removeDescription": "{email} dejará de estar en tu cuenta.",
         "remove": "Quitar",
         "primary": "Principal",
-        "recovery": "Recuperación",
+        "recovery": "Recuperar",
         "verified": "Verificada",
         "unverified": "Sin verificar",
         "noChannel": "No hay ningún canal de correo configurado, así que Polaris no puede enviar el enlace.",
         "verify": "Verificar",
         "stopRecovery": "Dejar de usar {email} para recuperación",
         "useRecovery": "Usar {email} para recuperación",
-        "notForRecovery": "No usar para recuperación",
-        "forRecovery": "Usar para recuperación",
+        "notForRecovery": "No para recuperar",
+        "forRecovery": "Para recuperar",
         "makePrimaryNamed": "Hacer principal {email}",
         "makePrimary": "Hacer principal",
         "removeNamed": "Quitar {email}",
@@ -860,7 +860,7 @@
         "working": "Procesando..."
     },
     "phone": {
-        "title": "Número de teléfono",
+        "title": "Teléfono",
         "description": "Se confirma a través de uno de tus propios canales de WhatsApp, que también es el que lleva un código de inicio de sesión cuando lo usas.",
         "remove": "Quitar",
         "change": "Cambiar",
@@ -870,10 +870,10 @@
         "code": "Código de confirmación",
         "confirm": "Confirmar",
         "codeSent": "Código enviado por WhatsApp.",
-        "sendCode": "Enviar código",
+        "sendCode": "Enviar",
         "checkNumber": "Revisa el número.",
         "changeTitle": "Cambiar tu número",
-        "addTitle": "Añadir un número de teléfono",
+        "addTitle": "Añadir teléfono",
         "setDescription": "Empieza sin confirmar. Confírmalo antes de que pueda llevar un código de inicio de sesión.",
         "removeTitle": "Quitar tu número",
         "removeDescription": "Confirma tu contraseña. WhatsApp dejará de ser una de tus opciones de inicio de sesión.",
@@ -881,7 +881,7 @@
     },
     "aiKeys": {
         "page": {
-            "title": "Claves de proveedores de IA",
+            "title": "Claves de IA",
             "intro": "Las cuentas de proveedor a las que se factura tu trabajo con IA. Una clave que añadas aquí se usa antes que cualquiera de las del despliegue."
         },
         "keys": {
@@ -914,11 +914,11 @@
     },
     "dns": {
         "errors": {
-            "readZones": "No se han podido leer las zonas",
-            "readRecords": "No se han podido leer los registros",
-            "saveRecord": "No se ha podido guardar el registro",
+            "readZones": "No se leyeron las zonas",
+            "readRecords": "No se leyeron los registros",
+            "saveRecord": "No se guardó el registro",
             "removeRecord": "No se ha podido quitar el registro",
-            "askResolvers": "No se ha podido consultar a los resolvedores",
+            "askResolvers": "No se consultó a los resolvers",
             "adminOnly": "Solo un administrador puede editar las zonas DNS de este Polaris",
             "unreadable": "No se ha podido leer ese registro"
         }
@@ -929,7 +929,7 @@
             "intro": "Polaris en tu escritorio, en tu navegador y en tu propio ordenador."
         },
         "extension": {
-            "title": "Extensión del navegador",
+            "title": "Extensión",
             "description": "Rellena un inicio de sesión, guarda uno nuevo y desbloquea desde tu bóveda. Pide permiso al navegador para hablar con este Polaris y con ningún otro, y no tiene acceso permanente a las páginas que abres.",
             "store": "Desde la tienda de tu navegador",
             "notYet": "Todavía no está",
@@ -938,10 +938,10 @@
             "alreadyHave": "¿Ya la tienes? <link>Conéctala a esta cuenta</link>. Tu bóveda es el segundo paso, desde la propia extensión."
         },
         "later": {
-            "title": "Todavía no está aquí",
+            "title": "Aún no está",
             "mobile": "Android e iOS",
             "mobileHint": "Todavía no hay app. Instalar Polaris como app, arriba, lo pone en tu pantalla de inicio desde el navegador, que es casi lo mismo.",
-            "cli": "Línea de comandos",
+            "cli": "Terminal",
             "cliHint": "Para gestionar tus cosas desde tu propio ordenador y abrir desde él un túnel a un servicio de aquí. Todavía no hay nada que instalar, así que no hay ningún comando que copiar."
         },
         "command": {
