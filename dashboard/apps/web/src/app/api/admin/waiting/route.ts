@@ -21,5 +21,5 @@ export async function GET(): Promise<Response> {
     const session = await backgroundUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!session.isAdmin) return NextResponse.json(NOTHING_WAITING);
-    return NextResponse.json(await adminWaiting());
+    return NextResponse.json(await adminWaiting(session.id));
 }

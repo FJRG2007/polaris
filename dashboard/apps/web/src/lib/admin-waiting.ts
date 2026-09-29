@@ -11,8 +11,9 @@
  * undone until a person does it.
  *
  * - **Reported messages and safety cases**, counted open. Not "unread": a report
- *   somebody has read and not settled is still a report, and a badge that
- *   cleared on being looked at would say the queue was empty while it was full.
+ *   somebody has read and not settled is still a report. What the badge does
+ *   once the queue has been looked at is the reader's choice - by default the
+ *   visit clears it until something new arrives, see `badge-seen.ts`.
  * - **An update nothing will install on its own.** A deployment set to install
  *   at three in the morning has no work for anybody, so it is not counted; one
  *   with automatic updates off has a person in the loop by definition, and that
@@ -28,6 +29,7 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { getSetting } from "@/lib/setting-store";
 import { getAutoUpdatePolicy } from "@/lib/update-watcher";
+import { markSeen, seenMarks, type BadgeScreen } from "@/lib/badge-seen";
 
 /** The key the update watcher claims once per published build, holding the short
  *  sha it announced and when. Read here rather than re-derived: the two must not
@@ -85,28 +87,61 @@ export function updateIsWaiting(input: {
     return input.autoUpdate === "off";
 }
 
-async function updateWaiting(): Promise<boolean> {
-    const running = loadEnv().POLARIS_BUILD_SHA ?? null;
-    if (!running) return false;
-    const [announced, policy] = await Promise.all([
-        getSetting(ANNOUNCED_KEY),
-        getAutoUpdatePolicy()
-    ]);
-    return updateIsWaiting({
-        running,
-        announced: announced?.split(" ")[0] ?? null,
-        autoUpdate: policy.mode
-    });
+/** The short sha the update watcher last announced, or null before it has. */
+async function announcedBuild(): Promise<string | null> {
+    return (await getSetting(ANNOUNCED_KEY))?.split(" ")[0] ?? null;
 }
 
-/** Everything above, in one read. Best-effort per part: a settings table that
- *  will not answer must not take the whole badge - and a badge that is short by
- *  one is better than a management screen that will not draw. */
-export async function adminWaiting(): Promise<AdminWaiting> {
-    const [reports, cases, update] = await Promise.all([
-        prisma.chatReport.count({ where: { status: "open" } }).catch(() => 0),
-        prisma.safetyCase.count({ where: { status: "open" } }).catch(() => 0),
-        updateWaiting().catch(() => false)
+/** The build waiting for somebody to press Install, or null when none is. */
+async function updateWaiting(): Promise<string | null> {
+    const running = loadEnv().POLARIS_BUILD_SHA ?? null;
+    if (!running) return null;
+    const [announced, policy] = await Promise.all([announcedBuild(), getAutoUpdatePolicy()]);
+    return updateIsWaiting({ running, announced, autoUpdate: policy.mode }) ? announced : null;
+}
+
+/** When a queue was last opened, or null for never or a mark nobody can read. */
+function seenAt(mark: string | undefined): Date | null {
+    if (!mark) return null;
+    const at = new Date(mark);
+    return Number.isNaN(at.getTime()) ? null : at;
+}
+
+/**
+ * Everything above, in one read, as one administrator's badge.
+ *
+ * With `userId`, what that account has already seen is left out when it lets
+ * opening a screen clear its badge: the build it was shown on the Update
+ * screen, and the reports and cases older than its last visit to Safety.
+ *
+ * Best-effort per part: a settings table that will not answer must not take the
+ * whole badge - and a badge that is short by one is better than a management
+ * screen that will not draw.
+ */
+export async function adminWaiting(userId?: string): Promise<AdminWaiting> {
+    const seen = userId ? await seenMarks(userId).catch(() => null) : null;
+    const since = seenAt(seen?.get("admin.safety"));
+    const newer = since ? { createdAt: { gt: since } } : {};
+    const [reports, cases, build] = await Promise.all([
+        prisma.chatReport.count({ where: { status: "open", ...newer } }).catch(() => 0),
+        prisma.safetyCase.count({ where: { status: "open", ...newer } }).catch(() => 0),
+        updateWaiting().catch(() => null)
     ]);
+    const update = build !== null && seen?.get("admin.update") !== build;
     return { reports, cases, update, total: reports + cases + (update ? 1 : 0) };
+}
+
+/**
+ * Somebody opened a screen a badge points at: remember what was on it.
+ *
+ * Written whether or not the account clears badges on a visit, so switching
+ * that on later does not raise a badge for something already looked at.
+ */
+export async function markScreenSeen(userId: string, screen: BadgeScreen): Promise<void> {
+    if (screen === "/admin/settings") {
+        const build = await announcedBuild();
+        if (build) await markSeen(userId, "admin.update", build);
+        return;
+    }
+    await markSeen(userId, "admin.safety", new Date().toISOString());
 }

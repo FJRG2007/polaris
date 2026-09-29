@@ -1,3 +1,4 @@
+import { SeenOnVisit } from "@/components/seen-on-visit";
 import { PageHeader } from "@polaris/ui";
 import { loadEnv } from "@polaris/config";
 import { requireAdmin } from "@/lib/session";
@@ -39,6 +40,8 @@ export default async function SettingsPage() {
         // keep it at the top so it does not shift as the update card grows.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader title={t("settings.page.title")} description={t("settings.page.description")} />
+            {/* The update this page shows is one the reader now knows about. */}
+            <SeenOnVisit screen="/admin/settings" />
             <SettingsView
                 initialPolicy={policy}
                 initialSource={source}

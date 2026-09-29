@@ -117,7 +117,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
     // act on any of it, so for everybody else the honest count is nothing and
     // asking would be two queries per page load for a badge that cannot appear.
     const adminCount = user.isAdmin
-        ? countAdminWaiting().catch(() => NO_ADMIN_WAITING)
+        ? countAdminWaiting(user.id).catch(() => NO_ADMIN_WAITING)
         : NO_ADMIN_WAITING;
     // The reader's language, which is not necessarily the account being shown:
     // an administrator viewing as somebody reads the frame in their own.

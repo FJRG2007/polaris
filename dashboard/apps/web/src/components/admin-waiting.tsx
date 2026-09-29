@@ -48,6 +48,8 @@ export interface AdminWaiting {
 export const NO_ADMIN_WAITING: AdminWaiting = { reports: 0, cases: 0, update: false, total: 0 };
 
 const WaitingContext = createContext<AdminWaiting>(NO_ADMIN_WAITING);
+/** Asks for the count again now, for a screen that just changed what it is. */
+const RecountContext = createContext<() => void>(() => undefined);
 
 /** What is waiting in Management. Nothing outside the provider, which is the
  *  honest answer for anybody who is not an administrator. */
@@ -146,5 +148,14 @@ export function AdminWaitingProvider({
         };
     }, [enabled, scope, shelf, recount, soundChanged]);
 
-    return <WaitingContext.Provider value={waiting}>{children}</WaitingContext.Provider>;
+    return (
+        <RecountContext.Provider value={recount}>
+            <WaitingContext.Provider value={waiting}>{children}</WaitingContext.Provider>
+        </RecountContext.Provider>
+    );
+}
+
+/** Ask for the count again now, for a screen that just changed what it counts. */
+export function useAdminRecount(): () => void {
+    return useContext(RecountContext);
 }

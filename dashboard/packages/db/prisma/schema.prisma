@@ -137,6 +137,10 @@ model User {
     // channel and large group, false is none. An app that can deliver one
     // decides how.
     messagesInGame Boolean?
+    // Whether opening the screen a badge points at clears it - an update
+    // waiting clears on the Update screen, a report on Safety - until something
+    // new arrives. Null is the default, which is yes. See `badge-seen.ts`.
+    badgesClearOnVisit Boolean?
     // Owned by the better-auth two-factor plugin; flipped on once the user has
     // verified their authenticator, and back off when they disable it.
     twoFactorEnabled Boolean @default(false)
@@ -332,6 +336,7 @@ model User {
     presenceSchedules   PresenceSchedule[]
     activities          UserActivity[]
     activitySettings    UserActivitySettings?
+    badgesSeen          UserBadgeSeen[]
     listeningAlong      SpotifyListenAlong?  @relation("ListenAlongListener")
     listenedAlongWith   SpotifyListenAlong[] @relation("ListenAlongHost")
     mailAccounts        MailAccount[]
@@ -11343,4 +11348,20 @@ model BackupKey {
     owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
     @@index([ownerId, retiredAt])
+}
+
+// How far one account has seen a badge's subject: the update it was shown, or
+// the moment it last opened the queue. Only read while the account lets opening
+// a screen clear its badge; anything newer than the mark raises it again.
+model UserBadgeSeen {
+    userId    String   @db.Uuid
+    // What the mark is for: admin.update | admin.safety
+    key       String
+    // The announced build for an update, an ISO timestamp for a queue.
+    mark      String
+    updatedAt DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([userId, key])
 }

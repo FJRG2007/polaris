@@ -14,6 +14,7 @@ import { listSmsSenders } from "@/lib/notifications/sms-service";
 import { NotificationsPageView } from "./notifications-page-view";
 import { prisma } from "@polaris/db";
 import { inGameChoice } from "@/lib/chat/in-game-choice";
+import { clearsOnVisit } from "@/lib/badge-seen";
 import { chatRelayReady, relaysChatToGames } from "@/lib/app-extensions/registry";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,10 @@ export default async function NotificationsPage() {
             relaysChatToGames().catch(() => false),
             // And chosen only once a server knows which of its players is them.
             chatRelayReady(user.id).catch(() => false),
-            prisma.user.findUnique({ where: { id: user.id }, select: { messagesInGame: true } })
+            prisma.user.findUnique({
+                where: { id: user.id },
+                select: { messagesInGame: true, badgesClearOnVisit: true }
+            })
         ]);
 
     return (
@@ -49,6 +53,11 @@ export default async function NotificationsPage() {
                     inGameOffered ? inGameChoice(account?.messagesInGame ?? null) : null
                 }
                 inGameReady={inGameReady}
+                // Only an administrator has a badge a visit can clear: the
+                // Management queue. Chat and Mail clear by being read.
+                badgesClearOnVisit={
+                    user.isAdmin ? clearsOnVisit(account?.badgesClearOnVisit) : null
+                }
             />
         </div>
     );

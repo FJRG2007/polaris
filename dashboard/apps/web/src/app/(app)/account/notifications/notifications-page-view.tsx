@@ -24,7 +24,8 @@ export function NotificationsPageView({
     senders,
     deliveries,
     messagesInGame,
-    inGameReady = true
+    inGameReady = true,
+    badgesClearOnVisit = null
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
     destinations: DestinationView[];
@@ -34,6 +35,8 @@ export function NotificationsPageView({
     messagesInGame: InGameChoice | null;
     /** Whether a server knows which of its players this account is. */
     inGameReady?: boolean;
+    /** Whether opening a screen clears its badge, or null for nobody with one. */
+    badgesClearOnVisit?: boolean | null;
 }) {
     const [tab, setTab] = useState<"history" | "settings">("history");
     const t = useTranslations("accountNotifications");
@@ -73,6 +76,7 @@ export function NotificationsPageView({
                     deliveries={deliveries}
                     messagesInGame={messagesInGame}
                     inGameReady={inGameReady}
+                    badgesClearOnVisit={badgesClearOnVisit}
                 />
             ) : null}
         </div>

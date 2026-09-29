@@ -391,5 +391,11 @@
         "network": "Network",
         "people": "People",
         "system": "Polaris"
+    },
+    "badges": {
+        "title": "Clear badges when I open the screen",
+        "label": "Clear a badge when I open its screen",
+        "onHint": "An update or a report stops counting once you have opened its screen. Something new counts again.",
+        "offHint": "Badges stay until the work is done: the update installed, the report settled."
     }
 }

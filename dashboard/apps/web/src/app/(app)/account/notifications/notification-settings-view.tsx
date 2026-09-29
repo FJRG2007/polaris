@@ -19,7 +19,8 @@ import { DestinationsCard } from "./destinations-card";
 import {
     saveNotificationRuleAction,
     saveSoundVolumeAction,
-    setMessagesInGameAction
+    setMessagesInGameAction,
+    setBadgesClearOnVisitAction
 } from "./actions";
 import { DEFAULT_SOUND_VOLUME } from "@/lib/notifications/sound-volume";
 import * as inGame from "@/lib/chat/in-game-choice";
@@ -89,7 +90,8 @@ export function NotificationSettingsView({
     senders,
     deliveries,
     messagesInGame = null,
-    inGameReady = true
+    inGameReady = true,
+    badgesClearOnVisit = null
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
     destinations: DestinationView[];
@@ -100,6 +102,9 @@ export function NotificationSettingsView({
     /** Whether a server knows which of its players this account is; until then
      *  there is nothing to choose. */
     inGameReady?: boolean;
+    /** Whether opening a screen clears its badge, or null for an account with
+     *  no such badge. */
+    badgesClearOnVisit?: boolean | null;
 }) {
     const [state, setState] = useState(
         () => new Map(rules.map((entry) => [entry.event, entry.rule]))
@@ -137,6 +142,7 @@ export function NotificationSettingsView({
             <BrowserNoticesCard />
             <SoundCard />
             <TabIconCard />
+            {badgesClearOnVisit !== null ? <BadgesCard initial={badgesClearOnVisit} /> : null}
             {messagesInGame !== null ? (
                 <InGameCard initial={messagesInGame} ready={inGameReady} />
             ) : null}
@@ -436,6 +442,50 @@ function SoundCard() {
                     on this device, and the volume governs how loud everything
                     is - a call rings whatever the switch says. */}
                 <VolumeSlider />
+            </CardBody>
+        </Card>
+    );
+}
+
+/**
+ * Whether opening the screen a badge points at clears it.
+ *
+ * On the account, so it holds on every device. Optimistic, and put back with
+ * the reason if the save is refused.
+ */
+function BadgesCard({ initial }: { initial: boolean }) {
+    const t = useTranslations("accountNotifications");
+    const [enabled, setEnabled] = useState(initial);
+    const [error, setError] = useState("");
+    const [, startSaving] = useTransition();
+
+    function toggle(next: boolean) {
+        setEnabled(next);
+        setError("");
+        startSaving(async () => {
+            const result = await setBadgesClearOnVisitAction(next).catch(() => ({
+                error: t("errors.notSavedTryAgain")
+            }));
+            if (result.error) {
+                setError(result.error);
+                setEnabled(!next);
+            }
+        });
+    }
+
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                        <p className="text-sm font-medium">{t("badges.title")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {enabled ? t("badges.onHint") : t("badges.offHint")}
+                        </p>
+                    </div>
+                    <Switch checked={enabled} onChange={toggle} aria-label={t("badges.label")} />
+                </div>
+                {error ? <p className="text-xs text-danger">{error}</p> : null}
             </CardBody>
         </Card>
     );

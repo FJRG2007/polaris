@@ -12,6 +12,7 @@
  * recorded with their name on it.
  */
 
+import { SeenOnVisit } from "@/components/seen-on-visit";
 import { PageHeader } from "@polaris/ui";
 import { SafetyView } from "./safety-view";
 import { requireAdmin } from "@/lib/session";
@@ -62,6 +63,8 @@ export default async function SafetyPage({
                 title={t("safety.page.title")}
                 description={t("safety.page.description")}
             />
+            {/* The reports and cases this page lists are ones the reader has seen. */}
+            <SeenOnVisit screen="/admin/safety" />
             <SafetyView
                 cases={cases}
                 reports={reports}

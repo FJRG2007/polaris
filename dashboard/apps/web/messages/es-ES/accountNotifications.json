@@ -391,5 +391,11 @@
         "network": "Red",
         "people": "Personas",
         "system": "Polaris"
+    },
+    "badges": {
+        "title": "Quitar avisos al abrir la pantalla",
+        "label": "Quitar el aviso al abrir su pantalla",
+        "onHint": "Una actualización o un reporte deja de contar en cuanto abres su pantalla. Lo nuevo vuelve a contar.",
+        "offHint": "Los avisos siguen hasta que se resuelve: la actualización instalada, el reporte cerrado."
     }
 }

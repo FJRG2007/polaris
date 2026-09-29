@@ -74,24 +74,24 @@ describe("the count reaching every badge in Polaris", () => {
 
     it("is seeded on the server, so the badge is right on the first paint", async () => {
         const chrome = await readFile(new URL("components/app-chrome.tsx", SRC), "utf8");
-        expect(chrome).toContain("countAdminWaiting()");
+        expect(chrome).toContain("countAdminWaiting(user.id)");
         // And asked for nobody else: two queries per page load for a badge that
         // cannot appear is two queries for nothing. Matched with the whitespace
         // folded, so the formatter wrapping a line does not read as a change.
         const flat = chrome.replace(/\s+/g, " ");
-        expect(flat).toContain("user.isAdmin ? countAdminWaiting()");
+        expect(flat).toContain("user.isAdmin ? countAdminWaiting(user.id)");
         expect(flat).toMatch(
             /<AdminWaitingProvider initial=\{adminWaiting\} enabled=\{user\.isAdmin\} ?>/
         );
     });
 
     it("counts what is open rather than what is unread", async () => {
-        // A report somebody has read and not settled is still a report, and a
-        // badge that cleared on being looked at would say an empty queue while it
-        // was full.
+        // A report somebody has read and not settled is still a report. Whether
+        // opening the queue clears the badge is the reader's setting, asserted in
+        // `badge-seen.test.ts`; what is counted is always what is still open.
         const waiting = await readFile(new URL("lib/admin-waiting.ts", SRC), "utf8");
-        expect(waiting).toContain('prisma.chatReport.count({ where: { status: "open" } })');
-        expect(waiting).toContain('prisma.safetyCase.count({ where: { status: "open" } })');
+        expect(waiting).toContain('prisma.chatReport.count({ where: { status: "open", ...newer } })');
+        expect(waiting).toContain('prisma.safetyCase.count({ where: { status: "open", ...newer } })');
     });
 
     it("tells the administrators when a message is reported", async () => {

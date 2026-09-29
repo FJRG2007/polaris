@@ -69,6 +69,23 @@ export async function setMessagesInGameAction(
     return { choice: parsed.data };
 }
 
+/**
+ * Whether opening the screen a badge points at clears it, until something new
+ * arrives. Saved on the account, so it holds on every device.
+ */
+export async function setBadgesClearOnVisitAction(
+    enabled: unknown
+): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = z.boolean().safeParse(enabled);
+    if (!parsed.success) return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
+    await prisma.user.update({
+        where: { id: user.id },
+        data: { badgesClearOnVisit: parsed.data }
+    });
+    return {};
+}
+
 /** How many test alerts one account may send, and over what span. */
 const TEST_LIMIT = 10;
 const TEST_WINDOW_MS = 5 * 60 * 1000;
