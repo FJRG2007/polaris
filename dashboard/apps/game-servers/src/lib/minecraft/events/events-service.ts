@@ -95,6 +95,8 @@ interface Loop {
     countdown: number;
     /** Parkour and spleef: how this server spells marked items, and its build limit. */
     flavour: stage.Flavour | null;
+    /** Whether operators' chat has been quietened for this run yet. */
+    quiet: boolean;
 }
 
 const loops = new Map<string, Loop>();
@@ -561,7 +563,8 @@ function startLoop(
         announced: run.phase === "running",
         language: settings.language,
         countdown: catalog.countdownSecondsFor(run.preset, settings),
-        flavour: null
+        flavour: null,
+        quiet: false
     };
     loop.timer.unref?.();
     loop.clock = setInterval(() => void showClock(loop), CLOCK_MS);
@@ -669,6 +672,7 @@ async function countdown(
     const language = loop.language;
     const left = (loop.run.startsAt - now) / 1000;
     const title = preset.name;
+    await quieten(installedAppId, loop, server);
     // No warning asked for: straight to the start, rather than "starts in 0:00".
     if (!loop.announced && loop.run.startsAt <= now) loop.announced = true;
     if (!loop.announced) {
@@ -777,6 +781,28 @@ async function showClock(loop: Loop): Promise<void> {
         lines.push(...commands.barUpdate(messages.barName(preset.name, left), left, total));
     }
     if (lines.length > 0) await server.sayAll(lines).catch(() => undefined);
+}
+
+/**
+ * Operators' chat kept clear of what the event's commands say, for as long as it
+ * runs: the rule's value written down first - so whatever ends the event, even
+ * after a restart, puts it back - and only then turned off.
+ */
+async function quieten(installedAppId: string, loop: Loop, server: ServerContainer): Promise<void> {
+    if (loop.quiet) return;
+    loop.quiet = true;
+    for (const rule of commands.FEEDBACK_RULES) {
+        const recorded = loop.run.gamerules[rule];
+        const value =
+            recorded ?? commands.readRuleValue(await server.say([commands.readRule(rule)]));
+        if (value === null) continue;
+        if (recorded === undefined) {
+            loop.run = { ...loop.run, gamerules: { ...loop.run.gamerules, [rule]: value } };
+            await persist(installedAppId, loop);
+        }
+        if (value === "true") await server.say([commands.setRule(rule, "false")]);
+        return;
+    }
 }
 
 /** What a gathering or a rare catch is for, said with the rules. */
@@ -2625,11 +2651,19 @@ export function cleanupOf(run: stored.EventRun): string[] {
             after.push(...rareCatch.catchCleanup());
             break;
     }
+    // Operators' chat is given back last, so the tidying up does not fill it either.
+    const feedback: string[] = commands.FEEDBACK_RULES.filter((rule) => rule in run.gamerules);
+    const rules = Object.fromEntries(
+        Object.entries(run.gamerules).filter(([rule]) => !feedback.includes(rule))
+    );
     return [
         ...before,
-        ...commands.cleanup(run.preset, run.place, run.target, run.gamerules, run.timeBefore),
+        ...commands.cleanup(run.preset, run.place, run.target, rules, run.timeBefore),
         ...after,
-        ...run.chunks.map(chunks.releaseChunk)
+        ...run.chunks.map(chunks.releaseChunk),
+        ...feedback
+            .filter((rule) => run.gamerules[rule] === "true" || run.gamerules[rule] === "false")
+            .map((rule) => commands.setRule(rule, run.gamerules[rule]!))
     ];
 }
 

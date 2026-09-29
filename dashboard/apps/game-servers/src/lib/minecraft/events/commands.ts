@@ -865,6 +865,16 @@ export const FROZEN_RULES = [
     ["doWeatherCycle", "advance_weather"]
 ] as const;
 
+/**
+ * The rule that shows operators what commands did, as `[Rcon: Set [pe_sum] for
+ * Alice to 3]` in their chat. An event runs dozens of commands a second - the
+ * clock, the scoreboard, a title for each player - and every one of them landed
+ * in the chat of every operator playing, burying it. Held off while an event is
+ * on and put back after, like the rules a blood moon holds; the answers Polaris
+ * reads over RCON do not depend on it. Its name before 1.21.11, then after.
+ */
+export const FEEDBACK_RULES = ["sendCommandFeedback", "send_command_feedback"] as const;
+
 export function readRule(name: string): string {
     return `gamerule ${name}`;
 }

@@ -273,6 +273,10 @@ function answer(line: string): string {
             )
             .join("\n");
     }
+    if (line === "gamerule sendCommandFeedback") {
+        // A server that shows operators every command's answer, as they come.
+        return "Gamerule sendCommandFeedback is currently set to: true";
+    }
     if (line === "gamerule keepInventory") {
         return world.keepInventory === "unknown"
             ? "Unknown or incomplete command, see below for error"
@@ -695,6 +699,32 @@ afterEach(async () => {
     }
     await play(10_000);
     vi.useRealTimers();
+});
+
+describe("operators' chat", () => {
+    it("is kept clear of the event's commands while it runs, and given back after", async () => {
+        setUp([{ ...catalog.newPreset("mining-rush", "rush"), minutes: 3 }], {
+            countdownSeconds: 10
+        });
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "rush",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        // Written down before it is turned off, so any end puts it back.
+        expect(state().run?.gamerules).toEqual({ sendCommandFeedback: "true" });
+        const off = world.sent.indexOf("gamerule sendCommandFeedback false");
+        expect(off).toBeGreaterThanOrEqual(0);
+        expect(off).toBeLessThan(world.sent.findIndex((line) => line.startsWith("bossbar add")));
+        await play(4 * 60_000);
+        expect(state().run).toBeNull();
+        expect(
+            world.sent.filter((line) => line.startsWith("gamerule sendCommandFeedback ")).at(-1)
+        ).toBe("gamerule sendCommandFeedback true");
+    });
 });
 
 describe("the boss bar's clock", () => {
@@ -2294,7 +2324,10 @@ describe("a horde defence", () => {
         // Nothing is lost to a death: keepInventory on, the server's own
         // value written down first.
         expect(world.sent).toContain("gamerule keepInventory true");
-        expect(state().run?.gamerules).toEqual({ keepInventory: "false" });
+        expect(state().run?.gamerules).toEqual({
+            keepInventory: "false",
+            sendCommandFeedback: "true"
+        });
         expect(state().run?.place).toEqual({ x: 300, y: 70, z: 0 });
         expect(state().run?.chunks).toHaveLength(25);
         const held = holds();
