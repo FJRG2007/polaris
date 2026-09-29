@@ -18,6 +18,7 @@
 
 import { describe, expect, it } from "vitest";
 import { BROWSER_GUIDES, browserGuide, detectBrowser } from "@/lib/browser-guide";
+import { translatorFor } from "@/lib/i18n/translate";
 
 /** Real-shaped user agents, one per browser the page has to tell apart. */
 const AGENTS = {
@@ -97,5 +98,9 @@ describe("what each browser is told to do", () => {
         // The Chromium caveat is what makes updating make sense: same folder,
         // refresh arrow.
         expect(browserGuide("chrome").caveat).toContain("refresh");
+        // The screen says them through the catalog, word for word in English.
+        const english = translatorFor("en-US", "account");
+        expect(english("downloads.steps.caveatFirefox")).toBe(browserGuide("firefox").caveat);
+        expect(english("downloads.steps.caveatChromium")).toBe(browserGuide("chrome").caveat);
     });
 });

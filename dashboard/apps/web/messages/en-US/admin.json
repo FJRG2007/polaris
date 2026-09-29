@@ -2271,7 +2271,25 @@
                 "confirmTitle": "Remove this access",
                 "confirmDescription": "They lose {name} the next time a page loads. Nothing else about their account changes.",
                 "confirm": "Remove",
-                "noAnswer": "Polaris did not answer. Reload the page and try again."
+                "noAnswer": "Polaris did not answer. Reload the page and try again.",
+                "theirGroup": "their {name} group",
+                "theirRole": "their {name} role",
+                "them": "them",
+                "gone": "No longer exists",
+                "kinds": {
+                    "install": "Installed app",
+                    "project": "Project",
+                    "domain": "Domain",
+                    "space": "Space",
+                    "drive": "Drive folder"
+                },
+                "every": {
+                    "install": "Every installed app",
+                    "project": "Every project",
+                    "domain": "Every domain",
+                    "space": "Every space",
+                    "drive": "Every drive folder"
+                }
             }
         },
         "capabilities": {

@@ -960,7 +960,8 @@
         "command": {
             "title": "Una línea, y la misma para actualizar",
             "system": "En qué sistema la instalas",
-            "hint": "Pégala en {shell}. Pone la extensión en una carpeta fija, así que solo la primera vez hace falta Cargar descomprimida; después, ejecuta la misma línea y pulsa la flecha de recargar en la tarjeta de Polaris. Firefox no está incluido: su complemento temporal desaparece al cerrar Firefox, así que no hay nada que un script pueda mantener al día."
+            "hint": "Pégala en {shell}. Pone la extensión en una carpeta fija, así que solo la primera vez hace falta Cargar descomprimida; después, ejecuta la misma línea y pulsa la flecha de recargar en la tarjeta de Polaris. Firefox no está incluido: su complemento temporal desaparece al cerrar Firefox, así que no hay nada que un script pueda mantener al día.",
+            "unix": "macOS y Linux"
         },
         "steps": {
             "yourBrowser": "Tu navegador",
@@ -973,7 +974,9 @@
             "developerMode": "Activa el <press>Modo de desarrollador</press>, arriba a la derecha. Sin él, el siguiente botón no aparece.",
             "pressFolder": "Pulsa <press>{action}</press> y elige la carpeta descomprimida.",
             "pressFile": "Pulsa <press>{action}</press> y elige el archivo que descargaste.",
-            "pointIt": "Abre la extensión y apúntala a este Polaris. Pide permiso para hablar con esta dirección y con ninguna otra."
+            "pointIt": "Abre la extensión y apúntala a este Polaris. Pide permiso para hablar con esta dirección y con ninguna otra.",
+            "caveatChromium": "Se queda hasta que la quites, y no se actualiza sola. Para que coja una versión nueva, sustituye los archivos en la misma carpeta y pulsa la flecha de recargar.",
+            "caveatFirefox": "Temporal quiere decir temporal: Firefox la descarta al cerrarse, así que hay que volver a cargarla la próxima vez."
         }
     }
 }

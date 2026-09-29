@@ -2271,7 +2271,25 @@
                 "confirmTitle": "Quitar este acceso",
                 "confirmDescription": "Pierde el acceso a {name} la próxima vez que cargue una página. Nada más cambia en su cuenta.",
                 "confirm": "Quitar",
-                "noAnswer": "Polaris no ha respondido. Recarga la página y vuelve a intentarlo."
+                "noAnswer": "Polaris no ha respondido. Recarga la página y vuelve a intentarlo.",
+                "theirGroup": "su grupo {name}",
+                "theirRole": "su rol {name}",
+                "them": "esta cuenta",
+                "gone": "Ya no existe",
+                "kinds": {
+                    "install": "App instalada",
+                    "project": "Proyecto",
+                    "domain": "Dominio",
+                    "space": "Espacio",
+                    "drive": "Carpeta de Drive"
+                },
+                "every": {
+                    "install": "Todas las apps instaladas",
+                    "project": "Todos los proyectos",
+                    "domain": "Todos los dominios",
+                    "space": "Todos los espacios",
+                    "drive": "Todas las carpetas de Drive"
+                }
             }
         },
         "capabilities": {

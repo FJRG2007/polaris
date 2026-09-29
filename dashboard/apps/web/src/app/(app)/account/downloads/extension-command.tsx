@@ -44,7 +44,7 @@ export function ExtensionCommand({ repo }: { repo: string }) {
                     onValueChange={(value) => setOs(value as InstallOs)}
                     options={INSTALL_OSES.map((entry) => ({
                         value: entry,
-                        label: installCommand(entry, repo).label
+                        label: entry === "unix" ? t("downloads.command.unix") : installCommand(entry, repo).label
                     }))}
                 />
             </div>

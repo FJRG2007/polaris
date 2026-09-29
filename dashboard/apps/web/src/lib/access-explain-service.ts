@@ -15,6 +15,10 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import * as auth from "@polaris/auth";
+import { readerWords } from "@/lib/i18n/reader-words";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+
+type AdminWords = NamespaceTranslator<"admin">;
 
 /** One permission, decided and explained. */
 export interface PermissionVerdict {
@@ -77,6 +81,7 @@ async function resourceLabels(
 
 /** Names for the principals a grant can be written for. */
 async function principalLabels(
+    t: AdminWords,
     grants: readonly auth.ResourceGrantRow[]
 ): Promise<Map<string, string>> {
     const ids = (type: string) =>
@@ -86,25 +91,33 @@ async function principalLabels(
         prisma.role.findMany({ where: { id: { in: ids("role") } }, select: { id: true, name: true } })
     ]);
     const labels = new Map<string, string>();
-    for (const row of groups) labels.set(`group:${row.id}`, `their ${row.name} group`);
-    for (const row of roles) labels.set(`role:${row.id}`, `their ${row.name} role`);
+    for (const row of groups) labels.set(`group:${row.id}`, t("usersDetail.accessView.resources.theirGroup", { name: row.name }));
+    for (const row of roles) labels.set(`role:${row.id}`, t("usersDetail.accessView.resources.theirRole", { name: row.name }));
     return labels;
 }
 
 /** How a statement source reads on the page, and where to go to change it. */
+/** Reads for the permission verdicts, which no screen renders yet: the access
+ *  screen shows grants on things. Worded in English until one does. */
 function describe(source: auth.StatementSource): { label: string; href: string } {
+    // i18n-ignore not rendered on any screen (see above)
     if (source.kind === "role") return { label: `their ${source.name} role`, href: "/admin/roles" };
     // An override names the capability rather than a document, because that is
     // what somebody would go looking for: "chat, switched on for this account".
     if (source.kind === "account") {
+        // i18n-ignore not rendered on any screen (see above)
         return { label: `${source.name}, set on this account`, href: "/admin/users" };
     }
     const via =
         source.principalType === "user"
+            // i18n-ignore not rendered on any screen (see above)
             ? "attached to them"
             : source.principalType === "group"
+              // i18n-ignore not rendered on any screen (see above)
               ? "through a group they are in"
+              // i18n-ignore not rendered on any screen (see above)
               : "through a role they hold";
+    // i18n-ignore not rendered on any screen (see above)
     return { label: `the ${source.name} policy, ${via}`, href: "/admin/policies" };
 }
 
@@ -142,7 +155,8 @@ export async function explainUserAccess(userId: string): Promise<AccessExplanati
         };
     });
 
-    const [things, principals] = await Promise.all([resourceLabels(grants), principalLabels(grants)]);
+    const t = await readerWords("admin");
+    const [things, principals] = await Promise.all([resourceLabels(grants), principalLabels(t, grants)]);
     const now = Date.now();
     const resources: ResourceGrantView[] = grants.map((grant) => {
         const key = `${grant.kind}:${grant.resourceId}`;
@@ -150,14 +164,15 @@ export async function explainUserAccess(userId: string): Promise<AccessExplanati
         return {
             id: grant.id,
             kind: grant.kind,
-            kindLabel: core.RESOURCE_KIND_META[grant.kind].label,
+            kindLabel: t(`usersDetail.accessView.resources.kinds.${grant.kind}`),
             resourceId: grant.resourceId,
             resourceLabel:
                 grant.resourceId === core.EVERY_RESOURCE
-                    ? `Every ${core.RESOURCE_KIND_META[grant.kind].label.toLowerCase()}`
-                    : (thing?.label ?? "No longer exists"),
+                    ? t(`usersDetail.accessView.resources.every.${grant.kind}`)
+                    : (thing?.label ?? t("usersDetail.accessView.resources.gone")),
             principalType: grant.principalType,
-            principalLabel: principals.get(`${grant.principalType}:${grant.principalId}`) ?? "them",
+            principalLabel:
+                principals.get(`${grant.principalType}:${grant.principalId}`) ?? t("usersDetail.accessView.resources.them"),
             actions: grant.actions,
             effect: grant.effect,
             canShare: grant.canShare,

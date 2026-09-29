@@ -57,13 +57,17 @@ const CHROMIUM = {
 } as const;
 
 export const BROWSER_GUIDES: readonly BrowserGuide[] = [
+    // i18n-ignore a browser's name
     { id: "chrome", label: "Chrome", page: "chrome://extensions", ...CHROMIUM },
+    // i18n-ignore a browser's name
     { id: "edge", label: "Edge", page: "edge://extensions", ...CHROMIUM },
+    // i18n-ignore a browser's name
     { id: "brave", label: "Brave", page: "brave://extensions", ...CHROMIUM },
+    // i18n-ignore a browser's name
     { id: "opera", label: "Opera", page: "opera://extensions", ...CHROMIUM },
     {
         id: "firefox",
-        label: "Firefox",
+        label: "Firefox", // i18n-ignore a browser's name
         // The fragment matters: plain about:debugging opens the setup pane, and
         // the extension is loaded from This Firefox.
         page: "about:debugging#/runtime/this-firefox",

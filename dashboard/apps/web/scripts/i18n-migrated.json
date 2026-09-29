@@ -1428,6 +1428,9 @@
         "web/src/lib/mcp/tools/deploy.ts",
         "web/src/lib/mcp/tools/index.ts",
         "web/src/lib/mcp/tools/sessions.ts",
-        "web/src/lib/mcp/tools/tasks.ts"
+        "web/src/lib/mcp/tools/tasks.ts",
+        "web/src/lib/access-explain-service.ts",
+        "web/src/lib/browser-guide.ts",
+        "web/src/lib/install-command.ts"
     ]
 }

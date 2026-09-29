@@ -960,7 +960,8 @@
         "command": {
             "title": "One line, and the same one to update",
             "system": "Which system you are installing on",
-            "hint": "Paste it into {shell}. It puts the extension in one fixed folder, so the first run is the only one that needs Load unpacked - after that, run the same line and press the refresh arrow on the Polaris card. Firefox is not covered: its temporary add-on is gone when Firefox closes, so there is nothing for a script to keep current."
+            "hint": "Paste it into {shell}. It puts the extension in one fixed folder, so the first run is the only one that needs Load unpacked - after that, run the same line and press the refresh arrow on the Polaris card. Firefox is not covered: its temporary add-on is gone when Firefox closes, so there is nothing for a script to keep current.",
+            "unix": "macOS and Linux"
         },
         "steps": {
             "yourBrowser": "Your browser",
@@ -973,7 +974,9 @@
             "developerMode": "Turn on <press>Developer mode</press>, top right. Without it the next button is not there.",
             "pressFolder": "Press <press>{action}</press> and choose the unpacked folder.",
             "pressFile": "Press <press>{action}</press> and choose the file you downloaded.",
-            "pointIt": "Open the extension and point it at this Polaris. It asks for permission to talk to this address and no other."
+            "pointIt": "Open the extension and point it at this Polaris. It asks for permission to talk to this address and no other.",
+            "caveatChromium": "It stays until you remove it, and it does not update itself. Replacing the files in the same folder and pressing the refresh arrow is how it takes a new version.",
+            "caveatFirefox": "Temporary is literal: Firefox lets it go when it closes, so it has to be loaded again next time."
         }
     }
 }

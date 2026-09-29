@@ -152,7 +152,9 @@ export function ExtensionSteps() {
                 </li>
             </ol>
 
-            <p className="text-xs text-muted-foreground">{guide.caveat}</p>
+            <p className="text-xs text-muted-foreground">
+                {t(guide.id === "firefox" ? "downloads.steps.caveatFirefox" : "downloads.steps.caveatChromium")}
+            </p>
         </div>
     );
 }

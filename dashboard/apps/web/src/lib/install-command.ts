@@ -46,6 +46,7 @@ export function installCommand(os: InstallOs, repo: string): InstallCommand {
     if (os === "windows") {
         return {
             os,
+            // i18n-ignore a system's name
             label: "Windows",
             shell: "PowerShell",
             command: `irm ${scripts}/install.ps1 | iex`
@@ -53,6 +54,7 @@ export function installCommand(os: InstallOs, repo: string): InstallCommand {
     }
     return {
         os,
+        // i18n-ignore the downloads screen says it in the reader's words
         label: "macOS and Linux",
         shell: "Terminal",
         command: `curl -fsSL ${scripts}/install.sh | sh`
