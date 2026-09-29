@@ -47,6 +47,7 @@
     },
     "dependencies": {
         "fuse.js": "7.0.0",
+        "intl-messageformat": "12.1.2",
         "ipaddr.js": "2.2.0",
         "zod": "3.24.1"
     }

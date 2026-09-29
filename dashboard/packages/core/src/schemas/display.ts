@@ -15,6 +15,7 @@
 
 import { z } from "zod";
 import { THEME_IDS } from "./themes.js";
+import { DEFAULT_LOCALE, LOCALE_INFO, LOCALES, type Locale } from "../i18n/locales.js";
 
 export const TEMPERATURE_UNITS = ["c", "f"] as const;
 export const DATE_ORDERS = ["dmy", "mdy"] as const;
@@ -26,9 +27,15 @@ export const CLOCK_FORMATS = ["24h", "12h"] as const;
  *  parts of the Middle East as Saturday first. */
 export const WEEK_STARTS = ["sun", "mon", "sat"] as const;
 
-/** The languages the interface is translated into. English is the only one so
- *  far; the setting exists so an account keeps its choice when more arrive. */
-export const LANGUAGES = ["en"] as const;
+/**
+ * The languages the interface is translated into - the locale registry, under
+ * the name this schema has always used for it.
+ *
+ * Only the resolved set carries one: an account's language is its own column
+ * (see `resolveDisplayPreferences`), so a stored blob's `language` is never what
+ * decides, and a legacy `"en"` in one still reads as English.
+ */
+export const LANGUAGES = LOCALES;
 
 /**
  * The sizes text is offered at, in pixels, smallest first.
@@ -139,7 +146,7 @@ export type DateOrder = (typeof DATE_ORDERS)[number];
 export type YearFormat = (typeof YEAR_FORMATS)[number];
 export type ClockFormat = (typeof CLOCK_FORMATS)[number];
 export type WeekStart = (typeof WEEK_STARTS)[number];
-export type Language = (typeof LANGUAGES)[number];
+export type Language = Locale;
 
 /** A complete set of choices - what every screen ends up formatting against. */
 export const displayPreferencesSchema = z.object({
@@ -149,7 +156,8 @@ export const displayPreferencesSchema = z.object({
     clock: z.enum(CLOCK_FORMATS),
     weekStart: z.enum(WEEK_STARTS),
     currency: z.enum(CURRENCY_CODES),
-    language: z.enum(LANGUAGES),
+    // "en" is what this held before there was more than one language.
+    language: z.preprocess((value) => (value === "en" ? DEFAULT_LOCALE : value), z.enum(LANGUAGES)),
     /** An IANA zone name, or `auto` for the clock of the device in front of the
      *  person. Every time on screen is written in it. */
     timeZone: timeZoneField,
@@ -174,7 +182,7 @@ export const DISPLAY_DEFAULTS: DisplayPreferences = {
     clock: "24h",
     weekStart: "sun",
     currency: "EUR",
-    language: "en",
+    language: DEFAULT_LOCALE,
     timeZone: AUTOMATIC_TIME_ZONE,
     theme: "dark",
     textSize: 16
@@ -188,12 +196,30 @@ function chosen(preferences: UserDisplayPreferences): UserDisplayPreferences {
     ) as UserDisplayPreferences;
 }
 
-/** Built-in defaults, then the platform's, then the user's own. */
+/**
+ * Built-in defaults, then what the reader's language implies, then the
+ * platform's, then the user's own.
+ *
+ * The language sits under the platform on purpose: an operator who set a house
+ * style meant it for everybody, and a Spanish reader on an instance that never
+ * chose still gets day-first dates and a week that starts on Monday. English
+ * implies nothing, so an English reader's formats are exactly what they were.
+ *
+ * `locale` is the account's language, which is not a display preference but its
+ * own setting; when given it is also what `language` resolves to.
+ */
 export function resolveDisplayPreferences(
     platform: UserDisplayPreferences | null | undefined,
-    user?: UserDisplayPreferences | null
+    user?: UserDisplayPreferences | null,
+    locale?: Locale
 ): DisplayPreferences {
-    return { ...DISPLAY_DEFAULTS, ...chosen(platform ?? {}), ...chosen(user ?? {}) };
+    return {
+        ...DISPLAY_DEFAULTS,
+        ...(locale ? LOCALE_INFO[locale].formats : {}),
+        ...chosen(platform ?? {}),
+        ...chosen(user ?? {}),
+        ...(locale ? { language: locale } : {})
+    };
 }
 
 /**
@@ -219,6 +245,18 @@ export function stringifyDisplayPreferences(preferences: UserDisplayPreferences)
 /** Weekday names, indexed the way `Date.getDay()` numbers them. */
 export const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 export const WEEKDAY_SHORT_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/**
+ * The seven day names in a language, indexed the way `Date.getDay()` numbers
+ * them. From Intl rather than a table, so a new language needs no list of its
+ * own; in English they are exactly `WEEKDAY_NAMES` and `WEEKDAY_SHORT_NAMES`.
+ * Written as the language writes them mid-sentence - Spanish ones are lower case.
+ */
+export function weekdayNames(locale: string, width: "long" | "short"): string[] {
+    const format = new Intl.DateTimeFormat(locale, { weekday: width, timeZone: "UTC" });
+    // 1 January 2023 was a Sunday, so day zero is getDay() zero.
+    return Array.from({ length: 7 }, (_, day) => format.format(new Date(Date.UTC(2023, 0, 1 + day))));
+}
 
 /** The `Date.getDay()` index a week begins on, which is what every calendar
  *  header, week grid and "this week" window counts from. */
@@ -402,6 +440,9 @@ export interface DisplayFormat {
     temperature(celsius: number | null | undefined): string;
     /** An amount in the chosen currency. */
     currency(amount: number | null | undefined): string;
+    /** A plain number, grouped and punctuated the way the reader's language
+     *  writes it ("1,234.5" or "1234,5"). */
+    number(value: number | null | undefined, options?: Intl.NumberFormatOptions): string;
 }
 
 export function createDisplayFormat(preferences: DisplayPreferences): DisplayFormat {
@@ -446,6 +487,10 @@ export function createDisplayFormat(preferences: DisplayPreferences): DisplayFor
         currency(amount) {
             if (amount === null || amount === undefined || !Number.isFinite(amount)) return "-";
             return new Intl.NumberFormat(localeFor(language), { style: "currency", currency }).format(amount);
+        },
+        number(value, options) {
+            if (value === null || value === undefined || !Number.isFinite(value)) return "-";
+            return new Intl.NumberFormat(localeFor(language), options).format(value);
         }
     };
 }
