@@ -30,6 +30,7 @@ import { Badge, Button, Checkbox, Input, cn } from "@polaris/ui";
 import { expandPermissions, impliedBy, type Permission } from "@polaris/core";
 import { SCOPE_GROUPS, SCOPE_HINTS, SCOPE_LABELS } from "@/lib/api-key-scopes";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 /** Which held scope pulled an implied one in, for the "Included with" note. */
 function includedBy(scope: Permission, selected: readonly Permission[]): Permission | null {
@@ -63,7 +64,7 @@ export function ScopePicker({
     const offered = useMemo(() => new Set(available), [available]);
     const groups = useMemo(() => {
         const named = SCOPE_GROUPS.map((group) => ({
-            title: group.title,
+            title: scopeGroupTitle(t, group.title),
             scopes: group.scopes.filter((scope) => offered.has(scope))
         })).filter((group) => group.scopes.length > 0);
         const listed = new Set(named.flatMap((group) => group.scopes));
@@ -231,4 +232,11 @@ export function ScopePicker({
             </div>
         </div>
     );
+}
+
+/** An area's name in the reader's words: `SCOPE_GROUPS` names each in English,
+ *  and the catalog holds the same names by that English, camel-cased. */
+function scopeGroupTitle(t: ReturnType<typeof useTranslations<"account">>, title: string): string {
+    const key = `apiKeys.scopes.groups.${title.replace(/ (\w)/g, (_, letter: string) => letter.toUpperCase()).replace(/^\w/, (letter) => letter.toLowerCase())}`;
+    return t.has(key) ? t(key as NamespaceKey<"account">) : title;
 }

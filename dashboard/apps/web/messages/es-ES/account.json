@@ -310,7 +310,25 @@
             "ofGroup": "{count} de {total}",
             "none": "Ninguno",
             "noMatch": "Ningún permiso coincide.",
-            "clear": "Borrar"
+            "clear": "Borrar",
+            "groups": {
+                "files": "Archivos",
+                "storage": "Almacenamiento",
+                "sharing": "Compartir",
+                "snippets": "Fragmentos",
+                "vault": "Vault",
+                "notes": "Notas",
+                "office": "Office",
+                "mail": "Correo",
+                "chat": "Chat",
+                "deployments": "Despliegues",
+                "gameServers": "Servidores de juegos",
+                "home": "Lugares",
+                "tools": "Herramientas",
+                "tasks": "Tareas",
+                "inbox": "Entrada",
+                "administration": "Administración"
+            }
         }
     },
     "connections": {

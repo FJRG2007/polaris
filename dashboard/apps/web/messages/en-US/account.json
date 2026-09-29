@@ -310,7 +310,25 @@
             "ofGroup": "{count} of {total}",
             "none": "None",
             "noMatch": "No permission matches that.",
-            "clear": "Clear"
+            "clear": "Clear",
+            "groups": {
+                "files": "Files",
+                "storage": "Storage",
+                "sharing": "Sharing",
+                "snippets": "Snippets",
+                "vault": "Vault",
+                "notes": "Notes",
+                "office": "Office",
+                "mail": "Mail",
+                "chat": "Chat",
+                "deployments": "Deployments",
+                "gameServers": "Game servers",
+                "home": "Home",
+                "tools": "Tools",
+                "tasks": "Tasks",
+                "inbox": "Inbox",
+                "administration": "Administration"
+            }
         }
     },
     "connections": {
