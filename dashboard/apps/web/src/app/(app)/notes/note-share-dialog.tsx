@@ -14,6 +14,7 @@
  */
 
 import * as actions from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Globe, Link2, Lock } from "lucide-react";
@@ -47,6 +48,7 @@ export function NoteShareDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("notes");
     const [share, setShare] = useState<NoteShareView | null>(null);
     const [url, setUrl] = useState("");
     const [loading, setLoading] = useState(true);
@@ -128,10 +130,9 @@ export function NoteShareDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Share this note</DialogTitle>
+                    <DialogTitle>{t("share.title")}</DialogTitle>
                     <DialogDescription>
-                        A link anybody can open, whether or not they have an account here. They can read
-                        &ldquo;{noteTitle}&rdquo; and nothing else, and they cannot change it.
+                        {t("share.description", { title: noteTitle })}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -139,12 +140,12 @@ export function NoteShareDialog({
                     <div className="flex items-center gap-3 rounded-md border border-border bg-surface p-3">
                         <Globe className="size-4 shrink-0 text-muted-foreground" />
                         <span className="min-w-0 flex-1 text-sm">
-                            {share ? "Anyone with the link can read it" : "Not shared"}
+                            {share ? t("share.on") : t("share.off")}
                         </span>
                         <Switch
                             checked={Boolean(share)}
                             disabled={busy || loading}
-                            aria-label="Share this note by link"
+                            aria-label={t("view.shareNote")}
                             onChange={(checked) => void (checked ? save() : unpublish())}
                         />
                     </div>
@@ -159,29 +160,29 @@ export function NoteShareDialog({
                                 >
                                     {url || "..."}
                                 </code>
-                                {url && <CopyButton value={url} label="Copy the link" />}
+                                {url && <CopyButton value={url} label={t("share.copy")} />}
                             </div>
 
                             {!share.usable.ok && (
                                 <p className="rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground">
-                                    Nobody can open this link right now: it is {share.usable.reason}.
+                                    {t("share.unusable", { reason: share.usable.reason })}
                                 </p>
                             )}
 
                             <label className="flex items-center gap-3 text-sm">
                                 <Switch
                                     checked={includeChildren}
-                                    aria-label="Include the pages under this one"
+                                    aria-label={t("share.children")}
                                     onChange={setIncludeChildren}
                                 />
-                                Include the pages under this one
+                                {t("share.children")}
                             </label>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="flex flex-col gap-1">
                                     <span className="text-xs text-muted-foreground">
                                         <Lock className="mr-1 inline size-3" />
-                                        {share.hasPassword ? "Replace the password" : "Password"}
+                                        {share.hasPassword ? t("share.replacePassword") : t("share.password")}
                                     </span>
                                     {/* enigma:allow-no-breach-check enigma:allow-identity-password -
                                         this is the link's own passphrase, not a credential: it
@@ -191,13 +192,13 @@ export function NoteShareDialog({
                                     <Input
                                         type="password"
                                         value={password}
-                                        placeholder={share.hasPassword ? "Set" : "None"}
+                                        placeholder={share.hasPassword ? t("share.passwordSet") : t("share.passwordNone")}
                                         autoComplete="new-password"
                                         onChange={(event) => setPassword(event.target.value)}
                                     />
                                 </div>
                                 <div className="flex flex-col gap-1">
-                                    <span className="text-xs text-muted-foreground">Expires on</span>
+                                    <span className="text-xs text-muted-foreground">{t("share.expires")}</span>
                                     <Input
                                         type="date"
                                         value={expires}
@@ -206,13 +207,13 @@ export function NoteShareDialog({
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-xs text-muted-foreground">
-                                        Opens allowed ({share.viewCount} so far)
+                                        {t("share.opens", { count: share.viewCount })}
                                     </span>
                                     <Input
                                         type="number"
                                         min={1}
                                         value={maxViews}
-                                        placeholder="No limit"
+                                        placeholder={t("share.noLimit")}
                                         onChange={(event) => setMaxViews(event.target.value)}
                                     />
                                 </div>
@@ -224,10 +225,10 @@ export function NoteShareDialog({
 
                             <div className="flex items-center justify-between gap-2">
                                 <Button variant="ghost" disabled={busy} onClick={() => void unpublish()}>
-                                    Stop sharing
+                                    {t("share.stop")}
                                 </Button>
                                 <Button disabled={busy} onClick={() => void save()}>
-                                    Save
+                                    {t("share.save")}
                                 </Button>
                             </div>
                         </>

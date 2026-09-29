@@ -11,6 +11,8 @@
  */
 
 import * as actions from "./actions";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { useEffect, useRef, useState } from "react";
@@ -30,10 +32,15 @@ import {
 } from "@polaris/ui";
 
 const ROLES = [
-    { value: "guest", label: "Can read" },
-    { value: "member", label: "Can write" },
-    { value: "admin", label: "Can run it" }
-];
+    { value: "guest", label: "notebook.roles.guest" },
+    { value: "member", label: "notebook.roles.member" },
+    { value: "admin", label: "notebook.roles.admin" }
+] as const satisfies readonly { value: string; label: NamespaceKey<"notes"> }[];
+
+/** The roles with their labels in the reader's language. */
+function roleOptions(t: NamespaceTranslator<"notes">) {
+    return ROLES.map((role) => ({ value: role.value, label: t(role.label) }));
+}
 
 // ---------------------------------------------------------------------------
 // Making one
@@ -46,6 +53,7 @@ export function NewNotebookDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("notes");
     const router = useRouter();
     const [name, setName] = useState("");
     const [orgId, setOrgId] = useState("");
@@ -92,21 +100,21 @@ export function NewNotebookDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>New notebook</DialogTitle>
+                    <DialogTitle>{t("notebook.newTitle")}</DialogTitle>
                     <DialogDescription>
-                        A shelf you can put other people on. Your own notes stay where they are.
+                        {t("notebook.newDescription")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         <span>
-                            Name <span aria-hidden="true">*</span>
+                            {t("notebook.name")} <span aria-hidden="true">*</span>
                         </span>
                         <Input
                             value={name}
                             autoFocus
-                            placeholder="Engineering"
+                            placeholder={t("notebook.namePlaceholder")}
                             onChange={(event) => setName(event.target.value)}
                             onKeyDown={(event) => {
                                 if (event.key === "Enter" && name.trim()) void create();
@@ -116,13 +124,13 @@ export function NewNotebookDialog({
 
                     {orgs.length > 0 && (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span>Belongs to</span>
+                            <span>{t("notebook.belongsTo")}</span>
                             <Select
                                 value={orgId}
                                 onValueChange={setOrgId}
-                                placeholder="Me"
+                                placeholder={t("notebook.me")}
                                 options={[
-                                    { value: "", label: "Me" },
+                                    { value: "", label: t("notebook.me") },
                                     ...orgs.map((org) => ({ value: org.id, label: org.name }))
                                 ]}
                             />
@@ -130,15 +138,15 @@ export function NewNotebookDialog({
                     )}
 
                     <label className="flex flex-col gap-1 text-sm">
-                        <span>Who can find it</span>
+                        <span>{t("notebook.whoFinds")}</span>
                         <Select
                             value={visibility}
                             onValueChange={setVisibility}
                             options={[
-                                { value: "private", label: "Only the people I add" },
+                                { value: "private", label: t("notebook.private") },
                                 {
                                     value: "internal",
-                                    label: orgId ? "Everybody in the organization" : "Everybody here"
+                                    label: orgId ? t("notebook.everybodyOrg") : t("notebook.everybodyHere")
                                 }
                             ]}
                         />
@@ -153,11 +161,11 @@ export function NewNotebookDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {t("notebook.cancel")}
                     </Button>
                     <Button size="sm" disabled={busy || !name.trim()} onClick={() => void create()}>
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        Make it
+                        {t("notebook.create")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -177,6 +185,7 @@ export function NotebookPeopleDialog({
     spaceId: string | null;
     onOpenChange: (spaceId: string | null) => void;
 }) {
+    const t = useTranslations("notes");
     const router = useRouter();
     const [people, setPeople] = useState<ShelfPerson[]>([]);
     const [teams, setTeams] = useState<ShelfTeam[]>([]);
@@ -237,9 +246,9 @@ export function NotebookPeopleDialog({
         <Dialog open={spaceId !== null} onOpenChange={(next) => !next && onOpenChange(null)}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Who can reach this notebook</DialogTitle>
+                    <DialogTitle>{t("notebook.peopleTitle")}</DialogTitle>
                     <DialogDescription>
-                        Reading, writing, or running it. Whoever made it always can.
+                        {t("notebook.peopleDescription")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -247,8 +256,8 @@ export function NotebookPeopleDialog({
                     <div className="flex flex-col gap-2">
                         <Input
                             value={query}
-                            placeholder="Find somebody by name"
-                            aria-label="Find somebody by name"
+                            placeholder={t("notebook.findPerson")}
+                            aria-label={t("notebook.findPerson")}
                             onChange={(event) => setQuery(event.target.value)}
                         />
                         {found.length > 0 && (
@@ -294,18 +303,18 @@ export function NotebookPeopleDialog({
                                     <PersonName id={person.userId} name={person.name}>
                                         {person.owner && (
                                             <span className="ml-1 text-xs text-muted-foreground">
-                                                owner
+                                                {t("notebook.owner")}
                                             </span>
                                         )}
                                     </PersonName>
                                 </span>
                                 {person.owner ? (
-                                    <span className="text-xs text-muted-foreground">Runs it</span>
+                                    <span className="text-xs text-muted-foreground">{t("notebook.runsIt")}</span>
                                 ) : (
                                     <>
                                         <Select
                                             value={person.role}
-                                            options={ROLES}
+                                            options={roleOptions(t)}
                                             className="w-36"
                                             onValueChange={(role) =>
                                                 void act(() =>
@@ -319,8 +328,8 @@ export function NotebookPeopleDialog({
                                         />
                                         <button
                                             type="button"
-                                            aria-label={`Take ${person.name} off this notebook`}
-                                            title="Take off"
+                                            aria-label={t("notebook.takeOffNamed", { name: person.name })}
+                                            title={t("notebook.takeOff")}
                                             onClick={() =>
                                                 void act(() =>
                                                     actions.revokeSpaceAction({
@@ -343,7 +352,7 @@ export function NotebookPeopleDialog({
                         <div className="flex flex-col gap-2">
                             <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                                 <Users className="size-3.5" />
-                                Teams
+                                {t("notebook.teams")}
                             </p>
                             <ul className="flex flex-col gap-1">
                                 {eligible.map((team) => {
@@ -355,9 +364,9 @@ export function NotebookPeopleDialog({
                                             </span>
                                             <Select
                                                 value={grant?.role ?? ""}
-                                                placeholder="No access"
+                                                placeholder={t("notebook.noAccess")}
                                                 className="w-36"
-                                                options={ROLES}
+                                                options={roleOptions(t)}
                                                 onValueChange={(role) =>
                                                     void act(() =>
                                                         actions.grantSpaceAction({
@@ -371,8 +380,8 @@ export function NotebookPeopleDialog({
                                             {grant && (
                                                 <button
                                                     type="button"
-                                                    aria-label={`Take ${team.name} off this notebook`}
-                                                    title="Take off"
+                                                    aria-label={t("notebook.takeOffNamed", { name: team.name })}
+                                                    title={t("notebook.takeOff")}
                                                     onClick={() =>
                                                         void act(() =>
                                                             actions.revokeSpaceAction({
@@ -402,7 +411,7 @@ export function NotebookPeopleDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(null)}>
-                        Done
+                        {t("notebook.done")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -422,6 +431,7 @@ export function ImportNotesDialog({
     target: { spaceId: string | null; folderId: string | null; name: string } | null;
     onOpenChange: (target: null) => void;
 }) {
+    const t = useTranslations("notes");
     const router = useRouter();
     const [files, setFiles] = useState<FileList | null>(null);
     const [keepFolders, setKeepFolders] = useState(true);
@@ -465,30 +475,25 @@ export function ImportNotesDialog({
         <Dialog open={target !== null} onOpenChange={(next) => !next && onOpenChange(null)}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Import Markdown</DialogTitle>
+                    <DialogTitle>{t("notebook.importTitle")}</DialogTitle>
                     <DialogDescription>
-                        Files, a folder, or a zipped vault. It lands in {target?.name ?? "this notebook"}.
+                        {target?.name
+                            ? t("notebook.importInto", { name: target.name })
+                            : t("notebook.importIntoThis")}
                     </DialogDescription>
                 </DialogHeader>
 
                 {done ? (
                     <div className="flex flex-col gap-1 text-sm">
-                        <p>
-                            {done.notes === 1 ? "One note" : `${done.notes} notes`}
-                            {done.folders > 0 &&
-                                ` in ${done.folders === 1 ? "one folder" : `${done.folders} folders`}`}
-                            .
-                        </p>
+                        <p>{t("notebook.imported", { notes: done.notes, folders: done.folders })}</p>
                         {done.links > 0 && (
                             <p className="text-muted-foreground">
-                                {done.links === 1 ? "One note's links" : `${done.links} notes' links`} now
-                                point at the notes they name.
+                                {t("notebook.linked", { count: done.links })}
                             </p>
                         )}
                         {done.skipped > 0 && (
                             <p className="text-muted-foreground">
-                                {done.skipped === 1 ? "One file was" : `${done.skipped} files were`} left
-                                alone: only Markdown and plain text are read.
+                                {t("notebook.skipped", { count: done.skipped })}
                             </p>
                         )}
                     </div>
@@ -498,7 +503,7 @@ export function ImportNotesDialog({
                             type="file"
                             multiple
                             accept=".md,.markdown,.mdx,.txt,.zip"
-                            aria-label="The files to bring in"
+                            aria-label={t("notebook.filesLabel")}
                             onChange={(event) => setFiles(event.target.files)}
                             className="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-field file:px-3 file:py-1.5 file:text-sm"
                         />
@@ -508,10 +513,10 @@ export function ImportNotesDialog({
                                 checked={keepFolders}
                                 onChange={(event) => setKeepFolders(event.target.checked)}
                             />
-                            Keep the folders the files are in
+                            {t("notebook.keepFolders")}
                         </label>
                         <p className="text-xs text-muted-foreground">
-                            Links written as [[another note]] are connected once everything is in.
+                            {t("notebook.wikiLinks")}
                         </p>
                     </div>
                 )}
@@ -524,7 +529,7 @@ export function ImportNotesDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(null)}>
-                        {done ? "Done" : "Cancel"}
+                        {done ? t("notebook.done") : t("notebook.cancel")}
                     </Button>
                     {!done && (
                         <Button
@@ -533,7 +538,7 @@ export function ImportNotesDialog({
                             onClick={() => void run()}
                         >
                             {busy ? <Loader2 className="size-4 animate-spin" /> : <Import className="size-4" />}
-                            Bring them in
+                            {t("notebook.bringIn")}
                         </Button>
                     )}
                 </DialogFooter>

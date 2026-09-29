@@ -17,6 +17,7 @@
  */
 
 import * as core from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { ShelfData } from "./note-tree";
@@ -57,6 +58,7 @@ export function NoteMoveDialog({
     from: MoveTarget;
     onMove: (target: MoveTarget) => Promise<{ error?: string }>;
 }) {
+    const t = useTranslations("notes");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [shelfId, setShelfId] = useState(from.spaceId ?? "");
@@ -100,19 +102,19 @@ export function NoteMoveDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Move this note</DialogTitle>
-                    <DialogDescription>Anything under it moves with it.</DialogDescription>
+                    <DialogTitle>{t("view.moveNote")}</DialogTitle>
+                    <DialogDescription>{t("move.description")}</DialogDescription>
                 </DialogHeader>
 
                 {shelves.length > 1 && (
                     <label className="flex flex-col gap-1 text-sm">
-                        <span>Notebook</span>
+                        <span>{t("move.notebook")}</span>
                         <Select
                             value={shelfId}
                             onValueChange={setShelfId}
                             options={shelves.map((entry) => ({
                                 value: entry.space?.id ?? "",
-                                label: entry.space?.name ?? "My notes"
+                                label: entry.space?.name ?? t("tree.myNotes")
                             }))}
                         />
                     </label>
@@ -122,7 +124,7 @@ export function NoteMoveDialog({
                     <ul className="flex flex-col gap-0.5">
                         <li>
                             <Destination
-                                label="Top level"
+                                label={t("move.topLevel")}
                                 busy={busy}
                                 here={here({ spaceId, folderId: null, parentId: null })}
                                 onSelect={() =>
@@ -140,7 +142,7 @@ export function NoteMoveDialog({
                                     // name say where they sit and the rest do not.
                                     where={
                                         core.needsQualifying(folder.name, sharedFolderNames)
-                                            ? folderPath(shelf.folders, folder.id)
+                                            ? folderPath(shelf.folders, folder.id, t("move.topLevel"))
                                             : undefined
                                     }
                                     icon={
@@ -157,7 +159,7 @@ export function NoteMoveDialog({
                         {notes.map((entry) => (
                             <li key={entry.id}>
                                 <Destination
-                                    label={`Under ${entry.title}`}
+                                    label={t("move.under", { title: entry.title })}
                                     icon={
                                         <CornerDownRight className="size-3.5 shrink-0 text-muted-foreground" />
                                     }
@@ -181,7 +183,7 @@ export function NoteMoveDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {t("notebook.cancel")}
                     </Button>
                     {busy && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
                 </DialogFooter>
@@ -194,7 +196,8 @@ export function NoteMoveDialog({
  *  folders on one shelf share a name. */
 function folderPath(
     folders: readonly { id: string; name: string; parentId: string | null }[],
-    folderId: string
+    folderId: string,
+    topLevel: string
 ): string | undefined {
     const byId = new Map(folders.map((folder) => [folder.id, folder]));
     const steps: string[] = [];
@@ -207,7 +210,7 @@ function folderPath(
         steps.unshift(parent.name);
         at = parent.parentId;
     }
-    return steps.length > 0 ? steps.join(" / ") : "Top level";
+    return steps.length > 0 ? steps.join(" / ") : topLevel;
 }
 
 function Destination({
@@ -228,6 +231,7 @@ function Destination({
     here: boolean;
     onSelect: () => void;
 }) {
+    const t = useTranslations("notes");
     return (
         <button
             type="button"
@@ -247,7 +251,7 @@ function Destination({
                     </span>
                 )}
             </span>
-            {here && <span className="shrink-0 text-xs text-muted-foreground">where it is</span>}
+            {here && <span className="shrink-0 text-xs text-muted-foreground">{t("move.here")}</span>}
         </button>
     );
 }

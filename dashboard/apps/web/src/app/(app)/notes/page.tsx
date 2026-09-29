@@ -15,6 +15,7 @@
  */
 
 import * as access from "@/lib/notes/access";
+import { getTranslations } from "@/lib/i18n/request";
 import { requirePermission } from "@/lib/session";
 import { NewNoteButton, NotesView } from "./notes-view";
 import { listShelves } from "@/lib/notes/shelf-service";
@@ -27,6 +28,7 @@ export default async function NotesPage({
 }: {
     searchParams: Promise<{ note?: string }>;
 }) {
+    const t = await getTranslations("notes");
     const user = await requirePermission("notes.use");
     const actor: access.NoteActor = { id: user.id, isAdmin: user.isAdmin };
     const wanted = (await searchParams).note ?? null;
@@ -48,10 +50,9 @@ export default async function NotesPage({
         <div className="flex w-full flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Notes</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("archive.notesTitle")}</h1>
                     <p className="text-sm text-muted-foreground">
-                        Yours alone unless you put it in a notebook. Mention people and tasks the way you
-                        would anywhere else in Polaris.
+                        {t("archive.notesDescription")}
                     </p>
                 </div>
                 <NewNoteButton />

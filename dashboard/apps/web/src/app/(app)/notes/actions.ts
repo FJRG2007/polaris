@@ -14,6 +14,7 @@
  */
 
 import * as core from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
 import { revalidatePath } from "next/cache";
 import * as access from "@/lib/notes/access";
 import { requirePermission } from "@/lib/session";
@@ -63,7 +64,7 @@ export async function createNoteAction(input: unknown): Promise<{ id?: string; e
     const caller = await actor();
     const parsed = core.noteCreateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That note could not be saved" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.noteSave") };
 
     try {
         await access.requirePlacement(caller, {
@@ -74,7 +75,7 @@ export async function createNoteAction(input: unknown): Promise<{ id?: string; e
         refresh();
         return { id };
     } catch (caught) {
-        return failure(caught, "That note could not be saved");
+        return failure(caught, (await getTranslations("notes"))("errors.noteSave"));
     }
 }
 
@@ -82,15 +83,15 @@ export async function updateNoteAction(input: unknown): Promise<{ error?: string
     const caller = await actor();
     const parsed = core.noteUpdateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That note could not be saved" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.noteSave") };
 
     try {
         await access.requireNote(caller, parsed.data.noteId, "member");
-        if (!(await notes.updateNote(parsed.data))) return { error: "That note no longer exists" };
+        if (!(await notes.updateNote(parsed.data))) return { error: (await getTranslations("notes"))("errors.noteGone") };
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That note could not be saved");
+        return failure(caught, (await getTranslations("notes"))("errors.noteSave"));
     }
 }
 
@@ -98,7 +99,7 @@ export async function moveNoteAction(input: unknown): Promise<{ error?: string }
     const caller = await actor();
     const parsed = core.noteMoveSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That note could not be moved" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.noteMove") };
 
     try {
         // Both ends: the note as it is now, and the shelf it is going to.
@@ -112,7 +113,7 @@ export async function moveNoteAction(input: unknown): Promise<{ error?: string }
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That note could not be moved");
+        return failure(caught, (await getTranslations("notes"))("errors.noteMove"));
     }
 }
 
@@ -120,11 +121,11 @@ export async function deleteNoteAction(noteId: string): Promise<{ error?: string
     const caller = await actor();
     try {
         await access.requireNote(caller, noteId, "member");
-        if (!(await notes.deleteNote(noteId))) return { error: "That note no longer exists" };
+        if (!(await notes.deleteNote(noteId))) return { error: (await getTranslations("notes"))("errors.noteGone") };
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That note could not be deleted");
+        return failure(caught, (await getTranslations("notes"))("errors.noteDelete"));
     }
 }
 
@@ -143,7 +144,7 @@ export async function createSpaceAction(input: unknown): Promise<{ id?: string; 
     const caller = await actor();
     const parsed = core.noteSpaceCreateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That notebook could not be made" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.notebookMake") };
 
     try {
         if (parsed.data.orgId) {
@@ -151,14 +152,14 @@ export async function createSpaceAction(input: unknown): Promise<{ id?: string; 
             // shelf; running its spaces does.
             const allowed = await listAdministeredOrgs(caller);
             if (!allowed.some((org) => org.id === parsed.data.orgId)) {
-                return { error: "You cannot make a notebook for that organization" };
+                return { error: (await getTranslations("notes"))("errors.notebookOrg") };
             }
         }
         const id = await shelves.createSpace(caller, parsed.data);
         refresh();
         return { id };
     } catch (caught) {
-        return failure(caught, "That notebook could not be made");
+        return failure(caught, (await getTranslations("notes"))("errors.notebookMake"));
     }
 }
 
@@ -166,7 +167,7 @@ export async function updateSpaceAction(input: unknown): Promise<{ error?: strin
     const caller = await actor();
     const parsed = core.noteSpaceUpdateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That notebook could not be changed" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.notebookChange") };
 
     try {
         await access.requireSpace(caller, parsed.data.spaceId, "admin");
@@ -174,7 +175,7 @@ export async function updateSpaceAction(input: unknown): Promise<{ error?: strin
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That notebook could not be changed");
+        return failure(caught, (await getTranslations("notes"))("errors.notebookChange"));
     }
 }
 
@@ -188,7 +189,7 @@ export async function spaceContentsAction(
         await access.requireSpace(caller, spaceId, "admin");
         return { ...(await shelves.spaceContents(spaceId)) };
     } catch (caught) {
-        return { notes: 0, folders: 0, ...failure(caught, "That notebook could not be read") };
+        return { notes: 0, folders: 0, ...failure(caught, (await getTranslations("notes"))("errors.notebookRead")) };
     }
 }
 
@@ -198,12 +199,12 @@ export async function deleteSpaceAction(spaceId: string): Promise<{ error?: stri
         // Deleting takes the writing with it, so it is the owner's alone - an
         // admin of a shelf may run it without being able to end it.
         const role = await access.requireSpace(caller, spaceId, "admin");
-        if (role !== "owner") return { error: "Only the notebook's owner can delete it" };
+        if (role !== "owner") return { error: (await getTranslations("notes"))("errors.notebookOwner") };
         await shelves.deleteSpace(spaceId);
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That notebook could not be deleted");
+        return failure(caught, (await getTranslations("notes"))("errors.notebookDelete"));
     }
 }
 
@@ -227,14 +228,14 @@ export async function spaceAccessAction(spaceId: string): Promise<{
         ]);
         return { people, teams, eligibleTeams };
     } catch (caught) {
-        return failure(caught, "Who can reach this notebook could not be read");
+        return failure(caught, (await getTranslations("notes"))("errors.peopleRead"));
     }
 }
 
 export async function grantSpaceAction(input: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.noteSpaceGrantSchema.safeParse(input);
-    if (!parsed.success) return { error: "That could not be granted" };
+    if (!parsed.success) return { error: (await getTranslations("notes"))("errors.grant") };
 
     try {
         await access.requireSpace(caller, parsed.data.spaceId, "admin");
@@ -244,37 +245,37 @@ export async function grantSpaceAction(input: unknown): Promise<{ error?: string
             const eligible = await shelves.teamsForSpace(parsed.data.spaceId);
             if (!eligible.some((team) => team.id === parsed.data.teamId)) {
                 return {
-                    error: "That team is not part of the organization this notebook belongs to"
+                    error: (await getTranslations("notes"))("errors.teamOutside")
                 };
             }
             await shelves.grantTeam(parsed.data.spaceId, parsed.data.teamId, parsed.data.role);
         } else if (parsed.data.userId) {
             await shelves.grantPerson(parsed.data.spaceId, parsed.data.userId, parsed.data.role);
         } else {
-            return { error: "Say who this is for" };
+            return { error: (await getTranslations("notes"))("errors.whoFor") };
         }
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That could not be granted");
+        return failure(caught, (await getTranslations("notes"))("errors.grant"));
     }
 }
 
 export async function revokeSpaceAction(input: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.noteSpaceGrantSchema.safeParse(input);
-    if (!parsed.success) return { error: "That could not be taken back" };
+    if (!parsed.success) return { error: (await getTranslations("notes"))("errors.revoke") };
 
     try {
         await access.requireSpace(caller, parsed.data.spaceId, "admin");
         if (parsed.data.teamId) await shelves.revokeTeam(parsed.data.spaceId, parsed.data.teamId);
         else if (parsed.data.userId)
             await shelves.revokePerson(parsed.data.spaceId, parsed.data.userId);
-        else return { error: "Say who this is for" };
+        else return { error: (await getTranslations("notes"))("errors.whoFor") };
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That could not be taken back");
+        return failure(caught, (await getTranslations("notes"))("errors.revoke"));
     }
 }
 
@@ -286,7 +287,7 @@ export async function createFolderAction(input: unknown): Promise<{ id?: string;
     const caller = await actor();
     const parsed = core.noteFolderCreateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That folder could not be made" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.folderMake") };
 
     try {
         await access.requirePlacement(caller, {
@@ -297,7 +298,7 @@ export async function createFolderAction(input: unknown): Promise<{ id?: string;
         refresh();
         return { id };
     } catch (caught) {
-        return failure(caught, "That folder could not be made");
+        return failure(caught, (await getTranslations("notes"))("errors.folderMake"));
     }
 }
 
@@ -305,7 +306,7 @@ export async function updateFolderAction(input: unknown): Promise<{ error?: stri
     const caller = await actor();
     const parsed = core.noteFolderUpdateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That folder could not be changed" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.folderChange") };
 
     try {
         await access.requireFolder(caller, parsed.data.folderId, "member");
@@ -313,14 +314,14 @@ export async function updateFolderAction(input: unknown): Promise<{ error?: stri
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That folder could not be changed");
+        return failure(caught, (await getTranslations("notes"))("errors.folderChange"));
     }
 }
 
 export async function moveFolderAction(input: unknown): Promise<{ error?: string }> {
     const caller = await actor();
     const parsed = core.noteFolderMoveSchema.safeParse(input);
-    if (!parsed.success) return { error: "That folder could not be moved" };
+    if (!parsed.success) return { error: (await getTranslations("notes"))("errors.folderMove") };
 
     try {
         await access.requireFolder(caller, parsed.data.folderId, "member");
@@ -333,7 +334,7 @@ export async function moveFolderAction(input: unknown): Promise<{ error?: string
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That folder could not be moved");
+        return failure(caught, (await getTranslations("notes"))("errors.folderMove"));
     }
 }
 
@@ -345,7 +346,7 @@ export async function folderContentsAction(
         await access.requireFolder(caller, folderId, "member");
         return { ...(await shelves.folderContents(folderId)) };
     } catch (caught) {
-        return { notes: 0, folders: 0, ...failure(caught, "That folder could not be read") };
+        return { notes: 0, folders: 0, ...failure(caught, (await getTranslations("notes"))("errors.folderRead")) };
     }
 }
 
@@ -357,7 +358,7 @@ export async function deleteFolderAction(folderId: string): Promise<{ error?: st
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That folder could not be deleted");
+        return failure(caught, (await getTranslations("notes"))("errors.folderDelete"));
     }
 }
 
@@ -391,13 +392,13 @@ export async function importNotesAction(form: FormData): Promise<{
         folderId: form.get("folderId") || null,
         keepFolders: form.get("keepFolders") !== "false"
     });
-    if (!parsed.success) return { error: "That import could not be read" };
+    if (!parsed.success) return { error: (await getTranslations("notes"))("errors.importRead") };
 
     const uploaded = form.getAll("files").filter((entry): entry is File => entry instanceof File);
-    if (uploaded.length === 0) return { error: "Choose the files to bring in" };
+    if (uploaded.length === 0) return { error: (await getTranslations("notes"))("errors.importChoose") };
     const weight = uploaded.reduce((total, file) => total + file.size, 0);
     if (weight > IMPORT_MAX_BYTES) {
-        return { error: "That is more than one import can carry. Bring it in a few at a time." };
+        return { error: (await getTranslations("notes"))("errors.importTooBig") };
     }
 
     try {
@@ -406,12 +407,12 @@ export async function importNotesAction(form: FormData): Promise<{
             folderId: parsed.data.folderId
         });
         const files = await readUploads(uploaded);
-        if (files.length === 0) return { error: "There was nothing to read in those files" };
+        if (files.length === 0) return { error: (await getTranslations("notes"))("errors.importEmpty") };
         const result = await importVault(caller.id, parsed.data, files);
         refresh();
         return result;
     } catch (caught) {
-        return failure(caught, "That import could not be finished");
+        return failure(caught, (await getTranslations("notes"))("errors.importFinish"));
     }
 }
 
@@ -469,7 +470,7 @@ export async function noteShareAction(
     try {
         return { share: await share.getNoteShare(caller, noteId) };
     } catch (caught) {
-        return failure(caught, "That link could not be read");
+        return failure(caught, (await getTranslations("notes"))("errors.linkRead"));
     }
 }
 
@@ -487,14 +488,14 @@ export async function publishNoteAction(
     const caller = await actor();
     const parsed = core.noteShareSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "Those settings could not be read" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.settingsRead") };
     }
     try {
         const published = await share.publishNote(caller, noteId, parsed.data);
         refresh();
         return published;
     } catch (caught) {
-        return failure(caught, "That note could not be published");
+        return failure(caught, (await getTranslations("notes"))("errors.notePublish"));
     }
 }
 
@@ -506,7 +507,7 @@ export async function revealNoteShareAction(
     try {
         return { url: await share.revealNoteShare(caller, noteId) };
     } catch (caught) {
-        return failure(caught, "That link could not be shown");
+        return failure(caught, (await getTranslations("notes"))("errors.linkShow"));
     }
 }
 
@@ -519,7 +520,7 @@ export async function unpublishNoteAction(noteId: string): Promise<{ error?: str
         refresh();
         return {};
     } catch (caught) {
-        return failure(caught, "That link could not be taken down");
+        return failure(caught, (await getTranslations("notes"))("errors.linkDown"));
     }
 }
 
@@ -536,15 +537,15 @@ export async function unlockNoteShareAction(
     password: string
 ): Promise<{ error?: string }> {
     const link = await share.resolveNoteShareByToken(token);
-    if (!link) return { error: "This link is not available." };
-    if (!share.noteShareUsability(link).ok) return { error: "This link is no longer available." };
+    if (!link) return { error: (await getTranslations("notes"))("errors.linkUnavailable") };
+    if (!share.noteShareUsability(link).ok) return { error: (await getTranslations("notes"))("errors.linkGone") };
 
     const limitKey = `note-unlock:${link.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, UNLOCK_LIMIT, UNLOCK_WINDOW_MS)).ok) {
-        return { error: "Too many attempts. Please wait a few minutes and try again." };
+        return { error: (await getTranslations("notes"))("errors.tooManyAttempts") };
     }
     if (!(await share.verifyNoteSharePassword(link.id, password))) {
-        return { error: "Incorrect password." };
+        return { error: (await getTranslations("notes"))("errors.wrongPassword") };
     }
 
     await resetRateLimit(limitKey);

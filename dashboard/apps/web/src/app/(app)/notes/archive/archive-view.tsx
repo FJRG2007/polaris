@@ -9,6 +9,7 @@
  */
 
 import { useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { RelativeTime } from "@/components/relative-time";
@@ -18,6 +19,7 @@ import { deleteNoteAction, updateNoteAction } from "../actions";
 import { Button, ConfirmDeleteDialog, EmptyState } from "@polaris/ui";
 
 export function ArchiveView({ notes }: { notes: readonly ArchivedNote[] }) {
+    const t = useTranslations("notes");
     const router = useRouter();
     const [error, setError] = useState("");
     const [deleting, setDeleting] = useState<ArchivedNote | null>(null);
@@ -26,8 +28,8 @@ export function ArchiveView({ notes }: { notes: readonly ArchivedNote[] }) {
         return (
             <EmptyState
                 icon={<Archive />}
-                title="Nothing archived."
-                description="Notes you put away from the sidebar end up here."
+                title={t("archive.emptyTitle")}
+                description={t("archive.emptyDescription")}
             />
         );
     }
@@ -56,17 +58,19 @@ export function ArchiveView({ notes }: { notes: readonly ArchivedNote[] }) {
                                 {note.title}
                             </span>
                             <span className="block text-xs text-muted-foreground">
-                                Archived <RelativeTime iso={note.updatedAt} />
+                                {t.rich("archive.archivedAt", {
+                                    time: () => <RelativeTime key="time" iso={note.updatedAt} />
+                                })}
                             </span>
                         </span>
                         <Button size="xs" variant="ghost" onClick={() => void restore(note.id)}>
                             <RotateCcw className="size-3.5" />
-                            Put back
+                            {t("archive.restore")}
                         </Button>
                         <button
                             type="button"
-                            aria-label={`Delete ${note.title}`}
-                            title="Delete"
+                            aria-label={t("archive.deleteNamed", { name: note.title })}
+                            title={t("tree.delete")}
                             onClick={() => setDeleting(note)}
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                         >
@@ -82,8 +86,17 @@ export function ArchiveView({ notes }: { notes: readonly ArchivedNote[] }) {
                 name={deleting?.title ?? ""}
                 kind="note"
                 requireTyping={false}
-                description="This one is gone for good. Anything that sat under it stays."
-                confirmLabel="Delete note"
+                title={t("view.deleteTitle")}
+                question={t.rich("view.deleteQuestion", {
+                    name: deleting?.title ?? "",
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
+                })}
+                description={t("archive.deleteBody")}
+                confirmLabel={t("view.deleteTitle")}
                 onConfirm={async () => {
                     if (deleting) await runAction(() => deleteNoteAction(deleting.id), setError);
                     setDeleting(null);

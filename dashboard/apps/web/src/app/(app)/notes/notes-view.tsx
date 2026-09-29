@@ -13,6 +13,7 @@
  */
 
 import { saveFile } from "@/components/transfers/move-file";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
@@ -32,6 +33,7 @@ import { ImportNotesDialog, NewNotebookDialog, NotebookPeopleDialog } from "./no
 const SAVE_AFTER = 800;
 
 export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; note: NoteView | null }) {
+    const t = useTranslations("notes");
     const router = useRouter();
     const [title, setTitle] = useState(note?.title ?? "");
     const [body, setBody] = useState(note?.body ?? "");
@@ -65,7 +67,7 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
         if (!note || !dirty) return;
         const timer = setTimeout(async () => {
             setSaving(true);
-            const written = { title: title.trim() || "Untitled", body };
+            const written = { title: title.trim() || t("tree.untitled"), body };
             const result = await runAction(
                 () => actions.updateNoteAction({ noteId: note.id, ...written }),
                 setError
@@ -119,13 +121,13 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
             <div className="flex min-w-0 flex-1 flex-col gap-3">
                 {!note ? (
                     <EmptyState
-                        title="Pick a note, or write a new one."
-                        description="Your own notes are yours alone. A notebook is shared with the people on it."
+                        title={t("view.emptyTitle")}
+                        description={t("view.emptyDescription")}
                     />
                 ) : (
                     <>
                         <nav
-                            aria-label="Where this note sits"
+                            aria-label={t("view.breadcrumb")}
                             className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground"
                         >
                             <span className="rounded px-1 py-0.5">{shelfName}</span>
@@ -148,16 +150,16 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                         <div className="flex items-start gap-2">
                             <Input
                                 value={title}
-                                aria-label="Note title"
-                                placeholder="Untitled"
+                                aria-label={t("view.titleLabel")}
+                                placeholder={t("tree.untitled")}
                                 onChange={(event) => setTitle(event.target.value)}
                                 bare
                                 className="h-auto flex-1 text-2xl font-semibold"
                             />
                             <button
                                 type="button"
-                                aria-label={note.pinned ? "Unpin this note" : "Pin this note"}
-                                title={note.pinned ? "Unpin" : "Pin to the top"}
+                                aria-label={note.pinned ? t("view.unpinNote") : t("view.pinNote")}
+                                title={note.pinned ? t("tree.unpin") : t("tree.pin")}
                                 onClick={() =>
                                     void act(() =>
                                         actions.updateNoteAction({ noteId: note.id, pinned: !note.pinned })
@@ -169,8 +171,8 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             </button>
                             <button
                                 type="button"
-                                aria-label="Move this note"
-                                title="Move"
+                                aria-label={t("view.moveNote")}
+                                title={t("view.move")}
                                 onClick={() => setMoving(note.id)}
                                 className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
@@ -178,8 +180,8 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             </button>
                             <button
                                 type="button"
-                                aria-label="Share this note by link"
-                                title="Share"
+                                aria-label={t("view.shareNote")}
+                                title={t("view.share")}
                                 onClick={() => setSharing(note.id)}
                                 className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
@@ -187,8 +189,8 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             </button>
                             <button
                                 type="button"
-                                aria-label="Export this note as Markdown"
-                                title="Export"
+                                aria-label={t("view.exportNote")}
+                                title={t("view.export")}
                                 onClick={() =>
                                     saveFile(
                                         `/api/notes/export?scope=note&id=${note.id}`,
@@ -201,8 +203,8 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             </button>
                             <button
                                 type="button"
-                                aria-label="Archive this note"
-                                title="Archive"
+                                aria-label={t("view.archiveNote")}
+                                title={t("tree.archive")}
                                 onClick={() =>
                                     void act(async () => {
                                         const result = await actions.updateNoteAction({
@@ -219,8 +221,8 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             </button>
                             <button
                                 type="button"
-                                aria-label="Delete this note"
-                                title="Delete"
+                                aria-label={t("view.deleteNote")}
+                                title={t("tree.delete")}
                                 onClick={() => setConfirmDelete(true)}
                                 className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                             >
@@ -229,15 +231,13 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                         </div>
 
                         <p className="text-xs text-muted-foreground" aria-live="polite">
-                            {saving ? (
-                                "Saving"
-                            ) : dirty ? (
-                                "Unsaved changes"
-                            ) : (
-                                <>
-                                    Saved <RelativeTime iso={note.updatedAt} />
-                                </>
-                            )}
+                            {saving
+                                ? t("view.saving")
+                                : dirty
+                                  ? t("view.unsaved")
+                                  : t.rich("view.saved", {
+                                        time: () => <RelativeTime key="time" iso={note.updatedAt} />
+                                    })}
                         </p>
 
                         {error && (
@@ -250,7 +250,7 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             key={note.id}
                             value={body}
                             onChange={setBody}
-                            placeholder="Type / for a block, @ for somebody, # for a task."
+                            placeholder={t("view.editorPlaceholder")}
                             className="min-h-[24rem] flex-1"
                         />
 
@@ -260,12 +260,21 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                             name={note.title}
                             kind="note"
                             requireTyping={false}
+                            title={t("view.deleteTitle")}
+                            question={t.rich("view.deleteQuestion", {
+                                name: note.title,
+                                strong: (chunks) => (
+                                    <span key="name" className="font-medium text-foreground">
+                                        {chunks}
+                                    </span>
+                                )
+                            })}
                             description={
                                 childCount > 0
-                                    ? `${childCount === 1 ? "One note sits" : `${childCount} notes sit`} under this one. They are kept, and move up to where this note was.`
-                                    : "Nothing else links to it."
+                                    ? t("view.deleteChildren", { count: childCount })
+                                    : t("view.deleteAlone")
                             }
-                            confirmLabel="Delete note"
+                            confirmLabel={t("view.deleteTitle")}
                             onConfirm={async () => {
                                 await runAction(() => actions.deleteNoteAction(note.id), setError);
                                 setConfirmDelete(false);
@@ -348,6 +357,7 @@ function trail(notes: readonly NoteSummary[], noteId: string | null): { id: stri
 /** The button the page header offers, kept out of the tree so the header can
  *  place one as well. */
 export function NewNoteButton() {
+    const t = useTranslations("notes");
     const router = useRouter();
     const [error, setError] = useState("");
     return (
@@ -356,7 +366,7 @@ export function NewNoteButton() {
                 size="sm"
                 onClick={async () => {
                     const result = await runAction(
-                        () => actions.createNoteAction({ title: "Untitled", body: "" }),
+                        () => actions.createNoteAction({ title: t("tree.untitled"), body: "" }),
                         setError
                     );
                     if (result?.id) router.push(`/notes?note=${result.id}`);
@@ -364,7 +374,7 @@ export function NewNoteButton() {
                 }}
             >
                 <Plus className="size-4" />
-                New note
+                {t("tree.newNote")}
             </Button>
             {error && <span className="text-xs text-danger">{error}</span>}
         </>

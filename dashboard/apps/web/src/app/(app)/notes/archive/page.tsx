@@ -8,6 +8,7 @@
  */
 
 import { ArchiveView } from "./archive-view";
+import { getTranslations } from "@/lib/i18n/request";
 import * as access from "@/lib/notes/access";
 import { requirePermission } from "@/lib/session";
 import { listArchivedNotes } from "@/lib/notes/note-service";
@@ -15,6 +16,7 @@ import { listArchivedNotes } from "@/lib/notes/note-service";
 export const dynamic = "force-dynamic";
 
 export default async function NotesArchivePage() {
+    const t = await getTranslations("notes");
     const user = await requirePermission("notes.use");
     // Every shelf they can reach, not only the workspace they have open: the
     // archive is where somebody goes to find one thing, and hiding half of it
@@ -27,10 +29,9 @@ export default async function NotesArchivePage() {
     return (
         <div className="flex w-full flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Archive</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("archive.title")}</h1>
                 <p className="text-sm text-muted-foreground">
-                    Notes you have put away. Nothing here is deleted. Putting one back returns it
-                    where it sat, or to the top level if that note is still archived.
+                    {t("archive.description")}
                 </p>
             </div>
             <ArchiveView notes={notes} />
