@@ -12,6 +12,8 @@
 import * as stage from "./stage";
 import * as spleef from "./spleef";
 import * as parkour from "./parkour";
+import * as stash from "./stash";
+import * as stashService from "./stash-service";
 import * as catalog from "../catalog";
 import * as commands from "../commands";
 import * as speech from "../../speech";
@@ -48,6 +50,10 @@ export interface StageTools {
     flavour(): Promise<stage.Flavour>;
     /** The item syntax that worked, when the version's guess did not. */
     itemsWork(items: stage.Flavour["items"]): void;
+    /** Whether this server can keep what players carry (`item`, from 1.17). */
+    canStash(): Promise<boolean>;
+    /** Whose run a kept bag belongs to, for its database copy. */
+    readonly stashOwner: stashService.StashOwner;
 }
 
 /** How many ticks the area gets to load before the site is given up. */
@@ -390,6 +396,24 @@ async function admit(
     });
     // Nobody is moved until where they were is kept.
     await tools.persist();
+    // Nor until what they carry is kept too (`stash`): they come in empty-handed.
+    if (await tools.canStash()) {
+        const volume = layout.volume;
+        const candidates = stash.spotsUnder({ x1: volume.x1, z1: volume.z1, x2: volume.x2, z2: volume.z2, y: volume.y1 });
+        for (const one of fresh) {
+            const taken = state(loop).saved.flatMap((each) =>
+                each.stash ? [...each.stash.barrels, ...each.stash.casing] : []
+            );
+            await stashService.stashIn(server, tools.stashOwner, one.name, candidates, taken, async (kept) => {
+                change(loop, {
+                    saved: state(loop).saved.map((each) =>
+                        same(each.name, one.name) ? { ...each, stash: kept } : each
+                    )
+                });
+                await tools.persist();
+            });
+        }
+    }
     const places = layout.kind === "spleef" ? spleef.spots(layout.arena, fresh.length) : [];
     if (layout.kind === "parkour") lines.push(...parkour.SCORES_ADDED);
     fresh.forEach((one, index) => {
@@ -425,9 +449,15 @@ async function sendHome(
 ): Promise<boolean> {
     const saved = state(loop).saved.find((one) => same(one.name, name));
     if (!saved) return true;
-    if (!(await returnOne(server, saved, (await tools.flavour()).items, loop.language)))
+    const keep = async (kept: stash.Stash | null) => {
+        change(loop, {
+            saved: state(loop).saved.map((one) => (same(one.name, name) ? { ...one, stash: kept } : one))
+        });
+        await tools.persist();
+    };
+    if (!(await returnOne(server, saved, (await tools.flavour()).items, loop.language, keep)))
         return false;
-    change(loop, { saved: state(loop).saved.filter((one) => one !== saved) });
+    change(loop, { saved: state(loop).saved.filter((one) => !same(one.name, name)) });
     return true;
 }
 
@@ -435,12 +465,25 @@ async function returnOne(
     server: ServerContainer,
     saved: stage.Saved,
     items: stage.Flavour["items"],
-    language: speech.Speech
+    language: speech.Speech,
+    keep: (kept: stash.Stash | null) => Promise<void>
 ): Promise<boolean> {
+    // The event's items off, then their own things back into their slots, then
+    // home - where anything whose slot was taken is dropped at their feet.
+    let home = false;
+    const goHome = async (): Promise<boolean> =>
+        (home = stage.returned(await server.say([stage.returnLine(saved)])));
+    const giveBack = async (then?: () => Promise<boolean>): Promise<boolean> => {
+        if (!saved.stash) return true;
+        await server.sayAll([stage.clearMarked(saved.name, items)]);
+        const how = await stashService.giveBack(server, saved.name, saved.stash, keep, then);
+        return how === "done" || how === "failed";
+    };
     // Sent back by an end that was stopped before it wrote so: not moved again.
     const say = (line: string) => server.say([line]);
-    if (await commands.alreadyBack(say, saved.name, stage.IN_ARENA)) return true;
-    if (!stage.returned(await server.say([stage.returnLine(saved)]))) return false;
+    if (await commands.alreadyBack(say, saved.name, stage.IN_ARENA)) return giveBack();
+    if (!(await giveBack(goHome))) return false;
+    if (!home && !(await goHome())) return false;
     await server.sayAll(
         stage.afterReturnLines(
             saved,
@@ -811,12 +854,18 @@ export async function settle(
                 .readWhere(await server.say([commands.WHERE]))
                 .map((one) => one.name.toLowerCase())
         );
+        // Their barrels are under the floor: loaded while they are given back.
+        if (leftover.area && saved.some((one) => one.stash))
+            await server.sayAll([stage.holdArea(leftover.area)]);
         const still: stage.Saved[] = [];
         for (const one of saved) {
+            let current = one;
             const back =
                 online.has(one.name.toLowerCase()) &&
-                (await returnOne(server, one, flavour.items, language));
-            if (!back) still.push(one);
+                (await returnOne(server, one, flavour.items, language, async (kept) => {
+                    current = { ...current, stash: kept };
+                }));
+            if (!back) still.push(current);
         }
         saved = still;
     }

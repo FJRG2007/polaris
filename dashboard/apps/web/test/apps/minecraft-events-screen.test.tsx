@@ -55,6 +55,15 @@ const view = {
         }
     ],
     pending: [],
+    stashFailures: [] as {
+        id: string;
+        player: string;
+        event: string;
+        note: string | null;
+        barrels: { x: number; y: number; z: number }[];
+        missing: number;
+        at: string;
+    }[],
     nextRandomAt: null,
     waiting: null,
     players: { online: 3, active: 2 },
@@ -73,8 +82,15 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/events-actions", () => 
     },
     startNowAction: async () => ({ view }),
     cancelEventAction: async () => ({ view }),
-    forgetPrizeAction: async () => ({ view })
+    forgetPrizeAction: async () => ({ view }),
+    retryStashAction: async (input: { id: string }) => {
+        retried.push(input.id);
+        return { view: { ...view, stashFailures: [] }, outcome: "done" };
+    },
+    dismissStashAction: async () => ({ view: { ...view, stashFailures: [] } })
 }));
+
+const retried: string[] = [];
 
 const { MinecraftEvents } = await import(
     "@polaris-app/game-servers/src/screens/installed/minecraft-events"
@@ -90,6 +106,33 @@ afterEach(() => {
 });
 
 describe("the Events tab", () => {
+    it("shows a player's things an event could not give back, and gives them back from there", async () => {
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({
+            view: {
+                ...view,
+                stashFailures: [
+                    {
+                        id: "00000000-0000-7000-8000-000000000001",
+                        player: "Ana",
+                        event: "Team duel",
+                        note: "1 stack(s) could not be given back and checked",
+                        barrels: [{ x: 10, y: 99, z: -4 }],
+                        missing: 1,
+                        at: "2026-09-29T20:00:00Z"
+                    }
+                ]
+            }
+        });
+        await waitFor(() => expect(screen.getByText("Things not given back")).toBeTruthy());
+        expect(screen.getByText(/1 stack in the barrels at 10 99 -4/)).toBeTruthy();
+        fireEvent.click(screen.getByLabelText("Give back now"));
+        await waitFor(() => expect(retried).toEqual(["00000000-0000-7000-8000-000000000001"]));
+        await waitFor(() => expect(screen.getByText("Ana has their things back.")).toBeTruthy());
+        expect(screen.queryByText("Things not given back")).toBeNull();
+        retried.length = 0;
+    });
+
     it("explains an event from its row", async () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         answerRead({ view });

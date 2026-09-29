@@ -3671,6 +3671,41 @@ model PlayerInventorySnapshot {
     @@index([installedAppId])
 }
 
+// What a player carried into an event's arena, kept while they played it.
+//
+// The game copy lives in two barrels under the arena; this is the second copy:
+// the whole inventory as the game wrote it, taken as the barrels were checked. A
+// give-back is checked against it, and barrels that were lost are rebuilt from it
+// as far as a command can carry each stack. Deleted once everything is given
+// back; one that could not be is "failed" and stays on the events panel, with
+// the slots still owed, until the operator gives it back or dismisses it.
+model EventInventoryStash {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    installedAppId String    @db.Uuid
+    runId          String
+    player         String
+    // The event's name as it ran, for the panel.
+    event          String
+    // `data get entity <player> Inventory`, as the server answered it.
+    inventory      String
+    // Stringified InventoryItem[] of the slots kept, each stack's data included.
+    items          String
+    // Stringified [{x,y,z}]: the two barrels, and the barrier round them.
+    barrels        String
+    casing         String    @default("[]")
+    // "stashed" | "failed"
+    status         String
+    note           String?
+    // Stringified slot numbers still owed, once failed.
+    missing        String?
+    createdAt      DateTime  @default(now())
+    updatedAt      DateTime  @updatedAt
+    dismissedAt    DateTime?
+
+    @@index([installedAppId, status])
+    @@index([runId])
+}
+
 // A world rule (or the difficulty) as the operator set it from Polaris.
 //
 // This is what the world is meant to be played under, and it wins: a change made

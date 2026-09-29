@@ -43,6 +43,16 @@ interface World {
     daylightCycle: "true" | "false";
     /** Whether phantoms come for a player who has not slept. */
     insomnia: "true" | "false";
+    /** Each player's own stacks by slot, as `data get entity <p> Inventory` answers
+     *  them; a player with none listed carries nothing. */
+    inv: Record<string, Map<number, Stack>>;
+    /** What each container block holds, by its slot, keyed `x y z`. */
+    containers: Map<string, Map<number, Stack>>;
+    /** Stacks lying on the ground, by the tag they were dropped with. */
+    drops: Map<string, { stack: Stack; owner: string | null }>;
+    /** Whether a stack dropped for a player is picked up by them the moment it
+     *  is theirs, as a player standing on it does. */
+    pickUp: boolean;
     /** Parkour: each racer's checkpoint as the game keeps it, and the tick they finished at. */
     checkpoint: Record<string, number>;
     finishTick: Record<string, number>;
@@ -168,6 +178,10 @@ const world: World = {
     difficulty: "Normal",
     daylightCycle: "true",
     insomnia: "true",
+    inv: {},
+    containers: new Map(),
+    drops: new Map(),
+    pickUp: false,
     checkpoint: {},
     finishTick: {},
     renamedRules: false,
@@ -225,6 +239,8 @@ const world: World = {
     shooters: []
 };
 let config: Record<string, unknown> = {};
+/** The kept-bag copies written to the database, by id. */
+const stashRows = new Map<string, Record<string, unknown>>();
 const held: string[] = [];
 const released: string[] = [];
 
@@ -317,6 +333,151 @@ function quickAnswer(line: string): string | null {
             world.finishTick[name] = Math.floor(Date.now() / 50) % 2147483647;
     }
     return found.map((name) => `${command.split(" ")[0]} ${name}`).join("\n");
+}
+
+/** One stack as the game keeps it: its data is the components compound, raw. */
+interface Stack {
+    id: string;
+    count: number;
+    components?: string;
+}
+
+/** A stack as SNBT, the way `data get` writes it. */
+function stackSnbt(stack: Stack, slot: number | null): string {
+    const parts = [
+        ...(slot === null ? [] : [`Slot: ${slot}b`]),
+        `id: "${stack.id}"`,
+        `count: ${stack.count}`,
+        ...(stack.components ? [`components: ${stack.components}`] : [])
+    ];
+    return `{${parts.join(", ")}}`;
+}
+
+/** `hotbar.3`, `armor.head` and the rest, as the inventory numbers them. */
+function slotNumber(name: string): number | null {
+    const hotbar = /^hotbar\.(\d+)$/.exec(name);
+    if (hotbar) return Number(hotbar[1]);
+    const bag = /^inventory\.(\d+)$/.exec(name);
+    if (bag) return 9 + Number(bag[1]);
+    const worn = ["armor.feet", "armor.legs", "armor.chest", "armor.head"].indexOf(name);
+    if (worn >= 0) return 100 + worn;
+    return name === "weapon.offhand" ? -106 : null;
+}
+
+/**
+ * Bags, barrels and dropped stacks, and `item replace` between them, as a 1.17+
+ * server answers: a copy is exact, a slot replaced with air is emptied, and an
+ * older server does not know the command.
+ */
+function itemAnswer(line: string): string | null {
+    const bagRead = /^data get entity (\w+) Inventory$/.exec(line);
+    if (bagRead) {
+        const name = bagRead[1]!;
+        if (!world.online.includes(name)) return "No entity was found";
+        const bag = world.inv[name] ?? new Map<number, Stack>();
+        const list = [...bag].sort(([a], [b]) => a - b).map(([slot, stack]) => stackSnbt(stack, slot));
+        return `${name} has the following entity data: [${list.join(", ")}]`;
+    }
+    const boxRead = /^data get block (-?\d+) (-?\d+) (-?\d+) Items$/.exec(line);
+    if (boxRead) {
+        const at = `${boxRead[1]} ${boxRead[2]} ${boxRead[3]}`;
+        const held = world.containers.get(at);
+        if (!held || world.blocks.get(at) !== "minecraft:barrel") return "The target block is not a block entity";
+        if (held.size === 0) return "Found no elements matching Items";
+        const list = [...held].sort(([a], [b]) => a - b).map(([slot, stack]) => stackSnbt(stack, slot));
+        return `${boxRead[1]}, ${boxRead[2]}, ${boxRead[3]} has the following block data: [${list.join(", ")}]`;
+    }
+    const dropRead = /^data get entity @e\[type=minecraft:item,tag=(\w+),limit=1\] Item$/.exec(line);
+    if (dropRead) {
+        const drop = world.drops.get(dropRead[1]!);
+        return drop ? `Item has the following entity data: ${stackSnbt(drop.stack, null)}` : "No entity was found";
+    }
+    if (!/\bitem replace\b/.test(line) && !/summon minecraft:item/.test(line) && !/tag=pe_sd/.test(line))
+        return null;
+    if (!events.atLeast(world.version, [1, 17]))
+        return "Unknown or incomplete command, see below for error\n...item<--[HERE]";
+    const intoBox =
+        /^execute in minecraft:overworld run item replace block (-?\d+ -?\d+ -?\d+) container\.(\d+) from entity (\w+) (\S+)$/.exec(line);
+    if (intoBox) {
+        const [, at, container, name, slotName] = intoBox as unknown as string[];
+        const stack = world.inv[name!]?.get(slotNumber(slotName!)!);
+        const held = world.containers.get(at!);
+        if (!held) return "The target block is not a container";
+        if (stack) held.set(Number(container), { ...stack });
+        else held.delete(Number(container));
+        return "Replaced a slot on 1 block";
+    }
+    const emptyBag = /^item replace entity (\w+) (\S+) with minecraft:air$/.exec(line);
+    if (emptyBag) {
+        world.inv[emptyBag[1]!]?.delete(slotNumber(emptyBag[2]!)!);
+        return "Replaced a slot on 1 entity";
+    }
+    const intoBag =
+        /^execute in minecraft:overworld run item replace entity (\w+) (\S+) from block (-?\d+ -?\d+ -?\d+) container\.(\d+)$/.exec(line);
+    if (intoBag) {
+        const [, name, slotName, at, container] = intoBag as unknown as string[];
+        if (!world.online.includes(name!)) return "No entity was found";
+        const stack = world.containers.get(at!)?.get(Number(container));
+        const bag = (world.inv[name!] ??= new Map());
+        if (stack) bag.set(slotNumber(slotName!)!, { ...stack });
+        else bag.delete(slotNumber(slotName!)!);
+        return "Replaced a slot on 1 entity";
+    }
+    const emptyBox =
+        /^execute in minecraft:overworld run item replace block (-?\d+ -?\d+ -?\d+) container\.(\d+) with minecraft:air$/.exec(line);
+    if (emptyBox) {
+        world.containers.get(emptyBox[1]!)?.delete(Number(emptyBox[2]));
+        return "Replaced a slot on 1 block";
+    }
+    const summoned = /^execute at (\w+) run summon minecraft:item ~ ~ ~ \{.*Tags:\["(\w+)"\].*\}$/.exec(line);
+    if (summoned) {
+        world.drops.set(summoned[2]!, { stack: { id: "minecraft:stone", count: 1 }, owner: null });
+        return "Summoned new Item";
+    }
+    const filled =
+        /^execute as @e\[type=minecraft:item,tag=(\w+),limit=1\] run item replace entity @s contents from block (-?\d+ -?\d+ -?\d+) container\.(\d+)$/.exec(line);
+    if (filled) {
+        const drop = world.drops.get(filled[1]!);
+        const stack = world.containers.get(filled[2]!)?.get(Number(filled[3]));
+        if (!drop || !stack) return "No entity was found";
+        drop.stack = { ...stack };
+        return "Replaced a slot on 1 entity";
+    }
+    const owned = /^execute as @e\[type=minecraft:item,tag=(\w+),limit=1\] run data modify entity @s Owner set from entity (\w+) UUID$/.exec(line);
+    if (owned) {
+        const drop = world.drops.get(owned[1]!);
+        if (drop) drop.owner = owned[2]!;
+        return drop ? "Modified entity data of Item" : "No entity was found";
+    }
+    const released = /^execute as @e\[type=minecraft:item,tag=(\w+)\] run data modify entity @s PickupDelay set value 0s$/.exec(line);
+    if (released) {
+        const drop = world.drops.get(released[1]!);
+        if (drop && world.pickUp && drop.owner) {
+            // Theirs, and under their feet: in their bag as soon as it can be.
+            const bag = (world.inv[drop.owner] ??= new Map());
+            let slot = 0;
+            while (bag.has(slot)) slot += 1;
+            bag.set(slot, { ...drop.stack });
+            world.drops.delete(released[1]!);
+        }
+        return drop ? "Modified entity data of Item" : "No entity was found";
+    }
+    const discarded = /^kill @e\[type=minecraft:item,tag=(\w+)\]$/.exec(line);
+    if (discarded) {
+        const had = world.drops.delete(discarded[1]!);
+        return had ? "Killed Item" : "No entity was found";
+    }
+    const untagged = /^tag @e\[type=minecraft:item,tag=(\w+)\] remove \1$/.exec(line);
+    if (untagged) {
+        const drop = world.drops.get(untagged[1]!);
+        if (drop) {
+            world.drops.delete(untagged[1]!);
+            world.drops.set(`lying-${world.drops.size}-${untagged[1]}`, drop);
+        }
+        // Picked up already: no item left to carry the tag.
+        return drop ? "Removed tag from 1 entity" : "No entity was found";
+    }
+    return null;
 }
 
 /** How a server refuses a line it cannot read: the brigadier error and where it stopped. */
@@ -441,6 +602,17 @@ function answer(sent: string): string {
     }
     const quick = quickAnswer(line);
     if (quick !== null) return quick;
+    const item = itemAnswer(line);
+    if (item !== null) return item;
+    // Several tests in one line: every one must pass.
+    const chained = /^execute in minecraft:overworld((?: if block -?\d+ -?\d+ -?\d+ \S+){2,})$/.exec(line);
+    if (chained) {
+        const tests = [...chained[1]!.matchAll(/ if block (-?\d+ -?\d+ -?\d+) (\S+)/g)];
+        const all = tests.every(([, at, block]) =>
+            block === "minecraft:air" ? !world.blocks.has(at!) && !world.solid : world.blocks.get(at!) === block
+        );
+        return all ? "Test passed" : "Test failed";
+    }
     const arenaTag = /^tag (\w+) (add|remove) pe_in$/.exec(line);
     if (arenaTag) {
         if (arenaTag[2] === "add") world.inside.add(arenaTag[1] as string);
@@ -500,6 +672,7 @@ function answer(sent: string): string {
     if (put) {
         if (world.blocks.has(put[1] as string)) return "Could not set the block";
         world.blocks.set(put[1] as string, put[2] as string);
+        if (put[2] === "minecraft:barrel") world.containers.set(put[1] as string, new Map());
         return `Changed the block at ${put[1]}`;
     }
     const take =
@@ -509,12 +682,17 @@ function answer(sent: string): string {
     if (take) {
         if (world.blocks.get(take[1] as string) !== take[2]) return "Test failed";
         world.blocks.delete(take[1] as string);
+        world.containers.delete(take[1] as string);
         return "Changed the block";
     }
     const ours = /^execute in minecraft:overworld if block (-?\d+ -?\d+ -?\d+) (\S+)$/.exec(line);
     // A block the world knows of, or a meteor's ore; any other test is answered
     // further down.
-    if (ours && (world.blocks.has(ours[1] as string) || /(_ore|ancient_debris)$/.test(ours[2]!)))
+    if (
+        ours &&
+        (world.blocks.has(ours[1] as string) ||
+            /(_ore|ancient_debris|^minecraft:barrel|^minecraft:barrier)$/.test(ours[2]!))
+    )
         return world.blocks.get(ours[1] as string) === ours[2] ? "Test passed" : "Test failed";
     if (line.includes("if entity @a[distance=..12]"))
         return world.nearMeteor ? "Test passed, count: 1" : "Test failed";
@@ -984,6 +1162,39 @@ vi.mock("@polaris/db", () => ({
         gamePlayerLink: {
             findMany: async () =>
                 Object.entries(world.links).map(([player, userId]) => ({ player, userId }))
+        },
+        eventInventoryStash: {
+            create: async ({ data }: { data: Record<string, unknown> }) => {
+                const id = `00000000-0000-7000-8000-${String(stashRows.size + 1).padStart(12, "0")}`;
+                stashRows.set(id, { ...data, id, dismissedAt: null, updatedAt: new Date() });
+                return { id };
+            },
+            delete: async ({ where }: { where: { id: string } }) => {
+                stashRows.delete(where.id);
+                return {};
+            },
+            deleteMany: async ({ where }: { where: { id: string } }) => ({
+                count: stashRows.delete(where.id) ? 1 : 0
+            }),
+            update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+                const row = stashRows.get(where.id);
+                if (row) stashRows.set(where.id, { ...row, ...data, updatedAt: new Date() });
+                return row ?? {};
+            },
+            updateMany: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+                const row = stashRows.get(where.id);
+                if (row) stashRows.set(where.id, { ...row, ...data });
+                return { count: row ? 1 : 0 };
+            },
+            findUnique: async ({ where }: { where: { id: string } }) => stashRows.get(where.id) ?? null,
+            findFirst: async ({ where }: { where: { id: string; status?: string } }) => {
+                const row = stashRows.get(where.id);
+                return row && (!where.status || row.status === where.status) ? row : null;
+            },
+            findMany: async ({ where }: { where: { status?: string } }) =>
+                [...stashRows.values()].filter(
+                    (row) => (!where.status || row.status === where.status) && !row.dismissedAt
+                )
         }
     }
 }));
@@ -1073,6 +1284,11 @@ beforeEach(() => {
     world.difficulty = "Normal";
     world.daylightCycle = "true";
     world.insomnia = "true";
+    world.inv = {};
+    stashRows.clear();
+    world.containers = new Map();
+    world.drops = new Map();
+    world.pickUp = false;
     world.checkpoint = {};
     world.finishTick = {};
     world.renamedRules = false;
@@ -3749,6 +3965,39 @@ describe("a parkour race", () => {
         expect(world.insomnia).toBe("false");
     });
 
+    it("takes everybody in empty-handed and gives them back all they carried, one who left halfway at once", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map([[7, { id: "minecraft:torch", count: 32 }]]) };
+        const ana = copyOf(world.inv.Ana!);
+        const ben = copyOf(world.inv.Ben!);
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(44_000);
+        const run = state().run!;
+        expect(run.stage?.built).toBe(true);
+        expect(world.inv.Ana!.size).toBe(0);
+        expect(world.inv.Ben!.size).toBe(0);
+        const kept = run.stage!.saved.find((one) => one.name === "Ana")!.stash!;
+        // Under the net, which is the lowest of what it built.
+        expect(kept.barrels[0]!.y).toBe(run.stage!.origin!.y - 4 - 1);
+        expect(stashRows.size).toBe(2);
+        // Ben leaves halfway: his things come straight back.
+        chat(["Ben", "leave"]);
+        await play(2_100);
+        expect(world.inv.Ben).toEqual(ben);
+        expect(state().run!.stage!.saved.map((one) => one.name)).toEqual(["Ana"]);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().run).toBeNull();
+        expect(world.inv.Ana).toEqual(ana);
+        expect(stashRows.size).toBe(0);
+        for (const spot of [...kept.barrels, ...kept.casing])
+            expect(world.blocks.has(`${spot.x} ${spot.y} ${spot.z}`)).toBe(false);
+        keptTheRules();
+    });
+
     it("called off halfway takes down exactly what it built and brings everybody back", async () => {
         setUp([race()]);
         await startArena("race");
@@ -4148,6 +4397,226 @@ async function joinAndStart(presetId: string): Promise<void> {
     expect(state().run?.joined).toEqual(["Ana", "Ben"]);
     await play(20_000);
 }
+
+// ------------------------------------------------------------------ players' own things
+
+/** A bag worth keeping: an enchanted sword, a shulker full of diamonds, a
+ *  helmet worn and a shield in the offhand. */
+function stuffed(): Map<number, Stack> {
+    return new Map<number, Stack>([
+        [0, { id: "minecraft:diamond_sword", count: 1, components: '{"minecraft:enchantments": {levels: {"minecraft:sharpness": 5}}}' }],
+        [9, { id: "minecraft:shulker_box", count: 1, components: '{"minecraft:container": [{slot: 0, item: {id: "minecraft:diamond", count: 64}}]}' }],
+        [20, { id: "minecraft:cooked_beef", count: 12 }],
+        [103, { id: "minecraft:diamond_helmet", count: 1 }],
+        [-106, { id: "minecraft:shield", count: 1 }]
+    ]);
+}
+
+const copyOf = (bag: Map<number, Stack>) => new Map([...bag].map(([slot, stack]) => [slot, { ...stack }]));
+
+describe("players' own things through an arena", () => {
+    const duelOf = () => ({ ...catalog.newPreset("team-duel", "duel"), minutes: 3 });
+
+    it("keeps everything in barrels under the floor, and gives it back before the prizes", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        world.dealt = { Ana: 10 };
+        world.inv = { Ana: stuffed(), Ben: new Map([[4, { id: "minecraft:bread", count: 5 }]]) };
+        const ana = copyOf(world.inv.Ana!);
+        const ben = copyOf(world.inv.Ben!);
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        const run = state().run!;
+        const box = run.arena!.box;
+        // Everything off them, and kept.
+        expect(world.inv.Ana!.size).toBe(0);
+        expect(world.inv.Ben!.size).toBe(0);
+        const anaStash = run.entrants.find((one) => one.name === "Ana")!.stash!;
+        expect(anaStash.kept.map((one) => one.slot).sort((a, b) => a - b)).toEqual([-106, 0, 9, 20, 103]);
+        // In barrels under the floor, cased in barrier.
+        for (const spot of anaStash.barrels) {
+            expect(spot.y).toBe(box.y1 - 1);
+            expect(world.blocks.get(`${spot.x} ${spot.y} ${spot.z}`)).toBe("minecraft:barrel");
+        }
+        expect(anaStash.casing).toHaveLength(8);
+        const first = anaStash.barrels[0]!;
+        expect(world.containers.get(`${first.x} ${first.y} ${first.z}`)?.get(0)).toEqual(ana.get(0));
+        // The whole bag in the database too.
+        const rows = [...stashRows.values()];
+        expect(rows.map((row) => row.player).sort()).toEqual(["Ana", "Ben"]);
+        expect(String(rows.find((row) => row.player === "Ana")!.inventory)).toContain("sharpness");
+        // Copied, then checked, then emptied; all before the kit and the move in.
+        const copied = world.sent.findIndex((line) => line.includes("from entity Ana hotbar.0"));
+        const emptied = world.sent.indexOf("item replace entity Ana hotbar.0 with minecraft:air");
+        const kit = world.sent.findIndex((line) => line.startsWith("give Ana minecraft:stone_sword"));
+        expect(copied).toBeGreaterThan(-1);
+        expect(emptied).toBeGreaterThan(copied);
+        expect(kit).toBeGreaterThan(emptied);
+
+        world.at = { Ana: [300, 102, -8], Ben: [300, 102, 8] };
+        await play(6_100);
+        world.dealt = { Ana: 60 };
+        world.hp = { Ben: 4 };
+        await play(2_100);
+        world.hp = {};
+        const from = world.sent.length;
+        await play(3 * 60_000);
+        expect(state().run).toBeNull();
+        // Byte for byte what they carried, and nothing of the stash left.
+        expect(world.inv.Ana).toEqual(ana);
+        expect(world.inv.Ben).toEqual(ben);
+        for (const spot of [...anaStash.barrels, ...anaStash.casing])
+            expect(world.blocks.has(`${spot.x} ${spot.y} ${spot.z}`)).toBe(false);
+        expect(stashRows.size).toBe(0);
+        // The kit off, their things back, and only then the prize.
+        const end = world.sent.slice(from);
+        const kitOff = end.findIndex((line) => line.startsWith("clear Ana minecraft:stone_sword"));
+        const back = end.findIndex((line) => / item replace entity Ana hotbar\.0 from block /.test(line));
+        const prize = end.indexOf("give Ana minecraft:diamond 5");
+        expect(kitOff).toBeGreaterThan(-1);
+        expect(back).toBeGreaterThan(kitOff);
+        expect(prize).toBeGreaterThan(back);
+        expect(state().arenaLeftovers).toEqual([]);
+    });
+
+    it("drops a stack at their feet, as theirs, when its slot is taken by the end", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        const ana = copyOf(world.inv.Ana!);
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        // Something picked up in the sword's slot while it ran.
+        world.inv.Ana!.set(0, { id: "minecraft:dirt", count: 3 });
+        await play(3 * 60_000 + 10_000);
+        expect(state().run).toBeNull();
+        expect(world.inv.Ana!.get(0)).toEqual({ id: "minecraft:dirt", count: 3 });
+        for (const slot of [9, 20, 103, -106]) expect(world.inv.Ana!.get(slot)).toEqual(ana.get(slot));
+        const lying = [...world.drops.values()];
+        expect(lying).toHaveLength(1);
+        expect(lying[0]).toEqual({ stack: ana.get(0), owner: "Ana" });
+        // Dropped once home, never in the arena.
+        const home = world.sent.findLastIndex((line) =>
+            line.startsWith("execute in minecraft:overworld run tp Ana ")
+        );
+        const drop = world.sent.findIndex((line) =>
+            line.startsWith("execute at Ana run summon minecraft:item")
+        );
+        expect(home).toBeGreaterThan(-1);
+        expect(drop).toBeGreaterThan(home);
+        expect(stashRows.size).toBe(0);
+    });
+
+    it("counts a dropped stack picked up the moment it lands as given back", async () => {
+        world.online = ["Ana", "Ben"];
+        world.pickUp = true;
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        const ana = copyOf(world.inv.Ana!);
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        world.inv.Ana!.set(0, { id: "minecraft:dirt", count: 3 });
+        await play(3 * 60_000 + 10_000);
+        expect(state().run).toBeNull();
+        const bag = [...world.inv.Ana!.values()];
+        expect(bag).toContainEqual(ana.get(0));
+        expect(world.drops.size).toBe(0);
+        // Nothing left owed, nothing on the panel.
+        expect(stashRows.size).toBe(0);
+    });
+
+    it("gives nothing twice when it stopped between writing a stash down and emptying the slots", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        const ana = copyOf(world.inv.Ana!);
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
+        // As if the slots were never emptied.
+        world.inv.Ana = copyOf(ana);
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
+        const fake = {
+            say: async (argv: readonly string[]) => answer(argv.join(" ")),
+            sayAll: async (lines: readonly string[]) => {
+                for (const line of lines) answer(line);
+            }
+        } as unknown as Parameters<typeof stashService.giveBack>[0];
+        const how = await stashService.giveBack(fake, "Ana", { ...kept, state: "taking" }, async () => undefined);
+        expect(how).toBe("done");
+        expect(world.inv.Ana).toEqual(ana);
+        expect(world.drops.size).toBe(0);
+    });
+
+    it("keeps an offline player's things until they are back, then gives them back before their prize", async () => {
+        world.online = ["Ana", "Ben"];
+        world.dealt = { Ana: 10 };
+        world.inv = { Ana: new Map(), Ben: stuffed() };
+        const ben = copyOf(world.inv.Ben!);
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        world.at = { Ana: [300, 102, -8], Ben: [300, 102, 8] };
+        await play(6_100);
+        world.dealt = { Ana: 60 };
+        world.hp = { Ben: 4 };
+        await play(2_100);
+        world.hp = {};
+        // Ben logs off before the end.
+        world.online = ["Ana"];
+        await play(3 * 60_000);
+        expect(state().run).toBeNull();
+        const owed = state().arenaLeftovers;
+        expect(owed).toHaveLength(1);
+        expect(owed[0]!.entrants.map((one) => one.name)).toEqual(["Ben"]);
+        expect(owed[0]!.entrants[0]!.stash?.kept).toHaveLength(5);
+        expect(world.inv.Ben!.size).toBe(0);
+        expect(stashRows.size).toBe(1);
+        // Back on: the sweep gives it all back.
+        world.online = ["Ana", "Ben"];
+        await events.sweepEvents();
+        expect(world.inv.Ben).toEqual(ben);
+        expect(state().arenaLeftovers).toEqual([]);
+        expect(stashRows.size).toBe(0);
+    });
+
+    it("never gives anything back twice, even when a give-back stopped halfway", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        const ana = copyOf(world.inv.Ana!);
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
+        const say = async (argv: readonly string[]) => answer(argv.join(" "));
+        const fake = {
+            say,
+            sayAll: async (lines: readonly string[]) => {
+                for (const line of lines) answer(line);
+            }
+        } as unknown as Parameters<typeof stashService.giveBack>[0];
+        // A give-back that ran to the end once...
+        expect(await stashService.giveBack(fake, "Ana", kept, async () => undefined)).toBe("done");
+        expect(world.inv.Ana).toEqual(ana);
+        // ...and again from the same stale record: nothing more is given.
+        world.inv.Ana!.clear();
+        const again = await stashService.giveBack(fake, "Ana", kept, async () => undefined);
+        expect(again).toBe("done");
+        expect(world.inv.Ana!.size).toBe(0);
+        expect(world.sent.filter((line) => line.startsWith("give Ana minecraft:diamond_sword"))).toEqual([]);
+    });
+
+    it("keeps nothing on a server before 1.17, which has no item command: the kit goes beside", async () => {
+        world.version = "1.16.5";
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        const ana = copyOf(world.inv.Ana!);
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        expect(world.inv.Ana).toEqual(ana);
+        expect(world.sent.some((line) => line.includes("item replace"))).toBe(false);
+        expect(state().run!.entrants.every((one) => one.stash === null)).toBe(true);
+    });
+});
 
 describe("a team duel", () => {
     const duelOf = (minutes = 3) => ({ ...catalog.newPreset("team-duel", "duel"), minutes });

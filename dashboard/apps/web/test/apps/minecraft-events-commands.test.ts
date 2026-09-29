@@ -1688,7 +1688,8 @@ describe("what an arena sends", () => {
             z: -2.25,
             yaw: 45,
             pitch: 10,
-            mode: "survival"
+            mode: "survival",
+            stash: null
         });
         expect(stage.savedFrom("Ben", where, facing, dims, modes)).toBeNull();
         expect(stage.savedFrom("Cy", where, facing, dims, modes)).toBeNull();

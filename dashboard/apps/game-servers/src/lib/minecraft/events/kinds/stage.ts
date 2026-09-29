@@ -41,6 +41,7 @@ import { z } from "zod";
 import { PLAYER_NAME } from "../catalog";
 import { stripFormatting } from "../../parse";
 import { CHAT_LINE, text } from "../commands";
+import { stashSchema } from "./stash";
 
 /** Every block an arena is ever built of - and so every block it may remove. */
 export const ARENA_BLOCKS = [
@@ -102,7 +103,9 @@ const savedSchema = z.object({
     z: z.number(),
     yaw: z.number(),
     pitch: z.number(),
-    mode: z.enum(["survival", "adventure"])
+    mode: z.enum(["survival", "adventure"]),
+    /** What they carried, kept in barrels until it is given back (`stash`). */
+    stash: stashSchema.nullable().default(null)
 });
 
 /** Where a player was, and how they were playing, before they were moved. */
@@ -376,7 +379,8 @@ export function savedFrom(
         z: at.z,
         yaw: turned.yaw,
         pitch: turned.pitch,
-        mode: mode === 0 ? "survival" : "adventure"
+        mode: mode === 0 ? "survival" : "adventure",
+        stash: null
     };
 }
 

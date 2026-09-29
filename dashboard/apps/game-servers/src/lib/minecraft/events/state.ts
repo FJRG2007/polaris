@@ -16,6 +16,7 @@ import {
     type EventPreset
 } from "./catalog";
 import { stageSchema, stageLeftoverSchema } from "./kinds/stage";
+import { stashSchema } from "./kinds/stash";
 
 export const TRIGGERS = ["manual", "scheduled", "random"] as const;
 export type EventTrigger = (typeof TRIGGERS)[number];
@@ -77,7 +78,9 @@ export const entrantSchema = z.object({
     away: z.boolean().default(true),
     /** Carries the arena's tag while in: one who is on without it has been put
      *  back already. False for anybody taken in before the tag was given. */
-    tagged: z.boolean().default(false)
+    tagged: z.boolean().default(false),
+    /** What they carried, kept in barrels until it is given back (`kinds/stash`). */
+    stash: stashSchema.nullable().default(null)
 });
 export type Entrant = z.infer<typeof entrantSchema>;
 

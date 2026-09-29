@@ -23,7 +23,7 @@ import * as catalog from "../../lib/minecraft/events/catalog";
 import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
 import type { EventsView } from "../../lib/minecraft/events/events-service";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { Copy, FastForward, Info, Loader2, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
+import { Copy, FastForward, Info, Loader2, Pencil, Play, Plus, RotateCcw, Square, Trash2 } from "lucide-react";
 
 const { useConfirm } = hostUi.confirmDialog;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -503,6 +503,34 @@ export function MinecraftEvents({
             const answer = await actions.forgetPrizeAction({ installedAppId, pendingId: id });
             if (answer.view) accept(answer.view, false);
             else setError(answer.error ?? t("events.errors.forgetPrize"));
+        });
+    }
+
+    function giveBackStash(id: string, player: string): void {
+        startTransition(async () => {
+            const answer = await actions.retryStashAction({ installedAppId, id });
+            if (!answer.view) {
+                setError(answer.error ?? t("events.errors.stashRetry"));
+                return;
+            }
+            accept(answer.view, false);
+            if (answer.outcome === "done") setNote(t("events.givenBack", { name: player }));
+            else if (answer.outcome === "offline") setError(t("events.stashOffline", { name: player }));
+            else setError(t("events.stashStillFailed", { name: player }));
+        });
+    }
+
+    async function dismissStash(id: string, player: string): Promise<void> {
+        const sure = await confirm({
+            title: t("events.dismissStashTitle", { name: player }),
+            description: t("events.dismissStashHint"),
+            confirmLabel: t("events.dismissIt")
+        });
+        if (!sure) return;
+        startTransition(async () => {
+            const answer = await actions.dismissStashAction({ installedAppId, id });
+            if (answer.view) accept(answer.view, false);
+            else setError(answer.error ?? t("events.errors.stashDismiss"));
         });
     }
 
@@ -1323,6 +1351,62 @@ export function MinecraftEvents({
                                     </ui.Button>
                                 </li>
                             ))}
+                        </ul>
+                    </ui.CardBody>
+                </ui.Card>
+            )}
+
+            {/* Players' own things an event could not give back whole. */}
+            {view && (view.stashFailures ?? []).length > 0 && (
+                <ui.Card>
+                    <ui.CardBody className="flex flex-col gap-2">
+                        <div>
+                            <p className="text-sm font-medium">{t("events.thingsNotGivenBack")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("events.thingsNotGivenBackHint")}
+                            </p>
+                        </div>
+                        <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
+                            {(view.stashFailures ?? []).map((one) => {
+                                const barrel = one.barrels[0];
+                                const where = barrel
+                                    ? t("events.stashStacks", {
+                                          count: one.missing,
+                                          x: barrel.x,
+                                          y: barrel.y,
+                                          z: barrel.z
+                                      })
+                                    : "";
+                                const detail = [one.event, where, one.note].filter(Boolean).join(" - ");
+                                return (
+                                    <li key={one.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                                        <span className="font-medium">{one.player}</span>
+                                        <span className="min-w-0 flex-1 truncate text-muted-foreground" title={detail}>
+                                            {detail}
+                                        </span>
+                                        <ui.Button
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label={t("events.giveBackNow")}
+                                            title={t("events.giveBackNow")}
+                                            disabled={!canManage || pending}
+                                            onClick={() => giveBackStash(one.id, one.player)}
+                                        >
+                                            <RotateCcw className="size-4" />
+                                        </ui.Button>
+                                        <ui.Button
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label={t("events.dismissStash", { name: one.player })}
+                                            title={t("events.dismissStash", { name: one.player })}
+                                            disabled={!canManage || pending}
+                                            onClick={() => void dismissStash(one.id, one.player)}
+                                        >
+                                            <Trash2 className="size-4" />
+                                        </ui.Button>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     </ui.CardBody>
                 </ui.Card>

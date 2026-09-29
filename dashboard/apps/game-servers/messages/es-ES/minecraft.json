@@ -1684,7 +1684,10 @@
             "forgetPrize": "No se pudo olvidar ese premio",
             "noServer": "Ese servidor no está aquí",
             "noEvent": "Ese evento no está aquí",
-            "noPrize": "Ese premio no está aquí"
+            "noPrize": "Ese premio no está aquí",
+            "noStash": "Esas cosas guardadas ya no están aquí",
+            "stashRetry": "No se le pudieron devolver sus cosas",
+            "stashDismiss": "No se pudo descartar"
         },
         "starting": "{name} está empezando.",
         "deleteTitle": "¿Borrar {name}?",
@@ -1734,7 +1737,18 @@
             "nautilus_shell": "Concha de nautilo",
             "enchanted_book": "Libro encantado",
             "bow": "Arco"
-        }
+        },
+        "thingsNotGivenBack": "Cosas sin devolver",
+        "thingsNotGivenBackHint": "Guardadas a salvo en sus barriles bajo la arena. Devuélvelas mientras el jugador esté conectado, o descártalo cuando esté resuelto.",
+        "stashStacks": "{count, plural, one {# montón} other {# montones}} en los barriles de {x} {y} {z}",
+        "giveBackNow": "Devolver ahora",
+        "givenBack": "{name} ya tiene sus cosas.",
+        "stashOffline": "{name} no está en el servidor. Vuelve a intentarlo cuando esté.",
+        "stashStillFailed": "Algunas cosas de {name} siguen sin poder devolverse.",
+        "dismissStash": "Descartar las cosas guardadas de {name}",
+        "dismissStashTitle": "¿Descartar las cosas guardadas de {name}?",
+        "dismissStashHint": "Deja de mostrarse aquí. Lo que siga en los barriles se queda allí.",
+        "dismissIt": "Descartar"
     },
     "editor": {
         "where": "Dónde",

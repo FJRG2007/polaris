@@ -27,6 +27,8 @@ import * as arena from "./arena";
 import * as duel from "./team-duel";
 import * as catalog from "../catalog";
 import * as build from "./build-battle";
+import * as stash from "./stash";
+import * as stashService from "./stash-service";
 import * as commands from "../commands";
 import * as speech from "../../speech";
 import * as written from "../messages";
@@ -65,6 +67,8 @@ export interface KindContext {
     atLeast(version: readonly number[]): Promise<boolean>;
     /** Who, in lower case, is still owed a trip back from an earlier arena. */
     owed(): Promise<ReadonlySet<string>>;
+    /** Whose run a kept bag belongs to, for its database copy. */
+    readonly stashOwner: stashService.StashOwner;
 }
 
 /** The event cannot go on, for the reason given. */
@@ -366,7 +370,8 @@ async function bringIn(ctx: KindContext): Promise<void> {
                 gamemode,
                 side: duelling ? index % 2 : index,
                 away: true,
-                tagged: true
+                tagged: true,
+                stash: null
             });
         }
         if (run.entrants.length + fresh.length < catalog.joinersNeeded(run.preset)) {
@@ -375,6 +380,7 @@ async function bringIn(ctx: KindContext): Promise<void> {
         ctx.run = { ...ctx.run, entrants: [...run.entrants, ...fresh], marker, kit };
         await ctx.persist();
     }
+    await stashAll(ctx);
     const out: string[] = [];
     const entrants = ctx.run.entrants;
     if (duelling) {
@@ -424,6 +430,33 @@ async function bringIn(ctx: KindContext): Promise<void> {
         endsAt: ctx.now + seconds * 1000
     };
     await ctx.persist();
+}
+
+/**
+ * Everybody's own things kept in barrels under the floor before they are
+ * brought in and handed the kit (`stash`), each written into the run as it is
+ * kept. From 1.17, which has `item`; before it, the kit goes beside what they
+ * carry, as it always has.
+ */
+async function stashAll(ctx: KindContext): Promise<void> {
+    if (!(await ctx.atLeast([1, 17]))) return;
+    const box = ctx.run.arena!.box;
+    const candidates = stash.spotsUnder({ x1: box.x1, z1: box.z1, x2: box.x2, z2: box.z2, y: box.y1 });
+    for (const one of ctx.run.entrants) {
+        if (one.stash || !one.away) continue;
+        const taken = ctx.run.entrants.flatMap((each) =>
+            each.stash ? [...each.stash.barrels, ...each.stash.casing] : []
+        );
+        await stashService.stashIn(ctx.server, ctx.stashOwner, one.name, candidates, taken, async (kept) => {
+            ctx.run = {
+                ...ctx.run,
+                entrants: ctx.run.entrants.map((each) =>
+                    each.name === one.name ? { ...each, stash: kept } : each
+                )
+            };
+            await ctx.persist();
+        });
+    }
 }
 
 // ------------------------------------------------------------------ team duel
@@ -757,6 +790,9 @@ export async function closeArena(
     const remaining: stored.Entrant[] = [];
     let index = 0;
     try {
+        // Their barrels are under the floor: loaded while they are given back.
+        if (left.arena && left.entrants.some((one) => one.stash))
+            await server.sayAll([arena.forceloadArea(left.arena.box, true)]);
         const owedRules = Object.entries(rules)
             .filter(([name, value]) => /^[A-Za-z:_]+$/.test(name) && /^(true|false)$/.test(value))
             .map(([name, value]) => commands.setRule(name, value));
@@ -765,13 +801,34 @@ export async function closeArena(
         const box = left.arena?.box ?? null;
         if (box && left.marker) await server.sayAll([arena.killMarkedDrops(box, left.marker)]);
         for (; index < left.entrants.length; index += 1) {
-            const one = left.entrants[index]!;
+            let one = left.entrants[index]!;
             if (!one.away || !arena.commandable(one)) continue;
+            // The kit off, then their own things back into their slots, then
+            // home - where anything whose slot was taken is dropped at their feet.
+            let home = false;
+            const goHome = async (): Promise<boolean> =>
+                (home = arena.wentHome(await server.say([arena.sendHome(one)])));
+            const giveBack = async (then?: () => Promise<boolean>): Promise<boolean> => {
+                if (!one.stash) return true;
+                const how = await stashService.giveBack(
+                    server,
+                    one.name,
+                    one.stash,
+                    async (kept) => {
+                        one = { ...one, stash: kept };
+                    },
+                    then
+                );
+                return how === "done" || how === "failed";
+            };
             // Sent back by an end that was stopped before it wrote so: not moved again.
             const say = (line: string) => server.say([line]);
-            if (one.tagged && (await commands.alreadyBack(say, one.name, arena.IN_ARENA))) continue;
+            if (one.tagged && (await commands.alreadyBack(say, one.name, arena.IN_ARENA))) {
+                if (!(await giveBack())) remaining.push(one);
+                continue;
+            }
             await server.sayAll(arena.homeward(one, left.marker, left.kit));
-            if (!arena.wentHome(await server.say([arena.sendHome(one)]))) {
+            if (!(await giveBack(goHome)) || (!home && !(await goHome()))) {
                 remaining.push(one);
                 continue;
             }

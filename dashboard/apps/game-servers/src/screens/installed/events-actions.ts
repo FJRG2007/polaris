@@ -126,6 +126,49 @@ export async function startNowAction(installedAppId: string): Promise<Answer> {
     }
 }
 
+const stashSchema = z.object({ installedAppId: serverId, id: z.string().uuid() });
+
+/** A player's things an event could not give back, tried again now. */
+export async function retryStashAction(
+    input: z.input<typeof stashSchema>
+): Promise<Answer & { outcome?: string }> {
+    const t = await gameWords("minecraft");
+    const parsed = stashSchema.safeParse(input);
+    if (!parsed.success) return { error: t("events.errors.noStash") };
+    try {
+        const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
+        const outcome = await events.retryStash(parsed.data.installedAppId, parsed.data.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.events.stash-retry",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId
+        });
+        return { view: await events.eventsView(parsed.data.installedAppId), outcome };
+    } catch (caught) {
+        return { error: await failure(caught, t("events.errors.stashRetry")) };
+    }
+}
+
+export async function dismissStashAction(input: z.input<typeof stashSchema>): Promise<Answer> {
+    const t = await gameWords("minecraft");
+    const parsed = stashSchema.safeParse(input);
+    if (!parsed.success) return { error: t("events.errors.noStash") };
+    try {
+        const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
+        await events.dismissStash(parsed.data.installedAppId, parsed.data.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.events.stash-dismiss",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId
+        });
+        return { view: await events.eventsView(parsed.data.installedAppId) };
+    } catch (caught) {
+        return { error: await failure(caught, t("events.errors.stashDismiss")) };
+    }
+}
+
 const forgetSchema = z.object({ installedAppId: serverId, pendingId: z.string().min(1).max(128) });
 
 export async function forgetPrizeAction(input: z.input<typeof forgetSchema>): Promise<Answer> {

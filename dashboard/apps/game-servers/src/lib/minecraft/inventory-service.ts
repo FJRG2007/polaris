@@ -75,7 +75,26 @@ export interface LiveReading {
  * That costs a round trip per stack and is only paid by the bags that need it.
  */
 export async function readLiveInventory(ask: Ask, player: string): Promise<LiveReading> {
-    const whole = stripFormatting(await ask(["data", "get", "entity", player, "Inventory"]));
+    return readLiveList(ask, ["entity", player], "Inventory", MOST_ENTRIES);
+}
+
+/** How many stacks a barrel or a chest holds. */
+const CONTAINER_ENTRIES = 27;
+
+/**
+ * What a container block holds - a barrel an event keeps somebody's things in -
+ * read the same way as a bag, so a big one survives the packet limit too. Always
+ * the Overworld, which is where the command source stands.
+ */
+export async function readLiveContainer(
+    ask: Ask,
+    at: { readonly x: number; readonly y: number; readonly z: number }
+): Promise<LiveReading> {
+    return readLiveList(ask, ["block", String(at.x), String(at.y), String(at.z)], "Items", CONTAINER_ENTRIES);
+}
+
+async function readLiveList(ask: Ask, target: readonly string[], path: string, most: number): Promise<LiveReading> {
+    const whole = stripFormatting(await ask(["data", "get", ...target, path]));
     if (!isDataReply(whole)) return { items: [], answered: false, chunked: false, unreadable: 0, said: whole };
 
     const items = parseInventory(whole);
@@ -87,8 +106,8 @@ export async function readLiveInventory(ask: Ask, player: string): Promise<LiveR
 
     const found: InventoryItem[] = [];
     let unreadable = 0;
-    for (let index = 0; index < MOST_ENTRIES; index += 1) {
-        const reply = stripFormatting(await ask(["data", "get", "entity", player, `Inventory[${index}]`]));
+    for (let index = 0; index < most; index += 1) {
+        const reply = stripFormatting(await ask(["data", "get", ...target, `${path}[${index}]`]));
         // "Found no elements matching Inventory[7]" - the list ended.
         if (!isDataReply(reply)) break;
         const stack = parseStack(reply);

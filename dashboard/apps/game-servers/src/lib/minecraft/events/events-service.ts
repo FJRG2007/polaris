@@ -44,6 +44,7 @@ import * as meteors from "./kinds/meteor-shower";
 import * as stageService from "./kinds/stage-service";
 import * as parkour from "./kinds/parkour";
 import * as arenaService from "./kinds/arena-service";
+import * as stashService from "./kinds/stash-service";
 import { editionOf, type ServerContainer } from "../service";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
@@ -352,6 +353,9 @@ export interface EventsView {
     } | null;
     readonly history: readonly stored.EventHistoryEntry[];
     readonly pending: readonly stored.PendingReward[];
+    /** Players' own things an event could not give back whole: kept in their
+     *  barrels, shown until given back from here or dismissed. */
+    readonly stashFailures: Awaited<ReturnType<typeof stashService.failedStashes>>;
     readonly nextRandomAt: number | null;
     readonly waiting: string | null;
     /** Who is on and who of them is playing, as the last look saw them. Null when
@@ -394,6 +398,7 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
             : null,
         history: state.history,
         pending: stored.livePending(state.pending, Date.now()),
+        stashFailures: await stashService.failedStashes(installedAppId).catch(() => []),
         nextRandomAt: state.nextRandomAt,
         waiting: state.waiting,
         players: seen
@@ -659,6 +664,24 @@ export async function forgetPending(installedAppId: string, pendingId: string): 
         ...state,
         pending: state.pending.filter((one) => one.id !== pendingId)
     }));
+}
+
+/**
+ * A player's things an event could not give back, tried again from their
+ * barrels - or their database copy - now. Answers how it went.
+ */
+export async function retryStash(installedAppId: string, id: string): Promise<stashService.GiveBack> {
+    const row = await readRow(installedAppId);
+    if (!row) throw new Error("That server is not here");
+    return withServerContainer(row.ownerId, installedAppId, async (server) => {
+        if (!server.running) return "offline" as const;
+        return stashService.retryStash(server, installedAppId, id);
+    });
+}
+
+/** Taken off the panel: the operator has dealt with it. */
+export async function dismissStash(installedAppId: string, id: string): Promise<void> {
+    await stashService.dismissStash(installedAppId, id);
 }
 
 // ------------------------------------------------------------------ the loop
@@ -1572,6 +1595,7 @@ function kindContext(
         giveUpPlace: (point) => retryPlace(installedAppId, loop, server, point),
         chat: () => chatSince(loop, server),
         atLeast: (wanted) => serverAtLeast(server, wanted),
+        stashOwner: { installedAppId, runId: loop.run.id, event: loop.run.preset.name },
         owed: async () => {
             const row = await readRow(installedAppId);
             return row ? owedNames(stored.readEventState(row.config)) : new Set<string>();
@@ -2662,7 +2686,9 @@ function stageTools(
         flavour: async () => loop.flavour ?? (loop.flavour = await stageFlavour(server)),
         itemsWork: (items) => {
             if (loop.flavour) loop.flavour = { ...loop.flavour, items };
-        }
+        },
+        canStash: () => serverAtLeast(server, [1, 17]),
+        stashOwner: { installedAppId, runId: loop.run.id, event: loop.run.preset.name }
     };
 }
 
@@ -2784,6 +2810,26 @@ async function finish(
         podium: string[];
         rounds: Record<string, number>;
     } | null = null;
+    /**
+     * Everybody back where they were - the kit taken back, their own things
+     * given back (`kinds/stash`) - and every block of the stage or the arena
+     * out. Before any prize, so a prize never lands in a slot that is about to
+     * be given back; whatever cannot be done now is kept, and the sweep
+     * finishes it. Once.
+     */
+    let broughtBack = false;
+    const bringBack = async (to: ServerContainer): Promise<void> => {
+        if (broughtBack) return;
+        broughtBack = true;
+        if (stageLeftover) {
+            const flavour = loop.flavour ?? (await stageFlavour(to));
+            stageLeftover = await stageService.settle(to, stageLeftover, flavour, language);
+        }
+        if (catalog.playsInArena(preset)) {
+            const open = arenaService.leftoverOf(run);
+            arenaLeftover = open ? await arenaService.closeArena(to, open, language) : null;
+        }
+    };
 
     try {
         if (server && outcome === "finished" && run.phase === "running" && info.competitive) {
@@ -2829,6 +2875,8 @@ async function finish(
                 podium: placed.map((one) => one.name),
                 rounds: preset.kind === "trivia" ? { ...run.points } : {}
             };
+            // The kit off and their own things back first; only then the prizes.
+            await bringBack(server);
             const online = new Set(
                 commands
                     .readWhere(await server.say([commands.WHERE]))
@@ -2938,18 +2986,9 @@ async function finish(
                     commands.say(messages.tag(language) + messages.dawn(survivors.length, language))
                 );
             }
-            // Everybody back where they were, and every block of the stage or
-            // the arena out, before the results are read to them and before
-            // the rules they held are put back. Whatever cannot be done now is
-            // kept, and the sweep finishes it.
-            if (stageLeftover) {
-                const flavour = loop.flavour ?? (await stageFlavour(server));
-                stageLeftover = await stageService.settle(server, stageLeftover, flavour, language);
-            }
-            if (catalog.playsInArena(preset)) {
-                const open = arenaService.leftoverOf(run);
-                arenaLeftover = open ? await arenaService.closeArena(server, open, language) : null;
-            }
+            // Everybody back where they were before the results are read to
+            // them and before the rules they held are put back.
+            await bringBack(server);
             await server.sayAll([...lines, ...cleanupOf(run)]);
         } else {
             // The server was not answering: clean up when it is back, so a

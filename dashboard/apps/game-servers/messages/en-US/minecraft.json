@@ -1684,7 +1684,10 @@
             "forgetPrize": "That prize could not be forgotten",
             "noServer": "That server is not here",
             "noEvent": "That event is not here",
-            "noPrize": "That prize is not here"
+            "noPrize": "That prize is not here",
+            "noStash": "Those kept things are no longer here",
+            "stashRetry": "Their things could not be given back",
+            "stashDismiss": "That could not be dismissed"
         },
         "starting": "{name} is starting.",
         "deleteTitle": "Delete {name}?",
@@ -1734,7 +1737,18 @@
             "nautilus_shell": "Nautilus shell",
             "enchanted_book": "Enchanted book",
             "bow": "Bow"
-        }
+        },
+        "thingsNotGivenBack": "Things not given back",
+        "thingsNotGivenBackHint": "Kept safe in their barrels under the arena. Give them back while the player is on, or dismiss it once it is dealt with.",
+        "stashStacks": "{count, plural, one {# stack} other {# stacks}} in the barrels at {x} {y} {z}",
+        "giveBackNow": "Give back now",
+        "givenBack": "{name} has their things back.",
+        "stashOffline": "{name} is not on the server. Try again when they are.",
+        "stashStillFailed": "Some of {name}'s things still could not be given back.",
+        "dismissStash": "Dismiss {name}'s kept things",
+        "dismissStashTitle": "Dismiss {name}'s kept things?",
+        "dismissStashHint": "It stops showing here. Whatever is still in the barrels stays there.",
+        "dismissIt": "Dismiss"
     },
     "editor": {
         "where": "Where",
