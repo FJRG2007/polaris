@@ -155,7 +155,7 @@
         },
         "devices": {
             "description": "Las cerraduras, interruptores y luces de este sitio: qué están haciendo, quién los ha usado y los botones para manejarlos.",
-            "title": "Dispositivos"
+            "title": "Aparatos"
         },
         "events": {
             "description": "Todo lo que han detectado las cámaras. Filtra por una cámara, una persona o una noche, y abre cualquier evento para ver la grabación de ese momento.",
@@ -867,7 +867,7 @@
             }
         },
         "doors": {
-            "open": "Puerta abierta",
+            "open": "Abierta",
             "closed": "Puerta cerrada",
             "unknown": "Puerta sin datos"
         },

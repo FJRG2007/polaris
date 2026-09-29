@@ -20,7 +20,7 @@
 
 import Link from "next/link";
 import type { GameKey } from "../../../messages";
-import { timeoutText, useGameText, usePlayerWords, useSchemaText } from "../game-text";
+import { timeoutText, useGameText, usePlayerWords, useSchemaText, useTabWords } from "../game-text";
 import { ArkMods } from "./ark-mods";
 import { ArkRules } from "./ark-rules";
 import * as actions from "./ark-actions";
@@ -182,6 +182,7 @@ export function ArkPanel({
         return isGameTab(slug, "ark") && canOpenGameTab(slug, held, "ark") ? slug : "";
     }, [pathname, installedAppId, held]);
     const tabs = useMemo(() => visibleGameTabs(held, "ark"), [held]);
+    const tabWords = useTabWords();
     const openTab = useCallback(
         (slug: string) => {
             if (slug === tab) return;
@@ -350,7 +351,7 @@ export function ArkPanel({
                                 : "border-transparent text-muted-foreground hover:text-foreground"
                         )}
                     >
-                        {entry.label}
+                        {tabWords(entry.label)}
                     </a>
                 ))}
             </ScrollRow>

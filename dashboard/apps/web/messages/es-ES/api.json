@@ -185,7 +185,7 @@
             "variablesUnreadable": "No se pudieron leer"
         },
         "virusTotal": {
-            "invalidKey": "Clave de API no válida",
+            "invalidKey": "Clave API no válida",
             "unreachable": "VirusTotal no responde",
             "unavailable": "VirusTotal no está disponible ({status})"
         },
@@ -208,7 +208,7 @@
         }
     },
     "words": {
-        "theOwner": "El propietario",
+        "theOwner": "El dueño",
         "mintedToken": "Creado desde los ajustes de esta app."
     }
 }

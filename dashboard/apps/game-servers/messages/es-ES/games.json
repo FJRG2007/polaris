@@ -1064,5 +1064,25 @@
         "xrayBody": "Cada una estaba completamente rodeada de roca, donde no se podía ver sin X-Ray.",
         "movementTitle": "{name} puede estar volando o teletransportándose en {server}",
         "movementBody": "{reasons}. No se le hizo nada: mira dónde y cuándo antes de decidir."
+    },
+    "tabs": {
+        "overview": "Resumen",
+        "console": "Consola",
+        "announce": "Anuncios",
+        "panel": "Panel lateral",
+        "chat": "Chat vinculado",
+        "events": "Eventos",
+        "challenges": "Retos",
+        "players": "Jugadores",
+        "world": "Mundo",
+        "rules": "Reglas",
+        "mods": "Mods",
+        "resources": "Recursos",
+        "usage": "Uso",
+        "security": "Seguridad",
+        "anticheat": "Antitrampas",
+        "access": "Acceso",
+        "schedule": "Horario",
+        "settings": "Ajustes"
     }
 }

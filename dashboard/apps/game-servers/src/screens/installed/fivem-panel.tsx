@@ -23,7 +23,7 @@
 
 import Link from "next/link";
 import type { GameKey } from "../../../messages";
-import { useGameText, usePlayerWords, useSchemaText } from "../game-text";
+import { useGameText, usePlayerWords, useSchemaText, useTabWords } from "../game-text";
 import * as actions from "./fivem-actions";
 import { FivemRules } from "./fivem-rules";
 import { GameConsole } from "./game-console";
@@ -161,6 +161,7 @@ export function FivemPanel({
         return isGameTab(slug, "fivem") && canOpenGameTab(slug, held, "fivem") ? slug : "";
     }, [pathname, installedAppId, held]);
     const tabs = useMemo(() => visibleGameTabs(held, "fivem"), [held]);
+    const tabWords = useTabWords();
     const openTab = useCallback(
         (slug: string) => {
             if (slug === tab) return;
@@ -295,7 +296,7 @@ export function FivemPanel({
                                 : "border-transparent text-muted-foreground hover:text-foreground"
                         )}
                     >
-                        {gameTabLabel(entry, "fivem")}
+                        {tabWords(gameTabLabel(entry, "fivem"))}
                     </a>
                 ))}
             </ScrollRow>

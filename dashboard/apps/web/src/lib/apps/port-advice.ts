@@ -82,6 +82,7 @@ function runsOf(numbers: readonly number[]): string[] {
 /** Whether the sentence about these ports is about more than one of them, so the
  *  verb beside it agrees. "UDP 19133-19135 is not confirmed" reads as a mistake,
  *  because it is one. */
+// i18n-ignore (marked per line below): still English - a documented exception until reach advice is keyed for the catalogs.
 function plural(ports: readonly GamePort[]): boolean {
     return new Set(ports.map((entry) => entry.port)).size > 1;
 }
@@ -104,7 +105,7 @@ export function describeBlocksFor(ports: readonly GamePort[], blocks: PortBlocks
 const NO_PORTS: GameReachAdvice = {
     ok: true,
     actionable: false,
-    title: "No published port",
+    title: "No published port", // i18n-ignore
     detail: "This server publishes no port, so there is nothing to open.",
     steps: [],
     forward: false
@@ -130,8 +131,8 @@ export function gameStoppedAdvice(ports: readonly GamePort[]): GameReachAdvice {
         ok: false,
         actionable: false,
         title: plural(ports)
-            ? "Stopped, so its ports cannot be checked"
-            : "Stopped, so its port cannot be checked",
+            ? "Stopped, so its ports cannot be checked" // i18n-ignore
+            : "Stopped, so its port cannot be checked", // i18n-ignore
         detail: `Nothing answers on ${named} while this server is down, and from here that looks exactly like a port nobody has opened. Start it and Polaris checks this by itself.`,
         steps: [],
         forward: false
@@ -167,7 +168,7 @@ export function gameReachAdvice(
         return {
             ok: true,
             actionable: false,
-            title: "Reachable from the internet",
+            title: "Reachable from the internet", // i18n-ignore
             detail: `Players have connected to this server from outside the network, so ${named} reaches it.`,
             steps: [],
             forward: false
@@ -184,8 +185,8 @@ export function gameReachAdvice(
             ok: false,
             actionable: false,
             title: many
-                ? "Not answering yet, so its ports cannot be checked"
-                : "Not answering yet, so its port cannot be checked",
+                ? "Not answering yet, so its ports cannot be checked" // i18n-ignore
+                : "Not answering yet, so its port cannot be checked", // i18n-ignore
             detail: `The server is not answering on ${named} yet, and a port with nothing behind it looks the same from outside whether it is open or not. A first start takes minutes - the server fetches itself, then generates a world - and Polaris checks this by itself once it answers.`,
             steps: [],
             forward: false
@@ -195,7 +196,7 @@ export function gameReachAdvice(
         return {
             ok: false,
             actionable: true,
-            title: "This line cannot receive incoming connections",
+            title: "This line cannot receive incoming connections", // i18n-ignore
             detail: `Your provider puts this connection behind carrier-grade NAT, so no forward can open ${named} - the public address is shared and it is not yours to open.`,
             steps: [
                 "Ask your provider for a public IP address, which some offer on request.",
@@ -213,7 +214,7 @@ export function gameReachAdvice(
             // that does not look identical - most routers will not loop their own
             // public address back inward - so the only honest claim is that nothing
             // has proved it yet.
-            title: `${named} ${many ? "are" : "is"} not confirmed from outside yet`,
+            title: `${named} ${many ? "are" : "is"} not confirmed from outside yet`, // i18n-ignore
             detail: `The domain setup opens 80 and 443 for websites; ${named} ${many ? "are this server's own ports and ride" : "is this server's own port and rides"} on none of that. Polaris cannot prove a forward from inside the network, so if you have already opened ${many ? "them" : "it"}, this clears itself the first time somebody joins from outside.`,
             steps: [
                 ranged
@@ -228,7 +229,7 @@ export function gameReachAdvice(
         return {
             ok: false,
             actionable: true,
-            title: `${named} ${many ? "are" : "is"} not confirmed from outside yet`,
+            title: `${named} ${many ? "are" : "is"} not confirmed from outside yet`, // i18n-ignore
             detail: `This server holds its own public address, so nothing has to be forwarded - but the provider's firewall or security group has to let ${named} in, and from in here an allowed port and a blocked one look the same until something arrives.`,
             steps: [
                 `If ${many ? "they are" : "it is"} not allowed yet, allow inbound ${named} in your provider's firewall or security group.`,
@@ -240,7 +241,7 @@ export function gameReachAdvice(
     return {
         ok: false,
         actionable: false,
-        title: `${named} may not be reachable yet`,
+        title: `${named} may not be reachable yet`, // i18n-ignore
         detail: `Polaris does not know where this machine sits on the network, so it cannot say what has to be opened for ${named}. Set it under Admin, Domains.`,
         steps: [],
         forward: false

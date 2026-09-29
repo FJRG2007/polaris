@@ -80,11 +80,13 @@ export const OVERVIEW_SIZE_LABELS: Record<OverviewWidgetSize, string> = {
     xl: "Widest"
 };
 
+// Labels and descriptions are the English fallback: the Overview and its
+// customize panel draw them from `home.widgets.<id>` (see `widget-names.ts`).
 export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     {
         id: "shortcuts",
-        label: "Quick access",
-        description: "The pages and services you pinned yourself.",
+        label: "Quick access", // i18n-ignore
+        description: "The pages and services you pinned yourself.", // i18n-ignore
         icon: Star,
         href: null,
         sizes: ["md", "lg", "xl"],
@@ -92,8 +94,8 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     },
     {
         id: "services",
-        label: "Services",
-        description: "What is deployed and running, and what stopped.",
+        label: "Services", // i18n-ignore
+        description: "What is deployed and running, and what stopped.", // i18n-ignore
         icon: Rocket,
         permission: "deploy.read",
         href: "/apps/deploy",
@@ -101,8 +103,8 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     },
     {
         id: "usage",
-        label: "Usage",
-        description: "CPU and memory on the machines you run things on.",
+        label: "Usage", // i18n-ignore
+        description: "CPU and memory on the machines you run things on.", // i18n-ignore
         icon: ChartColumn,
         permission: "deploy.read",
         href: "/watch/servers",
@@ -110,8 +112,8 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     },
     {
         id: "notifications",
-        label: "Notifications",
-        description: "The latest alerts, newest first.",
+        label: "Notifications", // i18n-ignore
+        description: "The latest alerts, newest first.", // i18n-ignore
         icon: Bell,
         href: "/account/notifications",
         sizes: ALL_SIZES,
@@ -119,8 +121,8 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     },
     {
         id: "recent",
-        label: "Recently visited",
-        description: "Where you have been in Polaris, on this device.",
+        label: "Recently visited", // i18n-ignore
+        description: "Where you have been in Polaris, on this device.", // i18n-ignore
         icon: Clock,
         href: null,
         sizes: ALL_SIZES,
@@ -128,8 +130,8 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     },
     {
         id: "tasks",
-        label: "My work",
-        description: "Tasks assigned to you, and what is overdue.",
+        label: "My work", // i18n-ignore
+        description: "Tasks assigned to you, and what is overdue.", // i18n-ignore
         icon: ListTodo,
         permission: "tasks.read",
         href: "/tasks",
@@ -137,8 +139,8 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     },
     {
         id: "alarms",
-        label: "Alarms",
-        description: "Alarms firing now, and what tripped recently.",
+        label: "Alarms", // i18n-ignore
+        description: "Alarms firing now, and what tripped recently.", // i18n-ignore
         icon: Activity,
         permission: "deploy.read",
         href: "/watch/alarms",
@@ -146,8 +148,8 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     },
     {
         id: "storage",
-        label: "Storage",
-        description: "How full each connected device is.",
+        label: "Storage", // i18n-ignore
+        description: "How full each connected device is.", // i18n-ignore
         icon: HardDrive,
         permission: "drive.read",
         href: "/drive/overview",
@@ -157,8 +159,8 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     },
     {
         id: "apps",
-        label: "Your apps",
-        description: "Every app this account can open.",
+        label: "Your apps", // i18n-ignore
+        description: "Every app this account can open.", // i18n-ignore
         icon: LayoutGrid,
         href: null,
         sizes: ALL_SIZES,
@@ -166,8 +168,8 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     },
     {
         id: "games",
-        label: "Game servers",
-        description: "Which of your servers are up, and how full they are.",
+        label: "Game servers", // i18n-ignore
+        description: "Which of your servers are up, and how full they are.", // i18n-ignore
         icon: Gamepad2,
         permission: "games.read",
         href: "/apps/games",
@@ -182,8 +184,8 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     },
     {
         id: "sessions",
-        label: "Signed in",
-        description: "The devices your account is open on right now.",
+        label: "Signed in", // i18n-ignore
+        description: "The devices your account is open on right now.", // i18n-ignore
         icon: MonitorSmartphone,
         // No permission: it is this account's own sessions, which is the one thing
         // every account may read about itself.
@@ -192,8 +194,8 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     },
     {
         id: "activity",
-        label: "Recent activity",
-        description: "What was done with your account, and from where.",
+        label: "Recent activity", // i18n-ignore
+        description: "What was done with your account, and from where.", // i18n-ignore
         icon: ScrollText,
         href: "/account/activity",
         sizes: ALL_SIZES

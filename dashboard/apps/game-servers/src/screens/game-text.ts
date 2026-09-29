@@ -21,6 +21,43 @@ export function useGameText<N extends GameNamespace>(namespace: N): GameText<N> 
     return gameCatalogs.translator(hostUi.i18nProvider.useLocale(), namespace);
 }
 
+/** The catalog key for each screen, by the name the dashboard's tab list gives it. */
+const TAB_WORDS: Readonly<Record<string, GameKey<"games">>> = {
+    Overview: "tabs.overview",
+    Console: "tabs.console",
+    Announce: "tabs.announce",
+    "Side panel": "tabs.panel",
+    "Linked chat": "tabs.chat",
+    Events: "tabs.events",
+    Challenges: "tabs.challenges",
+    Players: "tabs.players",
+    World: "tabs.world",
+    Rules: "tabs.rules",
+    Mods: "tabs.mods",
+    Resources: "tabs.resources",
+    Usage: "tabs.usage",
+    Security: "tabs.security",
+    "Anti-cheat": "tabs.anticheat",
+    Access: "tabs.access",
+    Schedule: "tabs.schedule",
+    Settings: "tabs.settings"
+};
+
+/**
+ * A server screen's name on the tab bar, in the reader's language.
+ *
+ * The list of screens is the dashboard's (`tabs.ts`), in English, because the
+ * rail and the route read it as data; the words on this app's own tab bar are
+ * this app's. A screen with no word here yet keeps the name it came with.
+ */
+export function useTabWords(): (label: string) => string {
+    const t = useGameText("games");
+    return (label) => {
+        const key = TAB_WORDS[label];
+        return key ? t(key) : label;
+    };
+}
+
 /** How long a timeout has left, in the reader's words: "40m left". */
 export function timeoutText(t: GameText<"games">, iso: string): string {
     return t("timeout.left", timeoutLeft(iso));

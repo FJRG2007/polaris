@@ -39,7 +39,7 @@
         "clearKey": "Borrar selección (Esc)",
         "deleteTitle": "{count, plural, one {Eliminar tarea} other {Eliminar tareas}}",
         "deleteQuestion": "¿Eliminar <strong>{name}</strong>?",
-        "deleteDescription": "Los comentarios, las listas de comprobación y el tiempo registrado se van con ellas. Archivarlas lo conserva todo y las quita del tablero.",
+        "deleteDescription": "Los comentarios, las checklists y el tiempo registrado se van con ellas. Archivarlas lo conserva todo y las quita del tablero.",
         "deleteConfirm": "{count, plural, one {Eliminar tarea} other {Eliminar # tareas}}"
     },
     "paste": {
@@ -150,7 +150,7 @@
         "adding": "Añadiendo...",
         "selected": "{count, plural, one {# tarea seleccionada} other {# tareas seleccionadas}}",
         "open": "Abrir",
-        "copyLink": "Copiar enlace",
+        "copyLink": "Copiar URL",
         "copyReference": "Copiar {reference}",
         "clear": "Quitar",
         "assign": "Asignar",

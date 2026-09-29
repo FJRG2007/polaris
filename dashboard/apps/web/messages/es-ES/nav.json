@@ -114,7 +114,7 @@
             "description": "Alarmas sobre la salud de las apps, picos y caídas"
         },
         "admin": {
-            "description": "Usuarios, acceso, dominios y actualizaciones",
+            "description": "Usuarios, acceso, dominios y versiones",
             "guestDescription": "Conversaciones con clientes de todos los canales"
         },
         "account": {
@@ -141,7 +141,7 @@
         "Archive": "Archivo",
         "Automations": "Automatizaciones",
         "Away message": "Respuesta automática",
-        "Backups": "Copias de seguridad",
+        "Backups": "Copias",
         "Billing": "Facturación",
         "Cameras": "Cámaras",
         "Challenges": "Retos",
@@ -170,7 +170,7 @@
         "Downloads": "Descargas",
         "Drafts": "Borradores",
         "Drive": "Drive",
-        "Drop points": "Puntos de entrega",
+        "Drop points": "Buzones",
         "Email": "Correo",
         "Events": "Eventos",
         "Everything": "Todo",
@@ -181,7 +181,7 @@
         "Filters": "Filtros",
         "Firewall": "Cortafuegos",
         "Friends": "Amigos",
-        "Game servers": "Servidores de juegos",
+        "Game servers": "Juegos",
         "Goals": "Objetivos",
         "Groups": "Grupos",
         "How it works": "Cómo funciona",
@@ -231,7 +231,7 @@
         "Runs": "Ejecuciones",
         "Safety": "Protección",
         "Scan a code": "Escanear un código",
-        "Schedule": "Programación",
+        "Schedule": "Horario",
         "Secrets": "Secretos",
         "Security": "Seguridad",
         "Send-as addresses": "Direcciones de envío",
@@ -261,7 +261,7 @@
         "Timesheet": "Horas",
         "Tools": "Herramientas",
         "Trash": "Papelera",
-        "Updates & settings": "Actualizaciones y ajustes",
+        "Updates & settings": "Versiones y ajustes",
         "Uploads": "Subidas",
         "Usage": "Uso",
         "Users": "Usuarios",

@@ -1498,6 +1498,22 @@
         "web/src/lib/link-denial.ts",
         "web/src/lib/snippet-access.ts",
         "web/src/lib/notes/share-access.ts",
-        "web/src/lib/office/link-access.ts"
+        "web/src/lib/office/link-access.ts",
+        "web/src/app/(app)/apps/installed/[id]/tabs.ts",
+        "web/src/app/(app)/apps/installed/[id]/messaging-bridge-panel.tsx",
+        "web/src/app/(app)/apps/installed/[id]/installed-app-dashboard.tsx",
+        "web/src/app/(app)/apps/installed/[id]/access-actions.ts",
+        "web/src/app/(app)/apps/installed/[id]/actions.ts",
+        "web/src/app/(app)/apps/installed/[id]/[[...tab]]/page.tsx",
+        "web/src/lib/overview/catalog.ts",
+        "web/src/lib/overview/place-labels.ts",
+        "web/src/lib/legal/documents.ts",
+        "web/src/lib/apps.ts",
+        "web/src/lib/apps/catalog.ts",
+        "web/src/lib/integrations/model-providers.ts",
+        "web/src/lib/apps/port-advice.ts",
+        "web/src/lib/apps/app-words.ts",
+        "web/src/lib/apps/install-service.ts",
+        "game-servers/src/screens/game-text.ts"
     ]
 }

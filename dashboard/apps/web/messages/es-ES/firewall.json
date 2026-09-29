@@ -298,7 +298,7 @@
             "label": "Fallos de acceso SSH y SFTP",
             "description": "Bloquea una dirección que no deja de fallar al iniciar sesión por SSH o SFTP en tus servidores. Se lee del registro de autenticación de cada servidor, así que detecta el tráfico que nunca llega al edge web."
         },
-        "title": "Bloqueos automáticos",
+        "title": "Vetos automáticos",
         "intro": "Se cuentan desde el registro de peticiones del edge y no en cada petición, así que vigilar una dirección no le cuesta nada al visitante. Un reincidente queda bloqueado cada vez más tiempo.",
         "hostnames": "Hosts",
         "within": "En (min)"
@@ -548,7 +548,7 @@
         "autoLabel": "Bloquear anomalías automáticamente",
         "overBaseline": "Veces lo normal",
         "assetMax": "Recursos pedidos",
-        "variantMax": "Variantes de consulta"
+        "variantMax": "Variantes"
     },
     "bans": {
         "title": "Bloqueadas ahora",

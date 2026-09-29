@@ -75,6 +75,7 @@ export interface ModelProviderSeed {
  * train their own models, the hosts that serve everybody's on their own
  * hardware, and the gateways that put one credential in front of several.
  */
+// i18n-ignore (marked per line below): model names are the providers' own; the card's words come from `integrationWords`.
 export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
     // -----------------------------------------------------------------------
     // Labs, which serve the models they train
@@ -88,7 +89,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://docs.mistral.ai/getting-started/models/",
         keyUrl: "https://console.mistral.ai/api-keys",
         probe: "https://api.mistral.ai/v1/models",
-        defaultModel: { label: "Mistral Medium", slug: "mistral/mistral-medium-2508" },
+        defaultModel: { label: "Mistral Medium", slug: "mistral/mistral-medium-2508" }, // i18n-ignore
         free: { kind: "free", note: "An experiment tier that needs no card, rate limited rather than metered." }
     },
     {
@@ -100,7 +101,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://docs.z.ai/guides/overview/pricing",
         keyUrl: "https://z.ai/manage-apikey/apikey-list",
         probe: "https://api.z.ai/api/paas/v4/models",
-        defaultModel: { label: "GLM 5.3 (Z.AI)", slug: "zai/glm-5.3" }
+        defaultModel: { label: "GLM 5.3 (Z.AI)", slug: "zai/glm-5.3" } // i18n-ignore
     },
     {
         slug: "minimax",
@@ -111,7 +112,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://platform.minimax.io/docs/guides/quickstart",
         keyUrl: "https://platform.minimax.io/user-center/basic-information/interface-key",
         probe: "https://api.minimax.io/anthropic/v1/models",
-        defaultModel: { label: "MiniMax M3", slug: "minimax/MiniMax-M3" }
+        defaultModel: { label: "MiniMax M3", slug: "minimax/MiniMax-M3" } // i18n-ignore
     },
     {
         slug: "cohere",
@@ -122,7 +123,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://docs.cohere.com/docs/models",
         keyUrl: "https://dashboard.cohere.com/api-keys",
         probe: "https://api.cohere.com/v1/models",
-        defaultModel: { label: "Command A (Cohere)", slug: "cohere/command-a-03-2025" },
+        defaultModel: { label: "Command A (Cohere)", slug: "cohere/command-a-03-2025" }, // i18n-ignore
         free: { kind: "trial", note: "A trial key with a monthly call allowance, for evaluating rather than running on." }
     },
     {
@@ -134,7 +135,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://llama.developer.meta.com/docs/models",
         keyUrl: "https://llama.developer.meta.com/api-keys",
         probe: "https://api.llama.com/compat/v1/models",
-        defaultModel: { label: "Llama 4 Scout", slug: "llama/llama-4-scout-17b-16e-instruct-fp8" }
+        defaultModel: { label: "Llama 4 Scout", slug: "llama/llama-4-scout-17b-16e-instruct-fp8" } // i18n-ignore
     },
     {
         slug: "alibaba",
@@ -145,7 +146,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://www.alibabacloud.com/help/en/model-studio/models",
         keyUrl: "https://bailian.console.alibabacloud.com/?tab=model#/api-key",
         probe: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models",
-        defaultModel: { label: "Qwen3 Coder Plus", slug: "alibaba/qwen3-coder-plus" }
+        defaultModel: { label: "Qwen3 Coder Plus", slug: "alibaba/qwen3-coder-plus" } // i18n-ignore
     },
     {
         slug: "venice",
@@ -155,7 +156,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Serves other labs' models without keeping what is sent through it.",
         docsUrl: "https://docs.venice.ai",
         keyUrl: "https://venice.ai/settings/api",
-        defaultModel: { label: "GLM 5.3 Flash (Venice)", slug: "venice/z-ai-glm-5-3-flash" }
+        defaultModel: { label: "GLM 5.3 Flash (Venice)", slug: "venice/z-ai-glm-5-3-flash" } // i18n-ignore
     },
     {
         slug: "upstage",
@@ -166,7 +167,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://developers.upstage.ai/docs/apis/chat",
         keyUrl: "https://console.upstage.ai/api-keys",
         probe: "https://api.upstage.ai/v1/solar/models",
-        defaultModel: { label: "Solar Pro 4", slug: "upstage/solar-pro4" }
+        defaultModel: { label: "Solar Pro 4", slug: "upstage/solar-pro4" } // i18n-ignore
     },
     {
         slug: "inception",
@@ -175,7 +176,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         envVar: "INCEPTION_API_KEY",
         summary: "A diffusion model that writes far faster than it reads.",
         docsUrl: "https://platform.inceptionlabs.ai/docs",
-        defaultModel: { label: "Mercury 2 (Inception)", slug: "inception/mercury-2" },
+        defaultModel: { label: "Mercury 2 (Inception)", slug: "inception/mercury-2" }, // i18n-ignore
         free: { kind: "trial", note: "A block of tokens on signup, with no card." }
     },
     {
@@ -186,7 +187,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Its own models beside the open ones, on one key.",
         docsUrl: "https://docs.arcee.ai",
         probe: "https://api.arcee.ai/api/v1/models",
-        defaultModel: { label: "DeepSeek V4 Flash (Arcee)", slug: "arcee/deepseek/deepseek-v4-flash-latest" },
+        defaultModel: { label: "DeepSeek V4 Flash (Arcee)", slug: "arcee/deepseek/deepseek-v4-flash-latest" }, // i18n-ignore
         free: { kind: "free", note: "A model kept free to use, with no card." }
     },
     {
@@ -198,7 +199,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://longcat.chat/platform/docs/",
         keyUrl: "https://longcat.chat/platform/api_keys",
         probe: "https://api.longcat.chat/openai/models",
-        defaultModel: { label: "LongCat 2.0", slug: "longcat/LongCat-2.0" },
+        defaultModel: { label: "LongCat 2.0", slug: "longcat/LongCat-2.0" }, // i18n-ignore
         free: { kind: "free", note: "Free to call, within a rate limit." }
     },
     {
@@ -208,7 +209,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         envVar: "SARVAM_API_KEY",
         summary: "Models trained for Indian languages.",
         docsUrl: "https://docs.sarvam.ai/api-reference-docs/getting-started/models",
-        defaultModel: { label: "Sarvam 105B", slug: "sarvam/sarvam-105b" },
+        defaultModel: { label: "Sarvam 105B", slug: "sarvam/sarvam-105b" }, // i18n-ignore
         free: { kind: "trial", note: "Signup credits that do not expire." }
     },
     {
@@ -220,7 +221,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://platform.stepfun.ai/docs/en/overview/concept",
         keyUrl: "https://platform.stepfun.ai/interface-key",
         probe: "https://api.stepfun.ai/v1/models",
-        defaultModel: { label: "Step 3.7 Flash", slug: "stepfun-ai/step-3.7-flash" }
+        defaultModel: { label: "Step 3.7 Flash", slug: "stepfun-ai/step-3.7-flash" } // i18n-ignore
     },
     {
         slug: "xiaomi",
@@ -231,7 +232,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://platform.xiaomimimo.com/#/docs",
         keyUrl: "https://platform.xiaomimimo.com/#/apikey",
         probe: "https://api.xiaomimimo.com/v1/models",
-        defaultModel: { label: "MiMo v2.5", slug: "xiaomi/mimo-v2.5" }
+        defaultModel: { label: "MiMo v2.5", slug: "xiaomi/mimo-v2.5" } // i18n-ignore
     },
     {
         slug: "volcengine",
@@ -243,7 +244,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         keyUrl: "https://console.volcengine.com/ark",
         probe: "https://ark.cn-beijing.volces.com/api/v3/models",
         defaultModel: {
-            label: "Doubao Seed 2.0 Code",
+            label: "Doubao Seed 2.0 Code", // i18n-ignore
             slug: "volcengine/doubao-seed-2-0-code-preview-260215"
         }
     },
@@ -256,7 +257,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://modelscope.cn/docs/model-service/API-Inference/intro",
         keyUrl: "https://modelscope.cn/my/myaccesstoken",
         defaultModel: {
-            label: "Qwen3 Coder 30B (ModelScope)",
+            label: "Qwen3 Coder 30B (ModelScope)", // i18n-ignore
             slug: "modelscope/Qwen/Qwen3-Coder-30B-A3B-Instruct"
         },
         free: { kind: "free", note: "A daily allowance on a hub account." }
@@ -274,7 +275,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://docs.together.ai/docs/serverless-models",
         keyUrl: "https://api.together.ai/settings/api-keys",
         probe: "https://api.together.xyz/v1/models",
-        defaultModel: { label: "Kimi K3 (Together)", slug: "togetherai/moonshotai/Kimi-K3" }
+        defaultModel: { label: "Kimi K3 (Together)", slug: "togetherai/moonshotai/Kimi-K3" } // i18n-ignore
     },
     {
         slug: "fireworks-ai",
@@ -286,7 +287,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         keyUrl: "https://app.fireworks.ai/settings/users/api-keys",
         probe: "https://api.fireworks.ai/inference/v1/models",
         defaultModel: {
-            label: "Kimi K3 (Fireworks)",
+            label: "Kimi K3 (Fireworks)", // i18n-ignore
             slug: "fireworks-ai/accounts/fireworks/models/kimi-k3"
         },
         free: { kind: "trial", note: "A starter credit on signup." }
@@ -299,7 +300,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Open models at some of the lowest per-token prices.",
         docsUrl: "https://deepinfra.com/models",
         keyUrl: "https://deepinfra.com/dash/api_keys",
-        defaultModel: { label: "Kimi K3 (DeepInfra)", slug: "deepinfra/moonshotai/Kimi-K3" },
+        defaultModel: { label: "Kimi K3 (DeepInfra)", slug: "deepinfra/moonshotai/Kimi-K3" }, // i18n-ignore
         free: { kind: "trial", note: "Signup credit, enough to try a run." }
     },
     {
@@ -311,7 +312,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://docs.tokenfactory.nebius.com/",
         keyUrl: "https://tokenfactory.nebius.com/",
         probe: "https://api.tokenfactory.nebius.com/v1/models",
-        defaultModel: { label: "Kimi K3 (Nebius)", slug: "nebius/moonshotai/Kimi-K3" },
+        defaultModel: { label: "Kimi K3 (Nebius)", slug: "nebius/moonshotai/Kimi-K3" }, // i18n-ignore
         free: { kind: "trial", note: "Signup credit for evaluating." }
     },
     {
@@ -323,7 +324,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://huggingface.co/docs/inference-providers",
         keyUrl: "https://huggingface.co/settings/tokens",
         defaultModel: {
-            label: "DeepSeek V4 Flash (Hugging Face)",
+            label: "DeepSeek V4 Flash (Hugging Face)", // i18n-ignore
             slug: "huggingface/deepseek-ai/DeepSeek-V4-Flash"
         },
         free: { kind: "free", note: "An allowance on a free account, with paid routing beyond it." }
@@ -336,7 +337,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "A wide catalogue on NVIDIA's own endpoints.",
         docsUrl: "https://docs.api.nvidia.com/nim/",
         keyUrl: "https://build.nvidia.com/settings/api-keys",
-        defaultModel: { label: "Kimi K3 (NVIDIA)", slug: "nvidia/moonshotai/kimi-k3" },
+        defaultModel: { label: "Kimi K3 (NVIDIA)", slug: "nvidia/moonshotai/kimi-k3" }, // i18n-ignore
         free: { kind: "free", note: "A developer allowance, rate limited rather than billed." }
     },
     {
@@ -348,7 +349,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://docs.baseten.co/inference/model-apis/overview",
         keyUrl: "https://app.baseten.co/settings/api_keys",
         probe: "https://inference.baseten.co/v1/models",
-        defaultModel: { label: "Kimi K3 (Baseten)", slug: "baseten/moonshotai/Kimi-K3" },
+        defaultModel: { label: "Kimi K3 (Baseten)", slug: "baseten/moonshotai/Kimi-K3" }, // i18n-ignore
         free: { kind: "trial", note: "Trial credits on signup." }
     },
     {
@@ -359,7 +360,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "The models you would run locally, run somewhere with the memory.",
         docsUrl: "https://docs.ollama.com/cloud",
         keyUrl: "https://ollama.com/settings/keys",
-        defaultModel: { label: "Kimi K3 (Ollama Cloud)", slug: "ollama-cloud/kimi-k3" },
+        defaultModel: { label: "Kimi K3 (Ollama Cloud)", slug: "ollama-cloud/kimi-k3" }, // i18n-ignore
         free: { kind: "free", note: "An hourly and daily allowance on a free account." }
     },
     {
@@ -371,7 +372,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://cloud.siliconflow.com/models",
         keyUrl: "https://cloud.siliconflow.com/account/ak",
         probe: "https://api.siliconflow.com/v1/models",
-        defaultModel: { label: "GLM 5.2 (SiliconFlow)", slug: "siliconflow/zai-org/GLM-5.2" },
+        defaultModel: { label: "GLM 5.2 (SiliconFlow)", slug: "siliconflow/zai-org/GLM-5.2" }, // i18n-ignore
         free: { kind: "free", note: "Some models served at no cost, the rest metered." }
     },
     {
@@ -382,7 +383,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Open models with GPU rental beside them.",
         docsUrl: "https://novita.ai/docs/guides/introduction",
         keyUrl: "https://novita.ai/settings/key-management",
-        defaultModel: { label: "Kimi K3 (Novita)", slug: "novita-ai/moonshotai/kimi-k3" },
+        defaultModel: { label: "Kimi K3 (Novita)", slug: "novita-ai/moonshotai/kimi-k3" }, // i18n-ignore
         free: { kind: "trial", note: "A small credit on signup." }
     },
     {
@@ -393,7 +394,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Open models served inside attested hardware.",
         docsUrl: "https://llm.chutes.ai/v1/models",
         keyUrl: "https://chutes.ai/app/api",
-        defaultModel: { label: "Kimi K3 (Chutes)", slug: "chutes/moonshotai/Kimi-K3-TEE" }
+        defaultModel: { label: "Kimi K3 (Chutes)", slug: "chutes/moonshotai/Kimi-K3-TEE" } // i18n-ignore
     },
     {
         slug: "scaleway",
@@ -404,7 +405,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://www.scaleway.com/en/docs/generative-apis/",
         keyUrl: "https://console.scaleway.com/iam/api-keys",
         probe: "https://api.scaleway.ai/v1/models",
-        defaultModel: { label: "Qwen3 235B (Scaleway)", slug: "scaleway/qwen3-235b-a22b-instruct-2507" },
+        defaultModel: { label: "Qwen3 235B (Scaleway)", slug: "scaleway/qwen3-235b-a22b-instruct-2507" }, // i18n-ignore
         free: { kind: "trial", note: "A block of tokens for new accounts." }
     },
     {
@@ -416,7 +417,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://www.ovhcloud.com/en/public-cloud/ai-endpoints/catalog/",
         keyUrl: "https://endpoints.ai.cloud.ovh.net/",
         defaultModel: {
-            label: "Qwen3 Coder 30B (OVHcloud)",
+            label: "Qwen3 Coder 30B (OVHcloud)", // i18n-ignore
             slug: "ovhcloud/qwen3-coder-30b-a3b-instruct"
         }
     },
@@ -429,7 +430,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://docs.wandb.ai/guides/integrations/inference/",
         keyUrl: "https://wandb.ai/authorize",
         probe: "https://api.inference.wandb.ai/v1/models",
-        defaultModel: { label: "GLM 5.2 (W&B)", slug: "wandb/zai-org/GLM-5.2" }
+        defaultModel: { label: "GLM 5.2 (W&B)", slug: "wandb/zai-org/GLM-5.2" } // i18n-ignore
     },
     {
         slug: "friendli",
@@ -439,7 +440,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Serverless endpoints for the open models.",
         docsUrl: "https://friendli.ai/docs/guides/serverless_endpoints/introduction",
         keyUrl: "https://suite.friendli.ai/",
-        defaultModel: { label: "GLM 5.3 (Friendli)", slug: "friendli/zai-org/GLM-5.3" },
+        defaultModel: { label: "GLM 5.3 (Friendli)", slug: "friendli/zai-org/GLM-5.3" }, // i18n-ignore
         free: { kind: "free", note: "A free tier on the serverless endpoints, with no card." }
     },
     {
@@ -451,7 +452,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://experiments.hetzner.com/docs/inference",
         keyUrl: "https://console.hetzner.com/",
         probe: "https://inference.hetzner.com/api/v1/models",
-        defaultModel: { label: "Qwen3.8 27B (Hetzner)", slug: "hetzner/Qwen3.8-27B" },
+        defaultModel: { label: "Qwen3.8 27B (Hetzner)", slug: "hetzner/Qwen3.8-27B" }, // i18n-ignore
         free: { kind: "free", note: "Served at no per-token cost while it is an experiment." }
     },
     {
@@ -462,7 +463,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Runs inside enclaves, so the host cannot read the prompt.",
         docsUrl: "https://docs.tinfoil.sh",
         keyUrl: "https://tinfoil.sh/dashboard",
-        defaultModel: { label: "DeepSeek V4 Flash (Tinfoil)", slug: "tinfoil/deepseek-v4-flash" }
+        defaultModel: { label: "DeepSeek V4 Flash (Tinfoil)", slug: "tinfoil/deepseek-v4-flash" } // i18n-ignore
     },
     {
         slug: "vultr",
@@ -471,7 +472,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         envVar: "VULTR_API_KEY",
         summary: "Serverless inference beside the rest of the cloud account.",
         docsUrl: "https://api.vultrinference.com/",
-        defaultModel: { label: "MiMo v2.5 Pro (Vultr)", slug: "vultr/XiaomiMiMo/MiMo-V2.5-Pro" }
+        defaultModel: { label: "MiMo v2.5 Pro (Vultr)", slug: "vultr/XiaomiMiMo/MiMo-V2.5-Pro" } // i18n-ignore
     },
     {
         slug: "crusoe",
@@ -482,7 +483,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://docs.crusoecloud.com/managed-inference/overview",
         keyUrl: "https://console.crusoecloud.com/",
         probe: "https://api.inference.crusoecloud.com/v1/models",
-        defaultModel: { label: "GLM 5.2 (Crusoe)", slug: "crusoe/zai/GLM-5.2" }
+        defaultModel: { label: "GLM 5.2 (Crusoe)", slug: "crusoe/zai/GLM-5.2" } // i18n-ignore
     },
     {
         slug: "gmicloud",
@@ -492,7 +493,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Open models with dedicated capacity behind them.",
         docsUrl: "https://docs.gmicloud.ai/inference-engine/api-reference/llm-api-reference",
         probe: "https://api.gmi-serving.com/v1/models",
-        defaultModel: { label: "DeepSeek V4 Pro (GMI)", slug: "gmicloud/deepseek-ai/DeepSeek-V4-Pro" }
+        defaultModel: { label: "DeepSeek V4 Pro (GMI)", slug: "gmicloud/deepseek-ai/DeepSeek-V4-Pro" } // i18n-ignore
     },
     {
         slug: "io-net",
@@ -503,7 +504,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://io.net/docs/guides/intelligence/io-intelligence",
         keyUrl: "https://ai.io.net/ai/api-keys",
         defaultModel: {
-            label: "Qwen3 235B (IO.NET)",
+            label: "Qwen3 235B (IO.NET)", // i18n-ignore
             slug: "io-net/Qwen/Qwen3-235B-A22B-Thinking-2507"
         },
         free: { kind: "free", note: "A daily allowance on a free account." }
@@ -516,7 +517,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Open models on Swedish hardware, under EU rules.",
         docsUrl: "https://api.berget.ai",
         keyUrl: "https://console.berget.ai/",
-        defaultModel: { label: "GLM 5.2 (Berget)", slug: "berget/zai-org/GLM-5.2" }
+        defaultModel: { label: "GLM 5.2 (Berget)", slug: "berget/zai-org/GLM-5.2" } // i18n-ignore
     },
 
     // -----------------------------------------------------------------------
@@ -530,7 +531,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "One key for the frontier models, billed through Vercel.",
         docsUrl: "https://vercel.com/docs/ai-gateway",
         keyUrl: "https://vercel.com/docs/ai-gateway",
-        defaultModel: { label: "Grok 4.20 (Vercel)", slug: "vercel/spacexai/grok-4.20-reasoning" },
+        defaultModel: { label: "Grok 4.20 (Vercel)", slug: "vercel/spacexai/grok-4.20-reasoning" }, // i18n-ignore
         free: { kind: "trial", note: "A starting credit on a Vercel account." }
     },
     {
@@ -540,7 +541,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         envVar: "REQUESTY_API_KEY",
         summary: "Routing across several hundred models, with spend caps.",
         docsUrl: "https://requesty.ai/solution/llm-routing/models",
-        defaultModel: { label: "GPT 5.5 Pro (Requesty)", slug: "requesty/gpt-5.5-pro" },
+        defaultModel: { label: "GPT 5.5 Pro (Requesty)", slug: "requesty/gpt-5.5-pro" }, // i18n-ignore
         free: { kind: "free", note: "A daily request allowance before anything is billed." }
     },
     {
@@ -551,7 +552,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "One key across the frontier labs.",
         docsUrl: "https://docs.zenmux.ai",
         keyUrl: "https://zenmux.ai/settings/keys",
-        defaultModel: { label: "Grok 4.2 Fast (ZenMux)", slug: "zenmux/x-ai/grok-4.2-fast" }
+        defaultModel: { label: "Grok 4.2 Fast (ZenMux)", slug: "zenmux/x-ai/grok-4.2-fast" } // i18n-ignore
     },
     {
         slug: "nano-gpt",
@@ -561,7 +562,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "The widest catalogue of the routers, paid per request.",
         docsUrl: "https://docs.nano-gpt.com",
         keyUrl: "https://nano-gpt.com/api",
-        defaultModel: { label: "GPT 5.6 Sol (NanoGPT)", slug: "nano-gpt/openai/gpt-5.6-sol" }
+        defaultModel: { label: "GPT 5.6 Sol (NanoGPT)", slug: "nano-gpt/openai/gpt-5.6-sol" } // i18n-ignore
     },
     {
         slug: "kilo",
@@ -571,7 +572,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "The router behind the Kilo coding tools.",
         docsUrl: "https://kilo.ai",
         keyUrl: "https://app.kilocode.ai/",
-        defaultModel: { label: "Grok 4.20 (Kilo)", slug: "kilo/x-ai/grok-4.20" }
+        defaultModel: { label: "Grok 4.20 (Kilo)", slug: "kilo/x-ai/grok-4.20" } // i18n-ignore
     },
     {
         slug: "llmgateway",
@@ -581,7 +582,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "An open-source router you can also host yourself.",
         docsUrl: "https://llmgateway.io/docs",
         keyUrl: "https://llmgateway.io/dashboard",
-        defaultModel: { label: "Grok 4.1 Fast (LLM Gateway)", slug: "llmgateway/grok-4-1-fast-reasoning" },
+        defaultModel: { label: "Grok 4.1 Fast (LLM Gateway)", slug: "llmgateway/grok-4-1-fast-reasoning" }, // i18n-ignore
         free: { kind: "free", note: "A free tier on the hosted router." }
     },
     {
@@ -591,7 +592,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         envVar: "POE_API_KEY",
         summary: "Spends the points a Poe subscription already includes.",
         docsUrl: "https://creator.poe.com/docs/external-applications/openai-compatible-api",
-        defaultModel: { label: "Grok 4 Fast (Poe)", slug: "poe/xai/grok-4-fast-reasoning" }
+        defaultModel: { label: "Grok 4 Fast (Poe)", slug: "poe/xai/grok-4-fast-reasoning" } // i18n-ignore
     },
     {
         slug: "helicone",
@@ -601,7 +602,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Routes and records the calls, for looking at afterwards.",
         docsUrl: "https://helicone.ai/models",
         keyUrl: "https://us.helicone.ai/developer",
-        defaultModel: { label: "Grok 4 Fast (Helicone)", slug: "helicone/grok-4-fast-reasoning" }
+        defaultModel: { label: "Grok 4 Fast (Helicone)", slug: "helicone/grok-4-fast-reasoning" } // i18n-ignore
     },
     {
         slug: "fastrouter",
@@ -610,7 +611,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         envVar: "FASTROUTER_API_KEY",
         summary: "Picks the cheapest host serving the model asked for.",
         docsUrl: "https://fastrouter.ai/models",
-        defaultModel: { label: "GPT 5.5 Pro (FastRouter)", slug: "fastrouter/openai/gpt-5.5-pro" },
+        defaultModel: { label: "GPT 5.5 Pro (FastRouter)", slug: "fastrouter/openai/gpt-5.5-pro" }, // i18n-ignore
         free: { kind: "free", note: "A free tier before anything is billed." }
     },
     {
@@ -621,7 +622,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "One key across the frontier models, paid as you go.",
         docsUrl: "https://docs.anyapi.ai",
         probe: "https://api.anyapi.ai/v1/models",
-        defaultModel: { label: "GPT 5.4 (AnyAPI)", slug: "anyapi/openai/gpt-5.4" },
+        defaultModel: { label: "GPT 5.4 (AnyAPI)", slug: "anyapi/openai/gpt-5.4" }, // i18n-ignore
         free: { kind: "free", note: "A free tier for trying it." }
     },
     {
@@ -632,7 +633,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Serves some of its catalogue at no cost.",
         docsUrl: "https://unorouter.com/models",
         keyUrl: "https://unorouter.com/dashboard",
-        defaultModel: { label: "GPT 5.5 (UnoRouter)", slug: "unorouter/gpt-5.5" },
+        defaultModel: { label: "GPT 5.5 (UnoRouter)", slug: "unorouter/gpt-5.5" }, // i18n-ignore
         free: { kind: "free", note: "Models marked free are served at no per-token cost." }
     },
     {
@@ -643,7 +644,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "One key across the frontier labs.",
         docsUrl: "https://docs.orcarouter.ai",
         keyUrl: "https://www.orcarouter.ai/",
-        defaultModel: { label: "GPT 5.5 Pro (OrcaRouter)", slug: "orcarouter/openai/gpt-5.5-pro" }
+        defaultModel: { label: "GPT 5.5 Pro (OrcaRouter)", slug: "orcarouter/openai/gpt-5.5-pro" } // i18n-ignore
     },
     {
         slug: "synthetic",
@@ -652,7 +653,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         envVar: "SYNTHETIC_API_KEY",
         summary: "A flat monthly price rather than a per-token one.",
         docsUrl: "https://synthetic.new/pricing",
-        defaultModel: { label: "Kimi K3 (Synthetic)", slug: "synthetic/hf:moonshotai/Kimi-K3" }
+        defaultModel: { label: "Kimi K3 (Synthetic)", slug: "synthetic/hf:moonshotai/Kimi-K3" } // i18n-ignore
     },
     {
         slug: "opencode",
@@ -662,7 +663,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "The models the agent runtime itself is built around.",
         docsUrl: "https://opencode.ai/docs/zen",
         keyUrl: "https://opencode.ai/auth",
-        defaultModel: { label: "GPT 5.5 Pro (Zen)", slug: "opencode/gpt-5.5-pro" }
+        defaultModel: { label: "GPT 5.5 Pro (Zen)", slug: "opencode/gpt-5.5-pro" } // i18n-ignore
     },
     {
         slug: "cortecs",
@@ -672,7 +673,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Routing with EU hosting where the model allows it.",
         docsUrl: "https://api.cortecs.ai/v1/models",
         keyUrl: "https://cortecs.ai/",
-        defaultModel: { label: "GPT 5.6 Sol (Cortecs)", slug: "cortecs/gpt-5.6-sol" }
+        defaultModel: { label: "GPT 5.6 Sol (Cortecs)", slug: "cortecs/gpt-5.6-sol" } // i18n-ignore
     },
     {
         slug: "edenai",
@@ -682,7 +683,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "One key across the labs and the clouds serving them.",
         docsUrl: "https://docs.edenai.co",
         keyUrl: "https://app.edenai.run/admin/account/settings",
-        defaultModel: { label: "GPT 5.5 Pro (Eden AI)", slug: "edenai/openai/gpt-5.5-pro" }
+        defaultModel: { label: "GPT 5.5 Pro (Eden AI)", slug: "edenai/openai/gpt-5.5-pro" } // i18n-ignore
     },
     {
         slug: "cline-pass",
@@ -692,7 +693,7 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Spends a ClinePass subscription instead of a provider bill.",
         docsUrl: "https://docs.cline.bot/getting-started/clinepass",
         keyUrl: "https://app.cline.bot/",
-        defaultModel: { label: "Kimi K3 (ClinePass)", slug: "cline-pass/cline-pass/kimi-k3" }
+        defaultModel: { label: "Kimi K3 (ClinePass)", slug: "cline-pass/cline-pass/kimi-k3" } // i18n-ignore
     }
 ];
 
@@ -726,7 +727,7 @@ export const SEEDED_MODEL_INTEGRATIONS: readonly IntegrationCatalogEntry[] = MOD
     summary: seed.summary,
     description: describe(seed),
     docsUrl: seed.docsUrl,
-    setupLinks: seed.keyUrl ? [{ label: "Create an API key", url: seed.keyUrl }] : undefined,
+    setupLinks: seed.keyUrl ? [{ label: "Create an API key", url: seed.keyUrl }] : undefined, // i18n-ignore
     requiresApiKey: true,
     apiKeyLabel: "API key",
     defaultModel: seed.defaultModel,

@@ -1064,5 +1064,25 @@
         "xrayBody": "Each one was fully enclosed in rock, where it could not be seen without X-Ray.",
         "movementTitle": "{name} may be flying or teleporting on {server}",
         "movementBody": "{reasons}. Nothing was done to them: look at where and when before deciding."
+    },
+    "tabs": {
+        "overview": "Overview",
+        "console": "Console",
+        "announce": "Announce",
+        "panel": "Side panel",
+        "chat": "Linked chat",
+        "events": "Events",
+        "challenges": "Challenges",
+        "players": "Players",
+        "world": "World",
+        "rules": "Rules",
+        "mods": "Mods",
+        "resources": "Resources",
+        "usage": "Usage",
+        "security": "Security",
+        "anticheat": "Anti-cheat",
+        "access": "Access",
+        "schedule": "Schedule",
+        "settings": "Settings"
     }
 }

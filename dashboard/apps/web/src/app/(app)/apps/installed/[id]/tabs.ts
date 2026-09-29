@@ -41,45 +41,48 @@ export interface GameTab {
 
 const EVERY_GAME: readonly GameId[] = ["minecraft", "ark", "fivem"];
 
+// The labels are data: the rail and search read them in English and translate
+// them where they are drawn (`nav.labels`), and a game's own tab bar says them
+// with the app's words (`useTabWords` in game-servers).
 export const GAME_TABS: readonly GameTab[] = [
-    { slug: "", label: "Overview", permission: "games.read", games: EVERY_GAME },
-    { slug: "console", label: "Console", permission: "games.console", games: EVERY_GAME },
+    { slug: "", label: "Overview", permission: "games.read", games: EVERY_GAME }, // i18n-ignore
+    { slug: "console", label: "Console", permission: "games.console", games: EVERY_GAME }, // i18n-ignore
     // Titles, a line in the chat and a sound, written with colours rather than
     // typed as JSON into the console. The same grant, since it is the server
     // talking to everybody on it; Minecraft only, the one game with titles.
-    { slug: "announce", label: "Announce", permission: "games.console", games: ["minecraft"] },
+    { slug: "announce", label: "Announce", permission: "games.console", games: ["minecraft"] }, // i18n-ignore
     // The box on the right of every player's screen. Its own screen rather than
     // the bottom of Announce, where nobody looking for it thought to scroll.
-    { slug: "panel", label: "Side panel", permission: "games.console", games: ["minecraft"] },
+    { slug: "panel", label: "Side panel", permission: "games.console", games: ["minecraft"] }, // i18n-ignore
     // The chat group or space the server talks through: whose call `{call.*}`
     // reads, where members ask it `/online`, where announcements are repeated.
     // A setting of the server, so the manager's.
-    { slug: "chat", label: "Linked chat", permission: "games.manage", games: ["minecraft"] },
+    { slug: "chat", label: "Linked chat", permission: "games.manage", games: ["minecraft"] }, // i18n-ignore
     // Competitions and happenings run on the server: the console's grant, since
     // an event talks to everybody on it and hands out items.
-    { slug: "events", label: "Events", permission: "games.console", games: ["minecraft"] },
+    { slug: "events", label: "Events", permission: "games.console", games: ["minecraft"] }, // i18n-ignore
     // Daily, weekly and monthly goals, a season pass and community goals: the
     // same grant as events, since they talk to everybody and hand out items.
-    { slug: "challenges", label: "Challenges", permission: "games.console", games: ["minecraft"] },
-    { slug: "players", label: "Players", permission: "games.read", games: EVERY_GAME },
-    { slug: "world", label: "World", permission: "games.manage", games: ["minecraft"] },
-    { slug: "rules", label: "Rules", permission: "games.read", games: EVERY_GAME },
+    { slug: "challenges", label: "Challenges", permission: "games.console", games: ["minecraft"] }, // i18n-ignore
+    { slug: "players", label: "Players", permission: "games.read", games: EVERY_GAME }, // i18n-ignore
+    { slug: "world", label: "World", permission: "games.manage", games: ["minecraft"] }, // i18n-ignore
+    { slug: "rules", label: "Rules", permission: "games.read", games: EVERY_GAME }, // i18n-ignore
     {
         slug: "mods",
-        label: "Mods",
-        labelByGame: { fivem: "Resources" },
+        label: "Mods", // i18n-ignore
+        labelByGame: { fivem: "Resources" }, // i18n-ignore
         permission: "games.manage",
         games: EVERY_GAME
     },
-    { slug: "usage", label: "Usage", permission: "games.read", games: EVERY_GAME },
-    { slug: "security", label: "Security", permission: "games.manage", games: EVERY_GAME },
+    { slug: "usage", label: "Usage", permission: "games.read", games: EVERY_GAME }, // i18n-ignore
+    { slug: "security", label: "Security", permission: "games.manage", games: EVERY_GAME }, // i18n-ignore
     // Anti X-Ray and the movement watch: reading the evidence is a moderator's,
     // as it is on the players it is about.
-    { slug: "anticheat", label: "Anti-cheat", permission: "games.moderate", games: ["minecraft"] },
-    { slug: "access", label: "Access", permission: "games.read", games: EVERY_GAME },
+    { slug: "anticheat", label: "Anti-cheat", permission: "games.moderate", games: ["minecraft"] }, // i18n-ignore
+    { slug: "access", label: "Access", permission: "games.read", games: EVERY_GAME }, // i18n-ignore
     // Restarts, backups, sleeping when empty: when things happen on their own.
-    { slug: "schedule", label: "Schedule", permission: "games.manage", games: EVERY_GAME },
-    { slug: "settings", label: "Settings", permission: "games.manage", games: EVERY_GAME }
+    { slug: "schedule", label: "Schedule", permission: "games.manage", games: EVERY_GAME }, // i18n-ignore
+    { slug: "settings", label: "Settings", permission: "games.manage", games: EVERY_GAME } // i18n-ignore
 ];
 
 /** What this game calls one screen. */

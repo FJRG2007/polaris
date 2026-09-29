@@ -69,6 +69,8 @@ import {
     cn
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useNavLabel } from "@/components/i18n/use-nav-label";
+import { categoryLabel, localizeApp } from "@/lib/apps/app-words";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { validationMessage } from "@/components/i18n/validation-message";
 
@@ -104,12 +106,23 @@ export function MarketplaceView({
     initialQuery?: string;
 }) {
     const t = useTranslations("marketplace");
+    const words = useTranslations("catalog");
+    const navLabel = useNavLabel();
     const router = useRouter();
     const [wizardApp, setWizardApp] = useState<AppManifest | null>(null);
     const [installingId, setInstallingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [query, setQuery] = useState(initialQuery);
-    const groups = appsByCategory();
+    // In the reader's words, so the cards and the search say what they read. An
+    // app or a category named after a screen takes the rail's label for it.
+    const groups = useMemo(
+        () =>
+            appsByCategory().map((group) => ({
+                category: categoryLabel(words, group.category, navLabel),
+                apps: group.apps.map((app) => localizeApp(words, app, navLabel))
+            })),
+        [words, navLabel]
+    );
 
     /**
      * One click installs the app the way its manifest describes it: on this
@@ -120,7 +133,9 @@ export function MarketplaceView({
     function install(app: AppManifest): void {
         setError(null);
         setInstallingId(app.id);
-        void installAppAction(defaultInstallInput(app))
+        // The manifest as declared: the card is in the reader's words, the install
+        // is the same in every language.
+        void installAppAction(defaultInstallInput(findApp(app.id) ?? app))
             .then((result) => {
                 if (result.error || !result.installedAppId) {
                     setError(result.error ?? t("errors.install"));
@@ -307,6 +322,8 @@ function uninstallDescription(t: Words, catalogId: string, name: string): string
 
 function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
     const t = useTranslations("marketplace");
+    const words = useTranslations("catalog");
+    const navLabel = useNavLabel();
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
     const [removing, setRemoving] = useState<string | null>(null);
@@ -356,7 +373,9 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
                                                 {item.name}
                                             </p>
                                             <p className="truncate text-xs text-muted-foreground">
-                                                {manifest?.category ?? item.catalogId}
+                                                {manifest
+                                                    ? categoryLabel(words, manifest.category, navLabel)
+                                                    : item.catalogId}
                                             </p>
                                         </div>
                                         <Badge

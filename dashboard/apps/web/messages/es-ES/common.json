@@ -16,7 +16,7 @@
             "brokeBody": "El resto de Polaris sigue funcionando. Vuelve a intentarlo; y si ha llegado una actualización bajo esta pestaña, Polaris lo indica en la esquina de la pantalla.",
             "reference": "Referencia: {digest}",
             "reload": "Recargar",
-            "trying": "Intentándolo",
+            "trying": "Probando",
             "tryAgain": "Reintentar"
         },
         "notFound": {

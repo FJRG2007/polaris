@@ -271,7 +271,7 @@
         "deleteConfirm": "Eliminar de todos"
     },
     "page": {
-        "title": "Copias de seguridad",
+        "title": "Copias",
         "description": "Qué está protegido, cada cuánto se copia y dónde viven esas copias."
     },
     "errors": {

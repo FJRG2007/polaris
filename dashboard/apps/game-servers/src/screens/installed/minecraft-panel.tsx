@@ -20,7 +20,7 @@
 
 import Link from "next/link";
 import type { GameKey } from "../../../messages";
-import { useGameText, useSchemaText } from "../game-text";
+import { useGameText, useSchemaText, useTabWords } from "../game-text";
 import { GameConsole } from "./game-console";
 import { CardBoundary } from "../../components/card-boundary";
 import { MinecraftAnnounce } from "./minecraft-announce";
@@ -206,6 +206,7 @@ export function MinecraftPanel({
         return isGameTab(slug, "minecraft") && canOpenGameTab(slug, held, "minecraft") ? slug : "";
     }, [pathname, installedAppId, held]);
     const tabs = useMemo(() => visibleGameTabs(held, "minecraft"), [held]);
+    const tabWords = useTabWords();
     const openTab = useCallback(
         (slug: string) => {
             if (slug === tab) return;
@@ -507,7 +508,7 @@ export function MinecraftPanel({
                                 : "border-transparent text-muted-foreground hover:text-foreground"
                         )}
                     >
-                        {entry.label}
+                        {tabWords(entry.label)}
                     </a>
                 ))}
             </ScrollRow>

@@ -134,7 +134,7 @@
                 "hint": "Para un informador que está en un sitio conocido: un servidor, un runner de compilación."
             },
             "anywhere": {
-                "label": "Cualquier sitio",
+                "label": "Donde sea",
                 "hint": "Lo que necesita un cliente de navegador, porque sus informes llegan desde las direcciones de quienes lo usan. Las reglas de cliente y la clave siguen aplicándose."
             }
         },

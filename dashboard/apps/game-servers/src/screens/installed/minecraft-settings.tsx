@@ -166,7 +166,7 @@ export function MinecraftSettings({
             {groups.map(({ group, fields }) => (
                 <Card key={group}>
                     <CardBody className="flex flex-col gap-3">
-                        <p className="text-sm font-medium">{group}</p>
+                        <p className="text-sm font-medium">{fields[0]?.groupLabel ?? group}</p>
                         {fields.map((field) => (
                             <label key={field.key} className="flex flex-col gap-1 text-sm">
                                 <span>{field.label}</span>

@@ -10,6 +10,7 @@
 
 import { z } from "zod";
 import { PERMISSIONS } from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
 import { listInstallAccess, revokeInstallAccess, shareInstall, type InstallAccessView } from "@/lib/apps/install-sharing";
 
 const shareSchema = z.object({
@@ -31,7 +32,7 @@ export async function installAccessAction(
     try {
         return { view: await listInstallAccess(installedAppId) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not read who can reach this server" };
+        return { error: caught instanceof Error ? caught.message : (await getTranslations("installed"))("errors.readAccess") };
     }
 }
 
@@ -39,11 +40,11 @@ export async function shareInstallAction(
     input: ShareInstallFormInput
 ): Promise<{ granted?: true; invite?: { url?: string; sendError?: string }; error?: string }> {
     const parsed = shareSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success) return { error: (await getTranslations("installed"))("errors.checkDetails") };
     try {
         return await shareInstall(parsed.data);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not give access" };
+        return { error: caught instanceof Error ? caught.message : (await getTranslations("installed"))("errors.give") };
     }
 }
 
@@ -54,10 +55,10 @@ export async function revokeInstallAccessAction(
     const parsed = z
         .object({ installedAppId: z.string().uuid(), grantId: z.string().uuid() })
         .safeParse({ installedAppId, grantId });
-    if (!parsed.success) return { error: "That is not access on this server" };
+    if (!parsed.success) return { error: (await getTranslations("installed"))("errors.notAccess") };
     try {
         return await revokeInstallAccess(parsed.data.installedAppId, parsed.data.grantId);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not remove that access" };
+        return { error: caught instanceof Error ? caught.message : (await getTranslations("installed"))("errors.remove") };
     }
 }

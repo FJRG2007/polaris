@@ -17,6 +17,8 @@ import { publishAccessChange } from "@/lib/access-live";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { availableHostPort } from "@/lib/apps/port-registry";
 import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
+import { readerWords } from "@/lib/i18n/reader-words";
+import { localizeSetting } from "@/lib/apps/app-words";
 import type { AppInstallInput } from "@/lib/apps/install-schema";
 import { invalidateInstallPresence } from "@/lib/apps/install-presence";
 import {
@@ -516,7 +518,10 @@ export interface InstalledAppSetting {
     key: string;
     label: string;
     help?: string;
+    /** The section it belongs to, as declared - screens compare it. */
     group?: string;
+    /** The section's heading, in the reader's language. */
+    groupLabel?: string;
     value: string;
     options?: Array<{ value: string; label: string }>;
 }
@@ -546,14 +551,18 @@ export async function getInstalledAppSettings(
             (item) => [item.key, item.value]
         )
     );
-    return fields.map((field) => ({
-        key: field.key,
-        label: field.label,
-        ...(field.help ? { help: field.help } : {}),
-        ...(field.group ? { group: field.group } : {}),
-        value: stored.get(field.key) ?? field.default ?? "",
-        ...(field.options ? { options: [...field.options] } : {})
-    }));
+    // Read by whoever opened the server, so in their language.
+    const words = await readerWords("catalog");
+    return fields.map((field) =>
+        localizeSetting(words, manifest.id, {
+            key: field.key,
+            label: field.label,
+            ...(field.help ? { help: field.help } : {}),
+            ...(field.group ? { group: field.group } : {}),
+            value: stored.get(field.key) ?? field.default ?? "",
+            ...(field.options ? { options: [...field.options] } : {})
+        })
+    );
 }
 
 /** Whether anybody still has this app, after one install of it was removed. */

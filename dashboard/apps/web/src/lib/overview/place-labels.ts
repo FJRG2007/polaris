@@ -96,7 +96,7 @@ export function describePlace(pathname: string, heading?: string | null): PlaceL
             ? { label: nearest.label, context: nearest.context }
             : { label: humanize(last), context: within };
     }
-    return { label: humanize(last) || "Polaris", context: null };
+    return { label: humanize(last) || "Polaris", context: null }; // i18n-ignore: the product's name
 }
 
 function sameWords(left: string, right: string): boolean {

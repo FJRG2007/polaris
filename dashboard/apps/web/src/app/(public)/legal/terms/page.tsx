@@ -12,5 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function TermsPage() {
-    return <LegalDocumentView document={termsDocument(await getLegalContact())} />;
+    const t = await getTranslations("publicPages");
+    const legal = termsDocument(await getLegalContact());
+    return <LegalDocumentView document={{ ...legal, title: t("layout.terms") }} />;
 }

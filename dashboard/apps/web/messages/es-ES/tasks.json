@@ -163,7 +163,7 @@
         "spaceRole": {
             "guest": "Invitado",
             "member": "Miembro",
-            "admin": "Administrador"
+            "admin": "Admin"
         },
         "spaceRoleHint": {
             "guest": "Ve las tareas y comenta en las que tiene asignadas.",
@@ -198,7 +198,7 @@
         "checkView": "Revisa la vista y reinténtalo",
         "chooseRecipients": "Elige a quién enviarla",
         "addPerson": "No se pudo añadir a esa persona",
-        "addChecklist": "No se pudo añadir la lista de comprobación",
+        "addChecklist": "No se pudo añadir la checklist",
         "addField": "No se pudo añadir el campo",
         "addStatus": "No se pudo añadir el estado",
         "addStep": "No se pudo añadir el paso",
@@ -235,7 +235,7 @@
         "logTime": "No se registró ese tiempo",
         "makeList": "No se pudo crear una lista para la tarea",
         "moveThatTask": "No se pudo mover esa tarea",
-        "moveChecklist": "No se pudo mover la lista de comprobación",
+        "moveChecklist": "No se pudo mover la checklist",
         "moveFolder": "No se pudo mover la carpeta",
         "moveList": "No se pudo mover la lista",
         "moveStep": "No se pudo mover el paso",
@@ -251,7 +251,7 @@
         "removeEntry": "No se pudo quitar ese registro",
         "removeFile": "No se pudo quitar ese archivo",
         "removePerson": "No se pudo quitar a esa persona",
-        "removeChecklist": "No se pudo quitar la lista de comprobación",
+        "removeChecklist": "No se pudo quitar la checklist",
         "removeField": "No se pudo quitar el campo",
         "removeForm": "No se pudo quitar el formulario",
         "removeLink": "No se pudo quitar el vínculo",
@@ -348,7 +348,7 @@
         "spotMovedShort": "Ese sitio se ha movido. Reinténtalo",
         "pickOtherStatus": "Elige otro estado al que mover las tareas",
         "spaceNeedsStatus": "Un espacio necesita al menos un estado",
-        "checklistGone": "Esa lista de comprobación ya no existe",
+        "checklistGone": "Esa checklist ya no existe",
         "stepGone": "Ese paso ya no existe",
         "selfDependency": "Una tarea no puede depender de sí",
         "taskNotInSpace": "Esa tarea no está en este espacio",
@@ -520,7 +520,7 @@
     "deleteTask": {
         "title": "Eliminar tarea",
         "question": "¿Eliminar <strong>{name}</strong>?",
-        "description": "Los comentarios, las listas de comprobación y el tiempo registrado se van con ella. Archivarla lo conserva todo y la quita del tablero."
+        "description": "Los comentarios, las checklists y el tiempo registrado se van con ella. Archivarla lo conserva todo y la quita del tablero."
     },
     "groups": {
         "all": "Todas",

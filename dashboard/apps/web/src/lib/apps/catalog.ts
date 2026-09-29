@@ -216,6 +216,7 @@ export interface AppManifest {
     legacy?: boolean;
 }
 
+// i18n-ignore (marked per line below): manifest words are data; screens draw them through `app-words.ts` and the `catalog` namespace.
 export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
     {
         id: "messaging-bridge",
@@ -224,7 +225,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: MessagesSquare,
         summary: "Unified inbox for WhatsApp, Telegram, Discord and Slack.",
         description:
-            "Runs the Polaris messaging bridge so you can read and reply to WhatsApp, Telegram, Discord and Slack conversations from one inbox, and lets AI assistants answer through the same channels. Self-hosted: the only external dependency is each platform and a phone number for WhatsApp.",
+            "Runs the Polaris messaging bridge so you can read and reply to WhatsApp, Telegram, Discord and Slack conversations from one inbox, and lets AI assistants answer through the same channels. Self-hosted: the only external dependency is each platform and a phone number for WhatsApp.", // i18n-ignore
         installMethod: "compose-template",
         capabilities: ["messaging-hub"],
         dashboard: "builtin",
@@ -234,8 +235,8 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             // from dashboard/services/messaging-bridge; the marketplace installs it as
             // a managed Deploy app rather than building from source on the host.
             image: "ghcr.io/fjrg2007/polaris-messaging-bridge:latest",
-            volumes: [{ name: "sessions", mountPath: "/app/.sessions", label: "Channel sessions" }],
-            ports: [{ container: 8787, protocol: "http", label: "Bridge API" }]
+            volumes: [{ name: "sessions", mountPath: "/app/.sessions", label: "Channel sessions" }], // i18n-ignore
+            ports: [{ container: 8787, protocol: "http", label: "Bridge API" }] // i18n-ignore
         }
     },
     {
@@ -256,7 +257,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         opensAt: "/tools",
         summary: "Convert, resize, optimize, trim and translate - without leaving Polaris.",
         description:
-            "The jobs people open a random website for, and hand somebody else's server their files to do: turning a PDF into a Word document, an image into another format, a spreadsheet into a CSV. Resize and optimize pictures, read what a file actually contains, trim and mute a video, shorten a link, translate a passage. The files stay on your own machine, and nothing is uploaded anywhere it was not already.",
+            "The jobs people open a random website for, and hand somebody else's server their files to do: turning a PDF into a Word document, an image into another format, a spreadsheet into a CSV. Resize and optimize pictures, read what a file actually contains, trim and mute a video, shorten a link, translate a passage. The files stay on your own machine, and nothing is uploaded anywhere it was not already.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",
@@ -276,7 +277,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         opensAt: "/apps/mail-server",
         summary: "Mail at your own domains, with its DNS written and checked for you.",
         description:
-            "Send and receive mail at your own domains. Polaris writes the SPF, DKIM and DMARC records, checks that they are published, and files the DMARC reports receivers send back. Create mailboxes, aliases and forwards from here. Installing downloads nothing: each mail server you set up runs as a container on the machine you choose, and publishes ports 25, 465, 587, 993 and 4190 there.",
+            "Send and receive mail at your own domains. Polaris writes the SPF, DKIM and DMARC records, checks that they are published, and files the DMARC reports receivers send back. Create mailboxes, aliases and forwards from here. Installing downloads nothing: each mail server you set up runs as a container on the machine you choose, and publishes ports 25, 465, 587, 993 and 4190 there.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["mail-server"],
         dashboard: "builtin",
@@ -295,12 +296,12 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         opensAt: "/apps/games",
         summary: "Create and run Minecraft, ARK and FiveM servers on your own machines.",
         description:
-            "Install it once and create as many servers as you want, of any game Polaris knows: Minecraft for PC, phones and consoles, ARK: Survival Evolved, or FiveM for GTA V. Each server gets an address on your domain, a console, player moderation, its own schedule, and the memory it needs for the players you expect. Nothing is downloaded until you create a server, and only for the game that server plays.",
+            "Install it once and create as many servers as you want, of any game Polaris knows: Minecraft for PC, phones and consoles, ARK: Survival Evolved, or FiveM for GTA V. Each server gets an address on your domain, a console, player moderation, its own schedule, and the memory it needs for the players you expect. Nothing is downloaded until you create a server, and only for the game that server plays.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["game-manager"],
         dashboard: "builtin",
         singleton: true,
-        consent: { label: "Minecraft EULA", url: "https://www.minecraft.net/eula" }
+        consent: { label: "Minecraft EULA", url: "https://www.minecraft.net/eula" } // i18n-ignore
     },
     {
         // Superseded by `game-servers`, and kept so the installs people already
@@ -313,7 +314,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: Gamepad2,
         summary: "Create and run as many Minecraft servers as you want.",
         description:
-            "The Minecraft server manager. Superseded by Game servers, which creates servers of every game Polaris knows from one page.",
+            "The Minecraft server manager. Superseded by Game servers, which creates servers of every game Polaris knows from one page.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["game-manager"],
         dashboard: "builtin",
@@ -328,12 +329,12 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: Gamepad2,
         summary: "A Java server for PC players, closed and protected by default.",
         description:
-            "Runs a Minecraft: Java Edition server on the machine you choose, with the world on a server-local volume or a NAS. It comes closed: Mojang authentication required, whitelist enforced, command blocks off, and an anticheat and a block-history plugin already installed. Manage it from the Game servers panel: console, players, mods and settings.",
+            "Runs a Minecraft: Java Edition server on the machine you choose, with the world on a server-local volume or a NAS. It comes closed: Mojang authentication required, whitelist enforced, command blocks off, and an anticheat and a block-history plugin already installed. Manage it from the Game servers panel: console, players, mods and settings.", // i18n-ignore
         docsUrl: "https://docker-minecraft-server.readthedocs.io/",
         installMethod: "compose-template",
         capabilities: ["game-server"],
         dashboard: "builtin",
-        consent: { label: "Minecraft EULA", url: "https://www.minecraft.net/eula" },
+        consent: { label: "Minecraft EULA", url: "https://www.minecraft.net/eula" }, // i18n-ignore
         template: {
             // Not `latest`: the Java version is the tag, and the right one depends
             // on the release the server runs - Java 25 for Minecraft 26.x and
@@ -344,15 +345,15 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             env: [
                 // Accepted by installing (the card says so); the image refuses to boot
                 // without it, so it is not a field anyone can usefully get wrong.
-                { key: "EULA", label: "Minecraft EULA", default: "TRUE", required: true },
+                { key: "EULA", label: "Minecraft EULA", default: "TRUE", required: true }, // i18n-ignore
                 // RCON is how the console, the player list and every moderation action
                 // reach the server. The image enables it and randomizes the password
                 // when unset - which a `docker exec rcon-cli` could then not use, so
                 // the install mints one and passes it as the container's own.
-                { key: "RCON_PASSWORD", label: "RCON password", generated: true },
+                { key: "RCON_PASSWORD", label: "RCON password", generated: true }, // i18n-ignore
                 {
                     key: "TYPE",
-                    label: "Server software",
+                    label: "Server software", // i18n-ignore
                     help: "Paper runs plugins and is faster than vanilla. Fabric, Forge and NeoForge run mods.",
                     default: "PAPER",
                     // The same list the create dialog offers, so a server can be
@@ -368,7 +369,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 },
                 {
                     key: "VERSION",
-                    label: "Minecraft version",
+                    label: "Minecraft version", // i18n-ignore
                     help: "LATEST tracks the newest release. Pin one (1.21.4) to keep clients and mods matched.",
                     default: "LATEST",
                     tunable: true,
@@ -384,7 +385,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // rather than memory; a server that must give its memory back
                     // is a schedule that stops the container.
                     key: "PAUSE_WHEN_EMPTY_SECONDS",
-                    label: "Pause when nobody is playing",
+                    label: "Pause when nobody is playing", // i18n-ignore
                     help: "Seconds with nobody on before the server stops ticking. It keeps its address and comes back the moment somebody joins, so nobody has to start it again. Zero never pauses. Minecraft 1.21.2 and later.",
                     default: "60",
                     format: "seconds",
@@ -393,7 +394,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 },
                 {
                     key: "MEMORY",
-                    label: "Memory",
+                    label: "Memory", // i18n-ignore
                     help: "JVM heap, with a unit: 2G or 2048M. Leave the machine at least a gigabyte for itself.",
                     default: "2G",
                     format: "jvm-heap",
@@ -402,7 +403,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 },
                 {
                     key: "MOTD",
-                    label: "Message of the day",
+                    label: "Message of the day", // i18n-ignore
                     help: "The line under the server name in the multiplayer list.",
                     default: "A Minecraft server on Polaris",
                     tunable: true,
@@ -410,44 +411,44 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 },
                 {
                     key: "DIFFICULTY",
-                    label: "Difficulty",
+                    label: "Difficulty", // i18n-ignore
                     default: "easy",
                     options: [
-                        { value: "peaceful", label: "Peaceful" },
-                        { value: "easy", label: "Easy" },
-                        { value: "normal", label: "Normal" },
-                        { value: "hard", label: "Hard" }
+                        { value: "peaceful", label: "Peaceful" }, // i18n-ignore
+                        { value: "easy", label: "Easy" }, // i18n-ignore
+                        { value: "normal", label: "Normal" }, // i18n-ignore
+                        { value: "hard", label: "Hard" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "World"
                 },
                 {
                     key: "MODE",
-                    label: "Game mode",
+                    label: "Game mode", // i18n-ignore
                     default: "survival",
                     options: [
-                        { value: "survival", label: "Survival" },
-                        { value: "creative", label: "Creative" },
-                        { value: "adventure", label: "Adventure" },
-                        { value: "spectator", label: "Spectator" }
+                        { value: "survival", label: "Survival" }, // i18n-ignore
+                        { value: "creative", label: "Creative" }, // i18n-ignore
+                        { value: "adventure", label: "Adventure" }, // i18n-ignore
+                        { value: "spectator", label: "Spectator" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "World"
                 },
                 {
                     key: "PVP",
-                    label: "Player versus player",
+                    label: "Player versus player", // i18n-ignore
                     default: "true",
                     options: [
-                        { value: "true", label: "Allowed" },
-                        { value: "false", label: "Blocked" }
+                        { value: "true", label: "Allowed" }, // i18n-ignore
+                        { value: "false", label: "Blocked" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "World"
                 },
                 {
                     key: "SEED",
-                    label: "World seed",
+                    label: "World seed", // i18n-ignore
                     help: "Blank generates a random world. Only applies before the world is created.",
                     tunable: true,
                     group: "World"
@@ -472,7 +473,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // projects Modrinth had never heard of, or installed a jar that
                     // brought the server down.
                     key: "MODRINTH_PROJECTS",
-                    label: "Mods and plugins",
+                    label: "Mods and plugins", // i18n-ignore
                     help: "Modrinth projects to install, comma separated. Managed from the Mods tab.",
                     default: "coreprotect?,luckperms?",
                     pluginServersOnly: true,
@@ -486,7 +487,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // every start, so a resource that is taken down is a plugin
                     // that stops appearing rather than one that breaks the boot.
                     key: "SPIGET_RESOURCES",
-                    label: "SpigotMC plugins",
+                    label: "SpigotMC plugins", // i18n-ignore
                     help: "SpigotMC resource numbers to install, comma separated. Managed from the Mods tab.",
                     default: "",
                     pluginServersOnly: true,
@@ -495,53 +496,53 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 },
                 {
                     key: "MODRINTH_DOWNLOAD_DEPENDENCIES",
-                    label: "Dependencies",
+                    label: "Dependencies", // i18n-ignore
                     help: "Whether a mod's own dependencies are installed with it.",
                     default: "required",
                     options: [
-                        { value: "required", label: "Required only" },
-                        { value: "optional", label: "Required and optional" },
-                        { value: "none", label: "None" }
+                        { value: "required", label: "Required only" }, // i18n-ignore
+                        { value: "optional", label: "Required and optional" }, // i18n-ignore
+                        { value: "none", label: "None" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Mods"
                 },
                 {
                     key: "RESOURCE_PACK",
-                    label: "Resource pack",
+                    label: "Resource pack", // i18n-ignore
                     help: "A direct link to the pack's zip. Players are offered it when they join.",
                     tunable: true,
                     group: "World"
                 },
                 {
                     key: "RESOURCE_PACK_SHA1",
-                    label: "Resource pack checksum",
+                    label: "Resource pack checksum", // i18n-ignore
                     help: "The pack's SHA-1. Without it clients re-download the pack every time.",
                     tunable: true,
                     group: "World"
                 },
                 {
                     key: "RESOURCE_PACK_ENFORCE",
-                    label: "Require the resource pack",
+                    label: "Require the resource pack", // i18n-ignore
                     help: "On disconnects players who decline it.",
                     default: "false",
                     options: [
-                        { value: "false", label: "Optional" },
-                        { value: "true", label: "Required" }
+                        { value: "false", label: "Optional" }, // i18n-ignore
+                        { value: "true", label: "Required" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "World"
                 },
                 {
                     key: "MAX_PLAYERS",
-                    label: "Player slots",
+                    label: "Player slots", // i18n-ignore
                     default: "20",
                     tunable: true,
                     group: "Players"
                 },
                 {
                     key: "VIEW_DISTANCE",
-                    label: "View distance",
+                    label: "View distance", // i18n-ignore
                     help: "Chunks sent to each player. Lower it if the server struggles.",
                     default: "10",
                     tunable: true,
@@ -553,12 +554,12 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // for how the server is closed should not find it filed beside
                     // the render distance.
                     key: "ONLINE_MODE",
-                    label: "Mojang authentication",
+                    label: "Mojang authentication", // i18n-ignore
                     help: "Off lets cracked clients in, and anyone can claim any username.",
                     default: "true",
                     options: [
-                        { value: "true", label: "Required" },
-                        { value: "false", label: "Not required" }
+                        { value: "true", label: "Required" }, // i18n-ignore
+                        { value: "false", label: "Not required" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Security"
@@ -568,12 +569,12 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // is found by scanners within the hour. It starts closed: add
                     // yourself from the Players screen, or turn this off.
                     key: "ENABLE_WHITELIST",
-                    label: "Whitelist",
+                    label: "Whitelist", // i18n-ignore
                     help: "On means only players you add can join. Add yourself from Players.",
                     default: "true",
                     options: [
-                        { value: "true", label: "Enforced" },
-                        { value: "false", label: "Anyone may join" }
+                        { value: "true", label: "Enforced" }, // i18n-ignore
+                        { value: "false", label: "Anyone may join" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Players"
@@ -586,23 +587,23 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // players added later survive a restart. Not tunable: the list
                     // is managed from Players and the firewall, not as raw text.
                     key: "WHITELIST",
-                    label: "Whitelisted players"
+                    label: "Whitelisted players" // i18n-ignore
                 },
                 {
                     // Same, for who administers it. A server whose creator is not an
                     // operator cannot be moderated from inside the game.
                     key: "OPS",
-                    label: "Operators"
+                    label: "Operators" // i18n-ignore
                 },
                 {
                     // Applies a whitelist change to whoever is already connected
                     // rather than only to the next person who joins.
                     key: "ENFORCE_WHITELIST",
-                    label: "Apply the whitelist immediately",
+                    label: "Apply the whitelist immediately", // i18n-ignore
                     default: "true",
                     options: [
-                        { value: "true", label: "Yes" },
-                        { value: "false", label: "On next join" }
+                        { value: "true", label: "Yes" }, // i18n-ignore
+                        { value: "false", label: "On next join" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Players"
@@ -611,39 +612,39 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // A command block is an in-game way to run server commands, and
                     // the usual route from "a griefer got in" to "the server is gone".
                     key: "ENABLE_COMMAND_BLOCK",
-                    label: "Command blocks",
+                    label: "Command blocks", // i18n-ignore
                     help: "Off keeps players from running server commands from inside the world.",
                     default: "false",
                     options: [
-                        { value: "false", label: "Blocked" },
-                        { value: "true", label: "Allowed" }
+                        { value: "false", label: "Blocked" }, // i18n-ignore
+                        { value: "true", label: "Allowed" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Security"
                 },
                 {
                     key: "ENFORCE_SECURE_PROFILE",
-                    label: "Signed chat profiles",
+                    label: "Signed chat profiles", // i18n-ignore
                     help: "On rejects clients that cannot prove who they are.",
                     default: "true",
                     options: [
-                        { value: "true", label: "Required" },
-                        { value: "false", label: "Not required" }
+                        { value: "true", label: "Required" }, // i18n-ignore
+                        { value: "false", label: "Not required" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Security"
                 },
                 {
                     key: "SPAWN_PROTECTION",
-                    label: "Spawn protection",
+                    label: "Spawn protection", // i18n-ignore
                     help: "Blocks in this radius of spawn can only be changed by operators. 0 disables it.",
                     default: "16",
                     tunable: true,
                     group: "Security"
                 }
             ],
-            volumes: [{ name: "data", mountPath: "/data", label: "World data" }],
-            ports: [{ container: 25565, protocol: "tcp", host: 25565, label: "Server port" }]
+            volumes: [{ name: "data", mountPath: "/data", label: "World data" }], // i18n-ignore
+            ports: [{ container: 25565, protocol: "tcp", host: 25565, label: "Server port" }] // i18n-ignore
         }
     },
     {
@@ -655,19 +656,19 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: Gamepad2,
         summary: "A Bedrock server for phones, consoles and Windows.",
         description:
-            "Runs a Minecraft: Bedrock Edition server, the one phones, consoles, tablets and the Windows app connect to. Managed from the same panel as a Java server: console, players, settings. Bedrock has no RCON, so commands are sent to the server's console and the player list is read from it.",
+            "Runs a Minecraft: Bedrock Edition server, the one phones, consoles, tablets and the Windows app connect to. Managed from the same panel as a Java server: console, players, settings. Bedrock has no RCON, so commands are sent to the server's console and the player list is read from it.", // i18n-ignore
         docsUrl: "https://github.com/itzg/docker-minecraft-bedrock-server",
         installMethod: "compose-template",
         capabilities: ["game-server"],
         dashboard: "builtin",
-        consent: { label: "Minecraft EULA", url: "https://www.minecraft.net/eula" },
+        consent: { label: "Minecraft EULA", url: "https://www.minecraft.net/eula" }, // i18n-ignore
         template: {
             image: "itzg/minecraft-bedrock-server:latest",
             env: [
-                { key: "EULA", label: "Minecraft EULA", default: "TRUE", required: true },
+                { key: "EULA", label: "Minecraft EULA", default: "TRUE", required: true }, // i18n-ignore
                 {
                     key: "VERSION",
-                    label: "Bedrock version",
+                    label: "Bedrock version", // i18n-ignore
                     help: "LATEST tracks the newest release.",
                     default: "LATEST",
                     tunable: true,
@@ -675,7 +676,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 },
                 {
                     key: "SERVER_NAME",
-                    label: "Server name",
+                    label: "Server name", // i18n-ignore
                     help: "Shown in the friends and servers list.",
                     default: "A Minecraft server on Polaris",
                     tunable: true,
@@ -683,46 +684,46 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 },
                 {
                     key: "DIFFICULTY",
-                    label: "Difficulty",
+                    label: "Difficulty", // i18n-ignore
                     default: "easy",
                     options: [
-                        { value: "peaceful", label: "Peaceful" },
-                        { value: "easy", label: "Easy" },
-                        { value: "normal", label: "Normal" },
-                        { value: "hard", label: "Hard" }
+                        { value: "peaceful", label: "Peaceful" }, // i18n-ignore
+                        { value: "easy", label: "Easy" }, // i18n-ignore
+                        { value: "normal", label: "Normal" }, // i18n-ignore
+                        { value: "hard", label: "Hard" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "World"
                 },
                 {
                     key: "GAMEMODE",
-                    label: "Game mode",
+                    label: "Game mode", // i18n-ignore
                     default: "survival",
                     options: [
-                        { value: "survival", label: "Survival" },
-                        { value: "creative", label: "Creative" },
-                        { value: "adventure", label: "Adventure" }
+                        { value: "survival", label: "Survival" }, // i18n-ignore
+                        { value: "creative", label: "Creative" }, // i18n-ignore
+                        { value: "adventure", label: "Adventure" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "World"
                 },
                 {
                     key: "LEVEL_SEED",
-                    label: "World seed",
+                    label: "World seed", // i18n-ignore
                     help: "Blank generates a random world. Only applies before the world is created.",
                     tunable: true,
                     group: "World"
                 },
                 {
                     key: "MAX_PLAYERS",
-                    label: "Player slots",
+                    label: "Player slots", // i18n-ignore
                     default: "10",
                     tunable: true,
                     group: "Players"
                 },
                 {
                     key: "VIEW_DISTANCE",
-                    label: "View distance",
+                    label: "View distance", // i18n-ignore
                     default: "10",
                     tunable: true,
                     group: "Players"
@@ -731,12 +732,12 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // Bedrock's whitelist. On by default for the same reason Java's
                     // is: a server nobody was let into cannot be griefed.
                     key: "ALLOW_LIST",
-                    label: "Allow list",
+                    label: "Allow list", // i18n-ignore
                     help: "On means only players on the allow list can join.",
                     default: "true",
                     options: [
-                        { value: "true", label: "Enforced" },
-                        { value: "false", label: "Anyone may join" }
+                        { value: "true", label: "Enforced" }, // i18n-ignore
+                        { value: "false", label: "Anyone may join" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Players"
@@ -746,24 +747,24 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // each to an XUID at startup, which is also the only way Polaris
                     // can name a Bedrock player before they have ever connected.
                     key: "OPS",
-                    label: "Operators"
+                    label: "Operators" // i18n-ignore
                 },
                 {
                     key: "ONLINE_MODE",
-                    label: "Xbox Live authentication",
+                    label: "Xbox Live authentication", // i18n-ignore
                     help: "Off lets unauthenticated clients in, and anyone can claim any name.",
                     default: "true",
                     options: [
-                        { value: "true", label: "Required" },
-                        { value: "false", label: "Not required" }
+                        { value: "true", label: "Required" }, // i18n-ignore
+                        { value: "false", label: "Not required" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Security"
                 }
             ],
-            volumes: [{ name: "data", mountPath: "/data", label: "World data" }],
+            volumes: [{ name: "data", mountPath: "/data", label: "World data" }], // i18n-ignore
             // Bedrock speaks UDP; published as TCP it answers nothing at all.
-            ports: [{ container: 19132, protocol: "udp", host: 19132, label: "Server port" }]
+            ports: [{ container: 19132, protocol: "udp", host: 19132, label: "Server port" }] // i18n-ignore
         }
     },
     {
@@ -775,7 +776,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: Gamepad2,
         summary: "Create and run as many ARK servers as you want.",
         description:
-            "The ARK: Survival Evolved server manager. Superseded by Game servers, which creates servers of every game Polaris knows from one page.",
+            "The ARK: Survival Evolved server manager. Superseded by Game servers, which creates servers of every game Polaris knows from one page.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["game-manager"],
         dashboard: "builtin",
@@ -790,7 +791,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: Gamepad2,
         summary: "An ARK server for PC players, closed to everyone you have not added.",
         description:
-            "Runs an ARK: Survival Evolved dedicated server on the machine you choose, with the world on a server-local volume or a NAS. It comes closed: a join password only you have, BattlEye on, an admin password Polaris mints and keeps, and only the players you add allowed in. Manage it from the Game servers panel: console, players, mods and settings.",
+            "Runs an ARK: Survival Evolved dedicated server on the machine you choose, with the world on a server-local volume or a NAS. It comes closed: a join password only you have, BattlEye on, an admin password Polaris mints and keeps, and only the players you add allowed in. Manage it from the Game servers panel: console, players, mods and settings.", // i18n-ignore
         docsUrl: "https://github.com/Hermsi1337/docker-ark-server",
         installMethod: "compose-template",
         capabilities: ["game-server"],
@@ -810,7 +811,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // prompt as too long, so the server's own admin cannot get in.
                     // It is minted to the same shape as the join password instead.
                     key: "ADMIN_PASSWORD",
-                    label: "Admin password",
+                    label: "Admin password", // i18n-ignore
                     help: "What you type after enablecheats in game. Change it from the server's Access screen.",
                     secret: true,
                     required: true
@@ -822,14 +823,14 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // onto the image's. Not tunable - a secret read back masked and
                     // saved again would overwrite the real one with a blank.
                     key: "SERVER_PASSWORD",
-                    label: "Join password",
+                    label: "Join password", // i18n-ignore
                     help: "Players type this when they connect. Change it from the server's Access screen.",
                     secret: true,
                     required: true
                 },
                 {
                     key: "SESSION_NAME",
-                    label: "Server name",
+                    label: "Server name", // i18n-ignore
                     help: "The name shown in the in-game server browser.",
                     default: "An ARK server on Polaris",
                     tunable: true,
@@ -837,7 +838,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 },
                 {
                     key: "SERVER_MAP",
-                    label: "Map",
+                    label: "Map", // i18n-ignore
                     help: "Changing it loads that map's own world. The old one is kept and comes back if you switch back.",
                     default: DEFAULT_ARK_MAP,
                     options: ARK_MAPS.map((map) => ({
@@ -852,21 +853,21 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 },
                 {
                     key: "SERVER_MAP_MOD_ID",
-                    label: "Modded map id",
+                    label: "Modded map id", // i18n-ignore
                     help: "The Steam Workshop id of a custom map. Leave blank for the maps that ship with the game.",
                     tunable: true,
                     group: "Mods"
                 },
                 {
                     key: "GAME_MOD_IDS",
-                    label: "Mods",
+                    label: "Mods", // i18n-ignore
                     help: "Steam Workshop ids, comma separated. Installed on the next start.",
                     tunable: true,
                     group: "Mods"
                 },
                 {
                     key: "MAX_PLAYERS",
-                    label: "Player slots",
+                    label: "Player slots", // i18n-ignore
                     default: "20",
                     tunable: true,
                     group: "Players"
@@ -876,69 +877,69 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // widens who can reach the server, and a server is easier to
                     // open later than it is to un-open.
                     key: "ENABLE_CROSSPLAY",
-                    label: "Epic Games players",
+                    label: "Epic Games players", // i18n-ignore
                     help: "On lets Epic clients join as well as Steam ones.",
                     default: "false",
                     options: [
-                        { value: "false", label: "Steam only" },
-                        { value: "true", label: "Steam and Epic" }
+                        { value: "false", label: "Steam only" }, // i18n-ignore
+                        { value: "true", label: "Steam and Epic" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Players"
                 },
                 {
                     key: "UPDATE_ON_START",
-                    label: "Update before starting",
+                    label: "Update before starting", // i18n-ignore
                     help: "Keeps the server and its mods current. Off starts faster and drifts behind the clients.",
                     default: "true",
                     options: [
-                        { value: "true", label: "Yes" },
-                        { value: "false", label: "No" }
+                        { value: "true", label: "Yes" }, // i18n-ignore
+                        { value: "false", label: "No" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Server"
                 },
                 {
                     key: "VALIDATE_ON_START",
-                    label: "Verify the files",
+                    label: "Verify the files", // i18n-ignore
                     help: "Has Steam repair a damaged install on each start. Noticeably slower.",
                     default: "false",
                     options: [
-                        { value: "false", label: "No" },
-                        { value: "true", label: "Yes" }
+                        { value: "false", label: "No" }, // i18n-ignore
+                        { value: "true", label: "Yes" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Server"
                 },
                 {
                     key: "PRE_UPDATE_BACKUP",
-                    label: "Back up before updating",
+                    label: "Back up before updating", // i18n-ignore
                     default: "true",
                     options: [
-                        { value: "true", label: "Yes" },
-                        { value: "false", label: "No" }
+                        { value: "true", label: "Yes" }, // i18n-ignore
+                        { value: "false", label: "No" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Server"
                 },
                 {
                     key: "BACKUP_ON_STOP",
-                    label: "Back up when stopping",
+                    label: "Back up when stopping", // i18n-ignore
                     default: "true",
                     options: [
-                        { value: "true", label: "Yes" },
-                        { value: "false", label: "No" }
+                        { value: "true", label: "Yes" }, // i18n-ignore
+                        { value: "false", label: "No" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Server"
                 },
                 {
                     key: "WARN_ON_STOP",
-                    label: "Warn players before stopping",
+                    label: "Warn players before stopping", // i18n-ignore
                     default: "true",
                     options: [
-                        { value: "true", label: "Yes" },
-                        { value: "false", label: "No" }
+                        { value: "true", label: "Yes" }, // i18n-ignore
+                        { value: "false", label: "No" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Server"
@@ -948,12 +949,12 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // unless somebody deliberately turns it off, and the label says
                     // which way round that is.
                     key: "DISABLE_BATTLEYE",
-                    label: "BattlEye anticheat",
+                    label: "BattlEye anticheat", // i18n-ignore
                     help: "Off means clients are not checked at all.",
                     default: "false",
                     options: [
-                        { value: "false", label: "On" },
-                        { value: "true", label: "Off" }
+                        { value: "false", label: "On" }, // i18n-ignore
+                        { value: "true", label: "Off" } // i18n-ignore
                     ],
                     tunable: true,
                     group: "Security"
@@ -965,25 +966,25 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // dropped that one word would reopen the server silently. The
                     // Security screen owns it.
                     key: "ARK_EXTRA_OPTS",
-                    label: "Launch options"
+                    label: "Launch options" // i18n-ignore
                 },
                 // The ports the server binds inside its container. Set by the create
                 // flow to the ones Polaris published for it, because ARK's raw socket
                 // has to be exactly one above its game port on the player's side too -
                 // so the two cannot be mapped independently. Not tunable: changing one
                 // without republishing is a server nobody can reach.
-                { key: "GAME_CLIENT_PORT", label: "Game port" },
-                { key: "UDP_SOCKET_PORT", label: "Raw socket port" },
-                { key: "SERVER_LIST_PORT", label: "Server list port" }
+                { key: "GAME_CLIENT_PORT", label: "Game port" }, // i18n-ignore
+                { key: "UDP_SOCKET_PORT", label: "Raw socket port" }, // i18n-ignore
+                { key: "SERVER_LIST_PORT", label: "Server list port" } // i18n-ignore
             ],
-            volumes: [{ name: "data", mountPath: "/app", label: "Server files and world" }],
+            volumes: [{ name: "data", mountPath: "/app", label: "Server files and world" }], // i18n-ignore
             // ARK speaks UDP on all three. RCON (27020/tcp) is deliberately absent:
             // commands are run inside the container, so nothing has to be exposed for
             // the console and the player list to work.
             ports: [
-                { container: 7777, protocol: "udp", host: 7777, label: "Game port" },
-                { container: 7778, protocol: "udp", host: 7778, label: "Raw socket" },
-                { container: 27015, protocol: "udp", host: 27015, label: "Server list" }
+                { container: 7777, protocol: "udp", host: 7777, label: "Game port" }, // i18n-ignore
+                { container: 7778, protocol: "udp", host: 7778, label: "Raw socket" }, // i18n-ignore
+                { container: 27015, protocol: "udp", host: 27015, label: "Server list" } // i18n-ignore
             ]
         }
     },
@@ -1001,7 +1002,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: Gamepad2,
         summary: "A Hytale world of your own, run from the server files on your account.",
         description:
-            "Runs a Hytale server on the machine you choose, with its worlds on a server-local volume or a NAS. The server files are yours rather than ours: Hytale hands them out through your own account, so put HytaleServer.jar and Assets.zip into the server's Files and it starts by itself. Players reach it over UDP, which is the only transport Hytale speaks.",
+            "Runs a Hytale server on the machine you choose, with its worlds on a server-local volume or a NAS. The server files are yours rather than ours: Hytale hands them out through your own account, so put HytaleServer.jar and Assets.zip into the server's Files and it starts by itself. Players reach it over UDP, which is the only transport Hytale speaks.", // i18n-ignore
         docsUrl: "https://support.hytale.com/hc/en-us/articles/45326769420827-Hytale-Server-Manual",
         installMethod: "compose-template",
         capabilities: ["game-server"],
@@ -1013,15 +1014,15 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // What the JVM may take. The server is the whole game rather
                     // than a plugin host, so the floor is higher than Minecraft's.
                     key: "HYTALE_MEMORY",
-                    label: "Memory",
+                    label: "Memory", // i18n-ignore
                     help: "How much memory the server may use, as 3G or 4096M.",
                     default: "3G"
                 }
             ],
-            volumes: [{ name: "data", mountPath: "/data", label: "Server files and worlds" }],
+            volumes: [{ name: "data", mountPath: "/data", label: "Server files and worlds" }], // i18n-ignore
             // QUIC, so UDP and nothing else. A deployment that published TCP here
             // would be a server nobody can join, with nothing anywhere saying why.
-            ports: [{ container: 5520, protocol: "udp", host: 5520, label: "Game port" }]
+            ports: [{ container: 5520, protocol: "udp", host: 5520, label: "Game port" }] // i18n-ignore
         }
     },
     {
@@ -1033,7 +1034,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: Gamepad2,
         summary: "A GTA V server of your own, closed to everyone you have not added.",
         description:
-            "Runs a FiveM server on the machine you choose, with its files on a server-local volume or a NAS. It comes closed: a console password Polaris mints and keeps, player addresses hidden, ScriptHook mods refused, and only the players you add allowed in. Manage it from the Game servers panel: console, players, resources and settings. It needs a free server key from keymaster.fivem.net.",
+            "Runs a FiveM server on the machine you choose, with its files on a server-local volume or a NAS. It comes closed: a console password Polaris mints and keeps, player addresses hidden, ScriptHook mods refused, and only the players you add allowed in. Manage it from the Game servers panel: console, players, resources and settings. It needs a free server key from keymaster.fivem.net.", // i18n-ignore
         docsUrl: "https://docs.fivem.net/docs/server-manual/setting-up-a-server/",
         installMethod: "compose-template",
         capabilities: ["game-server"],
@@ -1047,7 +1048,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // issued at keymaster.fivem.net. Asked for on the create form
                     // and never shown again.
                     key: "LICENSE_KEY",
-                    label: "Server key",
+                    label: "Server key", // i18n-ignore
                     help: "The free key from keymaster.fivem.net. Change it from the server's Settings screen.",
                     secret: true,
                     required: true
@@ -1063,7 +1064,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // is never shown to anybody, and this one is a value an operator
                     // may want to hand to a tool of their own.
                     key: "RCON_PASSWORD",
-                    label: "Console password",
+                    label: "Console password", // i18n-ignore
                     help: "What opens the server console. Change it from the server's Access screen.",
                     secret: true,
                     required: true
@@ -1074,18 +1075,18 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     // config instead, so the rules screen shows what is actually
                     // running. Not tunable: the rules screen owns it.
                     key: "NO_ONESYNC",
-                    label: "Leave OneSync to the server config",
+                    label: "Leave OneSync to the server config", // i18n-ignore
                     default: "1"
                 }
             ],
             volumes: [
-                { name: "config", mountPath: "/config", label: "Server files and resources" }
+                { name: "config", mountPath: "/config", label: "Server files and resources" } // i18n-ignore
             ],
             // One number, two transports: a FiveM client speaks both to the same
             // port and an address carries only the one. Published onto the port the
             // image binds inside, which its own config writes before Polaris can
             // reach the container at all.
-            ports: [{ container: 30120, protocol: "tcp", host: 30120, label: "Server port" }]
+            ports: [{ container: 30120, protocol: "tcp", host: 30120, label: "Server port" }] // i18n-ignore
         }
     },
     {
@@ -1100,7 +1101,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         opensAt: "/places",
         summary: "Your places, and the cameras watching them, on your own machines.",
         description:
-            "A house, an office, a workshop - each with its own cameras. Watch them live, keep what matters, and get told when something happens. Polaris pulls each camera once and shows it to everybody watching, so the camera never runs out of connections. Detection is yours to choose per camera - the camera's own alerts, movement, people, or faces - along with where it runs and how often, so a house full of cameras does not have to cost a machine.",
+            "A house, an office, a workshop - each with its own cameras. Watch them live, keep what matters, and get told when something happens. Polaris pulls each camera once and shows it to everybody watching, so the camera never runs out of connections. Detection is yours to choose per camera - the camera's own alerts, movement, people, or faces - along with where it runs and how often, so a house full of cameras does not have to cost a machine.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["home-hub"],
         dashboard: "builtin",
@@ -1119,7 +1120,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: Video,
         summary: "Pulls each camera once and streams it to everybody watching.",
         description:
-            "The media relay behind Home. It holds one connection per camera and re-serves it to every viewer without re-encoding, so a camera that allows a single stream can still be watched by several people at once, and the machine it runs on barely notices.",
+            "The media relay behind Home. It holds one connection per camera and re-serves it to every viewer without re-encoding, so a camera that allows a single stream can still be watched by several people at once, and the machine it runs on barely notices.", // i18n-ignore
         docsUrl: "https://github.com/AlexxIT/go2rtc",
         installMethod: "compose-template",
         capabilities: ["camera-hub"],
@@ -1131,14 +1132,14 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             image: "ghcr.io/fjrg2007/polaris-camera-relay:latest",
             build: "dashboard/services/camera-relay",
             env: [
-                { key: "RELAY_USERNAME", label: "API account", default: "polaris" },
+                { key: "RELAY_USERNAME", label: "API account", default: "polaris" }, // i18n-ignore
                 // Minted at install and never shown: nobody types it, Polaris is
                 // the only thing that ever calls this API, and the relay refuses
                 // to start without it rather than coming up open.
-                { key: "RELAY_PASSWORD", label: "API password", generated: true }
+                { key: "RELAY_PASSWORD", label: "API password", generated: true } // i18n-ignore
             ],
-            volumes: [{ name: "config", mountPath: "/config", label: "Relay configuration" }],
-            ports: [{ container: 1984, protocol: "http", label: "Relay API" }]
+            volumes: [{ name: "config", mountPath: "/config", label: "Relay configuration" }], // i18n-ignore
+            ports: [{ container: 1984, protocol: "http", label: "Relay API" }] // i18n-ignore
         }
     },
     {
@@ -1153,7 +1154,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: ScanFace,
         summary: "Puts names to the faces you have taught it, on your own hardware.",
         description:
-            "The recognizer behind Home's People screen. It finds faces in a frame and compares them with the ones you have taught it, on the machine you chose - photographs and the templates taken from them stay in this container and are never sent anywhere, including to Polaris.",
+            "The recognizer behind Home's People screen. It finds faces in a frame and compares them with the ones you have taught it, on the machine you chose - photographs and the templates taken from them stay in this container and are never sent anywhere, including to Polaris.", // i18n-ignore
         installMethod: "compose-template",
         capabilities: ["tool"],
         dashboard: "generic",
@@ -1168,10 +1169,10 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 // the vision workers are the only things that call this, and it
                 // refuses to start without one rather than coming up open on
                 // somebody's home network with a face database behind it.
-                { key: "FACE_API_KEY", label: "API key", generated: true }
+                { key: "FACE_API_KEY", label: "API key", generated: true } // i18n-ignore
             ],
-            volumes: [{ name: "data", mountPath: "/data", label: "Known faces" }],
-            ports: [{ container: 8000, protocol: "http", label: "Recognition API" }]
+            volumes: [{ name: "data", mountPath: "/data", label: "Known faces" }], // i18n-ignore
+            ports: [{ container: 8000, protocol: "http", label: "Recognition API" }] // i18n-ignore
         }
     },
     {
@@ -1186,7 +1187,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: ScanFace,
         summary: "Watches for movement, then looks properly at what it was.",
         description:
-            "The part of Places that looks at pixels. It reads the small stream from the relay - never the camera - and while nothing is happening that is all it does. When something moves in a part of the picture you care about, it looks properly: full frames through a detection model, following whatever it found for as long as it is there, so one arrival is one event with one good picture of it. It sits idle the rest of the time, and it runs on the machine you chose rather than on the one Polaris is on.",
+            "The part of Places that looks at pixels. It reads the small stream from the relay - never the camera - and while nothing is happening that is all it does. When something moves in a part of the picture you care about, it looks properly: full frames through a detection model, following whatever it found for as long as it is there, so one arrival is one event with one good picture of it. It sits idle the rest of the time, and it runs on the machine you chose rather than on the one Polaris is on.", // i18n-ignore
         installMethod: "compose-template",
         capabilities: ["tool"],
         dashboard: "generic",
@@ -1194,10 +1195,10 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             image: "ghcr.io/fjrg2007/polaris-vision:latest",
             build: "dashboard/services/vision",
             env: [
-                { key: "POLARIS_URL", label: "Where Polaris is", required: true },
+                { key: "POLARIS_URL", label: "Where Polaris is", required: true }, // i18n-ignore
                 // Minted at install. The worker presents it to ask what to watch
                 // and to report what it saw; nobody types it.
-                { key: "WORKER_KEY", label: "Worker key", generated: true }
+                { key: "WORKER_KEY", label: "Worker key", generated: true } // i18n-ignore
             ]
         }
     },
@@ -1208,7 +1209,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: Bot,
         summary: "An AI assistant that answers your messaging channels.",
         description:
-            "Deploys an OpenClaw AI assistant that connects to the messaging bridge and can auto-reply on any connected channel, with per-conversation handoff to a human agent.",
+            "Deploys an OpenClaw AI assistant that connects to the messaging bridge and can auto-reply on any connected channel, with per-conversation handoff to a human agent.", // i18n-ignore
         installMethod: "compose-template",
         capabilities: ["ai-assistant"],
         dashboard: "builtin",
@@ -1221,7 +1222,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: Bot,
         summary: "A Hermes AI agent for your messaging channels.",
         description:
-            "Deploys a Hermes AI agent that reuses the messaging bridge to handle conversations autonomously, escalating to a human when needed.",
+            "Deploys a Hermes AI agent that reuses the messaging bridge to handle conversations autonomously, escalating to a human when needed.", // i18n-ignore
         installMethod: "compose-template",
         capabilities: ["ai-assistant"],
         dashboard: "builtin",

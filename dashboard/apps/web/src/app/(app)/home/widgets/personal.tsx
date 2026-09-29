@@ -185,8 +185,14 @@ export function AppsWidget({
     apps: readonly { id: string; label: string; description: string; href: string }[];
 }) {
     const t = useTranslations("home");
+    const tnav = useTranslations("nav");
     const navLabel = useNavLabel();
     if (apps.length === 0) return <WidgetEmpty>{t("apps.empty")}</WidgetEmpty>;
+    // The same sentence the switcher shows for the app, in the reader's language.
+    const describe = (id: string, english: string) => {
+        const key = `apps.${id}.description`;
+        return tnav.has(key) ? tnav(key) : english;
+    };
 
     return (
         <div className="grid grid-cols-2 gap-2">
@@ -196,7 +202,7 @@ export function AppsWidget({
                     <Link
                         key={app.id}
                         href={app.href}
-                        title={app.description}
+                        title={describe(app.id, app.description)}
                         className="flex items-center gap-2 rounded-lg border border-border bg-surface/50 px-3 py-2 transition-colors hover:border-primary hover:bg-primary/5"
                     >
                         <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />

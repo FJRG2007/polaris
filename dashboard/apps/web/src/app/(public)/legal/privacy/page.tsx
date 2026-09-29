@@ -14,5 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 /** The privacy policy this deployment declares to Google and Epic. Public: a
  *  policy nobody can open without an account is not one a review desk accepts. */
 export default async function PrivacyPage() {
-    return <LegalDocumentView document={privacyDocument(await getLegalContact())} />;
+    const t = await getTranslations("publicPages");
+    const legal = privacyDocument(await getLegalContact());
+    return <LegalDocumentView document={{ ...legal, title: t("layout.privacy") }} />;
 }

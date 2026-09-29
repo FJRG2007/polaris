@@ -1,1 +1,160 @@
-{}
+{
+    "labels": {
+        "Aberration (needs the DLC)": "Aberration (necesita el DLC)",
+        "Adventure": "Aventura",
+        "Allow list": "Lista blanca",
+        "Allowed": "Permitido",
+        "Anyone may join": "Entra cualquiera",
+        "Apply the whitelist immediately": "Aplicar la lista blanca ya",
+        "Back up before updating": "Copia antes de actualizar",
+        "Back up when stopping": "Copia al detener",
+        "BattlEye anticheat": "Antitrampas BattlEye",
+        "Bedrock version": "Versión de Bedrock",
+        "Blocked": "Bloqueado",
+        "Channel sessions": "Sesiones de canales",
+        "Command blocks": "Bloques de comando",
+        "Creative": "Creativo",
+        "Crystal Isles (a separate free download)": "Crystal Isles (descarga gratuita aparte)",
+        "Custom server jar": "Jar de servidor propio",
+        "Dependencies": "Dependencias",
+        "Difficulty": "Dificultad",
+        "Easy": "Fácil",
+        "Enforced": "Obligatorio",
+        "Epic Games players": "Jugadores de Epic",
+        "Extinction (needs the DLC)": "Extinction (necesita el DLC)",
+        "Fjordur (a separate free download)": "Fjordur (descarga gratuita aparte)",
+        "Game mode": "Modalidad",
+        "Genesis: Part 1 (needs the DLC)": "Genesis: Part 1 (necesita el DLC)",
+        "Genesis: Part 2 (needs the DLC)": "Genesis: Part 2 (necesita el DLC)",
+        "Hard": "Difícil",
+        "Lost Island (a separate free download)": "Lost Island (descarga gratuita aparte)",
+        "Map": "Mapa",
+        "Memory": "Memoria",
+        "Message of the day": "Mensaje del día",
+        "Minecraft EULA": "EULA de Minecraft",
+        "Minecraft version": "Versión de Minecraft",
+        "Modded map id": "Id del mapa (mod)",
+        "Modrinth modpack": "Modpack de Modrinth",
+        "Mods and plugins": "Mods y plugins",
+        "Mojang authentication": "Autenticación de Mojang",
+        "No": "No",
+        "None": "Ninguna",
+        "Normal": "Normal",
+        "Not required": "No obligatorio",
+        "Off": "No",
+        "On": "Sí",
+        "On next join": "Al reconectar",
+        "Optional": "Opcional",
+        "Pause when nobody is playing": "Pausar si nadie juega",
+        "Peaceful": "Pacífico",
+        "Player slots": "Plazas",
+        "Player versus player": "Jugador contra jugador",
+        "Players": "Jugadores",
+        "Ragnarok (a separate free download)": "Ragnarok (descarga gratuita aparte)",
+        "Require the resource pack": "Exigir el pack de recursos",
+        "Required": "Obligatorio",
+        "Required and optional": "Obligatorias y opcionales",
+        "Required only": "Solo obligatorias",
+        "Resource pack": "Pack de recursos",
+        "Resource pack checksum": "Suma del pack",
+        "Scorched Earth (needs the DLC)": "Scorched Earth (necesita el DLC)",
+        "Security": "Seguridad",
+        "Server": "Servidor",
+        "Server name": "Nombre",
+        "Server software": "Software",
+        "Signed chat profiles": "Perfiles de chat firmados",
+        "Spawn protection": "Protección del spawn",
+        "Spectator": "Espectador",
+        "SpigotMC plugins": "Plugins de SpigotMC",
+        "Steam and Epic": "Steam y Epic",
+        "Steam only": "Solo Steam",
+        "The Center (a separate free download)": "The Center (descarga gratuita aparte)",
+        "Update before starting": "Actualizar al iniciar",
+        "Valguero (a separate free download)": "Valguero (descarga gratuita aparte)",
+        "Verify the files": "Verificar archivos",
+        "View distance": "Distancia visible",
+        "Warn players before stopping": "Avisar antes de detener",
+        "Whitelist": "Lista blanca",
+        "World": "Mundo",
+        "World seed": "Semilla",
+        "Xbox Live authentication": "Autenticación de Xbox Live",
+        "Yes": "Sí"
+    },
+    "categories": {
+        "Messaging": "Mensajería",
+        "AI": "IA",
+        "Home": "Hogar"
+    },
+    "apps": {
+        "messaging-bridge": {
+            "name": "Puente de mensajería",
+            "summary": "Una bandeja común para WhatsApp, Telegram, Discord y Slack.",
+            "description": "Ejecuta el puente de mensajería de Polaris para leer y responder conversaciones de WhatsApp, Telegram, Discord y Slack desde una sola bandeja, y deja que los asistentes de IA respondan por esos mismos canales. Autoalojado: la única dependencia externa es cada plataforma y un número de teléfono para WhatsApp."
+        },
+        "tools": {
+            "summary": "Convierte, redimensiona, optimiza, recorta y traduce sin salir de Polaris.",
+            "description": "Los trabajos para los que se abre una web cualquiera y se le dan los archivos al servidor de otro: pasar un PDF a documento de Word, una imagen a otro formato, una hoja de cálculo a CSV. Redimensiona y optimiza imágenes, mira qué contiene de verdad un archivo, recorta y silencia un vídeo, acorta un enlace, traduce un texto. Los archivos se quedan en tu propio equipo y no se suben a ningún sitio donde no estuvieran ya."
+        },
+        "mail-server": {
+            "summary": "Correo en tus propios dominios, con el DNS escrito y comprobado por ti.",
+            "description": "Envía y recibe correo en tus propios dominios. Polaris escribe los registros SPF, DKIM y DMARC, comprueba que están publicados y archiva los informes DMARC que devuelven los receptores. Crea buzones, alias y reenvíos desde aquí. Instalarlo no descarga nada: cada servidor de correo que configures se ejecuta como un contenedor en el equipo que elijas y publica allí los puertos 25, 465, 587, 993 y 4190."
+        },
+        "game-servers": {
+            "summary": "Crea y ejecuta servidores de Minecraft, ARK y FiveM en tus propios equipos.",
+            "description": "Instálalo una vez y crea tantos servidores como quieras, de cualquier juego que Polaris conozca: Minecraft para PC, móviles y consolas, ARK: Survival Evolved o FiveM para GTA V. Cada servidor tiene una dirección en tu dominio, una consola, moderación de jugadores, su propio horario y la memoria que necesita para los jugadores que esperas. No se descarga nada hasta que creas un servidor, y solo para el juego de ese servidor."
+        },
+        "home": {
+            "summary": "Tus lugares y las cámaras que los vigilan, en tus propios equipos.",
+            "description": "Una casa, una oficina, un taller: cada uno con sus cámaras. Míralas en directo, guarda lo importante y recibe un aviso cuando pase algo. Polaris abre cada cámara una sola vez y se la muestra a todos los que miran, así que la cámara nunca se queda sin conexiones. La detección la eliges tú por cámara (las alertas de la propia cámara, movimiento, personas o caras), junto con dónde se ejecuta y cada cuánto, para que una casa llena de cámaras no cueste un equipo."
+        },
+        "openclaw": {
+            "name": "Asistente OpenClaw",
+            "summary": "Un asistente de IA que responde en tus canales de mensajería.",
+            "description": "Despliega un asistente de IA de OpenClaw que se conecta al puente de mensajería y puede responder solo en cualquier canal conectado, pasando cada conversación a una persona cuando hace falta."
+        },
+        "hermes": {
+            "name": "Asistente Hermes",
+            "summary": "Un agente de IA de Hermes para tus canales de mensajería.",
+            "description": "Despliega un agente de IA de Hermes que usa el puente de mensajería para llevar conversaciones por su cuenta y pasar a una persona cuando hace falta."
+        }
+    },
+    "help": {
+        "minecraft": {
+            "TYPE": "Paper ejecuta plugins y va más rápido que vanilla. Fabric, Forge y NeoForge ejecutan mods.",
+            "VERSION": "LATEST sigue la última versión. Fija una (1.21.4) para que clientes y mods coincidan.",
+            "PAUSE_WHEN_EMPTY_SECONDS": "Segundos sin nadie antes de que el servidor deje de avanzar. Conserva su dirección y vuelve en cuanto alguien entra, así que nadie tiene que arrancarlo. Cero no pausa nunca. Minecraft 1.21.2 o posterior.",
+            "MEMORY": "Heap de la JVM, con unidad: 2G o 2048M. Deja al equipo al menos un gigabyte para sí mismo.",
+            "MOTD": "La línea bajo el nombre del servidor en la lista multijugador.",
+            "SEED": "En blanco genera un mundo aleatorio. Solo se aplica antes de crear el mundo.",
+            "MODRINTH_PROJECTS": "Proyectos de Modrinth que instalar, separados por comas. Se gestionan desde la pestaña Mods.",
+            "SPIGET_RESOURCES": "Números de recurso de SpigotMC que instalar, separados por comas. Se gestionan desde la pestaña Mods.",
+            "MODRINTH_DOWNLOAD_DEPENDENCIES": "Si las dependencias de un mod se instalan con él.",
+            "RESOURCE_PACK": "Un enlace directo al zip del paquete. Se ofrece a los jugadores al entrar.",
+            "RESOURCE_PACK_SHA1": "El SHA-1 del paquete. Sin él, los clientes lo vuelven a descargar cada vez.",
+            "RESOURCE_PACK_ENFORCE": "Activado, desconecta a los jugadores que lo rechazan.",
+            "VIEW_DISTANCE": "Chunks que se envían a cada jugador. Bájalo si el servidor va justo.",
+            "ONLINE_MODE": "Desactivado, entran clientes piratas y cualquiera puede usar cualquier nombre.",
+            "ENABLE_WHITELIST": "Activado, solo entran los jugadores que añadas. Añádete desde Jugadores.",
+            "ENABLE_COMMAND_BLOCK": "Desactivado, los jugadores no pueden ejecutar comandos del servidor desde dentro del mundo.",
+            "ENFORCE_SECURE_PROFILE": "Activado, rechaza a los clientes que no pueden demostrar quiénes son.",
+            "SPAWN_PROTECTION": "Los bloques en este radio del spawn solo los pueden cambiar los operadores. 0 lo desactiva."
+        },
+        "minecraft-bedrock": {
+            "VERSION": "LATEST sigue la última versión.",
+            "SERVER_NAME": "Se muestra en la lista de amigos y servidores.",
+            "LEVEL_SEED": "En blanco genera un mundo aleatorio. Solo se aplica antes de crear el mundo.",
+            "ALLOW_LIST": "Activado, solo entran los jugadores de la lista de acceso.",
+            "ONLINE_MODE": "Desactivado, entran clientes sin autenticar y cualquiera puede usar cualquier nombre."
+        },
+        "ark": {
+            "SESSION_NAME": "El nombre que sale en el buscador de servidores del juego.",
+            "SERVER_MAP": "Cambiarlo carga el mundo propio de ese mapa. El anterior se conserva y vuelve si cambias de nuevo.",
+            "SERVER_MAP_MOD_ID": "El id de Steam Workshop de un mapa personalizado. Déjalo en blanco para los mapas que trae el juego.",
+            "GAME_MOD_IDS": "Ids de Steam Workshop, separados por comas. Se instalan en el siguiente arranque.",
+            "ENABLE_CROSSPLAY": "Activado, entran clientes de Epic además de los de Steam.",
+            "UPDATE_ON_START": "Mantiene al día el servidor y sus mods. Desactivado, arranca antes y se queda por detrás de los clientes.",
+            "VALIDATE_ON_START": "Steam repara una instalación dañada en cada arranque. Bastante más lento.",
+            "DISABLE_BATTLEYE": "Desactivado, no se comprueba a los clientes en absoluto."
+        }
+    }
+}

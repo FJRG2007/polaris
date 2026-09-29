@@ -3,7 +3,7 @@
         "execution": {
             "actions": "GitHub Actions",
             "runners": "Runners de Polaris",
-            "server": "Servidor de Polaris"
+            "server": "Servidor Polaris"
         },
         "executionNote": {
             "actions": "Se ejecuta en una máquina de GitHub. Gratis en repositorios públicos, se cobra por minuto en los privados.",
@@ -76,7 +76,7 @@
             "failed": "Fallida"
         },
         "sessionPlace": {
-            "local": "Esta máquina de Polaris",
+            "local": "Esta máquina Polaris",
             "host": "Un servidor inscrito"
         }
     },
@@ -172,7 +172,7 @@
     },
     "sessions": {
         "errors": {
-            "checkForm": "Revisa el formulario",
+            "checkForm": "Revisa los datos",
             "repoNotConnected": "Ese repositorio no está conectado a la app de Agentes.",
             "noSharedMachine": "Este Polaris no ofrece una máquina compartida.",
             "serverNotYours": "Ese servidor no es tuyo.",
@@ -189,13 +189,13 @@
         "start": "Iniciar una sesión",
         "none": "Aún no hay sesiones",
         "noneHint": "Una sesión pone un agente de código en una rama propia, en una máquina que ya tienes. Puedes verlo trabajar, responder a sus preguntas y enviarle lo siguiente.",
-        "workspace": "Un espacio propio",
+        "workspace": "Un espacio",
         "aServer": "un servidor",
-        "thisBox": "esta máquina",
+        "thisBox": "este equipo",
         "stop": "Detener",
         "form": {
             "title": "En qué trabaja",
-            "titlePlaceholder": "Arreglar la redirección del login",
+            "titlePlaceholder": "Arreglar la redirección",
             "repository": "Repositorio",
             "noRepo": "Sin repositorio - solo abrir el agente",
             "workspaceHint": "Se abre en una máquina propia con un directorio vacío y nada descargado. La máquina conserva su carpeta personal, así que lo que instales y donde inicies sesión se queda para la próxima vez.",
@@ -242,7 +242,7 @@
             "subagentEnd": "Subagente terminado",
             "compact": "Compactando su contexto",
             "turnEnd": "Terminó un turno",
-            "sessionEnd": "Terminada",
+            "sessionEnd": "Terminó",
             "error": "Error"
         },
         "detach": "Soltar",
@@ -321,7 +321,7 @@
         "publicOff": "Los repositorios públicos están desactivados para esta cuenta. Vuelve a activarlos en los ajustes de Agentes, o el agente nunca se ejecutará aquí.",
         "noProvider": "Ningún proveedor conectado",
         "connectProvider": "Conecta antes un proveedor de modelos en Integraciones.",
-        "effort": "Esfuerzo de razonamiento",
+        "effort": "Razonamiento",
         "startsRestricted": "El agente empieza solo con ramas de trabajo y no puede hacer push a la rama principal. Cambia eso, y las reglas que lo inician, después desde los ajustes del repositorio.",
         "adding": "Añadiendo...",
         "add": "Añadir",
@@ -349,7 +349,7 @@
         "gate": "Control de calidad"
     },
     "runs": {
-        "start": "Iniciar ejecución",
+        "start": "Ejecutar",
         "none": "Aún no se ha ejecutado nada. Menciona la app en una issue o una pull request, añade una automatización o inicia una ejecución aquí.",
         "startedBy": "Iniciada por",
         "ranOn": "Ejecutó en",

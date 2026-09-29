@@ -341,7 +341,7 @@
     },
     "list": {
         "uninstall": "Desinstalar",
-        "setUp": "Instalar servidor de correo",
+        "setUp": "Crear servidor de correo",
         "none": "Sin servidor de correo",
         "noneBody": "Polaris instala uno en esta máquina o en un servidor que hayas registrado, y luego repasa su DNS contigo.",
         "on": "{domain} en {place}"

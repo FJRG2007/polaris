@@ -10,6 +10,7 @@
 
 import { useCallback } from "react";
 import { useLiveRead } from "@/components/use-live-resource";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import Link from "next/link";
 import {
     Hash,
@@ -25,18 +26,19 @@ import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
 import { inboxStateAction } from "@/app/(app)/admin/inbox/actions";
 import type { ChannelView } from "@/lib/messaging-service";
 
-/** A neutral glyph + label per platform (no third-party brand logos). */
+/** A neutral glyph + label per platform (no third-party brand logos). The
+ *  labels are the products' own names, the same in every language. */
 const PLATFORM: Record<string, { icon: LucideIcon; label: string }> = {
-    telegram: { icon: Send, label: "Telegram" },
-    whatsapp: { icon: MessageCircle, label: "WhatsApp" },
-    discord: { icon: Hash, label: "Discord" },
-    slack: { icon: Slack, label: "Slack" }
+    telegram: { icon: Send, label: "Telegram" }, // i18n-ignore
+    whatsapp: { icon: MessageCircle, label: "WhatsApp" }, // i18n-ignore
+    discord: { icon: Hash, label: "Discord" }, // i18n-ignore
+    slack: { icon: Slack, label: "Slack" } // i18n-ignore
 };
 
 const STATUS_TONE: Record<string, string> = {
     connected: "border-success-edge text-success",
     connecting: "border-warning-edge text-warning",
-    error: "border-danger-edge text-danger",
+    error: "border-danger-edge text-danger", // i18n-ignore: a class list
     disconnected: "border-danger-edge text-danger"
 };
 
@@ -45,7 +47,11 @@ function platformLabel(channel: ChannelView): string {
     return channel.provider === "whatsapp-cloud" ? `${base} Cloud` : base;
 }
 
+/** The statuses there are words for; anything newer is shown as it came. */
+const STATUSES = new Set(["connected", "connecting", "error", "disconnected"]);
+
 export function MessagingBridgePanel() {
+    const t = useTranslations("installed");
     // The channels as this tab last saw them paint at once; the fresh list replaces
     // only what moved. Names and statuses only - no channel's token is in it.
     const load = useCallback(
@@ -65,32 +71,30 @@ export function MessagingBridgePanel() {
             <CardBody className="flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <p className="text-sm font-medium">Channels</p>
+                        <p className="text-sm font-medium">{t("channels.title")}</p>
                         <p className="text-xs text-muted-foreground">
-                            Connect WhatsApp, Telegram, Discord or Slack. Each channel's token,
-                            phone number or QR is entered in the Inbox when you connect it.
+                            {t("channels.hint")}
                         </p>
                     </div>
                     <Button asChild size="sm">
                         <Link href="/admin/inbox">
-                            <Plus className="size-4" /> Connect a channel
+                            <Plus className="size-4" /> {t("channels.connect")}
                         </Link>
                     </Button>
                 </div>
 
                 {channels === null ? (
                     <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" /> Loading channels...
+                        <Loader2 className="size-4 animate-spin" /> {t("channels.loading")}
                     </div>
                 ) : channels.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border py-8 text-center">
                         <MessagesSquare className="size-6 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">
-                            No channels connected yet. Connect one to start receiving and sending
-                            messages from the Inbox.
+                            {t("channels.empty")}
                         </p>
                         <Button asChild size="sm" variant="secondary">
-                            <Link href="/admin/inbox">Go to the Inbox</Link>
+                            <Link href="/admin/inbox">{t("channels.goToInbox")}</Link>
                         </Button>
                     </div>
                 ) : (
@@ -111,7 +115,11 @@ export function MessagingBridgePanel() {
                                         </p>
                                     </div>
                                     <Badge className={cn(STATUS_TONE[channel.status])}>
-                                        {channel.status}
+                                        {STATUSES.has(channel.status)
+                                            ? t(
+                                                  `channels.status.${channel.status as "connected" | "connecting" | "error" | "disconnected"}`
+                                              )
+                                            : channel.status}
                                     </Badge>
                                 </li>
                             );
@@ -121,7 +129,7 @@ export function MessagingBridgePanel() {
 
                 {channels && channels.length > 0 && (
                     <Link href="/admin/inbox" className="text-sm text-primary hover:underline">
-                        Open the Inbox
+                        {t("channels.openInbox")}
                     </Link>
                 )}
             </CardBody>

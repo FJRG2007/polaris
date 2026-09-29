@@ -21,6 +21,7 @@ import { installedPanelSlot } from "@/lib/app-extensions/registry";
 import { canOpenGameTab, isGameTab } from "../tabs";
 import { gameOfServer } from "@/lib/apps/games-catalog";
 import { heldOn, resourceAccess } from "@/lib/resource-access";
+import { Messages } from "@/components/i18n/messages";
 import { InstalledAppDashboard } from "../installed-app-dashboard";
 import { gamePermissionsFor, installRef } from "@/lib/apps/install-access";
 import { getInstalledApp, getInstalledAppSettings } from "@/lib/apps/install-service";
@@ -96,13 +97,15 @@ export default async function InstalledAppPage({
         }).catch(() => null)
     ]);
     return (
-        <InstalledAppDashboard
-            app={app}
-            settings={settings}
-            slot={slot}
-            held={held}
-            canManage={canManage}
-            canRemove={canRemove}
-        />
+        <Messages namespaces={["installed", "catalog"]}>
+            <InstalledAppDashboard
+                app={app}
+                settings={settings}
+                slot={slot}
+                held={held}
+                canManage={canManage}
+                canRemove={canRemove}
+            />
+        </Messages>
     );
 }

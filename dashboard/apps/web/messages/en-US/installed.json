@@ -1,1 +1,46 @@
-{}
+{
+    "status": {
+        "installing": "Installing",
+        "running": "Running",
+        "stopped": "Stopped",
+        "failed": "Failed"
+    },
+    "stop": "Stop",
+    "start": "Start",
+    "redeploy": "Redeploy",
+    "uninstall": "Uninstall",
+    "runtimeLogs": "Runtime logs",
+    "refresh": "Refresh",
+    "waitingOutput": "Waiting for output...",
+    "notRunning": "The app is not running.",
+    "kind": "app",
+    "uninstallDescription": "This tears down its container and removes it from your apps. Data on server-local volumes is lost; data on a NAS mount is kept.",
+    "channels": {
+        "title": "Channels",
+        "hint": "Connect WhatsApp, Telegram, Discord or Slack. Each channel's token, phone number or QR is entered in the Inbox when you connect it.",
+        "connect": "Connect a channel",
+        "loading": "Loading channels...",
+        "empty": "No channels connected yet. Connect one to start receiving and sending messages from the Inbox.",
+        "goToInbox": "Go to the Inbox",
+        "openInbox": "Open the Inbox",
+        "status": {
+            "connected": "connected",
+            "connecting": "connecting",
+            "error": "error",
+            "disconnected": "disconnected"
+        }
+    },
+    "errors": {
+        "notFound": "Installed app not found",
+        "noDeployment": "This app has no deployment yet",
+        "redeploy": "Could not redeploy",
+        "update": "Could not update the app",
+        "ownerOnly": "Only the person who installed this app can remove it",
+        "uninstall": "Could not uninstall the app",
+        "readAccess": "Could not read who can reach this server",
+        "checkDetails": "Check the details and try again",
+        "give": "Could not give access",
+        "notAccess": "That is not access on this server",
+        "remove": "Could not remove that access"
+    }
+}

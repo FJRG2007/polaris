@@ -17,6 +17,9 @@ import { useRuntimeLog } from "./use-runtime-log";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import { LogViewer } from "@/components/log-viewer";
 import { MessagingBridgePanel } from "./messaging-bridge-panel";
+import { appName } from "@/lib/apps/app-words";
+import { useNavLabel } from "@/components/i18n/use-nav-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { gameForCatalogId, isGameServersApp } from "@/lib/apps/games-catalog";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, PageHeader, cn } from "@polaris/ui";
@@ -35,12 +38,8 @@ import {
     uninstallInstalledAppAction
 } from "./actions";
 
-const STATUS_LABEL: Record<string, string> = {
-    installing: "Installing",
-    running: "Running",
-    stopped: "Stopped",
-    failed: "Failed"
-};
+/** The statuses the shell has words for; anything else is shown as it came. */
+const STATUSES = new Set(["installing", "running", "stopped", "failed"]);
 
 /**
  * The adapted dashboard an app brings with it. Core's own apps are named here by
@@ -92,6 +91,9 @@ export function InstalledAppDashboard({
     /** Whether they may remove it. The owner's, and an administrator's. */
     canRemove?: boolean;
 }) {
+    const t = useTranslations("installed");
+    const words = useTranslations("catalog");
+    const navLabel = useNavLabel();
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [confirmingUninstall, setConfirmingUninstall] = useState(false);
@@ -123,7 +125,8 @@ export function InstalledAppDashboard({
     // than the marketplace it was installed from.
     const isGame = gameForCatalogId(app.catalogId) !== undefined || isGameServersApp(app.catalogId);
     const backHref = isGame ? "/apps/games" : "/apps/marketplace";
-    const backLabel = isGame ? "Game servers" : "Marketplace";
+    // i18n-ignore: the rail's own labels, translated by navLabel where drawn
+    const backLabel = navLabel(isGame ? "Game servers" : "Marketplace");
 
     function run(action: () => Promise<{ error?: string }>) {
         setError(null);
@@ -148,7 +151,7 @@ export function InstalledAppDashboard({
 
             <PageHeader
                 title={app.name}
-                description={[app.catalogName, app.serverName].filter(Boolean).join(" - ")}
+                description={[appName(words, app.catalogId, app.catalogName, navLabel), app.serverName].filter(Boolean).join(" - ")}
                 actions={
                     <div className="flex items-center gap-2">
                         <Badge
@@ -160,7 +163,9 @@ export function InstalledAppDashboard({
                         >
                             {liveStatus ??
                                 (app.applicationStatus
-                                    ? (STATUS_LABEL[app.applicationStatus] ?? app.applicationStatus)
+                                    ? STATUSES.has(app.applicationStatus)
+                                        ? t(`status.${app.applicationStatus as "installing" | "running" | "stopped" | "failed"}`)
+                                        : app.applicationStatus
                                     : "-")}
                         </Badge>
                         {canManage && (
@@ -178,7 +183,7 @@ export function InstalledAppDashboard({
                                     ) : (
                                         <Play className="size-4" />
                                     )}
-                                    {running ? "Stop" : "Start"}
+                                    {running ? t("stop") : t("start")}
                                 </Button>
                                 <Button
                                     size="sm"
@@ -186,7 +191,7 @@ export function InstalledAppDashboard({
                                     onClick={() => run(() => redeployInstalledAppAction(app.id))}
                                     disabled={pending || !applicationId}
                                 >
-                                    <RefreshCw className="size-4" /> Redeploy
+                                    <RefreshCw className="size-4" /> {t("redeploy")}
                                 </Button>
                             </>
                         )}
@@ -197,7 +202,7 @@ export function InstalledAppDashboard({
                                 onClick={() => setConfirmingUninstall(true)}
                                 disabled={pending}
                             >
-                                <Trash2 className="size-4" /> Uninstall
+                                <Trash2 className="size-4" /> {t("uninstall")}
                             </Button>
                         )}
                     </div>
@@ -221,7 +226,7 @@ export function InstalledAppDashboard({
                             ) : (
                                 <ChevronRight className="size-4" />
                             )}
-                            Runtime logs
+                            {t("runtimeLogs")}
                         </button>
                         {showLogs && (
                             <Button
@@ -230,7 +235,7 @@ export function InstalledAppDashboard({
                                 onClick={() => void loadLog()}
                                 disabled={!applicationId}
                             >
-                                <RefreshCw className="size-4" /> Refresh
+                                <RefreshCw className="size-4" /> {t("refresh")}
                             </Button>
                         )}
                     </div>
@@ -240,7 +245,7 @@ export function InstalledAppDashboard({
                             name={app.name}
                             searchable
                             emptyText={
-                                running ? "Waiting for output..." : "The app is not running."
+                                running ? t("waitingOutput") : t("notRunning")
                             }
                             className="h-80"
                         />
@@ -252,9 +257,9 @@ export function InstalledAppDashboard({
                 open={confirmingUninstall}
                 onOpenChange={(open) => !pending && setConfirmingUninstall(open)}
                 name={app.name}
-                kind="app"
-                confirmLabel="Uninstall"
-                description="This tears down its container and removes it from your apps. Data on server-local volumes is lost; data on a NAS mount is kept."
+                kind={t("kind")}
+                confirmLabel={t("uninstall")}
+                description={t("uninstallDescription")}
                 error={uninstallError}
                 pending={pending}
                 onConfirm={() =>

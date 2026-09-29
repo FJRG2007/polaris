@@ -59,6 +59,7 @@ function contactSection(contact: string | null): LegalSection[] {
  */
 export function privacyDocument(contact: string | null): LegalDocument {
     return {
+        // i18n-ignore: the page names the document in the reader's language; the text stays as written
         title: "Privacy",
         summary:
             "What Polaris stores, where it stays, and what happens to it when you unlink or leave.",
@@ -113,6 +114,7 @@ export function privacyDocument(contact: string | null): LegalDocument {
  *  own server and not a product with customers. */
 export function termsDocument(contact: string | null): LegalDocument {
     return {
+        // i18n-ignore: the page names the document in the reader's language; the text stays as written
         title: "Terms",
         summary: "The terms this Polaris deployment is offered under.",
         sections: [

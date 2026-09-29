@@ -151,11 +151,12 @@ export interface AppEntry {
 /** The landing screen's own app id. It is the one app whose rail is the others. */
 export const OVERVIEW_APP_ID = "overview";
 
+// i18n-ignore (marked per line below): labels, descriptions and keywords are data read by search and the rail; screens translate them where drawn (nav.labels, nav.apps).
 export const POLARIS_APPS: AppEntry[] = [
     {
         id: OVERVIEW_APP_ID,
-        label: "Overview",
-        description: "Your services, usage and shortcuts at a glance",
+        label: "Overview", // i18n-ignore
+        description: "Your services, usage and shortcuts at a glance", // i18n-ignore
         icon: LayoutDashboard,
         // /home rather than /overview: that path spent a release redirecting to
         // Drive's overview, permanently, and a browser that followed it once keeps
@@ -167,24 +168,24 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "drive",
-        label: "Drive",
-        description: "Files across every NAS",
+        label: "Drive", // i18n-ignore
+        description: "Files across every NAS", // i18n-ignore
         icon: HardDrive,
         href: "/drive",
         permission: "drive.read"
     },
     {
         id: "vault",
-        label: "Vault",
-        description: "Passwords, keys and secrets, encrypted in your browser",
+        label: "Vault", // i18n-ignore
+        description: "Passwords, keys and secrets, encrypted in your browser", // i18n-ignore
         icon: KeyRound,
         href: "/vault",
         permission: "vault.use"
     },
     {
         id: "apps",
-        label: "Apps",
-        description: "Install & run apps: deploys, servers, assistants",
+        label: "Apps", // i18n-ignore
+        description: "Install & run apps: deploys, servers, assistants", // i18n-ignore
         icon: LayoutGrid,
         // Deploy is the primary surface, so the app lands there rather than on the
         // marketplace.
@@ -207,9 +208,9 @@ export const POLARIS_APPS: AppEntry[] = [
          * of those installs to rename a word on screen.
          */
         id: "home",
-        label: "Places",
+        label: "Places", // i18n-ignore
         description:
-            "Your places, the cameras in them and the doors of them - what they saw, and what to do about it",
+            "Your places, the cameras in them and the doors of them - what they saw, and what to do about it", // i18n-ignore
         icon: House,
         // Never "/home": that path belongs to Overview and spent a release
         // redirecting permanently to Drive, so browsers that followed it once
@@ -229,9 +230,9 @@ export const POLARIS_APPS: AppEntry[] = [
          * converts nothing should not carry a menu entry for converting things.
          */
         id: "tools",
-        label: "Tools",
+        label: "Tools", // i18n-ignore
         description:
-            "Convert, resize, optimize, trim and translate - the small jobs, on your own machine",
+            "Convert, resize, optimize, trim and translate - the small jobs, on your own machine", // i18n-ignore
         icon: Wrench,
         href: "/tools",
         permission: "tools.use",
@@ -248,8 +249,8 @@ export const POLARIS_APPS: AppEntry[] = [
          * the installed apps, and links to them are in people's bookmarks.
          */
         id: "games",
-        label: "Game servers",
-        description: "Minecraft, ARK and FiveM servers on your own machines",
+        label: "Game servers", // i18n-ignore
+        description: "Minecraft, ARK and FiveM servers on your own machines", // i18n-ignore
         icon: Gamepad2,
         href: "/apps/games",
         permission: "games.read",
@@ -257,16 +258,16 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "tasks",
-        label: "Tasks",
-        description: "Plan and track work: spaces, lists, boards & goals",
+        label: "Tasks", // i18n-ignore
+        description: "Plan and track work: spaces, lists, boards & goals", // i18n-ignore
         icon: SquareCheckBig,
         href: "/tasks",
         permission: "tasks.read"
     },
     {
         id: "chat",
-        label: "Chat",
-        description: "Channels, direct messages and calls with the people here",
+        label: "Chat", // i18n-ignore
+        description: "Channels, direct messages and calls with the people here", // i18n-ignore
         icon: MessageCircle,
         href: "/chat",
         permission: "chat.use"
@@ -283,16 +284,16 @@ export const POLARIS_APPS: AppEntry[] = [
          * second-class version of the other.
          */
         id: "mail",
-        label: "Mail",
-        description: "Your mailboxes, read and answered here",
+        label: "Mail", // i18n-ignore
+        description: "Your mailboxes, read and answered here", // i18n-ignore
         icon: Mail,
         href: "/mail",
         permission: "mail.use"
     },
     {
         id: "notes",
-        label: "Notes",
-        description: "Write things down, nested the way a notebook is",
+        label: "Notes", // i18n-ignore
+        description: "Write things down, nested the way a notebook is", // i18n-ignore
         icon: NotebookPen,
         href: "/notes",
         permission: "notes.use"
@@ -311,38 +312,38 @@ export const POLARIS_APPS: AppEntry[] = [
          * reason.
          */
         id: "office",
-        label: "Office",
-        description: "Documents, spreadsheets, slides and diagrams, written together",
+        label: "Office", // i18n-ignore
+        description: "Documents, spreadsheets, slides and diagrams, written together", // i18n-ignore
         icon: FileStack,
         href: "/office",
         permission: "office.use"
     },
     {
         id: "watch",
-        label: "Watch",
-        description: "Alarms on app health, spikes and outages",
+        label: "Watch", // i18n-ignore
+        description: "Alarms on app health, spikes and outages", // i18n-ignore
         icon: Activity,
         href: "/watch",
         permission: "deploy.read"
     },
     {
         id: "admin",
-        label: "Management",
-        description: "Users, access, domains & updates",
+        label: "Management", // i18n-ignore
+        description: "Users, access, domains & updates", // i18n-ignore
         icon: SlidersHorizontal,
         href: "/admin",
         adminOnly: true,
         guest: {
             permission: "inbox.read",
             href: "/admin/inbox",
-            label: "Inbox",
-            description: "Customer conversations across every channel"
+            label: "Inbox", // i18n-ignore
+            description: "Customer conversations across every channel" // i18n-ignore
         }
     },
     {
         id: "account",
-        label: "My account",
-        description: "Profile, security & API keys",
+        label: "My account", // i18n-ignore
+        description: "Profile, security & API keys", // i18n-ignore
         icon: UserCog,
         href: "/account",
         // Reached from the account menu, not the switcher.
@@ -491,41 +492,41 @@ const ADMIN_PLATFORM_GROUP = "Platform";
 export const APP_SECTIONS: Record<string, AppSection[]> = {
     drive: [
         {
-            label: "Overview",
+            label: "Overview", // i18n-ignore
             href: "/drive/overview",
             icon: LayoutDashboard,
             keywords: ["usage", "storage"]
         },
-        { label: "Files", href: "/drive", icon: FolderOpen, keywords: ["browse", "folders"] },
+        { label: "Files", href: "/drive", icon: FolderOpen, keywords: ["browse", "folders"] }, // i18n-ignore
         {
-            label: "Shared",
+            label: "Shared", // i18n-ignore
             href: "/drive/shared",
             icon: Share2,
             keywords: ["shared with me", "people", "sent me", "gave me", "access"]
         },
-        { label: "Favorites", href: "/drive/favorites", icon: Star, keywords: ["starred"] },
-        { label: "Recent", href: "/drive/recent", icon: Clock },
+        { label: "Favorites", href: "/drive/favorites", icon: Star, keywords: ["starred"] }, // i18n-ignore
+        { label: "Recent", href: "/drive/recent", icon: Clock }, // i18n-ignore
         {
-            label: "Shared links",
+            label: "Shared links", // i18n-ignore
             href: "/drive/shared-links",
             icon: Link2,
             keywords: ["shares", "public"]
         },
         {
-            label: "Snippets",
+            label: "Snippets", // i18n-ignore
             href: "/drive/snippets",
             needs: "snippets.read",
             icon: Code2,
             keywords: ["paste", "pastebin", "code", "text", "env", "secret", "gist", "share text"]
         },
         {
-            label: "Drop points",
+            label: "Drop points", // i18n-ignore
             href: "/drive/drop-points",
             icon: Inbox,
             keywords: ["file requests", "uploads", "ask for text", "collect"]
         },
         {
-            label: "Where the room went",
+            label: "Where the room went", // i18n-ignore
             href: "/drive/insights",
             icon: ChartPie,
             keywords: [
@@ -542,11 +543,11 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "analyzer"
             ]
         },
-        { label: "Trash", href: "/drive/trash", icon: Trash2, keywords: ["deleted", "bin"] }
+        { label: "Trash", href: "/drive/trash", icon: Trash2, keywords: ["deleted", "bin"] } // i18n-ignore
     ],
     vault: [
         {
-            label: "Items",
+            label: "Items", // i18n-ignore
             href: "/vault",
             icon: KeyRound,
             keywords: [
@@ -560,7 +561,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "Vaults",
+            label: "Vaults", // i18n-ignore
             href: "/vault/vaults",
             icon: Building2,
             keywords: [
@@ -576,19 +577,19 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "Sends",
+            label: "Sends", // i18n-ignore
             href: "/vault/sends",
             icon: SendHorizontal,
             keywords: ["share a secret", "one time", "send", "hand over"]
         },
         {
-            label: "Connect an app",
+            label: "Connect an app", // i18n-ignore
             href: "/vault/clients",
             icon: MonitorSmartphone,
             keywords: ["bitwarden", "browser extension", "cli", "desktop", "mobile", "sync"]
         },
         {
-            label: "Settings",
+            label: "Settings", // i18n-ignore
             href: "/vault/settings",
             icon: SlidersHorizontal,
             keywords: ["master password", "kdf", "argon2", "export", "delete vault"]
@@ -599,7 +600,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             // Out of the rail: the app is this one screen, and a rail listing it
             // alone beside itself would be a column of nothing. Kept so search
             // still finds it by the games it runs.
-            label: "Servers",
+            label: "Servers", // i18n-ignore
             href: "/apps/games",
             needs: "games.read",
             requiresApp: "game-servers",
@@ -622,19 +623,19 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     ],
     apps: [
         {
-            label: "Deploy",
+            label: "Deploy", // i18n-ignore
             href: "/apps/deploy",
             icon: Rocket,
             keywords: ["projects", "services", "docker"]
         },
         {
-            label: "Marketplace",
+            label: "Marketplace", // i18n-ignore
             href: "/apps/marketplace",
             icon: Store,
             keywords: ["install", "catalog"]
         },
         {
-            label: "Servers",
+            label: "Servers", // i18n-ignore
             href: "/apps/servers",
             needs: "system.manage",
             icon: Server,
@@ -642,7 +643,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["hosts", "machines", "ssh"]
         },
         {
-            label: "Runners",
+            label: "Runners", // i18n-ignore
             href: "/apps/runners",
             needs: "system.manage",
             icon: Workflow,
@@ -650,14 +651,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["github actions", "ci"]
         },
         {
-            label: "Agents",
+            label: "Agents", // i18n-ignore
             href: "/apps/agents",
             needs: "agents.read",
             icon: Bot,
             keywords: ["coding agent", "ai", "review", "pull requests", "issues", "github"]
         },
         {
-            label: "Code",
+            label: "Code", // i18n-ignore
             href: "/apps/code",
             needs: "agents.read",
             icon: GitPullRequest,
@@ -673,7 +674,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "Firewall",
+            label: "Firewall", // i18n-ignore
             href: "/apps/firewall",
             needs: "deploy.manage",
             icon: ShieldCheck,
@@ -681,7 +682,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["waf", "ip", "allowlist", "denylist", "block", "access"]
         },
         {
-            label: "Analytics",
+            label: "Analytics", // i18n-ignore
             href: "/apps/analytics",
             needs: "deploy.manage",
             icon: ChartColumn,
@@ -689,7 +690,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["visitors", "traffic", "pageviews", "referrers", "metrics", "umami"]
         },
         {
-            label: "Telemetry",
+            label: "Telemetry", // i18n-ignore
             href: "/apps/telemetry",
             needs: "deploy.manage",
             icon: Bug,
@@ -705,7 +706,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "Databases",
+            label: "Databases", // i18n-ignore
             href: "/apps/databases",
             icon: Database,
             group: OPERATIONS_GROUP,
@@ -726,14 +727,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "Containers",
+            label: "Containers", // i18n-ignore
             href: "/apps/containers",
             icon: Container,
             group: MACHINES_GROUP,
             keywords: ["docker"]
         },
         {
-            label: "Backups",
+            label: "Backups", // i18n-ignore
             href: "/apps/backups",
             adminOnly: true,
             icon: Archive,
@@ -747,7 +748,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             // itself; reading mail stays in Mail. Only here once somebody installs
             // it from the marketplace: a Polaris that runs no mail server should
             // not carry a door onto one.
-            label: "Mail server",
+            label: "Mail server", // i18n-ignore
             href: "/apps/mail-server",
             needs: "mailserver.manage",
             requiresApp: "mail-server",
@@ -773,32 +774,32 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     ],
     watch: [
         {
-            label: "Overview",
+            label: "Overview", // i18n-ignore
             href: "/watch",
             icon: LayoutDashboard,
             keywords: ["monitoring", "health"]
         },
         {
-            label: "Servers",
+            label: "Servers", // i18n-ignore
             href: "/watch/servers",
             icon: Server,
             keywords: ["hosts", "machines", "load"]
         },
         {
-            label: "Services",
+            label: "Services", // i18n-ignore
             href: "/watch/services",
             icon: Rocket,
             keywords: ["apps", "deploys", "cpu", "memory"]
         },
-        { label: "Containers", href: "/watch/containers", icon: Container, keywords: ["docker"] },
+        { label: "Containers", href: "/watch/containers", icon: Container, keywords: ["docker"] }, // i18n-ignore
         {
-            label: "Alarms",
+            label: "Alarms", // i18n-ignore
             href: "/watch/alarms",
             icon: Bell,
             keywords: ["thresholds", "alerts", "events"]
         },
         {
-            label: "Webhooks",
+            label: "Webhooks", // i18n-ignore
             href: "/watch/webhooks",
             icon: Webhook,
             keywords: ["discord", "slack", "endpoints"]
@@ -806,14 +807,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     ],
     home: [
         {
-            label: "Live",
+            label: "Live", // i18n-ignore
             href: "/places",
             icon: Cctv,
             group: CAMERAS_GROUP,
             keywords: ["cameras", "wall", "watch", "stream", "view", "rtsp"]
         },
         {
-            label: "Events",
+            label: "Events", // i18n-ignore
             group: CAMERAS_GROUP,
             href: "/places/events",
             icon: Bell,
@@ -828,21 +829,21 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "Alerts",
+            label: "Alerts", // i18n-ignore
             group: CAMERAS_GROUP,
             href: "/places/alerts",
             icon: Bell,
             keywords: ["notify", "tell me", "warn", "rules", "who gets told", "message"]
         },
         {
-            label: "Clips",
+            label: "Clips", // i18n-ignore
             group: CAMERAS_GROUP,
             href: "/places/clips",
             icon: Video,
             keywords: ["recordings", "footage", "playback", "saved", "download"]
         },
         {
-            label: "Cameras",
+            label: "Cameras", // i18n-ignore
             group: CAMERAS_GROUP,
             href: "/places/cameras",
             icon: Camera,
@@ -858,14 +859,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "People",
+            label: "People", // i18n-ignore
             group: CAMERAS_GROUP,
             href: "/places/people",
             icon: ScanFace,
             keywords: ["faces", "known", "recognition", "family", "strangers"]
         },
         {
-            label: "Devices",
+            label: "Devices", // i18n-ignore
             group: DEVICES_GROUP,
             href: "/places/devices",
             icon: ToggleRight,
@@ -888,7 +889,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "Settings",
+            label: "Settings", // i18n-ignore
             href: "/places/settings",
             icon: SlidersHorizontal,
             keywords: ["relay", "storage", "retention", "where it runs", "uninstall"]
@@ -896,49 +897,49 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     ],
     tasks: [
         {
-            label: "My work",
+            label: "My work", // i18n-ignore
             href: "/tasks",
             icon: ListTodo,
             keywords: ["home", "assigned", "todo", "my tasks"]
         },
         {
-            label: "Everything",
+            label: "Everything", // i18n-ignore
             href: "/tasks/everything",
             icon: LayoutGrid,
             keywords: ["all tasks", "across spaces"]
         },
         {
-            label: "Sprints",
+            label: "Sprints", // i18n-ignore
             href: "/tasks/sprints",
             icon: CalendarRange,
             keywords: ["agile", "burndown", "iteration"]
         },
         {
-            label: "Goals",
+            label: "Goals", // i18n-ignore
             href: "/tasks/goals",
             icon: Target,
             keywords: ["okr", "objectives", "targets"]
         },
         {
-            label: "Docs",
+            label: "Docs", // i18n-ignore
             href: "/tasks/docs",
             icon: FileText,
             keywords: ["wiki", "notes", "knowledge"]
         },
         {
-            label: "Timesheet",
+            label: "Timesheet", // i18n-ignore
             href: "/tasks/time",
             icon: Timer,
             keywords: ["time tracking", "hours", "billable"]
         },
         {
-            label: "Reporting",
+            label: "Reporting", // i18n-ignore
             href: "/tasks/reports",
             icon: ChartColumn,
             keywords: ["dashboard", "workload", "metrics"]
         },
         {
-            label: "Connected trackers",
+            label: "Connected trackers", // i18n-ignore
             href: "/tasks/trackers",
             needs: "tasks.manage",
             icon: Link2,
@@ -956,56 +957,56 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
      */
     mail: [
         {
-            label: "Inbox",
+            label: "Inbox", // i18n-ignore
             href: "/mail",
             icon: Inbox,
             hidden: true,
             keywords: ["email", "gmail", "imap", "unread", "messages", "correo"]
         },
         {
-            label: "Starred",
+            label: "Starred", // i18n-ignore
             href: "/mail/starred",
             icon: Star,
             hidden: true,
             keywords: ["flagged", "important"]
         },
         {
-            label: "Sent",
+            label: "Sent", // i18n-ignore
             href: "/mail/sent",
             icon: SendHorizontal,
             hidden: true,
             keywords: ["outbox", "what I sent"]
         },
         {
-            label: "Drafts",
+            label: "Drafts", // i18n-ignore
             href: "/mail/drafts",
             icon: FileText,
             hidden: true,
             keywords: ["unsent", "scheduled", "send later", "unfinished"]
         },
         {
-            label: "Archive",
+            label: "Archive", // i18n-ignore
             href: "/mail/archive",
             icon: Archive,
             hidden: true,
             keywords: ["archived", "put away"]
         },
         {
-            label: "Spam",
+            label: "Spam", // i18n-ignore
             href: "/mail/junk",
             icon: Bug,
             hidden: true,
             keywords: ["junk", "phishing", "unwanted"]
         },
         {
-            label: "Trash",
+            label: "Trash", // i18n-ignore
             href: "/mail/trash",
             icon: Trash2,
             hidden: true,
             keywords: ["deleted", "bin"]
         },
         {
-            label: "Mailboxes",
+            label: "Mailboxes", // i18n-ignore
             href: "/mail/settings/accounts",
             icon: Mail,
             hidden: true,
@@ -1021,35 +1022,35 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "Send-as addresses",
+            label: "Send-as addresses", // i18n-ignore
             href: "/mail/settings/identities",
             icon: IdCard,
             hidden: true,
             keywords: ["alias", "identity", "from address", "send as"]
         },
         {
-            label: "Labels",
+            label: "Labels", // i18n-ignore
             href: "/mail/settings/labels",
             icon: Tag,
             hidden: true,
             keywords: ["tag", "colour", "group mail", "categories"]
         },
         {
-            label: "Filters",
+            label: "Filters", // i18n-ignore
             href: "/mail/settings/rules",
             icon: Workflow,
             hidden: true,
             keywords: ["rules", "sieve", "sort mail", "file automatically", "block sender"]
         },
         {
-            label: "Signature",
+            label: "Signature", // i18n-ignore
             href: "/mail/settings/signature",
             icon: NotebookPen,
             hidden: true,
             keywords: ["sign off", "footer"]
         },
         {
-            label: "Privacy",
+            label: "Privacy", // i18n-ignore
             href: "/mail/settings/privacy",
             icon: EyeOff,
             hidden: true,
@@ -1063,7 +1064,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "Away message",
+            label: "Away message", // i18n-ignore
             href: "/mail/settings/away",
             icon: CalendarClock,
             hidden: true,
@@ -1072,13 +1073,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     ],
     notes: [
         {
-            label: "Notes",
+            label: "Notes", // i18n-ignore
             href: "/notes",
             icon: NotebookPen,
             keywords: ["notepad", "scratch", "jot", "personal", "private", "markdown", "writing"]
         },
         {
-            label: "Archive",
+            label: "Archive", // i18n-ignore
             href: "/notes/archive",
             icon: Archive,
             keywords: ["archived", "put away", "old notes", "restore"]
@@ -1086,7 +1087,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     ],
     account: [
         {
-            label: "Profile",
+            label: "Profile", // i18n-ignore
             href: "/account",
             icon: UserCog,
             keywords: [
@@ -1110,7 +1111,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         // difference between the two screens - what a colleague sees, against
         // how Polaris reaches you - and one form could not say which was which.
         {
-            label: "Account",
+            label: "Account", // i18n-ignore
             href: "/account/details",
             icon: IdCard,
             keywords: [
@@ -1126,13 +1127,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "Account standing",
+            label: "Account standing", // i18n-ignore
             href: "/account/standing",
             icon: BadgeCheck,
             keywords: ["moderation", "warnings", "suspended", "reports", "timeout", "ban", "rules"]
         },
         {
-            label: "Preferences",
+            label: "Preferences", // i18n-ignore
             href: "/account/preferences",
             icon: SlidersHorizontal,
             keywords: [
@@ -1150,7 +1151,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         // somebody after "the app" was having to know that the desktop offer was
         // under Preferences and the extension under the vault's client screen.
         {
-            label: "Downloads",
+            label: "Downloads", // i18n-ignore
             href: "/account/downloads",
             icon: Download,
             keywords: [
@@ -1184,7 +1185,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         // else. "Devices" stays in the keywords, so looking for it still lands
         // here.
         {
-            label: "Voice & Video",
+            label: "Voice & Video", // i18n-ignore
             href: "/account/devices",
             icon: Mic,
             keywords: [
@@ -1207,7 +1208,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         // Who sees what, in one place: the rules by audience, the people those
         // rules name, and the hours that answer the same question by the clock.
         {
-            label: "Privacy",
+            label: "Privacy", // i18n-ignore
             href: "/account/privacy",
             icon: EyeOff,
             keywords: [
@@ -1223,7 +1224,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: PRIVACY_GROUP
         },
         {
-            label: "Status schedule",
+            label: "Status schedule", // i18n-ignore
             href: "/account/privacy/schedule",
             icon: CalendarClock,
             keywords: [
@@ -1243,26 +1244,26 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: PRIVACY_GROUP
         },
         {
-            label: "Friends",
+            label: "Friends", // i18n-ignore
             href: "/account/friends",
             icon: Users,
             keywords: ["friend", "request", "add somebody", "contacts"],
             group: PRIVACY_GROUP
         },
         {
-            label: "Notifications",
+            label: "Notifications", // i18n-ignore
             href: "/account/notifications",
             icon: Bell,
             keywords: ["alerts", "email"]
         },
         {
-            label: "Connected accounts",
+            label: "Connected accounts", // i18n-ignore
             href: "/account/connections",
             icon: Link2,
             keywords: ["github", "google", "link", "oauth", "repositories", "calendar"]
         },
         {
-            label: "Organizations",
+            label: "Organizations", // i18n-ignore
             href: "/account/organizations",
             icon: Building2,
             keywords: ["org", "orgs", "teams", "company", "members", "roster", "group"]
@@ -1270,35 +1271,35 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         // Everything that decides who reaches this account is one subject, and it
         // is half the rail: five screens people go looking for together.
         {
-            label: "Password & 2FA",
+            label: "Password & 2FA", // i18n-ignore
             href: "/account/security",
             icon: ShieldCheck,
             keywords: ["password", "2fa", "two-factor", "passkey", "security"],
             group: "Security"
         },
         {
-            label: "Sessions",
+            label: "Sessions", // i18n-ignore
             href: "/account/sessions",
             icon: MonitorSmartphone,
             keywords: ["devices", "sign out", "remembered devices", "trusted devices"],
             group: "Security"
         },
         {
-            label: "Activity",
+            label: "Activity", // i18n-ignore
             href: "/account/activity",
             icon: History,
             keywords: ["audit", "logs", "history", "what happened"],
             group: "Security"
         },
         {
-            label: "Scan a code",
+            label: "Scan a code", // i18n-ignore
             href: "/account/scan",
             icon: ScanLine,
             keywords: ["qr", "sign in", "approve", "camera"],
             group: "Security"
         },
         {
-            label: "Access rules",
+            label: "Access rules", // i18n-ignore
             href: "/account/access",
             icon: Network,
             keywords: ["ip", "country", "geo"],
@@ -1309,14 +1310,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         // deploys answer on. Under Security it read as a sign-in setting, and
         // mixed into the account's own list it was hard to find.
         {
-            label: "API keys",
+            label: "API keys", // i18n-ignore
             href: "/account/api-keys",
             icon: KeyRound,
             keywords: ["tokens", "developers", "integrations"],
             group: DEVELOPERS_GROUP
         },
         {
-            label: "AI provider keys",
+            label: "AI provider keys", // i18n-ignore
             href: "/account/ai-keys",
             icon: Sparkles,
             keywords: [
@@ -1340,7 +1341,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: DEVELOPERS_GROUP
         },
         {
-            label: "Domains",
+            label: "Domains", // i18n-ignore
             href: "/account/domains",
             icon: Globe,
             keywords: ["dns", "custom domain", "deploys", "hostnames", "wildcard", "own domain"],
@@ -1349,62 +1350,62 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     ],
     office: [
         {
-            label: "Recent",
+            label: "Recent", // i18n-ignore
             href: "/office",
             icon: Clock,
             keywords: ["all", "documents", "files", "everything"]
         },
-        { label: "Starred", href: "/office/starred", icon: Star, keywords: ["favourites"] },
+        { label: "Starred", href: "/office/starred", icon: Star, keywords: ["favourites"] }, // i18n-ignore
         {
-            label: "Shared with me",
+            label: "Shared with me", // i18n-ignore
             href: "/office/shared",
             icon: Users,
             keywords: ["gave me", "sent me", "access"]
         },
         {
-            label: "Documents",
+            label: "Documents", // i18n-ignore
             href: "/office/kind/doc",
             icon: FileText,
             group: "Kinds",
             keywords: ["docs", "word", "docx", "writing"]
         },
         {
-            label: "Spreadsheets",
+            label: "Spreadsheets", // i18n-ignore
             href: "/office/kind/sheet",
             icon: Table2,
             group: "Kinds",
             keywords: ["sheets", "excel", "xlsx", "formulas", "numbers"]
         },
         {
-            label: "Presentations",
+            label: "Presentations", // i18n-ignore
             href: "/office/kind/slides",
             icon: Presentation,
             group: "Kinds",
             keywords: ["slides", "powerpoint", "pptx", "deck"]
         },
         {
-            label: "Diagrams",
+            label: "Diagrams", // i18n-ignore
             href: "/office/kind/diagram",
             icon: Workflow,
             group: "Kinds",
             keywords: ["draw", "whiteboard", "flowchart", "architecture"]
         },
         {
-            label: "Comparisons",
+            label: "Comparisons", // i18n-ignore
             href: "/office/kind/comparison",
             icon: Columns3,
             group: "Kinds",
             keywords: ["competitors", "battlecard", "matrix", "vendors", "alternatives"]
         },
         {
-            label: "Archive",
+            label: "Archive", // i18n-ignore
             href: "/office/archive",
             icon: Archive,
             group: "Filed",
             keywords: ["archived", "put away"]
         },
         {
-            label: "Trash",
+            label: "Trash", // i18n-ignore
             href: "/office/trash",
             icon: Trash2,
             group: "Filed",
@@ -1412,16 +1413,16 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         }
     ],
     admin: [
-        { label: "Overview", href: "/admin", adminOnly: true, icon: LayoutDashboard },
+        { label: "Overview", href: "/admin", adminOnly: true, icon: LayoutDashboard }, // i18n-ignore
         {
-            label: "Activity",
+            label: "Activity", // i18n-ignore
             href: "/admin/activity",
             adminOnly: true,
             icon: Activity,
             keywords: ["audit", "logs"]
         },
         {
-            label: "Evidence",
+            label: "Evidence", // i18n-ignore
             href: "/admin/evidence",
             adminOnly: true,
             icon: ClipboardCheck,
@@ -1437,7 +1438,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
-            label: "Users",
+            label: "Users", // i18n-ignore
             href: "/admin/users",
             adminOnly: true,
             icon: Users,
@@ -1445,7 +1446,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PEOPLE_GROUP
         },
         {
-            label: "Groups",
+            label: "Groups", // i18n-ignore
             href: "/admin/groups",
             adminOnly: true,
             icon: UsersRound,
@@ -1453,7 +1454,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PEOPLE_GROUP
         },
         {
-            label: "Organizations",
+            label: "Organizations", // i18n-ignore
             href: "/admin/organizations",
             adminOnly: true,
             icon: Building2,
@@ -1461,7 +1462,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PEOPLE_GROUP
         },
         {
-            label: "Roles",
+            label: "Roles", // i18n-ignore
             href: "/admin/roles",
             adminOnly: true,
             icon: IdCard,
@@ -1477,7 +1478,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_ACCESS_GROUP
         },
         {
-            label: "Policies",
+            label: "Policies", // i18n-ignore
             href: "/admin/policies",
             adminOnly: true,
             icon: Scale,
@@ -1485,7 +1486,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_ACCESS_GROUP
         },
         {
-            label: "Security",
+            label: "Security", // i18n-ignore
             href: "/admin/security",
             adminOnly: true,
             icon: ShieldCheck,
@@ -1503,7 +1504,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_ACCESS_GROUP
         },
         {
-            label: "Inbox",
+            label: "Inbox", // i18n-ignore
             href: "/admin/inbox",
             icon: MessagesSquare,
             keywords: [
@@ -1518,7 +1519,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_COMMUNICATION_GROUP
         },
         {
-            label: "Email",
+            label: "Email", // i18n-ignore
             href: "/admin/email",
             adminOnly: true,
             icon: Mail,
@@ -1535,7 +1536,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_COMMUNICATION_GROUP
         },
         {
-            label: "Chat",
+            label: "Chat", // i18n-ignore
             href: "/admin/chat",
             adminOnly: true,
             icon: MessageSquare,
@@ -1556,7 +1557,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_COMMUNICATION_GROUP
         },
         {
-            label: "Safety",
+            label: "Safety", // i18n-ignore
             href: "/admin/safety",
             adminOnly: true,
             icon: Flag,
@@ -1576,7 +1577,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_COMMUNICATION_GROUP
         },
         {
-            label: "Consumption",
+            label: "Consumption", // i18n-ignore
             href: "/admin/consumption",
             adminOnly: true,
             icon: Gauge,
@@ -1596,7 +1597,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
-            label: "Billing",
+            label: "Billing", // i18n-ignore
             href: "/admin/billing",
             adminOnly: true,
             icon: Wallet,
@@ -1618,7 +1619,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
-            label: "Domains",
+            label: "Domains", // i18n-ignore
             href: "/admin/domains",
             adminOnly: true,
             icon: Globe,
@@ -1626,7 +1627,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
-            label: "Display defaults",
+            label: "Display defaults", // i18n-ignore
             href: "/admin/display",
             adminOnly: true,
             icon: SlidersHorizontal,
@@ -1634,7 +1635,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
-            label: "Agent defaults",
+            label: "Agent defaults", // i18n-ignore
             href: "/admin/agents",
             adminOnly: true,
             icon: Bot,
@@ -1650,7 +1651,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
-            label: "Keeping records",
+            label: "Keeping records", // i18n-ignore
             href: "/admin/retention",
             adminOnly: true,
             icon: Trash2,
@@ -1676,7 +1677,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
-            label: "Uploads",
+            label: "Uploads", // i18n-ignore
             href: "/admin/uploads",
             adminOnly: true,
             icon: HardDrive,
@@ -1693,7 +1694,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
-            label: "Integrations",
+            label: "Integrations", // i18n-ignore
             href: "/admin/integrations",
             adminOnly: true,
             icon: Blocks,
@@ -1701,7 +1702,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
-            label: "AI providers",
+            label: "AI providers", // i18n-ignore
             href: "/admin/integrations/models",
             adminOnly: true,
             icon: Sparkles,
@@ -1723,7 +1724,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
-            label: "Updates & settings",
+            label: "Updates & settings", // i18n-ignore
             href: "/admin/settings",
             adminOnly: true,
             icon: Settings,
@@ -1767,48 +1768,48 @@ export interface AppSubapp {
 export const APP_SUBAPPS: AppSubapp[] = [
     {
         id: "inbox",
-        label: "Inbox",
+        label: "Inbox", // i18n-ignore
         icon: MessagesSquare,
         base: "/admin/inbox",
-        parent: { label: "Management", href: "/admin" },
+        parent: { label: "Management", href: "/admin" }, // i18n-ignore
         parentAppId: "admin",
         sections: [
             {
-                label: "Conversations",
+                label: "Conversations", // i18n-ignore
                 href: "/admin/inbox",
                 icon: MessagesSquare,
                 keywords: ["chats", "messages"]
             },
             {
-                label: "Contacts",
+                label: "Contacts", // i18n-ignore
                 href: "/admin/inbox/contacts",
                 icon: Contact,
                 keywords: ["people"]
             },
             {
-                label: "Channels",
+                label: "Channels", // i18n-ignore
                 href: "/admin/inbox/channels",
                 icon: Radio,
                 keywords: ["whatsapp", "telegram", "slack", "discord"]
             },
-            { label: "Logs", href: "/admin/inbox/logs", icon: ScrollText }
+            { label: "Logs", href: "/admin/inbox/logs", icon: ScrollText } // i18n-ignore
         ]
     },
     {
         id: "agents",
-        label: "Agents",
+        label: "Agents", // i18n-ignore
         icon: Bot,
         base: "/apps/agents",
-        parent: { label: "Apps", href: "/apps/deploy" },
+        parent: { label: "Apps", href: "/apps/deploy" }, // i18n-ignore
         sections: [
             {
-                label: "Overview",
+                label: "Overview", // i18n-ignore
                 href: "/apps/agents",
                 icon: LayoutDashboard,
                 keywords: ["agents", "coding agent", "ai", "summary"]
             },
             {
-                label: "Repositories",
+                label: "Repositories", // i18n-ignore
                 href: "/apps/agents/repos",
                 needs: "agents.read",
                 icon: FolderGit2,
@@ -1823,7 +1824,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 ]
             },
             {
-                label: "Automations",
+                label: "Automations", // i18n-ignore
                 href: "/apps/agents/automations",
                 needs: "agents.read",
                 icon: Workflow,
@@ -1837,7 +1838,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 ]
             },
             {
-                label: "Sessions",
+                label: "Sessions", // i18n-ignore
                 href: "/apps/agents/sessions",
                 needs: "agents.read",
                 icon: MessagesSquare,
@@ -1853,14 +1854,14 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 ]
             },
             {
-                label: "Runs",
+                label: "Runs", // i18n-ignore
                 href: "/apps/agents/runs",
                 needs: "agents.read",
                 icon: History,
                 keywords: ["history", "logs", "failed", "what happened"]
             },
             {
-                label: "Settings",
+                label: "Settings", // i18n-ignore
                 href: "/apps/agents/settings",
                 needs: "agents.read",
                 icon: SlidersHorizontal,
@@ -1876,7 +1877,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 ]
             },
             {
-                label: "Set up",
+                label: "Set up", // i18n-ignore
                 href: "/apps/agents/setup",
                 needs: "agents.read",
                 icon: BookOpen,
@@ -1887,19 +1888,19 @@ export const APP_SUBAPPS: AppSubapp[] = [
     },
     {
         id: "runners",
-        label: "Runners",
+        label: "Runners", // i18n-ignore
         icon: Workflow,
         base: "/apps/runners",
-        parent: { label: "Apps", href: "/apps/deploy" },
+        parent: { label: "Apps", href: "/apps/deploy" }, // i18n-ignore
         sections: [
             {
-                label: "Pools",
+                label: "Pools", // i18n-ignore
                 href: "/apps/runners",
                 icon: Workflow,
                 keywords: ["runners", "github actions", "ci", "machines", "self-hosted"]
             },
             {
-                label: "Repositories",
+                label: "Repositories", // i18n-ignore
                 href: "/apps/runners/repos",
                 needs: "system.manage",
                 icon: FolderGit2,
@@ -1914,21 +1915,21 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 ]
             },
             {
-                label: "Runs",
+                label: "Runs", // i18n-ignore
                 href: "/apps/runners/runs",
                 needs: "system.manage",
                 icon: History,
                 keywords: ["history", "jobs", "workflow runs", "builds", "logs", "failed"]
             },
             {
-                label: "Secrets",
+                label: "Secrets", // i18n-ignore
                 href: "/apps/runners/secrets",
                 needs: "system.manage",
                 icon: KeyRound,
                 keywords: ["variables", "env", "credentials", "tokens", "passwords"]
             },
             {
-                label: "How it works",
+                label: "How it works", // i18n-ignore
                 href: "/apps/runners/guide",
                 needs: "system.manage",
                 icon: BookOpen,
@@ -1958,30 +1959,30 @@ const ACCESS_GROUP = "Who gets in";
  */
 const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
     "": {
-        label: "Overview",
+        label: "Overview", // i18n-ignore
         icon: LayoutDashboard,
         keywords: ["status", "address", "players online"]
     },
     console: {
-        label: "Console",
+        label: "Console", // i18n-ignore
         icon: Terminal,
         group: RUNNING_GROUP,
         keywords: ["commands", "rcon", "logs", "say"]
     },
     players: {
-        label: "Players",
+        label: "Players", // i18n-ignore
         icon: Users,
         group: RUNNING_GROUP,
         keywords: ["who is on", "kick", "ban", "op", "inventory", "give item"]
     },
     usage: {
-        label: "Usage",
+        label: "Usage", // i18n-ignore
         icon: ChartColumn,
         group: RUNNING_GROUP,
         keywords: ["cpu", "memory", "history", "metrics"]
     },
     announce: {
-        label: "Announce",
+        label: "Announce", // i18n-ignore
         icon: Megaphone,
         group: TALKING_GROUP,
         keywords: [
@@ -1995,7 +1996,7 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         ]
     },
     panel: {
-        label: "Side panel",
+        label: "Side panel", // i18n-ignore
         icon: PanelRight,
         group: TALKING_GROUP,
         keywords: [
@@ -2009,7 +2010,7 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         ]
     },
     chat: {
-        label: "Linked chat",
+        label: "Linked chat", // i18n-ignore
         icon: MessagesSquare,
         group: TALKING_GROUP,
         keywords: [
@@ -2026,7 +2027,7 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         ]
     },
     events: {
-        label: "Events",
+        label: "Events", // i18n-ignore
         icon: PartyPopper,
         group: TALKING_GROUP,
         keywords: [
@@ -2044,7 +2045,7 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         ]
     },
     challenges: {
-        label: "Challenges",
+        label: "Challenges", // i18n-ignore
         icon: Trophy,
         group: TALKING_GROUP,
         keywords: [
@@ -2062,19 +2063,19 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         ]
     },
     schedule: {
-        label: "Schedule",
+        label: "Schedule", // i18n-ignore
         icon: CalendarClock,
         group: RUNNING_GROUP,
         keywords: ["restart", "backup", "sleep", "wake on join", "automatic", "timer"]
     },
     world: {
-        label: "World",
+        label: "World", // i18n-ignore
         icon: Globe,
         group: CONTENT_GROUP,
         keywords: ["level", "seed", "backups", "restore", "new world"]
     },
     rules: {
-        label: "Rules",
+        label: "Rules", // i18n-ignore
         icon: Scale,
         group: CONTENT_GROUP,
         keywords: [
@@ -2090,25 +2091,25 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         ]
     },
     mods: {
-        label: "Mods",
+        label: "Mods", // i18n-ignore
         icon: Blocks,
         group: CONTENT_GROUP,
         keywords: ["plugins", "datapacks", "modrinth", "fabric", "forge"]
     },
     access: {
-        label: "Access",
+        label: "Access", // i18n-ignore
         icon: IdCard,
         group: ACCESS_GROUP,
         keywords: ["invite", "who can manage", "moderator", "grants"]
     },
     security: {
-        label: "Security",
+        label: "Security", // i18n-ignore
         icon: ShieldCheck,
         group: ACCESS_GROUP,
         keywords: ["whitelist", "bans", "firewall", "addresses"]
     },
     anticheat: {
-        label: "Anti-cheat",
+        label: "Anti-cheat", // i18n-ignore
         icon: ScanFace,
         group: ACCESS_GROUP,
         keywords: [
@@ -2123,7 +2124,7 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         ]
     },
     settings: {
-        label: "Settings",
+        label: "Settings", // i18n-ignore
         icon: SlidersHorizontal,
         keywords: ["server.properties", "memory", "version", "restart", "uninstall"]
     }
@@ -2170,7 +2171,7 @@ export function installedAppSubapp(id: string, nav: InstalledAppNav): AppSubapp 
         label: nav.name,
         icon: Gamepad2,
         base,
-        parent: { label: "Game servers", href: "/apps/games" },
+        parent: { label: "Game servers", href: "/apps/games" }, // i18n-ignore
         sections
     };
 }
@@ -2206,55 +2207,55 @@ export function orgSubapp(slug: string): AppSubapp {
         label: `@${slug}`,
         icon: Building2,
         base,
-        parent: { label: "Organizations", href: ORG_BASE },
+        parent: { label: "Organizations", href: ORG_BASE }, // i18n-ignore
         sections: [
             {
-                label: "Overview",
+                label: "Overview", // i18n-ignore
                 href: base,
                 icon: LayoutDashboard,
                 keywords: ["organization", "summary"]
             },
             {
-                label: "People",
+                label: "People", // i18n-ignore
                 href: `${base}/people`,
                 icon: Users,
                 keywords: ["members", "roster", "who", "invite", "add somebody"]
             },
             {
-                label: "Teams",
+                label: "Teams", // i18n-ignore
                 href: `${base}/teams`,
                 icon: UsersRound,
                 keywords: ["groups", "squads", "access", "grants"]
             },
             {
-                label: "Roles",
+                label: "Roles", // i18n-ignore
                 href: `${base}/roles`,
                 icon: IdCard,
                 permission: "roles.manage",
                 keywords: ["permissions", "what they can do", "admin", "member"]
             },
             {
-                label: "Spaces",
+                label: "Spaces", // i18n-ignore
                 href: `${base}/spaces`,
                 icon: SquareCheckBig,
                 keywords: ["tasks", "work", "boards", "lists", "projects"]
             },
             {
-                label: "Mailboxes",
+                label: "Mailboxes", // i18n-ignore
                 href: `${base}/mailboxes`,
                 icon: Mail,
                 permission: "mail.manage",
                 keywords: ["email", "addresses", "company address", "support", "hand out"]
             },
             {
-                label: "Domains",
+                label: "Domains", // i18n-ignore
                 href: `${base}/domains`,
                 icon: Globe,
                 permission: "domains.manage",
                 keywords: ["dns", "deploys", "hostnames", "custom domain", "wildcard"]
             },
             {
-                label: "Billing",
+                label: "Billing", // i18n-ignore
                 href: `${base}/billing`,
                 icon: Wallet,
                 permission: "settings.manage",
@@ -2270,14 +2271,14 @@ export function orgSubapp(slug: string): AppSubapp {
                 ]
             },
             {
-                label: "Activity",
+                label: "Activity", // i18n-ignore
                 href: `${base}/activity`,
                 icon: History,
                 permission: "activity.read",
                 keywords: ["audit", "history", "logs", "what happened", "who did"]
             },
             {
-                label: "Settings",
+                label: "Settings", // i18n-ignore
                 href: `${base}/settings`,
                 icon: SlidersHorizontal,
                 permission: "settings.manage",

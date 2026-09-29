@@ -11,6 +11,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { clearResourceGrants } from "@polaris/auth";
 import { installRef } from "@/lib/apps/install-access";
@@ -22,8 +23,9 @@ import { requirePermissionOn, type ResourceAccess } from "@/lib/resource-access"
 /** The backing application, resolved on the owner's behalf. */
 async function applicationFor(access: ResourceAccess, id: string): Promise<string> {
     const app = await getInstalledApp(access.ownerId, id);
-    if (!app) throw new Error("Installed app not found");
-    if (!app.applicationId) throw new Error("This app has no deployment yet");
+    const t = await getTranslations("installed");
+    if (!app) throw new Error(t("errors.notFound"));
+    if (!app.applicationId) throw new Error(t("errors.noDeployment"));
     return app.applicationId;
 }
 
@@ -38,7 +40,7 @@ export async function redeployInstalledAppAction(id: string): Promise<{ error?: 
         revalidatePath(`/apps/installed/${id}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not redeploy" };
+        return { error: caught instanceof Error ? caught.message : (await getTranslations("installed"))("errors.redeploy") };
     }
 }
 
@@ -55,7 +57,7 @@ export async function setInstalledAppRunningAction(
         revalidatePath(`/apps/installed/${id}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update the app" };
+        return { error: caught instanceof Error ? caught.message : (await getTranslations("installed"))("errors.update") };
     }
 }
 
@@ -63,7 +65,7 @@ export async function uninstallInstalledAppAction(id: string): Promise<{ error?:
     try {
         const { user, access } = await requirePermissionOn("deploy.manage", installRef(id));
         if (!access.isOwner && !user.isAdmin) {
-            return { error: "Only the person who installed this app can remove it" };
+            return { error: (await getTranslations("installed"))("errors.ownerOnly") };
         }
         await uninstallApp(access.ownerId, id);
         // The app is gone, so the access people were given to it is too.
@@ -77,6 +79,6 @@ export async function uninstallInstalledAppAction(id: string): Promise<{ error?:
         revalidatePath("/apps/marketplace");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not uninstall the app" };
+        return { error: caught instanceof Error ? caught.message : (await getTranslations("installed"))("errors.uninstall") };
     }
 }

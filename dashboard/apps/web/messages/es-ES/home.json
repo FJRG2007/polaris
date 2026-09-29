@@ -74,7 +74,7 @@
             "description": "Todas las apps que puede abrir esta cuenta."
         },
         "games": {
-            "label": "Servidores de juegos",
+            "label": "Juegos",
             "description": "Qué servidores tuyos están en marcha y lo llenos que están."
         },
         "sessions": {

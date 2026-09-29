@@ -1,1 +1,46 @@
-{}
+{
+    "status": {
+        "installing": "Instalando",
+        "running": "En marcha",
+        "stopped": "Detenida",
+        "failed": "Fallida"
+    },
+    "stop": "Parar",
+    "start": "Iniciar",
+    "redeploy": "Redesplegar",
+    "uninstall": "Desinstalar",
+    "runtimeLogs": "Registros",
+    "refresh": "Actualizar",
+    "waitingOutput": "Esperando salida...",
+    "notRunning": "La aplicación no está en marcha.",
+    "kind": "app",
+    "uninstallDescription": "Esto elimina su contenedor y la quita de tus aplicaciones. Los datos en volúmenes locales del servidor se pierden; los que están en un montaje NAS se conservan.",
+    "channels": {
+        "title": "Canales",
+        "hint": "Conecta WhatsApp, Telegram, Discord o Slack. El token, el número de teléfono o el QR de cada canal se introduce en Entrada al conectarlo.",
+        "connect": "Conectar un canal",
+        "loading": "Cargando canales...",
+        "empty": "Aún no hay canales conectados. Conecta uno para empezar a recibir y enviar mensajes desde Entrada.",
+        "goToInbox": "Ir a Entrada",
+        "openInbox": "Abrir Entrada",
+        "status": {
+            "connected": "conectado",
+            "connecting": "conectando",
+            "error": "error",
+            "disconnected": "desconectado"
+        }
+    },
+    "errors": {
+        "notFound": "No existe esa aplicación",
+        "noDeployment": "Aún no se ha desplegado",
+        "redeploy": "Falló el redespliegue",
+        "update": "Falló el cambio de estado",
+        "ownerOnly": "Solo quien instaló esta aplicación puede quitarla",
+        "uninstall": "Falló la desinstalación",
+        "readAccess": "No se ha podido leer quién puede entrar en este servidor",
+        "checkDetails": "Revisa los datos y vuelve a intentarlo",
+        "give": "No se ha podido dar acceso",
+        "notAccess": "Eso no es un acceso de este servidor",
+        "remove": "No se ha podido quitar ese acceso"
+    }
+}
