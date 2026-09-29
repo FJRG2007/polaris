@@ -19,6 +19,7 @@ import type {
     HostSnapshot,
     OverviewData
 } from "../../src/app/(app)/apps/containers/types";
+import { withMessages } from "../setup/i18n";
 
 let snapshot: HostSnapshot | null = null;
 
@@ -82,7 +83,7 @@ function row(overrides: Partial<ContainerRow> = {}): ContainerRow {
 
 function render(value: HostSnapshot): string {
     snapshot = value;
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <ContainersView
             connections={[
                 {
@@ -98,7 +99,7 @@ function render(value: HostSnapshot): string {
             canManage
             localDiagnostic={null}
         />
-    );
+    ));
 }
 
 describe("containers table freshness", () => {

@@ -28,6 +28,9 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { containerAction, removeContainerAction } from "../actions";
+import { containerStateLabel } from "../container-words";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 import {
@@ -70,11 +73,14 @@ import {
 
 export type ContainerTab = "details" | "logs" | "files" | "console";
 
-const TABS: Array<{ id: ContainerTab; label: string; icon: ReactNode }> = [
-    { id: "details", label: "Details", icon: <FileText className="size-4" /> },
-    { id: "logs", label: "Logs", icon: <ScrollText className="size-4" /> },
-    { id: "files", label: "Files", icon: <Folder className="size-4" /> },
-    { id: "console", label: "Console", icon: <TerminalSquare className="size-4" /> }
+type Words = NamespaceTranslator<"containers">;
+
+/** The tabs, in order; each one's name is `tabs.<id>` in the catalog. */
+const TABS: Array<{ id: ContainerTab; icon: ReactNode }> = [
+    { id: "details", icon: <FileText className="size-4" /> },
+    { id: "logs", icon: <ScrollText className="size-4" /> },
+    { id: "files", icon: <Folder className="size-4" /> },
+    { id: "console", icon: <TerminalSquare className="size-4" /> }
 ];
 
 const REFRESH_MS = 5000;
@@ -114,6 +120,7 @@ export function ContainerView({
     initialTab: ContainerTab;
     canManage: boolean;
 }) {
+    const t = useTranslations("containers");
     const router = useRouter();
     const [confirm, confirmDialog] = useConfirm();
     const [pending, startTransition] = useTransition();
@@ -174,7 +181,8 @@ export function ContainerView({
         setSizes(readSnapshot<ContainerSizes>(sizeKey, 24 * 3_600_000)?.value ?? null);
         void (async () => {
             const result = await fetchJson<{ detail: ContainerDetailData }>(
-                `/api/containers/inspect?${query}&size=1`
+                `/api/containers/inspect?${query}&size=1`,
+                t
             );
             if (cancelled || !result.ok) return;
             const measured: ContainerSizes = {
@@ -187,7 +195,7 @@ export function ContainerView({
         return () => {
             cancelled = true;
         };
-    }, [query, sizeKey]);
+    }, [query, sizeKey, t]);
 
     // The chart holds what this page watched. A seeded sample from a previous
     // visit still has a number worth showing above, but plotting it would draw a
@@ -220,11 +228,9 @@ export function ContainerView({
 
     async function onRemove(): Promise<void> {
         const confirmed = await confirm({
-            title: `Remove ${containerRef}?`,
-            description: running
-                ? "It is still running, so it will be stopped first. Named volumes and images are left alone."
-                : "Named volumes and images are left alone.",
-            confirmLabel: "Remove",
+            title: t("remove.title", { name: containerRef }),
+            description: running ? t("remove.running") : t("remove.stopped"),
+            confirmLabel: t("remove.confirm"),
             danger: true
         });
         if (!confirmed) return;
@@ -255,7 +261,7 @@ export function ContainerView({
                         href={listHref}
                         className="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                     >
-                        <ArrowLeft className="size-3" /> Containers
+                        <ArrowLeft className="size-3" /> {t("overview.containers")}
                     </Link>
                     <div className="flex flex-wrap items-center gap-2">
                         <h1
@@ -265,7 +271,7 @@ export function ContainerView({
                             {detail?.name || containerRef}
                         </h1>
                         {detail ? (
-                            <Badge variant={running ? "success" : "neutral"}>{state}</Badge>
+                            <Badge variant={running ? "success" : "neutral"}>{containerStateLabel(t, state)}</Badge>
                         ) : (
                             <Skeleton className="h-5 w-16 rounded-full" />
                         )}
@@ -282,8 +288,8 @@ export function ContainerView({
                         size="icon"
                         variant="ghost"
                         onClick={() => reloadDetail()}
-                        aria-label="Refresh"
-                        title="Refresh"
+                        aria-label={t("live.refresh")}
+                        title={t("live.refresh")}
                     >
                         <RefreshCw className="size-4" />
                     </Button>
@@ -296,8 +302,8 @@ export function ContainerView({
                                         variant="ghost"
                                         onClick={() => onLifecycle("restart")}
                                         disabled={pending}
-                                        aria-label="Restart"
-                                        title="Restart"
+                                        aria-label={t("actions.restart")}
+                                        title={t("actions.restart")}
                                     >
                                         <RotateCw className="size-4" />
                                     </Button>
@@ -306,8 +312,8 @@ export function ContainerView({
                                         variant="ghost"
                                         onClick={() => onLifecycle("stop")}
                                         disabled={pending}
-                                        aria-label="Stop"
-                                        title="Stop"
+                                        aria-label={t("actions.stop")}
+                                        title={t("actions.stop")}
                                     >
                                         <Square className="size-4" />
                                     </Button>
@@ -318,8 +324,8 @@ export function ContainerView({
                                     variant="ghost"
                                     onClick={() => onLifecycle("start")}
                                     disabled={pending || !detail}
-                                    aria-label="Start"
-                                    title="Start"
+                                    aria-label={t("actions.start")}
+                                    title={t("actions.start")}
                                 >
                                     <Play className="size-4" />
                                 </Button>
@@ -329,8 +335,8 @@ export function ContainerView({
                                 variant="ghost"
                                 onClick={() => void onRemove()}
                                 disabled={pending || !detail}
-                                aria-label="Remove"
-                                title="Remove"
+                                aria-label={t("remove.confirm")}
+                                title={t("remove.confirm")}
                             >
                                 <Trash2 className="size-4" />
                             </Button>
@@ -345,49 +351,41 @@ export function ContainerView({
                 </div>
             ) : detailStale ? (
                 <div className="rounded-md border border-warning-edge bg-warning-soft p-3 text-sm">
-                    Showing what was last read. {detailStale}
+                    {t("detail.stale", { reason: detailStale })}
                 </div>
             ) : null}
 
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <Stat
                     icon={<Cpu className="size-4" />}
-                    label="CPU"
+                    label={t("columns.cpu")}
                     value={latest ? `${latest.cpuPercent}%` : running ? null : "-"}
-                    hint={host ? `${host.overview.ncpu} cores on the host` : "of the host's cores"}
+                    hint={host ? t("detail.hostCores", { count: host.overview.ncpu }) : t("detail.ofHostCores")}
                     age={latestAge}
                 />
                 <Stat
                     icon={<MemoryStick className="size-4" />}
-                    label="Memory"
+                    label={t("columns.memory")}
                     value={latest ? formatBytes(latest.memUsage) : running ? null : "-"}
                     hint={
                         latest && latest.memLimit > 0
-                            ? `${latest.memPercent}% of ${formatBytes(latest.memLimit)}`
-                            : "no limit set"
+                            ? t("detail.memShare", { percent: latest.memPercent, limit: formatBytes(latest.memLimit) })
+                            : t("detail.noLimit")
                     }
                     age={latestAge}
                 />
                 <Stat
                     icon={<Network className="size-4" />}
-                    label="Network"
-                    value={latest ? `${formatBytes(latest.netRx)} in` : running ? null : "-"}
-                    hint={
-                        latest
-                            ? `${formatBytes(latest.netTx)} out, since it started`
-                            : "since it started"
-                    }
+                    label={t("detail.network")}
+                    value={latest ? t("detail.in", { size: formatBytes(latest.netRx) }) : running ? null : "-"}
+                    hint={latest ? t("detail.out", { size: formatBytes(latest.netTx) }) : t("detail.sinceStart")}
                     age={latestAge}
                 />
                 <Stat
                     icon={<HardDrive className="size-4" />}
-                    label="Disk I/O"
-                    value={latest ? `${formatBytes(latest.blockRead)} read` : running ? null : "-"}
-                    hint={
-                        latest
-                            ? `${formatBytes(latest.blockWrite)} written, since it started`
-                            : "since it started"
-                    }
+                    label={t("detail.disk")}
+                    value={latest ? t("detail.read", { size: formatBytes(latest.blockRead) }) : running ? null : "-"}
+                    hint={latest ? t("detail.written", { size: formatBytes(latest.blockWrite) }) : t("detail.sinceStart")}
                     age={latestAge}
                 />
             </div>
@@ -414,7 +412,7 @@ export function ContainerView({
                             )}
                         >
                             {entry.icon}
-                            {entry.label}
+                            {t(`tabs.${entry.id}`)}
                         </button>
                     ))}
                 </ScrollRow>
@@ -440,13 +438,13 @@ export function ContainerView({
 
 /** CPU and memory over the window the page has been open for. */
 function Usage({ samples }: { samples: Sample[] }) {
+    const t = useTranslations("containers");
     const format = useDisplayFormat();
     if (samples.length < 2) {
         return (
             <Card>
                 <CardBody className="text-xs text-muted-foreground">
-                    Watching usage. The chart fills in from here - the first points arrive within a
-                    few seconds.
+                    {t("detail.watching")}
                 </CardBody>
             </Card>
         );
@@ -463,7 +461,7 @@ function Usage({ samples }: { samples: Sample[] }) {
         v: sample.usage.memUsage,
         note:
             sample.usage.memLimit > 0
-                ? `${formatBytes(sample.usage.memUsage)} of ${formatBytes(sample.usage.memLimit)}`
+                ? t("overview.ofValue", { used: formatBytes(sample.usage.memUsage), total: formatBytes(sample.usage.memLimit) })
                 : formatBytes(sample.usage.memUsage)
     }));
 
@@ -475,7 +473,7 @@ function Usage({ samples }: { samples: Sample[] }) {
                         points={cpu}
                         from={from}
                         to={to}
-                        label="CPU"
+                        label={t("columns.cpu")}
                         format={(value) => `${Math.round(value * 100) / 100}%`}
                         formatTime={(at) => format.dateTime(at)}
                     />
@@ -488,7 +486,7 @@ function Usage({ samples }: { samples: Sample[] }) {
                         from={from}
                         to={to}
                         tone="success"
-                        label="Memory"
+                        label={t("columns.memory")}
                         format={(value) => formatBytes(value)}
                         formatTime={(at) => format.dateTime(at)}
                     />
@@ -508,20 +506,21 @@ function RunsOn({
     host: HostInfo | null;
     networks: string[] | null;
 }) {
+    const t = useTranslations("containers");
     const reach = connection.local
-        ? "Local engine, brokered by the host daemon"
+        ? t("runsOn.local")
         : connection.host
-          ? `Registered server, over ${connection.transport}`
-          : `Docker connection, over ${connection.transport}`;
+          ? t("runsOn.server", { transport: connection.transport })
+          : t("runsOn.connection", { transport: connection.transport });
 
     return (
         <Card>
             <CardBody className="space-y-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
-                    <Server className="size-4 text-muted-foreground" /> Runs on
+                    <Server className="size-4 text-muted-foreground" /> {t("runsOn.title")}
                 </div>
                 <dl className="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-2 text-sm">
-                    <Field label="Host">
+                    <Field label={t("connection.host")}>
                         <Link
                             href={`/apps/containers?c=${encodeURIComponent(connection.id)}`}
                             className="hover:underline"
@@ -529,22 +528,22 @@ function RunsOn({
                             {connection.name}
                         </Link>
                     </Field>
-                    <Field label="Reached">{reach}</Field>
-                    <Field label="Engine">
+                    <Field label={t("runsOn.reached")}>{reach}</Field>
+                    <Field label={t("overview.engine")}>
                         {host ? (
                             `${host.overview.name}${host.overview.serverVersion ? ` - ${host.overview.serverVersion}` : ""}`
                         ) : (
                             <Skeleton className="h-4 w-40" />
                         )}
                     </Field>
-                    <Field label="Machine">
+                    <Field label={t("runsOn.machine")}>
                         {host ? (
-                            `${host.overview.ncpu} cores, ${formatBytes(host.overview.memTotal)}`
+                            t("runsOn.machineValue", { count: host.overview.ncpu, memory: formatBytes(host.overview.memTotal) })
                         ) : (
                             <Skeleton className="h-4 w-32" />
                         )}
                     </Field>
-                    <Field label="Networks">
+                    <Field label={t("runsOn.networks")}>
                         {networks === null ? "" : networks.join(", ") || "-"}
                     </Field>
                 </dl>
@@ -563,11 +562,12 @@ function Storage({
     detail: ContainerDetailData | null;
     sizes: ContainerSizes | null;
 }) {
+    const t = useTranslations("containers");
     return (
         <Card>
             <CardBody className="space-y-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
-                    <HardDrive className="size-4 text-muted-foreground" /> Storage
+                    <HardDrive className="size-4 text-muted-foreground" /> {t("storage.title")}
                 </div>
                 {!detail ? (
                     <div className="space-y-2">
@@ -577,27 +577,27 @@ function Storage({
                     </div>
                 ) : (
                     <dl className="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-2 text-sm">
-                        <Field label="Writable layer">
+                        <Field label={t("storage.writable")}>
                             {!sizes ? (
                                 <Skeleton className="h-4 w-24" />
                             ) : sizes.sizeRw === null ? (
-                                "Not reported"
+                                t("storage.notReported")
                             ) : (
                                 formatBytes(sizes.sizeRw)
                             )}
                         </Field>
-                        <Field label="Total on disk">
+                        <Field label={t("storage.total")}>
                             {!sizes ? (
                                 <Skeleton className="h-4 w-32" />
                             ) : sizes.sizeRootFs === null ? (
-                                "Not reported"
+                                t("storage.notReported")
                             ) : (
-                                `${formatBytes(sizes.sizeRootFs)} with its image layers`
+                                t("storage.withLayers", { size: formatBytes(sizes.sizeRootFs) })
                             )}
                         </Field>
-                        <Field label="Mounts">
+                        <Field label={t("storage.mounts")}>
                             {detail.mounts.length === 0
-                                ? "None"
+                                ? t("storage.none")
                                 : detail.mounts.map((mount) => (
                                       <div key={mount.destination} className="break-all text-xs">
                                           {mount.source} -&gt; {mount.destination} (
@@ -613,6 +613,7 @@ function Storage({
 }
 
 function DetailsTab({ detail }: { detail: ContainerDetailData | null }) {
+    const t = useTranslations("containers");
     const format = useDisplayFormat();
 
     if (!detail) {
@@ -627,24 +628,24 @@ function DetailsTab({ detail }: { detail: ContainerDetailData | null }) {
 
     return (
         <dl className="grid grid-cols-[9rem_1fr] gap-x-4 gap-y-2 text-sm">
-            <Field label="Container id">
+            <Field label={t("details.id")}>
                 <code className="break-all text-xs">{detail.id.slice(0, 12)}</code>
             </Field>
-            <Field label="Image">{detail.image}</Field>
-            <Field label="Command">
+            <Field label={t("details.image")}>{detail.image}</Field>
+            <Field label={t("details.command")}>
                 <code className="break-all text-xs">{detail.command || "-"}</code>
             </Field>
-            <Field label="Created">{format.dateTime(detail.createdAt)}</Field>
-            <Field label="Started">
+            <Field label={t("details.created")}>{format.dateTime(detail.createdAt)}</Field>
+            <Field label={t("details.started")}>
                 {detail.startedAt ? format.dateTime(detail.startedAt) : "-"}
             </Field>
-            <Field label="Restarts">{detail.restartCount}</Field>
+            <Field label={t("details.restarts")}>{detail.restartCount}</Field>
             {detail.composeProject ? (
-                <Field label="Compose project">{detail.composeProject}</Field>
+                <Field label={t("details.compose")}>{detail.composeProject}</Field>
             ) : null}
-            <Field label="Ports">
+            <Field label={t("details.ports")}>
                 {detail.ports.length === 0
-                    ? "None published"
+                    ? t("details.noPorts")
                     : detail.ports.map((port) => (
                           <div key={port.container}>
                               {port.host ? `${port.host} -> ` : ""}
@@ -652,13 +653,13 @@ function DetailsTab({ detail }: { detail: ContainerDetailData | null }) {
                           </div>
                       ))}
             </Field>
-            <Field label="Environment">
+            <Field label={t("details.environment")}>
                 {detail.env.length === 0 ? (
-                    "None"
+                    t("storage.none")
                 ) : (
                     <>
                         <span className="text-xs text-muted-foreground">
-                            Names only; values are never read.
+                            {t("details.namesOnly")}
                         </span>
                         <div className="mt-1 flex flex-wrap gap-1">
                             {detail.env.map((name) => (
@@ -675,6 +676,7 @@ function DetailsTab({ detail }: { detail: ContainerDetailData | null }) {
 }
 
 function LogsTab({ query }: { query: string }) {
+    const t = useTranslations("containers");
     const [logs, setLogs] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [tail, setTail] = useState(200);
@@ -684,7 +686,8 @@ function LogsTab({ query }: { query: string }) {
         async (lines: number) => {
             setLoading(true);
             const result = await fetchJson<{ logs: string }>(
-                `/api/containers/logs?${query}&tail=${lines}`
+                `/api/containers/logs?${query}&tail=${lines}`,
+                t
             );
             setLoading(false);
             if (!result.ok) setError(result.error);
@@ -693,7 +696,7 @@ function LogsTab({ query }: { query: string }) {
                 setLogs(result.data.logs);
             }
         },
-        [query]
+        [query, t]
     );
 
     useEffect(() => {
@@ -703,22 +706,22 @@ function LogsTab({ query }: { query: string }) {
     return (
         <div className="flex h-full flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground">Last {tail} lines</span>
+                <span className="text-xs text-muted-foreground">{t("logs.last", { count: tail })}</span>
                 <div className="flex items-center gap-1">
                     <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => setTail(tail >= 2000 ? 200 : tail * 5)}
                     >
-                        {tail >= 2000 ? "Show fewer" : "Show more"}
+                        {tail >= 2000 ? t("logs.fewer") : t("logs.more")}
                     </Button>
                     <Button
                         size="icon"
                         variant="ghost"
                         onClick={() => void load(tail)}
                         disabled={loading}
-                        aria-label="Refresh logs"
-                        title="Refresh logs"
+                        aria-label={t("logs.refresh")}
+                        title={t("logs.refresh")}
                     >
                         <RefreshCw className={cn("size-4", loading && "animate-spin")} />
                     </Button>
@@ -729,7 +732,7 @@ function LogsTab({ query }: { query: string }) {
                 <Skeleton className="h-64 w-full" />
             ) : (
                 <pre className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-md bg-[#0b0e14] p-3 text-xs leading-relaxed text-[#c9d1d9]">
-                    {logs?.trim() ? logs : "This container has printed nothing."}
+                    {logs?.trim() ? logs : t("logs.empty")}
                 </pre>
             )}
         </div>
@@ -737,6 +740,7 @@ function LogsTab({ query }: { query: string }) {
 }
 
 function FilesTab({ query }: { query: string }) {
+    const t = useTranslations("containers");
     const [path, setPath] = useState("/");
     const [entries, setEntries] = useState<Array<{ name: string; isDir: boolean }> | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -746,7 +750,8 @@ function FilesTab({ query }: { query: string }) {
         setEntries(null);
         void (async () => {
             const result = await fetchJson<{ entries: Array<{ name: string; isDir: boolean }> }>(
-                `/api/containers/files?${query}&p=${encodeURIComponent(path)}`
+                `/api/containers/files?${query}&p=${encodeURIComponent(path)}`,
+                t
             );
             if (cancelled) return;
             if (!result.ok) {
@@ -760,13 +765,13 @@ function FilesTab({ query }: { query: string }) {
         return () => {
             cancelled = true;
         };
-    }, [query, path]);
+    }, [query, path, t]);
 
     const segments = path.split("/").filter(Boolean);
 
     return (
         <div className="flex h-full flex-col gap-2">
-            <nav className="flex flex-wrap items-center gap-1 text-sm" aria-label="Breadcrumb">
+            <nav className="flex flex-wrap items-center gap-1 text-sm" aria-label={t("files.breadcrumb")}>
                 <button type="button" className="hover:underline" onClick={() => setPath("/")}>
                     /
                 </button>
@@ -792,7 +797,7 @@ function FilesTab({ query }: { query: string }) {
                 </div>
             ) : entries.length === 0 && !error ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
-                    This directory is empty.
+                    {t("files.empty")}
                 </p>
             ) : (
                 <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-md border border-border">
@@ -830,8 +835,8 @@ function FilesTab({ query }: { query: string }) {
                                                     entry.name
                                                 );
                                             }}
-                                            aria-label={`Download ${entry.name}`}
-                                            title={`Download ${entry.name}`}
+                                            aria-label={t("files.download", { name: entry.name })}
+                                            title={t("files.download", { name: entry.name })}
                                             className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                                         >
                                             <Download className="size-4" />
@@ -860,26 +865,26 @@ function ConsoleTab({
     running: boolean;
     canAttach: boolean;
 }) {
+    const t = useTranslations("containers");
     if (!running) {
         return (
             <Notice tone="muted">
                 <TerminalSquare className="mb-2 size-5" />
-                Start this container to open a console in it.
+                {t("console.start")}
             </Notice>
         );
     }
     if (!canAttach) {
         return (
             <Notice tone="muted">
-                This host does not offer an interactive session. Its engine is reached through the
-                host daemon, which brokers one bounded call at a time.
+                {t("console.noSession")}
             </Notice>
         );
     }
     return (
         <TerminalPanel
             target={{ kind: "docker", connectionId, containerRef }}
-            label={`${name} - /bin/sh`}
+            label={`${name} - /bin/sh`} // i18n-ignore a shell's name
         />
     );
 }
@@ -905,8 +910,9 @@ function Stat({
     hint: string;
     age?: number | null;
 }) {
+    const t = useTranslations("containers");
     const stale = value !== null && age !== null && age !== undefined && age > STALE_AFTER_MS;
-    const caption = stale ? `${hint} - ${formatAge(age)} ago` : hint;
+    const caption = stale ? t("detail.aged", { hint, age: formatAge(age) }) : hint;
     return (
         <Card>
             <CardBody className="p-3">
@@ -956,16 +962,17 @@ function Notice({ tone, children }: { tone: "danger" | "muted"; children: ReactN
 /** Fetch JSON and normalize both a transport failure and an `{ error }` body
  *  into one shape, so every caller handles failure the same way. */
 async function fetchJson<T>(
-    url: string
+    url: string,
+    t: Words
 ): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
     try {
         const response = await fetch(url);
         const payload = (await response.json()) as T & { error?: string };
         if (!response.ok || payload.error) {
-            return { ok: false, error: payload.error ?? `Request failed (${response.status})` };
+            return { ok: false, error: payload.error ?? t("errors.requestFailed", { status: response.status }) };
         }
         return { ok: true, data: payload };
     } catch {
-        return { ok: false, error: "Could not reach Polaris" };
+        return { ok: false, error: t("errors.unreachable") };
     }
 }

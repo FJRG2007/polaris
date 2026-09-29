@@ -515,5 +515,64 @@
             "summary": "Polaris could not tell where this server lives.",
             "routing": "Set where it lives to get the right way to point a domain at it."
         }
+    },
+    "footprint": {
+        "noReason": "The engine did not say why.",
+        "title": "Polaris itself",
+        "measure": "Measure again",
+        "failed": "Polaris could not measure itself. {reason}",
+        "columns": {
+            "part": "Part",
+            "cpu": "CPU",
+            "memory": "Memory",
+            "disk": "Disk"
+        },
+        "totals": "<b>{memory}</b> of memory{machine, select, yes { of the machine's {total}} other {}}, <b>{cpu}%</b> CPU, and <b>{complete, select, yes {} other {at least }}{disk}</b> on disk - {images} of images, {data} of data, {written} written by the containers themselves.",
+        "rest": "Everything else running here - <b>{count, plural, one {# container} other {# containers}}</b> of services and installed apps - is using <b>{memory}</b> and <b>{cpu}%</b> CPU.",
+        "image": "image {size}",
+        "written": "written {size}",
+        "notMeasured": "not measured",
+        "parts": {
+            "web": {
+                "label": "Dashboard",
+                "summary": "The control plane: every page, the API, and the background sweeps."
+            },
+            "postgres": {
+                "label": "Database",
+                "summary": "Everything Polaris remembers."
+            },
+            "traefik": {
+                "label": "Edge",
+                "summary": "Routes every domain and holds the certificates."
+            },
+            "edgeGuard": {
+                "label": "Edge guard",
+                "summary": "Applies the firewall to requests as they arrive."
+            },
+            "hostd": {
+                "label": "Host daemon",
+                "summary": "Mounts, host files and the Docker proxy."
+            },
+            "livekit": {
+                "label": "Call server",
+                "summary": "Carries the sound and the picture in a call."
+            },
+            "mdns": {
+                "label": "Local discovery",
+                "summary": "Answers to polaris.local on the network."
+            },
+            "mcRouter": {
+                "label": "Minecraft router",
+                "summary": "One port for every Java server."
+            },
+            "caddy": {
+                "label": "Edge (legacy)",
+                "summary": "The previous edge, kept for rollback."
+            },
+            "tunnel": {
+                "label": "Public tunnel",
+                "summary": "Publishes Polaris without a port forward."
+            }
+        }
     }
 }

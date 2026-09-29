@@ -42,6 +42,7 @@
     "web/components:audience.admins (es-ES)",
     "web/components:calls.missed (es-ES)",
     "web/components:files.tabs.mine (es-ES)",
+    "web/components:footprint.parts.postgres.label (es-ES)",
     "web/components:mailUnread.title (es-ES)",
     "web/components:presence.offline (es-ES)",
     "web/components:search.scopes.databases.label (es-ES)",

@@ -992,6 +992,13 @@
         "web/src/lib/mail-server/inbound.ts",
         "web/src/lib/mail-server/setup.ts",
         "web/src/lib/mail-server/refusal-text.ts",
-        "web/src/lib/mail-server/words.ts"
+        "web/src/lib/mail-server/words.ts",
+        "web/src/app/(app)/apps/containers/[containerId]/container-view.tsx",
+        "web/src/app/(app)/apps/containers/actions.ts",
+        "web/src/app/(app)/apps/containers/containers-view.tsx",
+        "web/src/app/(app)/apps/containers/docker-connection-dialog.tsx",
+        "web/src/app/(app)/apps/containers/page.tsx",
+        "web/src/app/(app)/apps/containers/polaris-footprint.tsx",
+        "web/src/app/(app)/apps/containers/container-words.ts"
     ]
 }

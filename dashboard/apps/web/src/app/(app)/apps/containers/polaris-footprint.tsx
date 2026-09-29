@@ -21,12 +21,42 @@ import { RefreshCw, Sparkles } from "lucide-react";
 import { useLiveRead } from "@/components/use-live-resource";
 import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
 import { footprintDiskBytes, type FootprintPart, type PolarisFootprint } from "./types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+
+type Words = NamespaceTranslator<"components">;
+
+/** The parts of the stack by the English name `lib/polaris-parts` gives them, so
+ *  a reading already on its way keeps meaning the same row. A part this does not
+ *  know keeps its own name. */
+const PART_KEYS: Readonly<Record<string, string>> = {
+    Dashboard: "web",
+    Database: "postgres",
+    Edge: "traefik",
+    "Edge guard": "edgeGuard",
+    "Host daemon": "hostd",
+    "Call server": "livekit",
+    "Local discovery": "mdns",
+    "Minecraft router": "mcRouter",
+    "Edge (legacy)": "caddy",
+    "Public tunnel": "tunnel"
+};
+
+function partWords(t: Words, part: FootprintPart): { label: string; summary: string } {
+    const key = PART_KEYS[part.label];
+    if (!key) return { label: part.label, summary: part.summary };
+    return {
+        label: t(`footprint.parts.${key}.label` as NamespaceKey<"components">),
+        summary: t(`footprint.parts.${key}.summary` as NamespaceKey<"components">)
+    };
+}
 
 /** Slow to measure and slow to change: a stack that has just been asked how big it
  *  is will give the same answer for a good while. */
 const REFRESH_MS = 5 * 60_000;
 
 export function PolarisFootprintCard() {
+    const t = useTranslations("components");
     // Set for the next read only, so the button gets a measurement taken now while
     // the poll behind it goes on sharing the one the server is holding - which is
     // what keeps a page open in two tabs from measuring the stack twice.
@@ -44,11 +74,11 @@ export function PolarisFootprintCard() {
             throw new Error(
                 typeof body === "object" && body !== null && "error" in body
                     ? String((body as { error: unknown }).error)
-                    : "The engine did not say why."
+                    : t("footprint.noReason")
             );
         }
         return body as PolarisFootprint;
-    }, []);
+    }, [t]);
 
     const {
         data: footprint,
@@ -76,17 +106,17 @@ export function PolarisFootprintCard() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
                         <Sparkles className="size-4 text-muted-foreground" />
-                        Polaris itself
+                        {t("footprint.title")}
                     </div>
                     <Button size="sm" variant="ghost" onClick={measureAgain} disabled={refreshing}>
                         <RefreshCw className="size-4" />
-                        Measure again
+                        {t("footprint.measure")}
                     </Button>
                 </div>
 
                 {problem && (
                     <p className="text-sm text-danger">
-                        Polaris could not measure itself. {problem}
+                        {t("footprint.failed", { reason: problem })}
                     </p>
                 )}
 
@@ -101,10 +131,10 @@ export function PolarisFootprintCard() {
                         <table className="w-full min-w-[38rem] text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="py-1 pr-3 font-medium">Part</th>
-                                    <th className="py-1 pr-3 font-medium">CPU</th>
-                                    <th className="py-1 pr-3 font-medium">Memory</th>
-                                    <th className="py-1 font-medium">Disk</th>
+                                    <th className="py-1 pr-3 font-medium">{t("footprint.columns.part")}</th>
+                                    <th className="py-1 pr-3 font-medium">{t("footprint.columns.cpu")}</th>
+                                    <th className="py-1 pr-3 font-medium">{t("footprint.columns.memory")}</th>
+                                    <th className="py-1 font-medium">{t("footprint.columns.disk")}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -136,35 +166,35 @@ function Totals({ footprint }: { footprint: PolarisFootprint }) {
     // the previous one - and this figure is newer than some of those. Reading it
     // as though it were always there turns a stale answer into a blank screen.
     const rest = footprint.rest as PolarisFootprint["rest"] | undefined;
+    const t = useTranslations("components");
+    const strong = (chunks: React.ReactNode) => (
+        <span key="strong" className="font-medium text-foreground">
+            {chunks}
+        </span>
+    );
     return (
         <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">
-                {formatBytes(footprint.memUsedBytes)}
-            </span>{" "}
-            of memory
-            {footprint.memTotalBytes
-                ? ` of the machine's ${formatBytes(footprint.memTotalBytes)}`
-                : ""}
-            , <span className="font-medium text-foreground">{footprint.cpuPercent}%</span> CPU, and{" "}
-            <span className="font-medium text-foreground">
-                {footprint.diskComplete ? "" : "at least "}
-                {formatBytes(disk)}
-            </span>{" "}
-            on disk - {formatBytes(footprint.imageBytes)} of images,{" "}
-            {formatBytes(footprint.volumeBytes)} of data, {formatBytes(footprint.writableBytes)}{" "}
-            written by the containers themselves.
+            {t.rich("footprint.totals", {
+                memory: formatBytes(footprint.memUsedBytes),
+                machine: footprint.memTotalBytes ? "yes" : "no",
+                total: footprint.memTotalBytes ? formatBytes(footprint.memTotalBytes) : "",
+                cpu: footprint.cpuPercent,
+                complete: footprint.diskComplete ? "yes" : "no",
+                disk: formatBytes(disk),
+                images: formatBytes(footprint.imageBytes),
+                data: formatBytes(footprint.volumeBytes),
+                written: formatBytes(footprint.writableBytes),
+                b: strong
+            })}
             {rest && rest.containers > 0 ? (
                 <>
                     {" "}
-                    Everything else running here -{" "}
-                    <span className="font-medium text-foreground">
-                        {rest.containers} container{rest.containers === 1 ? "" : "s"}
-                    </span>{" "}
-                    of services and installed apps - is using{" "}
-                    <span className="font-medium text-foreground">
-                        {formatBytes(rest.memUsedBytes)}
-                    </span>{" "}
-                    and <span className="font-medium text-foreground">{rest.cpuPercent}%</span> CPU.
+                    {t.rich("footprint.rest", {
+                        count: rest.containers,
+                        memory: formatBytes(rest.memUsedBytes),
+                        cpu: rest.cpuPercent,
+                        b: strong
+                    })}
                 </>
             ) : null}
         </p>
@@ -175,12 +205,14 @@ function PartRow({ part }: { part: FootprintPart }) {
     const volumes = part.volumes.reduce((total, volume) => total + (volume.usedBytes ?? 0), 0);
     const disk = (part.imageBytes ?? 0) + (part.writableBytes ?? 0) + volumes;
     const running = part.state === "running";
+    const t = useTranslations("components");
+    const words = partWords(t, part);
     return (
         <tr className="border-t border-border align-top">
             <td className="py-2 pr-3">
-                <div className="font-medium">{part.label}</div>
-                {part.summary && (
-                    <div className="text-xs text-muted-foreground">{part.summary}</div>
+                <div className="font-medium">{words.label}</div>
+                {words.summary && (
+                    <div className="text-xs text-muted-foreground">{words.summary}</div>
                 )}
                 <div className="truncate text-xs text-muted-foreground/80" title={part.image}>
                     {part.name}
@@ -196,13 +228,13 @@ function PartRow({ part }: { part: FootprintPart }) {
             <td
                 className="py-2 text-muted-foreground"
                 title={[
-                    part.imageBytes === null ? null : `image ${formatBytes(part.imageBytes)}`,
+                    part.imageBytes === null ? null : t("footprint.image", { size: formatBytes(part.imageBytes) }),
                     part.writableBytes === null
                         ? null
-                        : `written ${formatBytes(part.writableBytes)}`,
+                        : t("footprint.written", { size: formatBytes(part.writableBytes) }),
                     ...part.volumes.map(
                         (volume) =>
-                            `${volume.name} ${volume.usedBytes === null ? "not measured" : formatBytes(volume.usedBytes)}`
+                            `${volume.name} ${volume.usedBytes === null ? t("footprint.notMeasured") : formatBytes(volume.usedBytes)}`
                     )
                 ]
                     .filter(Boolean)

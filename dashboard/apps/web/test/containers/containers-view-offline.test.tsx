@@ -11,6 +11,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DockerConnectionSummary } from "../../src/app/(app)/apps/containers/types";
+import { withMessages } from "../setup/i18n";
 
 let reachability: { id: string; state: "up" | "down"; detail: string | null }[] | null = null;
 let snapshotRequested: boolean[] = [];
@@ -61,7 +62,7 @@ const connections: DockerConnectionSummary[] = [
 ];
 
 function render(selected: string): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <ContainersView
             connections={connections}
             connectionId={selected}
@@ -69,7 +70,7 @@ function render(selected: string): string {
             canManage
             localDiagnostic={null}
         />
-    );
+    ));
 }
 
 beforeEach(() => {

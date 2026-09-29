@@ -3,6 +3,7 @@ import { loadEnv } from "@polaris/config";
 import { requirePermission } from "@/lib/session";
 import { ContainersView } from "./containers-view";
 import { containerHosts, selectConnection } from "./connections";
+import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
@@ -27,12 +28,13 @@ export default async function ContainersPage({
     const params = await searchParams;
     const hosts = await containerHosts(user);
     const selected = selectConnection(hosts, pick(params.c));
+    const t = await getTranslations("containers");
 
     return (
         <>
             <PageHeader
-                title="Containers"
-                description="Monitor and manage Docker across your hosts - usage, state, and lifecycle."
+                title={t("overview.containers")}
+                description={t("page.description")}
             />
             <ContainersView
                 connections={hosts.connections}

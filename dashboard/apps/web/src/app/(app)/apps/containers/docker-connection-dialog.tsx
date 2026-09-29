@@ -25,14 +25,11 @@ import {
     DialogDescription
 } from "@polaris/ui";
 import { createDockerConnectionAction } from "./actions";
-
-const TRANSPORT_LABELS: Record<DockerTransport, string> = {
-    socket: "Local socket",
-    ssh: "SSH (host Engine)",
-    tcp: "TCP"
-};
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) {
+    const t = useTranslations("containers");
+    const tcommon = useTranslations("common");
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [transport, setTransport] = useState<DockerTransport>(sshEnabled ? "ssh" : "socket");
@@ -102,36 +99,34 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
             <DialogTrigger asChild>
                 <Button size="sm" variant="secondary">
                     <Plus className="size-4" />
-                    Add host
+                    {t("connection.add")}
                 </Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add a Docker host</DialogTitle>
-                    <DialogDescription>
-                        Monitor and manage containers on this host.
-                    </DialogDescription>
+                    <DialogTitle>{t("connection.title")}</DialogTitle>
+                    <DialogDescription>{t("connection.intro")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Transport
+                        {t("connection.transport")}
                         <Select
                             value={transport}
                             onValueChange={(value) => setTransport(value as DockerTransport)}
                             options={DOCKER_TRANSPORTS.map((value) => ({
                                 value,
-                                label: TRANSPORT_LABELS[value]
+                                label: t(`connection.transports.${value}`)
                             }))}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        Name
-                        <Input name="name" required placeholder="Local host" />
+                        {t("connection.name")}
+                        <Input name="name" required placeholder={t("connection.namePlaceholder")} />
                     </label>
 
                     {transport === "socket" ? (
                         <label className="flex flex-col gap-1 text-sm">
-                            Socket path
+                            {t("connection.socketPath")}
                             <Input name="socketPath" placeholder="/var/run/docker.sock" />
                         </label>
                     ) : null}
@@ -139,16 +134,16 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                     {transport === "ssh" ? (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
-                                Host
+                                {t("connection.host")}
                                 <Input name="host" required defaultValue="host.docker.internal" />
                             </label>
                             <div className="grid grid-cols-2 gap-2">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Port
+                                    {t("connection.port")}
                                     <Input name="port" type="number" defaultValue="22" />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Username
+                                    {t("connection.username")}
                                     <Input name="username" required />
                                 </label>
                             </div>
@@ -159,13 +154,12 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                     checked={useInstallKey}
                                     onChange={(event) => setUseInstallKey(event.target.checked)}
                                 />
-                                Use the installed access key
-                                {sshEnabled ? null : " (this deployment has none)"}
+                                {sshEnabled ? t("connection.installKey") : t("connection.installKeyNone")}
                             </label>
                             {useInstallKey ? null : (
                                 <>
                                     <label className="flex flex-col gap-1 text-sm">
-                                        Private key (PEM)
+                                        {t("connection.privateKey")}
                                         <Textarea
                                             name="privateKey"
                                             rows={4}
@@ -173,7 +167,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                         />
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
-                                        Key passphrase (optional)
+                                        {t("connection.passphrase")}
                                         <Input name="passphrase" type="password" />
                                     </label>
                                 </>
@@ -185,11 +179,11 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                         <>
                             <div className="grid grid-cols-2 gap-2">
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Host
+                                    {t("connection.host")}
                                     <Input name="host" required />
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Port
+                                    {t("connection.port")}
                                     <Input name="port" type="number" defaultValue="2375" />
                                 </label>
                             </div>
@@ -200,12 +194,12 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                     checked={tls}
                                     onChange={(event) => setTls(event.target.checked)}
                                 />
-                                Use TLS
+                                {t("connection.tls")}
                             </label>
                             {tls ? (
                                 <>
                                     <label className="flex flex-col gap-1 text-sm">
-                                        CA certificate
+                                        {t("connection.ca")}
                                         <Textarea
                                             name="ca"
                                             rows={3}
@@ -213,7 +207,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                         />
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
-                                        Client certificate
+                                        {t("connection.cert")}
                                         <Textarea
                                             name="cert"
                                             rows={3}
@@ -221,7 +215,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                         />
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
-                                        Client key
+                                        {t("connection.key")}
                                         <Textarea
                                             name="key"
                                             rows={3}
@@ -237,11 +231,11 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                     <div className="mt-2 flex justify-end gap-2">
                         <DialogClose asChild>
                             <Button type="button" variant="ghost">
-                                Cancel
+                                {tcommon("actions.cancel")}
                             </Button>
                         </DialogClose>
                         <Button type="submit" disabled={pending}>
-                            {pending ? "Connecting..." : "Add host"}
+                            {pending ? t("connection.connecting") : t("connection.add")}
                         </Button>
                     </div>
                 </form>

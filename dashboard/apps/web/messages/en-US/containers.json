@@ -1,1 +1,190 @@
-{}
+{
+    "hosts": {
+        "noAnswer": "No answer",
+        "title": "Docker hosts",
+        "none": "No hosts yet.",
+        "notAnswering": "Not answering: {reason}",
+        "offline": "Offline",
+        "local": "local",
+        "removeNamed": "Remove {name}"
+    },
+    "remove": {
+        "title": "Remove {name}?",
+        "running": "It is still running, so it will be stopped first. Named volumes and images are left alone.",
+        "stopped": "Named volumes and images are left alone.",
+        "confirm": "Remove",
+        "connectionTitle": "Remove this Docker connection?"
+    },
+    "live": {
+        "paused": "Paused",
+        "loading": "Loading",
+        "firstReading": "Live - first usage reading on its way",
+        "aged": "Live - usage from {age} ago",
+        "refreshing": "Live - refreshing every 5s",
+        "stale": "Showing the last reading. {reason}",
+        "pause": "Pause",
+        "resume": "Resume",
+        "refresh": "Refresh"
+    },
+    "local": {
+        "title": "The local Docker host is not available yet",
+        "edition": "Edition",
+        "hostd": "Host daemon",
+        "presentVersion": "present (v{version})",
+        "present": "present",
+        "notDetected": "not detected",
+        "socket": "Docker socket",
+        "reported": "reported",
+        "notReported": "not reported"
+    },
+    "empty": {
+        "connect": "Connect a Docker host to monitor and manage containers.",
+        "local": "The local host appears here automatically in the full edition. Use Add host for a remote engine.",
+        "noContainers": "No containers on this host."
+    },
+    "down": {
+        "title": "{name} is not answering",
+        "body": "Its containers show here again as soon as it is back. Where it is and how Polaris reaches it are on <link>its server page</link>."
+    },
+    "columns": {
+        "container": "Container",
+        "state": "State",
+        "cpu": "CPU",
+        "memory": "Memory"
+    },
+    "states": {
+        "running": "running",
+        "exited": "exited",
+        "created": "created",
+        "paused": "paused",
+        "restarting": "restarting",
+        "removing": "removing",
+        "dead": "dead"
+    },
+    "actions": {
+        "logs": "Logs",
+        "files": "Files",
+        "console": "Console",
+        "restart": "Restart",
+        "stop": "Stop",
+        "start": "Start"
+    },
+    "overview": {
+        "containers": "Containers",
+        "runningTotal": "running / total",
+        "cpu": "CPU (containers)",
+        "cores": "{count} cores",
+        "memory": "Memory (containers)",
+        "of": "of {total}",
+        "engine": "Engine",
+        "ofValue": "{used} of {total}"
+    },
+    "connection": {
+        "add": "Add host",
+        "title": "Add a Docker host",
+        "intro": "Monitor and manage containers on this host.",
+        "transport": "Transport",
+        "transports": {
+            "socket": "Local socket",
+            "ssh": "SSH (host Engine)",
+            "tcp": "TCP"
+        },
+        "name": "Name",
+        "namePlaceholder": "Local host",
+        "socketPath": "Socket path",
+        "host": "Host",
+        "port": "Port",
+        "username": "Username",
+        "installKey": "Use the installed access key",
+        "installKeyNone": "Use the installed access key (this deployment has none)",
+        "privateKey": "Private key (PEM)",
+        "passphrase": "Key passphrase (optional)",
+        "tls": "Use TLS",
+        "ca": "CA certificate",
+        "cert": "Client certificate",
+        "key": "Client key",
+        "connecting": "Connecting..."
+    },
+    "tabs": {
+        "details": "Details",
+        "logs": "Logs",
+        "files": "Files",
+        "console": "Console"
+    },
+    "detail": {
+        "stale": "Showing what was last read. {reason}",
+        "hostCores": "{count} cores on the host",
+        "ofHostCores": "of the host's cores",
+        "memShare": "{percent}% of {limit}",
+        "noLimit": "no limit set",
+        "network": "Network",
+        "in": "{size} in",
+        "out": "{size} out, since it started",
+        "sinceStart": "since it started",
+        "disk": "Disk I/O",
+        "read": "{size} read",
+        "written": "{size} written, since it started",
+        "watching": "Watching usage. The chart fills in from here - the first points arrive within a few seconds.",
+        "aged": "{hint} - {age} ago"
+    },
+    "runsOn": {
+        "local": "Local engine, brokered by the host daemon",
+        "server": "Registered server, over {transport}",
+        "connection": "Docker connection, over {transport}",
+        "title": "Runs on",
+        "reached": "Reached",
+        "machine": "Machine",
+        "machineValue": "{count} cores, {memory}",
+        "networks": "Networks"
+    },
+    "storage": {
+        "title": "Storage",
+        "writable": "Writable layer",
+        "notReported": "Not reported",
+        "total": "Total on disk",
+        "withLayers": "{size} with its image layers",
+        "mounts": "Mounts",
+        "none": "None"
+    },
+    "details": {
+        "id": "Container id",
+        "image": "Image",
+        "command": "Command",
+        "created": "Created",
+        "started": "Started",
+        "restarts": "Restarts",
+        "compose": "Compose project",
+        "ports": "Ports",
+        "noPorts": "None published",
+        "environment": "Environment",
+        "namesOnly": "Names only; values are never read."
+    },
+    "logs": {
+        "last": "Last {count} lines",
+        "fewer": "Show fewer",
+        "more": "Show more",
+        "refresh": "Refresh logs",
+        "empty": "This container has printed nothing."
+    },
+    "files": {
+        "breadcrumb": "Breadcrumb",
+        "empty": "This directory is empty.",
+        "download": "Download {name}"
+    },
+    "console": {
+        "start": "Start this container to open a console in it.",
+        "noSession": "This host does not offer an interactive session. Its engine is reached through the host daemon, which brokers one bounded call at a time."
+    },
+    "errors": {
+        "requestFailed": "Request failed ({status})",
+        "unreachable": "Could not reach Polaris",
+        "invalidConnection": "Invalid connection",
+        "engineUnreachable": "Could not reach the Docker Engine with these settings",
+        "connectionFailed": "Connection failed",
+        "actionFailed": "Action failed",
+        "removeFailed": "Could not remove this container"
+    },
+    "page": {
+        "description": "Monitor and manage Docker across your hosts - usage, state, and lifecycle."
+    }
+}

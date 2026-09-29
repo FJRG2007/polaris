@@ -99,11 +99,12 @@ const SCHEMA_WORDS: Record<string, ServersKey> = {
     "Write something first": "errors.schema.writeSomething"
 };
 
-/** The first thing a schema refused, in the reader's words, or `fallback` when it
- *  said nothing this screen has words for. */
+/** The first thing a schema refused, in the reader's words; a sentence this has
+ *  no words for passes through, and `fallback` stands in when it said nothing. */
 async function schemaSay(message: string | undefined, fallback: ServersKey): Promise<string> {
-    const key = message ? SCHEMA_WORDS[message] : undefined;
-    return say(key ?? fallback);
+    if (!message) return say(fallback);
+    const key = SCHEMA_WORDS[message];
+    return key ? say(key) : message;
 }
 
 /** What has happened to this server. */

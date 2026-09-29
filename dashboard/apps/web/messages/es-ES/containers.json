@@ -1,1 +1,190 @@
-{}
+{
+    "hosts": {
+        "noAnswer": "No responde",
+        "title": "Hosts de Docker",
+        "none": "Aún no hay hosts.",
+        "notAnswering": "No responde: {reason}",
+        "offline": "Apagado",
+        "local": "local",
+        "removeNamed": "Quitar {name}"
+    },
+    "remove": {
+        "title": "¿Quitar {name}?",
+        "running": "Sigue en marcha, así que primero se detendrá. Los volúmenes con nombre y las imágenes no se tocan.",
+        "stopped": "Los volúmenes con nombre y las imágenes no se tocan.",
+        "confirm": "Quitar",
+        "connectionTitle": "¿Quitar esta conexión de Docker?"
+    },
+    "live": {
+        "paused": "En pausa",
+        "loading": "Cargando",
+        "firstReading": "En directo: llega la primera lectura de uso",
+        "aged": "En directo: uso de hace {age}",
+        "refreshing": "En directo: se actualiza cada 5 s",
+        "stale": "Se muestra la última lectura. {reason}",
+        "pause": "Pausar",
+        "resume": "Reanudar",
+        "refresh": "Actualizar"
+    },
+    "local": {
+        "title": "El host de Docker local aún no está disponible",
+        "edition": "Edición",
+        "hostd": "Daemon de host",
+        "presentVersion": "presente (v{version})",
+        "present": "presente",
+        "notDetected": "no detectado",
+        "socket": "Socket de Docker",
+        "reported": "informado",
+        "notReported": "no informado"
+    },
+    "empty": {
+        "connect": "Conecta un host de Docker para vigilar y gestionar contenedores.",
+        "local": "En la edición completa el host local aparece aquí solo. Usa Añadir host para un motor remoto.",
+        "noContainers": "No hay contenedores en este host."
+    },
+    "down": {
+        "title": "{name} no responde",
+        "body": "Sus contenedores volverán a aparecer aquí en cuanto vuelva. Dónde está y cómo llega Polaris a él se ve en <link>su página de servidor</link>."
+    },
+    "columns": {
+        "container": "Contenedor",
+        "state": "Estado",
+        "cpu": "CPU",
+        "memory": "Memoria"
+    },
+    "states": {
+        "running": "en marcha",
+        "exited": "detenido",
+        "created": "creado",
+        "paused": "en pausa",
+        "restarting": "reiniciando",
+        "removing": "quitándose",
+        "dead": "muerto"
+    },
+    "actions": {
+        "logs": "Logs",
+        "files": "Archivos",
+        "console": "Consola",
+        "restart": "Reiniciar",
+        "stop": "Detener",
+        "start": "Iniciar"
+    },
+    "overview": {
+        "containers": "Contenedores",
+        "runningTotal": "en marcha / total",
+        "cpu": "CPU (contenedores)",
+        "cores": "{count} núcleos",
+        "memory": "Memoria (contenedores)",
+        "of": "de {total}",
+        "engine": "Motor",
+        "ofValue": "{used} de {total}"
+    },
+    "connection": {
+        "add": "Añadir host",
+        "title": "Añadir host de Docker",
+        "intro": "Vigila y gestiona los contenedores de este host.",
+        "transport": "Transporte",
+        "transports": {
+            "socket": "Socket local",
+            "ssh": "SSH (Engine del host)",
+            "tcp": "TCP"
+        },
+        "name": "Nombre",
+        "namePlaceholder": "Host local",
+        "socketPath": "Ruta socket",
+        "host": "Host",
+        "port": "Puerto",
+        "username": "Usuario",
+        "installKey": "Usar la clave de acceso instalada",
+        "installKeyNone": "Usar la clave de acceso instalada (este despliegue no tiene)",
+        "privateKey": "Clave privada (PEM)",
+        "passphrase": "Frase de la clave (opcional)",
+        "tls": "Usar TLS",
+        "ca": "Certificado CA",
+        "cert": "Certificado de cliente",
+        "key": "Clave cliente",
+        "connecting": "Conectando..."
+    },
+    "tabs": {
+        "details": "Detalles",
+        "logs": "Logs",
+        "files": "Archivos",
+        "console": "Consola"
+    },
+    "detail": {
+        "stale": "Se muestra lo último leído. {reason}",
+        "hostCores": "{count} núcleos en el host",
+        "ofHostCores": "de los núcleos del host",
+        "memShare": "{percent}% de {limit}",
+        "noLimit": "sin límite",
+        "network": "Red",
+        "in": "{size} de entrada",
+        "out": "{size} de salida, desde que arrancó",
+        "sinceStart": "desde que arrancó",
+        "disk": "E/S disco",
+        "read": "{size} leídos",
+        "written": "{size} escritos, desde que arrancó",
+        "watching": "Vigilando el uso. El gráfico se rellena a partir de ahora: los primeros puntos llegan en unos segundos.",
+        "aged": "{hint} - hace {age}"
+    },
+    "runsOn": {
+        "local": "Motor local, a través del daemon de host",
+        "server": "Servidor registrado, por {transport}",
+        "connection": "Conexión de Docker, por {transport}",
+        "title": "Corre en",
+        "reached": "Acceso",
+        "machine": "Máquina",
+        "machineValue": "{count} núcleos, {memory}",
+        "networks": "Redes"
+    },
+    "storage": {
+        "title": "Disco",
+        "writable": "Capa escribible",
+        "notReported": "Sin datos",
+        "total": "Total en disco",
+        "withLayers": "{size} con sus capas de imagen",
+        "mounts": "Montajes",
+        "none": "Ninguno"
+    },
+    "details": {
+        "id": "Id",
+        "image": "Imagen",
+        "command": "Comando",
+        "created": "Creado",
+        "started": "Iniciado",
+        "restarts": "Reinicios",
+        "compose": "Proyecto Compose",
+        "ports": "Puertos",
+        "noPorts": "Ninguno publicado",
+        "environment": "Entorno",
+        "namesOnly": "Solo los nombres; los valores nunca se leen."
+    },
+    "logs": {
+        "last": "Últimas {count} líneas",
+        "fewer": "Mostrar menos",
+        "more": "Mostrar más",
+        "refresh": "Actualizar logs",
+        "empty": "Este contenedor no ha escrito nada."
+    },
+    "files": {
+        "breadcrumb": "Ruta",
+        "empty": "Esta carpeta está vacía.",
+        "download": "Descargar {name}"
+    },
+    "console": {
+        "start": "Inicia este contenedor para abrir una consola en él.",
+        "noSession": "Este host no ofrece sesión interactiva. Se llega a su motor a través del daemon de host, que hace de intermediario de una llamada acotada cada vez."
+    },
+    "errors": {
+        "requestFailed": "La petición falló ({status})",
+        "unreachable": "No se pudo llegar a Polaris",
+        "invalidConnection": "Conexión no válida",
+        "engineUnreachable": "No se pudo llegar al Docker Engine con estos ajustes",
+        "connectionFailed": "La conexión falló",
+        "actionFailed": "La acción falló",
+        "removeFailed": "No se pudo quitar este contenedor"
+    },
+    "page": {
+        "description": "Vigila y gestiona Docker en tus hosts: uso, estado y ciclo de vida."
+    }
+}

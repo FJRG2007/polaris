@@ -18,13 +18,28 @@ import {
     HOST_DOCKER_PREFIX,
     LOCAL_DOCKER_CONNECTION_ID
 } from "@/lib/docker-service";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+type ContainersKey = NamespaceKey<"containers">;
+
+/** A reply in the reader's language. */
+async function say(key: ContainersKey): Promise<string> {
+    return (await getTranslations("containers"))(key);
+}
+
+/** What went wrong, for the reader: a service's own sentence passes through, and
+ *  anything that is not an Error reads as `fallback`. */
+async function failure(caught: unknown, fallback: ContainersKey): Promise<string> {
+    return caught instanceof Error ? caught.message : say(fallback);
+}
 
 const CONTAINERS_PATH = "/apps/containers";
 
 export async function createDockerConnectionAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = createDockerConnectionSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid connection" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await say("errors.invalidConnection")) };
 
     // Validate connectivity before persisting.
     try {
@@ -35,9 +50,9 @@ export async function createDockerConnectionAction(input: unknown): Promise<{ er
         });
         const ok = await probe.ping();
         await probe.dispose();
-        if (!ok) return { error: "Could not reach the Docker Engine with these settings" };
+        if (!ok) return { error: await say("errors.engineUnreachable") };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Connection failed" };
+        return { error: await failure(caught, "errors.connectionFailed") };
     }
 
     const created = await createDockerConnection(
@@ -80,7 +95,7 @@ export async function containerAction(
             else await driver.restart(containerId);
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Action failed" };
+        return { error: await failure(caught, "errors.actionFailed") };
     }
     await recordAudit({
         actorId: user.id,
@@ -108,7 +123,7 @@ export async function removeContainerAction(
     try {
         await withDockerDriver(connectionId, user.id, (driver) => driver.remove(containerId, options));
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not remove this container" };
+        return { error: await failure(caught, "errors.removeFailed") };
     }
     await recordAudit({
         actorId: user.id,

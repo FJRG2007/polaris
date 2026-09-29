@@ -21,6 +21,8 @@ import { carryForwardUsage } from "./usage";
 import { formatAge, STALE_AFTER_MS } from "./freshness";
 import { useConfirm } from "@/components/confirm-dialog";
 import { PolarisFootprintCard } from "./polaris-footprint";
+import { containerStateLabel } from "./container-words";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useLiveResource } from "@/components/use-live-resource";
 import {
     DEFAULT_DIRECTION,
@@ -92,6 +94,7 @@ export function ContainersView({
     canManage: boolean;
     localDiagnostic: LocalHostDiagnostic | null;
 }) {
+    const t = useTranslations("containers");
     const router = useRouter();
     // Whether the host on screen is the machine Polaris runs on, which is the only
     // one that has a Polaris to measure.
@@ -131,9 +134,9 @@ export function ContainersView({
         (connection: DockerConnectionSummary): string | null => {
             if (!connection.hostId || !reachability) return null;
             const status = reachability.find((entry) => entry.id === connection.hostId);
-            return status?.state === "down" ? (status.detail ?? "No answer") : null;
+            return status?.state === "down" ? (status.detail ?? t("hosts.noAnswer")) : null;
         },
-        [reachability]
+        [reachability, t]
     );
     const selected = connections.find((connection) => connection.id === connectionId) ?? null;
     const unreachable = selected ? downReason(selected) : null;
@@ -197,11 +200,9 @@ export function ContainersView({
     async function onRemoveContainer(container: ContainerRow) {
         const running = container.state === "running";
         const confirmed = await confirm({
-            title: `Remove ${container.name}?`,
-            description: running
-                ? "It is still running, so it will be stopped first. Named volumes and images are left alone."
-                : "Named volumes and images are left alone.",
-            confirmLabel: "Remove",
+            title: t("remove.title", { name: container.name }),
+            description: running ? t("remove.running") : t("remove.stopped"),
+            confirmLabel: t("remove.confirm"),
             danger: true
         });
         if (!confirmed) return;
@@ -222,8 +223,8 @@ export function ContainersView({
     async function onDeleteConnection(id: string) {
         if (
             !(await confirm({
-                title: "Remove this Docker connection?",
-                confirmLabel: "Remove",
+                title: t("remove.connectionTitle"),
+                confirmLabel: t("remove.confirm"),
                 danger: true
             }))
         )
@@ -262,14 +263,14 @@ export function ContainersView({
     // that has aged pass for this instant's.
     const usageAge = snapshot?.statsAt ? Date.now() - snapshot.statsAt : null;
     const statusLabel = !live
-        ? "Paused"
+        ? t("live.paused")
         : loading
-          ? "Loading"
+          ? t("live.loading")
           : usageAge === null
-            ? "Live - first usage reading on its way"
+            ? t("live.firstReading")
             : usageAge > STALE_AFTER_MS
-              ? `Live - usage from ${formatAge(usageAge)} ago`
-              : "Live - refreshing every 5s";
+              ? t("live.aged", { age: formatAge(usageAge) })
+              : t("live.refreshing")
 
     /** A container's own page, on the host it was listed from. Named rather than
      *  identified: it is what Docker calls it, what every call here accepts in
@@ -283,12 +284,12 @@ export function ContainersView({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
             <aside className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-sm font-medium text-muted-foreground">Docker hosts</h2>
+                    <h2 className="text-sm font-medium text-muted-foreground">{t("hosts.title")}</h2>
                     <DockerConnectionDialog sshEnabled={sshEnabled} />
                 </div>
                 <nav className="flex flex-col gap-1">
                     {connections.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No hosts yet.</p>
+                        <p className="text-sm text-muted-foreground">{t("hosts.none")}</p>
                     ) : (
                         connections.map((connection) => (
                             <div key={connection.id} className="group flex items-center gap-1">
@@ -297,7 +298,7 @@ export function ContainersView({
                                     // would only spend its connect timeout to say so.
                                     <span
                                         aria-disabled="true"
-                                        title={`Not answering: ${downReason(connection)}`}
+                                        title={t("hosts.notAnswering", { reason: downReason(connection) ?? "" })}
                                         className={cn(
                                             "flex flex-1 cursor-not-allowed items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground",
                                             connection.id === connectionId && "bg-muted font-medium"
@@ -305,7 +306,7 @@ export function ContainersView({
                                     >
                                         <Server className="size-4" />
                                         <span className="flex-1 truncate">{connection.name}</span>
-                                        <Badge variant="danger">Offline</Badge>
+                                        <Badge variant="danger">{t("hosts.offline")}</Badge>
                                     </span>
                                 ) : (
                                     <Link
@@ -320,7 +321,7 @@ export function ContainersView({
                                             {connection.name}
                                         </span>
                                         <Badge variant="neutral">
-                                            {connection.local ? "local" : connection.transport}
+                                            {connection.local ? t("hosts.local") : connection.transport}
                                         </Badge>
                                     </Link>
                                 )}
@@ -329,8 +330,8 @@ export function ContainersView({
                                         size="icon"
                                         variant="ghost"
                                         onClick={() => onDeleteConnection(connection.id)}
-                                        aria-label={`Remove ${connection.name}`}
-                                        title={`Remove ${connection.name}`}
+                                        aria-label={t("hosts.removeNamed", { name: connection.name })}
+                                        title={t("hosts.removeNamed", { name: connection.name })}
                                         className="md:opacity-0 md:group-hover:opacity-100"
                                     >
                                         <Trash2 className="size-4" />
@@ -345,48 +346,49 @@ export function ContainersView({
             <section className="min-w-0">
                 {localDiagnostic ? (
                     <div className="mb-4 rounded-md border border-warning-edge bg-warning-soft p-4 text-sm">
-                        <p className="font-medium">The local Docker host is not available yet</p>
+                        <p className="font-medium">{t("local.title")}</p>
                         <p className="mt-1 text-muted-foreground">{localDiagnostic.reason}</p>
                         <dl className="mt-3 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                            <dt>Edition</dt>
+                            <dt>{t("local.edition")}</dt>
                             <dd className="font-mono">{localDiagnostic.edition}</dd>
-                            <dt>Host daemon</dt>
+                            <dt>{t("local.hostd")}</dt>
                             <dd className="font-mono">
                                 {localDiagnostic.hostdPresent
-                                    ? `present${localDiagnostic.hostdVersion ? ` (v${localDiagnostic.hostdVersion})` : ""}`
-                                    : "not detected"}
+                                    ? localDiagnostic.hostdVersion
+                                        ? t("local.presentVersion", { version: localDiagnostic.hostdVersion })
+                                        : t("local.present")
+                                    : t("local.notDetected")}
                             </dd>
-                            <dt>Docker socket</dt>
+                            <dt>{t("local.socket")}</dt>
                             <dd className="font-mono">
-                                {localDiagnostic.dockerReported ? "reported" : "not reported"}
+                                {localDiagnostic.dockerReported ? t("local.reported") : t("local.notReported")}
                             </dd>
                         </dl>
                     </div>
                 ) : null}
                 {!connectionId ? (
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                        Connect a Docker host to monitor and manage containers.
-                        <span className="mt-2 block">
-                            The local host appears here automatically in the full edition. Use Add
-                            host for a remote engine.
-                        </span>
+                        {t("empty.connect")}
+                        <span className="mt-2 block">{t("empty.local")}</span>
                     </div>
                 ) : unreachable && selected ? (
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         <p className="font-medium text-foreground">
-                            {selected.name} is not answering
+                            {t("down.title", { name: selected.name })}
                         </p>
                         <p className="mt-1">{unreachable}</p>
                         <p className="mt-3">
-                            Its containers show here again as soon as it is back. Where it is and
-                            how Polaris reaches it are on{" "}
-                            <Link
-                                href={`/apps/servers/${selected.hostId}`}
-                                className="underline hover:text-foreground"
-                            >
-                                its server page
-                            </Link>
-                            .
+                            {t.rich("down.body", {
+                                link: (chunks) => (
+                                    <Link
+                                        key="link"
+                                        href={`/apps/servers/${selected.hostId}`}
+                                        className="underline hover:text-foreground"
+                                    >
+                                        {chunks}
+                                    </Link>
+                                )
+                            })}
                         </p>
                     </div>
                 ) : (
@@ -398,7 +400,7 @@ export function ContainersView({
                         ) : null}
                         {!actionError && !error && stale ? (
                             <div className="mb-4 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm">
-                                Showing the last reading. {stale}
+                                {t("live.stale", { reason: stale })}
                             </div>
                         ) : null}
 
@@ -429,7 +431,7 @@ export function ContainersView({
                                     variant="ghost"
                                     onClick={() => setLive((value) => !value)}
                                 >
-                                    {live ? "Pause" : "Resume"}
+                                    {live ? t("live.pause") : t("live.resume")}
                                 </Button>
                                 <Button
                                     size="sm"
@@ -438,7 +440,7 @@ export function ContainersView({
                                     disabled={pending}
                                 >
                                     <RefreshCw className="size-4" />
-                                    Refresh
+                                    {t("live.refresh")}
                                 </Button>
                             </div>
                         </div>
@@ -448,25 +450,25 @@ export function ContainersView({
                                 <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                     <tr>
                                         <SortHeader
-                                            label="Container"
+                                            label={t("columns.container")}
                                             order="name"
                                             sort={sort}
                                             onSort={sortBy}
                                         />
                                         <SortHeader
-                                            label="State"
+                                            label={t("columns.state")}
                                             order="state"
                                             sort={sort}
                                             onSort={sortBy}
                                         />
                                         <SortHeader
-                                            label="CPU"
+                                            label={t("columns.cpu")}
                                             order="cpu"
                                             sort={sort}
                                             onSort={sortBy}
                                         />
                                         <SortHeader
-                                            label="Memory"
+                                            label={t("columns.memory")}
                                             order="memory"
                                             sort={sort}
                                             onSort={sortBy}
@@ -489,7 +491,7 @@ export function ContainersView({
                                                 colSpan={5}
                                                 className="px-3 py-8 text-center text-muted-foreground"
                                             >
-                                                No containers on this host.
+                                                {t("empty.noContainers")}
                                             </td>
                                         </tr>
                                     ) : (
@@ -521,7 +523,7 @@ export function ContainersView({
                                                                 : "neutral"
                                                         }
                                                     >
-                                                        {container.state}
+                                                        {containerStateLabel(t, container.state)}
                                                     </Badge>
                                                 </td>
                                                 <UsageCell
@@ -543,20 +545,20 @@ export function ContainersView({
                                                 <td className="px-3 py-2">
                                                     <div className="flex justify-end gap-1">
                                                         <IconLink
-                                                            label="Logs"
+                                                            label={t("actions.logs")}
                                                             href={containerHref(container, "logs")}
                                                         >
                                                             <ScrollText className="size-4" />
                                                         </IconLink>
                                                         <IconLink
-                                                            label="Files"
+                                                            label={t("actions.files")}
                                                             href={containerHref(container, "files")}
                                                         >
                                                             <FileText className="size-4" />
                                                         </IconLink>
                                                         {container.state === "running" ? (
                                                             <IconLink
-                                                                label="Console"
+                                                                label={t("actions.console")}
                                                                 href={containerHref(
                                                                     container,
                                                                     "console"
@@ -566,7 +568,7 @@ export function ContainersView({
                                                             </IconLink>
                                                         ) : (
                                                             <IconButton
-                                                                label="Console"
+                                                                label={t("actions.console")}
                                                                 onClick={() => undefined}
                                                                 disabled
                                                             >
@@ -578,7 +580,7 @@ export function ContainersView({
                                                                 {container.state === "running" ? (
                                                                     <>
                                                                         <IconButton
-                                                                            label="Restart"
+                                                                            label={t("actions.restart")}
                                                                             onClick={() =>
                                                                                 onAction(
                                                                                     container.id,
@@ -590,7 +592,7 @@ export function ContainersView({
                                                                             <RotateCw className="size-4" />
                                                                         </IconButton>
                                                                         <IconButton
-                                                                            label="Stop"
+                                                                            label={t("actions.stop")}
                                                                             onClick={() =>
                                                                                 onAction(
                                                                                     container.id,
@@ -604,7 +606,7 @@ export function ContainersView({
                                                                     </>
                                                                 ) : (
                                                                     <IconButton
-                                                                        label="Start"
+                                                                        label={t("actions.start")}
                                                                         onClick={() =>
                                                                             onAction(
                                                                                 container.id,
@@ -617,7 +619,7 @@ export function ContainersView({
                                                                     </IconButton>
                                                                 )}
                                                                 <IconButton
-                                                                    label="Remove"
+                                                                    label={t("remove.confirm")}
                                                                     onClick={() =>
                                                                         void onRemoveContainer(
                                                                             container
@@ -649,29 +651,30 @@ export function ContainersView({
  *  least once: the totals are zero until then, and a zero that means "not read
  *  yet" is worse than saying nothing. */
 function Overview({ overview, sampled }: { overview: OverviewData; sampled: boolean }) {
+    const t = useTranslations("containers");
     return (
         <>
             <Stat
                 icon={<Boxes className="size-4" />}
-                label="Containers"
+                label={t("overview.containers")}
                 value={`${overview.running}/${overview.containers}`}
-                hint="running / total"
+                hint={t("overview.runningTotal")}
             />
             <Stat
                 icon={<Cpu className="size-4" />}
-                label="CPU (containers)"
+                label={t("overview.cpu")}
                 value={sampled ? `${overview.aggregateCpuPercent}%` : null}
-                hint={`${overview.ncpu} cores`}
+                hint={t("overview.cores", { count: overview.ncpu })}
             />
             <Stat
                 icon={<MemoryStick className="size-4" />}
-                label="Memory (containers)"
+                label={t("overview.memory")}
                 value={sampled ? formatBytes(overview.aggregateMemUsage) : null}
-                hint={`of ${formatBytes(overview.memTotal)}`}
+                hint={t("overview.of", { total: formatBytes(overview.memTotal) })}
             />
             <Stat
                 icon={<Server className="size-4" />}
-                label="Engine"
+                label={t("overview.engine")}
                 value={overview.serverVersion || overview.name}
                 hint={overview.name}
             />

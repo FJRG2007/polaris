@@ -515,5 +515,64 @@
             "summary": "Polaris no ha podido saber dónde está este servidor.",
             "routing": "Indica dónde está para saber cómo apuntarle un dominio."
         }
+    },
+    "footprint": {
+        "noReason": "El motor no ha dicho por qué.",
+        "title": "El propio Polaris",
+        "measure": "Volver a medir",
+        "failed": "Polaris no ha podido medirse. {reason}",
+        "columns": {
+            "part": "Parte",
+            "cpu": "CPU",
+            "memory": "Memoria",
+            "disk": "Disco"
+        },
+        "totals": "<b>{memory}</b> de memoria{machine, select, yes { de los {total} de la máquina} other {}}, <b>{cpu}%</b> de CPU y <b>{complete, select, yes {} other {al menos }}{disk}</b> en disco: {images} de imágenes, {data} de datos y {written} escritos por los propios contenedores.",
+        "rest": "Todo lo demás que corre aquí (<b>{count, plural, one {# contenedor} other {# contenedores}}</b> de servicios y apps instaladas) usa <b>{memory}</b> y <b>{cpu}%</b> de CPU.",
+        "image": "imagen {size}",
+        "written": "escrito {size}",
+        "notMeasured": "sin medir",
+        "parts": {
+            "web": {
+                "label": "Panel",
+                "summary": "El panel de control: todas las páginas, la API y las tareas en segundo plano."
+            },
+            "postgres": {
+                "label": "Base de datos",
+                "summary": "Todo lo que Polaris recuerda."
+            },
+            "traefik": {
+                "label": "Edge",
+                "summary": "Enruta cada dominio y guarda los certificados."
+            },
+            "edgeGuard": {
+                "label": "Edge guard",
+                "summary": "Aplica el cortafuegos a las peticiones según llegan."
+            },
+            "hostd": {
+                "label": "Daemon de host",
+                "summary": "Montajes, archivos del host y el proxy de Docker."
+            },
+            "livekit": {
+                "label": "Llamadas",
+                "summary": "Transporta el sonido y la imagen de una llamada."
+            },
+            "mdns": {
+                "label": "Descubrimiento",
+                "summary": "Responde a polaris.local en la red."
+            },
+            "mcRouter": {
+                "label": "Router de Minecraft",
+                "summary": "Un puerto para todos los servidores Java."
+            },
+            "caddy": {
+                "label": "Edge (antiguo)",
+                "summary": "El edge anterior, guardado para volver atrás."
+            },
+            "tunnel": {
+                "label": "Túnel público",
+                "summary": "Publica Polaris sin redirigir puertos."
+            }
+        }
     }
 }

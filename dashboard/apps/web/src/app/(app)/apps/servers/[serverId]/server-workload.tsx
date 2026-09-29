@@ -21,6 +21,7 @@ import { useLiveResource } from "@/components/use-live-resource";
 import { formatAge, STALE_AFTER_MS } from "@/app/(app)/apps/containers/freshness";
 import type { ContainerRow, HostSnapshot } from "@/app/(app)/apps/containers/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { containerStateLabel } from "@/app/(app)/apps/containers/container-words";
 
 /** The same cadence the Containers table polls at: this is the same data, and a
  *  server's page is no less live than the list it was opened from. */
@@ -130,6 +131,7 @@ function ContainerLine({
     /** What the machine has, so a container's memory reads as a share of it. */
     memTotal: number | null;
 }) {
+    const tc = useTranslations("containers");
     const share = memTotal && container.memUsage !== null ? container.memUsage / memTotal : null;
     return (
         <li>
@@ -146,7 +148,9 @@ function ContainerLine({
                         {container.image}
                     </span>
                 </span>
-                {container.state === "running" ? null : <Badge variant="neutral">{container.state}</Badge>}
+                {container.state === "running" ? null : (
+                    <Badge variant="neutral">{containerStateLabel(tc, container.state)}</Badge>
+                )}
                 <span className="w-14 shrink-0 text-right tabular-nums text-muted-foreground">
                     {container.cpuPercent === null ? "-" : `${container.cpuPercent}%`}
                 </span>
