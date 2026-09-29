@@ -65,7 +65,39 @@
         "theySignInFrom": "Inicia sesión desde",
         "note": "Nota",
         "whoThisIsForWhoever": "Quién es, para quien lea la lista después. Solo lo ve Polaris.",
-        "whoThisIs": "Quién es"
+        "whoThisIs": "Quién es",
+        "experienceOf": "Experiencia de {name}",
+        "teleportNamed": "Teleportar a {name}",
+        "inventoryOf": "Inventario de {name}",
+        "whereIs": "Dónde está {name}",
+        "asking": "Preguntando al servidor...",
+        "coordinatesOf": "Coordenadas de {name}",
+        "exactly": "- exacto",
+        "dimensions": {
+            "overworld": "Superficie",
+            "nether": "El Nether",
+            "end": "El End"
+        },
+        "onThisServer": "{name} en este servidor",
+        "editNamed": "Editar {name}",
+        "followsDescription": "{player} entra desde donde {account} tenga sesión en Polaris.",
+        "linkedDescription": "{player} es {account} en Polaris. Desde dónde entra lo deciden las direcciones de abajo.",
+        "inviteEmail": "Invitar a {email}",
+        "tiedTo": "La cuenta que cree queda vinculada a {name}.",
+        "inviteFailed": "No se pudo enviar el correo a {email} ({reason}). Envíale este enlace en su lugar.",
+        "inviteLink": "Envía este enlace a {email}. Cuando cree su cuenta, quedará vinculada a {name}.",
+        "invited": "Invitación enviada a {email}. Cuando cree su cuenta, quedará vinculada a {name}.",
+        "whereCanJoin": "Desde dónde puede entrar {name}",
+        "followsHint": "Solo entra desde una dirección donde {name} tenga sesión en Polaris, y se le quita al cerrarla.",
+        "typedGo": " Las direcciones escritas para él se quitan.",
+        "linkedHint": "Vinculado a {name} para saber quién es. Las direcciones escritas aquí siguen decidiendo desde dónde entra.",
+        "noMinecraft": "{name} no ha vinculado Minecraft, así que escribe su usuario.",
+        "typedBy": "Escrito por {name} (sin verificar).",
+        "linkedTo": "Vinculado a {name}.",
+        "followsSignIns": "Sigue los inicios de sesión de {name} en Polaris.",
+        "notSignedIn": "{account} no tiene sesión en Polaris en ninguna parte, así que {player} no puede entrar ahora.",
+        "removeAddressFrom": "Quitar {address} de {name}",
+        "removeNamed": "Quitar {name}"
     },
     "announce": {
         "forTheTimeBelow": "El tiempo de abajo",
@@ -120,6 +152,20 @@
         "bedrockHasNoCustomColors": "Bedrock no tiene colores personalizados, subrayado ni tachado; se muestra lo más parecido que tiene.",
         "howItLooksInThe": "Cómo se ve en el juego, mientras escribes.",
         "previewOfTheAnnouncementIn": "Vista previa del anuncio en el juego",
-        "minecraftDrawsItsOwnFont": "Minecraft dibuja su propia fuente, así que el espaciado aquí es aproximado."
+        "minecraftDrawsItsOwnFont": "Minecraft dibuja su propia fuente, así que el espaciado aquí es aproximado.",
+        "vars": {
+            "game": "Cada jugador ve el suyo",
+            "account": "Cada jugador ve el de su cuenta de Polaris. Añade un valor por defecto para quien no tenga: '{'polaris.name | \"Jugador\"'}'",
+            "server": "El mismo para todos, leído al enviarlo"
+        },
+        "deleteTitle": "¿Borrar «{name}»?",
+        "onScreenNow": "En pantalla ahora: ",
+        "until": "hasta el {date}",
+        "load": "Cargar «{name}»",
+        "moreFor": "Más de {name}",
+        "overwrite": "Guardar lo escrito en ella",
+        "chatLines": "Hasta {count} líneas en el chat.",
+        "inSeconds": "{label}, en segundos",
+        "play": "Oír"
     }
 }

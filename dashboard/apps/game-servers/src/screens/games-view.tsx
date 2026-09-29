@@ -360,7 +360,7 @@ export function GamesView({
                 description={
                     rows.length === 0
                         ? t("list.runGameServersOnYour")
-                        : `${rows.length} ${rows.length === 1 ? "server" : "servers"}, ${playing} playing right now.`
+                        : t("list.summary", { count: rows.length, playing })
                 }
                 actions={
                     canCreate ? (
@@ -435,7 +435,7 @@ export function GamesView({
                                 }
                             >
                                 <Archive className="size-4" />
-                                Archived {archivedCount > 0 ? `(${archivedCount})` : ""}
+                                {archivedCount > 0 ? t("list.archivedCount", { count: archivedCount }) : t("list.archived")}
                             </Button>
                         )}
                     </div>
@@ -545,13 +545,14 @@ function SortHeader({
     sorted: list.SortDir | null;
     onClick: () => void;
 }) {
+    const t = useGameText("games");
     return (
         <th className="px-3 py-2 font-medium">
             <button
                 type="button"
                 onClick={onClick}
                 className="flex items-center gap-1 transition-colors hover:text-foreground"
-                title={`Sort by ${label.toLowerCase()}`}
+                title={t("list.sortBy", { label: label.toLowerCase() })}
             >
                 {label}
                 {sorted === null ? (
@@ -633,16 +634,19 @@ function TurnOnGameServers({ canAdd }: { canAdd: boolean }) {
                     )}
 
                     <p className="text-xs text-muted-foreground">
-                        Creating a Minecraft server accepts the{" "}
-                        <a
-                            href="https://www.minecraft.net/eula"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline underline-offset-2 hover:text-foreground"
-                        >
-                            {t("list.minecraftEula")}
-                        </a>
-                        .
+                        {t.rich("list.eulaNotice", {
+                            eula: (chunks) => (
+                                <a
+                                    key="eula"
+                                    href="https://www.minecraft.net/eula"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="underline underline-offset-2 hover:text-foreground"
+                                >
+                                    {chunks}
+                                </a>
+                            )
+                        })}
                     </p>
                 </CardBody>
             </Card>
@@ -673,8 +677,6 @@ function filesRoot(game: GameId | null): string {
 /** Why a server has no files to browse: it has never been deployed, so there is
  *  no container and nothing on disk. A stopped one is browsable - its files are
  *  read out of the volumes it leaves behind. */
-const FILES_NEED_DEPLOY = "Deploy the server to browse its files";
-
 function ServerRow({
     server,
     canManage,
@@ -781,8 +783,8 @@ function ServerRow({
                             <IconButton
                                 label={
                                     server.favorite
-                                        ? `Take ${server.name} off your favorites`
-                                        : `Keep ${server.name} at the top`
+                                        ? t("list.unfavoriteNamed", { name: server.name })
+                                        : t("list.favoriteNamed", { name: server.name })
                                 }
                                 disabled={pending}
                                 onClick={() => onPref({ favorite: !server.favorite })}
@@ -794,15 +796,15 @@ function ServerRow({
                                     )}
                                 />
                             </IconButton>
-                            <IconLink label={`Open ${server.name}`} href={href}>
+                            <IconLink label={t("list.openNamed", { name: server.name })} href={href}>
                                 <ExternalLink className="size-4" />
                             </IconLink>
                             {files && (
                                 <IconLink
                                     label={
                                         browsable
-                                            ? `Browse the files of ${server.name}`
-                                            : FILES_NEED_DEPLOY
+                                            ? t("list.filesOf", { name: server.name })
+                                            : t("list.filesNeedDeploy")
                                     }
                                     href={files}
                                     disabled={!browsable}
@@ -812,7 +814,7 @@ function ServerRow({
                             )}
                             {canManage && (
                                 <IconButton
-                                    label={running ? `Stop ${server.name}` : `Start ${server.name}`}
+                                    label={running ? t("list.stopNamed", { name: server.name }) : t("list.startNamed", { name: server.name })}
                                     disabled={pending || !known || !server.applicationId}
                                     onClick={() =>
                                         onRun(() => setGameServerRunningAction(server.id, !running))
@@ -827,7 +829,7 @@ function ServerRow({
                             )}
                             {canRemove && (
                                 <IconButton
-                                    label={`Delete ${server.name}`}
+                                    label={t("list.deleteNamed", { name: server.name })}
                                     disabled={pending}
                                     onClick={onDelete}
                                 >
@@ -860,7 +862,7 @@ function ServerRow({
                         // tooltip nobody can reach.
                         <ContextMenuItem disabled>
                             <FolderOpen className="size-4" /> {t("list.files")}
-                            <span className="ml-auto pl-3 text-xs">{FILES_NEED_DEPLOY}</span>
+                            <span className="ml-auto pl-3 text-xs">{t("list.filesNeedDeploy")}</span>
                         </ContextMenuItem>
                     ))}
                 {known && address && (
@@ -1015,7 +1017,7 @@ function AddressCell({
             <code className="truncate font-mono text-xs" title={facts.address}>
                 {facts.address}
             </code>
-            {fresh && <CopyButton value={facts.address} label={`the address of ${name}`} />}
+            {fresh && <CopyButton value={facts.address} label={t("list.addressOf", { name })} />}
         </div>
     );
 }

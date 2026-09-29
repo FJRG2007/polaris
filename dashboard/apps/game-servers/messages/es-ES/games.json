@@ -31,7 +31,6 @@
         "runGameServers": "Ejecutar servidores",
         "createAsManyAsYou": "Crea tantos como quieras, de cualquier juego de abajo, cada uno con su dirección, consola, jugadores y ajustes. No se descarga nada hasta que creas un servidor, y solo para el juego de ese servidor.",
         "turnOnGameServers": "Activar servidores",
-        "minecraftEula": "EULA de Minecraft",
         "open": "Abrir",
         "files": "Archivos",
         "copyAddress": "Copiar",
@@ -47,7 +46,21 @@
         "nobodyIsPlayingRightNow": "Nadie está jugando ahora",
         "bedrockClientsCanJoinThis": "Los clientes Bedrock pueden entrar en este servidor Java",
         "bedrockToo": "Y Bedrock",
-        "noAddressYet": "Aún sin dirección"
+        "noAddressYet": "Aún sin dirección",
+        "summary": "{count, plural, one {# servidor} other {# servidores}}, {playing} jugando ahora.",
+        "archived": "Archivados ",
+        "archivedCount": "Archivados ({count})",
+        "sortBy": "Ordenar por {label}",
+        "eulaNotice": "Crear un servidor de Minecraft acepta el <eula>EULA de Minecraft</eula>.",
+        "unfavoriteNamed": "Quitar {name} de favoritos",
+        "favoriteNamed": "Mantener {name} arriba",
+        "openNamed": "Abrir {name}",
+        "filesOf": "Ver los archivos de {name}",
+        "filesNeedDeploy": "Despliega el servidor para ver sus archivos",
+        "stopNamed": "Parar {name}",
+        "startNamed": "Arrancar {name}",
+        "deleteNamed": "Borrar {name}",
+        "addressOf": "la dirección de {name}"
     },
     "create": {
         "newServer": "Nuevo",
@@ -65,7 +78,6 @@
         "howMuchTheServerMay": "Cuánto puede usar el servidor, como 3G o 4096M.",
         "hytaleGivesOutItsServer": "Hytale entrega los archivos del servidor a través de tu propia cuenta. Cuando exista este servidor, pon HytaleServer.jar y Assets.zip en sus Archivos y arrancará solo.",
         "serverKey": "Clave",
-        "getOneFromKeymaster": "consigue una en keymaster",
         "nameInTheServerBrowser": "Nombre en el buscador",
         "blankUsesTheNameAbove": "Vacío usa el nombre de arriba. Es lo que buscan los jugadores en el juego.",
         "on": "Sí",
@@ -107,6 +119,16 @@
         "itStartsWithAConsole": "Empieza con una contraseña de consola que Polaris guarda por ti, las direcciones de los jugadores ocultas y los mods de ScriptHook rechazados. Quién puede entrar se cambia desde la pantalla Seguridad del propio servidor.",
         "theServerStartsClosedNobody": "El servidor empieza cerrado: nadie más puede entrar hasta que lo añadas, y cada jugador solo entra desde la dirección registrada para él. Cámbialo después en Cortafuegos.",
         "cancel": "Cancelar",
-        "createServer": "Crear servidor"
+        "createServer": "Crear servidor",
+        "blueprintOption": "{name} ({count} ajustes)",
+        "fivemKey": "FiveM no arranca sin una. Son gratis: <link>consigue una en keymaster</link>.",
+        "arkMemory": "Un servidor de ARK para {count, plural, one {# jugador} other {# jugadores}} a la vez usa unos <strong>{memory}</strong> de memoria y unos 30 GB de disco, que se descargan la primera vez que arranca.",
+        "fivemMemory": "Un servidor de FiveM para {count, plural, one {# jugador} other {# jugadores}} a la vez usa unos <strong>{memory}</strong> de memoria, más lo que pesen los recursos que instales.",
+        "otherMemory": "Polaris le dará <amount></amount> de memoria para {count, plural, one {# jugador} other {# jugadores}} a la vez. Puedes cambiarlo después en Ajustes.",
+        "committed": "{memory} ya comprometidos con servidores de aquí.",
+        "connectTo": "Los jugadores se conectarán a <address></address>.",
+        "connectToPort": "Los jugadores se conectarán a <address></address> y su puerto.",
+        "addressHint": "Una dirección, un rango como 203.0.113.0/24, o \"any\".",
+        "exampleName": "Aventura"
     }
 }

@@ -31,7 +31,6 @@
         "runGameServers": "Run game servers",
         "createAsManyAsYou": "Create as many as you want, of any game below, each with its own address, console, players and settings. Nothing is downloaded until you create a server, and only for the game that server plays.",
         "turnOnGameServers": "Turn on game servers",
-        "minecraftEula": "Minecraft EULA",
         "open": "Open",
         "files": "Files",
         "copyAddress": "Copy address",
@@ -47,7 +46,21 @@
         "nobodyIsPlayingRightNow": "Nobody is playing right now",
         "bedrockClientsCanJoinThis": "Bedrock clients can join this Java server",
         "bedrockToo": "Bedrock too",
-        "noAddressYet": "No address yet"
+        "noAddressYet": "No address yet",
+        "summary": "{count} {count, plural, one {server} other {servers}}, {playing} playing right now.",
+        "archived": "Archived ",
+        "archivedCount": "Archived ({count})",
+        "sortBy": "Sort by {label}",
+        "eulaNotice": "Creating a Minecraft server accepts the <eula>Minecraft EULA</eula>.",
+        "unfavoriteNamed": "Take {name} off your favorites",
+        "favoriteNamed": "Keep {name} at the top",
+        "openNamed": "Open {name}",
+        "filesOf": "Browse the files of {name}",
+        "filesNeedDeploy": "Deploy the server to browse its files",
+        "stopNamed": "Stop {name}",
+        "startNamed": "Start {name}",
+        "deleteNamed": "Delete {name}",
+        "addressOf": "the address of {name}"
     },
     "create": {
         "newServer": "New server",
@@ -65,7 +78,6 @@
         "howMuchTheServerMay": "How much the server may take, as 3G or 4096M.",
         "hytaleGivesOutItsServer": "Hytale gives out its server files through your own account. Once this server exists, put HytaleServer.jar and Assets.zip into its Files and it starts by itself.",
         "serverKey": "Server key",
-        "getOneFromKeymaster": "get one from keymaster",
         "nameInTheServerBrowser": "Name in the server browser",
         "blankUsesTheNameAbove": "Blank uses the name above. This is what players search for in game.",
         "on": "On",
@@ -107,6 +119,16 @@
         "itStartsWithAConsole": "It starts with a console password Polaris keeps for you, player addresses hidden and ScriptHook mods refused. Who may join is changed from the server's own Security screen.",
         "theServerStartsClosedNobody": "The server starts closed: nobody else can join until you add them, and each player is only let in from the address registered to them. Change it later under Firewall.",
         "cancel": "Cancel",
-        "createServer": "Create server"
+        "createServer": "Create server",
+        "blueprintOption": "{name} ({count} settings)",
+        "fivemKey": "FiveM will not start without one. They are free: <link>get one from keymaster</link>.",
+        "arkMemory": "An ARK server for {count} {count, plural, one {player} other {players}} at once uses around <strong>{memory}</strong> of memory and about 30 GB of disk, downloaded the first time it starts.",
+        "fivemMemory": "A FiveM server for {count} {count, plural, one {player} other {players}} at once uses around <strong>{memory}</strong> of memory, plus whatever the resources you install weigh.",
+        "otherMemory": "Polaris will give it <amount></amount> of memory for {count} {count, plural, one {player} other {players}} at once. You can change it later under Settings.",
+        "committed": "{memory} already promised to servers here.",
+        "connectTo": "Players will connect to <address></address>.",
+        "connectToPort": "Players will connect to <address></address> and its port.",
+        "addressHint": "One address, a range like 203.0.113.0/24, or \"any\".",
+        "exampleName": "Survival"
     }
 }

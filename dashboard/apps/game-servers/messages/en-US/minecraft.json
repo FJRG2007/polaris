@@ -65,7 +65,39 @@
         "theySignInFrom": "They sign in from",
         "note": "Note",
         "whoThisIsForWhoever": "Who this is, for whoever reads the list next. Only Polaris sees it.",
-        "whoThisIs": "Who this is"
+        "whoThisIs": "Who this is",
+        "experienceOf": "{name}'s experience",
+        "teleportNamed": "Teleport {name}",
+        "inventoryOf": "{name}'s inventory",
+        "whereIs": "Where {name} is",
+        "asking": "Asking the server...",
+        "coordinatesOf": "{name}'s coordinates",
+        "exactly": "- exactly",
+        "dimensions": {
+            "overworld": "Overworld",
+            "nether": "The Nether",
+            "end": "The End"
+        },
+        "onThisServer": "{name} on this server",
+        "editNamed": "Edit {name}",
+        "followsDescription": "{player} joins from wherever {account} is signed in to Polaris.",
+        "linkedDescription": "{player} is {account} on Polaris. Where they join from is the addresses below.",
+        "inviteEmail": "Invite {email}",
+        "tiedTo": "The account they make is tied to {name}.",
+        "inviteFailed": "The email to {email} could not be sent ({reason}). Send them this link instead.",
+        "inviteLink": "Send {email} this link. When they make their account, it is tied to {name}.",
+        "invited": "Invited {email}. When they make their account, it is tied to {name}.",
+        "whereCanJoin": "Where {name} can join from",
+        "followsHint": "They are let in only from an address where {name} is signed in to Polaris, and removed when they sign out.",
+        "typedGo": " The addresses typed for them go.",
+        "linkedHint": "Linked to {name} for who they are. The addresses typed here still decide where they join from.",
+        "noMinecraft": "{name} has not linked Minecraft, so type their username.",
+        "typedBy": "Typed by {name} (not verified).",
+        "linkedTo": "Linked to {name}.",
+        "followsSignIns": "Follows {name}'s Polaris sign-ins.",
+        "notSignedIn": "{account} is not signed in to Polaris anywhere, so {player} cannot join right now.",
+        "removeAddressFrom": "Remove {address} from {name}",
+        "removeNamed": "Remove {name}"
     },
     "announce": {
         "forTheTimeBelow": "For the time below",
@@ -120,6 +152,20 @@
         "bedrockHasNoCustomColors": "Bedrock has no custom colors, underline or strikethrough; the nearest it has is shown.",
         "howItLooksInThe": "How it looks in the game, as you type.",
         "previewOfTheAnnouncementIn": "Preview of the announcement in the game",
-        "minecraftDrawsItsOwnFont": "Minecraft draws its own font, so the spacing here is close rather than exact."
+        "minecraftDrawsItsOwnFont": "Minecraft draws its own font, so the spacing here is close rather than exact.",
+        "vars": {
+            "game": "Each player sees their own",
+            "account": "Each player sees their Polaris account's. Add a fallback for players with none: '{'polaris.name | \"Player\"'}'",
+            "server": "The same for everybody, read when it is sent"
+        },
+        "deleteTitle": "Delete \"{name}\"?",
+        "onScreenNow": "On screen now: ",
+        "until": "until {date}",
+        "load": "Load \"{name}\"",
+        "moreFor": "More for {name}",
+        "overwrite": "Save what is written into it",
+        "chatLines": "Up to {count} lines in the chat.",
+        "inSeconds": "{label}, in seconds",
+        "play": "Play"
     }
 }

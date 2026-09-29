@@ -13,7 +13,8 @@
  */
 
 import * as mc from "../../lib/minecraft/motd";
-import { useGameText } from "../game-text";
+import { useGameText, type GameText } from "../game-text";
+import type { GameKey } from "../../../messages";
 import { McLine } from "../../components/mc-text";
 import type { MinecraftEdition } from "../../lib/minecraft/service";
 import { FormattedTextField } from "../../components/formatted-text-field";
@@ -92,7 +93,11 @@ import {
  * The words a field can fill in, for its Variable menu. `server` is the side
  * panel's list: it is the same for everybody, so nothing of one player's.
  */
-export function insertsFor(edition: MinecraftEdition, scope: "all" | "server" = "all") {
+export function insertsFor(
+    t: GameText<"minecraft">,
+    edition: MinecraftEdition,
+    scope: "all" | "server" = "all"
+) {
     return VARIABLES.filter(
         (spec) =>
             (edition !== "bedrock" || spec.bedrock) && (scope === "all" || spec.kind === "server")
@@ -101,10 +106,10 @@ export function insertsFor(edition: MinecraftEdition, scope: "all" | "server" = 
         text: `{${spec.name}}`,
         title:
             spec.kind === "game"
-                ? "Each player sees their own"
+                ? t("announce.vars.game")
                 : spec.kind === "account"
-                  ? 'Each player sees their Polaris account\'s. Add a fallback for players with none: {polaris.name | "Player"}'
-                  : "The same for everybody, read when it is sent"
+                  ? t("announce.vars.account")
+                  : t("announce.vars.server")
     }));
 }
 
@@ -137,10 +142,10 @@ export function FieldNote({
 }
 
 /** What "Stays on screen" offers. */
-const HOLDS: readonly { readonly value: Hold; readonly label: string }[] = [
-    { value: "timed", label: t("announce.forTheTimeBelow") },
-    { value: "until", label: t("announce.untilAMoment") },
-    { value: "manual", label: t("announce.untilItIsTakenDown") }
+const HOLDS: readonly { readonly value: Hold; readonly label: GameKey<"minecraft"> }[] = [
+    { value: "timed", label: "announce.forTheTimeBelow" },
+    { value: "until", label: "announce.untilAMoment" },
+    { value: "manual", label: "announce.untilItIsTakenDown" }
 ];
 
 /** An ISO moment as a `datetime-local` input reads it, in this browser's time. */
@@ -308,7 +313,7 @@ export function MinecraftAnnounce({
         [draft, edition, known]
     );
     const blocked = Object.keys(problems).length > 0;
-    const inserts = useMemo(() => insertsFor(edition), [edition]);
+    const inserts = useMemo(() => insertsFor(t, edition), [t, edition]);
     // A sound on its own is something to send: a horn with nothing written is
     // how "a raid is starting" is said without words. Java only - Bedrock's
     // announcements carry no sound.
@@ -366,7 +371,7 @@ export function MinecraftAnnounce({
 
     async function forget(template: AnnouncementTemplate): Promise<void> {
         const agreed = await confirm({
-            title: `Delete "${template.name}"?`,
+            title: t("announce.deleteTitle", { name: template.name }),
             description: t("announce.itGoesForEverybodyWho"),
             confirmLabel: t("announce.delete"),
             danger: true
@@ -399,7 +404,7 @@ export function MinecraftAnnounce({
                         {live?.pinned && (
                             <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
                                 <span className="min-w-0 text-xs">
-                                    <span className="font-medium">On screen now: </span>
+                                    <span className="font-medium">{t("announce.onScreenNow")}</span>
                                     <span className="text-muted-foreground">
                                         {mc
                                             .stripMotd(
@@ -411,7 +416,7 @@ export function MinecraftAnnounce({
                                         {" - "}
                                         {live.pinned.endsAt === null
                                             ? t("announce.untilItIsTakenDown2")
-                                            : `until ${new Date(live.pinned.endsAt).toLocaleString()}`}
+                                            : t("announce.until", { date: new Date(live.pinned.endsAt).toLocaleString() })}
                                     </span>
                                 </span>
                                 <Button
@@ -458,7 +463,7 @@ export function MinecraftAnnounce({
                                                 setNote(null);
                                             }}
                                             className="max-w-48 truncate px-2 py-1 text-xs transition-colors hover:bg-muted disabled:opacity-50"
-                                            title={`Load "${template.name}"`}
+                                            title={t("announce.load", { name: template.name })}
                                         >
                                             {template.name}
                                         </button>
@@ -466,8 +471,8 @@ export function MinecraftAnnounce({
                                             <DropdownMenuTrigger asChild>
                                                 <button
                                                     type="button"
-                                                    aria-label={`More for ${template.name}`}
-                                                    title={`More for ${template.name}`}
+                                                    aria-label={t("announce.moreFor", { name: template.name })}
+                                                    title={t("announce.moreFor", { name: template.name })}
                                                     disabled={!templatesHeard}
                                                     className="border-l border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                                 >
@@ -483,8 +488,7 @@ export function MinecraftAnnounce({
                                                         })
                                                     }
                                                 >
-                                                    <Save className="size-4" /> Save what is written
-                                                    into it
+                                                    <Save className="size-4" /> {t("announce.overwrite")}
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     className="text-danger"
@@ -564,7 +568,7 @@ export function MinecraftAnnounce({
                                 placeholder={t("announce.checkYourInventoryForA")}
                             />
                         </Section>
-                        <Section title={t("announce.chat")} hint={`Up to ${CHAT_MAX_LINES} lines in the chat.`}>
+                        <Section title={t("announce.chat")} hint={t("announce.chatLines", { count: CHAT_MAX_LINES })}>
                             <FormattedTextField
                                 value={draft.chat}
                                 onChange={(chat) => set({ chat })}
@@ -620,7 +624,7 @@ export function MinecraftAnnounce({
                                                     )
                                                 });
                                             }}
-                                            aria-label={`${label}, in seconds`}
+                                            aria-label={t("announce.inSeconds", { label })}
                                         />
                                         <span className="text-xs text-muted-foreground">s</span>
                                     </span>
@@ -641,7 +645,7 @@ export function MinecraftAnnounce({
                                     }
                                     options={HOLDS.map((hold) => ({
                                         value: hold.value,
-                                        label: hold.label
+                                        label: t(hold.label)
                                     }))}
                                     aria-label={t("announce.howLongItStaysOn")}
                                 />
@@ -972,7 +976,7 @@ function AnnouncementPreview({
                         onClick={play}
                         disabled={phase !== "still"}
                     >
-                        <Play className="size-3.5" /> Play
+                        <Play className="size-3.5" /> {t("announce.play")}
                     </Button>
                 </div>
 

@@ -17,6 +17,14 @@
 
 import * as actions from "./minecraft-actions";
 import { useGameText } from "../game-text";
+import type { GameKey } from "../../../messages";
+
+/** The three worlds, by the id the game reports them with. */
+const DIMENSION_KEYS: Readonly<Record<string, GameKey<"minecraft">>> = {
+    "minecraft:overworld": "players.dimensions.overworld",
+    "minecraft:the_nether": "players.dimensions.nether",
+    "minecraft:the_end": "players.dimensions.end"
+};
 import type { PlayerStats } from "../../lib/games-activity";
 import { InventoryEditor } from "./minecraft-inventory-editor";
 import { PlayerRecordPanel } from "../../components/player-history";
@@ -91,7 +99,7 @@ export function ExperienceDialog({
 
     return (
         <PlayerFormDialog
-            title={`${player}'s experience`}
+            title={t("players.experienceOf", { name: player })}
             description={t("players.appliedToThePlayerStanding")}
             confirmLabel={
                 mode === "set" ? t("players.setIt") : mode === "remove" ? t("players.takeItAway") : t("players.giveIt")
@@ -190,7 +198,7 @@ export function TeleportDialog({
 
     return (
         <PlayerFormDialog
-            title={`Teleport ${player}`}
+            title={t("players.teleportNamed", { name: player })}
             description={t("players.toAnotherPlayerWhoIs")}
             onClose={onClose}
             pending={pending}
@@ -264,7 +272,7 @@ export function InventoryDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto overscroll-contain">
                 <DialogHeader>
-                    <DialogTitle>{player}&apos;s inventory</DialogTitle>
+                    <DialogTitle>{t("players.inventoryOf", { name: player })}</DialogTitle>
                     <DialogDescription>
                         {canEdit
                             ? t("players.dragToRearrangeItOr")
@@ -314,10 +322,10 @@ export function LocationDialog({
 
     return (
         <Reading
-            title={`Where ${player} is`}
+            title={t("players.whereIs", { name: player })}
             description={t("players.readFromTheRunningServer")}
             icon={<MapPin className="size-6" />}
-            loadingLabel="Asking the server..."
+            loadingLabel={t("players.asking")}
             empty="The server did not say."
             loading={loading}
             error={error}
@@ -352,13 +360,17 @@ function Coordinates({ player, position }: { player: string; position: PlayerPos
                 </dl>
                 <CopyButton
                     value={coordinates}
-                    label={`${player}'s coordinates`}
+                    label={t("players.coordinatesOf", { name: player })}
                     className="size-8"
                 />
             </div>
             <p className="text-xs text-muted-foreground">
-                {position.dimension ? dimensionLabel(position.dimension) : t("players.worldNotReported")} -
-                exactly{" "}
+                {position.dimension
+                    ? DIMENSION_KEYS[position.dimension]
+                        ? t(DIMENSION_KEYS[position.dimension]!)
+                        : dimensionLabel(position.dimension)
+                    : t("players.worldNotReported")}{" "}
+                {t("players.exactly")}{" "}
                 <span className="font-mono">
                     {position.x.toFixed(2)} {position.y.toFixed(2)} {position.z.toFixed(2)}
                 </span>
@@ -534,7 +546,7 @@ export function HistoryDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{player} on this server</DialogTitle>
+                    <DialogTitle>{t("players.onThisServer", { name: player })}</DialogTitle>
                     <DialogDescription>
                         {t("players.whatPolarisHasWatchedAnd")}
                     </DialogDescription>
@@ -815,12 +827,12 @@ export function PlayerAccessDialog({
 
     return (
         <PlayerFormDialog
-            title={editing ? `Edit ${player.username}` : t("players.addAPlayer")}
+            title={editing ? t("players.editNamed", { name: player.username }) : t("players.addAPlayer")}
             description={
                 following
-                    ? `${player?.username} joins from wherever ${linkedTo?.name} is signed in to Polaris.`
+                    ? t("players.followsDescription", { player: player?.username ?? "", account: linkedTo?.name ?? "" })
                     : linkedTo
-                      ? `${player?.username} is ${linkedTo.name} on Polaris. Where they join from is the addresses below.`
+                      ? t("players.linkedDescription", { player: player?.username ?? "", account: linkedTo.name })
                       : editing
                         ? t("players.addAnotherAddressTheyPlay")
                         : t("players.aPlayerIsLetIn")
@@ -910,10 +922,10 @@ export function PlayerAccessDialog({
                                 onClick={invite}
                             >
                                 {inviting && <Loader2 className="size-3.5 animate-spin" />}
-                                Invite {inviteEmail}
+                                {t("players.inviteEmail", { email: inviteEmail })}
                             </Button>
                             <span className="text-xs text-muted-foreground">
-                                The account they make is tied to {name}.
+                                {t("players.tiedTo", { name })}
                             </span>
                         </div>
                     )}
@@ -927,10 +939,10 @@ export function PlayerAccessDialog({
                         <div className="flex flex-col gap-1 pt-1 text-xs text-muted-foreground">
                             <span>
                                 {invited.sendError
-                                    ? `The email to ${invited.email} could not be sent (${invited.sendError}). Send them this link instead.`
+                                    ? t("players.inviteFailed", { email: invited.email, reason: invited.sendError })
                                     : invited.url
-                                      ? `Send ${invited.email} this link. When they make their account, it is tied to ${name}.`
-                                      : `Invited ${invited.email}. When they make their account, it is tied to ${name}.`}
+                                      ? t("players.inviteLink", { email: invited.email, name })
+                                      : t("players.invited", { email: invited.email, name })}
                             </span>
                             {invited.url && (
                                 <span className="flex items-center gap-1">
@@ -948,7 +960,7 @@ export function PlayerAccessDialog({
             {linking && account && edition === "java" && (
                 <div className="flex flex-col gap-1.5">
                     <span className="text-xs text-muted-foreground">
-                        Where {account.name} can join from
+                        {t("players.whereCanJoin", { name: account.name })}
                     </span>
                     <div
                         className="flex flex-wrap gap-1"
@@ -978,8 +990,8 @@ export function PlayerAccessDialog({
                     </div>
                     <p className="text-xs text-muted-foreground">
                         {follow
-                            ? `They are let in only from an address where ${account.name} is signed in to Polaris, and removed when they sign out.${editing && hasAddresses ? " The addresses typed for them go." : ""}`
-                            : `Linked to ${account.name} for who they are. The addresses typed here still decide where they join from.`}
+                            ? `${t("players.followsHint", { name: account.name })}${editing && hasAddresses ? t("players.typedGo") : ""}`
+                            : t("players.linkedHint", { name: account.name })}
                     </p>
                 </div>
             )}
@@ -989,9 +1001,9 @@ export function PlayerAccessDialog({
                 error={nameInvalid ? t("players.thatIsNotAUsername") : null}
                 hint={
                     !editing && account && noMinecraft
-                        ? `${account.name} has not linked Minecraft, so type their username.`
+                        ? t("players.noMinecraft", { name: account.name })
                         : !editing && account && typedName !== null && username.trim() === typedName
-                          ? `Typed by ${account.name} (not verified).`
+                          ? t("players.typedBy", { name: account.name })
                           : undefined
                 }
             >
@@ -1008,10 +1020,10 @@ export function PlayerAccessDialog({
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
                     <span className="text-xs text-muted-foreground">
                         {!following
-                            ? `Linked to ${linkedTo.name}.`
+                            ? t("players.linkedTo", { name: linkedTo.name })
                             : player?.addresses.length
-                              ? `Follows ${linkedTo.name}'s Polaris sign-ins.`
-                              : `${linkedTo.name} is not signed in to Polaris anywhere, so ${player?.username} cannot join right now.`}
+                              ? t("players.followsSignIns", { name: linkedTo.name })
+                              : t("players.notSignedIn", { account: linkedTo.name, player: player?.username ?? "" })}
                     </span>
                     {onUnlink && player && (
                         <Button
@@ -1044,8 +1056,8 @@ export function PlayerAccessDialog({
                                     <button
                                         type="button"
                                         disabled={pending}
-                                        aria-label={`Remove ${held} from ${player.username}`}
-                                        title={`Remove ${held}`}
+                                        aria-label={t("players.removeAddressFrom", { address: held, name: player.username })}
+                                        title={t("players.removeNamed", { name: held })}
                                         className="text-muted-foreground hover:text-danger disabled:opacity-50"
                                         onClick={() => onRemoveAddress(held)}
                                     >

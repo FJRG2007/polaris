@@ -13,6 +13,7 @@
  */
 
 import * as mc from "../../lib/minecraft/motd";
+import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { McLine } from "../../components/mc-text";
 import { insertsFor } from "./minecraft-announce";
@@ -99,6 +100,7 @@ export function MinecraftSidebar({
     installedAppId: string;
     canManage: boolean;
 }) {
+    const t = useGameText("minecraft");
     // What this tab last read paints first, so the panel is there at once on a
     // revisit; the read below replaces it when it moved.
     const stateKey = `live-display:${installedAppId}`;
@@ -175,7 +177,7 @@ export function MinecraftSidebar({
     // Only a change is worth a save: the same panel saved again is a round trip
     // that changes nothing on anybody's screen.
     const dirty = state !== null && JSON.stringify(draft) !== JSON.stringify(state.sidebar);
-    const inserts = useMemo(() => insertsFor("java", "server"), []);
+    const inserts = useMemo(() => insertsFor(t, "java", "server"), [t]);
     /** Changing the panel waits for the server's answer, as the form did when
      *  it was only drawn after it. */
     const editable = canManage && heard;

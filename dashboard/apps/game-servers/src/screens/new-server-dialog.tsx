@@ -32,7 +32,7 @@ import { isIdentifier } from "../lib/fivem/players";
 import { expectedFivemMemoryMb } from "../lib/fivem/config";
 import { isLicenseKey, KEYMASTER_URL, LICENSE_KEY_HINT } from "../lib/fivem/config";
 import { ARK_MAPS, mapRequirementHint } from "@polaris/core";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { isAddressRule, isPlayerName } from "../lib/minecraft/access";
 import { createGameServerSchema, isModIdList } from "../lib/games-schema";
 import { Gamepad2, Loader2, MemoryStick, RefreshCw, ShieldCheck, Users } from "lucide-react";
@@ -384,10 +384,12 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             onChange={(event) => setName(event.target.value)}
                             placeholder={
                                 game === "ark"
+                                    // i18n-ignore: a map's own name
                                     ? "The Island"
                                     : game === "fivem"
+                                      // i18n-ignore: the game's city, a proper name
                                       ? "Los Santos"
-                                      : "Survival"
+                                      : t("create.exampleName")
                             }
                         />
                     </label>
@@ -456,7 +458,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             { value: "", label: t("create.startFromABlueprintInstead") },
                                             ...templates.map((entry) => ({
                                                 value: entry.id,
-                                                label: `${entry.name} (${entry.settings} settings)`
+                                                label: t("create.blueprintOption", { name: entry.name, count: entry.settings })
                                             }))
                                         ]}
                                         aria-label={t("create.aServerYouSavedTo")}
@@ -483,6 +485,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 <Input
                                     value={hytaleMemory}
                                     onChange={(event) => setHytaleMemory(event.target.value)}
+                                    // i18n-ignore: an amount in the format the field takes
                                     placeholder="3G"
                                     className="font-mono"
                                     autoComplete="off"
@@ -520,16 +523,19 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 >
                                     {licenseError ?? (
                                         <>
-                                            FiveM will not start without one. They are free:{" "}
-                                            <a
-                                                href={KEYMASTER_URL}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="text-primary hover:underline"
-                                            >
-                                                {t("create.getOneFromKeymaster")}
-                                            </a>
-                                            .
+                                            {t.rich<ReactNode>("create.fivemKey", {
+                                                link: (chunks) => (
+                                                    <a
+                                                        key="keymaster"
+                                                        href={KEYMASTER_URL}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="text-primary hover:underline"
+                                                    >
+                                                        {chunks}
+                                                    </a>
+                                                )
+                                            })}
                                         </>
                                     )}
                                 </span>
@@ -541,6 +547,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     <Input
                                         value={sessionName}
                                         onChange={(event) => setSessionName(event.target.value)}
+                                        // i18n-ignore: the game's city, a proper name
                                         placeholder={name.trim() || "Los Santos"}
                                     />
                                     <span className="text-xs text-muted-foreground">
@@ -548,6 +555,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     </span>
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
+                                    {/* i18n-ignore: FiveM's feature name */}
                                     <span className="font-medium">OneSync</span>
                                     <Select
                                         value={onesync}
@@ -559,6 +567,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                             { value: "legacy", label: t("create.legacy") },
                                             { value: "off", label: t("create.off") }
                                         ]}
+                                        // i18n-ignore: FiveM's feature name
                                         aria-label="OneSync"
                                     />
                                     <span
@@ -597,6 +606,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     <Input
                                         value={sessionName}
                                         onChange={(event) => setSessionName(event.target.value)}
+                                        // i18n-ignore: a map's own name
                                         placeholder={name.trim() || "The Island"}
                                     />
                                     <span className="text-xs text-muted-foreground">
@@ -654,32 +664,41 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             <span>
                                 {game === "ark" ? (
                                     <>
-                                        An ARK server for {concurrentPlayers}{" "}
-                                        {concurrentPlayers === 1 ? "player" : "players"} at once
-                                        uses around{" "}
-                                        <strong className="text-foreground">{memory}</strong> of
-                                        memory and about 30 GB of disk, downloaded the first time it
-                                        starts.
+                                        {t.rich<ReactNode>("create.arkMemory", {
+                                            count: concurrentPlayers,
+                                            memory: memory ?? "",
+                                            strong: (chunks) => (
+                                            <strong key="memory" className="text-foreground">
+                                                {chunks}
+                                            </strong>
+                                        )
+                                        })}
                                     </>
                                 ) : game === "fivem" ? (
                                     <>
-                                        A FiveM server for {concurrentPlayers}{" "}
-                                        {concurrentPlayers === 1 ? "player" : "players"} at once
-                                        uses around{" "}
-                                        <strong className="text-foreground">{memory}</strong> of
-                                        memory, plus whatever the resources you install weigh.
+                                        {t.rich<ReactNode>("create.fivemMemory", {
+                                            count: concurrentPlayers,
+                                            memory: memory ?? "",
+                                            strong: (chunks) => (
+                                            <strong key="memory" className="text-foreground">
+                                                {chunks}
+                                            </strong>
+                                        )
+                                        })}
                                     </>
                                 ) : (
                                     <>
-                                        Polaris will give it{" "}
-                                        {memory === undefined ? (
-                                            <Skeleton className="inline-block h-3 w-10 align-middle" />
-                                        ) : (
-                                            <strong className="text-foreground">{memory}</strong>
-                                        )}{" "}
-                                        of memory for {concurrentPlayers}{" "}
-                                        {concurrentPlayers === 1 ? "player" : "players"} at once.
-                                        You can change it later under Settings.
+                                        {t.rich<ReactNode>("create.otherMemory", {
+                                            count: concurrentPlayers,
+                                            amount: () =>
+                                                memory === undefined ? (
+                                                    <Skeleton key="memory" className="inline-block h-3 w-10 align-middle" />
+                                                ) : (
+                                                    <strong key="memory" className="text-foreground">
+                                                        {memory}
+                                                    </strong>
+                                                )
+                                        })}
                                     </>
                                 )}
                             </span>
@@ -704,7 +723,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Users className="size-3" />
                                 {machine.committedMb > 0
-                                    ? `${formatMemory(machine.committedMb)} already promised to servers here.`
+                                    ? t("create.committed", { memory: formatMemory(machine.committedMb) })
                                     : t("create.noOtherGameServerOn")}
                             </span>
                         )}
@@ -720,11 +739,18 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     placeholder={label || "survival"}
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    Players will connect to{" "}
-                                    <code className="font-mono">{address}</code>
-                                    {game === "ark" || game === "fivem" || edition === "bedrock"
-                                        ? " and its port."
-                                        : "."}
+                                    {t.rich(
+                                        game === "ark" || game === "fivem" || edition === "bedrock"
+                                            ? "create.connectToPort"
+                                            : "create.connectTo",
+                                        {
+                                            address: () => (
+                                                <code key="address" className="font-mono">
+                                                    {address}
+                                                </code>
+                                            )
+                                        }
+                                    )}
                                 </span>
                             </>
                         ) : (
@@ -898,6 +924,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     <Input
                                         value={ownerPlayer}
                                         onChange={(event) => setOwnerPlayer(event.target.value)}
+                                        // i18n-ignore: the game's default player name
                                         placeholder={edition === "bedrock" ? t("create.gamertag") : "Steve"}
                                     />
                                     {playerError && (
@@ -918,7 +945,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         )}
                                     >
                                         {addressError ??
-                                            'One address, a range like 203.0.113.0/24, or "any".'}
+                                            t("create.addressHint")}
                                     </span>
                                 </label>
                             </div>
