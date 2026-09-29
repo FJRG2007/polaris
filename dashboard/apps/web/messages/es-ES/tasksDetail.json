@@ -206,5 +206,12 @@
         "leaveDescription": "No se pudo guardar el último cambio.",
         "leaveQuestion": "Todo lo demás queda como se guardó. Lo que sigue en los campos se pierde.",
         "leaveConfirm": "Descartarlo"
+    },
+    "priority": {
+        "urgent": "Urgente",
+        "high": "Alta",
+        "normal": "Normal",
+        "low": "Baja",
+        "none": "Sin prioridad"
     }
 }

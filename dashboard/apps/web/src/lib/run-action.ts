@@ -15,7 +15,13 @@ import { checkForNewBuild } from "@/lib/new-build";
  *  act on, an update that landed under this tab, is not told to them here. Being
  *  asked to reload on the off chance is not guidance; the check below finds out,
  *  and the banner that follows says so and offers the button. */
-const FAILED = "The request could not be completed. Try again.";
+let failed = "The request could not be completed. Try again.";
+
+/** The sentence above in the reader's language, handed in by the i18n provider
+ *  once it knows which - this runs outside any component and cannot ask. */
+export function setActionFailureText(text: string): void {
+    failed = text;
+}
 
 /**
  * Await a server action, returning null when it rejects and reporting why through
@@ -32,7 +38,7 @@ export async function runAction<T>(call: () => Promise<T>, onFailure: (message: 
         // rather than assumed, and not awaited: the caller gets its answer now, and
         // if the deployment really has moved on the banner says so a moment later.
         void checkForNewBuild();
-        onFailure(FAILED);
+        onFailure(failed);
         return null;
     }
 }

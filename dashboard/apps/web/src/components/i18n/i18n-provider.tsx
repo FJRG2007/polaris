@@ -20,6 +20,7 @@ import type { Namespace, NamespaceTranslator } from "@/lib/i18n/types";
 import { readLocaleCookie, writeLocaleCookie } from "@/lib/i18n/cookie";
 import { UiStringsProvider, type UiStrings } from "@polaris/ui";
 import { createContext, Fragment, useContext, useEffect, useMemo, type ReactNode } from "react";
+import { setActionFailureText } from "@/lib/run-action";
 import { createTranslator, DEFAULT_LOCALE, negotiateLocale, type Locale, type Namespaces } from "@polaris/core";
 
 interface I18nState {
@@ -52,6 +53,8 @@ export function I18nProvider({
  *  name - from the `components` catalog every page is handed. */
 function UiWords({ children }: { children: ReactNode }) {
     const t = useTranslations("components");
+    const actionFailed = t("actions.requestFailed");
+    useEffect(() => setActionFailureText(actionFailed), [actionFailed]);
     const strings = useMemo<UiStrings>(() => {
         const parts = (said: (string | ReactNode)[]) =>
             said.map((part, index) => <Fragment key={index}>{part}</Fragment>);

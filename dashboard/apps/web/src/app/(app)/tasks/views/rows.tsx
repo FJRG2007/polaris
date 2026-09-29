@@ -506,6 +506,7 @@ export function TableView(props: ViewProps) {
     const { rows, context, selection, onOpen, onSelect } = props;
     const format = useDisplayFormat();
     const t = useTranslations("tasksViews");
+    const tp = useTranslations("tasks");
     // Every custom field gets a column here: being able to compare them side by
     // side is the whole reason to look at a table rather than a list.
     const columns = context.fields;
@@ -605,7 +606,7 @@ export function TableView(props: ViewProps) {
                                                     props.onEdit(task, { priority })
                                                 }
                                             />
-                                            {core.TASK_PRIORITY_LABELS[task.priority]}
+                                            {tp(`labels.priority.${task.priority}`)}
                                         </span>
                                     </td>
                                     <td className="whitespace-nowrap px-2 py-1.5">

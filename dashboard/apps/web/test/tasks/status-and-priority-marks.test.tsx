@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 import { StatusIcon } from "@/app/(app)/tasks/pickers";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PriorityMark } from "@/components/priority-mark";
+import { withMessages } from "../setup/i18n";
 import { TASK_PRIORITIES, TASK_STATUS_TYPES } from "@polaris/core";
 
 /** The `d` of every path in the markup, which is where these shapes live. */
@@ -99,9 +100,13 @@ describe("what a priority looks like", () => {
     it("draws something for a task nobody prioritised", () => {
         // Blank was the old behaviour, and a gap in a column where every other
         // row has a mark reads as "not loaded yet" as readily as "nobody said".
-        const html = renderToStaticMarkup(<PriorityMark priority="none" />);
+        const html = renderToStaticMarkup(withMessages(<PriorityMark priority="none" />));
         expect(html).toContain("<svg");
         expect(html).toContain("No priority");
+        // And in the reader's language.
+        expect(renderToStaticMarkup(withMessages(<PriorityMark priority="none" />, "es-ES"))).toContain(
+            "Sin prioridad"
+        );
     });
 
     it("names itself, for a reader who is not looking at it", () => {

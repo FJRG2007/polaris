@@ -4,7 +4,8 @@
         "confirm": "Confirm",
         "tryAgain": "Try again",
         "dismiss": "Dismiss",
-        "remove": "Remove"
+        "remove": "Remove",
+        "requestFailed": "The request could not be completed. Try again."
     },
     "activity": {
         "heading": {
@@ -28,7 +29,9 @@
     },
     "appBundles": {
         "partFailed": "Part of this page did not load. Reload the page to try again.",
-        "unavailable": "{name} is not available right now"
+        "unavailable": "{name} is not available right now",
+        "thisApp": "This app",
+        "stillDownloading": "Polaris is still downloading it. Try again in a moment."
     },
     "presence": {
         "online": "Online",
@@ -1224,5 +1227,12 @@
         "noMatch": "No kept lines match.",
         "nothingKept": "Nothing kept yet. Output is kept once a minute while a service runs.",
         "newest": "Newest"
+    },
+    "priority": {
+        "urgent": "Urgent",
+        "high": "High",
+        "normal": "Normal",
+        "low": "Low",
+        "none": "No priority"
     }
 }

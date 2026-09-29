@@ -20,6 +20,7 @@ import { appUnavailableReason } from "./lifecycle";
 import * as mount from "@/components/app-bundles/mount";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import { AppUnavailable } from "@/components/app-bundles/unavailable";
+import { getTranslations } from "@/lib/i18n/request";
 import type { ComponentType } from "react";
 
 provideShared({ "polaris:mount": mount });
@@ -49,11 +50,12 @@ export async function renderAppPage(surface: string, app: string, { params, sear
     if (!(await isAppInstalled(app))) redirect(`/apps/marketplace?app=${encodeURIComponent(app)}`);
     if (loadedBundle(app)) notFound();
     // Installed, and its code not here yet.
+    const t = await getTranslations("components");
     return (
         <AppUnavailable
             app={app}
-            name={findApp(app)?.name ?? "This app"}
-            reason={appUnavailableReason(app) ?? "Polaris is still downloading it. Try again in a moment."}
+            name={findApp(app)?.name ?? t("appBundles.thisApp")}
+            reason={appUnavailableReason(app) ?? t("appBundles.stillDownloading")}
         />
     );
 }

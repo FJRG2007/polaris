@@ -1345,7 +1345,8 @@
         "restartsForSettings": "The server restarts to pick the new settings up.",
         "memoryFixed": "The memory you typed is now the server's figure, and Polaris no longer adjusts it. Switch it back under Memory above.",
         "pendingChanges": "{count} {count, plural, one {change} other {changes}} the server picks up when it next starts.",
-        "restartReason": "a settings change"
+        "restartReason": "a settings change",
+        "ungrouped": "Settings"
     },
     "gameRules": {
         "keepInventory": {

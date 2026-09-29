@@ -206,5 +206,12 @@
         "leaveDescription": "The last change could not be saved.",
         "leaveQuestion": "Everything else stays as it was saved. What is still in the boxes goes.",
         "leaveConfirm": "Leave it behind"
+    },
+    "priority": {
+        "urgent": "Urgent",
+        "high": "High",
+        "normal": "Normal",
+        "low": "Low",
+        "none": "No priority"
     }
 }

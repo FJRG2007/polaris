@@ -7,6 +7,7 @@
  */
 
 import type { NamespaceTranslator } from "@/lib/i18n/types";
+import * as core from "@polaris/core";
 import type { ActivityView, CommentView } from "@/lib/tasks/task-service";
 
 /** What the stream is showing: everything, or only what people said. */
@@ -18,6 +19,19 @@ export type StreamItem =
 
 /** One history line in plain language. The stored values are already resolved to
  *  names, so this is a sentence rather than a second lookup. */
+/**
+ * A priority as the activity stored it - the English word, which is what every
+ * row ever written holds - said in the reader's language. Anything that is not
+ * one of the priorities is shown as it was written.
+ */
+function priorityWord(t: NamespaceTranslator<"tasksDetail">, stored: string | null | undefined): string {
+    if (!stored) return "";
+    const key = (Object.keys(core.TASK_PRIORITY_LABELS) as core.TaskPriority[]).find(
+        (priority) => core.TASK_PRIORITY_LABELS[priority] === stored
+    );
+    return key ? t(`priority.${key}`) : stored;
+}
+
 export function describeActivity(t: NamespaceTranslator<"tasksDetail">, line: ActivityView): string {
     const who = line.authorName ?? t("activity.aRule");
     const another = t("activity.anotherStatus");
@@ -29,7 +43,11 @@ export function describeActivity(t: NamespaceTranslator<"tasksDetail">, line: Ac
                 ? t("activity.statusMoved", { who, from: line.fromValue, to: line.toValue ?? another })
                 : t("activity.statusSet", { who, to: line.toValue ?? another });
         case "priority":
-            return t("activity.priority", { who, from: line.fromValue ?? "", to: line.toValue ?? "" });
+            return t("activity.priority", {
+                who,
+                from: priorityWord(t, line.fromValue),
+                to: priorityWord(t, line.toValue)
+            });
         case "due":
             return line.toValue ? t("activity.dueSet", { who }) : t("activity.dueCleared", { who });
         case "assignee":

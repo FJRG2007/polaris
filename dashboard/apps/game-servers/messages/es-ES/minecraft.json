@@ -1345,7 +1345,8 @@
         "restartsForSettings": "El servidor se reinicia para coger los nuevos ajustes.",
         "memoryFixed": "La memoria que escribiste es ahora la cifra del servidor, y Polaris ya no la ajusta. Vuelve a cambiarlo en Memoria, arriba.",
         "pendingChanges": "{count} {count, plural, one {cambio} other {cambios}} que el servidor toma en su próximo arranque.",
-        "restartReason": "un cambio de ajustes"
+        "restartReason": "un cambio de ajustes",
+        "ungrouped": "Ajustes"
     },
     "gameRules": {
         "keepInventory": {

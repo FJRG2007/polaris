@@ -30,7 +30,8 @@
  */
 
 import { cn } from "@polaris/ui";
-import { TASK_PRIORITY_COLORS, TASK_PRIORITY_LABELS, type TaskPriority } from "@polaris/core";
+import { TASK_PRIORITY_COLORS, type TaskPriority } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** How many of the three bars are solid. The rest are drawn faint rather than
  *  left out, so the mark keeps one width and a column of them lines up. */
@@ -54,7 +55,8 @@ export function PriorityMark({
     priority: TaskPriority;
     className?: string;
 }) {
-    const label = TASK_PRIORITY_LABELS[priority];
+    const t = useTranslations("components");
+    const label = t(`priority.${priority}`);
     const color = TASK_PRIORITY_COLORS[priority];
     const shared = cn("size-3.5 shrink-0", className);
 

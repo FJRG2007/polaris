@@ -4,7 +4,8 @@
         "confirm": "Confirmar",
         "tryAgain": "Reintentar",
         "dismiss": "Descartar",
-        "remove": "Quitar"
+        "remove": "Quitar",
+        "requestFailed": "No se ha podido completar. Inténtalo de nuevo."
     },
     "activity": {
         "heading": {
@@ -28,7 +29,9 @@
     },
     "appBundles": {
         "partFailed": "Una parte de esta pÃ¡gina no se ha cargado. Recarga la pÃ¡gina para volver a intentarlo.",
-        "unavailable": "{name} no estÃ¡ disponible ahora mismo"
+        "unavailable": "{name} no estÃ¡ disponible ahora mismo",
+        "thisApp": "Esta app",
+        "stillDownloading": "Polaris aún la está descargando. Inténtalo en un momento."
     },
     "presence": {
         "online": "En lÃ­nea",
@@ -1224,5 +1227,12 @@
         "noMatch": "Ninguna línea guardada coincide.",
         "nothingKept": "Aún no hay nada guardado. La salida se guarda una vez por minuto mientras un servicio está en marcha.",
         "newest": "Recientes"
+    },
+    "priority": {
+        "urgent": "Urgente",
+        "high": "Alta",
+        "normal": "Normal",
+        "low": "Baja",
+        "none": "Sin prioridad"
     }
 }
