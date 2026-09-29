@@ -14,6 +14,7 @@
  */
 
 import Link from "next/link";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { copyText } from "@/app/(app)/chat/links";
 import { useChat } from "@/app/(app)/chat/chat-context";
 import { useRouter } from "next/navigation";
@@ -44,6 +45,7 @@ import {
 } from "@polaris/ui";
 
 export function MeetingsView() {
+    const t = useTranslations("chat");
     const router = useRouter();
     const baseUrl = useAppUrl();
     const format = useDisplayFormat();
@@ -68,19 +70,18 @@ export function MeetingsView() {
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
             <header className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">
                 <Video className="size-4 shrink-0 text-muted-foreground" />
-                <h1 className="min-w-0 flex-1 truncate text-sm font-medium">Meetings</h1>
+                <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{t("meetings.meetings")}</h1>
                 {may.meetings && (
                     <Button size="sm" onClick={() => setCreating(true)}>
                         <Plus className="size-4" />
-                        New meeting
+                        {t("meetings.newMeeting")}
                     </Button>
                 )}
             </header>
 
             <div className="flex flex-col gap-3 p-4">
                 <p className="text-xs text-muted-foreground">
-                    A room with a link anybody can open, whether or not they have a Polaris account.
-                    Whoever creates one hosts it.
+                    {t("meetings.aRoomWithALink")}
                 </p>
 
                 {error && (
@@ -97,11 +98,11 @@ export function MeetingsView() {
                 ) : meetings.length === 0 ? (
                     <EmptyState
                         icon={<Calendar />}
-                        title="No meetings"
+                        title={t("meetings.noMeetings")}
                         description={
                             may.meetings
-                                ? "Create one to get a link you can send to anybody."
-                                : "You will see meetings here when somebody invites you to one."
+                                ? t("meetings.createOneToGetA")
+                                : t("meetings.youWillSeeMeetingsHere")
                         }
                     />
                 ) : (
@@ -120,20 +121,18 @@ export function MeetingsView() {
                                             <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                                 <span>
                                                     {meeting.mine
-                                                        ? "You are hosting"
-                                                        : `${meeting.hostName} is hosting`}
+                                                        ? t("meetings.youAreHosting")
+                                                        : t("meetingRoom.hostedBy", { name: meeting.hostName })}
                                                 </span>
                                                 <span>{whenIs(meeting, format.dateTime)}</span>
                                                 {meeting.present > 0 && (
                                                     <span className="flex items-center gap-1 text-success">
                                                         <Users className="size-3.5 shrink-0" />
-                                                        {meeting.present === 1
-                                                            ? "1 person is in it"
-                                                            : `${meeting.present} people are in it`}
+                                                        {t("meetings.present", { count: meeting.present })}
                                                     </span>
                                                 )}
                                                 {meeting.requireAccount && (
-                                                    <span>Polaris accounts only</span>
+                                                    <span>{t("meetings.polarisAccountsOnly")}</span>
                                                 )}
                                             </span>
                                             {meeting.people.length > 0 && (
@@ -147,7 +146,7 @@ export function MeetingsView() {
                                             <Button
                                                 size="xs"
                                                 variant="secondary"
-                                                title="Copy the link to send"
+                                                title={t("meetings.copyTheLinkToSend")}
                                                 onClick={async () => {
                                                     await copyText(
                                                         `${baseUrl}/m/${meeting.guestToken}`
@@ -157,15 +156,15 @@ export function MeetingsView() {
                                                 }}
                                             >
                                                 <Link2 className="size-3.5" />
-                                                {copied === meeting.id ? "Copied" : "Copy link"}
+                                                {copied === meeting.id ? t("meetings.copied") : t("meetings.copyLink")}
                                             </Button>
                                         )}
                                         {meeting.mine && (
                                             <Button
                                                 size="icon-xs"
                                                 variant="secondary"
-                                                title="Rename or reschedule"
-                                                aria-label={`Rename or reschedule ${meeting.title}`}
+                                                title={t("meetings.renameOrReschedule")}
+                                                aria-label={t("meetings.renameNamed", { name: meeting.title })}
                                                 onClick={() => setEditing(meeting)}
                                             >
                                                 <Pencil className="size-3.5" />
@@ -178,7 +177,7 @@ export function MeetingsView() {
                                             }
                                         >
                                             <Video className="size-3.5" />
-                                            Join
+                                            {t("meetings.join")}
                                         </Button>
                                     </CardBody>
                                 </Card>
@@ -232,6 +231,7 @@ function NewMeetingDialog({
     onCreated: (meetingId: string) => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("chat");
     const [title, setTitle] = useState("");
     const [when, setWhen] = useState("");
     const [approveGuests, setApproveGuests] = useState(true);
@@ -270,50 +270,50 @@ function NewMeetingDialog({
         <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>New meeting</DialogTitle>
+                    <DialogTitle>{t("meetings.newMeeting")}</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs font-medium">
-                            Name<span className="text-danger"> *</span>
+                            {t("meetings.name")}<span className="text-danger"> *</span>
                         </span>
                         <Input
                             autoFocus
                             value={title}
                             maxLength={MAX_MEETING_TITLE}
-                            placeholder="What it is about"
+                            placeholder={t("meetings.whatItIsAbout")}
                             onChange={(event) => setTitle(event.target.value)}
                         />
                     </label>
 
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium">When</span>
+                        <span className="text-xs font-medium">{t("meetings.when")}</span>
                         <Input
                             type="datetime-local"
                             value={when}
                             onChange={(event) => setWhen(event.target.value)}
                         />
                         <span className="text-[0.6875rem] text-muted-foreground">
-                            Leave it empty for a room that is open as soon as you make it.
+                            {t("meetings.leaveItEmptyForA")}
                         </span>
                     </label>
 
                     <Setting
-                        label="Let people in yourself"
-                        hint="Anybody on the link waits until you admit them. A link that can be forwarded will be."
+                        label={t("meetings.letPeopleInYourself")}
+                        hint={t("meetings.anybodyOnTheLinkWaits")}
                         checked={approveGuests}
                         onChange={setApproveGuests}
                     />
                     <Setting
-                        label="Polaris accounts only"
-                        hint="The link names the meeting but only opens for somebody signed in."
+                        label={t("meetings.polarisAccountsOnly")}
+                        hint={t("meetings.theLinkNamesTheMeeting")}
                         checked={requireAccount}
                         onChange={setRequireAccount}
                     />
                 </div>
                 <DialogFooter>
                     <Button variant="secondary" size="sm" onClick={onClose}>
-                        Cancel
+                        {t("meetings.cancel")}
                     </Button>
                     <Button
                         size="sm"
@@ -321,7 +321,7 @@ function NewMeetingDialog({
                         onClick={() => void create()}
                     >
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        Create
+                        {t("meetings.create")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

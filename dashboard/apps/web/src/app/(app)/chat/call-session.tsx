@@ -20,6 +20,7 @@
  */
 
 import Link from "next/link";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCall } from "./use-call";
 import { CallAudio } from "./call-audio";
 import { Button, cn } from "@polaris/ui";
@@ -201,6 +202,7 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
  * finer is over there.
  */
 export function CallBar({ onScreen }: { onScreen: string | null }) {
+    const t = useTranslations("chat");
     const { call, session, leave } = useCallHold();
     // The room this bar is about, wherever it is drawn in full: a conversation
     // for a call, the meeting itself for a meeting. Either way the bar is a way
@@ -255,7 +257,7 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                 <Link
                     href={session.href ?? `/chat/c/${session.channelId}`}
                     className="min-w-0 max-w-[12rem] truncate text-xs font-medium no-underline hover:underline"
-                    title="Back to the call"
+                    title={t("callSession.backToTheCall")}
                 >
                     {session.title}
                 </Link>
@@ -281,7 +283,7 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                         className="flex shrink-0 items-center gap-1 rounded-full bg-warning-soft px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase text-warning-ink"
                     >
                         <AlertTriangle className="size-2.5 shrink-0" />
-                        No sound
+                        {t("callSession.noSound")}
                     </span>
                 )}
                 {hands.length > 0 && (
@@ -295,24 +297,24 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                 )}
                 {recorded && (
                     <span
-                        title="This call is being recorded"
+                        title={t("callSession.thisCallIsBeingRecorded")}
                         className="flex shrink-0 items-center gap-1 rounded-full bg-danger-soft px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase text-danger-ink"
                     >
                         <span aria-hidden="true" className="size-1.5 rounded-full bg-danger" />
-                        Rec
+                        {t("callSession.rec")}
                     </span>
                 )}
 
                 <button
                     type="button"
                     onClick={call.toggleMic}
-                    aria-label={call.micOn ? "Mute" : "Unmute"}
+                    aria-label={call.micOn ? t("callSession.mute") : t("callSession.unmute")}
                     title={
                         call.moderation.serverMuted || call.moderation.serverDeafened
-                            ? "A moderator muted you"
+                            ? t("callSession.aModeratorMutedYou")
                             : call.micOn
-                              ? "Mute (F9)"
-                              : "Unmute (F9)"
+                              ? t("callSession.muteF9")
+                              : t("callSession.unmuteF9")
                     }
                     className={cn(
                         "rounded-full p-1.5 transition-colors hover:bg-muted",
@@ -324,13 +326,13 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                 <button
                     type="button"
                     onClick={call.toggleDeafen}
-                    aria-label={call.deafened ? "Undeafen" : "Deafen"}
+                    aria-label={call.deafened ? t("callSession.undeafen") : t("callSession.deafen")}
                     title={
                         call.moderation.serverDeafened
-                            ? "A moderator deafened you"
+                            ? t("callSession.aModeratorDeafenedYou")
                             : call.deafened
-                              ? "Undeafen (F10)"
-                              : "Deafen (F10)"
+                              ? t("callSession.undeafenF10")
+                              : t("callSession.deafenF10")
                     }
                     className={cn(
                         "rounded-full p-1.5 transition-colors hover:bg-muted",
@@ -343,7 +345,7 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                         <Headphones className="size-4" />
                     )}
                 </button>
-                <Button size="icon" variant="danger" aria-label="Leave the call" onClick={leave}>
+                <Button size="icon" variant="danger" aria-label={t("callSession.leaveTheCall")} onClick={leave}>
                     <PhoneOff className="size-4" />
                 </Button>
             </div>

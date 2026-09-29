@@ -313,7 +313,7 @@ describe("combining from a person's menu", () => {
     );
 
     it("is greyed out in a call of two, and live again with three", () => {
-        const { rerender } = render(menu(true));
+        const { rerender } = render(menu(true), { wrapper: MessagesWrapper });
         fireEvent.contextMenu(screen.getByText("Bo"));
         const ask = screen.getByRole("menuitem", { name: /Ask them to combine audio/ });
         expect(ask.getAttribute("aria-disabled")).toBe("true");

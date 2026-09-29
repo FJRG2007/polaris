@@ -15,6 +15,7 @@
  * through writing the answers, which must not send the poll.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -28,7 +29,7 @@ function dialog() {
             open
             onOpenChange={() => undefined}
             onConfirm={(draft) => made.push(draft)}
-        />
+        />, { wrapper: MessagesWrapper }
     );
 }
 

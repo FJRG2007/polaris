@@ -21,6 +21,8 @@
  */
 
 import * as core from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { BarChart3, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -39,6 +41,18 @@ import {
 /** What a poll opens with. Two, and a third arrives as soon as the second is
  *  written - see `boxes` below. */
 const OPENING_ANSWERS = 2;
+
+/** How long each offered duration is called, by its length in hours. */
+const POLL_DURATION_KEYS: Readonly<Record<number, NamespaceKey<"chat">>> = {
+    1: "poll.durations.h1",
+    4: "poll.durations.h4",
+    8: "poll.durations.h8",
+    24: "poll.durations.d1",
+    72: "poll.durations.d3",
+    168: "poll.durations.w1",
+    336: "poll.durations.w2",
+    [core.POLL_NO_END]: "poll.durations.open"
+};
 
 /** What this dialog hands back, ready for the schema. */
 export interface PollDraft {
@@ -72,6 +86,7 @@ export function PollDialog({
     /** What the server said, when it refused one this dialog thought was fine. */
     error?: string;
 }) {
+    const t = useTranslations("chat");
     const [question, setQuestion] = useState("");
     const [answers, setAnswers] = useState<string[]>(() => Array(OPENING_ANSWERS).fill(""));
     const [multiple, setMultiple] = useState(false);
@@ -118,13 +133,13 @@ export function PollDialog({
      * off for not having finished typing.
      */
     const refusal = !asked
-        ? "Ask something first"
+        ? t("errors.pollQuestionRequired")
         : tooLongQuestion
-          ? `The question can be up to ${core.MAX_POLL_QUESTION} characters`
+          ? t("poll.questionTooLong", { max: core.MAX_POLL_QUESTION })
           : kept.length < core.MIN_POLL_OPTIONS
-            ? "A poll needs at least two answers"
+            ? t("poll.needsTwo")
             : tooLongAnswer
-              ? `An answer can be up to ${core.MAX_POLL_OPTION} characters`
+              ? t("poll.answerTooLong", { max: core.MAX_POLL_OPTION })
               : null;
 
     const setAnswer = (index: number, value: string) => {
@@ -152,38 +167,37 @@ export function PollDialog({
 
     const durations = [...core.POLL_DURATIONS, core.POLL_NO_END].map((value) => ({
         value: String(value),
-        label: core.POLL_DURATION_LABELS[value] ?? `${value} hours`
+        label: POLL_DURATION_KEYS[value] ? t(POLL_DURATION_KEYS[value]!) : t("poll.hours", { count: value })
     }));
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Create a poll</DialogTitle>
+                    <DialogTitle>{t("poll.createAPoll")}</DialogTitle>
                     <DialogDescription>
-                        It goes into the conversation as a message. Everybody here can answer, and
-                        you can close it whenever you have what you needed.
+                        {t("poll.itGoesIntoTheConversation")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1 text-sm">
                         <span>
-                            Question <span aria-hidden="true">*</span>
+                            {t("poll.question")} <span aria-hidden="true">*</span>
                         </span>
                         <Input
                             autoFocus
                             value={question}
                             disabled={busy}
                             maxLength={core.MAX_POLL_QUESTION}
-                            placeholder="Where are we going for lunch?"
+                            placeholder={t("poll.whereAreWeGoingFor")}
                             onChange={(event) => setQuestion(event.target.value)}
                         />
                     </label>
 
                     <div className="flex flex-col gap-1.5">
                         <span className="text-sm">
-                            Answers <span aria-hidden="true">*</span>
+                            {t("poll.answers")} <span aria-hidden="true">*</span>
                         </span>
                         <ul className="flex flex-col gap-1.5">
                             {answers.map((text, index) => (
@@ -193,8 +207,8 @@ export function PollDialog({
                                         value={text}
                                         disabled={busy}
                                         maxLength={core.MAX_POLL_OPTION}
-                                        aria-label={`Answer ${index + 1}`}
-                                        placeholder={`Answer ${index + 1}`}
+                                        aria-label={t("poll.answerN", { n: index + 1 })}
+                                        placeholder={t("poll.answerN", { n: index + 1 })}
                                         ref={(node) => {
                                             boxRefs.current[index] = node;
                                         }}
@@ -214,8 +228,8 @@ export function PollDialog({
                                         size="icon-sm"
                                         variant="ghost"
                                         disabled={busy}
-                                        title="Remove"
-                                        aria-label={`Remove answer ${index + 1}`}
+                                        title={t("poll.remove")}
+                                        aria-label={t("poll.removeAnswerN", { n: index + 1 })}
                                         onClick={() => removeAnswer(index)}
                                     >
                                         <X />
@@ -232,50 +246,49 @@ export function PollDialog({
                                 className="self-start"
                             >
                                 <Plus />
-                                Add an answer
+                                {t("poll.addAnAnswer")}
                             </Button>
                         )}
                     </div>
 
                     <label className="flex items-center justify-between gap-3 text-sm">
                         <span>
-                            More than one answer
+                            {t("poll.moreThanOneAnswer")}
                             <span className="block text-xs text-muted-foreground">
-                                People can pick as many as apply.
+                                {t("poll.peopleCanPickAsMany")}
                             </span>
                         </span>
                         <Switch
                             checked={multiple}
                             disabled={busy}
                             onChange={setMultiple}
-                            aria-label="Allow more than one answer"
+                            aria-label={t("poll.allowMoreThanOneAnswer")}
                         />
                     </label>
 
                     <label className="flex items-center justify-between gap-3 text-sm">
                         <span>
-                            Hide the results until it closes
+                            {t("poll.hideTheResultsUntilIt")}
                             <span className="block text-xs text-muted-foreground">
-                                Nobody sees the counts while it runs, so early votes do not sway
-                                the rest.
+                                {t("poll.nobodySeesTheCountsWhile")}
                             </span>
                         </span>
                         <Switch
                             checked={hideResults}
                             disabled={busy}
                             onChange={setHideResults}
-                            aria-label="Hide the results until the poll closes"
+                            aria-label={t("poll.hideTheResultsUntilThe")}
                         />
                     </label>
 
                     {timed && (
                         <label className="flex items-center justify-between gap-3 text-sm">
-                            <span id="poll-length">Open for</span>
+                            <span id="poll-length">{t("poll.openFor")}</span>
                             <Select
                                 value={String(hours)}
                                 disabled={busy}
                                 options={durations}
-                                aria-label="How long the poll stays open"
+                                aria-label={t("poll.howLongThePollStays")}
                                 className="w-44"
                                 onValueChange={(value) => setHours(Number(value))}
                             />
@@ -293,7 +306,7 @@ export function PollDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" disabled={busy} onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {t("poll.cancel")}
                     </Button>
                     <Button
                         onClick={send}
@@ -302,7 +315,7 @@ export function PollDialog({
                         title={refusal ?? undefined}
                     >
                         <BarChart3 />
-                        {busy ? "Sending..." : "Create poll"}
+                        {busy ? t("poll.sending") : t("poll.createPoll")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

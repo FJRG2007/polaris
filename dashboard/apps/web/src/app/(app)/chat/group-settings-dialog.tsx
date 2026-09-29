@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
@@ -48,6 +49,7 @@ export function GroupSettingsDialog({
     onOpenChange: (open: boolean) => void;
     onChanged: () => void;
 }) {
+    const t = useTranslations("chat");
     const [members, setMembers] = useState<readonly ChatMemberView[]>([]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
@@ -105,10 +107,9 @@ export function GroupSettingsDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Group settings</DialogTitle>
+                    <DialogTitle>{t("groupSettings.groupSettings")}</DialogTitle>
                     <DialogDescription>
-                        Yours, because you run this group. Everything else about it is
-                        everybody&apos;s.
+                        {t("groupSettings.yoursBecauseYouRunThis")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -116,42 +117,42 @@ export function GroupSettingsDialog({
                     <label className="flex items-start justify-between gap-3">
                         <span className="flex min-w-0 flex-col">
                             <span className="text-sm font-medium">
-                                Let anybody change the name and picture
+                                {t("groupSettings.letAnybodyChangeTheName")}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                Off, only you can. On, anybody in the group can.
+                                {t("groupSettings.offOnlyYouCanOn")}
                             </span>
                         </span>
                         <Switch
                             checked={shown.membersMayEdit}
                             disabled={busy}
                             onChange={(next: boolean) => void setSwitch({ membersMayEdit: next })}
-                            aria-label="Let anybody change the name and picture"
+                            aria-label={t("groupSettings.letAnybodyChangeTheName")}
                         />
                     </label>
 
                     <label className="flex items-start justify-between gap-3">
                         <span className="flex min-w-0 flex-col">
-                            <span className="text-sm font-medium">Let anybody add people</span>
+                            <span className="text-sm font-medium">{t("groupSettings.letAnybodyAddPeople")}</span>
                             <span className="text-xs text-muted-foreground">
-                                Off, only you can add people to this group.
+                                {t("groupSettings.offOnlyYouCanAdd")}
                             </span>
                         </span>
                         <Switch
                             checked={shown.membersMayInvite}
                             disabled={busy}
                             onChange={(next: boolean) => void setSwitch({ membersMayInvite: next })}
-                            aria-label="Let anybody add people"
+                            aria-label={t("groupSettings.letAnybodyAddPeople")}
                         />
                     </label>
 
                     <label className="flex items-start justify-between gap-3">
                         <span className="flex min-w-0 flex-col">
                             <span className="text-sm font-medium">
-                                Let anybody use @everyone and @here
+                                {t("groupSettings.letAnybodyUseEveryoneAnd")}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                Off, only you can notify the whole group at once.
+                                {t("groupSettings.offOnlyYouCanNotify")}
                             </span>
                         </span>
                         <Switch
@@ -160,18 +161,18 @@ export function GroupSettingsDialog({
                             onChange={(next: boolean) =>
                                 void setSwitch({ membersMayMention: next })
                             }
-                            aria-label="Let anybody use @everyone and @here"
+                            aria-label={t("groupSettings.letAnybodyUseEveryoneAnd")}
                         />
                     </label>
 
                     <div className="flex flex-col gap-2">
-                        <span className="text-sm font-medium">Hand the group over</span>
+                        <span className="text-sm font-medium">{t("groupSettings.handTheGroupOver")}</span>
                         <span className="text-xs text-muted-foreground">
-                            They run it from then on. You stay in it.
+                            {t("groupSettings.theyRunItFromThen")}
                         </span>
                         {others.length === 0 ? (
                             <p className="text-xs text-muted-foreground">
-                                There is nobody else in this group yet.
+                                {t("groupSettings.thereIsNobodyElseIn")}
                             </p>
                         ) : (
                             // Plain: this is where somebody is chosen to own the
@@ -205,7 +206,7 @@ export function GroupSettingsDialog({
                                                         disabled={busy}
                                                         onClick={() => void hand(member.userId)}
                                                     >
-                                                        Hand it over
+                                                        {t("groupSettings.handItOver")}
                                                     </Button>
                                                     <Button
                                                         size="xs"
@@ -213,7 +214,7 @@ export function GroupSettingsDialog({
                                                         disabled={busy}
                                                         onClick={() => setHandingTo(null)}
                                                     >
-                                                        Cancel
+                                                        {t("groupSettings.cancel")}
                                                     </Button>
                                                 </>
                                             ) : (
@@ -223,7 +224,7 @@ export function GroupSettingsDialog({
                                                     disabled={busy}
                                                     onClick={() => setHandingTo(member.userId)}
                                                 >
-                                                    Make owner
+                                                    {t("groupSettings.makeOwner")}
                                                 </Button>
                                             )}
                                         </PersonRow>
@@ -242,7 +243,7 @@ export function GroupSettingsDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                        Close
+                        {t("groupSettings.close")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

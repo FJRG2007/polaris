@@ -14,6 +14,7 @@
  */
 
 import { callDevices } from "./call-media";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useRef, useState } from "react";
 import { micDevice } from "./mic-device";
 import { MicSettings } from "./mic-settings";
@@ -84,6 +85,7 @@ export function ClipDialog({
     maxBytes: number;
     maxMib: number;
 }) {
+    const t = useTranslations("chat");
     const clip = useClipRecorder({ maxBytes });
     const [sources, setSources] = useState<ClipSources>({ camera: false, microphone: true });
     /**
@@ -145,10 +147,9 @@ export function ClipDialog({
         <Dialog open={open} onOpenChange={(next) => (next ? undefined : close())}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Record a clip</DialogTitle>
+                    <DialogTitle>{t("clip.recordAClip")}</DialogTitle>
                     <DialogDescription>
-                        Polaris records the screen or window you pick and puts the video in your
-                        message. Up to {clock(MAX_CLIP_SECONDS)} and {maxMib} MB.
+                        {t("clip.description", { time: clock(MAX_CLIP_SECONDS), size: maxMib })}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -161,7 +162,7 @@ export function ClipDialog({
                         <div className="flex flex-wrap items-center gap-2">
                             <SourceToggle
                                 on={sources.camera}
-                                label={sources.camera ? "Camera on" : "Camera off"}
+                                label={sources.camera ? t("clip.cameraOn") : t("clip.cameraOff")}
                                 onToggle={() =>
                                     setSources((current) => ({ ...current, camera: !current.camera }))
                                 }
@@ -171,11 +172,11 @@ export function ClipDialog({
                                 ) : (
                                     <CameraOff className="size-3.5" />
                                 )}
-                                Camera
+                                {t("clip.camera")}
                             </SourceToggle>
                             <SourceToggle
                                 on={sources.microphone}
-                                label={sources.microphone ? "Microphone on" : "Microphone off"}
+                                label={sources.microphone ? t("clip.microphoneOn") : t("clip.microphoneOff")}
                                 onToggle={() =>
                                     setSources((current) => ({
                                         ...current,
@@ -188,11 +189,10 @@ export function ClipDialog({
                                 ) : (
                                     <MicOff className="size-3.5" />
                                 )}
-                                Microphone
+                                {t("clip.microphone")}
                             </SourceToggle>
                             <p className="w-full text-xs text-muted-foreground">
-                                Your browser asks which screen or window to record. The camera goes
-                                in the corner of the picture.
+                                {t("clip.yourBrowserAsksWhichScreen")}
                             </p>
 
                             {/* Which one, where there is more than one to choose
@@ -200,9 +200,9 @@ export function ClipDialog({
                                 asked a question it has no answer to. */}
                             {sources.camera && devices.cameras.length > 1 && (
                                 <label className="flex w-full flex-col gap-1 text-xs">
-                                    Camera
+                                    {t("clip.camera")}
                                     <Select
-                                        aria-label="Camera"
+                                        aria-label={t("clip.camera")}
                                         value={sources.cameraId ?? devices.cameras[0]?.id ?? ""}
                                         onValueChange={(id) =>
                                             setSources((current) => ({ ...current, cameraId: id }))
@@ -240,7 +240,7 @@ export function ClipDialog({
                                 />
                             ) : (
                                 <div className="flex aspect-video w-full items-center justify-center rounded-md border border-border bg-muted/30 text-sm text-muted-foreground">
-                                    Recording your screen
+                                    {t("clip.recordingYourScreen")}
                                 </div>
                             )}
                         </div>
@@ -266,11 +266,11 @@ export function ClipDialog({
                         {clip.stage === "idle" && (
                             <Button onClick={() => void clip.start(sources)}>
                                 <Circle className="size-4 fill-current text-danger" />
-                                Start recording
+                                {t("clip.startRecording")}
                             </Button>
                         )}
                         {clip.stage === "starting" && (
-                            <p className="text-sm text-muted-foreground">Waiting for the screen...</p>
+                            <p className="text-sm text-muted-foreground">{t("clip.waitingForTheScreen")}</p>
                         )}
                         {running && (
                             <>
@@ -291,17 +291,17 @@ export function ClipDialog({
                                 {clip.stage === "recording" ? (
                                     <Button size="sm" variant="secondary" onClick={clip.pause}>
                                         <Pause className="size-4" />
-                                        Pause
+                                        {t("clip.pause")}
                                     </Button>
                                 ) : (
                                     <Button size="sm" variant="secondary" onClick={clip.resume}>
                                         <Play className="size-4" />
-                                        Resume
+                                        {t("clip.resume")}
                                     </Button>
                                 )}
                                 <Button size="sm" onClick={clip.stop}>
                                     <Square className="size-4" />
-                                    Stop
+                                    {t("clip.stop")}
                                 </Button>
                             </>
                         )}
@@ -314,14 +314,17 @@ export function ClipDialog({
                                         onOpenChange(false);
                                     }}
                                 >
-                                    Attach it
+                                    {t("clip.attachIt")}
                                 </Button>
                                 <Button size="sm" variant="secondary" onClick={clip.discard}>
                                     <RotateCcw className="size-4" />
-                                    Record again
+                                    {t("clip.recordAgain")}
                                 </Button>
                                 <span className="text-xs text-muted-foreground">
-                                    {clock(clip.seconds)}, {Math.max(1, Math.round(clip.file.size / (1024 * 1024)))} MB
+                                    {t("clip.recorded", {
+                                        time: clock(clip.seconds),
+                                        size: Math.max(1, Math.round(clip.file.size / (1024 * 1024)))
+                                    })}
                                 </span>
                             </>
                         )}
@@ -336,7 +339,7 @@ export function ClipDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={close}>
-                        {running ? "Stop and close" : "Close"}
+                        {running ? t("clip.stopAndClose") : t("clip.close")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

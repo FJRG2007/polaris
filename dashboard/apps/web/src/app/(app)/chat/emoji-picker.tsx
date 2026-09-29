@@ -26,6 +26,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { createPortal } from "react-dom";
 import type { TenorResult } from "@/lib/chat/tenor";
 import { Loader2, Search, Smile, Star } from "lucide-react";
@@ -195,6 +196,7 @@ export function EmojiPicker({
      *  one is copied rather than fetched back off this Polaris. */
     onSaved?: (savedId: string) => void;
 }) {
+    const t = useTranslations("chat");
     const [open, setOpen] = useState(false);
     const [tab, setTab] = useState<Tab>("emoji");
     const [query, setQuery] = useState("");
@@ -432,8 +434,8 @@ export function EmojiPicker({
             ref={trigger}
             type="button"
             disabled={disabled}
-            aria-label="Emoji, GIFs and stickers"
-            title="Emoji, GIFs and stickers"
+            aria-label={t("emojiPicker.emojiGifsAndStickers")}
+            title={t("emojiPicker.emojiGifsAndStickers")}
             aria-expanded={open}
             onClick={() => setOpen((current) => !current)}
             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
@@ -454,7 +456,7 @@ export function EmojiPicker({
                     data-state="open"
                     // Pointer events back on, for a composer inside a dialog: a
                     // modal dialog turns them off on the body, where this is drawn.
-                    aria-label="Emoji, GIFs and stickers"
+                    aria-label={t("emojiPicker.emojiGifsAndStickers")}
                     style={{
                         left: at.left,
                         top: at.top,
@@ -511,17 +513,17 @@ export function EmojiPicker({
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={
                                 tab === "emoji"
-                                    ? "Search emoji"
+                                    ? t("emojiPicker.searchEmoji")
                                     : tab === "sticker"
-                                      ? "Search stickers"
-                                      : "Search GIFs"
+                                      ? t("emojiPicker.searchStickers")
+                                      : t("emojiPicker.searchGifs")
                             }
                             aria-label={
                                 tab === "emoji"
-                                    ? "Search emoji"
+                                    ? t("emojiPicker.searchEmoji")
                                     : tab === "sticker"
-                                      ? "Search stickers"
-                                      : "Search GIFs"
+                                      ? t("emojiPicker.searchStickers")
+                                      : t("emojiPicker.searchGifs")
                             }
                             className="h-7 w-full rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                         />
@@ -532,7 +534,7 @@ export function EmojiPicker({
                             query.trim() ? (
                                 found.length === 0 ? (
                                     <p className="px-1 py-6 text-center text-xs text-muted-foreground">
-                                        No emoji matches that.
+                                        {t("emojiPicker.noEmojiMatchesThat")}
                                     </p>
                                 ) : (
                                     <Grid entries={found} onPick={pick} />
@@ -546,7 +548,7 @@ export function EmojiPicker({
                                     {recent.emoji.length > 0 && (
                                         <section className="mb-2">
                                             <h3 className="px-1 pb-1 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                                                Recent
+                                                {t("emojiPicker.recent")}
                                             </h3>
                                             <Grid entries={recentEntries} onPick={pick} />
                                         </section>
@@ -565,12 +567,11 @@ export function EmojiPicker({
                             saved === null ? (
                                 <p className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
                                     <Loader2 className="size-3.5 animate-spin" />
-                                    Looking
+                                    {t("emojiPicker.looking")}
                                 </p>
                             ) : saved.length === 0 ? (
                                 <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-                                    Nothing kept yet. The star in the corner of any picture puts it
-                                    here - in a message, or in the GIFs beside this.
+                                    {t("emojiPicker.nothingKeptYetTheStar")}
                                 </p>
                             ) : (
                                 <ul className="grid grid-cols-2 gap-1">
@@ -594,8 +595,7 @@ export function EmojiPicker({
                         ) : tenorReady === false ? (
                             <div className="flex flex-col gap-3 px-2 py-4">
                                 <p className="text-center text-xs text-muted-foreground">
-                                    Searching for GIFs and stickers is switched off here. An
-                                    administrator can turn it on.
+                                    {t("emojiPicker.searchingForGifsAndStickers")}
                                 </p>
                                 <ByLink
                                     onSend={(address) => {
@@ -607,7 +607,7 @@ export function EmojiPicker({
                         ) : searching || tenorReady === null ? (
                             <p className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
                                 <Loader2 className="size-3.5 animate-spin" />
-                                Looking
+                                {t("emojiPicker.looking")}
                             </p>
                         ) : !query.trim() && recent.media.length > 0 ? (
                             // Before anything has been typed, the ones already
@@ -615,7 +615,7 @@ export function EmojiPicker({
                             // tab is usually reaching for the same one again.
                             <>
                                 <h3 className="px-1 pb-1 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                                    Recent
+                                    {t("emojiPicker.recent")}
                                 </h3>
                                 <MediaGrid
                                     entries={recent.media}
@@ -629,7 +629,7 @@ export function EmojiPicker({
                                 />
                                 {results.length > 0 && (
                                     <h3 className="px-1 pb-1 pt-2 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                                        Trending
+                                        {t("emojiPicker.trending")}
                                     </h3>
                                 )}
                                 <MediaGrid
@@ -649,7 +649,7 @@ export function EmojiPicker({
                             </>
                         ) : results.length === 0 ? (
                             <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-                                Nothing came back for that.
+                                {t("emojiPicker.nothingCameBackForThat")}
                             </p>
                         ) : (
                             <MediaGrid
@@ -685,6 +685,7 @@ export function EmojiPicker({
  * attachment, so the conversation never asks the other site for it.
  */
 function ByLink({ onSend }: { onSend: (address: string) => void }) {
+    const t = useTranslations("chat");
     const [address, setAddress] = useState("");
     const usable = /^https?:\/\/\S+$/i.test(address.trim());
 
@@ -697,7 +698,7 @@ function ByLink({ onSend }: { onSend: (address: string) => void }) {
             className="flex flex-col gap-1.5"
         >
             <label htmlFor="picker-link" className="text-xs text-muted-foreground">
-                Send a picture or GIF by its address
+                {t("emojiPicker.sendAPictureOrGif")}
             </label>
             <span className="flex gap-1.5">
                 <input
@@ -712,7 +713,7 @@ function ByLink({ onSend }: { onSend: (address: string) => void }) {
                     disabled={!usable}
                     className="rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground transition-opacity disabled:opacity-40"
                 >
-                    Send
+                    {t("emojiPicker.send")}
                 </button>
             </span>
         </form>
@@ -778,11 +779,12 @@ function Tile({
     onPick: () => void;
     onKeep: (keep: boolean) => void;
 }) {
+    const t = useTranslations("chat");
     return (
         <li className="group/pic relative">
             <button
                 type="button"
-                title={description || "Send this"}
+                title={description || t("emojiPicker.sendThis")}
                 onClick={onPick}
                 className="block w-full overflow-hidden rounded-md ring-border transition-shadow hover:ring-2"
             >
@@ -797,8 +799,8 @@ function Tile({
             <button
                 type="button"
                 aria-pressed={kept}
-                aria-label={kept ? "Stop keeping this picture" : "Keep this picture"}
-                title={kept ? "Kept. It is in your picker." : "Keep this"}
+                aria-label={kept ? t("emojiPicker.stopKeepingThisPicture") : t("emojiPicker.keepThisPicture")}
+                title={kept ? t("emojiPicker.keptItIsInYour") : t("emojiPicker.keepThis")}
                 onClick={(event) => {
                     // The tile under it sends. Keeping is not the first half of
                     // sending.

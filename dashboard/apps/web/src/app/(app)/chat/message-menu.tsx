@@ -20,6 +20,7 @@
  */
 
 import { isPlayable } from "./voice-recorder";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { copyText, messageLink } from "./links";
 import { useAppUrl } from "@/components/app-url";
 import { imageItems } from "@/components/image-actions";
@@ -104,6 +105,7 @@ export function MessageMenu({
     actions: MessageActions;
     children: ReactNode;
 }) {
+    const t = useTranslations("chat");
     const { message, mine, canPost, canModerate } = actions;
     const baseUrl = useAppUrl();
     const toast = useToast();
@@ -162,7 +164,7 @@ export function MessageMenu({
             setSaving(file.id);
             toast.show({
                 key: note,
-                title: "Preparing the file",
+                title: t("messageMenu.preparingTheFile"),
                 body: "Converted here, in this tab. It stays stored as it was.",
                 // Until it is done, however long that is.
                 life: 0
@@ -244,7 +246,7 @@ export function MessageMenu({
                     <>
                         <ContextMenuItem onSelect={() => void copyText(link.copy)}>
                             <Link2 className="size-3.5" />
-                            {link.kind === "email" ? "Copy email address" : "Copy link"}
+                            {link.kind === "email" ? t("messageMenu.copyEmailAddress") : t("messageMenu.copyLink")}
                         </ContextMenuItem>
                         {/* The address as the browser has it, not the one that
                             gets copied: a page inside Polaris opens on this
@@ -254,7 +256,7 @@ export function MessageMenu({
                             onSelect={() => window.open(link.open, "_blank", "noopener,noreferrer")}
                         >
                             <ExternalLink className="size-3.5" />
-                            {link.kind === "email" ? "Send an email" : "Open link"}
+                            {link.kind === "email" ? t("messageMenu.sendAnEmail") : t("messageMenu.openLink")}
                         </ContextMenuItem>
                         <ContextMenuSeparator />
                     </>
@@ -265,7 +267,8 @@ export function MessageMenu({
                         {actions.onReply && (
                             <ContextMenuItem onSelect={() => actions.onReply?.(message)}>
                                 <CornerUpLeft className="size-3.5" />
-                                Reply
+                                {t("messageMenu.reply")}
+                                {/* i18n-ignore: a key on the keyboard */}
                                 <MenuShortcut>R</MenuShortcut>
                             </ContextMenuItem>
                         )}
@@ -277,7 +280,7 @@ export function MessageMenu({
                         {!mine && message.authorId && actions.onReplyPrivately && (
                             <ContextMenuItem onSelect={() => actions.onReplyPrivately?.(message)}>
                                 <MessageCircleReply className="size-3.5" />
-                                Reply privately
+                                {t("messageMenu.replyPrivately")}
                             </ContextMenuItem>
                         )}
                         {/* Absent rather than refused when whoever wrote it does
@@ -286,13 +289,13 @@ export function MessageMenu({
                         {message.forwardable && actions.onForward && (
                             <ContextMenuItem onSelect={() => actions.onForward?.(message)}>
                                 <Forward className="size-3.5" />
-                                Forward
+                                {t("messageMenu.forward")}
                             </ContextMenuItem>
                         )}
                         {actions.onOpenThread && (
                             <ContextMenuItem onSelect={() => actions.onOpenThread?.(message)}>
                                 <MessageSquare className="size-3.5" />
-                                Reply in a thread
+                                {t("messageMenu.replyInAThread")}
                             </ContextMenuItem>
                         )}
                         <ContextMenuSeparator />
@@ -301,12 +304,12 @@ export function MessageMenu({
 
                 <ContextMenuItem onSelect={() => actions.onStar(message)}>
                     <Star className="size-3.5" />
-                    {message.starred ? "Remove from saved" : "Save"}
+                    {message.starred ? t("messageMenu.removeFromSaved") : t("messageMenu.save")}
                 </ContextMenuItem>
                 {actions.onMarkUnread && !mine && !message.deleted && (
                     <ContextMenuItem onSelect={() => actions.onMarkUnread?.(message)}>
                         <Mail className="size-3.5" />
-                        Mark unread from here
+                        {t("messageMenu.markUnreadFromHere")}
                     </ContextMenuItem>
                 )}
                 {/* Offered on a deleted message too: the line is still there,
@@ -318,7 +321,7 @@ export function MessageMenu({
                     }
                 >
                     <Link2 className="size-3.5" />
-                    Copy message link
+                    {t("messageMenu.copyMessageLink")}
                 </ContextMenuItem>
                 {/* What it reads as, not what it is stored as. Markdown escapes
                     its punctuation, so copying the source hands back a line full
@@ -326,7 +329,7 @@ export function MessageMenu({
                 {!message.deleted && (
                     <ContextMenuItem onSelect={() => void copyText(plainText(message.body))}>
                         <Copy className="size-3.5" />
-                        Copy text
+                        {t("messageMenu.copyText")}
                         <MenuShortcut keys="Mod+C" />
                     </ContextMenuItem>
                 )}
@@ -343,7 +346,7 @@ export function MessageMenu({
                             >
                                 <Download className="size-3.5" />
                                 <span className="min-w-0 truncate">
-                                    {saveable.length === 1 ? "Download" : file.name}
+                                    {saveable.length === 1 ? t("messageMenu.download") : file.name}
                                 </span>
                             </a>
                         </ContextMenuItem>
@@ -356,7 +359,7 @@ export function MessageMenu({
                                 {/* Named only when there is more than one, since
                                     a voice message has no name worth reading. */}
                                 <span className="min-w-0 truncate">
-                                    {recordings.length === 1 ? "Download the audio" : file.name}
+                                    {recordings.length === 1 ? t("messageMenu.downloadTheAudio") : file.name}
                                 </span>
                             </ContextMenuSubTrigger>
                             {/* A format rather than a file, because what was
@@ -389,7 +392,7 @@ export function MessageMenu({
                 {message.receipt && !message.deleted && (
                     <ContextMenuItem onSelect={() => actions.onExplain(message)}>
                         <Info className="size-3.5" />
-                        Information
+                        {t("messageMenu.information")}
                     </ContextMenuItem>
                 )}
 
@@ -410,7 +413,7 @@ export function MessageMenu({
                             onSelect={() => actions.onReport(message)}
                         >
                             <Flag className="size-3.5" />
-                            Report this message
+                            {t("messageMenu.reportThisMessage")}
                         </ContextMenuItem>
                     </>
                 )}
@@ -424,7 +427,8 @@ export function MessageMenu({
                         {mine && actions.onEdit && (
                             <ContextMenuItem onSelect={() => actions.onEdit?.(message)}>
                                 <Pencil className="size-3.5" />
-                                Edit
+                                {t("messageMenu.edit")}
+                                {/* i18n-ignore: a key on the keyboard */}
                                 <MenuShortcut>F2</MenuShortcut>
                             </ContextMenuItem>
                         )}
@@ -433,8 +437,8 @@ export function MessageMenu({
                             onSelect={() => actions.onDelete(message)}
                         >
                             <Trash2 className="size-3.5" />
-                            Delete
-                            <MenuShortcut>Del</MenuShortcut>
+                            {t("messageMenu.delete")}
+                            <MenuShortcut>{t("messageMenu.del")}</MenuShortcut>
                         </ContextMenuItem>
                     </>
                 )}

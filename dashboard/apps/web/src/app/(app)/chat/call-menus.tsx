@@ -8,6 +8,7 @@
  */
 
 import { useVoiceSettings } from "./voice-settings";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ModerationItems, type SeatModeration } from "./call-moderation-menu";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { Check, Headphones, PictureInPicture2, Users, Volume2, VolumeX } from "lucide-react";
@@ -68,6 +69,7 @@ export function PersonMenu({
     moderation?: SeatModeration;
     children: React.ReactNode;
 }) {
+    const t = useTranslations("chat");
     const [volume, setVolume] = useCallVolume(volumeKey);
 
     return (
@@ -86,7 +88,7 @@ export function PersonMenu({
                     className="flex-col items-stretch gap-1.5"
                 >
                     <span className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Volume</span>
+                        <span>{t("callMenus.volume")}</span>
                         <span
                             className={cn(
                                 "tabular-nums",
@@ -102,7 +104,7 @@ export function PersonMenu({
                         max={MAX_VOLUME}
                         step={0.05}
                         value={volume}
-                        aria-label={`How loud ${name} is`}
+                        aria-label={t("callMenus.howLoud", { name })}
                         onChange={(event) => setVolume(Number(event.target.value))}
                         className="w-full accent-primary"
                     />
@@ -118,8 +120,8 @@ export function PersonMenu({
                         className="self-start text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:no-underline disabled:opacity-60"
                     >
                         {volume === DEFAULT_VOLUME
-                            ? "As they were sent"
-                            : "Back to how they were sent"}
+                            ? t("callMenus.asTheyWereSent")
+                            : t("callMenus.backToHowTheyWere")}
                     </button>
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setVolume(volume === 0 ? DEFAULT_VOLUME : 0)}>
@@ -128,7 +130,7 @@ export function PersonMenu({
                     ) : (
                         <VolumeX className="size-3.5" />
                     )}
-                    {volume === 0 ? "Let them through" : "Silence them for you"}
+                    {volume === 0 ? t("callMenus.letThemThrough") : t("callMenus.silenceThemForYou")}
                 </ContextMenuItem>
 
                 {/* The way to combine with somebody this browser did not hear -
@@ -138,7 +140,7 @@ export function PersonMenu({
                 {onCombine && (
                     <ContextMenuItem onSelect={onCombine} disabled={combineLocked}>
                         <Headphones className="size-3.5" />
-                        Use their audio
+                        {t("callMenus.useTheirAudio")}
                     </ContextMenuItem>
                 )}
                 {onAskCombine && (
@@ -147,12 +149,12 @@ export function PersonMenu({
                         disabled={combineAsked || combineLocked}
                     >
                         <Users className="size-3.5" />
-                        {combineAsked ? "Asked to combine" : "Ask them to combine audio"}
+                        {combineAsked ? t("callMenus.askedToCombine") : t("callMenus.askThemToCombineAudio")}
                     </ContextMenuItem>
                 )}
                 {(onCombine || onAskCombine) && combineLocked && (
                     <p className="px-2 pb-1 text-xs text-muted-foreground">
-                        Needs at least three people in the call.
+                        {t("callMenus.needsAtLeastThreePeople")}
                     </p>
                 )}
                 {moderation && <ModerationItems seat={moderation} name={name} />}
@@ -194,6 +196,7 @@ export function StreamMenu({
     onWatch: () => void;
     children: React.ReactNode;
 }) {
+    const t = useTranslations("chat");
     const [volume, setVolume] = useCallVolume(streamVolumeKey(person));
     const [muted, setMuted] = useStreamMuted(person);
     const [voice, setVoice] = useVoiceSettings();
@@ -206,7 +209,7 @@ export function StreamMenu({
                 <ContextMenuLabel className="truncate">{name}</ContextMenuLabel>
                 <ContextMenuSeparator />
                 <ContextMenuItem onSelect={onWatch}>
-                    {watching ? "Stop watching" : "Watch stream"}
+                    {watching ? t("callMenus.stopWatching") : t("callMenus.watchStream")}
                 </ContextMenuItem>
                 {canPopOut() && (
                     <ContextMenuItem
@@ -224,13 +227,13 @@ export function StreamMenu({
                         }}
                     >
                         <PictureInPicture2 className="size-3.5" />
-                        {popped ? "Close pop-out" : "Pop out"}
+                        {popped ? t("callMenus.closePopOut") : t("callMenus.popOut")}
                     </ContextMenuItem>
                 )}
                 <ContextMenuSeparator />
                 {!hasSound && (
                     <p className="px-2 pb-1 text-xs text-muted-foreground">
-                        This stream has no sound.
+                        {t("callMenus.thisStreamHasNoSound")}
                     </p>
                 )}
                 <ContextMenuItem
@@ -245,7 +248,7 @@ export function StreamMenu({
                     aria-checked={muted}
                 >
                     <Check className={cn("size-3.5", muted ? "opacity-100" : "opacity-0")} />
-                    Mute stream
+                    {t("callMenus.muteStream")}
                 </ContextMenuItem>
                 <ContextMenuItem
                     disabled={!hasSound}
@@ -253,7 +256,7 @@ export function StreamMenu({
                     className="flex-col items-stretch gap-1.5"
                 >
                     <span className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Stream volume</span>
+                        <span>{t("callMenus.streamVolume")}</span>
                         <span
                             className={cn(
                                 "tabular-nums",
@@ -270,7 +273,7 @@ export function StreamMenu({
                         step={0.05}
                         value={volume}
                         disabled={!hasSound}
-                        aria-label={`How loud ${name} is`}
+                        aria-label={t("callMenus.howLoud", { name })}
                         onChange={(event) => {
                             const next = Number(event.target.value);
                             setVolume(next);
@@ -286,7 +289,7 @@ export function StreamMenu({
                     className="flex-col items-stretch gap-1.5"
                 >
                     <span className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Stream attenuation</span>
+                        <span>{t("callMenus.streamAttenuation")}</span>
                         <span className="tabular-nums">{voice.streamAttenuation}%</span>
                     </span>
                     <input
@@ -296,14 +299,14 @@ export function StreamMenu({
                         step={5}
                         value={voice.streamAttenuation}
                         disabled={!hasSound}
-                        aria-label="How far other voices are lowered while a stream plays"
+                        aria-label={t("callMenus.howFarOtherVoicesAre")}
                         onChange={(event) =>
                             setVoice({ streamAttenuation: Number(event.target.value) })
                         }
                         className="w-full accent-primary"
                     />
                     <span className="text-[0.6875rem] text-foreground-subtle">
-                        Lowers everybody else while a stream plays.
+                        {t("callMenus.lowersEverybodyElseWhileA")}
                     </span>
                 </ContextMenuItem>
             </ContextMenuContent>

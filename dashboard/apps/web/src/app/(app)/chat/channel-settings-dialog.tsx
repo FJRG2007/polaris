@@ -15,6 +15,7 @@
  */
 
 import * as actions from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as core from "@polaris/core";
 import { useChat } from "./chat-context";
 import { ShareDialog } from "@/components/access/share-dialog";
@@ -46,6 +47,7 @@ export function ChannelSettingsDialog({
     channel: ChatChannelView | null;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("chat");
     const router = useRouter();
     const { refresh } = useChat();
     const [name, setName] = useState("");
@@ -114,11 +116,11 @@ export function ChannelSettingsDialog({
             <Dialog open={channel !== null} onOpenChange={onOpenChange}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Channel settings</DialogTitle>
+                        <DialogTitle>{t("channelSettings.channelSettings")}</DialogTitle>
                         <DialogDescription>
                             {channel?.archived
-                                ? "This channel is archived. It is still readable and nothing new can be said in it."
-                                : "What it is called and what it is for."}
+                                ? t("channelSettings.thisChannelIsArchivedIt")
+                                : t("channelSettings.whatItIsCalledAnd")}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -127,7 +129,7 @@ export function ChannelSettingsDialog({
                             <Input
                                 value={name}
                                 autoFocus
-                                aria-label="Channel name"
+                                aria-label={t("channelSettings.channelName")}
                                 maxLength={80}
                                 onChange={(event) => setName(event.target.value)}
                                 onKeyDown={(event) => {
@@ -144,8 +146,8 @@ export function ChannelSettingsDialog({
 
                         <Input
                             value={topic}
-                            aria-label="What it is for"
-                            placeholder="What it is for (optional)"
+                            aria-label={t("channelSettings.whatItIsFor")}
+                            placeholder={t("channelSettings.whatItIsForOptional")}
                             maxLength={core.MAX_CHAT_TOPIC}
                             onChange={(event) => setTopic(event.target.value)}
                         />
@@ -158,15 +160,15 @@ export function ChannelSettingsDialog({
                             it. */}
                         <label className="flex flex-col gap-1">
                             <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                Wait between messages
+                                {t("channelSettings.waitBetweenMessages")}
                             </span>
                             <Select
                                 value={String(slowmode)}
                                 onValueChange={(value) => setSlowmode(Number(value))}
-                                aria-label="Wait between messages"
+                                aria-label={t("channelSettings.waitBetweenMessages")}
                                 options={core.CHAT_SLOWMODE_STEPS.map((seconds) => ({
                                     value: String(seconds),
-                                    label: seconds === 0 ? "Off" : core.slowmodeSpoken(seconds)
+                                    label: seconds === 0 ? t("channelSettings.off") : core.slowmodeSpoken(seconds)
                                 }))}
                             />
                         </label>
@@ -178,14 +180,14 @@ export function ChannelSettingsDialog({
                         {voice && (
                             <label className="flex flex-col gap-1">
                                 <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                    User limit
+                                    {t("channelSettings.userLimit")}
                                 </span>
                                 <Input
                                     value={limitText}
                                     inputMode="numeric"
-                                    aria-label="User limit"
+                                    aria-label={t("channelSettings.userLimit")}
                                     aria-invalid={limitError ? true : undefined}
-                                    placeholder="No limit"
+                                    placeholder={t("channelSettings.noLimit")}
                                     maxLength={2}
                                     onChange={(event) =>
                                         setLimitText(event.target.value.replace(/[^0-9]/g, ""))
@@ -198,7 +200,7 @@ export function ChannelSettingsDialog({
                                     )}
                                 >
                                     {limitError ||
-                                        `Up to ${core.MAX_VOICE_USER_LIMIT}. Empty or 0 is no limit.`}
+                                        t("channelSettings.limitHint", { max: core.MAX_VOICE_USER_LIMIT })}
                                 </span>
                             </label>
                         )}
@@ -212,10 +214,9 @@ export function ChannelSettingsDialog({
                         {channel?.private ? (
                             <div className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
                                 <div className="min-w-0">
-                                    <p className="text-[13px] text-foreground">Teams and roles</p>
+                                    <p className="text-[13px] text-foreground">{t("channelSettings.teamsAndRoles")}</p>
                                     <p className="text-[12px] text-muted-foreground">
-                                        Let a group reach this room without adding them one at a
-                                        time.
+                                        {t("channelSettings.letAGroupReachThis")}
                                     </p>
                                 </div>
                                 <Button
@@ -223,7 +224,7 @@ export function ChannelSettingsDialog({
                                     size="sm"
                                     onClick={() => setSharing(true)}
                                 >
-                                    Manage
+                                    {t("channelSettings.manage")}
                                 </Button>
                             </div>
                         ) : null}
@@ -258,7 +259,7 @@ export function ChannelSettingsDialog({
                                     refresh();
                                 }}
                             >
-                                {channel?.archived ? "Reopen" : "Archive"}
+                                {channel?.archived ? t("channelSettings.reopen") : t("channelSettings.archive")}
                             </Button>
                             <Button
                                 size="sm"
@@ -266,12 +267,12 @@ export function ChannelSettingsDialog({
                                 disabled={busy}
                                 onClick={() => setConfirmDelete(true)}
                             >
-                                Delete
+                                {t("channelSettings.delete")}
                             </Button>
                         </span>
                         <span className="flex items-center gap-2">
                             <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-                                Cancel
+                                {t("channelSettings.cancel")}
                             </Button>
                             <Button
                                 size="sm"
@@ -279,7 +280,7 @@ export function ChannelSettingsDialog({
                                 onClick={() => void save()}
                             >
                                 {busy && <Loader2 className="size-4 animate-spin" />}
-                                Save
+                                {t("channelSettings.save")}
                             </Button>
                         </span>
                     </DialogFooter>
@@ -301,8 +302,8 @@ export function ChannelSettingsDialog({
                 onOpenChange={setConfirmDelete}
                 name={channel?.name ?? ""}
                 kind="channel"
-                description="Every message in it goes with it. Archiving keeps them readable instead."
-                confirmLabel="Delete channel"
+                description={t("channelSettings.everyMessageInItGoes")}
+                confirmLabel={t("channelSettings.deleteChannel")}
                 onConfirm={async () => {
                     if (!channel) return;
                     await runAction(() => actions.deleteChannelAction(channel.id), setError);

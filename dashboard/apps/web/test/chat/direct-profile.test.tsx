@@ -19,6 +19,7 @@
  * how the profile ends up missing the item somebody actually uses.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { DirectProfile } from "@/app/(app)/chat/direct-profile";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -99,7 +100,7 @@ function panel() {
             open
             onOpenChange={() => undefined}
             onMention={() => undefined}
-        />
+        />, { wrapper: MessagesWrapper }
     );
 }
 

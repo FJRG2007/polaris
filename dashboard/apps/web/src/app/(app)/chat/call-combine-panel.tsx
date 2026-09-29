@@ -18,6 +18,7 @@
  */
 
 import type { CallState } from "./call-state";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState, type ReactNode } from "react";
 import { Headphones, Users, Volume2, X } from "lucide-react";
 import {
@@ -38,6 +39,7 @@ function nameOf(call: CallState, seat: string | null): string {
 }
 
 export function CombineStrip({ call }: { call: CallState }) {
+    const t = useTranslations("chat");
     /** Who has been turned down, for as long as this screen is open. */
     const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 
@@ -47,14 +49,19 @@ export function CombineStrip({ call }: { call: CallState }) {
                 icon={<Headphones className="size-4 shrink-0 text-primary" />}
                 text={
                     <>
-                        Your microphone and speakers are off.{" "}
-                        <span className="font-medium">{nameOf(call, call.audioHost)}</span>
-                        {"'s device is carrying this room."}
+                        {t.rich<ReactNode>("combine.companion", {
+                            name: nameOf(call, call.audioHost),
+                            strong: (chunks) => (
+                                <span key="name" className="font-medium">
+                                    {chunks}
+                                </span>
+                            )
+                        })}
                     </>
                 }
             >
                 <Button size="sm" variant="secondary" onClick={call.leaveCombine}>
-                    Use my own audio
+                    {t("combine.useMyOwnAudio")}
                 </Button>
             </Strip>
         );
@@ -67,9 +74,7 @@ export function CombineStrip({ call }: { call: CallState }) {
                 icon={<Users className="size-4 shrink-0 text-primary" />}
                 text={
                     <>
-                        This device is carrying the room for{" "}
-                        {others === 1 ? "one other person" : `${others} other people`} sitting with
-                        you. Their microphones and speakers are off.
+                        {t("combine.carrying", { count: others })}
                     </>
                 }
             />
@@ -95,14 +100,19 @@ export function CombineStrip({ call }: { call: CallState }) {
             icon={<Volume2 className="size-4 shrink-0 text-primary" />}
             text={
                 <>
-                    <span className="font-medium">{name}</span> sounds like they are in this room.
-                    Combining stops the echo: one device keeps its microphone and speakers, and the
-                    other goes quiet.
+                    {t.rich<ReactNode>("combine.heard", {
+                        name,
+                        strong: (chunks) => (
+                                <span key="name" className="font-medium">
+                                    {chunks}
+                                </span>
+                            )
+                    })}
                 </>
             }
         >
             <Button size="sm" onClick={() => call.combineWith(heard)}>
-                Use their audio
+                {t("combine.useTheirAudio")}
             </Button>
             <Button
                 size="sm"
@@ -110,12 +120,12 @@ export function CombineStrip({ call }: { call: CallState }) {
                 disabled={call.combineAsked === heard}
                 onClick={() => call.askToCombine(heard)}
             >
-                {call.combineAsked === heard ? "Asked" : "Ask them instead"}
+                {call.combineAsked === heard ? t("combine.asked") : t("combine.askThemInstead")}
             </Button>
             <button
                 type="button"
-                aria-label="Not in this room"
-                title="Not in this room"
+                aria-label={t("combine.notInThisRoom")}
+                title={t("combine.notInThisRoom")}
                 onClick={() => setDismissed((current) => new Set([...current, heard]))}
                 className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
@@ -151,6 +161,7 @@ function Strip({
  * be able to do to somebody else without being noticed asking.
  */
 export function CombineRequestDialog({ call }: { call: CallState }) {
+    const t = useTranslations("chat");
     const asking = call.combineRequest;
     if (!asking || !call.combineOpen) return null;
     const name = nameOf(call, asking.from);
@@ -159,18 +170,16 @@ export function CombineRequestDialog({ call }: { call: CallState }) {
         <Dialog open onOpenChange={(open) => !open && call.answerCombine(false)}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Combine audio with {name}?</DialogTitle>
+                    <DialogTitle>{t("combine.requestTitle", { name })}</DialogTitle>
                     <DialogDescription>
-                        {name} says you are in the same room. Your microphone and speakers turn off
-                        and their device carries the room, which is what stops the echo. You stay in
-                        the call, with your camera, your name and your chat.
+                        {t("combine.requestBody", { name })}
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
                     <Button variant="ghost" onClick={() => call.answerCombine(false)}>
-                        Not in the same room
+                        {t("combine.notInTheSameRoom")}
                     </Button>
-                    <Button onClick={() => call.answerCombine(true)}>Combine audio</Button>
+                    <Button onClick={() => call.answerCombine(true)}>{t("combine.combineAudio")}</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

@@ -21,6 +21,7 @@
  */
 
 import * as core from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useMemo, useState } from "react";
 import { CalendarClock } from "lucide-react";
 import { useDisplayFormat, useDisplayPreferences } from "@/components/display-format";
@@ -105,6 +106,7 @@ export function ScheduleDialog({
     /** What the server said, when it refused one this dialog thought was fine. */
     error?: string;
 }) {
+    const t = useTranslations("chat");
     const format = useDisplayFormat();
     const { timeZone } = useDisplayPreferences();
 
@@ -127,7 +129,8 @@ export function ScheduleDialog({
 
     const reading = fromFields(date, time);
     const at = reading ? core.zonedInstant(reading, timeZone) : null;
-    const refusal = at ? core.scheduleRefusal(at) : "Pick a date and a time";
+    const problem = at ? core.scheduleProblem(at) : "noDate";
+    const refusal = problem ? t(`errors.schedule.${problem}`) : null;
 
     /** A press that answers the question outright, since a preset is an answer
      *  rather than a starting point for the fields below it. */
@@ -137,10 +140,9 @@ export function ScheduleDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Send this later</DialogTitle>
+                    <DialogTitle>{t("schedule.sendThisLater")}</DialogTitle>
                     <DialogDescription>
-                        It stays out of the conversation until then. Nobody is told, and you can take
-                        it back at any point before it goes.
+                        {t("schedule.itStaysOutOfThe")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -152,7 +154,7 @@ export function ScheduleDialog({
                             disabled={busy}
                             onClick={() => take(new Date(Date.now() + 30 * 60 * 1000))}
                         >
-                            In 30 minutes
+                            {t("schedule.in30Minutes")}
                         </Button>
                         <Button
                             size="sm"
@@ -160,7 +162,7 @@ export function ScheduleDialog({
                             disabled={busy}
                             onClick={() => take(core.zonedInstant(tomorrowMorning, timeZone))}
                         >
-                            Tomorrow at {format.time(core.zonedInstant(tomorrowMorning, timeZone))}
+                            {t("schedule.tomorrowAt", { time: format.time(core.zonedInstant(tomorrowMorning, timeZone)) })}
                         </Button>
                         <Button
                             size="sm"
@@ -168,27 +170,27 @@ export function ScheduleDialog({
                             disabled={busy}
                             onClick={() => take(core.zonedInstant(mondayMorning, timeZone))}
                         >
-                            Monday at {format.time(core.zonedInstant(mondayMorning, timeZone))}
+                            {t("schedule.mondayAt", { time: format.time(core.zonedInstant(mondayMorning, timeZone)) })}
                         </Button>
                     </div>
 
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="flex flex-col gap-1 text-sm">
-                            Date
+                            {t("schedule.date")}
                             <input
                                 type="date"
                                 value={date}
-                                aria-label="Date"
+                                aria-label={t("schedule.date")}
                                 onChange={(event) => setDate(event.target.value)}
                                 className="rounded-md border border-border bg-field px-2 py-1.5 text-sm text-foreground hover:border-border-strong focus:border-border-strong"
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Time
+                            {t("schedule.time")}
                             <input
                                 type="time"
                                 value={time}
-                                aria-label="Time"
+                                aria-label={t("schedule.time")}
                                 onChange={(event) => setTime(event.target.value)}
                                 className="rounded-md border border-border bg-field px-2 py-1.5 text-sm text-foreground hover:border-border-strong focus:border-border-strong"
                             />
@@ -199,14 +201,14 @@ export function ScheduleDialog({
                             onClick={() => at && take(at)}
                         >
                             <CalendarClock className="size-4" />
-                            {busy ? "Scheduling..." : "Schedule"}
+                            {busy ? t("schedule.scheduling") : t("schedule.schedule")}
                         </Button>
                     </div>
 
                     <p className={refusal || error ? "text-xs text-danger" : "text-xs text-muted-foreground"}>
                         {error ??
                             refusal ??
-                            (at ? `Sends on ${format.date(at)} at ${format.time(at)}.` : "")}
+                            (at ? t("schedule.sendsOn", { date: format.date(at), time: format.time(at) }) : "")}
                         {!refusal && !error && timeZone !== core.AUTOMATIC_TIME_ZONE
                             ? ` ${timeZone.replace(/_/g, " ")}.`
                             : ""}
@@ -215,7 +217,7 @@ export function ScheduleDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" disabled={busy} onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {t("schedule.cancel")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

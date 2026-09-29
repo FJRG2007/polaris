@@ -9,6 +9,7 @@
  * throwing it, which is why the error has to be taken off the result.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
@@ -56,7 +57,7 @@ describe("the group's own switches", () => {
                 open
                 onOpenChange={() => undefined}
                 onChanged={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         const invite = screen.getByLabelText("Let anybody add people");
@@ -79,7 +80,7 @@ describe("the group's own switches", () => {
                 open
                 onOpenChange={() => undefined}
                 onChanged={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
         await act(async () => {
             fireEvent.click(screen.getByLabelText("Let anybody add people"));

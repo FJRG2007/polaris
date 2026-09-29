@@ -10,6 +10,7 @@
  */
 
 import * as core from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -42,6 +43,7 @@ export function NewChannelDialog({
     categoryId?: string | null;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("chat");
     const router = useRouter();
     const { refresh } = useChat();
     const [name, setName] = useState("");
@@ -84,13 +86,13 @@ export function NewChannelDialog({
         <Dialog open={space !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>New channel</DialogTitle>
-                    <DialogDescription>In {space?.name ?? "this space"}.</DialogDescription>
+                    <DialogTitle>{t("newChannel.newChannel")}</DialogTitle>
+                    <DialogDescription>{t("newChannel.inSpace", { name: space?.name ?? t("newChannel.thisSpace") })}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <SegmentedControl
-                        aria-label="What kind of channel"
+                        aria-label={t("newChannel.whatKindOfChannel")}
                         value={kind}
                         onValueChange={setKind}
                         options={[
@@ -99,20 +101,20 @@ export function NewChannelDialog({
                                 label: (
                                     <span className="flex items-center gap-1.5">
                                         <Hash className="size-3.5" />
-                                        Text
+                                        {t("newChannel.text")}
                                     </span>
                                 ),
-                                title: "A conversation people read back"
+                                title: t("newChannel.aConversationPeopleReadBack")
                             },
                             {
                                 value: "voice",
                                 label: (
                                     <span className="flex items-center gap-1.5">
                                         <Volume2 className="size-3.5" />
-                                        Voice
+                                        {t("newChannel.voice")}
                                     </span>
                                 ),
-                                title: "A room people walk into and talk in"
+                                title: t("newChannel.aRoomPeopleWalkInto")
                             }
                         ]}
                     />
@@ -121,7 +123,7 @@ export function NewChannelDialog({
                         <Input
                             value={name}
                             autoFocus
-                            aria-label="Channel name"
+                            aria-label={t("newChannel.channelName")}
                             placeholder="release-planning"
                             maxLength={80}
                             onChange={(event) => setName(event.target.value)}
@@ -139,26 +141,24 @@ export function NewChannelDialog({
 
                     <Input
                         value={topic}
-                        aria-label="What it is for"
-                        placeholder="What it is for (optional)"
+                        aria-label={t("newChannel.whatItIsFor")}
+                        placeholder={t("newChannel.whatItIsForOptional")}
                         maxLength={200}
                         onChange={(event) => setTopic(event.target.value)}
                     />
 
                     {kind === "voice" && (
                         <p className="text-xs text-muted-foreground">
-                            A voice channel has a conversation too, for the links and notes that
-                            go with what is being said. Joining the call is a press, not a
-                            consequence of opening it.
+                            {t("newChannel.aVoiceChannelHasA")}
                         </p>
                     )}
 
                     <label className="flex items-start gap-3 rounded-md border border-border px-3 py-2">
                         <Switch checked={privateChannel} onChange={setPrivateChannel} />
                         <span className="flex flex-col gap-0.5">
-                            <span className="text-sm font-medium">Private</span>
+                            <span className="text-sm font-medium">{t("newChannel.private")}</span>
                             <span className="text-xs text-muted-foreground">
-                                Only the people added to it can see it, even inside this space.
+                                {t("newChannel.onlyThePeopleAddedTo")}
                             </span>
                         </span>
                     </label>
@@ -172,11 +172,11 @@ export function NewChannelDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {t("newChannel.cancel")}
                     </Button>
                     <Button size="sm" disabled={busy || !stored} onClick={() => void create()}>
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        Create {kind === "voice" ? "voice channel" : "channel"}
+                        {kind === "voice" ? t("newChannel.createVoice") : t("newChannel.createText")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

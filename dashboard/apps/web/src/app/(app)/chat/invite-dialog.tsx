@@ -16,6 +16,7 @@
  */
 
 import * as actions from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
@@ -46,6 +47,7 @@ export function InviteDialog({
     space: ChatSpaceView | null;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("chat");
     const baseUrl = useAppUrl();
     const format = useDisplayFormat();
     const [expires, setExpires] = useState(String(core.INVITE_DURATIONS[4]));
@@ -103,19 +105,18 @@ export function InviteDialog({
         <Dialog open={space !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Invite people</DialogTitle>
+                    <DialogTitle>{t("invite.invitePeople")}</DialogTitle>
                     <DialogDescription>
-                        Into {space?.name ?? "this space"}. Whoever accepts sees the channels a
-                        member sees, and nothing that is private inside it.
+                        {t("invite.into", { name: space?.name ?? t("invite.thisSpace") })}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-2">
-                        <span className="text-sm font-medium">A link</span>
+                        <span className="text-sm font-medium">{t("invite.aLink")}</span>
                         <div className="flex flex-wrap items-end gap-2">
                             <label className="flex min-w-32 flex-1 flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Expires after</span>
+                                <span className="text-xs text-muted-foreground">{t("invite.expiresAfter")}</span>
                                 <Select
                                     value={expires}
                                     onValueChange={setExpires}
@@ -129,7 +130,7 @@ export function InviteDialog({
                             </label>
                             <label className="flex min-w-32 flex-1 flex-col gap-1">
                                 <span className="text-xs text-muted-foreground">
-                                    Number of uses
+                                    {t("invite.numberOfUses")}
                                 </span>
                                 <Select
                                     value={uses}
@@ -148,7 +149,7 @@ export function InviteDialog({
                                 ) : (
                                     <Link2 className="size-4" />
                                 )}
-                                New link
+                                {t("invite.newLink")}
                             </Button>
                         </div>
                     </div>
@@ -165,16 +166,16 @@ export function InviteDialog({
                                     </code>
                                     <span className="shrink-0 text-[0.6875rem] text-muted-foreground">
                                         {invite.maxUses === null
-                                            ? `${invite.uses} used`
+                                            ? t("invite.used", { count: invite.uses })
                                             : `${invite.uses}/${invite.maxUses}`}
                                         {invite.expiresAt
-                                            ? ` - until ${format.dateTime(invite.expiresAt)}`
-                                            : " - no end"}
+                                            ? t("invite.until", { date: format.dateTime(invite.expiresAt) })
+                                            : t("invite.noEnd")}
                                     </span>
                                     <button
                                         type="button"
-                                        aria-label="Copy this link"
-                                        title="Copy this link"
+                                        aria-label={t("invite.copyThisLink")}
+                                        title={t("invite.copyThisLink")}
                                         onClick={async () => {
                                             await navigator.clipboard
                                                 ?.writeText(linkFor(invite.code))
@@ -191,8 +192,8 @@ export function InviteDialog({
                                     </button>
                                     <button
                                         type="button"
-                                        aria-label="Withdraw this invitation"
-                                        title="Withdraw"
+                                        aria-label={t("invite.withdrawThisInvitation")}
+                                        title={t("invite.withdraw")}
                                         onClick={async () => {
                                             await actions.revokeInviteAction(invite.id);
                                             setInvites((current) =>
@@ -209,9 +210,9 @@ export function InviteDialog({
                     )}
 
                     <div className="flex flex-col gap-2 border-t border-border pt-4">
-                        <span className="text-sm font-medium">Or send it to somebody here</span>
+                        <span className="text-sm font-medium">{t("invite.orSendItToSomebody")}</span>
                         <PeoplePicker
-                            label="Who to send it to"
+                            label={t("invite.whoToSendItTo")}
                             picked={[]}
                             max={1}
                             search={actions.searchPeopleAction}
@@ -237,10 +238,10 @@ export function InviteDialog({
                             {sentTo ? (
                                 <span className="flex items-center gap-1 text-success">
                                     <Send className="size-3" />
-                                    Sent to {sentTo}.
+                                    {t("invite.sentTo", { name: sentTo })}
                                 </span>
                             ) : (
-                                "It arrives as a message in your conversation with them."
+                                t("invite.itArrivesAsAMessage")
                             )}
                         </p>
                     </div>

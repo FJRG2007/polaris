@@ -9,6 +9,7 @@
  * does apply: your card, a mention of yourself, and editing how you appear.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PersonPressContext } from "@/components/person-press";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -58,7 +59,7 @@ function open(viewerId: string, onMention?: (text: string) => void) {
             >
                 <button type="button">Ana row</button>
             </MemberMenu>
-        </PersonPressContext.Provider>
+        </PersonPressContext.Provider>, { wrapper: MessagesWrapper }
     );
     fireEvent.contextMenu(screen.getByText("Ana row"));
     return cards;
@@ -111,7 +112,7 @@ describe("the menu opened without a right-click", () => {
                 >
                     <button type="button">Ana row</button>
                 </MemberMenu>
-            </PersonPressContext.Provider>
+            </PersonPressContext.Provider>, { wrapper: MessagesWrapper }
         );
         fireEvent.pointerDown(screen.getByText("Ana row"), {
             button: 0,

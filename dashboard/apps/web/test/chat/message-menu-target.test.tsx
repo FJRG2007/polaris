@@ -15,6 +15,7 @@
  * That is the shape this pins: press once, on a picture, and read the menu.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { ToastProvider } from "@polaris/ui";
 import userEvent from "@testing-library/user-event";
 import type { ChatMessageView } from "@/lib/chat/messages";
@@ -70,7 +71,7 @@ function menu() {
                     <img src="/api/chat/attachments/a1" alt="holiday.png" />
                 </div>
             </MessageMenu>
-        </ToastProvider>
+        </ToastProvider>, { wrapper: MessagesWrapper }
     );
 }
 

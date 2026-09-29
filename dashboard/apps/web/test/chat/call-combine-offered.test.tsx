@@ -7,6 +7,7 @@
  * roster keeps a seat until its heartbeat runs out.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { combineOffered } from "@/app/(app)/chat/call-combine";
@@ -49,13 +50,13 @@ function call(open: boolean): CallState {
 
 describe("the suggestion strip", () => {
     it("suggests combining with somebody heard nearby when it is offered", () => {
-        expect(renderToStaticMarkup(<CombineStrip call={call(true)} />)).toContain(
+        expect(renderToStaticMarkup(withMessages(<CombineStrip call={call(true)} />))).toContain(
             "sounds like they are in this room"
         );
     });
 
     it("says nothing in a call of two", () => {
-        expect(renderToStaticMarkup(<CombineStrip call={call(false)} />)).toBe("");
-        expect(renderToStaticMarkup(<CombineRequestDialog call={call(false)} />)).toBe("");
+        expect(renderToStaticMarkup(withMessages(<CombineStrip call={call(false)} />))).toBe("");
+        expect(renderToStaticMarkup(withMessages(<CombineRequestDialog call={call(false)} />))).toBe("");
     });
 });

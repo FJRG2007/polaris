@@ -17,6 +17,7 @@
  */
 
 import * as core from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { PersonName } from "@/components/person-name";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
@@ -49,6 +50,7 @@ export function SearchPanel({
      *  wants the next one to still be there. */
     onOpen: (hit: ChatSearchHit) => void;
 }) {
+    const t = useTranslations("chat");
     const { viewerId } = useChat();
     const [term, setTerm] = useState("");
     const [here, setHere] = useState(true);
@@ -93,15 +95,15 @@ export function SearchPanel({
         <SidePane
             pane="search"
             bounds={SEARCH_PANE}
-            label="Search width"
+            label={t("search.searchWidth")}
             className="min-w-0 border-l border-border"
         >
             <div className="flex h-header shrink-0 items-center gap-2 border-b border-border px-3">
                 <Search className="size-4 shrink-0 text-muted-foreground" />
-                <span className="text-sm font-semibold">Search</span>
+                <span className="text-sm font-semibold">{t("search.search")}</span>
                 <button
                     type="button"
-                    aria-label="Close search"
+                    aria-label={t("search.closeSearch")}
                     onClick={onClose}
                     className="ml-auto rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
@@ -119,27 +121,27 @@ export function SearchPanel({
                     <Input
                         value={term}
                         autoFocus
-                        placeholder="What was said"
-                        aria-label="What was said"
+                        placeholder={t("search.whatWasSaid")}
+                        aria-label={t("search.whatWasSaid")}
                         onChange={(event) => setTerm(event.target.value)}
                     />
                 </form>
 
                 <SegmentedControl
                     size="sm"
-                    aria-label="Where to look"
+                    aria-label={t("search.whereToLook")}
                     value={here ? "here" : "everywhere"}
                     onValueChange={(value) => setHere(value === "here")}
                     options={[
-                        { value: "here", label: "This conversation", title: channelName },
-                        { value: "everywhere", label: "Everywhere" }
+                        { value: "here", label: t("search.thisConversation"), title: channelName },
+                        { value: "everywhere", label: t("search.everywhere") }
                     ]}
                 />
 
                 {/* One person at most: "from either of these two" is a
                     question nobody asks a chat search. */}
                 <PeoplePicker
-                    label="From somebody in particular"
+                    label={t("search.fromSomebodyInParticular")}
                     max={1}
                     picked={author ? [author] : []}
                     onChange={(picked) => setAuthor(picked.at(-1) ?? null)}
@@ -147,10 +149,10 @@ export function SearchPanel({
                 />
 
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                    Carrying
+                    {t("search.carrying")}
                     <SegmentedControl
                         size="sm"
-                        aria-label="What the message carries"
+                        aria-label={t("search.whatTheMessageCarries")}
                         value={has}
                         onValueChange={setHas}
                         options={core.CHAT_SEARCH_ATTACHMENTS.map((value) => ({
@@ -162,20 +164,20 @@ export function SearchPanel({
 
                 <div className="flex items-center gap-2">
                     <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted-foreground">
-                        After
+                        {t("search.after")}
                         <Input
                             type="date"
                             value={after}
-                            aria-label="On or after"
+                            aria-label={t("search.onOrAfter")}
                             onChange={(event) => setAfter(event.target.value)}
                         />
                     </label>
                     <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted-foreground">
-                        Before
+                        {t("search.before")}
                         <Input
                             type="date"
                             value={before}
-                            aria-label="On or before"
+                            aria-label={t("search.onOrBefore")}
                             onChange={(event) => setBefore(event.target.value)}
                         />
                     </label>
@@ -183,7 +185,7 @@ export function SearchPanel({
 
                 <Button size="sm" disabled={empty || busy} onClick={() => void run()}>
                     {busy && <Loader2 className="size-4 animate-spin" />}
-                    Search
+                    {t("search.search")}
                 </Button>
             </div>
 
@@ -191,12 +193,12 @@ export function SearchPanel({
                 {hits === null ? (
                     <p className="px-3 py-6 text-center text-xs text-muted-foreground">
                         {empty
-                            ? "Type something, or pick who said it."
-                            : "Press Search when the filters are right."}
+                            ? t("search.typeSomethingOrPickWho")
+                            : t("search.pressSearchWhenTheFilters")}
                     </p>
                 ) : hits.length === 0 ? (
                     <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                        Nothing matches that.
+                        {t("search.nothingMatchesThat")}
                     </p>
                 ) : (
                     <ol className="flex flex-col">

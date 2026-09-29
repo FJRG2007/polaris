@@ -23,7 +23,9 @@ import * as room from "@/lib/chat/meeting-chat";
 import * as calls from "@/lib/chat/call-server";
 import { mayRing } from "@/lib/privacy-service";
 import { requirePermission } from "@/lib/session";
-import { getLocale } from "@/lib/i18n/request";
+import { getLocale, getTranslations } from "@/lib/i18n/request";
+import { translatorFor } from "@/lib/i18n/translate";
+import { getUserLocale } from "@/lib/i18n/locale-service";
 import * as moderation from "@/lib/chat/call-moderation";
 import { createNotification } from "@/lib/notification-service";
 import { callModerationSchema } from "@/lib/chat/voice-moderation";
@@ -94,7 +96,7 @@ export async function startCallAction(
      */
     const other = await chat.directCounterpart(user.id, channelId);
     if (other && !(await mayRing({ id: user.id, isAdmin: user.isAdmin }, other))) {
-        return { error: "This person does not take calls from you." };
+        return { error: (await getTranslations("chat"))("errors.noCallsFromYou") };
     }
     const result = await guard(() =>
         meetings.startOrJoin({ id: user.id, name: user.name }, channelId)
@@ -120,7 +122,7 @@ export async function inviteToCallAction(
     const user = await requirePermission("chat.use");
     if (!(await can(user.id, "chat.call"))) return { error: NO_CALLS };
     const parsed = inviteSchema.safeParse(input);
-    if (!parsed.success) return { error: "Pick somebody to bring in" };
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.pickToBringIn") };
 
     const result = await guard(() =>
         meetings.inviteToCall(
@@ -184,10 +186,10 @@ export async function joinAsGuestAction(
     input: unknown
 ): Promise<{ meetingId?: string; admission?: string; error?: string }> {
     const parsed = guestJoinSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That did not work" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.didNotWork") };
 
     const result = await guard(() => meetings.joinAsGuest(parsed.data.token, parsed.data.name));
-    if (result.error || !result.value) return { error: result.error ?? "That did not work" };
+    if (result.error || !result.value) return { error: result.error ?? (await getTranslations("chat"))("errors.didNotWork") };
 
     const seat = result.value;
     if (seat.guestKey) {
@@ -244,7 +246,7 @@ export async function callTokenAction(
     meetingId: string
 ): Promise<{ url?: string; token?: string; waiting?: boolean; error?: string }> {
     const seat = await resolveSeat(meetingId);
-    if (!seat) return { error: "You are not in that call" };
+    if (!seat) return { error: (await getTranslations("chat"))("errors.notInCall") };
     if (seat.admission !== "admitted") return { waiting: true };
 
     const endpoint = await calls.callServer();
@@ -302,7 +304,7 @@ export async function admitAction(
     admitted: boolean
 ): Promise<{ error?: string }> {
     const seat = await resolveSeat(meetingId);
-    if (!seat) return { error: "You are not in that call" };
+    if (!seat) return { error: (await getTranslations("chat"))("errors.notInCall") };
     return guard(() => meetings.decideAdmission(seat, participantId, admitted));
 }
 
@@ -319,7 +321,7 @@ export async function moderateCallAction(
 ): Promise<{ warning?: string; error?: string }> {
     const user = await requirePermission("chat.use");
     const parsed = callModerationSchema.safeParse(input);
-    if (!parsed.success) return { error: "That could not be done" };
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notDone") };
 
     const result = await guard(() =>
         moderation.moderateSeat({ id: user.id }, parsed.data.participantId, parsed.data.action)
@@ -427,7 +429,7 @@ export async function createMeetingAction(
 
     const parsed = newMeetingSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "That could not be created" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notCreated") };
     }
 
     const result = await guard(() =>
@@ -494,19 +496,21 @@ export async function inviteToMeetingAction(
 ): Promise<{ invited?: number; error?: string }> {
     const user = await requirePermission("chat.use");
     const parsed = inviteMeetingSchema.safeParse(input);
-    if (!parsed.success) return { error: "Pick somebody to invite" };
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.pickToInvite") };
 
     const result = await guard(() =>
         meetings.inviteToMeeting({ id: user.id }, parsed.data.meetingId, parsed.data.userIds)
     );
-    if (result.error || !result.value) return { error: result.error ?? "That did not work" };
+    if (result.error || !result.value) return { error: result.error ?? (await getTranslations("chat"))("errors.didNotWork") };
 
     for (const userId of result.value.invited) {
+        // Written for whoever is invited, who reads it later, in their language.
+        const words = translatorFor(await getUserLocale(userId), "chat");
         await createNotification({
             userId,
             type: "chat.meeting.invited",
-            title: `${user.name} invited you to ${result.value.title}`,
-            body: "Open it to join when it starts.",
+            title: words("meetingNotice.invitedTitle", { name: user.name, meeting: result.value.title }),
+            body: words("meetingNotice.invitedBody"),
             href: `/chat/meetings/${parsed.data.meetingId}`
         });
     }
@@ -534,7 +538,7 @@ const meetingOptionsSchema = z.object({
 export async function setMeetingOptionsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("chat.use");
     const parsed = meetingOptionsSchema.safeParse(input);
-    if (!parsed.success) return { error: "That could not be saved" };
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notSaved") };
 
     const { meetingId, scheduledAt, ...rest } = parsed.data;
     return guard(() =>
@@ -593,7 +597,7 @@ export async function sayInMeetingAction(
     body: string
 ): Promise<{ error?: string }> {
     const seat = await resolveSeat(String(meetingId));
-    if (!seat) return { error: "You are not in that meeting" };
+    if (!seat) return { error: (await getTranslations("chat"))("errors.notInMeeting") };
     return guard(() => room.sayInMeeting(seat, String(body ?? "")));
 }
 
@@ -620,10 +624,10 @@ const pollSchema = z.object({
 export async function pollInMeetingAction(input: unknown): Promise<{ error?: string }> {
     const parsed = pollSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That could not be asked" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notAsked") };
 
     const seat = await resolveSeat(parsed.data.meetingId);
-    if (!seat) return { error: "You are not in that meeting" };
+    if (!seat) return { error: (await getTranslations("chat"))("errors.notInMeeting") };
     const { question, options, multiple, hideResults } = parsed.data;
     return guard(() => room.pollInMeeting(seat, { question, options, multiple, hideResults }));
 }
@@ -634,7 +638,7 @@ export async function voteInMeetingAction(
     optionId: string
 ): Promise<{ error?: string }> {
     const seat = await resolveSeat(String(meetingId));
-    if (!seat) return { error: "You are not in that meeting" };
+    if (!seat) return { error: (await getTranslations("chat"))("errors.notInMeeting") };
     return guard(() => room.voteInMeeting(seat, String(optionId ?? "")));
 }
 
@@ -644,7 +648,7 @@ export async function closePollInMeetingAction(
     messageId: string
 ): Promise<{ error?: string }> {
     const seat = await resolveSeat(String(meetingId));
-    if (!seat) return { error: "You are not in that meeting" };
+    if (!seat) return { error: (await getTranslations("chat"))("errors.notInMeeting") };
     return guard(() => room.closePollInMeeting(seat, String(messageId ?? "")));
 }
 

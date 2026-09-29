@@ -35,6 +35,8 @@
  */
 
 import * as actions from "./actions";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
@@ -101,12 +103,12 @@ import {
  * back tomorrow", and a box accepting minutes is a box somebody types 10000 into
  * at four in the morning.
  */
-const TIMEOUTS: readonly { minutes: number; label: string }[] = [
-    { minutes: 5, label: "5 minutes" },
-    { minutes: 60, label: "1 hour" },
-    { minutes: 60 * 24, label: "1 day" },
-    { minutes: 60 * 24 * 7, label: "1 week" }
-];
+const TIMEOUTS = [
+    { minutes: 5, label: "memberMenu.timeouts.minutes5" },
+    { minutes: 60, label: "memberMenu.timeouts.hour" },
+    { minutes: 60 * 24, label: "memberMenu.timeouts.day" },
+    { minutes: 60 * 24 * 7, label: "memberMenu.timeouts.week" }
+] as const satisfies readonly { minutes: number; label: NamespaceKey<"chat"> }[];
 
 /**
  * Somebody the menu is about.
@@ -227,6 +229,7 @@ export function MemberMenu({
     openWith?: "right-click" | "press";
     children: ReactNode;
 }) {
+    const t = useTranslations("chat");
     const menu = openWith === "press" ? PRESS : RIGHT_CLICK;
     const router = useRouter();
     // What opens somebody's card on this screen, and the row it opens beside -
@@ -349,7 +352,7 @@ export function MemberMenu({
                         }}
                     >
                         <UserRound className="size-3.5" />
-                        Profile
+                        {t("memberMenu.profile")}
                     </menu.Item>
                 )}
 
@@ -362,12 +365,12 @@ export function MemberMenu({
                         {onMention && (
                             <menu.Item onSelect={() => onMention(mentionOf(member))}>
                                 <AtSign className="size-3.5" />
-                                Mention
+                                {t("memberMenu.mention")}
                             </menu.Item>
                         )}
                         <menu.Item onSelect={() => router.push("/account")}>
                             <UserPen className="size-3.5" />
-                            Edit your profile
+                            {t("memberMenu.editYourProfile")}
                         </menu.Item>
                     </>
                 )}
@@ -390,7 +393,7 @@ export function MemberMenu({
                                     onSelect={() => void direct.open(member.userId)}
                                 >
                                     <MessageSquare className="size-3.5" />
-                                    Message
+                                    {t("memberMenu.message")}
                                 </menu.Item>
                                 {/* The same conversation, arriving with the call
                                     already starting. The address is what carries
@@ -405,19 +408,19 @@ export function MemberMenu({
                                     }
                                 >
                                     <Phone className="size-3.5" />
-                                    Call
+                                    {t("memberMenu.call")}
                                 </menu.Item>
                                 {onMention && (
                                     <menu.Item onSelect={() => onMention(mentionOf(member))}>
                                         <AtSign className="size-3.5" />
-                                        Mention
+                                        {t("memberMenu.mention")}
                                     </menu.Item>
                                 )}
                             </>
                         )}
                         <menu.Item onSelect={() => onNickname(member)}>
                             <PenLine className="size-3.5" />
-                            Change nickname
+                            {t("memberMenu.changeNickname")}
                         </menu.Item>
                         {/* Yours alone. Nobody is told, because it is a decision
                             about a pair of ears - see `call-volumes`. */}
@@ -432,7 +435,7 @@ export function MemberMenu({
                             ) : (
                                 <VolumeX className="size-3.5" />
                             )}
-                            {silenced ? "Let them through" : "Silence them for you"}
+                            {silenced ? t("memberMenu.letThemThrough") : t("memberMenu.silenceThemForYou")}
                         </menu.Item>
 
                         {/* Shown even when it can do nothing, and that is
@@ -442,13 +445,13 @@ export function MemberMenu({
                         {invitable.length === 0 ? (
                             <menu.Item disabled>
                                 <UserPlus className="size-3.5" />
-                                No server to invite them to
+                                {t("memberMenu.noServerToInviteThem")}
                             </menu.Item>
                         ) : (
                             <menu.Sub>
                                 <menu.SubTrigger>
                                     <UserPlus className="size-3.5" />
-                                    Invite to a server
+                                    {t("memberMenu.inviteToAServer")}
                                 </menu.SubTrigger>
                                 <menu.SubContent className="max-h-72 overflow-y-auto overscroll-contain">
                                     {invitable.map((entry) => (
@@ -491,7 +494,7 @@ export function MemberMenu({
                             onSelect={() => void toggleBlock()}
                         >
                             <ShieldBan className="size-3.5" />
-                            {shut ? "Unblock" : "Block"}
+                            {shut ? t("memberMenu.unblock") : t("memberMenu.block")}
                         </menu.Item>
                         {/* Beside blocking because it is the other half of the
                             same moment, and separate from it because they are
@@ -510,7 +513,7 @@ export function MemberMenu({
                             onSelect={() => setReporting(true)}
                         >
                             <Flag className="size-3.5" />
-                            Report this account
+                            {t("memberMenu.reportThisAccount")}
                         </menu.Item>
                     </>
                 )}
@@ -529,7 +532,7 @@ export function MemberMenu({
                             }
                         >
                             <Crown className="size-3.5" />
-                            Make them the owner
+                            {t("memberMenu.makeThemTheOwner")}
                         </menu.Item>
                     </>
                 )}
@@ -545,7 +548,7 @@ export function MemberMenu({
                                 about the list rather than about the act. */}
                             <menu.SubTrigger variant="danger">
                                 <Timer className="size-3.5" />
-                                Time out
+                                {t("memberMenu.timeOut")}
                             </menu.SubTrigger>
                             <menu.SubContent>
                                 {TIMEOUTS.map((choice) => (
@@ -564,7 +567,7 @@ export function MemberMenu({
                                             )
                                         }
                                     >
-                                        For {choice.label}
+                                        {t("memberMenu.forDuration", { duration: t(choice.label) })}
                                     </menu.Item>
                                 ))}
                                 <menu.Separator />
@@ -582,7 +585,7 @@ export function MemberMenu({
                                         )
                                     }
                                 >
-                                    Let them speak again
+                                    {t("memberMenu.letThemSpeakAgain")}
                                 </menu.Item>
                             </menu.SubContent>
                         </menu.Sub>
@@ -602,7 +605,7 @@ export function MemberMenu({
                             }
                         >
                             <UserMinus className="size-3.5" />
-                            {space ? "Remove from the server" : "Remove from the group"}
+                            {space ? t("memberMenu.removeFromTheServer") : t("memberMenu.removeFromTheGroup")}
                         </menu.Item>
 
                         {/* Only a space. See `memberActions`. */}
@@ -615,7 +618,7 @@ export function MemberMenu({
                                 }
                             >
                                 <Ban className="size-3.5" />
-                                Ban from the server
+                                {t("memberMenu.banFromTheServer")}
                             </menu.Item>
                         )}
                     </>
