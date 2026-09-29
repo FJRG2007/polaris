@@ -44,6 +44,7 @@ export interface StrategyMeta {
 
 export const STRATEGY_META: Record<ExposureStrategy, StrategyMeta> = {
     "own-domain": {
+        // i18n-ignore the setup wizard says it by id (admin/domains/strategy-words)
         label: "Your own domain",
         summary: "One wildcard DNS record per zone, and Polaris issues Let's Encrypt certificates for every hostname it mints.",
         dependency: "Your registrar - nothing else in the path.",
@@ -53,6 +54,7 @@ export const STRATEGY_META: Record<ExposureStrategy, StrategyMeta> = {
         needsDomain: true
     },
     duckdns: {
+        // i18n-ignore the setup wizard says it by id (admin/domains/strategy-words)
         label: "Free DuckDNS domain",
         summary: "A free <name>.duckdns.org with wildcard support, kept pointed at this server as your IP changes.",
         dependency: "duckdns.org, free and account-based.",
@@ -62,6 +64,7 @@ export const STRATEGY_META: Record<ExposureStrategy, StrategyMeta> = {
         needsDomain: false
     },
     "free-subdomain": {
+        // i18n-ignore the setup wizard says it by id (admin/domains/strategy-words)
         label: "Free automatic subdomain",
         summary: "Instant sslip.io hostnames that encode this server's IP. No setup, no account - public if the IP is, LAN-only otherwise.",
         dependency: "sslip.io public DNS, no account.",
@@ -71,6 +74,7 @@ export const STRATEGY_META: Record<ExposureStrategy, StrategyMeta> = {
         needsDomain: false
     },
     "cloudflare-tunnel": {
+        // i18n-ignore the setup wizard says it by id (admin/domains/strategy-words)
         label: "Cloudflare tunnel",
         summary: "An outbound tunnel exposes each service on your domain. Works with no public IP and no open ports.",
         dependency: "A Cloudflare account, and their edge on every request.",
@@ -80,6 +84,7 @@ export const STRATEGY_META: Record<ExposureStrategy, StrategyMeta> = {
         needsDomain: true
     },
     "quick-tunnel": {
+        // i18n-ignore the setup wizard says it by id (admin/domains/strategy-words)
         label: "Cloudflare quick link",
         summary: "A throwaway trycloudflare.com URL per service. Zero setup, but the URL changes every restart.",
         dependency: "Cloudflare, no account.",
@@ -97,6 +102,8 @@ export interface StrategyOption {
     available: boolean;
     /** Why it is recommended, or why it is unavailable. */
     note?: string;
+    /** Which note that is, for a screen that says it in another language. */
+    noteId?: string;
 }
 
 export interface StrategyChoice {
@@ -125,6 +132,7 @@ export interface ApproachMeta {
 
 export const APPROACH_META: Record<ExposureApproach, ApproachMeta> = {
     ports: {
+        // i18n-ignore the setup wizard says it by id (admin/domains/strategy-words)
         label: "Open ports 80 and 443",
         summary: "Visitors connect straight to this server. Nothing sits in between, and nothing has to keep working for it except your own line.",
         pros: [
@@ -139,6 +147,7 @@ export const APPROACH_META: Record<ExposureApproach, ApproachMeta> = {
         ]
     },
     tunnel: {
+        // i18n-ignore the setup wizard says it by id (admin/domains/strategy-words)
         label: "Publish through a tunnel",
         summary: "This server dials out to a provider, which takes the traffic and passes it back down. Set up in Polaris, with nothing to change in the router.",
         pros: [
@@ -164,6 +173,8 @@ export interface ApproachOption {
     meta: ApproachMeta;
     /** What is different about this side on this server, when something is. */
     note?: string;
+    /** Which note that is, for a screen that says it in another language. */
+    noteId?: string;
     /** Its strategies, in the same order the full list ranks them. */
     strategies: StrategyOption[];
     /** The one to select when the operator picks this side. Both sides always have
@@ -206,7 +217,13 @@ export function approachesFor(environment: ServerEnvironment): ApproachChoice {
         // side empty, so the fallback is a total function rather than a real case.
         const best = (strategies.find((option) => option.available) ?? strategies[0]!).id;
         const note = APPROACH_NOTE[environment]?.[id];
-        return { id, meta: APPROACH_META[id], ...(note ? { note } : {}), strategies, best };
+        return {
+            id,
+            meta: APPROACH_META[id],
+            ...(note ? { note, noteId: `approach.${environment}.${id}` } : {}),
+            strategies,
+            best
+        };
     });
     return { recommended: approachOf(choice.recommended), options };
 }
@@ -246,12 +263,20 @@ export function strategiesFor(environment: ServerEnvironment): StrategyChoice {
         .sort((a, b) => rank(order, a) - rank(order, b))
         .map((id) => {
             const available = order.includes(id);
+            const specific = available ? "" : unavailableNote(id, environment);
             const note = available
                 ? id === order[0]
                     ? RECOMMENDATION[environment]
                     : undefined
-                : unavailableNote(id, environment) || "Not available on this kind of server.";
-            return { id, meta: STRATEGY_META[id], available, note };
+                : specific || "Not available on this kind of server.";
+            const noteId = available
+                ? id === order[0]
+                    ? `recommend.${environment}`
+                    : undefined
+                : specific
+                  ? `unavailable.${id}`
+                  : "unavailable.generic";
+            return { id, meta: STRATEGY_META[id], available, note, ...(noteId ? { noteId } : {}) };
         });
     return { recommended: order[0], options };
 }

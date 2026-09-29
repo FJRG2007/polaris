@@ -747,6 +747,102 @@
             "manual": "<b>{provider}</b> responde por <code>{zone}</code>.",
             "unknown": "{zone} lo sirve {nameserver}. Crea los registros donde lo gestiones.",
             "open": "Abrir {provider}"
+        },
+        "strategies": {
+            "ownDomain": {
+                "label": "Tu propio dominio",
+                "summary": "Un registro DNS comodín por zona, y Polaris emite certificados de Let's Encrypt para cada nombre de host que crea.",
+                "dependency": "Tu registrador, y nada más en medio.",
+                "requires": {
+                    "0": "Un dominio que controles",
+                    "1": "Una IP pública",
+                    "2": "Los puertos 80 y 443 llegando a este servidor"
+                }
+            },
+            "duckdns": {
+                "label": "Dominio DuckDNS gratis",
+                "summary": "Un '<nombre>'.duckdns.org gratuito con comodín, que sigue apuntando a este servidor aunque cambie tu IP.",
+                "dependency": "duckdns.org, gratuito y con cuenta.",
+                "requires": {
+                    "0": "Un subdominio y un token de DuckDNS",
+                    "1": "Los puertos 80 y 443 llegando a este servidor"
+                }
+            },
+            "freeSubdomain": {
+                "label": "Subdominio automático gratuito",
+                "summary": "Nombres de host de sslip.io al instante que codifican la IP de este servidor. Sin configuración ni cuenta: públicos si la IP lo es, solo de la red local si no.",
+                "dependency": "DNS público de sslip.io, sin cuenta."
+            },
+            "cloudflareTunnel": {
+                "label": "Túnel de Cloudflare",
+                "summary": "Un túnel saliente publica cada servicio en tu dominio. Funciona sin IP pública y sin puertos abiertos.",
+                "dependency": "Una cuenta de Cloudflare, y su red en cada petición.",
+                "requires": {
+                    "0": "Una cuenta de Cloudflare",
+                    "1": "Tu dominio en Cloudflare",
+                    "2": "Un token de API conectado en Integraciones"
+                }
+            },
+            "quickTunnel": {
+                "label": "Enlace rápido de Cloudflare",
+                "summary": "Una URL desechable de trycloudflare.com por servicio. Sin configuración, pero la URL cambia en cada reinicio.",
+                "dependency": "Cloudflare, sin cuenta."
+            }
+        },
+        "approaches": {
+            "ports": {
+                "label": "Abrir los puertos 80 y 443",
+                "summary": "Los visitantes se conectan directamente a este servidor. No hay nada en medio, y solo tu propia línea tiene que seguir funcionando.",
+                "pros": {
+                    "0": "Ningún tercero entre los visitantes y este servidor",
+                    "1": "Gratis, sin crear ninguna cuenta",
+                    "2": "Un registro comodín cubre cada nombre de host que crea Polaris"
+                },
+                "cons": {
+                    "0": "Hay que crear dos reglas de reenvío, en el router o en un firewall",
+                    "1": "Necesita una IP pública que llegue a este servidor",
+                    "2": "Quien se conecta ve la dirección de tu línea"
+                }
+            },
+            "tunnel": {
+                "label": "Publicar mediante un túnel",
+                "summary": "Este servidor se conecta hacia fuera a un proveedor, que recibe el tráfico y se lo devuelve. Se configura en Polaris, sin cambiar nada en el router.",
+                "pros": {
+                    "0": "Nada que configurar en el router",
+                    "1": "Funciona en una línea donde no se puede reenviar ningún puerto",
+                    "2": "Tu propia dirección queda detrás del proveedor"
+                },
+                "cons": {
+                    "0": "Cada petición pasa por el proveedor",
+                    "1": "Necesita una cuenta con ellos, incluido el plan gratuito",
+                    "2": "La velocidad y la disponibilidad pasan a depender de ellos y no de ti"
+                }
+            }
+        },
+        "notes": {
+            "approach": {
+                "vps": {
+                    "ports": "No hay router en medio: permite la entrada por 80 y 443 en el firewall de tu proveedor."
+                },
+                "cloud": {
+                    "ports": "No hay router en medio: permite la entrada por 80 y 443 en el grupo de seguridad de la instancia."
+                },
+                "home-cgnat": {
+                    "ports": "Tu proveedor comparte una dirección entre sus clientes, así que no se puede reenviar ningún puerto a este servidor. Lo que queda en este lado llega a tu propia red y a nada más."
+                }
+            },
+            "recommend": {
+                "vps": "Este servidor tiene su propia IP pública, así que un registro comodín que apunte directamente a él es el camino más corto: gratis y sin nadie en medio.",
+                "cloud": "La instancia tiene dirección pública, así que un registro comodín que apunte directamente a ella es el camino más corto. Permite 80 y 443 en su grupo de seguridad.",
+                "home-nat": "Tu router tiene una IP pública, así que reenviar 80 y 443 te da dominios reales sin ningún servicio de terceros en medio.",
+                "home-cgnat": "Tu proveedor comparte una dirección entre clientes, así que no se puede reenviar ningún puerto a este servidor. Solo un túnel saliente llega hasta él.",
+                "unknown": "Indica dónde está este servidor para recibir una recomendación a su medida. Mientras tanto, los subdominios gratuitos funcionan en cualquier caso."
+            },
+            "unavailable": {
+                "own-domain": "Necesita una IP pública que llegue a este servidor; el NAT del operador no te da ninguna.",
+                "duckdns": "Apuntaría a la dirección compartida de tu operador, que no llega a este servidor.",
+                "generic": "No disponible en este tipo de servidor."
+            }
         }
     },
     "email": {

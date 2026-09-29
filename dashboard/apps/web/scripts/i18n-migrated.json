@@ -1436,6 +1436,8 @@
         "web/src/lib/deploy/build-machine.ts",
         "web/src/lib/integrations/criminalip.ts",
         "web/src/lib/integrations/tunnel-token.ts",
-        "web/src/lib/messaging/discord-invite.ts"
+        "web/src/lib/messaging/discord-invite.ts",
+        "web/src/lib/domain-strategies.ts",
+        "web/src/app/(app)/admin/domains/strategy-words.ts"
     ]
 }

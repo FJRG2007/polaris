@@ -62,6 +62,7 @@ import {
     Trash2,
     TriangleAlert
 } from "lucide-react";
+import { approachWords, strategyNote, strategyWords } from "./strategy-words";
 
 /** A zone row as the wizard edits it (the saved shape, plus a key for React). */
 interface ZoneRow {
@@ -566,27 +567,27 @@ function StrategyStep({
                                     ) : (
                                         <Router className="size-4 text-primary" />
                                     )}
-                                    {option.meta.label}
+                                    {approachWords(t, option.id).label}
                                     {option.id === approaches.recommended && (
                                         <Badge variant="success">
                                             <Sparkles className="size-3" /> {t("domainsSetup.recommended")}
                                         </Badge>
                                     )}
                                 </span>
-                                <span className="text-xs text-muted-foreground">{option.meta.summary}</span>
+                                <span className="text-xs text-muted-foreground">{approachWords(t, option.id).summary}</span>
                                 <span className="flex flex-col gap-1 text-xs">
-                                    {option.meta.pros.map((line) => (
+                                    {approachWords(t, option.id).pros.map((line) => (
                                         <span key={line} className="flex items-start gap-1.5 text-muted-foreground">
                                             <Check className="mt-0.5 size-3 shrink-0 text-success" /> {line}
                                         </span>
                                     ))}
-                                    {option.meta.cons.map((line) => (
+                                    {approachWords(t, option.id).cons.map((line) => (
                                         <span key={line} className="flex items-start gap-1.5 text-muted-foreground">
                                             <Minus className="mt-0.5 size-3 shrink-0 text-warning" /> {line}
                                         </span>
                                     ))}
                                 </span>
-                                {option.note && <span className="text-xs text-warning">{option.note}</span>}
+                                {option.note && <span className="text-xs text-warning">{strategyNote(t, option)}</span>}
                             </button>
                         );
                     })}
@@ -634,7 +635,7 @@ function StrategyStep({
                                 } ${option.available ? "" : "cursor-not-allowed opacity-50"}`}
                             >
                                 <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                                    {option.meta.label}
+                                    {strategyWords(t, option.id).label}
                                     {option.id === choice.recommended ? (
                                         <Badge variant="success">
                                             <Sparkles className="size-3" /> {t("domainsSetup.recommended")}
@@ -652,18 +653,20 @@ function StrategyStep({
                                         <Badge variant="neutral">{t("domainsSetup.strategy.tokenConnected")}</Badge>
                                     )}
                                 </span>
-                                <span className="text-xs text-muted-foreground">{option.meta.summary}</span>
+                                <span className="text-xs text-muted-foreground">{strategyWords(t, option.id).summary}</span>
                                 <span className="text-xs text-muted-foreground">
-                                    {t("domainsSetup.strategy.dependsOn", { value: option.meta.dependency })}
+                                    {t("domainsSetup.strategy.dependsOn", { value: strategyWords(t, option.id).dependency })}
                                 </span>
                                 {option.meta.requires.length > 0 && (
                                     <span className="text-xs text-muted-foreground">
-                                        {t("domainsSetup.strategy.needs", { value: option.meta.requires.join(" - ") })}
+                                        {t("domainsSetup.strategy.needs", {
+                                            value: strategyWords(t, option.id).requires.join(" - ")
+                                        })}
                                     </span>
                                 )}
                                 {option.note && (
                                     <span className={`text-xs ${option.available ? "text-primary" : "text-warning"}`}>
-                                        {option.note}
+                                        {strategyNote(t, option)}
                                     </span>
                                 )}
                             </button>
@@ -738,7 +741,7 @@ function DomainStep({
                     }
                 />
                 <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
-                    {meta.summary}
+                    {strategyWords(t, strategy).summary}
                 </p>
                 {meta.needsDomain ? (
                     <a href="/admin/integrations" className="w-fit text-xs text-primary hover:underline">

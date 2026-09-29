@@ -747,6 +747,102 @@
             "manual": "<b>{provider}</b> answers for <code>{zone}</code>.",
             "unknown": "{zone} is served by {nameserver}. Create the records where you manage it.",
             "open": "Open {provider}"
+        },
+        "strategies": {
+            "ownDomain": {
+                "label": "Your own domain",
+                "summary": "One wildcard DNS record per zone, and Polaris issues Let's Encrypt certificates for every hostname it mints.",
+                "dependency": "Your registrar - nothing else in the path.",
+                "requires": {
+                    "0": "A domain you control",
+                    "1": "A public IP",
+                    "2": "Ports 80 and 443 reaching this server"
+                }
+            },
+            "duckdns": {
+                "label": "Free DuckDNS domain",
+                "summary": "A free '<name>'.duckdns.org with wildcard support, kept pointed at this server as your IP changes.",
+                "dependency": "duckdns.org, free and account-based.",
+                "requires": {
+                    "0": "A DuckDNS subdomain and token",
+                    "1": "Ports 80 and 443 reaching this server"
+                }
+            },
+            "freeSubdomain": {
+                "label": "Free automatic subdomain",
+                "summary": "Instant sslip.io hostnames that encode this server's IP. No setup, no account - public if the IP is, LAN-only otherwise.",
+                "dependency": "sslip.io public DNS, no account."
+            },
+            "cloudflareTunnel": {
+                "label": "Cloudflare tunnel",
+                "summary": "An outbound tunnel exposes each service on your domain. Works with no public IP and no open ports.",
+                "dependency": "A Cloudflare account, and their edge on every request.",
+                "requires": {
+                    "0": "A Cloudflare account",
+                    "1": "Your domain on Cloudflare",
+                    "2": "An API token connected under Integrations"
+                }
+            },
+            "quickTunnel": {
+                "label": "Cloudflare quick link",
+                "summary": "A throwaway trycloudflare.com URL per service. Zero setup, but the URL changes every restart.",
+                "dependency": "Cloudflare, no account."
+            }
+        },
+        "approaches": {
+            "ports": {
+                "label": "Open ports 80 and 443",
+                "summary": "Visitors connect straight to this server. Nothing sits in between, and nothing has to keep working for it except your own line.",
+                "pros": {
+                    "0": "No third party between visitors and this server",
+                    "1": "Free, with no account to create anywhere",
+                    "2": "One wildcard record covers every hostname Polaris mints"
+                },
+                "cons": {
+                    "0": "Two forwarding rules to create, in the router or in a firewall",
+                    "1": "Needs a public IP that reaches this server",
+                    "2": "Whoever connects sees the address of your line"
+                }
+            },
+            "tunnel": {
+                "label": "Publish through a tunnel",
+                "summary": "This server dials out to a provider, which takes the traffic and passes it back down. Set up in Polaris, with nothing to change in the router.",
+                "pros": {
+                    "0": "Nothing to configure in the router",
+                    "1": "Works on a line where no port can be forwarded",
+                    "2": "Your own address stays behind the provider"
+                },
+                "cons": {
+                    "0": "Every request goes through the provider",
+                    "1": "Needs an account with them, free tier included",
+                    "2": "Speed and uptime become theirs rather than yours"
+                }
+            }
+        },
+        "notes": {
+            "approach": {
+                "vps": {
+                    "ports": "No router in the way - allow inbound 80 and 443 in your provider's firewall instead."
+                },
+                "cloud": {
+                    "ports": "No router in the way - allow inbound 80 and 443 in the instance's security group instead."
+                },
+                "home-cgnat": {
+                    "ports": "Your ISP shares one address between its customers, so no port can be forwarded to this server. What is left on this side reaches your own network and nothing beyond it."
+                }
+            },
+            "recommend": {
+                "vps": "This server holds its own public IP, so a wildcard record pointed straight at it is the shortest path - free and with nobody in between.",
+                "cloud": "The instance is publicly addressable, so a wildcard record pointed straight at it is the shortest path. Allow 80 and 443 in its security group.",
+                "home-nat": "Your router owns a public IP, so forwarding 80 and 443 gives you real domains with no third-party service in the path.",
+                "home-cgnat": "Your ISP shares one address between customers, so no port can be forwarded to this server. An outbound tunnel is the only thing that reaches it.",
+                "unknown": "Answer where this server lives to get a recommendation that matches it. Free subdomains work either way in the meantime."
+            },
+            "unavailable": {
+                "own-domain": "Needs a public IP that reaches this server; carrier NAT gives you none.",
+                "duckdns": "Would point at your carrier's shared address, which does not reach this server.",
+                "generic": "Not available on this kind of server."
+            }
         }
     },
     "email": {
