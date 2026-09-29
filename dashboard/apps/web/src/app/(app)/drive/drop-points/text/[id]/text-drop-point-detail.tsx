@@ -17,6 +17,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { AccountInput } from "@/components/account-input";
 import { useFormChanged } from "@/lib/use-form-changed";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowLeft, Check, Copy, EyeOff, Loader2, Save } from "lucide-react";
 import {
     revealTextRequestLinkAction,
@@ -73,6 +74,7 @@ export function TextDropPointDetail({
     collected: CollectedRow[];
 }) {
     const router = useRouter();
+    const t = useTranslations("drivePoints");
     const format = useDisplayFormat();
     const [countries, setCountries] = useState(request.allowedCountries);
     const [continents, setContinents] = useState(request.allowedContinents);
@@ -100,8 +102,8 @@ export function TextDropPointDetail({
         const result = await revealTextRequestLinkAction(request.id);
         if (result.error || !result.url) {
             await confirm({
-                title: "No link to copy",
-                description: result.error ?? "This drop point has no link.",
+                title: t("text.noLinkTitle"),
+                description: result.error ?? t("text.noLink"),
                 alert: true
             });
             return;
@@ -156,27 +158,27 @@ export function TextDropPointDetail({
                     <Button asChild size="sm" variant="ghost" className="-ml-2 mb-1">
                         <Link href="/drive/drop-points">
                             <ArrowLeft className="size-4" />
-                            Drop points
+                            {t("detail.back")}
                         </Link>
                     </Button>
                     <h1 className="truncate text-[1.0625rem] font-semibold tracking-tight" title={request.title}>
                         {request.title}
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        {request.submissionCount}
-                        {request.maxSubmissions !== null ? `/${request.maxSubmissions}` : ""}{" "}
-                        collected
+                        {request.maxSubmissions !== null
+                            ? t("text.collectedOf", { count: request.submissionCount, max: request.maxSubmissions })
+                            : t("text.collectedCount", { count: request.submissionCount })}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {request.revokedAt ? <Badge variant="neutral">Closed</Badge> : null}
+                    {request.revokedAt ? <Badge variant="neutral">{t("detail.status.closed")}</Badge> : null}
                     <Button size="sm" variant="secondary" onClick={onCopyLink}>
                         {copied ? (
                             <Check className="size-4 text-success" />
                         ) : (
                             <Copy className="size-4" />
                         )}
-                        Copy link
+                        {t("text.copyLink")}
                     </Button>
                 </div>
             </div>
@@ -186,18 +188,18 @@ export function TextDropPointDetail({
                     readOnly
                     value={link}
                     className="font-mono text-xs"
-                    aria-label="Drop point link"
+                    aria-label={t("text.link")}
                 />
             ) : null}
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Collected</CardTitle>
+                    <CardTitle>{t("detail.fields.collected")}</CardTitle>
                 </CardHeader>
                 <CardBody className="p-0">
                     {collected.length === 0 ? (
                         <p className="p-6 text-center text-sm text-muted-foreground">
-                            Nothing has arrived yet.
+                            {t("text.empty")}
                         </p>
                     ) : (
                         <ul className="divide-y divide-border">
@@ -213,12 +215,12 @@ export function TextDropPointDetail({
                                                 {row.sealed ? (
                                                     <EyeOff
                                                         className="size-3 text-muted-foreground"
-                                                        aria-label="Sealed"
+                                                        aria-label={t("text.sealed")}
                                                     />
                                                 ) : null}
                                             </p>
                                             <p className="truncate text-xs text-muted-foreground">
-                                                {row.from ?? "Anonymous"} - {formatBytes(row.size)}{" "}
+                                                {row.from ?? t("detail.anonymous")} - {formatBytes(row.size)}{" "}
                                                 - {format.dateTime(row.at)}
                                             </p>
                                         </div>
@@ -232,16 +234,16 @@ export function TextDropPointDetail({
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Rules</CardTitle>
+                    <CardTitle>{t("text.rules")}</CardTitle>
                 </CardHeader>
                 <CardBody>
                     <form {...formProps} onSubmit={onSave} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Title
+                            {t("form.title")}
                             <Input name="title" defaultValue={request.title} />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            What to send
+                            {t("text.whatToSend")}
                             <Textarea
                                 name="instructions"
                                 rows={2}
@@ -250,7 +252,7 @@ export function TextDropPointDetail({
                         </label>
                         <div className="grid grid-cols-2 gap-3">
                             <label className="flex flex-col gap-1 text-sm">
-                                Max characters
+                                {t("text.maxLength")}
                                 <Input
                                     name="maxLength"
                                     type="number"
@@ -259,12 +261,12 @@ export function TextDropPointDetail({
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                Max submissions
+                                {t("text.maxSubmissions")}
                                 <Input
                                     name="maxSubmissions"
                                     type="number"
                                     min="1"
-                                    placeholder="Unlimited"
+                                    placeholder={t("text.unlimited")}
                                     defaultValue={request.maxSubmissions ?? ""}
                                 />
                             </label>
@@ -272,17 +274,17 @@ export function TextDropPointDetail({
                         <div className="grid grid-cols-2 gap-3">
                             <label className="flex flex-col gap-1 text-sm">
                                 {request.hasPassword
-                                    ? "Change the password"
-                                    : "Password (optional)"}
+                                    ? t("text.changePassword")
+                                    : t("text.password")}
                                 <Input
                                     name="password"
                                     type="password"
-                                    placeholder={request.hasPassword ? "Unchanged" : "No password"}
+                                    placeholder={request.hasPassword ? t("text.unchanged") : t("text.noPassword")}
                                     autoComplete="off"
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                Closes
+                                {t("text.closes")}
                                 <Input
                                     name="expiresAt"
                                     type="date"
@@ -293,7 +295,7 @@ export function TextDropPointDetail({
                         {request.hasPassword ? (
                             <label className="flex items-center gap-2 text-sm">
                                 <input type="checkbox" name="clearPassword" className="size-4" />
-                                Remove the password
+                                {t("text.removePassword")}
                             </label>
                         ) : null}
                         <label className="flex items-center gap-2 text-sm">
@@ -303,16 +305,16 @@ export function TextDropPointDetail({
                                 checked={requireLogin}
                                 onChange={(event) => setRequireLogin(event.target.checked)}
                             />
-                            They must sign in to Polaris first
+                            {t("text.requireLogin")}
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Only these people (optional)
+                            {t("text.people")}
                             <AccountInput
                                 name="allowedUsers"
                                 multiple
                                 defaultValue={request.allowedUsers.join(", ")}
-                                placeholder="username or email, comma separated"
-                                aria-label="People who may send to this drop point"
+                                placeholder={t("text.peoplePlaceholder")}
+                                aria-label={t("text.peopleLabel")}
                             />
                         </label>
                         <label className="flex items-start gap-2 text-sm">
@@ -323,24 +325,21 @@ export function TextDropPointDetail({
                                 onChange={(event) => setAllowSealed(event.target.checked)}
                             />
                             <span>
-                                Let them seal it in their browser
-                                <span className="block text-xs text-muted-foreground">
-                                    Then Polaris cannot read it either, and they have to send you
-                                    the key separately.
-                                </span>
+                                {t("text.sealedLabel")}
+                                <span className="block text-xs text-muted-foreground">{t("text.sealedHint")}</span>
                             </span>
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Restrict to IPs / ranges (optional)
+                            {t("form.cidrs")}
                             <Input
                                 name="allowedCidrs"
                                 defaultValue={request.allowedCidrs.join(", ")}
-                                placeholder="e.g. 203.0.113.4, 10.0.0.0/24"
+                                placeholder={t("form.cidrsPlaceholder")}
                                 autoComplete="off"
                             />
                         </label>
                         <div className="flex flex-col gap-1 text-sm">
-                            Restrict by location (optional)
+                            {t("form.location")}
                             <GeoPicker
                                 countries={countries}
                                 continents={continents}
@@ -351,7 +350,7 @@ export function TextDropPointDetail({
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="mt-1 flex items-center justify-end gap-2">
                             {saved ? (
-                                <span className="text-xs text-muted-foreground">Saved</span>
+                                <span className="text-xs text-muted-foreground">{t("text.saved")}</span>
                             ) : null}
                             <Button type="submit" disabled={pending || !dirty}>
                                 {pending ? (
@@ -359,7 +358,7 @@ export function TextDropPointDetail({
                                 ) : (
                                     <Save className="size-4" />
                                 )}
-                                Save
+                                {t("text.save")}
                             </Button>
                         </div>
                     </form>

@@ -162,8 +162,8 @@ export default async function SharePage({
                     </Badge>
                 ) : null}
             </div>
-            {/* The Drive viewer and the transfers corner inside, in the reader's words. */}
-            <Messages namespaces={["drive", "files"]}>
+            {/* The Drive viewer inside, in the reader's words. */}
+            <Messages namespaces={["drive", "driveViewer"]}>
                 {isFile ? (
                     <ShareFileCard
                         token={token}

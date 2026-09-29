@@ -307,5 +307,115 @@
         "creating": "Creando...",
         "createAndLink": "Crear y enlazar",
         "create": "Crear ZIP"
+    },
+    "explorer": {
+        "opFailed": "Falló: {label}",
+        "noAnswer": "No responde",
+        "readFailed": "Polaris no pudo leer esta carpeta.",
+        "unreachable": "No se pudo contactar con Polaris para leer esta carpeta.",
+        "unreachableHint": "Se cortó la conexión con Polaris, no la de este dispositivo.",
+        "refused": "Se rechazó ese archivo.",
+        "ops": {
+            "creating": "Creando {name}",
+            "moving": "Moviendo {name}",
+            "copying": "Copiando {name}",
+            "emptying": "Vaciando {name}",
+            "emptyingToTrash": "Vaciando {name} a la papelera"
+        },
+        "locations": "Ubicaciones",
+        "checkAgain": "Comprobar",
+        "checkSources": "Comprobar los orígenes que no responden",
+        "noConnections": "Aún no hay conexiones.",
+        "notAnswering": "No responde: {reason}",
+        "updateCredentialsFor": "Actualizar las credenciales de {name}",
+        "updateCredentials": "Renovar acceso",
+        "editNamed": "Editar {name}",
+        "removeNamed": "Quitar {name}",
+        "addConnection": "Añade una conexión de almacenamiento para empezar.",
+        "thisServer": "Este servidor",
+        "rekeyTitle": "Hay que actualizar las credenciales",
+        "rekeyBody": "Las credenciales de esta conexión se cifraron con otra clave maestra y ya no se pueden leer. Vuelve a escribir la contraseña (o la clave) para recuperar el acceso - se conservan tus archivos, enlaces, permisos y ajustes.",
+        "askOwner": "Pide al propietario que actualice las credenciales de esta conexión.",
+        "thisFolder": "Esta carpeta",
+        "access": "Acceso",
+        "background": "Trabajando en segundo plano",
+        "stopNamed": "Detener {label}",
+        "stopHint": "Detener - lo que ya se ha movido se queda",
+        "dismiss": "Cerrar",
+        "cancel": "Cancelar",
+        "create": "Crear",
+        "newFolder": {
+            "title": "Nueva carpeta",
+            "description": "Crea una carpeta en la ubicación actual.",
+            "placeholder": "Nombre"
+        },
+        "newFile": {
+            "title": "Archivo",
+            "description": "Crea aquí un archivo vacío. Usa cualquier extensión (p. ej. .txt, .md, .json)."
+        },
+        "trash": {
+            "titleOne": "Mover a la papelera",
+            "titleMany": "Mover {count} elementos a la papelera",
+            "bodyOne": "{name} irá a la papelera. Puedes restaurarlo desde allí.",
+            "bodyMany": "Los elementos elegidos irán a la papelera. Puedes restaurarlos desde allí.",
+            "confirm": "A la papelera"
+        },
+        "empty": {
+            "titlePermanent": "Vaciar para siempre",
+            "titleTrash": "Vaciar a la papelera",
+            "bodyPermanent": "Todo lo que hay en {name} se eliminará para siempre. La carpeta se conserva. No se puede deshacer.",
+            "bodyTrash": "Todo lo que hay en {name} irá a la papelera. La carpeta se conserva. Puedes restaurarlo desde la papelera.",
+            "confirmPermanent": "Vaciar",
+            "confirmTrash": "A la papelera"
+        },
+        "delete": {
+            "titleOne": "Eliminar para siempre",
+            "titleMany": "Eliminar {count} elementos para siempre",
+            "bodyOne": "{name} se eliminará para siempre. No se puede deshacer.",
+            "bodyMany": "Los elementos elegidos se eliminarán para siempre. No se puede deshacer.",
+            "confirm": "Eliminar"
+        },
+        "badges": {
+            "keyChanged": "clave nueva",
+            "noAnswer": "no responde",
+            "shared": "común",
+            "host": "equipo"
+        },
+        "schedule": {
+            "pickTime": "Elige una fecha y una hora.",
+            "title": "Programar borrado",
+            "bodyOne": "{name} se eliminará en el momento que elijas.",
+            "bodyMany": "{count} elementos se eliminarán en el momento que elijas.",
+            "deleteOn": "Eliminar el",
+            "permanent": "Eliminar para siempre (sin papelera)",
+            "hint": "Se ejecuta la próxima vez que se explore esta conexión después de ese momento, o a la hora exacta si el cron de borrado está configurado.",
+            "scheduling": "Programando...",
+            "submit": "Programar"
+        },
+        "down": {
+            "localTitle": "Polaris no llega a {name} desde dentro",
+            "title": "{name} no responde",
+            "localBody": "{name} es la máquina en la que funciona Polaris, así que no está apagada - Polaris está en ella. Lo que falla es cómo llega Polaris a sus archivos: una conexión que sale de su propio contenedor y vuelve a esta máquina.",
+            "body": "{detail}. Sus archivos no están disponibles hasta que vuelva.",
+            "tried": "Polaris probó <mono>{endpoint}</mono>.",
+            "looking": "Buscándola en esta red...",
+            "found": "Encontrada en <mono>{address}</mono> y actualizada. Había cambiado su dirección del router.",
+            "elsewhere": "Tampoco está en esta red, así que la máquina está apagada o su conexión ha caído.",
+            "nowhere": "Polaris no conoce su propia dirección en esta red, así que no puede decir qué hay cerca.",
+            "searchFailed": "Polaris no pudo buscar en esta red desde aquí.",
+            "look": "Buscarla en esta red",
+            "open": "Abrir {name}",
+            "openServers": "Ver servidores"
+        },
+        "smb": {
+            "title": "Explorar el UNAS por SMB",
+            "body": "Los archivos se sirven desde la carpeta SMB del dispositivo, con la misma cuenta de UniFi que ya indicaste. Elige la carpeta que abrir.",
+            "detecting": "Buscando carpetas...",
+            "none": "No se detectó ninguna carpeta. Escribe su nombre abajo (activa SMB en el UNAS si está apagado).",
+            "type": "O escribe el nombre",
+            "placeholder": "p. ej. Personal-Drive, data, home",
+            "connecting": "Conectando...",
+            "connect": "Conectar"
+        }
     }
 }

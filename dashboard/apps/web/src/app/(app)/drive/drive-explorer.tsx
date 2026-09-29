@@ -20,6 +20,7 @@
  */
 
 import { sendFile } from "@/components/transfers/move-file";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import Link from "next/link";
 import { FilesView } from "./files-view";
 import * as driveActions from "./actions";
@@ -151,6 +152,7 @@ export function DriveExplorer({
     abilities: DriveAbilities;
 }) {
     const router = useRouter();
+    const t = useTranslations("drive");
     const fileInput = useRef<HTMLInputElement>(null);
     /** The listing request in flight. There is only ever one: a new location, or a
      *  refresh after a write, calls off the one before it instead of racing it. */
@@ -241,7 +243,7 @@ export function DriveExplorer({
                 if (result && typeof result === "object" && result.error) setOpError(result.error);
             } catch (caught) {
                 setOpError(
-                    caught instanceof Error && caught.message ? caught.message : `${label} failed`
+                    caught instanceof Error && caught.message ? caught.message : t("explorer.opFailed", { label })
                 );
             } finally {
                 setOps((prev) => prev.filter((op) => op.id !== id));
@@ -323,9 +325,9 @@ export function DriveExplorer({
         (id: string | null): string | null => {
             if (!id || !reachability) return null;
             const status = reachability.find((entry) => entry.id === id);
-            return status?.state === "down" ? (status.detail ?? "No answer") : null;
+            return status?.state === "down" ? (status.detail ?? t("explorer.noAnswer")) : null;
         },
-        [reachability]
+        [reachability, t]
     );
     /** Where Polaris dialled for the source being looked at. The reason on its own
      *  is not something anybody can act on: what has to be fixed depends on which
@@ -398,7 +400,7 @@ export function DriveExplorer({
                 } else if (!res.ok) {
                     setEntries([]);
                     setError({
-                        reason: body.error ?? "Polaris could not read this folder.",
+                        reason: body.error ?? t("explorer.readFailed"),
                         hint: typeof body.hint === "string" ? body.hint : null,
                         detail: typeof body.detail === "string" ? body.detail : null,
                         retryable: body.retryable !== false
@@ -417,8 +419,8 @@ export function DriveExplorer({
                 // the device, so the offer is simply to ask again.
                 if (!signal.aborted) {
                     setError({
-                        reason: "Polaris could not be reached to read this folder.",
-                        hint: "The connection to Polaris itself dropped, not the one to this device.",
+                        reason: t("explorer.unreachable"),
+                        hint: t("explorer.unreachableHint"),
                         detail: null,
                         retryable: true
                     });
@@ -427,7 +429,7 @@ export function DriveExplorer({
                 if (!signal.aborted) setLoading(false);
             }
         },
-        [connectionId, path, unreachable]
+        [connectionId, path, unreachable, t]
     );
 
     useEffect(() => {
@@ -459,7 +461,7 @@ export function DriveExplorer({
             const sent = await sendFile(`/api/drive/upload?${query.toString()}`, file, {
                 name: relPath
             });
-            if (!sent.ok && sent.status !== 0) setOpError(sent.body || "That file was refused.");
+            if (!sent.ok && sent.status !== 0) setOpError(sent.body || t("explorer.refused"));
         }
         setUploading(false);
         if (fileInput.current) fileInput.current.value = "";
@@ -472,7 +474,7 @@ export function DriveExplorer({
         if (!connectionId || !name) return;
         setNewFolderOpen(false);
         setNewFolderName("");
-        runOp(`Creating ${name}`, () => driveActions.mkdirAction(connectionId, path, name));
+        runOp(t("explorer.ops.creating", { name }), () => driveActions.mkdirAction(connectionId, path, name));
     }
 
     function onRename(entry: DriveEntry, nextName: string) {
@@ -532,7 +534,7 @@ export function DriveExplorer({
         if (!connectionId || !name) return;
         setNewFileOpen(false);
         setNewFileName("Untitled.txt");
-        runOp(`Creating ${name}`, () => driveActions.createFileAction(connectionId, path, name));
+        runOp(t("explorer.ops.creating", { name }), () => driveActions.createFileAction(connectionId, path, name));
     }
 
     function onSetNote(entry: DriveEntry, note: string | null) {
@@ -551,14 +553,14 @@ export function DriveExplorer({
         // or its own parent would otherwise flash the row out and back).
         if (to === entry.path) return;
         setEntries((prev) => prev.filter((row) => row.path !== entry.path));
-        runOp(`Moving ${entry.name}`, () =>
+        runOp(t("explorer.ops.moving", { name: entry.name }), () =>
             driveActions.moveIntoAction(connectionId, entry.path, destFolderPath)
         );
     }
 
     function onCopy(entry: DriveEntry, destFolderPath: string) {
         if (!connectionId) return;
-        runOp(`Copying ${entry.name}`, () =>
+        runOp(t("explorer.ops.copying", { name: entry.name }), () =>
             driveActions.copyAction(connectionId, entry.path, destFolderPath)
         );
     }
@@ -612,7 +614,9 @@ export function DriveExplorer({
         if (!connectionId || !emptyTarget) return;
         const { entry, permanent } = emptyTarget;
         setEmptyTarget(null);
-        const label = permanent ? `Emptying ${entry.name}` : `Emptying ${entry.name} to Trash`;
+        const label = permanent
+            ? t("explorer.ops.emptying", { name: entry.name })
+            : t("explorer.ops.emptyingToTrash", { name: entry.name });
         runOp(label, () => driveActions.emptyFolderAction(connectionId, entry.path, permanent));
     }
 
@@ -620,7 +624,7 @@ export function DriveExplorer({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
             <aside className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-medium text-muted-foreground">Locations</h2>
+                    <h2 className="text-sm font-medium text-muted-foreground">{t("explorer.locations")}</h2>
                     <div className="flex items-center gap-1">
                         {anyDown ? (
                             <Button
@@ -628,8 +632,8 @@ export function DriveExplorer({
                                 variant="ghost"
                                 onClick={recheckSources}
                                 disabled={rechecking}
-                                title="Check again"
-                                aria-label="Check the sources that are not answering"
+                                title={t("explorer.checkAgain")}
+                                aria-label={t("explorer.checkSources")}
                             >
                                 <RefreshCw className={cn("size-4", rechecking && "animate-spin")} />
                             </Button>
@@ -639,7 +643,7 @@ export function DriveExplorer({
                 </div>
                 <nav className="flex flex-col gap-1">
                     {connections.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No connections yet.</p>
+                        <p className="text-sm text-muted-foreground">{t("explorer.noConnections")}</p>
                     ) : (
                         connections.map((connection) => (
                             <div key={connection.id} className="group flex items-center gap-1">
@@ -648,7 +652,7 @@ export function DriveExplorer({
                                     // would only spend its connect timeout to say so.
                                     <span
                                         aria-disabled="true"
-                                        title={`Not answering: ${downReason(connection.id)}`}
+                                        title={t("explorer.notAnswering", { reason: downReason(connection.id) ?? "" })}
                                         className="flex flex-1 cursor-not-allowed items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground"
                                     >
                                         <ConnectionLabel
@@ -686,8 +690,8 @@ export function DriveExplorer({
                                         type="button"
                                         onClick={() => setEditConn(connection)}
                                         className="rounded-md p-1 text-warning transition-colors hover:bg-warning-soft"
-                                        aria-label={`Update credentials for ${connection.name}`}
-                                        title="Update credentials"
+                                        aria-label={t("explorer.updateCredentialsFor", { name: connection.name })}
+                                        title={t("explorer.updateCredentials")}
                                     >
                                         <KeyRound className="size-4" />
                                     </button>
@@ -697,7 +701,7 @@ export function DriveExplorer({
                                         type="button"
                                         onClick={() => setEditConn(connection)}
                                         className="rounded-md p-1 text-muted-foreground transition-opacity hover:text-foreground md:opacity-0 md:group-hover:opacity-100"
-                                        aria-label={`Edit ${connection.name}`}
+                                        aria-label={t("explorer.editNamed", { name: connection.name })}
                                     >
                                         <Pencil className="size-4" />
                                     </button>
@@ -707,7 +711,7 @@ export function DriveExplorer({
                                         type="button"
                                         onClick={() => setDeleteConn(connection)}
                                         className="rounded-md p-1 text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
-                                        aria-label={`Remove ${connection.name}`}
+                                        aria-label={t("explorer.removeNamed", { name: connection.name })}
                                     >
                                         <Trash2 className="size-4" />
                                     </button>
@@ -725,11 +729,11 @@ export function DriveExplorer({
                 <TransfersPanel />
                 {!connectionId ? (
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                        Add a storage connection to start browsing.
+                        {t("explorer.addConnection")}
                     </div>
                 ) : unreachable ? (
                     <UnreachableServer
-                        name={selectedConnection?.name ?? "This server"}
+                        name={selectedConnection?.name ?? t("explorer.thisServer")}
                         detail={unreachable}
                         endpoint={downEndpoint}
                         // Straight to the machine's own page rather than to the
@@ -758,15 +762,8 @@ export function DriveExplorer({
                         <div className="flex items-start gap-3">
                             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
                             <div className="flex flex-col gap-2">
-                                <h3 className="text-sm font-medium">
-                                    Saved credentials need updating
-                                </h3>
-                                <p className="text-sm text-muted-foreground">
-                                    This connection&apos;s credentials were encrypted with a
-                                    different master key and can no longer be read. Enter the
-                                    password (or key) again to restore access - your files, shares,
-                                    ACLs, and settings are all kept.
-                                </p>
+                                <h3 className="text-sm font-medium">{t("explorer.rekeyTitle")}</h3>
+                                <p className="text-sm text-muted-foreground">{t("explorer.rekeyBody")}</p>
                                 {selectedConnection.canManageAccess ? (
                                     <div>
                                         <Button
@@ -775,12 +772,12 @@ export function DriveExplorer({
                                             className="mt-1"
                                         >
                                             <KeyRound className="size-4" />
-                                            Update credentials
+                                            {t("explorer.updateCredentials")}
                                         </Button>
                                     </div>
                                 ) : (
                                     <p className="text-xs text-muted-foreground">
-                                        Ask the owner to update this connection&apos;s credentials.
+                                        {t("explorer.askOwner")}
                                     </p>
                                 )}
                             </div>
@@ -848,7 +845,7 @@ export function DriveExplorer({
                                               name:
                                                   segments[segments.length - 1] ??
                                                   selectedConnection?.name ??
-                                                  "This folder",
+                                                  t("explorer.thisFolder"),
                                               isDir: true
                                           }
                                       ])
@@ -879,7 +876,7 @@ export function DriveExplorer({
                                           name:
                                               segments[segments.length - 1] ??
                                               selectedConnection?.name ??
-                                              "This folder",
+                                              t("explorer.thisFolder"),
                                           isDir: true
                                       })
                                 : undefined
@@ -922,14 +919,14 @@ export function DriveExplorer({
                                                     name:
                                                         segments[segments.length - 1] ??
                                                         selectedConnection?.name ??
-                                                        "This folder"
+                                                        t("explorer.thisFolder")
                                                 })
                                             }
-                                            title="Access"
-                                            aria-label="Access"
+                                            title={t("explorer.access")}
+                                            aria-label={t("explorer.access")}
                                         >
                                             <ShieldCheck className="size-4" />
-                                            <span className="hidden sm:inline">Access</span>
+                                            <span className="hidden sm:inline">{t("explorer.access")}</span>
                                         </Button>
                                     ) : null}
                                     {selectedConnection?.kind === "unifi-unas" ? (
@@ -945,7 +942,7 @@ export function DriveExplorer({
             {ops.length > 0 || jobs.length > 0 ? (
                 <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-3 rounded-lg border border-border-strong bg-elevated p-3 shadow-popover">
                     <p className="text-xs font-medium text-muted-foreground">
-                        Working in the background
+                        {t("explorer.background")}
                     </p>
                     {ops.map((op) => (
                         <div key={op.id} className="flex items-center gap-2 text-sm">
@@ -963,8 +960,8 @@ export function DriveExplorer({
                                 </span>
                                 <button
                                     type="button"
-                                    aria-label={`Stop ${job.label}`}
-                                    title="Stop - what has already moved stays moved"
+                                    aria-label={t("explorer.stopNamed", { label: job.label })}
+                                    title={t("explorer.stopHint")}
                                     onClick={() => {
                                         setJobs((before) =>
                                             before.filter((entry) => entry.id !== job.id)
@@ -1013,7 +1010,7 @@ export function DriveExplorer({
                         type="button"
                         onClick={() => setOpError(null)}
                         className="shrink-0 rounded p-0.5 hover:bg-danger-soft"
-                        aria-label="Dismiss"
+                        aria-label={t("explorer.dismiss")}
                     >
                         <X className="size-4" />
                     </button>
@@ -1057,26 +1054,24 @@ export function DriveExplorer({
             <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>New folder</DialogTitle>
-                        <DialogDescription>
-                            Create a folder in the current location.
-                        </DialogDescription>
+                        <DialogTitle>{t("explorer.newFolder.title")}</DialogTitle>
+                        <DialogDescription>{t("explorer.newFolder.description")}</DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submitNewFolder} className="flex flex-col gap-3">
                         <Input
                             autoFocus
                             value={newFolderName}
                             onChange={(event) => setNewFolderName(event.target.value)}
-                            placeholder="Folder name"
+                            placeholder={t("explorer.newFolder.placeholder")}
                         />
                         <div className="flex justify-end gap-2">
                             <DialogClose asChild>
                                 <Button type="button" variant="ghost">
-                                    Cancel
+                                    {t("explorer.cancel")}
                                 </Button>
                             </DialogClose>
                             <Button type="submit" disabled={!newFolderName.trim()}>
-                                Create
+                                {t("explorer.create")}
                             </Button>
                         </div>
                     </form>
@@ -1086,26 +1081,25 @@ export function DriveExplorer({
             <Dialog open={newFileOpen} onOpenChange={setNewFileOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>New file</DialogTitle>
-                        <DialogDescription>
-                            Create an empty file here. Use any extension (e.g. .txt, .md, .json).
-                        </DialogDescription>
+                        <DialogTitle>{t("explorer.newFile.title")}</DialogTitle>
+                        <DialogDescription>{t("explorer.newFile.description")}</DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submitNewFile} className="flex flex-col gap-3">
                         <Input
                             autoFocus
                             value={newFileName}
                             onChange={(event) => setNewFileName(event.target.value)}
+                            // i18n-ignore: an example file name
                             placeholder="Untitled.txt"
                         />
                         <div className="flex justify-end gap-2">
                             <DialogClose asChild>
                                 <Button type="button" variant="ghost">
-                                    Cancel
+                                    {t("explorer.cancel")}
                                 </Button>
                             </DialogClose>
                             <Button type="submit" disabled={!newFileName.trim()}>
-                                Create
+                                {t("explorer.create")}
                             </Button>
                         </div>
                     </form>
@@ -1119,16 +1113,14 @@ export function DriveExplorer({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            Move{" "}
                             {deleteTargets && deleteTargets.length > 1
-                                ? `${deleteTargets.length} items`
-                                : "item"}{" "}
-                            to Trash
+                                ? t("explorer.trash.titleMany", { count: deleteTargets.length })
+                                : t("explorer.trash.titleOne")}
                         </DialogTitle>
                         <DialogDescription className="truncate">
                             {deleteTargets && deleteTargets.length === 1
-                                ? `${deleteTargets[0]?.name} will be moved to the recycle bin. You can restore it from Trash.`
-                                : "The selected items will be moved to the recycle bin. You can restore them from Trash."}
+                                ? t("explorer.trash.bodyOne", { name: deleteTargets[0]?.name ?? "" })
+                                : t("explorer.trash.bodyMany")}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2">
@@ -1137,10 +1129,10 @@ export function DriveExplorer({
                             variant="ghost"
                             onClick={() => setDeleteTargets(null)}
                         >
-                            Cancel
+                            {t("explorer.cancel")}
                         </Button>
                         <Button type="button" variant="danger" onClick={confirmDelete}>
-                            Move to Trash
+                            {t("explorer.trash.confirm")}
                         </Button>
                     </div>
                 </DialogContent>
@@ -1154,23 +1146,23 @@ export function DriveExplorer({
                     <DialogHeader>
                         <DialogTitle>
                             {emptyTarget?.permanent
-                                ? "Empty folder permanently"
-                                : "Empty folder to Trash"}
+                                ? t("explorer.empty.titlePermanent")
+                                : t("explorer.empty.titleTrash")}
                         </DialogTitle>
                         <DialogDescription className="truncate">
                             {emptyTarget
                                 ? emptyTarget.permanent
-                                    ? `Everything inside ${emptyTarget.entry.name} will be permanently deleted. The folder itself is kept. This cannot be undone.`
-                                    : `Everything inside ${emptyTarget.entry.name} will be moved to the recycle bin. The folder itself is kept. You can restore items from Trash.`
+                                    ? t("explorer.empty.bodyPermanent", { name: emptyTarget.entry.name })
+                                    : t("explorer.empty.bodyTrash", { name: emptyTarget.entry.name })
                                 : ""}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => setEmptyTarget(null)}>
-                            Cancel
+                            {t("explorer.cancel")}
                         </Button>
                         <Button type="button" variant="danger" onClick={confirmEmpty}>
-                            {emptyTarget?.permanent ? "Empty permanently" : "Empty to Trash"}
+                            {emptyTarget?.permanent ? t("explorer.empty.confirmPermanent") : t("explorer.empty.confirmTrash")}
                         </Button>
                     </div>
                 </DialogContent>
@@ -1183,16 +1175,14 @@ export function DriveExplorer({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            Delete{" "}
                             {permanentTargets && permanentTargets.length > 1
-                                ? `${permanentTargets.length} items`
-                                : "item"}{" "}
-                            permanently
+                                ? t("explorer.delete.titleMany", { count: permanentTargets.length })
+                                : t("explorer.delete.titleOne")}
                         </DialogTitle>
                         <DialogDescription className="truncate">
                             {permanentTargets && permanentTargets.length === 1
-                                ? `${permanentTargets[0]?.name} will be deleted for good. This cannot be undone.`
-                                : "The selected items will be deleted for good. This cannot be undone."}
+                                ? t("explorer.delete.bodyOne", { name: permanentTargets[0]?.name ?? "" })
+                                : t("explorer.delete.bodyMany")}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2">
@@ -1201,10 +1191,10 @@ export function DriveExplorer({
                             variant="ghost"
                             onClick={() => setPermanentTargets(null)}
                         >
-                            Cancel
+                            {t("explorer.cancel")}
                         </Button>
                         <Button type="button" variant="danger" onClick={confirmDeletePermanent}>
-                            Delete permanently
+                            {t("explorer.delete.confirm")}
                         </Button>
                     </div>
                 </DialogContent>
@@ -1252,6 +1242,7 @@ function ConnectionLabel({
     connection: ConnectionSummary;
     down: string | null;
 }) {
+    const t = useTranslations("drive");
     return (
         <>
             {connection.kind === "personal" ? (
@@ -1265,16 +1256,16 @@ function ConnectionLabel({
             {connection.needsRekey ? (
                 <Badge variant="warning" className="gap-1">
                     <AlertTriangle className="size-3" />
-                    key changed
+                    {t("explorer.badges.keyChanged")}
                 </Badge>
             ) : null}
             {down ? (
                 <Badge variant="danger" title={down}>
-                    no answer
+                    {t("explorer.badges.noAnswer")}
                 </Badge>
             ) : null}
-            {connection.shared ? <Badge variant="neutral">shared</Badge> : null}
-            {connection.requiresHostd ? <Badge variant="neutral">host</Badge> : null}
+            {connection.shared ? <Badge variant="neutral">{t("explorer.badges.shared")}</Badge> : null}
+            {connection.requiresHostd ? <Badge variant="neutral">{t("explorer.badges.host")}</Badge> : null}
         </>
     );
 }
@@ -1297,6 +1288,7 @@ function ScheduleDeleteDialog({
     onScheduled: () => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("drive");
     const [when, setWhen] = useState("");
     const [permanent, setPermanent] = useState(false);
     const [pending, setPending] = useState(false);
@@ -1314,7 +1306,7 @@ function ScheduleDeleteDialog({
         event.preventDefault();
         if (!targets || targets.length === 0) return;
         if (!when) {
-            setError("Pick a date and time.");
+            setError(t("explorer.schedule.pickTime"));
             return;
         }
         setPending(true);
@@ -1348,15 +1340,16 @@ function ScheduleDeleteDialog({
         <Dialog open={targets !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Schedule deletion</DialogTitle>
+                    <DialogTitle>{t("explorer.schedule.title")}</DialogTitle>
                     <DialogDescription className="truncate">
-                        {count === 1 ? targets?.[0]?.name : `${count} items`} will be deleted at the
-                        time you choose.
+                        {count === 1
+                            ? t("explorer.schedule.bodyOne", { name: targets?.[0]?.name ?? "" })
+                            : t("explorer.schedule.bodyMany", { count })}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Delete on
+                        {t("explorer.schedule.deleteOn")}
                         <Input
                             type="datetime-local"
                             value={when}
@@ -1371,11 +1364,10 @@ function ScheduleDeleteDialog({
                             onChange={(event) => setPermanent(event.target.checked)}
                             className="size-4"
                         />
-                        Delete permanently (skip the recycle bin)
+                        {t("explorer.schedule.permanent")}
                     </label>
                     <p className="text-xs text-muted-foreground">
-                        Runs the next time this connection is browsed after that moment, or exactly
-                        on time if the deletion cron is configured.
+                        {t("explorer.schedule.hint")}
                     </p>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
@@ -1389,7 +1381,7 @@ function ScheduleDeleteDialog({
                             variant={permanent ? "danger" : undefined}
                             disabled={pending}
                         >
-                            {pending ? "Scheduling..." : "Schedule"}
+                            {pending ? t("explorer.schedule.scheduling") : t("explorer.schedule.submit")}
                         </Button>
                     </div>
                 </form>
@@ -1440,6 +1432,7 @@ function UnreachableServer({
      * Every candidate is checked against the host key this server is already
      * pinned to, so nothing is believed on the strength of having answered.
      */
+    const t = useTranslations("drive");
     const [search, setSearch] = useState<
         | { kind: "idle" }
         | { kind: "looking" }
@@ -1491,12 +1484,12 @@ function UnreachableServer({
                         different answer, and saying the first sends somebody to
                         check a machine that is plainly fine. */}
                     <h3 className="text-sm font-medium">
-                        {local ? `Polaris cannot reach ${name} from inside itself` : `${name} is not answering`}
+                        {local ? t("explorer.down.localTitle", { name }) : t("explorer.down.title", { name })}
                     </h3>
                     <p className="text-sm text-muted-foreground">
                         {local
-                            ? `${name} is the machine Polaris runs on, so it is not off - Polaris is on it. What is not working is the way Polaris reaches its files, which is a connection out of its own container and back to this machine.`
-                            : `${detail}. Its files are unavailable until it is back.`}
+                            ? t("explorer.down.localBody", { name })
+                            : t("explorer.down.body", { detail })}
                     </p>
                     {/* The address it dialled, which is what turns a reason into
                         something somebody can act on: "that address does not
@@ -1505,39 +1498,50 @@ function UnreachableServer({
                         an IP that has since moved. */}
                     {endpoint ? (
                         <p className="text-xs text-muted-foreground">
-                            Polaris tried <span className="font-mono">{endpoint}</span>.
+                            {t.rich("explorer.down.tried", {
+                                endpoint,
+                                mono: (chunks) => (
+                                    <span key="endpoint" className="font-mono">
+                                        {chunks}
+                                    </span>
+                                )
+                            })}
                         </p>
                     ) : null}
                     {/* What Polaris is doing about it, without being asked. */}
                     {search.kind === "looking" ? (
                         <p className="flex items-center gap-2 text-xs text-muted-foreground">
                             <Loader2 className="size-3 animate-spin" />
-                            Looking for it on this network...
+                            {t("explorer.down.looking")}
                         </p>
                     ) : search.kind === "found" ? (
                         <p className="text-xs text-success">
-                            Found it at <span className="font-mono">{search.address}</span> and
-                            switched to it. A lease from the router had moved.
+                            {t.rich("explorer.down.found", {
+                                address: search.address,
+                                mono: (chunks) => (
+                                    <span key="address" className="font-mono">
+                                        {chunks}
+                                    </span>
+                                )
+                            })}
                         </p>
                     ) : search.kind === "elsewhere" ? (
                         <p className="text-xs text-muted-foreground">
-                            It is not on this network either, so the machine itself is off or the
-                            link to it is down.
+                            {t("explorer.down.elsewhere")}
                         </p>
                     ) : search.kind === "nowhere-to-look" ? (
                         <p className="text-xs text-muted-foreground">
-                            Polaris does not know its own address on this network, so it cannot say
-                            what is near it.
+                            {t("explorer.down.nowhere")}
                         </p>
                     ) : search.kind === "failed" ? (
                         <p className="text-xs text-muted-foreground">
-                            Polaris could not search this network from here.
+                            {t("explorer.down.searchFailed")}
                         </p>
                     ) : null}
                     <div className="mt-1 flex flex-wrap gap-2">
                         <Button size="sm" variant="secondary" onClick={onRecheck}>
                             <RefreshCw className="size-4" />
-                            Check again
+                            {t("explorer.checkAgain")}
                         </Button>
                         {hostId ? (
                             <Button
@@ -1547,12 +1551,12 @@ function UnreachableServer({
                                 onClick={() => void look()}
                             >
                                 <Radar className="size-4" />
-                                Look for it on this network
+                                {t("explorer.down.look")}
                             </Button>
                         ) : null}
                         <Button size="sm" variant="ghost" asChild>
                             <Link href={serverHref ?? "/apps/servers"}>
-                                {serverHref ? `Open ${name}` : "Open Servers"}
+                                {serverHref ? t("explorer.down.open", { name }) : t("explorer.down.openServers")}
                             </Link>
                         </Button>
                     </div>
@@ -1568,6 +1572,7 @@ function UnreachableServer({
  * fallback, defaulting to the UNAS Pro's out-of-the-box "Personal-Drive".
  */
 function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved: () => void }) {
+    const t = useTranslations("drive");
     const [share, setShare] = useState("Personal-Drive");
     const [shares, setShares] = useState<string[] | null>(null);
     const [discovering, setDiscovering] = useState(true);
@@ -1608,11 +1613,8 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
                 <div className="flex items-start gap-3 text-sm">
                     <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                     <div className="flex flex-col gap-1">
-                        <span className="font-medium">Browse UNAS files over SMB</span>
-                        <span className="text-muted-foreground">
-                            Files are served from the device&apos;s SMB share, using the same UniFi
-                            account you already entered. Pick the share to open.
-                        </span>
+                        <span className="font-medium">{t("explorer.smb.title")}</span>
+                        <span className="text-muted-foreground">{t("explorer.smb.body")}</span>
                     </div>
                 </div>
 
@@ -1620,7 +1622,7 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Skeleton className="h-8 w-24" />
                         <Skeleton className="h-8 w-24" />
-                        <span>Detecting shares...</span>
+                        <span>{t("explorer.smb.detecting")}</span>
                     </div>
                 ) : shares && shares.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
@@ -1639,8 +1641,7 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        No shares were detected automatically. Enter the share name below (enable
-                        SMB on the UNAS if it is off).
+                        {t("explorer.smb.none")}
                     </p>
                 )}
 
@@ -1652,16 +1653,16 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
                     className="flex flex-wrap items-end gap-2"
                 >
                     <label className="flex flex-1 flex-col gap-1 text-sm">
-                        Or type a share name
+                        {t("explorer.smb.type")}
                         <input
                             className="h-9 rounded-md border border-border bg-surface px-3 text-sm"
                             value={share}
                             onChange={(event) => setShare(event.target.value)}
-                            placeholder="e.g. Personal-Drive, data, home"
+                            placeholder={t("explorer.smb.placeholder")}
                         />
                     </label>
                     <Button type="submit" variant="ghost" disabled={pending || !share.trim()}>
-                        {pending ? "Connecting..." : "Connect"}
+                        {pending ? t("explorer.smb.connecting") : t("explorer.smb.connect")}
                     </Button>
                 </form>
                 {error ? <p className="text-sm text-danger">{error}</p> : null}

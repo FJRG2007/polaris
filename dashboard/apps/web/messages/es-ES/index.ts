@@ -13,7 +13,6 @@ import home from "./home.json";
 import mail from "./mail.json";
 import admin from "./admin.json";
 import drive from "./drive.json";
-import files from "./files.json";
 import notes from "./notes.json";
 import tasks from "./tasks.json";
 import tools from "./tools.json";
@@ -44,6 +43,8 @@ import mailServer from "./mailServer.json";
 import tasksViews from "./tasksViews.json";
 import validation from "./validation.json";
 import accountOrgs from "./accountOrgs.json";
+import drivePoints from "./drivePoints.json";
+import driveViewer from "./driveViewer.json";
 import mailCompose from "./mailCompose.json";
 import marketplace from "./marketplace.json";
 import publicPages from "./publicPages.json";
@@ -87,7 +88,8 @@ export default {
     deploySettings,
     dns,
     drive,
-    files,
+    drivePoints,
+    driveViewer,
     firewall,
     home,
     installed,

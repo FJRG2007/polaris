@@ -307,5 +307,115 @@
         "creating": "Creating...",
         "createAndLink": "Create and link",
         "create": "Create zip"
+    },
+    "explorer": {
+        "opFailed": "{label} failed",
+        "noAnswer": "No answer",
+        "readFailed": "Polaris could not read this folder.",
+        "unreachable": "Polaris could not be reached to read this folder.",
+        "unreachableHint": "The connection to Polaris itself dropped, not the one to this device.",
+        "refused": "That file was refused.",
+        "ops": {
+            "creating": "Creating {name}",
+            "moving": "Moving {name}",
+            "copying": "Copying {name}",
+            "emptying": "Emptying {name}",
+            "emptyingToTrash": "Emptying {name} to Trash"
+        },
+        "locations": "Locations",
+        "checkAgain": "Check again",
+        "checkSources": "Check the sources that are not answering",
+        "noConnections": "No connections yet.",
+        "notAnswering": "Not answering: {reason}",
+        "updateCredentialsFor": "Update credentials for {name}",
+        "updateCredentials": "Update credentials",
+        "editNamed": "Edit {name}",
+        "removeNamed": "Remove {name}",
+        "addConnection": "Add a storage connection to start browsing.",
+        "thisServer": "This server",
+        "rekeyTitle": "Saved credentials need updating",
+        "rekeyBody": "This connection's credentials were encrypted with a different master key and can no longer be read. Enter the password (or key) again to restore access - your files, shares, ACLs, and settings are all kept.",
+        "askOwner": "Ask the owner to update this connection's credentials.",
+        "thisFolder": "This folder",
+        "access": "Access",
+        "background": "Working in the background",
+        "stopNamed": "Stop {label}",
+        "stopHint": "Stop - what has already moved stays moved",
+        "dismiss": "Dismiss",
+        "cancel": "Cancel",
+        "create": "Create",
+        "newFolder": {
+            "title": "New folder",
+            "description": "Create a folder in the current location.",
+            "placeholder": "Folder name"
+        },
+        "newFile": {
+            "title": "New file",
+            "description": "Create an empty file here. Use any extension (e.g. .txt, .md, .json)."
+        },
+        "trash": {
+            "titleOne": "Move item to Trash",
+            "titleMany": "Move {count} items to Trash",
+            "bodyOne": "{name} will be moved to the recycle bin. You can restore it from Trash.",
+            "bodyMany": "The selected items will be moved to the recycle bin. You can restore them from Trash.",
+            "confirm": "Move to Trash"
+        },
+        "empty": {
+            "titlePermanent": "Empty folder permanently",
+            "titleTrash": "Empty folder to Trash",
+            "bodyPermanent": "Everything inside {name} will be permanently deleted. The folder itself is kept. This cannot be undone.",
+            "bodyTrash": "Everything inside {name} will be moved to the recycle bin. The folder itself is kept. You can restore items from Trash.",
+            "confirmPermanent": "Empty permanently",
+            "confirmTrash": "Empty to Trash"
+        },
+        "delete": {
+            "titleOne": "Delete item permanently",
+            "titleMany": "Delete {count} items permanently",
+            "bodyOne": "{name} will be deleted for good. This cannot be undone.",
+            "bodyMany": "The selected items will be deleted for good. This cannot be undone.",
+            "confirm": "Delete permanently"
+        },
+        "badges": {
+            "keyChanged": "key changed",
+            "noAnswer": "no answer",
+            "shared": "shared",
+            "host": "host"
+        },
+        "schedule": {
+            "pickTime": "Pick a date and time.",
+            "title": "Schedule deletion",
+            "bodyOne": "{name} will be deleted at the time you choose.",
+            "bodyMany": "{count} items will be deleted at the time you choose.",
+            "deleteOn": "Delete on",
+            "permanent": "Delete permanently (skip the recycle bin)",
+            "hint": "Runs the next time this connection is browsed after that moment, or exactly on time if the deletion cron is configured.",
+            "scheduling": "Scheduling...",
+            "submit": "Schedule"
+        },
+        "down": {
+            "localTitle": "Polaris cannot reach {name} from inside itself",
+            "title": "{name} is not answering",
+            "localBody": "{name} is the machine Polaris runs on, so it is not off - Polaris is on it. What is not working is the way Polaris reaches its files, which is a connection out of its own container and back to this machine.",
+            "body": "{detail}. Its files are unavailable until it is back.",
+            "tried": "Polaris tried <mono>{endpoint}</mono>.",
+            "looking": "Looking for it on this network...",
+            "found": "Found it at <mono>{address}</mono> and switched to it. A lease from the router had moved.",
+            "elsewhere": "It is not on this network either, so the machine itself is off or the link to it is down.",
+            "nowhere": "Polaris does not know its own address on this network, so it cannot say what is near it.",
+            "searchFailed": "Polaris could not search this network from here.",
+            "look": "Look for it on this network",
+            "open": "Open {name}",
+            "openServers": "Open Servers"
+        },
+        "smb": {
+            "title": "Browse UNAS files over SMB",
+            "body": "Files are served from the device's SMB share, using the same UniFi account you already entered. Pick the share to open.",
+            "detecting": "Detecting shares...",
+            "none": "No shares were detected automatically. Enter the share name below (enable SMB on the UNAS if it is off).",
+            "type": "Or type a share name",
+            "placeholder": "e.g. Personal-Drive, data, home",
+            "connecting": "Connecting...",
+            "connect": "Connect"
+        }
     }
 }

@@ -19,6 +19,7 @@ import { useFormChanged } from "@/lib/use-form-changed";
 import { useConfirm } from "@/components/confirm-dialog";
 import { AccountInput } from "@/components/account-input";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { RequestDialog } from "@/app/(app)/drive/request-dialog";
 import { useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { DeleteDropPointDialog } from "@/app/(app)/drive/drop-points/delete-drop-point-dialog";
@@ -106,20 +107,20 @@ export interface VisitorRow {
 }
 
 function status(config: DropPointConfig): {
-    label: string;
+    label: "detail.status.closed" | "detail.status.scheduled" | "detail.status.expired" | "detail.status.full" | "detail.status.open";
     variant: "success" | "neutral" | "warning";
 } {
-    if (config.revokedAt) return { label: "Closed", variant: "neutral" };
+    if (config.revokedAt) return { label: "detail.status.closed", variant: "neutral" };
     if (config.startsAt && new Date(config.startsAt).getTime() > Date.now()) {
-        return { label: "Scheduled", variant: "warning" };
+        return { label: "detail.status.scheduled", variant: "warning" };
     }
     if (config.expiresAt && new Date(config.expiresAt).getTime() <= Date.now()) {
-        return { label: "Expired", variant: "warning" };
+        return { label: "detail.status.expired", variant: "warning" };
     }
     if (config.maxFiles !== null && config.submissionCount >= config.maxFiles) {
-        return { label: "Full", variant: "warning" };
+        return { label: "detail.status.full", variant: "warning" };
     }
-    return { label: "Open", variant: "success" };
+    return { label: "detail.status.open", variant: "success" };
 }
 
 function statusTone(value: string): string {
@@ -157,6 +158,7 @@ export function DropPointDetail({
     connections: { id: string; name: string }[];
 }) {
     const router = useRouter();
+    const t = useTranslations("drivePoints");
     const [pending, startTransition] = useTransition();
     const [editing, setEditing] = useState(false);
     const [cloning, setCloning] = useState(false);
@@ -179,9 +181,9 @@ export function DropPointDetail({
     async function onClose() {
         if (
             !(await confirm({
-                title: "Close this drop point?",
-                description: "It will stop accepting uploads immediately.",
-                confirmLabel: "Close",
+                title: t("detail.closeTitle"),
+                description: t("detail.closeDescription"),
+                confirmLabel: t("detail.close"),
                 danger: true
             }))
         )
@@ -198,7 +200,7 @@ export function DropPointDetail({
             if (result.error) {
                 setDeleting(false);
                 await confirm({
-                    title: "Couldn't delete this drop point",
+                    title: t("detail.deleteFailed"),
                     description: result.error,
                     alert: true
                 });
@@ -212,9 +214,9 @@ export function DropPointDetail({
     async function onDeleteFile(row: SubmissionRow) {
         if (
             !(await confirm({
-                title: "Delete this file?",
-                description: `${row.fileName} will be permanently removed.`,
-                confirmLabel: "Delete",
+                title: t("detail.deleteFileTitle"),
+                description: t("detail.deleteFileDescription", { name: row.fileName }),
+                confirmLabel: t("detail.delete"),
                 danger: true
             }))
         )
@@ -233,7 +235,7 @@ export function DropPointDetail({
                     return next;
                 });
                 await confirm({
-                    title: "Couldn't delete file",
+                    title: t("detail.deleteFileFailed"),
                     description: result.error,
                     alert: true
                 });
@@ -244,7 +246,7 @@ export function DropPointDetail({
     // Clone opens the create dialog in picker mode, prefilled with this drop
     // point's guardrails; the owner only chooses where the new one collects.
     const cloneInitial = {
-        title: `${config.title} (copy)`,
+        title: t("detail.copyTitle", { title: config.title }),
         instructions: config.instructions ?? "",
         extensions: config.allowedExtensions.join(", "),
         deniedExtensions: config.deniedExtensions.join(", "),
@@ -266,9 +268,9 @@ export function DropPointDetail({
     };
 
     const tabs = [
-        { id: "overview" as const, label: "Overview", icon: Inbox, count: null },
-        { id: "files" as const, label: "Files", icon: FileText, count: files.length },
-        { id: "visitors" as const, label: "Visitors", icon: Users, count: visitors.length }
+        { id: "overview" as const, label: t("detail.tabs.overview"), icon: Inbox, count: null },
+        { id: "files" as const, label: t("detail.tabs.files"), icon: FileText, count: files.length },
+        { id: "visitors" as const, label: t("detail.tabs.visitors"), icon: Users, count: visitors.length }
     ];
 
     return (
@@ -278,7 +280,7 @@ export function DropPointDetail({
                 className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
                 <ChevronLeft className="size-4" />
-                Drop points
+                {t("detail.back")}
             </Link>
 
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -290,7 +292,7 @@ export function DropPointDetail({
                             className="flex items-center gap-2 truncate text-[1.0625rem] font-semibold tracking-tight"
                         >
                             {config.title}
-                            <Badge variant={state.variant}>{state.label}</Badge>
+                            <Badge variant={state.variant}>{t(state.label)}</Badge>
                         </h1>
                         <p
                             title={`${config.connectionName}${config.destinationPath ? ` / ${config.destinationPath}` : ""}`}
@@ -304,38 +306,38 @@ export function DropPointDetail({
                 <div className="flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
                         <Pencil className="size-4" />
-                        Configure
+                        {t("detail.configure")}
                     </Button>
                     {config.revokedAt ? (
                         <Button size="sm" variant="ghost" onClick={onReopen} disabled={pending}>
                             <RotateCcw className="size-4" />
-                            Reopen
+                            {t("detail.reopen")}
                         </Button>
                     ) : (
                         <Button size="sm" variant="ghost" onClick={onClose} disabled={pending}>
                             <Ban className="size-4" />
-                            Close
+                            {t("detail.close")}
                         </Button>
                     )}
                     <Button size="sm" variant="ghost" onClick={() => setSavingTemplate(true)}>
                         <Save className="size-4" />
-                        Save as template
+                        {t("detail.saveTemplate")}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setCloning(true)}>
                         <Copy className="size-4" />
-                        Clone
+                        {t("detail.clone")}
                     </Button>
                     <Button size="sm" variant="ghost" asChild>
                         <Link href={driveHref}>
                             <FolderOpen className="size-4" />
-                            Open folder
+                            {t("detail.openFolder")}
                         </Link>
                     </Button>
                     <Button
                         size="sm"
                         variant="ghost"
-                        aria-label="Delete this drop point"
-                        title="Delete"
+                        aria-label={t("detail.deleteThis")}
+                        title={t("detail.delete")}
                         onClick={() => setDeleting(true)}
                         disabled={pending}
                     >
@@ -416,54 +418,55 @@ export function DropPointDetail({
 }
 
 function OverviewTab({ config }: { config: DropPointConfig }) {
+    const t = useTranslations("drivePoints");
     const format = useDisplayFormat();
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-                    <Field label="Max size">{formatBytes(BigInt(config.maxSizeBytes))}</Field>
-                    <Field label="Min size">
-                        {config.minSizeBytes ? formatBytes(BigInt(config.minSizeBytes)) : "None"}
+                    <Field label={t("detail.fields.maxSize")}>{formatBytes(BigInt(config.maxSizeBytes))}</Field>
+                    <Field label={t("detail.fields.minSize")}>
+                        {config.minSizeBytes ? formatBytes(BigInt(config.minSizeBytes)) : t("detail.values.none")}
                     </Field>
-                    <Field label="Max files">{config.maxFiles ?? "No limit"}</Field>
-                    <Field label="Collected">{config.submissionCount}</Field>
-                    <Field label="Starts">
-                        {config.startsAt ? format.dateTime(config.startsAt) : "Immediately"}
+                    <Field label={t("detail.fields.maxFiles")}>{config.maxFiles ?? t("detail.values.noLimit")}</Field>
+                    <Field label={t("detail.fields.collected")}>{config.submissionCount}</Field>
+                    <Field label={t("detail.fields.starts")}>
+                        {config.startsAt ? format.dateTime(config.startsAt) : t("detail.values.immediately")}
                     </Field>
-                    <Field label="Expires">
-                        {config.expiresAt ? format.date(config.expiresAt) : "Never"}
+                    <Field label={t("detail.fields.expires")}>
+                        {config.expiresAt ? format.date(config.expiresAt) : t("detail.values.never")}
                     </Field>
-                    <Field label="Sign-in">
-                        {config.requireLogin ? "Required" : "Not required"}
+                    <Field label={t("detail.fields.signIn")}>
+                        {config.requireLogin ? t("detail.values.required") : t("detail.values.notRequired")}
                     </Field>
-                    <Field label="PIN">{config.hasPassword ? "Set" : "None"}</Field>
-                    <Field label="Uploader delete">
+                    <Field label={t("detail.fields.pin")}>{config.hasPassword ? t("detail.values.set") : t("detail.values.none")}</Field>
+                    <Field label={t("detail.fields.uploaderDelete")}>
                         {config.allowUploaderDelete
                             ? config.uploaderDeleteWindowSeconds
-                                ? `${Math.round(config.uploaderDeleteWindowSeconds / 60)} min`
-                                : "Anytime"
-                            : "Off"}
+                                ? t("detail.values.minutes", { count: Math.round(config.uploaderDeleteWindowSeconds / 60) })
+                                : t("detail.values.anytime")
+                            : t("detail.values.off")}
                     </Field>
-                    <Field label="Users">
-                        {config.allowedUsers.length > 0 ? config.allowedUsers.join(", ") : "Anyone"}
+                    <Field label={t("detail.fields.users")}>
+                        {config.allowedUsers.length > 0 ? config.allowedUsers.join(", ") : t("detail.values.anyone")}
                     </Field>
-                    <Field label="File types">
+                    <Field label={t("detail.fields.fileTypes")}>
                         {config.allowedExtensions.length > 0
                             ? config.allowedExtensions.join(", ")
-                            : "Any"}
+                            : t("detail.values.any")}
                     </Field>
-                    <Field label="Blocked types">
+                    <Field label={t("detail.fields.blockedTypes")}>
                         {config.deniedExtensions.length > 0
                             ? config.deniedExtensions.join(", ")
-                            : "None"}
+                            : t("detail.values.none")}
                     </Field>
-                    <Field label="IP allowlist">
-                        {config.allowedCidrs.length > 0 ? config.allowedCidrs.join(", ") : "Any"}
+                    <Field label={t("detail.fields.ipAllowlist")}>
+                        {config.allowedCidrs.length > 0 ? config.allowedCidrs.join(", ") : t("detail.values.any")}
                     </Field>
-                    <Field label="Locations">
+                    <Field label={t("detail.fields.locations")}>
                         {config.allowedContinents.length + config.allowedCountries.length > 0
                             ? [...config.allowedContinents, ...config.allowedCountries].join(", ")
-                            : "Any"}
+                            : t("detail.values.any")}
                     </Field>
                 </dl>
                 {config.instructions ? (
@@ -485,12 +488,13 @@ function FilesTab({
     onDelete: (row: SubmissionRow) => void;
     pending: boolean;
 }) {
+    const t = useTranslations("drivePoints");
     const format = useDisplayFormat();
     if (files.length === 0) {
         return (
             <Card>
                 <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                    Nothing uploaded yet.
+                    {t("detail.files.empty")}
                 </CardBody>
             </Card>
         );
@@ -502,11 +506,11 @@ function FilesTab({
                     <table className="w-full min-w-[42rem] text-sm">
                         <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
                             <tr>
-                                <th className="px-4 py-2 font-medium">File</th>
-                                <th className="px-4 py-2 font-medium">Size</th>
-                                <th className="px-4 py-2 font-medium">Uploaded by</th>
-                                <th className="px-4 py-2 font-medium">When</th>
-                                <th className="px-4 py-2 font-medium">Status</th>
+                                <th className="px-4 py-2 font-medium">{t("detail.files.file")}</th>
+                                <th className="px-4 py-2 font-medium">{t("detail.files.size")}</th>
+                                <th className="px-4 py-2 font-medium">{t("detail.files.uploadedBy")}</th>
+                                <th className="px-4 py-2 font-medium">{t("detail.files.when")}</th>
+                                <th className="px-4 py-2 font-medium">{t("detail.files.status")}</th>
                                 <th className="px-4 py-2" />
                             </tr>
                         </thead>
@@ -523,7 +527,7 @@ function FilesTab({
                                         {formatBytes(BigInt(row.size))}
                                     </td>
                                     <td className="px-4 py-2 text-muted-foreground">
-                                        {row.uploader ?? "Anonymous"}
+                                        {row.uploader ?? t("detail.anonymous")}
                                     </td>
                                     <td className="px-4 py-2 text-muted-foreground">
                                         {format.dateTime(row.at)}
@@ -539,7 +543,7 @@ function FilesTab({
                                             onClick={() => onDelete(row)}
                                             disabled={pending}
                                             className="text-muted-foreground hover:text-danger disabled:opacity-50"
-                                            aria-label="Delete file"
+                                            aria-label={t("detail.files.delete")}
                                         >
                                             <Trash2 className="size-4" />
                                         </button>
@@ -558,12 +562,13 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
     // A ticking clock, not one read at render: "Active now" used to stay on screen
     // for as long as the tab was open, however long ago the visitor left.
     const now = useNow(10_000);
+    const t = useTranslations("drivePoints");
     const format = useDisplayFormat();
     if (visitors.length === 0) {
         return (
             <Card>
                 <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                    No one has opened this drop point yet.
+                    {t("detail.visitors.empty")}
                 </CardBody>
             </Card>
         );
@@ -575,11 +580,11 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
                     <table className="w-full min-w-[42rem] text-sm">
                         <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
                             <tr>
-                                <th className="px-4 py-2 font-medium">IP</th>
-                                <th className="px-4 py-2 font-medium">User</th>
-                                <th className="px-4 py-2 font-medium">First seen</th>
-                                <th className="px-4 py-2 font-medium">Connected</th>
-                                <th className="px-4 py-2 font-medium">Uploaded</th>
+                                <th className="px-4 py-2 font-medium">{t("detail.visitors.ip")}</th>
+                                <th className="px-4 py-2 font-medium">{t("detail.visitors.user")}</th>
+                                <th className="px-4 py-2 font-medium">{t("detail.visitors.firstSeen")}</th>
+                                <th className="px-4 py-2 font-medium">{t("detail.visitors.connected")}</th>
+                                <th className="px-4 py-2 font-medium">{t("detail.visitors.uploaded")}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -595,10 +600,10 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
                                         className="border-t border-border hover:bg-card-hover"
                                     >
                                         <td className="px-4 py-2 font-mono text-xs">
-                                            {row.ip ?? "unknown"}
+                                            {row.ip ?? t("detail.visitors.unknown")}
                                         </td>
                                         <td className="px-4 py-2 text-muted-foreground">
-                                            {row.user ?? "Anonymous"}
+                                            {row.user ?? t("detail.anonymous")}
                                         </td>
                                         <td className="px-4 py-2 text-muted-foreground">
                                             {format.dateTime(row.firstSeenAt)}
@@ -615,12 +620,12 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
                                                             : "text-muted-foreground"
                                                     }
                                                 >
-                                                    {live ? "Active now" : duration}
+                                                    {live ? t("detail.visitors.activeNow") : duration}
                                                 </span>
                                             </span>
                                         </td>
                                         <td className="px-4 py-2 text-muted-foreground">
-                                            {row.uploads > 0 ? `${row.uploads} file(s)` : "No"}
+                                            {row.uploads > 0 ? t("detail.visitors.files", { count: row.uploads }) : t("detail.visitors.none")}
                                         </td>
                                     </tr>
                                 );
@@ -651,6 +656,7 @@ function SaveTemplateDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("drivePoints");
     const [name, setName] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -688,25 +694,23 @@ function SaveTemplateDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Save as template</DialogTitle>
-                    <DialogDescription>
-                        Reuse these guardrails when creating future drop points.
-                    </DialogDescription>
+                    <DialogTitle>{t("detail.saveTemplate")}</DialogTitle>
+                    <DialogDescription>{t("template.description")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Template name
+                        {t("template.name")}
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder="e.g. Client intake"
+                            placeholder={t("template.namePlaceholder")}
                             autoFocus
                         />
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end">
                         <Button type="submit" disabled={pending || !name.trim()}>
-                            {pending ? "Saving..." : "Save template"}
+                            {pending ? t("form.saving") : t("template.save")}
                         </Button>
                     </div>
                 </form>
@@ -726,6 +730,7 @@ function EditDropPointDialog({
     onOpenChange: (open: boolean) => void;
     onSaved: () => void;
 }) {
+    const t = useTranslations("drivePoints");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [geoCountries, setGeoCountries] = useState<string[]>(config.allowedCountries);
@@ -795,15 +800,14 @@ function EditDropPointDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[85vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
-                    <DialogTitle>Configure drop point</DialogTitle>
+                    <DialogTitle>{t("edit.title")}</DialogTitle>
                     <DialogDescription className="truncate">
-                        Uploads keep collecting into &quot;
-                        {config.destinationPath || config.connectionName}&quot;.
+                        {t("edit.description", { place: config.destinationPath || config.connectionName })}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3" {...formProps}>
                     <label className="flex flex-col gap-1 text-sm">
-                        Title
+                        {t("form.title")}
                         <Input
                             name="title"
                             required
@@ -812,7 +816,7 @@ function EditDropPointDialog({
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        Instructions (optional)
+                        {t("form.instructions")}
                         <Textarea
                             name="instructions"
                             rows={2}
@@ -821,32 +825,32 @@ function EditDropPointDialog({
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        Allowed extensions (optional)
+                        {t("form.extensions")}
                         <Input
                             name="extensions"
                             defaultValue={config.allowedExtensions.join(", ")}
-                            placeholder="e.g. psd, ai, sketch"
+                            placeholder={t("form.extensionsPlaceholder")}
                             autoComplete="off"
                         />
                         <span className="text-xs text-muted-foreground">
-                            Leave empty to allow any file type.
+                            {t("form.extensionsHint")}
                         </span>
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        Blocked extensions (optional)
+                        {t("form.denied")}
                         <Input
                             name="deniedExtensions"
                             defaultValue={config.deniedExtensions.join(", ")}
-                            placeholder="e.g. exe, bat, sh"
+                            placeholder={t("form.deniedPlaceholder")}
                             autoComplete="off"
                         />
                         <span className="text-xs text-muted-foreground">
-                            Rejected even if also allowed.
+                            {t("form.deniedHint")}
                         </span>
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Min size (MB)
+                            {t("form.minSize")}
                             <Input
                                 name="minMb"
                                 type="number"
@@ -861,11 +865,11 @@ function EditDropPointDialog({
                                           )
                                         : ""
                                 }
-                                placeholder="None"
+                                placeholder={t("detail.values.none")}
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Max size (MB)
+                            {t("form.maxSize")}
                             <Input
                                 name="maxMb"
                                 type="number"
@@ -877,17 +881,17 @@ function EditDropPointDialog({
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Max files
+                            {t("form.maxFiles")}
                             <Input
                                 name="maxFiles"
                                 type="number"
                                 min="1"
                                 defaultValue={config.maxFiles ?? ""}
-                                placeholder="No limit"
+                                placeholder={t("detail.values.noLimit")}
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Starts
+                            {t("detail.fields.starts")}
                             <Input
                                 name="startsAt"
                                 type="datetime-local"
@@ -895,7 +899,7 @@ function EditDropPointDialog({
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Expires
+                            {t("detail.fields.expires")}
                             <Input
                                 name="expiresAt"
                                 type="date"
@@ -904,16 +908,16 @@ function EditDropPointDialog({
                         </label>
                     </div>
                     <label className="flex flex-col gap-1 text-sm">
-                        Restrict to IPs / ranges (optional)
+                        {t("form.cidrs")}
                         <Input
                             name="allowedCidrs"
                             defaultValue={config.allowedCidrs.join(", ")}
-                            placeholder="e.g. 203.0.113.4, 10.0.0.0/24"
+                            placeholder={t("form.cidrsPlaceholder")}
                             autoComplete="off"
                         />
                     </label>
                     <div className="flex flex-col gap-1 text-sm">
-                        Restrict by location (optional)
+                        {t("form.location")}
                         <GeoPicker
                             countries={geoCountries}
                             continents={geoContinents}
@@ -922,18 +926,18 @@ function EditDropPointDialog({
                         />
                     </div>
                     <label className="flex flex-col gap-1 text-sm">
-                        Access PIN
+                        {t("form.pin")}
                         <Input
                             name="password"
                             type="password"
-                            placeholder={config.hasPassword ? "Leave blank to keep" : "No PIN"}
+                            placeholder={config.hasPassword ? t("form.pinKeep") : t("form.noPin")}
                             autoComplete="off"
                         />
                     </label>
                     {config.hasPassword ? (
                         <label className="flex items-center gap-2 text-sm">
                             <input type="checkbox" name="removePin" className="size-4" />
-                            Remove PIN
+                            {t("form.removePin")}
                         </label>
                     ) : null}
                     <label className="flex items-center gap-2 text-sm">
@@ -943,7 +947,7 @@ function EditDropPointDialog({
                             defaultChecked={config.requireLogin}
                             className="size-4"
                         />
-                        Require uploaders to sign in
+                        {t("form.requireLogin")}
                     </label>
                     <label className="flex items-center gap-2 text-sm">
                         <input
@@ -952,7 +956,7 @@ function EditDropPointDialog({
                             defaultChecked={config.allowOverwrite}
                             className="size-4"
                         />
-                        Let an upload replace a file of the same name
+                        {t("form.overwrite")}
                     </label>
                     <div className="flex flex-col gap-1.5 text-sm">
                         <label className="flex items-center gap-2">
@@ -962,43 +966,45 @@ function EditDropPointDialog({
                                 defaultChecked={config.allowUploaderDelete}
                                 className="size-4"
                             />
-                            Let uploaders delete their own files
+                            {t("form.uploaderDelete")}
                         </label>
                         <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                            Only within
-                            <Input
-                                name="deleteWindowMin"
-                                type="number"
-                                min="1"
-                                defaultValue={
-                                    config.uploaderDeleteWindowSeconds
-                                        ? Math.round(config.uploaderDeleteWindowSeconds / 60)
-                                        : ""
-                                }
-                                placeholder="anytime"
-                                className="h-8 w-24"
-                            />
-                            minutes of upload (blank = anytime)
+                            {t.rich("form.deleteWindow", {
+                                field: () => (
+                                    <Input
+                                        key="window"
+                                        name="deleteWindowMin"
+                                        type="number"
+                                        min="1"
+                                        defaultValue={
+                                            config.uploaderDeleteWindowSeconds
+                                                ? Math.round(config.uploaderDeleteWindowSeconds / 60)
+                                                : ""
+                                        }
+                                        placeholder={t("form.anytime")}
+                                        className="h-8 w-24"
+                                    />
+                                )
+                            })}
                         </label>
                     </div>
                     <label className="flex flex-col gap-1 text-sm">
-                        Restrict to specific users (optional)
+                        {t("form.users")}
                         <AccountInput
                             multiple
                             name="allowedUsers"
                             defaultValue={config.allowedUsers.join(", ")}
-                            placeholder="e.g. @alice, bob@example.com"
-                            aria-label="Restrict to specific users"
+                            placeholder={t("form.usersPlaceholder")}
+                            aria-label={t("form.usersLabel")}
                         />
                         <span className="text-xs text-muted-foreground">
-                            Only these accounts may upload (sign-in required). Match by username or
-                            email.
+                            {t("form.usersHint")}
                         </span>
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end">
                         <Button type="submit" disabled={pending || !changed}>
-                            {pending ? "Saving..." : "Save changes"}
+                            {pending ? t("form.saving") : t("form.save")}
                         </Button>
                     </div>
                 </form>
