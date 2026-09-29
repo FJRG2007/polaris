@@ -168,5 +168,47 @@
         "expiringBody": "{count, plural, one {Queda # día} other {Quedan # días}}. Sustituye la clave aquí y las ejecuciones seguirán funcionando; si no, se detendrán ese día.",
         "expiredMine": "Ya no se usa. Las ejecuciones pasan a la siguiente clave de tu lista, o a la del despliegue.",
         "expiredDeployment": "Ya no se usa. Las ejecuciones pasan a la siguiente clave de la lista, o a la que haya traído cada cuenta."
+    },
+    "update": {
+        "readyTitle": "Hay una actualización de Polaris lista para instalar",
+        "readyBody": "Build {sha}. {plan}",
+        "planDaily": "Se instala sola a las {at}, o instálala ahora desde Ajustes.",
+        "planNow": "Se está instalando ahora.",
+        "planManual": "Instálala desde Ajustes, donde también puedes ver qué ha cambiado.",
+        "installingTitle": "Polaris instala una actualización",
+        "installingBody": "Build {sha}. El panel sigue funcionando mientras arranca la nueva build; Ajustes muestra el registro.",
+        "notStartedTitle": "Polaris no pudo instalar una actualización",
+        "notStartedBody": "{reason} La build {sha} aún se puede instalar desde Ajustes, o con \"polaris update\" en el host.",
+        "reasonUnavailable": "Este despliegue no instala sus propias actualizaciones.",
+        "reasonDisabled": "Las actualizaciones están desactivadas en este host.",
+        "reasonUnreachable": "No se pudo contactar con el agente del host.",
+        "failedTitle": "Falló la instalación de una actualización de Polaris",
+        "failedBody": "Build {sha}. El actualizador se detuvo con el código de salida {code}; Ajustes tiene el registro y puede notificarlo."
+    },
+    "address": {
+        "backTitle": "{host} vuelve a responder",
+        "backBody": "{url} vuelve a ser accesible.",
+        "tunnelGoneTitle": "La dirección del túnel ya no está",
+        "tunnelGoneBody": "{url} dejó de responder y su túnel ya no está en marcha, así que se ha quitado de las direcciones de este despliegue. Los enlaces compartidos pasan a la siguiente dirección. Desde Ajustes se puede levantar un túnel nuevo.",
+        "offlineTitle": "Polaris no puede acceder a internet",
+        "offlineBody": "Nada respondió en {url}, ni tampoco nada más: los resolvedores públicos que comprueba Polaris también están en silencio, así que es la línea y no la dirección. No hay que cambiar nada de {host}: volverá a ser accesible cuando vuelva la conexión. Todo lo que Polaris hace fuera de esta red queda en pausa hasta entonces.",
+        "downTitle": "{host} no responde",
+        "downBody": "Nada respondió en {url}. Polaris puede acceder a internet, así que el problema es esa dirección y no la conexión. Sigue en Ajustes, marcada como inaccesible.",
+        "downBodyDetail": "Nada respondió en {url} ({detail}). Polaris puede acceder a internet, así que el problema es esa dirección y no la conexión. Sigue en Ajustes, marcada como inaccesible."
+    },
+    "leftover": {
+        "title": "{count, plural, one {Polaris eliminó un volumen sobrante ({size})} other {Polaris eliminó # volúmenes sobrantes ({size})}}",
+        "line": "{name} - {size}",
+        "sizeUnknown": "tamaño desconocido"
+    },
+    "github": {
+        "appMissingTitle": "A la GitHub App le falta un permiso que solo tú puedes añadir",
+        "appMissingBody": "Aún no pide {permissions}, así que nadie puede concederlo: no hay ninguna solicitud que aceptar. {where} Después, cada cuenta donde está instalada recibe una solicitud que aceptar. Hasta entonces, se rechazan los grupos de runners y las ejecuciones de agentes.",
+        "setOn": "Configúralo en {url} y guarda.",
+        "setOnApp": "Configúralo en la página de permisos de la propia App en GitHub y guarda.",
+        "waitingTitle": "GitHub espera a que aceptes un permiso",
+        "waitingBody": "{logins} no ha concedido {permissions}. {open} pulsa Review request y luego Accept new permissions. Hasta entonces, se rechazan los grupos de runners y las ejecuciones de agentes en esa cuenta. Solo quien es propietario de la cuenta puede aceptarlo, así que esto Polaris no puede hacerlo por ti.",
+        "openUrl": "Abre {url} y",
+        "openInstallation": "Abre la instalación en GitHub y"
     }
 }

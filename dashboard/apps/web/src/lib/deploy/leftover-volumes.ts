@@ -24,6 +24,9 @@ import { recordAudit } from "@/lib/audit-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { hostVolumes, removeHostVolume } from "./host-volumes";
 import { notifyOperators } from "@/lib/notifications/operators";
+import { translatorFor } from "@/lib/i18n/translate";
+import { DEFAULT_LOCALE } from "@polaris/core";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 /** The switch on the storage screen. Anything but "off" is on. */
 export const AUTO_REMOVE_KEY = "storage.removeLeftoverVolumes";
@@ -86,16 +89,22 @@ export async function removeLeftoverVolumes(): Promise<RemovedVolume[]> {
 
     if (removed.length > 0) {
         const total = removed.reduce((sum, volume) => sum + (volume.bytes ?? 0), 0);
+        const say = (t: NamespaceTranslator<"notices">) => ({
+            title: t("leftover.title", { count: removed.length, size: size(total) }),
+            body: removed
+                .map((volume) =>
+                    t("leftover.line", {
+                        name: volume.description ?? volume.name,
+                        size: volume.bytes === null ? t("leftover.sizeUnknown") : size(volume.bytes)
+                    })
+                )
+                .join("\n")
+        });
         await notifyOperators({
             permission: "system.manage",
             event: "server.space",
-            title:
-                removed.length === 1
-                    ? `Polaris removed a leftover volume (${size(total)})`
-                    : `Polaris removed ${removed.length} leftover volumes (${size(total)})`,
-            body: removed
-                .map((volume) => `${volume.description ?? volume.name} - ${size(volume.bytes)}`)
-                .join("\n"),
+            ...say(translatorFor(DEFAULT_LOCALE, "notices")),
+            say,
             href: "/apps/servers"
         });
     }

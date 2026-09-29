@@ -24,7 +24,9 @@
  */
 
 import { prisma } from "@polaris/db";
-import type { Permission } from "@polaris/core";
+import { DEFAULT_LOCALE, type Permission } from "@polaris/core";
+import { translatorFor } from "@/lib/i18n/translate";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { publicHostname, syncDashboardRoute } from "@/lib/domain-edge";
 import { checkDomain } from "@/lib/watch/health-probe";
 import { removeDashboardDomain } from "@/lib/domain-service";
@@ -32,6 +34,12 @@ import { notifyOperators } from "@/lib/notifications/operators";
 import { reachableAddresses, type DeploymentAddress } from "@/lib/deployment-addresses";
 import { getPolarisTunnelStatus, stopPolarisTunnel } from "@/lib/polaris-tunnel-service";
 import { hasInternet } from "@/lib/internet-reach";
+
+/** An operator alert in one reader's words, and the same in the default language
+ *  for when theirs cannot be worked out. */
+function inWords(say: (t: NamespaceTranslator<"notices">) => { title: string; body: string }) {
+    return { ...say(translatorFor(DEFAULT_LOCALE, "notices")), say };
+}
 import { settleShareTunnel } from "@/lib/public-reach";
 
 /** Who hears about an address going down - the people who can fix one. */
@@ -252,8 +260,10 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
             await notifyOperators({
                 permission: ADDRESS_PERMISSION,
                 event: "network.address",
-                title: `${address.host} is answering again`,
-                body: `${address.url} is reachable again.`,
+                ...inWords((t) => ({
+                    title: t("address.backTitle", { host: address.host }),
+                    body: t("address.backBody", { url: address.url })
+                })),
                 href: "/admin/settings",
                 level: "success"
             });
@@ -265,8 +275,10 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
         await notifyOperators({
             permission: ADDRESS_PERMISSION,
             event: "network.address",
-            title: "The tunnel address is gone",
-            body: `${address.url} stopped answering and its tunnel is no longer running, so it has been dropped from this deployment's addresses. Share links move to the next address. Settings can raise a new tunnel.`,
+            ...inWords((t) => ({
+                title: t("address.tunnelGoneTitle"),
+                body: t("address.tunnelGoneBody", { url: address.url })
+            })),
             href: "/admin/settings"
         });
         return;
@@ -282,8 +294,10 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
         await notifyOperators({
             permission: ADDRESS_PERMISSION,
             event: "network.address",
-            title: "Polaris cannot reach the internet",
-            body: `Nothing answered at ${address.url}, and neither did anything else - the public resolvers Polaris checks are silent too, so this is the line rather than the address. Nothing about ${address.host} needs changing: it will be reachable again when the connection is. Anything Polaris does outside this network is paused until then.`,
+            ...inWords((t) => ({
+                title: t("address.offlineTitle"),
+                body: t("address.offlineBody", { url: address.url, host: address.host })
+            })),
             href: "/admin/settings",
             actionRequired: true
         });
@@ -293,8 +307,12 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
     await notifyOperators({
         permission: ADDRESS_PERMISSION,
         event: "network.address",
-        title: `${address.host} is not answering`,
-        body: `Nothing answered at ${address.url}${detail ? ` (${detail})` : ""}. Polaris can reach the internet, so this is about that address rather than about the connection. It is still listed in Settings, marked unreachable.`,
+        ...inWords((t) => ({
+            title: t("address.downTitle", { host: address.host }),
+            body: detail
+                ? t("address.downBodyDetail", { url: address.url, detail })
+                : t("address.downBody", { url: address.url })
+        })),
         href: "/admin/settings",
         actionRequired: true
     });

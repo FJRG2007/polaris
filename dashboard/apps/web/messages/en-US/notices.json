@@ -168,5 +168,47 @@
         "expiringBody": "{count} day(s) left. Replace the key here and runs keep working; leave it and they stop on the day.",
         "expiredMine": "It is no longer used. Runs fall back to the next key in your list, or to the deployment's.",
         "expiredDeployment": "It is no longer used. Runs fall back to the next key in the list, or to whatever each account brought itself."
+    },
+    "update": {
+        "readyTitle": "A Polaris update is ready to install",
+        "readyBody": "Build {sha}. {plan}",
+        "planDaily": "It installs itself at {at}, or install it now from Settings.",
+        "planNow": "It is being installed now.",
+        "planManual": "Install it from Settings, where you can also see what changed.",
+        "installingTitle": "Polaris is installing an update",
+        "installingBody": "Build {sha}. The dashboard keeps serving while the new build starts; Settings shows the log.",
+        "notStartedTitle": "Polaris could not install an update",
+        "notStartedBody": "{reason} Build {sha} can still be installed from Settings, or with \"polaris update\" on the host.",
+        "reasonUnavailable": "This deployment does not install its own updates.",
+        "reasonDisabled": "Updates are switched off on this host.",
+        "reasonUnreachable": "The host agent could not be reached.",
+        "failedTitle": "A Polaris update failed to install",
+        "failedBody": "Build {sha}. The updater stopped with exit code {code}; Settings has the log and can report it."
+    },
+    "address": {
+        "backTitle": "{host} is answering again",
+        "backBody": "{url} is reachable again.",
+        "tunnelGoneTitle": "The tunnel address is gone",
+        "tunnelGoneBody": "{url} stopped answering and its tunnel is no longer running, so it has been dropped from this deployment''s addresses. Share links move to the next address. Settings can raise a new tunnel.",
+        "offlineTitle": "Polaris cannot reach the internet",
+        "offlineBody": "Nothing answered at {url}, and neither did anything else - the public resolvers Polaris checks are silent too, so this is the line rather than the address. Nothing about {host} needs changing: it will be reachable again when the connection is. Anything Polaris does outside this network is paused until then.",
+        "downTitle": "{host} is not answering",
+        "downBody": "Nothing answered at {url}. Polaris can reach the internet, so this is about that address rather than about the connection. It is still listed in Settings, marked unreachable.",
+        "downBodyDetail": "Nothing answered at {url} ({detail}). Polaris can reach the internet, so this is about that address rather than about the connection. It is still listed in Settings, marked unreachable."
+    },
+    "leftover": {
+        "title": "{count, plural, one {Polaris removed a leftover volume ({size})} other {Polaris removed # leftover volumes ({size})}}",
+        "line": "{name} - {size}",
+        "sizeUnknown": "size unknown"
+    },
+    "github": {
+        "appMissingTitle": "The GitHub App is missing a permission only you can add",
+        "appMissingBody": "It does not ask for {permissions} yet, so nobody can grant it - there is no request to accept. {where} Each account it is installed on then gets a request to accept. Until then, runner pools and agent runs are refused.",
+        "setOn": "Set it on {url} and save.",
+        "setOnApp": "Set it on the App''s own permissions page on GitHub and save.",
+        "waitingTitle": "GitHub is waiting for you to accept a permission",
+        "waitingBody": "{logins} has not granted {permissions}. {open} press Review request, then Accept new permissions. Until then, runner pools and agent runs on it are refused. Only the account owner can accept it, so this is one Polaris cannot do for you.",
+        "openUrl": "Open {url} and",
+        "openInstallation": "Open the installation on GitHub and"
     }
 }

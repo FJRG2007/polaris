@@ -24,7 +24,16 @@ import { prisma } from "@polaris/db";
 import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus, type UpdateStatus } from "@/lib/update-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { notifyOperators } from "@/lib/notifications/operators";
+import { notifyOperators, type OperatorAlert } from "@/lib/notifications/operators";
+import { translatorFor } from "@/lib/i18n/translate";
+import { DEFAULT_LOCALE } from "@polaris/core";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+
+/** An operator alert in one reader's words, and the same in the default language
+ *  for when theirs cannot be worked out. */
+function inWords(say: (t: NamespaceTranslator<"notices">) => { title: string; body: string }) {
+    return { ...say(translatorFor(DEFAULT_LOCALE, "notices")), say };
+}
 import { sweepExpiringModelKeys } from "@/lib/agents/model-key-expiry";
 import { refreshModelCatalogIfStale } from "@/lib/agents/model-catalog";
 import { markNotificationsReadByType } from "@/lib/notification-service";
@@ -33,7 +42,6 @@ import {
     lastUpdateOutcome,
     publishUpdateSource,
     startHostUpdate,
-    updateTriggerReason,
     type UpdateTrigger
 } from "@/lib/update-runner";
 import {
@@ -118,6 +126,7 @@ async function tellOperators(input: {
     body: string;
     level?: NotificationLevel;
     actionRequired?: boolean;
+    say?: OperatorAlert["say"];
 }): Promise<void> {
     await notifyOperators({ ...input, permission: UPDATE_PERMISSION, href: "/admin/settings" });
 }
@@ -135,16 +144,20 @@ async function firstSeen(sha: string, policy: AutoUpdatePolicy): Promise<Date> {
         // reader so what reaches a phone or a chat webhook is superseded too,
         // and so the bell holds the latest rather than the pile.
         await markNotificationsReadByType([READY_EVENT]);
-        const plan =
-            policy.mode === "daily"
-                ? `It installs itself at ${policy.at}, or install it now from Settings.`
-                : policy.mode === "immediate"
-                  ? "It is being installed now."
-                  : "Install it from Settings, where you can also see what changed.";
         await tellOperators({
             event: "system.update",
-            title: "A Polaris update is ready to install",
-            body: `Build ${sha}. ${plan}`,
+            ...inWords((t) => ({
+                title: t("update.readyTitle"),
+                body: t("update.readyBody", {
+                    sha,
+                    plan:
+                        policy.mode === "daily"
+                            ? t("update.planDaily", { at: policy.at })
+                            : policy.mode === "immediate"
+                              ? t("update.planNow")
+                              : t("update.planManual")
+                })
+            })),
             actionRequired: policy.mode === "off"
         });
         return now;
@@ -171,8 +184,7 @@ async function install(sha: string): Promise<void> {
     if (trigger === "started") {
         await tellOperators({
             event: "system.updated",
-            title: "Polaris is installing an update",
-            body: `Build ${sha}. The dashboard keeps serving while the new build starts; Settings shows the log.`
+            ...inWords((t) => ({ title: t("update.installingTitle"), body: t("update.installingBody", { sha }) }))
         });
         return;
     }
@@ -181,8 +193,18 @@ async function install(sha: string): Promise<void> {
     await setSetting(INSTALLED_KEY, `${sha} failed`);
     await tellOperators({
         event: "system.updated",
-        title: "Polaris could not install an update",
-        body: `${updateTriggerReason(trigger)} Build ${sha} can still be installed from Settings, or with "polaris update" on the host.`,
+        ...inWords((t) => ({
+            title: t("update.notStartedTitle"),
+            body: t("update.notStartedBody", {
+                sha,
+                reason:
+                    trigger === "unavailable"
+                        ? t("update.reasonUnavailable")
+                        : trigger === "disabled"
+                          ? t("update.reasonDisabled")
+                          : t("update.reasonUnreachable")
+            })
+        })),
         level: "danger",
         actionRequired: true
     });
@@ -214,10 +236,10 @@ async function reportFailedInstall(sha: string): Promise<void> {
         data: { value: `${sha} failed` }
     });
     if (claimed.count !== 1) return;
+    const exitCode = outcome.exitCode;
     await tellOperators({
         event: "system.updated",
-        title: "A Polaris update failed to install",
-        body: `Build ${sha}. The updater stopped with exit code ${outcome.exitCode}; Settings has the log and can report it.`,
+        ...inWords((t) => ({ title: t("update.failedTitle"), body: t("update.failedBody", { sha, code: exitCode }) })),
         level: "danger",
         actionRequired: true
     });

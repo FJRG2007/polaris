@@ -17,7 +17,10 @@
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { notifyOperators } from "@/lib/notifications/operators";
 import { githubPermissionGap, refreshInstallations } from "@/lib/github-service";
-import { ACCEPT_STEP, permissionList } from "@/lib/integrations/github-permission-copy";
+import { permissionList } from "@/lib/integrations/github-permission-copy";
+import { translatorFor } from "@/lib/i18n/translate";
+import { DEFAULT_LOCALE } from "@polaris/core";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 /** What was last announced, so the same gap is not announced twice. */
 const SEEN_KEY = "integrations.github.permission-gap";
@@ -75,39 +78,38 @@ export async function notifyGithubPermissionGap(): Promise<void> {
         // manifest that creates the App, and offers no way to change it
         // afterwards - so this alert used to send people to accept a request
         // that did not exist, and kept sending them.
-        const alert =
-            gap.appMissing.length > 0
+        const appMissing = gap.appMissing.length > 0;
+        // The address is in the body as well as behind the link, because this
+        // also goes out by mail and to a webhook, where "open the installation"
+        // is a sentence with nothing to press - and because whoever has to
+        // accept it is often signed in to GitHub in a different browser from the
+        // one Polaris is open in.
+        const say = (t: NamespaceTranslator<"notices">) =>
+            appMissing
                 ? {
-                      title: "The GitHub App is missing a permission only you can add",
-                      body: `It does not ask for ${permissionList(gap.appMissing)} yet, so nobody can grant it - there is no request to accept. ${
-                          gap.appPermissionsUrl
-                              ? `Set it on ${gap.appPermissionsUrl} and save.`
-                              : "Set it on the App's own permissions page on GitHub and save."
-                      } Each account it is installed on then gets a request to accept. Until then, runner pools and agent runs are refused.`,
-                      href: gap.appPermissionsUrl ?? "/admin/integrations"
+                      title: t("github.appMissingTitle"),
+                      body: t("github.appMissingBody", {
+                          permissions: permissionList(gap.appMissing),
+                          where: gap.appPermissionsUrl
+                              ? t("github.setOn", { url: gap.appPermissionsUrl })
+                              : t("github.setOnApp")
+                      })
                   }
                 : {
-                      title: "GitHub is waiting for you to accept a permission",
-                      // The address is in the body as well as behind the link,
-                      // because this also goes out by mail and to a webhook,
-                      // where "open the installation" is a sentence with nothing
-                      // to press - and because whoever has to accept it is often
-                      // signed in to GitHub in a different browser from the one
-                      // Polaris is open in.
-                      body: `${gap.installations.map((row) => row.login).join(", ")} has not granted ${permissionList([
-                          ...new Set(gap.installations.flatMap((row) => row.missing))
-                      ])}. ${
-                          gap.reviewUrl ? `Open ${gap.reviewUrl} and ` : "Open the installation on GitHub and "
-                      }${ACCEPT_STEP.charAt(0).toLowerCase() + ACCEPT_STEP.slice(1)} Until then, runner pools and agent runs on it are refused. Only the account owner can accept it, so this is one Polaris cannot do for you.`,
-                      href: gap.reviewUrl ?? "/admin/integrations"
+                      title: t("github.waitingTitle"),
+                      body: t("github.waitingBody", {
+                          logins: gap.installations.map((row) => row.login).join(", "),
+                          permissions: permissionList([...new Set(gap.installations.flatMap((row) => row.missing))]),
+                          open: gap.reviewUrl ? t("github.openUrl", { url: gap.reviewUrl }) : t("github.openInstallation")
+                      })
                   };
 
         await notifyOperators({
             permission: "system.manage",
             event: "integrations.github.permissions",
-            title: alert.title,
-            body: alert.body,
-            href: alert.href,
+            ...say(translatorFor(DEFAULT_LOCALE, "notices")),
+            say,
+            href: appMissing ? (gap.appPermissionsUrl ?? "/admin/integrations") : (gap.reviewUrl ?? "/admin/integrations"),
             level: "warning",
             actionRequired: true
         });

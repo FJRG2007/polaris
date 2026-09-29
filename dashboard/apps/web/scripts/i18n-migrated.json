@@ -1298,6 +1298,11 @@
         "web/src/lib/connections/health.ts",
         "web/src/lib/connections/suggest-link.ts",
         "web/src/lib/connections/attention.ts",
-        "web/src/lib/agents/model-key-expiry.ts"
+        "web/src/lib/agents/model-key-expiry.ts",
+        "web/src/lib/update-watcher.ts",
+        "web/src/lib/address-health.ts",
+        "web/src/lib/deploy/leftover-volumes.ts",
+        "web/src/lib/integrations/github-permission-notice.ts",
+        "web/src/lib/update-runner.ts"
     ]
 }

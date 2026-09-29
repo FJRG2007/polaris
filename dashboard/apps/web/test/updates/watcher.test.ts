@@ -90,8 +90,7 @@ vi.mock("@/lib/update-service", () => ({ getUpdateStatus: async () => status }))
 vi.mock("@/lib/update-runner", () => ({
     startHostUpdate: () => startHostUpdate(),
     publishUpdateSource: (source: string) => publishUpdateSource(source),
-    lastUpdateOutcome: () => lastUpdateOutcome(),
-    updateTriggerReason: () => "The host agent could not be reached."
+    lastUpdateOutcome: () => lastUpdateOutcome()
 }));
 
 const { checkForUpdate, saveAutoUpdatePolicy } = await import("../../src/lib/update-watcher");
