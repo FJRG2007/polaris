@@ -278,5 +278,78 @@
             "recent": "Checked recently.",
             "connected": "Connected."
         }
+    },
+    "rules": {
+        "fields": {
+            "from": "the sender",
+            "recipient": "any recipient",
+            "to": "the To line",
+            "subject": "the subject",
+            "body": "the message",
+            "list": "the mailing list",
+            "attachment": "attachments (yes or no)",
+            "size": "the size in bytes"
+        },
+        "operators": {
+            "contains": "contains",
+            "notContains": "does not contain",
+            "is": "is exactly",
+            "isNot": "is not",
+            "startsWith": "starts with",
+            "endsWith": "ends with",
+            "matches": "matches the pattern",
+            "greaterThan": "is more than",
+            "lessThan": "is less than"
+        },
+        "title": "Filters on {address}",
+        "hint": "Run on arrival, top to bottom. A rule set to stop there is the last one a message meets.",
+        "new": "New filter",
+        "empty": "No filters. Everything that arrives goes to the inbox.",
+        "on": "On",
+        "off": "Off",
+        "stops": " - stops the filters below it",
+        "matched": " - matched {count} times",
+        "deleteNamed": "Delete the filter {name}",
+        "and": " and ",
+        "or": " or ",
+        "condition": "{field} {operator} \"{value}\"",
+        "said": {
+            "move": "move it to {folder}",
+            "moveSomewhere": "move it to a folder",
+            "label": "label it {label}",
+            "labelSomething": "label it",
+            "forward": "send it on to {to}"
+        },
+        "sentence": "If {conditions}, {actions}.",
+        "actions": {
+            "archive": "archive it",
+            "move": "move it to a folder",
+            "label": "put a label on it",
+            "star": "star it",
+            "read": "mark it read",
+            "junk": "put it in spam",
+            "trash": "put it in the trash",
+            "pin": "pin it",
+            "mute": "mute the conversation",
+            "forward": "send it on to somebody"
+        },
+        "name": "Name it",
+        "namePlaceholder": "Invoices into Accounts",
+        "if": "If",
+        "fieldLabel": "What to look at",
+        "operatorLabel": "How to compare it",
+        "valueLabel": "What to look for",
+        "then": "then",
+        "actionLabel": "What to do",
+        "folderLabel": "Which folder",
+        "labelLabel": "Which label",
+        "forwardLabel": "Where to send it",
+        "forwardHint": "A copy is sent from this mailbox, and replies to it go to whoever wrote the original. It will not send to an address you have here - that is a loop - and a message that has already been forwarded once is left alone.",
+        "stopLabel": "Stop the filters below this one",
+        "stop": "Stop here - do not run the filters below this one",
+        "existingLabel": "Also run it over the mail already here",
+        "existing": "Also run it over the mail already in the inbox",
+        "saved": "Filter saved.",
+        "save": "Save the filter"
     }
 }

@@ -27,29 +27,41 @@ import type { MailFolderView } from "@/lib/mailbox/views";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { Button, Input, Select, Switch, useToast } from "@polaris/ui";
 import { deleteRuleAction, saveRuleAction } from "@/app/(app)/mail/actions";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
-const FIELDS = [
-    { value: "from", label: "the sender" },
-    { value: "recipient", label: "any recipient" },
-    { value: "to", label: "the To line" },
-    { value: "subject", label: "the subject" },
-    { value: "body", label: "the message" },
-    { value: "list", label: "the mailing list" },
-    { value: "attachment", label: "attachments (yes or no)" },
-    { value: "size", label: "the size in bytes" }
-];
+/** What a condition can look at, named in `mailSettings.rules.fields.<key>`. */
+const FIELDS = {
+    from: "from",
+    recipient: "recipient",
+    to: "to",
+    subject: "subject",
+    body: "body",
+    list: "list",
+    attachment: "attachment",
+    size: "size"
+} as const;
 
-const OPERATORS = [
-    { value: "contains", label: "contains" },
-    { value: "not-contains", label: "does not contain" },
-    { value: "is", label: "is exactly" },
-    { value: "is-not", label: "is not" },
-    { value: "starts-with", label: "starts with" },
-    { value: "ends-with", label: "ends with" },
-    { value: "matches", label: "matches the pattern" },
-    { value: "greater-than", label: "is more than" },
-    { value: "less-than", label: "is less than" }
-];
+/** How it compares, named in `mailSettings.rules.operators.<key>`. */
+const OPERATORS = {
+    contains: "contains",
+    "not-contains": "notContains",
+    is: "is",
+    "is-not": "isNot",
+    "starts-with": "startsWith",
+    "ends-with": "endsWith",
+    matches: "matches",
+    "greater-than": "greaterThan",
+    "less-than": "lessThan"
+} as const;
+
+function fieldOptions(t: NamespaceTranslator<"mailSettings">) {
+    return Object.entries(FIELDS).map(([value, key]) => ({ value, label: t(`rules.fields.${key}`) }));
+}
+
+function operatorOptions(t: NamespaceTranslator<"mailSettings">) {
+    return Object.entries(OPERATORS).map(([value, key]) => ({ value, label: t(`rules.operators.${key}`) }));
+}
 
 export function RulesView({
     accounts,
@@ -64,6 +76,7 @@ export function RulesView({
 }) {
     const router = useRouter();
     const toast = useToast();
+    const t = useTranslations("mailSettings");
     const [accountId, setAccountId] = useState(accounts[0]!.id);
     const account = accounts.find((one) => one.id === accountId) ?? accounts[0]!;
     const mine = rules[account.id] ?? [];
@@ -75,21 +88,18 @@ export function RulesView({
 
             <div className="mb-3 flex items-center justify-between">
                 <div>
-                    <h2 className="text-[13px] font-medium">Filters on {account.address}</h2>
-                    <p className="text-[12px] text-muted-foreground">
-                        Run on arrival, top to bottom. A rule set to stop there is the last one a
-                        message meets.
-                    </p>
+                    <h2 className="text-[13px] font-medium">{t("rules.title", { address: account.address })}</h2>
+                    <p className="text-[12px] text-muted-foreground">{t("rules.hint")}</p>
                 </div>
                 <Button variant="secondary" onClick={() => setAdding(true)}>
                     <Plus className="size-4 shrink-0" aria-hidden />
-                    New filter
+                    {t("rules.new")}
                 </Button>
             </div>
 
             {mine.length === 0 && !adding ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
-                    No filters. Everything that arrives goes to the inbox.
+                    {t("rules.empty")}
                 </p>
             ) : null}
 
@@ -105,21 +115,19 @@ export function RulesView({
                                     {rule.name}
                                 </p>
                                 <p className="text-[12px] text-muted-foreground">
-                                    {describe(rule, folders, labels)}
+                                    {describe(t, rule, folders, labels)}
                                 </p>
                                 <p className="text-[11px] text-foreground-subtle">
-                                    {rule.enabled ? "On" : "Off"}
-                                    {rule.stop ? " - stops the filters below it" : ""}
-                                    {rule.matchCount > 0
-                                        ? ` - matched ${rule.matchCount} times`
-                                        : ""}
+                                    {rule.enabled ? t("rules.on") : t("rules.off")}
+                                    {rule.stop ? t("rules.stops") : ""}
+                                    {rule.matchCount > 0 ? t("rules.matched", { count: rule.matchCount }) : ""}
                                 </p>
                             </div>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label={`Delete the filter ${rule.name}`}
-                                title={`Delete the filter ${rule.name}`}
+                                aria-label={t("rules.deleteNamed", { name: rule.name })}
+                                title={t("rules.deleteNamed", { name: rule.name })}
                                 onClick={() =>
                                     void (async () => {
                                         const answer = await deleteRuleAction(account.id, rule.id);
@@ -157,48 +165,54 @@ export function RulesView({
 
 /** A rule as a sentence, which is how it will be read back a year from now. */
 function describe(
+    t: NamespaceTranslator<"mailSettings">,
     rule: MailRuleView,
     folders: readonly MailFolderView[],
     labels: readonly MailLabelView[]
 ): string {
-    const joiner = rule.match === "all" ? " and " : " or ";
+    const joiner = rule.match === "all" ? t("rules.and") : t("rules.or");
     const conditions = rule.conditions
         .map((condition) => {
-            const field =
-                FIELDS.find((one) => one.value === condition.field)?.label ?? condition.field;
-            const operator =
-                OPERATORS.find((one) => one.value === condition.operator)?.label ??
-                condition.operator;
-            return `${field} ${operator} "${condition.value}"`;
+            const fieldKey = FIELDS[condition.field as keyof typeof FIELDS];
+            const operatorKey = OPERATORS[condition.operator as keyof typeof OPERATORS];
+            return t("rules.condition", {
+                field: fieldKey ? t(`rules.fields.${fieldKey}`) : condition.field,
+                operator: operatorKey ? t(`rules.operators.${operatorKey}`) : condition.operator,
+                value: condition.value
+            });
         })
         .join(joiner);
     const actions = rule.actions
         .map((action) => {
             switch (action.kind) {
-                case "move":
-                    return `move it to ${folders.find((folder) => folder.id === action.folder)?.name ?? "a folder"}`;
-                case "label":
-                    return `label it ${labels.find((label) => label.id === action.label)?.name ?? ""}`.trim();
+                case "move": {
+                    const folder = folders.find((one) => one.id === action.folder)?.name;
+                    return folder ? t("rules.said.move", { folder }) : t("rules.said.moveSomewhere");
+                }
+                case "label": {
+                    const label = labels.find((one) => one.id === action.label)?.name;
+                    return label ? t("rules.said.label", { label }) : t("rules.said.labelSomething");
+                }
                 case "star":
-                    return "star it";
+                    return t("rules.actions.star");
                 case "read":
-                    return "mark it read";
+                    return t("rules.actions.read");
                 case "archive":
-                    return "archive it";
+                    return t("rules.actions.archive");
                 case "trash":
-                    return "put it in the trash";
+                    return t("rules.actions.trash");
                 case "junk":
-                    return "put it in spam";
+                    return t("rules.actions.junk");
                 case "pin":
-                    return "pin it";
+                    return t("rules.actions.pin");
                 case "mute":
-                    return "mute the conversation";
+                    return t("rules.actions.mute");
                 case "forward":
-                    return `send it on to ${action.to}`;
+                    return t("rules.said.forward", { to: action.to });
             }
         })
         .join(", ");
-    return `If ${conditions}, ${actions}.`;
+    return t("rules.sentence", { conditions, actions });
 }
 
 function RuleForm({
@@ -215,6 +229,9 @@ function RuleForm({
     onCancel: () => void;
 }) {
     const toast = useToast();
+    const t = useTranslations("mailSettings");
+    const tm = useTranslations("mail");
+    const tc = useTranslations("common");
     const [name, setName] = useState("");
     const [field, setField] = useState("from");
     const [operator, setOperator] = useState("contains");
@@ -229,16 +246,16 @@ function RuleForm({
     const [saving, startSaving] = useBusy();
 
     const actionOptions = [
-        { value: "archive", label: "archive it" },
-        ...(folders.length > 0 ? [{ value: "move", label: "move it to a folder" }] : []),
-        ...(labels.length > 0 ? [{ value: "label", label: "put a label on it" }] : []),
-        { value: "star", label: "star it" },
-        { value: "read", label: "mark it read" },
-        { value: "junk", label: "put it in spam" },
-        { value: "trash", label: "put it in the trash" },
-        { value: "pin", label: "pin it" },
-        { value: "mute", label: "mute the conversation" },
-        { value: "forward", label: "send it on to somebody" }
+        { value: "archive", label: t("rules.actions.archive") },
+        ...(folders.length > 0 ? [{ value: "move", label: t("rules.actions.move") }] : []),
+        ...(labels.length > 0 ? [{ value: "label", label: t("rules.actions.label") }] : []),
+        { value: "star", label: t("rules.actions.star") },
+        { value: "read", label: t("rules.actions.read") },
+        { value: "junk", label: t("rules.actions.junk") },
+        { value: "trash", label: t("rules.actions.trash") },
+        { value: "pin", label: t("rules.actions.pin") },
+        { value: "mute", label: t("rules.actions.mute") },
+        { value: "forward", label: t("rules.actions.forward") }
     ];
 
     /** The forward address as the form reads it. Answered while it is typed
@@ -260,47 +277,47 @@ function RuleForm({
         <div className="mt-3 space-y-3 rounded-md border border-border p-3">
             <label className="block">
                 <span className="mb-1 block text-[12px] text-muted-foreground">
-                    Name it <span aria-hidden>*</span>
+                    {t("rules.name")} <span aria-hidden>*</span>
                 </span>
                 <Input
                     value={name}
                     autoFocus
-                    placeholder="Invoices into Accounts"
+                    placeholder={t("rules.namePlaceholder")}
                     onChange={(event) => setName(event.target.value)}
                 />
             </label>
 
             <div className="flex flex-wrap items-end gap-2">
-                <span className="pb-2 text-[13px] text-muted-foreground">If</span>
+                <span className="pb-2 text-[13px] text-muted-foreground">{t("rules.if")}</span>
                 <Select
                     value={field}
                     onValueChange={setField}
-                    options={FIELDS}
-                    aria-label="What to look at"
+                    options={fieldOptions(t)}
+                    aria-label={t("rules.fieldLabel")}
                     className="w-44"
                 />
                 <Select
                     value={operator}
                     onValueChange={setOperator}
-                    options={OPERATORS}
-                    aria-label="How to compare it"
+                    options={operatorOptions(t)}
+                    aria-label={t("rules.operatorLabel")}
                     className="w-44"
                 />
                 <Input
                     value={value}
                     onChange={(event) => setValue(event.target.value)}
-                    aria-label="What to look for"
+                    aria-label={t("rules.valueLabel")}
                     className="w-52"
                 />
             </div>
 
             <div className="flex flex-wrap items-end gap-2">
-                <span className="pb-2 text-[13px] text-muted-foreground">then</span>
+                <span className="pb-2 text-[13px] text-muted-foreground">{t("rules.then")}</span>
                 <Select
                     value={actionKind}
                     onValueChange={setActionKind}
                     options={actionOptions}
-                    aria-label="What to do"
+                    aria-label={t("rules.actionLabel")}
                     className="w-56"
                 />
                 {actionKind === "move" ? (
@@ -311,7 +328,7 @@ function RuleForm({
                             value: folder.id,
                             label: folder.name
                         }))}
-                        aria-label="Which folder"
+                        aria-label={t("rules.folderLabel")}
                         className="w-48"
                     />
                 ) : null}
@@ -320,7 +337,7 @@ function RuleForm({
                         value={labelId}
                         onValueChange={setLabelId}
                         options={labels.map((label) => ({ value: label.id, label: label.name }))}
-                        aria-label="Which label"
+                        aria-label={t("rules.labelLabel")}
                         className="w-48"
                     />
                 ) : null}
@@ -330,7 +347,7 @@ function RuleForm({
                             value={forwardTo}
                             inputMode="email"
                             placeholder="them@example.com"
-                            aria-label="Where to send it"
+                            aria-label={t("rules.forwardLabel")}
                             aria-invalid={forwardAddress === "invalid" ? true : undefined}
                             aria-describedby="forward-address"
                             onChange={(event) => setForwardTo(event.target.value)}
@@ -340,7 +357,7 @@ function RuleForm({
                             className="mt-1 block text-[12px] text-danger"
                             role={forwardAddress === "invalid" ? "alert" : undefined}
                         >
-                            {forwardAddress === "invalid" ? "That is not an email address." : ""}
+                            {forwardAddress === "invalid" ? tm("errors.notEmail") : ""}
                         </span>
                     </div>
                 ) : null}
@@ -348,9 +365,7 @@ function RuleForm({
 
             {actionKind === "forward" ? (
                 <p className="text-[12px] text-foreground-subtle">
-                    A copy is sent from this mailbox, and replies to it go to whoever wrote the
-                    original. It will not send to an address you have here - that is a loop - and a
-                    message that has already been forwarded once is left alone.
+                    {t("rules.forwardHint")}
                 </p>
             ) : null}
 
@@ -358,17 +373,17 @@ function RuleForm({
                 <Switch
                     checked={stop}
                     onChange={setStop}
-                    aria-label="Stop the filters below this one"
+                    aria-label={t("rules.stopLabel")}
                 />
-                Stop here - do not run the filters below this one
+                {t("rules.stop")}
             </label>
             <label className="flex items-center gap-2 text-[13px]">
                 <Switch
                     checked={applyToExisting}
                     onChange={setApplyToExisting}
-                    aria-label="Also run it over the mail already here"
+                    aria-label={t("rules.existingLabel")}
                 />
-                Also run it over the mail already in the inbox
+                {t("rules.existing")}
             </label>
 
             {problem ? <p className="text-[13px] text-danger">{problem}</p> : null}
@@ -403,15 +418,15 @@ function RuleForm({
                                 setProblem(said);
                                 return;
                             }
-                            toast.show({ title: "Filter saved." });
+                            toast.show({ title: t("rules.saved") });
                             onDone();
                         })
                     }
                 >
-                    Save the filter
+                    {t("rules.save")}
                 </Button>
                 <Button variant="ghost" onClick={onCancel}>
-                    Cancel
+                    {tc("actions.cancel")}
                 </Button>
             </div>
         </div>

@@ -278,5 +278,78 @@
             "recent": "Revisado hace poco.",
             "connected": "Conectado."
         }
+    },
+    "rules": {
+        "fields": {
+            "from": "el remitente",
+            "recipient": "cualquier destinatario",
+            "to": "la línea Para",
+            "subject": "el asunto",
+            "body": "el mensaje",
+            "list": "la lista de correo",
+            "attachment": "los adjuntos (sí o no)",
+            "size": "el tamaño en bytes"
+        },
+        "operators": {
+            "contains": "contiene",
+            "notContains": "no contiene",
+            "is": "es exactamente",
+            "isNot": "no es",
+            "startsWith": "empieza por",
+            "endsWith": "termina en",
+            "matches": "coincide con el patrón",
+            "greaterThan": "es mayor que",
+            "lessThan": "es menor que"
+        },
+        "title": "Filtros de {address}",
+        "hint": "Se ejecutan al llegar, de arriba abajo. Una regla que detiene el resto es la última que ve un mensaje.",
+        "new": "Nuevo filtro",
+        "empty": "No hay filtros. Todo lo que llega va a Recibidos.",
+        "on": "Activado",
+        "off": "Desactivado",
+        "stops": " - detiene los filtros de debajo",
+        "matched": " - coincidió {count} {count, plural, one {vez} other {veces}}",
+        "deleteNamed": "Eliminar el filtro {name}",
+        "and": " y ",
+        "or": " o ",
+        "condition": "{field} {operator} \"{value}\"",
+        "said": {
+            "move": "moverlo a {folder}",
+            "moveSomewhere": "moverlo a una carpeta",
+            "label": "etiquetarlo como {label}",
+            "labelSomething": "etiquetarlo",
+            "forward": "reenviarlo a {to}"
+        },
+        "sentence": "Si {conditions}, {actions}.",
+        "actions": {
+            "archive": "archivarlo",
+            "move": "moverlo a una carpeta",
+            "label": "ponerle una etiqueta",
+            "star": "destacarlo",
+            "read": "marcarlo como leído",
+            "junk": "enviarlo a spam",
+            "trash": "enviarlo a la papelera",
+            "pin": "fijarlo",
+            "mute": "silenciar la conversación",
+            "forward": "reenviarlo a alguien"
+        },
+        "name": "Ponle nombre",
+        "namePlaceholder": "Facturas a Contabilidad",
+        "if": "Si",
+        "fieldLabel": "Qué mirar",
+        "operatorLabel": "Cómo compararlo",
+        "valueLabel": "Qué buscar",
+        "then": "entonces",
+        "actionLabel": "Qué hacer",
+        "folderLabel": "Qué carpeta",
+        "labelLabel": "Qué etiqueta",
+        "forwardLabel": "Adónde enviarlo",
+        "forwardHint": "Se envía una copia desde este buzón, y las respuestas van a quien escribió el original. No se envía a una dirección que tengas aquí, porque sería un bucle, y un mensaje que ya se reenvió una vez se deja como está.",
+        "stopLabel": "Detener los filtros de debajo de este",
+        "stop": "Parar aquí: no ejecutar los filtros de debajo de este",
+        "existingLabel": "Ejecutarlo también sobre el correo que ya está aquí",
+        "existing": "Ejecutarlo también sobre el correo que ya está en Recibidos",
+        "saved": "Filtro guardado.",
+        "save": "Guardar el filtro"
     }
 }
