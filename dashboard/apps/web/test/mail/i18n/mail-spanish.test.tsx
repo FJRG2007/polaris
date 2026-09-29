@@ -37,12 +37,12 @@ describe("the notice for a mailbox that stopped signing in", () => {
     it("says what happened and offers the fix in Spanish", () => {
         const markup = notice("password");
         expect(markup).toContain("ana@example.com ha dejado de aceptar su contraseña");
-        expect(markup).toContain("Actualizar contraseña");
+        expect(markup).toContain("Cambiar contraseña");
         expect(markup).not.toContain("Update password");
     });
 
     it("says reconnect for an authorized mailbox", () => {
-        expect(notice("oauth")).toContain("Volver a conectar");
+        expect(notice("oauth")).toContain("Reconectar");
     });
 });
 

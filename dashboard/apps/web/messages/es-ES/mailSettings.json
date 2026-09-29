@@ -1,6 +1,6 @@
 {
     "noMailboxes": {
-        "title": "Todavía no hay buzones",
+        "title": "Aún no hay buzones",
         "body": "{what, select, archive {La importación y exportación se configura} away {La respuesta automática se configura} identities {Una dirección para enviar como se configura} junk {El spam se configura} privacy {La privacidad se configura} rules {Un filtro se configura} other {La firma se configura}} por buzón. <link>Conecta uno</link> y esta pantalla se rellenará."
     },
     "layout": {
@@ -12,8 +12,8 @@
     },
     "sendCheck": {
         "notStarted": "No se pudo iniciar esa comprobación.",
-        "again": "Comprobar de nuevo",
-        "start": "Comprobar el envío",
+        "again": "Repetir prueba",
+        "start": "Probar el envío",
         "idle": "Envía un mensaje de este buzón a sí mismo y cuenta qué le pasa."
     },
     "nav": {
@@ -43,7 +43,7 @@
         "saved": "Firma guardada."
     },
     "away": {
-        "toggleLabel": "Enviar una respuesta automática",
+        "toggleLabel": "Responder automáticamente",
         "toggle": "Responder al correo de {address} mientras estoy fuera",
         "subject": "Asunto, si quieres uno distinto de \"Re: su asunto\"",
         "body": "Qué dice",
@@ -59,7 +59,7 @@
         "hint": "Una etiqueta abarca todos los buzones, algo que una carpeta no puede hacer. Los filtros pueden ponerla automáticamente.",
         "name": "Nombre",
         "placeholder": "Facturas",
-        "colour": "Color de la etiqueta",
+        "colour": "Color",
         "made": "Etiqueta creada.",
         "make": "Crearla",
         "empty": "Todavía no hay etiquetas.",
@@ -69,10 +69,10 @@
         "deleted": "{name} ya no está. El correo que la llevaba, sí."
     },
     "blocked": {
-        "noMailboxTitle": "Todavía no hay buzón",
+        "noMailboxTitle": "Aún no hay buzón",
         "noMailboxBody": "Conecta uno y podrás empezar a rechazar remitentes en él.",
         "explain": "El correo no se puede rechazar antes de que llegue. El servidor que lo envía entrega el mensaje en tu buzón mucho antes de que Polaris lo vea, y ningún programa de correo puede impedirlo: solo tu proveedor puede. Así que bloquear aquí significa lo siguiente mejor: todo lo de esa dirección va directo a la papelera y nunca llega a Recibidos. Sigue llegando y sigue ocupando tu buzón, pero no lo ves, y va a un sitio de donde puedes recuperarlo en lugar de a uno de donde no.",
-        "title": "Remitentes bloqueados",
+        "title": "Bloqueados",
         "empty": "Nadie. Bloquear a alguien desde un mensaje lo añade aquí.",
         "toSpam": "Directo a spam",
         "toTrash": "Directo a la papelera",
@@ -95,7 +95,7 @@
         "change": "Cambiar",
         "reset": "Restablecer",
         "saving": "Guardando...",
-        "resetAll": "Restablecer todas las teclas",
+        "resetAll": "Restablecer todas",
         "unsaved": "Todavía no se ha guardado."
     },
     "junk": {
@@ -105,7 +105,7 @@
         "forgetConfirm": "Olvidarlo",
         "forgotten": "Vuelve a empezar de cero.",
         "explain": "Tu proveedor filtra este buzón antes de que Polaris lo vea, así que lo que esto atrapa es lo que se coló, y lo atrapa con cosas que tu proveedor no puede saber: a quién escribes, qué has marcado ya como spam y qué has rescatado. Funciona aquí, en esta máquina, y ningún mensaje se envía a ningún sitio para puntuarlo. Si hay un servicio de reputación de direcciones activado en Integraciones, se comprueban con él la dirección del remitente y el dominio que hay detrás: la dirección, nunca el mensaje.",
-        "judge": "Juzgar el correo que llega",
+        "judge": "Juzgar lo que llega",
         "judgeHint": "Lo que es claramente spam va a la carpeta Spam. Lo que solo es dudoso se queda donde está y lo avisa cuando lo abres.",
         "offHint": "Desactivarlo cambia lo que pasa con el correo que llegue después. Nunca mueve ni vuelve a leer lo que ya está aquí.",
         "learned": "Lo que ha aprendido",
@@ -179,7 +179,7 @@
         "saved": "Guardado.",
         "mailboxes": "Buzones que mostrar",
         "mailboxesHint": "Correo sigue normalmente el selector de la parte superior de la pantalla, así que ves tus buzones en tu propio espacio y los de una empresa en el suyo. Mostrarlos todos pone cada buzón en un mismo sitio, sea cual sea el seleccionado, y los contadores y los avisos de correo nuevo siguen lo que elijas aquí.",
-        "sort": "Ordenar las listas por",
+        "sort": "Ordenar por",
         "sortHint": "Cómo se abre cada lista. Los botones de encima de una lista siguen mandando en la página en la que estás, y esa página es un enlace que puedes enviar.",
         "markRead": "Marcar un mensaje como leído",
         "markReadHint": "Pasar por un mensaje en un panel de lectura no es lo mismo que leerlo, y un mensaje marcado como leído es un mensaje perdido.",
@@ -192,20 +192,20 @@
         "layoutHint": "Se recuerda para este navegador y no para tu cuenta: un móvil y un escritorio no tienen la misma forma.",
         "layoutFull": "El mensaje ocupa la pantalla",
         "layoutSplit": "Una lista junto al mensaje",
-        "mailto": "Enlaces de correo",
+        "mailto": "Enlaces mailto",
         "mailtoHint": "Abre aquí como mensaje nuevo cada enlace mailto en el que hagas clic, como un enlace de escríbenos en cualquier web. Tu navegador te pide confirmarlo y puede deshacerlo desde sus propios ajustes.",
         "mailtoUnsupported": "Este navegador no puede pasar enlaces de correo a una web. Chrome, Edge y Firefox sí pueden.",
         "mailtoConfirm": "Confírmalo en la barra que muestra tu navegador.",
         "mailtoRefused": "Este navegador se negó. Solo lo permite en una página abierta por https.",
-        "mailtoButton": "Abrir los enlaces de correo en Polaris"
+        "mailtoButton": "Abrir enlaces de correo en Polaris"
     },
     "privacy": {
         "keep": {
-            "quarter": "Después de 15 minutos",
-            "hour": "Después de una hora",
-            "sixHours": "Después de seis horas",
-            "day": "Después de un día",
-            "week": "Después de una semana"
+            "quarter": "Tras 15 minutos",
+            "hour": "Tras una hora",
+            "sixHours": "Tras seis horas",
+            "day": "Tras un día",
+            "week": "Tras una semana"
         },
         "modes": {
             "block": {
@@ -223,19 +223,19 @@
         },
         "title": "Imágenes y cualquier otra cosa que cargue un mensaje",
         "lead": "Un mensaje puede llevar una imagen invisible que le dice a su remitente en qué momento lo abriste, desde dónde y con qué. Polaris las descarga todas por ti, así que lo que recibe es una petición de este servidor y no nada sobre ti.",
-        "nameTrackersLabel": "Nombrar los rastreadores",
+        "nameTrackersLabel": "Nombrar rastreadores",
         "nameTrackers": "Decir qué empresas estaban rastreando",
         "nameTrackersHint": "Un mensaje dice cuántos rastreadores llevaba y de quién son, en lugar de solo que se bloqueó algo.",
         "cleanLinksLabel": "Limpiar enlaces",
         "cleanLinks": "Quitar el rastreo de los enlaces",
         "cleanLinksHint": "Un enlace sigue yendo adonde dice; deja de llevar quién lo siguió.",
-        "receipts": "Responder a las confirmaciones de lectura",
+        "receipts": "Confirmar la lectura",
         "receiptsHint": "Desactivado, al remitente que pide saber si leíste su mensaje no se le avisa. Polaris te sigue mostrando que lo pidió.",
         "codes": "Tirar los códigos cuando caduquen",
         "codesHint": "Un código de verificación deja de funcionar en unos minutos y luego se queda años en tu buzón. Desactivado por defecto: esto elimina correo, así que es algo que activar y no algo que desactivar.",
-        "keepLabel": "Cuánto tiempo se guarda un código",
+        "keepLabel": "Cuánto se guarda un código",
         "thenTrash": "y luego a la papelera, donde aún puedes recuperarlo.",
-        "trusted": "Remitentes cuyas imágenes se cargan",
+        "trusted": "Remitentes con imágenes cargadas",
         "trustedEmpty": "Nadie todavía. Permitir a un remitente desde un mensaje lo añade aquí.",
         "untrust": "Dejar de cargar imágenes de {address}"
     },
@@ -283,7 +283,7 @@
     "rules": {
         "fields": {
             "from": "el remitente",
-            "recipient": "cualquier destinatario",
+            "recipient": "un destinatario",
             "to": "la línea Para",
             "subject": "el asunto",
             "body": "el mensaje",
@@ -294,7 +294,7 @@
         "operators": {
             "contains": "contiene",
             "notContains": "no contiene",
-            "is": "es exactamente",
+            "is": "es igual a",
             "isNot": "no es",
             "startsWith": "empieza por",
             "endsWith": "termina en",
@@ -327,20 +327,20 @@
             "move": "moverlo a una carpeta",
             "label": "ponerle una etiqueta",
             "star": "destacarlo",
-            "read": "marcarlo como leído",
+            "read": "marcarlo leído",
             "junk": "enviarlo a spam",
             "trash": "enviarlo a la papelera",
             "pin": "fijarlo",
             "mute": "silenciar la conversación",
             "forward": "reenviarlo a alguien"
         },
-        "name": "Ponle nombre",
+        "name": "Nombre",
         "namePlaceholder": "Facturas a Contabilidad",
         "if": "Si",
         "fieldLabel": "Qué mirar",
         "operatorLabel": "Cómo compararlo",
         "valueLabel": "Qué buscar",
-        "then": "entonces",
+        "then": "luego",
         "actionLabel": "Qué hacer",
         "folderLabel": "Qué carpeta",
         "labelLabel": "Qué etiqueta",

@@ -2,7 +2,7 @@
     "labels": {
         "signatureAuto": {
             "never": "Solo cuando la inserto",
-            "new": "En los mensajes que empiezo",
+            "new": "En mensajes que empiezo",
             "always": "En todo, también en las respuestas"
         },
         "category": {
@@ -10,7 +10,7 @@
             "social": "Social",
             "promotions": "Promociones",
             "billing": "Compras y facturas",
-            "updates": "Notificaciones",
+            "updates": "Avisos",
             "security": "Seguridad"
         },
         "filter": {
@@ -20,10 +20,10 @@
             "attachments": "Con adjuntos"
         },
         "sort": {
-            "newest": "Más recientes primero",
-            "oldest": "Más antiguos primero",
-            "largest": "Más grandes primero",
-            "smallest": "Más pequeños primero"
+            "newest": "Más nuevos",
+            "oldest": "Más antiguos",
+            "largest": "Más grandes",
+            "smallest": "Más pequeños"
         },
         "folderRole": {
             "inbox": "Recibidos",
@@ -169,10 +169,10 @@
         "chooseAccount": "Elige la cuenta autorizada a la que pertenece este buzón",
         "password": "Escribe la contraseña de este buzón",
         "name": "Ponle un nombre",
-        "ruleName": "Ponle un nombre a la regla",
+        "ruleName": "Ponle nombre a la regla",
         "endsAfterStart": "Tiene que terminar después de empezar",
         "nameUnder80": "El nombre debe tener menos de 80 caracteres",
-        "serverName": "Escribe el nombre del servidor",
+        "serverName": "Falta el servidor",
         "sayWhatHappens": "Di qué debe pasar",
         "sayWhatToLookFor": "Di qué buscar",
         "pinOrMute": "Di si fijar o silenciar.",
@@ -203,43 +203,43 @@
     },
     "search": {
         "title": "Búsqueda: {query}",
-        "emptyTitle": "No hay coincidencias",
+        "emptyTitle": "Sin resultados",
         "emptyBody": "Polaris busca en el correo que ya ha descargado, que son los pocos cientos de mensajes más recientes de cada carpeta. Lo más antiguo sigue en el servidor de correo."
     },
     "views": {
         "inbox": {
             "title": "Recibidos",
-            "emptyTitle": "No hay nada pendiente",
+            "emptyTitle": "Nada pendiente",
             "emptyBody": "Todo lo que ha llegado está atendido."
         },
         "starred": {
             "title": "Destacados",
-            "emptyTitle": "No hay nada destacado",
+            "emptyTitle": "Nada destacado",
             "emptyBody": "Destaca una conversación para tenerla aquí, en todos los buzones."
         },
         "important": {
             "title": "Importantes",
-            "emptyTitle": "No hay nada marcado como importante",
+            "emptyTitle": "Nada marcado como importante",
             "emptyBody": "Marca un mensaje como importante para tenerlo aquí, en todos los buzones."
         },
         "snoozed": {
             "title": "Pospuestos",
-            "emptyTitle": "No hay nada pospuesto",
+            "emptyTitle": "Nada pospuesto",
             "emptyBody": "Una conversación que pospones sale de Recibidos hasta la hora que elegiste."
         },
         "sent": {
             "title": "Enviados",
-            "emptyTitle": "Todavía no has enviado nada",
+            "emptyTitle": "Nada enviado aún",
             "emptyBody": "Los mensajes que envías aparecen aquí, de todos los buzones."
         },
         "archive": {
             "title": "Archivo",
-            "emptyTitle": "No hay nada archivado",
+            "emptyTitle": "Nada archivado",
             "emptyBody": "Archivar saca una conversación de Recibidos sin eliminarla."
         },
         "junk": {
             "title": "Spam",
-            "emptyTitle": "No hay spam",
+            "emptyTitle": "Sin spam",
             "emptyBody": "Lo que tu servidor de correo marca como spam acaba aquí."
         },
         "trash": {
@@ -252,8 +252,8 @@
         "label": "Buzones que necesitan atención",
         "authorization": "{address} ha dejado de aceptar su autorización",
         "password": "{address} ha dejado de aceptar su contraseña",
-        "reconnect": "Volver a conectar",
-        "updatePassword": "Actualizar contraseña"
+        "reconnect": "Reconectar",
+        "updatePassword": "Cambiar contraseña"
     },
     "delivery": {
         "accepted": "Tu servidor de salida lo aceptó a las {time} y desde entonces no ha vuelto nada. Es todo lo que Polaris puede saber de un mensaje una vez entregado.",
@@ -268,7 +268,7 @@
         "accepted": "{copy, select, failed {No se pudo guardar una copia en Enviados. } none {Este buzón no tiene carpeta de Enviados, así que no se guardó copia. } other {}}Tu servidor de salida aceptó el mensaje. Todavía no ha vuelto aquí, lo que en un buzón de otro proveedor puede tardar unos minutos."
     },
     "print": {
-        "title": "Imprimir - Correo de Polaris",
+        "title": "Imprimir - Polaris Mail",
         "print": "Imprimir",
         "leftOut": "{count, plural, one {No se incluye el mensaje más antiguo} other {No se incluyen los # mensajes más antiguos}}.",
         "from": "De",
@@ -289,7 +289,7 @@
     "address": {
         "copyRefused": "Este navegador no dejó que Polaris lo copiara.",
         "copyNamed": "Copiar {address}",
-        "copy": "Copiar dirección",
+        "copy": "Copiar correo",
         "newMessage": "Nuevo mensaje",
         "findMail": "Buscar su correo",
         "block": "Bloquear"
@@ -387,8 +387,8 @@
         "findFrom": "Buscar todo lo de {sender}",
         "findFromThis": "Buscar todo lo de este remitente",
         "block": "Bloquear a {sender}",
-        "blockThis": "Bloquear a este remitente",
-        "copySender": "Copiar la dirección del remitente",
+        "blockThis": "Bloquear remitente",
+        "copySender": "Copiar correo del remitente",
         "copyLink": "Copiar el enlace a esta conversación",
         "snoozes": {
             "laterToday": "Más tarde hoy",
@@ -406,7 +406,7 @@
         "labelEmptyBody": "Pon esta etiqueta en una conversación y se reunirá aquí."
     },
     "drafts": {
-        "emptyTitle": "No hay nada a medio escribir",
+        "emptyTitle": "Nada a medio escribir",
         "emptyBody": "Un mensaje que empiezas se guarda aquí mientras escribes, así que puedes cerrar el editor y volver a él.",
         "title": "Borradores",
         "subtitle": "Se guardan mientras escribes. Nada de lo que hay aquí se ha enviado.",
@@ -414,7 +414,7 @@
         "waiting": "Esperando para salir",
         "waitingAt": "Esperando para salir a las {time}",
         "to": "Para {names}",
-        "toNobody": "Para nadie todavía",
+        "toNobody": "Sin destinatario",
         "retry": "Volver a enviar este mensaje",
         "retrying": "Volviendo a enviarlo.",
         "notWaiting": "Ese mensaje ya no está esperando para enviarse.",
@@ -426,7 +426,7 @@
         "or": " o ",
         "selectAll": "Seleccionar todo lo que se ve",
         "shiftClick": "Mayús+clic",
-        "selectRun": "Seleccionar una serie de conversaciones",
+        "selectRun": "Seleccionar varias conversaciones",
         "delete": "Supr",
         "backspace": "Retroceso",
         "enter": "Intro"
@@ -439,11 +439,11 @@
         "archive": "Archivar",
         "trash": "Mover a la papelera",
         "junk": "Marcar como spam",
-        "star": "Destacar o quitar destacado",
+        "star": "Destacar o quitar",
         "important": "Marcar como importante o no",
         "pin": "Fijar arriba o desfijar",
-        "mute": "Silenciar o dejar de silenciar",
-        "markUnread": "Marcar como no leído",
+        "mute": "Silenciar o no",
+        "markUnread": "Poner no leído",
         "next": "Conversación siguiente",
         "previous": "Conversación anterior",
         "open": "Abrir la seleccionada",
@@ -456,11 +456,11 @@
         "title": "Suscripciones",
         "lead": "Remitentes que publican una forma de salir de su lista. Polaris los anota a medida que llega su correo, así que esto es todo lo que ha visto y no todo aquello a lo que te hayas suscrito alguna vez.",
         "capped": " Solo se muestran los que escribieron más recientemente.",
-        "noMailboxTitle": "Todavía no hay buzón",
+        "noMailboxTitle": "Aún no hay buzón",
         "noMailboxBody": "Conecta uno y las listas que recibe aparecerán aquí.",
-        "emptyTitle": "Todavía no hay nada que dejar",
+        "emptyTitle": "Aún no hay nada que dejar",
         "emptyBody": "Los boletines y las listas de correo aparecen aquí a medida que llegan.",
-        "find": "Buscar un remitente",
+        "find": "Buscar remitente",
         "ignored": "{count, plural, one {# remitente siguió escribiendo después de que se lo pidieras.} other {# remitentes siguieron escribiendo después de que se lo pidieras.}}",
         "noMatch": "Ningún remitente coincide con eso.",
         "messages": "{count, plural, one {# mensaje} other {# mensajes}}, el último el {date}",
@@ -469,21 +469,21 @@
         "fromBody": "Encontrado en su mensaje y no publicado como cabecera.",
         "blocked": "{sender} ahora va directo a la papelera.",
         "block": "Bloquear",
-        "askAgain": "Volver a pedirlo"
+        "askAgain": "Repetir"
     },
     "searchBox": {
-        "placeholder": "Buscar en el correo",
+        "placeholder": "Buscar correo",
         "clear": "Borrar la búsqueda",
-        "options": "Opciones de búsqueda",
+        "options": "Opciones",
         "from": "De",
         "to": "Para",
-        "words": "Contiene las palabras",
+        "words": "Con las palabras",
         "without": "No contiene",
         "exact": "Esta frase exacta",
-        "after": "Después de",
+        "after": "Desde",
         "before": "Antes de",
         "attachment": "Tiene un adjunto",
-        "link": "Tiene un enlace",
+        "link": "Con enlace",
         "clearAll": "Borrarlo todo",
         "search": "Buscar",
         "syntax": "Todo esto también se puede escribir en la caja: <code>from:ana</code>, <code>has:attachment</code>, <code>after:2026-01-01</code>, <code>\"palabras exactas\"</code>, <code>-excluido</code>."
@@ -509,14 +509,14 @@
         "showFolders": "Mostrar las carpetas de {address}",
         "nothingSynced": "Todavía no se ha sincronizado nada.",
         "noColour": "Sin color",
-        "rename": "Cambiar nombre",
+        "rename": "Renombrar",
         "delete": "Eliminar",
         "labels": "Etiquetas",
         "deleteBody": "La carpeta y todos sus mensajes se eliminan del servidor de correo. No se puede deshacer desde Polaris.",
         "deleteConfirm": "Eliminarla",
-        "renameTitle": "Cambiar el nombre de la carpeta",
+        "renameTitle": "Renombrar carpeta",
         "name": "Nombre",
-        "folderName": "Nombre de la carpeta",
+        "folderName": "Nombre",
         "renameHint": "Se cambia en el servidor de correo, así que todos los programas con los que leas este buzón lo siguen.",
         "unreachable": "Polaris no puede contactar con este servidor de correo.",
         "needsConnecting": "Este buzón necesita volver a conectarse.",
@@ -540,7 +540,7 @@
         "reconnected": "{address} vuelve a estar conectado. Su correo está en camino.",
         "saved": "{address} se ha guardado.",
         "connected": "{address} está conectado. Su correo está en camino.",
-        "address": "Dirección de correo",
+        "address": "Correo",
         "fixedAddress": "Para usar otra dirección, añádela como un buzón nuevo.",
         "already": "Ese buzón ya está aquí. Ábrelo desde la barra lateral o quítalo primero para volver a añadirlo.",
         "otherAccount": "La cuenta de {provider} que autorizaste no es {address}. Autoriza esa para conectarlo o usa una contraseña.",
@@ -566,11 +566,11 @@
         "makeOne": "Crear una",
         "displayName": "Tu nombre, tal como lo verán",
         "displayNamePlaceholder": "Si lo dejas vacío, se usa tu nombre de Polaris",
-        "label": "Nombre en la barra lateral",
+        "label": "Nombre en el lateral",
         "labelPlaceholder": "Si lo dejas vacío, se usa la dirección",
         "colour": "Color",
         "automatic": "Automático",
-        "servers": "Ajustes del servidor",
+        "servers": "Servidores",
         "notWorkedOut": "sin determinar",
         "incoming": "Entrada (IMAP)",
         "outgoing": "Salida (SMTP)",
@@ -648,20 +648,20 @@
         "listFrom": "{name} envía esto como lista de correo.",
         "receipt": "El remitente pidió que se le avisara cuando se abriera. Polaris no se lo dijo.",
         "saveNamed": "Guardar {name}",
-        "unstar": "Quitar destacado",
-        "star": "Destacar",
-        "unimportant": "Marcar como no importante",
-        "important": "Marcar como importante",
-        "markUnread": "Marcar como no leído",
+        "unstar": "Desmarcar",
+        "star": "Marcar",
+        "unimportant": "Quitar importante",
+        "important": "Marcar importante",
+        "markUnread": "Marcar no leído",
         "archive": "Archivar",
         "restore": "Devolver a donde estaba",
-        "deleteForever": "Eliminar para siempre",
-        "trash": "Mover a la papelera",
+        "deleteForever": "Borrar para siempre",
+        "trash": "A la papelera",
         "replyAll": "Responder a todos",
         "more": "Más opciones de esta conversación",
         "unpin": "Desfijar",
         "pin": "Fijar arriba",
-        "unmute": "Dejar de silenciar",
+        "unmute": "Reactivar",
         "mute": "Silenciar",
         "label": "Etiquetar esta conversación",
         "firstLabel": "Crea tu primera etiqueta",
@@ -671,7 +671,7 @@
         "copyTo": "copia a",
         "list": "Esto llegó como lista de correo.",
         "thisSender": "este remitente",
-        "saveZip": "Guardarlo todo como .zip",
+        "saveZip": "Guardar todo en .zip",
         "saveMessage": "Guardar este mensaje"
     },
     "spam": {
@@ -735,7 +735,7 @@
         "oneAtATime": "Mostrar un mensaje cada vez",
         "split": "Mostrar la lista junto al mensaje",
         "emptyNow": "Vaciar ahora",
-        "markRead": "Marcar como leído",
+        "markRead": "Marcar leído",
         "snoozeTomorrow": "Posponer hasta mañana por la mañana",
         "junk": "Marcar como spam",
         "failedTitle": "No se pudo cargar esta lista",
