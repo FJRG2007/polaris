@@ -412,5 +412,81 @@
         "workingIn": "Working in {name}",
         "heading": "Working in",
         "manage": "Manage {name}"
+    },
+    "share": {
+        "capabilities": {
+            "guest": {
+                "label": "Guest",
+                "hint": "Read it, and comment where they are involved."
+            },
+            "member": {
+                "label": "Member",
+                "hint": "Take part: post, create and edit."
+            },
+            "admin": {
+                "label": "Admin",
+                "hint": "Everything a member can do, plus running it."
+            },
+            "view": {
+                "label": "Can see",
+                "hint": "Watch it and see its state. Nothing else."
+            },
+            "control": {
+                "label": "Can operate",
+                "hint": "Open, close and switch it, as well as see it."
+            }
+        },
+        "standings": {
+            "live": "In force",
+            "waiting": "Not started",
+            "expired": "Expired",
+            "closed": "Outside its hours",
+            "spent": "Used up"
+        },
+        "stopTitle": "Stop sharing with {name}?",
+        "stopBody": "{who} loses access to {what} at once. You can share it again afterwards.",
+        "title": "Share {name}",
+        "stopNamed": "Stop sharing with {name}",
+        "range": "{from} to {to}",
+        "fromOnly": "from {from}",
+        "untilOnly": "until {to}",
+        "weekdays": "Weekdays",
+        "weekends": "Weekends",
+        "noDays": "No days",
+        "usesOf": "{uses} of {max} uses",
+        "shared": "Shared",
+        "stop": "Stop sharing",
+        "takenBack": "Taken back",
+        "introBounded": "Give somebody access without giving them the rest. You can limit it to certain days, hours and a number of uses.",
+        "intro": "Give a person, a team or a role access to this without adding them one at a time.",
+        "already": "Already shared with",
+        "none": "Not shared with anybody yet.",
+        "more": "Share with somebody else",
+        "who": "Who to share with",
+        "person": "A person",
+        "team": "A team",
+        "teamHint": "A team of one of your organizations",
+        "role": "A role",
+        "roleHint": "Everybody holding a role in one of your organizations",
+        "search": "Search for somebody",
+        "searchPlaceholder": "Name, username or address",
+        "whichTeam": "Which team",
+        "whichRole": "Which role",
+        "pickTeam": "Pick a team",
+        "pickRole": "Pick a role",
+        "can": "What they can do",
+        "sometimes": "Only sometimes",
+        "limit": "Limit when this works",
+        "fromDay": "From this day",
+        "toDay": "Until this day",
+        "days": "On these days",
+        "fromHour": "From this hour",
+        "toHour": "Until this hour",
+        "uses": "How many times",
+        "usesPlaceholder": "As often as they like",
+        "usesHint": "Only actually operating it counts. Looking at it does not.",
+        "note": "What this is for",
+        "notePlaceholder": "Cleaner, Tuesdays",
+        "share": "Share"
     }
 }

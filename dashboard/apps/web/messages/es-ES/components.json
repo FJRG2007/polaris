@@ -412,5 +412,81 @@
         "workingIn": "Trabajando en {name}",
         "heading": "Trabajando en",
         "manage": "Gestionar {name}"
+    },
+    "share": {
+        "capabilities": {
+            "guest": {
+                "label": "Invitado",
+                "hint": "Leerlo y comentar donde le afecte."
+            },
+            "member": {
+                "label": "Miembro",
+                "hint": "Participar: publicar, crear y editar."
+            },
+            "admin": {
+                "label": "Admin",
+                "hint": "Todo lo que puede un miembro, y además gestionarlo."
+            },
+            "view": {
+                "label": "Puede ver",
+                "hint": "Vigilarlo y ver su estado. Nada más."
+            },
+            "control": {
+                "label": "Puede manejar",
+                "hint": "Abrirlo, cerrarlo y accionarlo, además de verlo."
+            }
+        },
+        "standings": {
+            "live": "En vigor",
+            "waiting": "Sin empezar",
+            "expired": "Caducado",
+            "closed": "Fuera de horario",
+            "spent": "Agotado"
+        },
+        "stopTitle": "¿Dejar de compartir con {name}?",
+        "stopBody": "{who} pierde el acceso a {what} al momento. Puedes volver a compartirlo después.",
+        "title": "Compartir {name}",
+        "stopNamed": "Dejar de compartir con {name}",
+        "range": "{from} a {to}",
+        "fromOnly": "desde {from}",
+        "untilOnly": "hasta {to}",
+        "weekdays": "Laborables",
+        "weekends": "Fines de semana",
+        "noDays": "Ningún día",
+        "usesOf": "{uses} de {max} usos",
+        "shared": "Compartido",
+        "stop": "Retirar",
+        "takenBack": "Retirado",
+        "introBounded": "Da acceso a alguien sin darle el resto. Puedes limitarlo a ciertos días, horas y un número de usos.",
+        "intro": "Da acceso a una persona, un equipo o un rol sin añadirlos de uno en uno.",
+        "already": "Ya compartido con",
+        "none": "Todavía no se ha compartido con nadie.",
+        "more": "Compartir con otra persona",
+        "who": "Con quién compartir",
+        "person": "Una persona",
+        "team": "Un equipo",
+        "teamHint": "Un equipo de una de tus organizaciones",
+        "role": "Un rol",
+        "roleHint": "Todas las personas con un rol en una de tus organizaciones",
+        "search": "Buscar a alguien",
+        "searchPlaceholder": "Nombre, usuario o dirección",
+        "whichTeam": "Qué equipo",
+        "whichRole": "Qué rol",
+        "pickTeam": "Elegir equipo",
+        "pickRole": "Elige un rol",
+        "can": "Qué puede hacer",
+        "sometimes": "Solo a veces",
+        "limit": "Limitar cuándo funciona",
+        "fromDay": "Desde el día",
+        "toDay": "Hasta el día",
+        "days": "Estos días",
+        "fromHour": "Desde la hora",
+        "toHour": "Hasta la hora",
+        "uses": "Cuántas veces",
+        "usesPlaceholder": "Las que quiera",
+        "usesHint": "Solo cuenta manejarlo de verdad. Mirarlo no.",
+        "note": "Para qué es",
+        "notePlaceholder": "Limpieza, los martes",
+        "share": "Compartir"
     }
 }

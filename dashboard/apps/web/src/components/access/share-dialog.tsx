@@ -18,6 +18,8 @@
 import * as core from "@polaris/core";
 import type { GrantView } from "@/lib/access/grants";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { GrantCandidate } from "@/lib/access/sharing-service";
@@ -45,15 +47,8 @@ import {
     useToast
 } from "@polaris/ui";
 
-/** How each capability reads. The same words the server uses, since a screen
- *  that renames them is a screen whose refusals name something else. */
-const CAPABILITY_WORDS: Record<string, { label: string; hint: string }> = {
-    guest: { label: "Guest", hint: "Read it, and comment where they are involved." },
-    member: { label: "Member", hint: "Take part: post, create and edit." },
-    admin: { label: "Admin", hint: "Everything a member can do, plus running it." },
-    view: { label: "Can see", hint: "Watch it and see its state. Nothing else." },
-    control: { label: "Can operate", hint: "Open, close and switch it, as well as see it." }
-};
+/** The capabilities this dialog has words for, as `share.capabilities.<id>`. */
+const CAPABILITIES = new Set(["guest", "member", "admin", "view", "control"]);
 
 /** What a standing looks like beside a row. Only `live` is quiet: the other four
  *  are the reason somebody is looking. */
@@ -94,6 +89,13 @@ export function ShareDialog({
 }) {
     const toast = useToast();
     const format = useDisplayFormat();
+    const t = useTranslations("components");
+    const locale = useLocale();
+    const capabilityLabel = (one: string) =>
+        CAPABILITIES.has(one) ? t(`share.capabilities.${one}.label` as NamespaceKey<"components">) : one;
+    const capabilityHint = (one: string) =>
+        CAPABILITIES.has(one) ? t(`share.capabilities.${one}.hint` as NamespaceKey<"components">) : "";
+    const dayNames = useMemo(() => core.weekdayNames(locale, "short"), [locale]);
     // The reader's own week, so Monday-first and Sunday-first both draw the days
     // in the order the person expects to read them in.
     const weekOrder = useMemo(() => core.weekOrderFrom(format.weekStartsOn), [format.weekStartsOn]);
@@ -195,7 +197,7 @@ export function ShareDialog({
         }
         setGrants(answer.grants ?? []);
         reset();
-        toast.show({ title: "Shared" });
+        toast.show({ title: t("share.shared") });
     };
 
     /**
@@ -208,9 +210,9 @@ export function ShareDialog({
      */
     const revoke = async (grant: GrantView): Promise<void> => {
         const sure = await confirm({
-            title: `Stop sharing with ${grant.principalName}?`,
-            description: `${grant.principalName} loses access to ${name} at once. You can share it again afterwards.`,
-            confirmLabel: "Stop sharing",
+            title: t("share.stopTitle", { name: grant.principalName }),
+            description: t("share.stopBody", { who: grant.principalName, what: name }),
+            confirmLabel: t("share.stop"),
             danger: true
         });
         if (!sure) return;
@@ -223,7 +225,7 @@ export function ShareDialog({
             return;
         }
         setGrants(answer.grants ?? []);
-        toast.show({ title: "Taken back" });
+        toast.show({ title: t("share.takenBack") });
     };
 
     return (
@@ -233,15 +235,15 @@ export function ShareDialog({
                 it is one column of fourteen rows. */}
             <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>Share {name}</DialogTitle>
+                    <DialogTitle>{t("share.title", { name })}</DialogTitle>
                     <DialogDescription>
                         {bounded
-                            ? "Give somebody access without giving them the rest. You can limit it to certain days, hours and a number of uses."
-                            : "Give a person, a team or a role access to this without adding them one at a time."}
+                            ? t("share.introBounded")
+                            : t("share.intro")}
                     </DialogDescription>
                 </DialogHeader>
 
-                <section className="flex flex-col gap-2" aria-label="Already shared with">
+                <section className="flex flex-col gap-2" aria-label={t("share.already")}>
                     {grants === null ? (
                         <>
                             <Skeleton className="h-12 w-full" />
@@ -249,7 +251,7 @@ export function ShareDialog({
                         </>
                     ) : grants.length === 0 ? (
                         <p className="text-[13px] text-muted-foreground">
-                            Not shared with anybody yet.
+                            {t("share.none")}
                         </p>
                     ) : (
                         <ul className="flex flex-col gap-1">
@@ -276,14 +278,13 @@ export function ShareDialog({
                                                 </span>
                                             ) : null}
                                             <Badge variant={STANDING_TONE[grant.standing]}>
-                                                {core.GRANT_STANDING_LABELS[grant.standing]}
+                                                {t(`share.standings.${grant.standing}`)}
                                             </Badge>
                                         </p>
                                         <p className="text-[12px] text-muted-foreground">
-                                            {CAPABILITY_WORDS[grant.capability]?.label ??
-                                                grant.capability}
-                                            {describe(grant, weekOrder) ? (
-                                                <> - {describe(grant, weekOrder)}</>
+                                            {capabilityLabel(grant.capability)}
+                                            {describe(grant, weekOrder, t, dayNames) ? (
+                                                <> - {describe(grant, weekOrder, t, dayNames)}</>
                                             ) : null}
                                         </p>
                                         {grant.note ? (
@@ -295,8 +296,8 @@ export function ShareDialog({
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        aria-label={`Stop sharing with ${grant.principalName}`}
-                                        title={`Stop sharing with ${grant.principalName}`}
+                                        aria-label={t("share.stopNamed", { name: grant.principalName })}
+                                        title={t("share.stopNamed", { name: grant.principalName })}
                                         onClick={() => void revoke(grant)}
                                     >
                                         <Trash2 className="size-4 shrink-0" aria-hidden />
@@ -309,10 +310,10 @@ export function ShareDialog({
 
                 <section
                     className="flex flex-col gap-3 border-t border-border pt-4"
-                    aria-label="Share with somebody else"
+                    aria-label={t("share.more")}
                 >
                     <SegmentedControl
-                        aria-label="Who to share with"
+                        aria-label={t("share.who")}
                         size="sm"
                         value={kind}
                         onValueChange={(next) => {
@@ -320,18 +321,18 @@ export function ShareDialog({
                             setPrincipalId("");
                         }}
                         options={[
-                            { value: "user", label: "A person" },
+                            { value: "user", label: t("share.person") },
                             {
                                 value: "team",
-                                label: "A team",
+                                label: t("share.team"),
                                 disabled: !candidates.some((one) => one.type === "team"),
-                                title: "A team of one of your organizations"
+                                title: t("share.teamHint")
                             },
                             {
                                 value: "role",
-                                label: "A role",
+                                label: t("share.role"),
                                 disabled: !candidates.some((one) => one.type === "role"),
-                                title: "Everybody holding a role in one of your organizations"
+                                title: t("share.roleHint")
                             }
                         ]}
                     />
@@ -342,7 +343,7 @@ export function ShareDialog({
                                 className="text-[12px] text-muted-foreground"
                                 htmlFor="share-who"
                             >
-                                Search for somebody
+                                {t("share.search")}
                             </label>
                             <div className="relative">
                                 <Search
@@ -353,7 +354,7 @@ export function ShareDialog({
                                     id="share-who"
                                     className="pl-8"
                                     value={query}
-                                    placeholder="Name, username or address"
+                                    placeholder={t("share.searchPlaceholder")}
                                     onChange={(event) => setQuery(event.target.value)}
                                 />
                             </div>
@@ -382,10 +383,10 @@ export function ShareDialog({
                         </div>
                     ) : (
                         <Select
-                            aria-label={kind === "team" ? "Which team" : "Which role"}
+                            aria-label={kind === "team" ? t("share.whichTeam") : t("share.whichRole")}
                             value={principalId}
                             onValueChange={setPrincipalId}
-                            placeholder={kind === "team" ? "Pick a team" : "Pick a role"}
+                            placeholder={kind === "team" ? t("share.pickTeam") : t("share.pickRole")}
                             options={groups.map((one) => ({
                                 value: one.id,
                                 label: one.orgName ? `${one.orgName} - ${one.name}` : one.name
@@ -395,20 +396,20 @@ export function ShareDialog({
 
                     <div className="flex flex-col gap-1">
                         <label className="text-[12px] text-muted-foreground" htmlFor="share-what">
-                            What they can do
+                            {t("share.can")}
                         </label>
                         <Select
                             id="share-what"
-                            aria-label="What they can do"
+                            aria-label={t("share.can")}
                             value={capability}
                             onValueChange={setCapability}
                             options={capabilities.map((one) => ({
                                 value: one,
-                                label: CAPABILITY_WORDS[one]?.label ?? one
+                                label: capabilityLabel(one)
                             }))}
                         />
                         <p className="text-[12px] text-foreground-subtle">
-                            {CAPABILITY_WORDS[capability]?.hint ?? ""}
+                            {capabilityHint(capability)}
                         </p>
                     </div>
 
@@ -420,19 +421,19 @@ export function ShareDialog({
                                         className="size-4 shrink-0 text-foreground-subtle"
                                         aria-hidden
                                     />
-                                    Only sometimes
+                                    {t("share.sometimes")}
                                 </span>
                                 <Switch
                                     checked={limited}
                                     onChange={setLimited}
-                                    aria-label="Limit when this works"
+                                    aria-label={t("share.limit")}
                                 />
                             </label>
 
                             {limited ? (
                                 <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
                                     <div className="grid gap-3 sm:grid-cols-2">
-                                        <Field label="From this day" htmlFor="share-from-day">
+                                        <Field label={t("share.fromDay")} htmlFor="share-from-day">
                                             <Input
                                                 id="share-from-day"
                                                 type="date"
@@ -442,7 +443,7 @@ export function ShareDialog({
                                                 }
                                             />
                                         </Field>
-                                        <Field label="Until this day" htmlFor="share-to-day">
+                                        <Field label={t("share.toDay")} htmlFor="share-to-day">
                                             <Input
                                                 id="share-to-day"
                                                 type="date"
@@ -454,7 +455,7 @@ export function ShareDialog({
 
                                     <fieldset className="flex flex-col gap-1">
                                         <legend className="text-[12px] text-muted-foreground">
-                                            On these days
+                                            {t("share.days")}
                                         </legend>
                                         <div className="flex flex-wrap gap-1">
                                             {weekOrder.map((day: number) => {
@@ -474,7 +475,7 @@ export function ShareDialog({
                                                                 : "border-border text-muted-foreground"
                                                         )}
                                                     >
-                                                        {core.DAY_SHORT_NAMES[day]}
+                                                        {dayNames[day]}
                                                     </button>
                                                 );
                                             })}
@@ -482,7 +483,7 @@ export function ShareDialog({
                                     </fieldset>
 
                                     <div className="grid gap-3 sm:grid-cols-2">
-                                        <Field label="From this hour" htmlFor="share-from-hour">
+                                        <Field label={t("share.fromHour")} htmlFor="share-from-hour">
                                             <Input
                                                 id="share-from-hour"
                                                 type="time"
@@ -492,7 +493,7 @@ export function ShareDialog({
                                                 }
                                             />
                                         </Field>
-                                        <Field label="Until this hour" htmlFor="share-to-hour">
+                                        <Field label={t("share.toHour")} htmlFor="share-to-hour">
                                             <Input
                                                 id="share-to-hour"
                                                 type="time"
@@ -504,30 +505,30 @@ export function ShareDialog({
                                         </Field>
                                     </div>
 
-                                    <Field label="How many times" htmlFor="share-uses">
+                                    <Field label={t("share.uses")} htmlFor="share-uses">
                                         <Input
                                             id="share-uses"
                                             type="number"
                                             min={1}
                                             inputMode="numeric"
-                                            placeholder="As often as they like"
+                                            placeholder={t("share.usesPlaceholder")}
                                             value={maxUses}
                                             onChange={(event) => setMaxUses(event.target.value)}
                                         />
                                     </Field>
                                     <p className="text-[12px] text-foreground-subtle">
-                                        Only actually operating it counts. Looking at it does not.
+                                        {t("share.usesHint")}
                                     </p>
                                 </div>
                             ) : null}
                         </div>
                     ) : null}
 
-                    <Field label="What this is for" htmlFor="share-note">
+                    <Field label={t("share.note")} htmlFor="share-note">
                         <Input
                             id="share-note"
                             value={note}
-                            placeholder="Cleaner, Tuesdays"
+                            placeholder={t("share.notePlaceholder")}
                             onChange={(event) => setNote(event.target.value)}
                         />
                     </Field>
@@ -541,7 +542,7 @@ export function ShareDialog({
                             {busy ? (
                                 <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
                             ) : null}
-                            Share
+                            {t("share.share")}
                         </Button>
                     </div>
                 </section>
@@ -573,14 +574,48 @@ function Field({
 
 /** The bounds of one grant in a line, or "" when it has none. Dates are drawn
  *  through the reader's own format, like every other date here. */
-function describe(grant: GrantView, weekOrder: readonly number[]): string {
-    return core.describeGrant(
-        {
-            ...grant.schedule,
-            startsAt: grant.schedule.startsAt ? new Date(grant.schedule.startsAt) : null,
-            endsAt: grant.schedule.endsAt ? new Date(grant.schedule.endsAt) : null
-        },
-        weekOrder,
-        (date) => date.toISOString().slice(0, 10)
-    );
+function describe(
+    grant: GrantView,
+    weekOrder: readonly number[],
+    t: NamespaceTranslator<"components">,
+    dayNames: readonly string[]
+): string {
+    // `core.describeGrant`'s sentence, in the reader's words.
+    const schedule = grant.schedule;
+    const day = (iso: string) => iso.slice(0, 10);
+    const parts: string[] = [];
+    if (schedule.startsAt && schedule.endsAt) {
+        parts.push(t("share.range", { from: day(schedule.startsAt), to: day(schedule.endsAt) }));
+    } else if (schedule.startsAt) {
+        parts.push(t("share.fromOnly", { from: day(schedule.startsAt) }));
+    } else if (schedule.endsAt) {
+        parts.push(t("share.untilOnly", { to: day(schedule.endsAt) }));
+    }
+    const mask = schedule.days & core.EVERY_DAY;
+    if (mask !== core.EVERY_DAY) {
+        parts.push(
+            mask === core.WEEKDAYS
+                ? t("share.weekdays")
+                : mask === core.WEEKEND
+                  ? t("share.weekends")
+                  : mask === 0
+                    ? t("share.noDays")
+                    : weekOrder
+                          .filter((one) => core.runsOnDay(mask, one))
+                          .map((one) => dayNames[one])
+                          .join(", ")
+        );
+    }
+    if (schedule.startMinute !== null && schedule.endMinute !== null) {
+        parts.push(
+            t("share.range", {
+                from: core.clockTime(schedule.startMinute),
+                to: core.clockTime(schedule.endMinute)
+            })
+        );
+    }
+    if (schedule.maxUses !== null) {
+        parts.push(t("share.usesOf", { uses: schedule.uses, max: schedule.maxUses }));
+    }
+    return parts.join(" - ");
 }

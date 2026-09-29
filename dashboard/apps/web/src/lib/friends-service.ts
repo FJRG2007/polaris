@@ -18,6 +18,7 @@ import { blockedEitherWay } from "@/lib/blocks";
 import { prisma, VISIBLE_USER } from "@polaris/db";
 import { contactLines } from "@/lib/privacy-service";
 import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
 
 /** Somebody, as a friends list draws them. */
 export interface FriendView {
@@ -290,15 +291,13 @@ async function announce(
     });
     // Never the address. An alert naming somebody is still a screen showing one
     // account something about another, and this one goes out by mail as well.
-    const name = person?.name || (person?.username ? `@${person.username}` : "") || "Somebody";
+    const t = await wordsFor(userId, "notices");
+    const name = person?.name || (person?.username ? `@${person.username}` : "") || t("friends.somebody");
     await notify({
         userId,
         event: "account.friend",
-        title: what === "asked" ? `${name} wants to be added` : `${name} added you`,
-        body:
-            what === "asked"
-                ? "Answer it on your friends page."
-                : "You can now see whatever they show their friends.",
+        title: what === "asked" ? t("friends.asked", { name }) : t("friends.accepted", { name }),
+        body: what === "asked" ? t("friends.askedBody") : t("friends.acceptedBody"),
         href: FRIENDS_PATH,
         // Only the request is waiting on anybody. Being accepted is news.
         actionRequired: what === "asked",
