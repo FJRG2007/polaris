@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function MailJunkPage() {
     const user = await requirePermission("mail.use");
     const accounts = await listAccountViews(user.id, await mailShelfFor(user.id));
-    if (accounts.length === 0) return <NoMailboxes what="Junk" />;
+    if (accounts.length === 0) return <NoMailboxes what="junk" />;
 
     const learning: Record<string, { junk: number; good: number; words: number }> = {};
     for (const account of accounts) learning[account.id] = await spamLearning(account.id);

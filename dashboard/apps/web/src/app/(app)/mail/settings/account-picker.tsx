@@ -14,6 +14,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 
 export function AccountPicker({
@@ -25,9 +26,10 @@ export function AccountPicker({
     value: string;
     onChange: (accountId: string) => void;
 }) {
+    const t = useTranslations("mailSettings");
     if (accounts.length < 2) return null;
     return (
-        <div className="mb-4 flex flex-wrap gap-1" role="tablist" aria-label="Mailbox">
+        <div className="mb-4 flex flex-wrap gap-1" role="tablist" aria-label={t("picker.label")}>
             {accounts.map((account) => (
                 <button
                     key={account.id}

@@ -9,6 +9,7 @@
 
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import mail from "../../messages/en-US/mail.json";
 
 const SCREENS = new URL("../../src/app/(app)/mail/", import.meta.url);
 
@@ -18,7 +19,8 @@ describe("writing with no mailbox", () => {
         expect(shell).toContain('CONNECT_MAILBOX_HREF = "/mail/settings/accounts?connect=1"');
         // The one gate every caller goes through: Write, the shortcut, a reply.
         expect(shell).toMatch(/if \(draft && !hasMailbox\) \{\s*router\.push\(CONNECT_MAILBOX_HREF\);/);
-        expect(shell).toContain('{hasMailbox ? "Write" : "Connect a mailbox"}');
+        expect(shell).toContain('{hasMailbox ? t("shell.write") : t("onboarding.connect")}');
+        expect(mail.onboarding.connect).toBe("Connect a mailbox");
         // Nothing hands the raw setter out any more.
         expect(shell).not.toContain("openComposer: setComposing");
     });

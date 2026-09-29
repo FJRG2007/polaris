@@ -19,6 +19,7 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import mail from "../../messages/en-US/mail.json";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 
@@ -49,7 +50,8 @@ describe("which mailbox a sender writes to", () => {
             "utf8"
         );
         expect(view).not.toContain("` - to ${mailbox}`");
-        expect(view).toContain("to {mailbox}");
+        expect(view).toContain('t("subscriptions.to", { mailbox })');
+        expect(mail.subscriptions.to).toBe("to {mailbox}");
     });
 
     it("wears the mailbox's own colour, so the row and the rail agree", async () => {

@@ -31,6 +31,9 @@ import { useEffect, useRef, useState } from "react";
 import { useBusy } from "@/app/(app)/mail/use-busy";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { MAIL_TRASH_KEEP_CHOICES } from "@polaris/core";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { mailRefusalText } from "@/lib/mailbox/refusal-text";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
 import { Button, ConfirmDeleteDialog, Select, Switch, cn, useToast } from "@polaris/ui";
@@ -79,6 +82,7 @@ export function AccountsView({
     moveShelf?: string | null;
 }) {
     const router = useRouter();
+    const t = useTranslations("mailSettings");
     const movedTo = useRef<string | null>(null);
     useEffect(() => {
         if (!moveShelf) {
@@ -140,57 +144,46 @@ export function AccountsView({
         <div className="space-y-4">
             {outcome === "linked" ? (
                 <p className="rounded-md border border-border bg-card px-3 py-2 text-[13px] text-muted-foreground">
-                    {outcomeProvider === "microsoft" ? "Microsoft" : "Google"} account authorized.
-                    Add the mailbox below and it will be offered without a password.
+                    {t("accounts.linked", { provider: outcomeProvider === "microsoft" ? "Microsoft" : "Google" })}
                 </p>
             ) : null}
             {outcome === "not_public" ? (
                 <p className="rounded-md border border-danger-edge bg-card px-3 py-2 text-[13px] text-danger">
-                    {outcomeProvider === "microsoft" ? "Microsoft" : "Google"} had nowhere to send
-                    you back to. Polaris is only reachable on this network, and an address like that
-                    is one they refuse.{" "}
+                    {t("accounts.notPublic", { provider: outcomeProvider === "microsoft" ? "Microsoft" : "Google" })}{" "}
                     {canSetDomain ? (
                         <Link href="/admin/domains" className="underline">
-                            Give Polaris a public address
+                            {t("accounts.givePublic")}
                         </Link>
                     ) : (
-                        "Ask an administrator to give Polaris a public address."
+                        t("accounts.askAdmin")
                     )}
                 </p>
             ) : outcome === "wrong_account" ? (
                 <p className="rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-[13px]">
-                    That is not the {outcomeProvider === "microsoft" ? "Microsoft" : "Google"}{" "}
-                    account this mailbox is. Nothing was connected. Authorize the account whose
-                    address you typed, or add the mailbox with a password.
+                    {t("accounts.wrongAccount", { provider: outcomeProvider === "microsoft" ? "Microsoft" : "Google" })}
                 </p>
             ) : outcome && outcome !== "linked" ? (
                 <p className="rounded-md border border-danger-edge bg-card px-3 py-2 text-[13px] text-danger">
-                    That authorization did not finish. Nothing was changed.
+                    {t("accounts.unfinished")}
                 </p>
             ) : null}
 
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-[15px] font-semibold tracking-tight">Your mailboxes</h2>
-                    <p className="text-[13px] text-muted-foreground">
-                        Connect as many as you like. They share one inbox and each keeps its own
-                        colour.
-                    </p>
+                    <h2 className="text-[15px] font-semibold tracking-tight">{t("accounts.title")}</h2>
+                    <p className="text-[13px] text-muted-foreground">{t("accounts.lead")}</p>
                 </div>
                 <Button onClick={() => setAdding(true)}>
                     <Plus className="size-4 shrink-0" aria-hidden />
-                    Add a mailbox
+                    {t("accounts.add")}
                 </Button>
             </div>
 
             {accounts.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border px-4 py-8 text-center">
                     <Mail className="mx-auto size-5 shrink-0 text-foreground-subtle" aria-hidden />
-                    <p className="mt-2 text-[13px] font-medium">No mailboxes yet</p>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                        Connect one and your mail is read here instead of in somebody else&apos;s
-                        browser tab.
-                    </p>
+                    <p className="mt-2 text-[13px] font-medium">{t("noMailboxes.title")}</p>
+                    <p className="mt-1 text-[13px] text-muted-foreground">{t("accounts.emptyBody")}</p>
                 </div>
             ) : (
                 <ul className="space-y-2">
@@ -218,7 +211,7 @@ export function AccountsView({
                     key={editedAccount.id}
                     editing={editedAccount}
                     focusPassword={editing?.focusPassword ?? false}
-                    title="Edit mailbox"
+                    title={t("accounts.editTitle")}
                     links={links}
                     googleReady={googleReady}
                     microsoftReady={microsoftReady}
@@ -268,6 +261,8 @@ function AccountRow({
 }) {
     const router = useRouter();
     const toast = useToast();
+    const t = useTranslations("mailSettings");
+    const tm = useTranslations("mail");
     const [busy, startBusy] = useBusy();
     const [removing, setRemoving] = useState(false);
     const [unified, setUnified] = useState(account.unified);
@@ -299,7 +294,7 @@ function AccountRow({
                         ) : null}
                         {account.auth === "oauth" ? (
                             <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                                Authorized
+                                {t("accounts.authorized")}
                             </span>
                         ) : null}
                     </p>
@@ -322,13 +317,13 @@ function AccountRow({
                         ) : (
                             <CheckCircle2 className="size-3.5 shrink-0" aria-hidden />
                         )}
-                        {stateSentence(account)}
+                        {stateSentence(t, tm, account)}
                     </p>
                 </div>
 
                 {refused ? (
                     <Button size="sm" variant="outline" onClick={() => onEdit(true)}>
-                        {account.auth === "oauth" ? "Reconnect" : "Update password"}
+                        {account.auth === "oauth" ? tm("refused.reconnect") : tm("refused.updatePassword")}
                     </Button>
                 ) : null}
 
@@ -352,14 +347,14 @@ function AccountRow({
                                 router.refresh();
                             });
                         }}
-                        aria-label="Include this mailbox in the shared inbox"
+                        aria-label={t("accounts.unifiedLabel")}
                     />
-                    In the shared inbox
+                    {t("accounts.unified")}
                 </label>
 
                 <label
                     className="flex shrink-0 items-center gap-2 text-[12px] text-muted-foreground"
-                    title="A notice from your system when new mail arrives here while Polaris is in another tab or window"
+                    title={t("accounts.notifyHint")}
                 >
                     <Switch
                         checked={notify}
@@ -376,9 +371,9 @@ function AccountRow({
                                 router.refresh();
                             });
                         }}
-                        aria-label="Tell me when new mail arrives in this mailbox"
+                        aria-label={t("accounts.notifyLabel")}
                     />
-                    Notify me
+                    {t("accounts.notify")}
                 </label>
 
                 {/* What every mail service does, said where the mailbox's own
@@ -387,16 +382,16 @@ function AccountRow({
                     answer somebody can give. */}
                 <label
                     className="flex shrink-0 items-center gap-2 text-[12px] text-muted-foreground"
-                    title="Messages in this mailbox's trash are deleted on the mail server once they are this old"
+                    title={t("accounts.trashHint")}
                 >
-                    Empty the trash
+                    {t("accounts.trash")}
                     <Select
                         value={String(trashDays)}
-                        aria-label="When this mailbox's trash is emptied"
+                        aria-label={t("accounts.trashLabel")}
                         className="h-7 w-44 text-[12px]"
                         options={MAIL_TRASH_KEEP_CHOICES.map((choice) => ({
                             value: String(choice.days),
-                            label: choice.label
+                            label: t("accounts.trashKeep", { days: choice.days })
                         }))}
                         onValueChange={(next) => {
                             const days = Number(next);
@@ -421,8 +416,8 @@ function AccountRow({
                 <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Check this mailbox now"
-                    title="Check this mailbox now"
+                    aria-label={t("accounts.checkNow")}
+                    title={t("accounts.checkNow")}
                     disabled={busy}
                     onClick={() =>
                         startBusy(async () => {
@@ -441,8 +436,8 @@ function AccountRow({
                 <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Edit this mailbox"
-                    title="Edit this mailbox"
+                    aria-label={t("accounts.edit")}
+                    title={t("accounts.edit")}
                     onClick={() => onEdit(false)}
                 >
                     <Pencil className="size-4 shrink-0" aria-hidden />
@@ -450,8 +445,8 @@ function AccountRow({
                 <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Remove this mailbox"
-                    title="Remove this mailbox"
+                    aria-label={t("accounts.remove")}
+                    title={t("accounts.remove")}
                     onClick={() => setRemoving(true)}
                 >
                     <Trash2 className="size-4 shrink-0" aria-hidden />
@@ -472,7 +467,7 @@ function AccountRow({
                     // One row of several and nothing inside it is lost, so a
                     // plain confirmation rather than typing the address out.
                     requireTyping={false}
-                    title={`Remove ${account.address}?`}
+                    title={t("accounts.removeTitle", { address: account.address })}
                     // Both halves, because each is a thing somebody gets wrong
                     // in the opposite direction: "remove mailbox" reads as
                     // "delete my mail" to anybody who has not thought about
@@ -480,12 +475,12 @@ function AccountRow({
                     // to anybody who has - while the filters they wrote here,
                     // and everything else Polaris holds for this mailbox alone,
                     // go with it.
-                    description={`Polaris stops checking it and deletes what it holds for it: the mail it cached, its filters, templates, signature, send-as addresses, drafts and what its spam filter learned. Nothing on the mail server is touched.${
-                        account.auth === "oauth"
-                            ? " Your connected account stays connected: it is on your profile and may be authorizing other things too."
-                            : ""
-                    }`}
-                    confirmLabel="Remove it"
+                    question={t.rich("accounts.removeQuestion", {
+                        address: account.address,
+                        strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                    })}
+                    description={t("accounts.removeBody", { oauth: account.auth === "oauth" ? "yes" : "no" })}
+                    confirmLabel={t("accounts.removeConfirm")}
                     onConfirm={() => {
                         setRemoving(false);
                         onRemoved(true);
@@ -497,7 +492,7 @@ function AccountRow({
                                 toast.show({ title: said });
                                 return;
                             }
-                            toast.show({ title: `${account.address} is no longer connected.` });
+                            toast.show({ title: t("accounts.removed", { address: account.address }) });
                             router.refresh();
                         })();
                     }}
@@ -507,17 +502,25 @@ function AccountRow({
     );
 }
 
-function stateSentence(account: MailAccountView): string {
-    if (account.state === "checking") return "Checking the new details with its servers...";
+function stateSentence(
+    t: NamespaceTranslator<"mailSettings">,
+    tm: NamespaceTranslator<"mail">,
+    account: MailAccountView
+): string {
+    if (account.state === "checking") return t("accounts.state.checking");
     if (account.state === "auth") {
         // Said as what happened and what Polaris did about it. The detail is
         // the refusal's own sentence, which is Polaris' words, never the
         // server's.
         return account.auth === "oauth"
-            ? `${account.stateDetail || "Its authorization was refused."} Checking is paused until it is reconnected.`
-            : `${account.stateDetail || "The server stopped accepting its password."} Checking is paused until the password is updated.`;
+            ? t("accounts.state.oauthRefused", {
+                  detail: account.stateDetail ? mailRefusalText(tm, account.stateDetail) : t("accounts.state.oauthDefault")
+              })
+            : t("accounts.state.passwordRefused", {
+                  detail: account.stateDetail ? mailRefusalText(tm, account.stateDetail) : t("accounts.state.passwordDefault")
+              });
     }
-    if (account.state === "unreachable") return "Polaris cannot reach this mail server.";
-    if (account.state === "never") return "Waiting for its first check.";
-    return account.lastSyncAt ? "Checked recently." : "Connected.";
+    if (account.state === "unreachable") return tm("rail.unreachable");
+    if (account.state === "never") return t("accounts.state.never");
+    return account.lastSyncAt ? t("accounts.state.recent") : t("accounts.state.connected");
 }

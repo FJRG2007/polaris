@@ -33,6 +33,8 @@ import { AssigneePicker, StatusPicker } from "./pickers";
 import type { SavedView } from "@/lib/tasks/view-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { holdSelection, shortfallMessage } from "./views/shared";
+import { groupLabel, optionLabel } from "./option-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { bulkOverlay, taskOverlay, useLatest } from "./optimistic";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
@@ -103,6 +105,8 @@ export function ListScreen({
     const router = useRouter();
     const toast = useToast();
     const format = useDisplayFormat();
+    const t = useTranslations("tasksViews");
+    const tt = useTranslations("tasks");
     const [, startRefresh] = useTransition();
 
     // A private view is one person's own way of looking at this list, so it is
@@ -319,6 +323,19 @@ export function ListScreen({
         [visibleFacts, rowById]
     );
 
+    // The ids a group can be named after, so a heading core made up itself is
+    // told apart from a status, person, tag or list somebody named.
+    const namedGroups = useMemo(
+        () =>
+            new Set([
+                ...context.statuses.map((status) => status.id),
+                ...context.people.map((person) => person.id),
+                ...context.tags.map((tag) => tag.id),
+                ...lists.map((list) => list.id)
+            ]),
+        [context.statuses, context.people, context.tags, lists]
+    );
+
     const groups = useMemo<ViewProps["groups"]>(
         () =>
             core
@@ -339,6 +356,7 @@ export function ListScreen({
                 )
                 .map((group) => ({
                     ...group,
+                    label: groupLabel(tt, groupBy, group, (key) => namedGroups.has(key)),
                     tasks: group.tasks
                         .map((facts) => rowById.get(facts.id))
                         .filter((task): task is TaskRow => task !== undefined)
@@ -351,7 +369,9 @@ export function ListScreen({
             context.people,
             context.tags,
             lists,
-            format.weekStartsOn
+            format.weekStartsOn,
+            namedGroups,
+            tt
         ]
     );
 
@@ -412,7 +432,7 @@ export function ListScreen({
 
         const view = {
             ...owner,
-            name: ownView?.name ?? "My order",
+            name: ownView?.name ?? t("views.myOrder"),
             type: viewType,
             groupBy,
             sort: { field: "manual", direction: "asc" },
@@ -518,7 +538,7 @@ export function ListScreen({
                 : statusId === null
                   ? {
                         statusId: null,
-                        statusName: "No status",
+                        statusName: tt("groups.noStatus"),
                         statusColor: "#64748b",
                         statusType: "open"
                     }
@@ -645,7 +665,7 @@ export function ListScreen({
 
     /** Say so when a write reached fewer tasks than the selection it was handed. */
     const reportShortfall = (count: number | undefined, asked: number, verb: BulkVerb) => {
-        const message = shortfallMessage(count, asked, verb);
+        const message = shortfallMessage(count, asked, verb, t);
         if (message) setError(message);
     };
 
@@ -699,9 +719,9 @@ export function ListScreen({
      */
     const copySelection = (targets: readonly TaskRow[]) => {
         if (targets.length === 0) return;
-        const label = targets.length === 1 ? targets[0]!.name : `${targets.length} tasks`;
+        const label = targets.length === 1 ? targets[0]!.name : t("bulk.tasks", { count: targets.length });
         writeTaskClipboard({ taskIds: targets.map((task) => task.id), label });
-        toast.show({ key: "tasks-copy", title: `Copied ${label}` });
+        toast.show({ key: "tasks-copy", title: t("bulk.copied", { label }) });
     };
 
     /**
@@ -732,13 +752,13 @@ export function ListScreen({
         const report = result.report;
         if (!report) return;
         const left: string[] = [];
-        if (report.droppedStatuses > 0) left.push("a status");
-        if (report.droppedTags > 0) left.push(report.droppedTags === 1 ? "a tag" : "tags");
-        if (report.droppedAssignees > 0) left.push("people");
+        if (report.droppedStatuses > 0) left.push(t("paste.aStatus"));
+        if (report.droppedTags > 0) left.push(report.droppedTags === 1 ? t("paste.aTag") : t("paste.tags"));
+        if (report.droppedAssignees > 0) left.push(t("paste.people"));
         toast.show({
             key: "tasks-paste",
-            title: report.created === 1 ? "Pasted one task" : `Pasted ${report.created} tasks`,
-            body: left.length > 0 ? `This space has no ${left.join(", no ")} to match, so that was left off.` : undefined
+            title: t("paste.pasted", { count: report.created }),
+            body: left.length > 0 ? t("paste.leftOff", { items: left.join(t("paste.joiner")) }) : undefined
         });
         refresh();
     };
@@ -931,10 +951,10 @@ export function ListScreen({
                 {context.canEdit && createTarget && (
                     <Button
                         size="sm"
-                        title="New task (N)"
+                        title={t("toolbar.newTaskKey")}
                         onClick={() => setCreating({ name: "", dueDate: null })}
                     >
-                        <Plus className="size-4" /> New task
+                        <Plus className="size-4" /> {t("toolbar.newTask")}
                     </Button>
                 )}
             </header>
@@ -972,9 +992,9 @@ export function ListScreen({
                         onValueChange={(value) => setGroupBy(value as core.TaskGroupField)}
                         options={core.TASK_GROUP_FIELDS.map((field) => ({
                             value: field,
-                            label: `Group: ${core.TASK_GROUP_LABELS[field]}`
+                            label: t("toolbar.group", { label: optionLabel(tt, "group", field) })
                         }))}
-                        aria-label="Group by"
+                        aria-label={t("toolbar.groupBy")}
                         className="h-8 w-44 text-xs"
                     />
                 )}
@@ -986,9 +1006,9 @@ export function ListScreen({
                     }
                     options={core.TASK_SORT_FIELDS.map((field) => ({
                         value: field,
-                        label: `Sort: ${core.TASK_SORT_LABELS[field]}`
+                        label: t("toolbar.sort", { label: optionLabel(tt, "sort", field) })
                     }))}
-                    aria-label="Sort by"
+                    aria-label={t("toolbar.sortBy")}
                     className="h-8 w-44 text-xs"
                 />
                 <button
@@ -998,7 +1018,7 @@ export function ListScreen({
                     }
                     className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                    {sort.direction === "asc" ? "Ascending" : "Descending"}
+                    {sort.direction === "asc" ? t("toolbar.ascending") : t("toolbar.descending")}
                 </button>
 
                 {/* Not offered while grouping by status, where closed work is in
@@ -1011,7 +1031,7 @@ export function ListScreen({
                             checked={showClosed}
                             onChange={(event) => setShowClosed(event.target.checked)}
                         />
-                        Show closed
+                        {t("toolbar.showClosed")}
                     </label>
                 )}
 
@@ -1020,8 +1040,8 @@ export function ListScreen({
                     <input
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Search tasks"
-                        aria-label="Search tasks"
+                        placeholder={t("toolbar.search")}
+                        aria-label={t("toolbar.search")}
                         className="h-8 w-44 rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                     />
                 </div>
@@ -1076,18 +1096,18 @@ export function ListScreen({
                                 variant="ghost"
                                 onClick={() => void applyToTasks(selected, { archived: true })}
                             >
-                                Archive
+                                {t("bulk.archive")}
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setDeleting(selected)}>
-                                Delete
+                                {t("bulk.delete")}
                             </Button>
                         </>
                     )}
                     <span className="flex-1" />
                     <button
                         type="button"
-                        aria-label="Clear selection"
-                        title="Clear selection (Esc)"
+                        aria-label={t("bulk.clear")}
+                        title={t("bulk.clearKey")}
                         onClick={clearSelection}
                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
@@ -1104,8 +1124,8 @@ export function ListScreen({
 
             {rows.length === 0 && (
                 <EmptyState
-                    title="Nothing here yet."
-                    description="Add the first task and it appears on every view of this list."
+                    title={t("empty.title")}
+                    description={t("empty.description")}
                     // Saying "add the first task" and offering no way to add one
                     // has told somebody they are stuck. The key is printed
                     // beside it because it is the one people keep, and because
@@ -1118,7 +1138,7 @@ export function ListScreen({
                                 onClick={() => setCreating({ name: "", dueDate: null })}
                             >
                                 <Plus className="size-4" />
-                                Add a task
+                                {t("empty.add")}
                             </Button>
                         ) : undefined
                     }
@@ -1126,8 +1146,7 @@ export function ListScreen({
             )}
 
             <p className="text-[0.6875rem] text-muted-foreground">
-                Ctrl-click (or Cmd-click) selects a task without opening it, shift-click takes
-                everything between, Esc clears the selection, and N starts a new task.
+                {t("hint")}
             </p>
 
             {createTarget && (
@@ -1169,7 +1188,7 @@ export function ListScreen({
                 // One task is named; a selection is counted, since a dialog
                 // listing forty names says less than the number does.
                 name={
-                    deleting.length === 1 ? (deleting[0]?.name ?? "") : `${deleting.length} tasks`
+                    deleting.length === 1 ? (deleting[0]?.name ?? "") : t("bulk.tasks", { count: deleting.length })
                 }
                 kind={deleting.length === 1 ? "task" : "tasks"}
                 // One row of many is asked plainly, the way every other single
@@ -1177,10 +1196,13 @@ export function ListScreen({
                 // comment and hour logged against forty at once, off one click on
                 // a screen where the click before it was a shift-click.
                 requireTyping={deleting.length > 1}
-                description="Comments, checklists and tracked time go with them. Archiving keeps all of that and takes them off the board."
-                confirmLabel={
-                    deleting.length === 1 ? "Delete task" : `Delete ${deleting.length} tasks`
-                }
+                title={t("bulk.deleteTitle", { count: deleting.length })}
+                question={t.rich("bulk.deleteQuestion", {
+                    name: deleting[0]?.name ?? "",
+                    strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                })}
+                description={t("bulk.deleteDescription")}
+                confirmLabel={t("bulk.deleteConfirm", { count: deleting.length })}
                 onConfirm={async () => {
                     const taskIds = deleting.map((task) => task.id);
                     if (taskIds.length === 0) return;

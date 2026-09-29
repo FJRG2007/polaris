@@ -7,6 +7,9 @@
  * mailboxes or three folders findable at a glance. One list, so a mailbox given
  * "Green" on its edit form is the green its folders can be given in the rail.
  */
+
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+
 export const MAIL_PALETTE: readonly { hex: string; name: string }[] = [
     { hex: "#6366f1", name: "Indigo" },
     { hex: "#0ea5e9", name: "Blue" },
@@ -80,4 +83,9 @@ export function coloursFor(
         taken.add(next);
     }
     return out;
+}
+
+/** A palette colour's name in the reader's language, from `mail.palette`. */
+export function swatchName(t: NamespaceTranslator<"mail">, name: string): string {
+    return t(`palette.${name.toLowerCase()}` as Parameters<typeof t>[0]);
 }

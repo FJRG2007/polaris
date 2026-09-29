@@ -16,6 +16,7 @@ import type { TagView } from "@/lib/tasks/space-service";
 import { AssigneePicker, TagPicker } from "@/app/(app)/tasks/pickers";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 // The menus position themselves against the box their trigger occupies, which
 // is machinery jsdom does not have.
@@ -46,7 +47,7 @@ const PEOPLE: PersonRef[] = [
 
 describe("the tag picker", () => {
     it("puts the caret in its search as it opens", async () => {
-        render(<TagPicker tags={TAGS} selected={[]} onChange={() => {}} />);
+        render(<TagPicker tags={TAGS} selected={[]} onChange={() => {}} />, { wrapper: MessagesWrapper });
 
         await userEvent.click(screen.getByRole("button", { name: "Tags" }));
 
@@ -54,7 +55,7 @@ describe("the tag picker", () => {
     });
 
     it("narrows the list as it is typed into, without the menu taking the keystrokes", async () => {
-        render(<TagPicker tags={TAGS} selected={[]} onChange={() => {}} />);
+        render(<TagPicker tags={TAGS} selected={[]} onChange={() => {}} />, { wrapper: MessagesWrapper });
         await userEvent.click(screen.getByRole("button", { name: "Tags" }));
         const field = await screen.findByPlaceholderText("Find a tag");
 
@@ -74,7 +75,7 @@ describe("the tag picker", () => {
 describe("the assignee picker", () => {
     it("offers its search whatever the size of the space", async () => {
         const onChange = vi.fn();
-        render(<AssigneePicker people={PEOPLE} selected={[]} onChange={onChange} />);
+        render(<AssigneePicker people={PEOPLE} selected={[]} onChange={onChange} />, { wrapper: MessagesWrapper });
 
         await userEvent.click(screen.getByRole("button", { name: "Assignees" }));
         const field = await screen.findByPlaceholderText("Find someone");

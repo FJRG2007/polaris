@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TagPicker } from "../../src/app/(app)/tasks/pickers";
 import type { TagView } from "../../src/lib/tasks/space-service";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 afterEach(cleanup);
 
@@ -49,7 +50,7 @@ describe("naming a tag that does not exist yet", () => {
     it("puts it on the task on the first press, not the second", async () => {
         const user = userEvent.setup();
         const onChange = vi.fn();
-        render(<Harness onChange={onChange} />);
+        render(<Harness onChange={onChange} />, { wrapper: MessagesWrapper });
 
         await user.click(screen.getByRole("button", { name: "Tags" }));
         const field = await screen.findByLabelText("Find or create a tag");
@@ -64,7 +65,7 @@ describe("naming a tag that does not exist yet", () => {
 
     it("empties the field, so the next name is typed rather than typed onto", async () => {
         const user = userEvent.setup();
-        render(<Harness onChange={() => undefined} />);
+        render(<Harness onChange={() => undefined} />, { wrapper: MessagesWrapper });
 
         await user.click(screen.getByRole("button", { name: "Tags" }));
         const field = await screen.findByLabelText("Find or create a tag");

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { TaskCard } from "@/app/(app)/tasks/views/board";
 import type { TaskCommands } from "@/app/(app)/tasks/views/task-actions";
 import type { PersonRef, SpaceContext, TaskRow } from "@/lib/tasks/facts";
+import { withMessages } from "../setup/i18n";
 
 const ANA: PersonRef = { id: "u1", name: "Ana Ruiz", image: null };
 
@@ -77,7 +78,7 @@ function commandsFor(task: TaskRow, canEdit = true): TaskCommands {
 }
 
 function card(task: TaskRow, canEdit = true): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <TaskCard
             commands={commandsFor(task, canEdit)}
             selected={false}
@@ -86,7 +87,7 @@ function card(task: TaskRow, canEdit = true): string {
             onDragStart={() => {}}
             onDropAt={() => {}}
         />
-    );
+    ));
 }
 
 describe("board card", () => {

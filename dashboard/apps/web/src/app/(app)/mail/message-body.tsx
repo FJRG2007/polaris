@@ -33,6 +33,8 @@ import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function MessageBody({
     html,
@@ -68,13 +70,14 @@ export function MessageBody({
     const guessed: MessagePaper = useMemo(() => (dressesItself(drawn) ? "own" : "reader"), [drawn]);
     const [paper, setPaper] = useState<MessagePaper | null>(null);
     const inForce = paper ?? guessed;
+    const t = useTranslations("mail");
 
     return (
         <div className="min-w-0">
             {trackerVendors.length > 0 ? (
                 <p className="mb-2 flex items-center gap-1.5 text-[12px] text-foreground-subtle">
                     <ShieldCheck className="size-3.5 shrink-0 text-success" aria-hidden />
-                    {trackerSentence(trackerVendors)}
+                    {trackerSentence(t, trackerVendors)}
                 </p>
             ) : null}
 
@@ -86,15 +89,11 @@ export function MessageBody({
                         className="mt-2 text-[12px] text-foreground-subtle underline hover:text-foreground"
                         onClick={() => setPaper(inForce === "own" ? "reader" : "own")}
                     >
-                        {inForce === "own"
-                            ? "Show this in the Polaris theme"
-                            : "Show this on its own white page"}
+                        {inForce === "own" ? t("body.readerTheme") : t("body.ownPage")}
                     </button>
                 </>
             ) : (
-                <p className="text-[13px] text-foreground-subtle">
-                    This message has nothing in it.
-                </p>
+                <p className="text-[13px] text-foreground-subtle">{t("body.empty")}</p>
             )}
         </div>
     );
@@ -161,12 +160,12 @@ export function linkifyBareAddresses(html: string): string {
  * the wrong trade: neither Gmail nor Proton asks that, and it turned every
  * newsletter into a chore.
  */
-function trackerSentence(vendors: readonly string[]): string {
+function trackerSentence(t: NamespaceTranslator<"mail">, vendors: readonly string[]): string {
     const named =
         vendors.length === 1
-            ? vendors[0]
-            : `${vendors.slice(0, -1).join(", ")} and ${vendors.at(-1)}`;
-    return `Trackers from ${named} were served through Polaris, so they learned nothing about you.`;
+            ? (vendors[0] ?? "")
+            : `${vendors.slice(0, -1).join(", ")}${t("body.and")}${vendors.at(-1)}`;
+    return t("body.trackers", { named });
 }
 
 /**
@@ -362,6 +361,7 @@ export function SandboxedHtml({
     // and never during render: the server has no window, and a value that
     // differed between its HTML and the browser's first paint is a hydration
     // mismatch on the most security-sensitive component in the app.
+    const t = useTranslations("mail");
     const [origin, setOrigin] = useState("");
     useEffect(() => {
         setOrigin(window.location.origin);
@@ -443,7 +443,7 @@ export function SandboxedHtml({
         return (
             <div
                 className="h-24 animate-pulse rounded-md bg-card"
-                aria-label="Opening the message"
+                aria-label={t("body.opening")}
             />
         );
     }
@@ -451,7 +451,7 @@ export function SandboxedHtml({
     return (
         <iframe
             ref={frame}
-            title="Message"
+            title={t("body.frameTitle")}
             // No allow-same-origin, deliberately and permanently. Scripts are
             // granted only so the frame can report its own height; with an
             // opaque origin they reach nothing of this page's.

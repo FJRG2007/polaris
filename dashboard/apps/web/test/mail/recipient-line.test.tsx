@@ -22,6 +22,7 @@ import type { MailViewContext } from "@/app/(app)/mail/mail-view";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: () => undefined, push: () => undefined, replace: () => undefined })
@@ -132,8 +133,7 @@ function draw(to: readonly core.MailAddress[], cc: readonly core.MailAddress[]):
                 context={CONTEXT}
                 markRead="never"
             />
-        </ToastProvider>
-    );
+        </ToastProvider>, { wrapper: MessagesWrapper });
 }
 
 /** One row of the header, read the way somebody reads it. */

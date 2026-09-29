@@ -16,6 +16,8 @@
 
 import { z } from "zod";
 import { Button, cn, useToast } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Loader2, MailCheck, Send, TriangleAlert } from "lucide-react";
 
@@ -40,6 +42,7 @@ const POLL_FOR_MS = 5 * 60 * 1000;
 
 export function SendCheck({ accountId }: { accountId: string }) {
     const toast = useToast();
+    const t = useTranslations("mailSettings");
     const [check, setCheck] = useState<Check | null>(null);
     const [busy, setBusy] = useState(false);
     /** When this screen started waiting, so the polling stops on its own. */
@@ -90,12 +93,12 @@ export function SendCheck({ accountId }: { accountId: string }) {
             }
             const said = (body as { error?: unknown } | null)?.error;
             toast.show({
-                title: typeof said === "string" ? said : "That check could not be started."
+                title: typeof said === "string" ? said : t("sendCheck.notStarted")
             });
         })();
     };
 
-    const look = lookOf(check);
+    const look = lookOf(check, t);
     return (
         <div className="mt-2 flex flex-wrap items-start gap-2 border-t border-border/60 pt-2">
             <p
@@ -117,14 +120,14 @@ export function SendCheck({ accountId }: { accountId: string }) {
                 disabled={busy || check?.stage === "sending"}
                 onClick={start}
             >
-                {check && check.stage !== "none" ? "Check again" : "Check sending"}
+                {check && check.stage !== "none" ? t("sendCheck.again") : t("sendCheck.start")}
             </Button>
         </div>
     );
 }
 
 /** The sentence and the mark that goes with it. */
-function lookOf(check: Check | null): {
+function lookOf(check: Check | null, t: NamespaceTranslator<"mailSettings">): {
     text: string;
     tone: string;
     spin: boolean;
@@ -132,7 +135,7 @@ function lookOf(check: Check | null): {
 } {
     if (!check || check.stage === "none") {
         return {
-            text: "Sends a message from this mailbox to itself and reports what happens to it.",
+            text: t("sendCheck.idle"),
             tone: "text-muted-foreground",
             spin: false,
             Icon: Send

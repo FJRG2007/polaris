@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { Button, cn } from "@polaris/ui";
 import { AlertTriangle } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { refusedMailboxHref } from "@/lib/mailbox/refusals";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 
@@ -21,8 +22,9 @@ type NoticeAccount = Pick<MailAccountView, "id" | "address" | "auth" | "state">;
 /** One refused mailbox, as the notice says it. */
 export interface RefusedNotice {
     readonly id: string;
-    readonly sentence: string;
-    readonly action: string;
+    readonly address: string;
+    /** Refused an authorization rather than a password: the fix is to reconnect. */
+    readonly authorized: boolean;
     readonly href: string;
 }
 
@@ -37,11 +39,8 @@ export function refusedNotices(accounts: readonly NoticeAccount[]): RefusedNotic
         .filter((account) => account.state === "auth")
         .map((account) => ({
             id: account.id,
-            sentence:
-                account.auth === "oauth"
-                    ? `${account.address} stopped accepting its authorization`
-                    : `${account.address} stopped accepting its password`,
-            action: account.auth === "oauth" ? "Reconnect" : "Update password",
+            address: account.address,
+            authorized: account.auth === "oauth",
             href: refusedMailboxHref(account.id)
         }));
 }
@@ -55,10 +54,11 @@ export function RefusedMailboxes({
     className?: string;
     onNavigate?: () => void;
 }) {
+    const t = useTranslations("mail");
     const notices = refusedNotices(accounts);
     if (notices.length === 0) return null;
     return (
-        <ul className={cn("space-y-1.5", className)} aria-label="Mailboxes that need attention">
+        <ul className={cn("space-y-1.5", className)} aria-label={t("refused.label")}>
             {notices.map((notice) => (
                 <li
                     key={notice.id}
@@ -66,10 +66,14 @@ export function RefusedMailboxes({
                     role="status"
                 >
                     <AlertTriangle className="size-3.5 shrink-0 text-warning" aria-hidden />
-                    <span className="min-w-0 flex-1 break-words">{notice.sentence}</span>
+                    <span className="min-w-0 flex-1 break-words">
+                        {notice.authorized
+                            ? t("refused.authorization", { address: notice.address })
+                            : t("refused.password", { address: notice.address })}
+                    </span>
                     <Button asChild size="xs" variant="outline" className="shrink-0">
                         <Link href={notice.href} onClick={onNavigate}>
-                            {notice.action}
+                            {notice.authorized ? t("refused.reconnect") : t("refused.updatePassword")}
                         </Link>
                     </Button>
                 </li>

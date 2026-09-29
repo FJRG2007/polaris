@@ -17,6 +17,8 @@
 import * as core from "@polaris/core";
 import { useMemo, useRef, useState } from "react";
 import { useAppUrl } from "@/components/app-url";
+import { optionLabel } from "../option-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TaskRow } from "@/lib/tasks/facts";
 import type { SpaceContext } from "@/lib/tasks/facts";
 import { PersonName, PersonRow } from "@/components/person-name";
@@ -234,6 +236,9 @@ function CreateStatusDialog({
         color: string;
     }) => Promise<string | null>;
 }) {
+    const t = useTranslations("tasksViews");
+    const tt = useTranslations("tasks");
+    const tc = useTranslations("common");
     const [name, setName] = useState("");
     const [type, setType] = useState<core.TaskStatusType>("open");
     const [picked, setPicked] = useState<string | null>(null);
@@ -254,16 +259,16 @@ function CreateStatusDialog({
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>New status</DialogTitle>
-                    <DialogDescription>Added to this space and set on this task.</DialogDescription>
+                    <DialogTitle>{t("menu.newStatus")}</DialogTitle>
+                    <DialogDescription>{t("menu.newStatusDescription")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Name
+                        {t("menu.name")}
                         <Input
                             autoFocus
                             value={name}
-                            placeholder="On hold"
+                            placeholder={t("menu.namePlaceholder")}
                             onChange={(event) => setName(event.target.value)}
                             onKeyDown={(event) => {
                                 if (event.key !== "Enter") return;
@@ -274,7 +279,7 @@ function CreateStatusDialog({
                     </label>
 
                     <div className="flex flex-col gap-1 text-sm">
-                        Kind
+                        {t("menu.kind")}
                         <div className="flex flex-wrap gap-1">
                             {core.TASK_STATUS_TYPES.map((entry) => (
                                 <button
@@ -289,21 +294,21 @@ function CreateStatusDialog({
                                             : "border-border text-muted-foreground hover:text-foreground"
                                     )}
                                 >
-                                    {core.TASK_STATUS_TYPE_LABELS[entry]}
+                                    {optionLabel(tt, "statusType", entry)}
                                 </button>
                             ))}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            {core.TASK_STATUS_TYPE_HINTS[type]}
+                            {optionLabel(tt, "statusTypeHint", type)}
                         </p>
                     </div>
 
                     <label className="flex items-center gap-2 text-sm">
-                        Colour
+                        {t("menu.colour")}
                         <input
                             type="color"
                             value={color}
-                            aria-label="Status color"
+                            aria-label={t("menu.statusColor")}
                             onChange={(event) => setPicked(event.target.value)}
                             className="size-8 cursor-pointer rounded border border-border bg-transparent"
                         />
@@ -311,10 +316,10 @@ function CreateStatusDialog({
 
                     <div className="flex justify-end gap-2">
                         <Button variant="secondary" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button disabled={!trimmed || busy} onClick={() => void submit()}>
-                            {busy ? "Adding..." : "Add"}
+                            {busy ? t("menu.adding") : t("board.add")}
                         </Button>
                     </div>
                 </div>
@@ -342,6 +347,9 @@ function sharedBy(
 }
 
 /** Right-click anywhere on a task. */
+/** The key that deletes the selection, drawn beside the menu item. */
+const DELETE_SHORTCUT = "Del"; // i18n-ignore
+
 export function TaskMenu({
     commands,
     children
@@ -351,6 +359,8 @@ export function TaskMenu({
 }) {
     const { task, targets, context, canEdit } = commands;
     const baseUrl = useAppUrl();
+    const t = useTranslations("tasksViews");
+    const tt = useTranslations("tasks");
     const [drafting, setDrafting] = useState(false);
     /** True while a tag typed into the submenu is being made, so a second enter
      *  in the same tick does not make it twice - the picker inside a task guards
@@ -500,20 +510,20 @@ export function TaskMenu({
                 <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
                 <ContextMenuContent className="w-56">
                     {many ? (
-                        <ContextMenuLabel>{targets.length} tasks selected</ContextMenuLabel>
+                        <ContextMenuLabel>{t("menu.selected", { count: targets.length })}</ContextMenuLabel>
                     ) : (
                         <>
                             <ContextMenuItem onSelect={commands.onOpen}>
                                 <ExternalLink className="size-3.5" />
-                                Open
+                                {t("menu.open")}
                             </ContextMenuItem>
                             <ContextMenuItem onSelect={() => void copy(taskLink(baseUrl, task.id))}>
                                 <Link2 className="size-3.5" />
-                                Copy link
+                                {t("menu.copyLink")}
                             </ContextMenuItem>
                             <ContextMenuItem onSelect={() => void copy(task.reference)}>
                                 <Copy className="size-3.5" />
-                                Copy {task.reference}
+                                {t("menu.copyReference", { reference: task.reference })}
                             </ContextMenuItem>
                         </>
                     )}
@@ -524,18 +534,18 @@ export function TaskMenu({
                             <ContextMenuSub>
                                 <ContextMenuSubTrigger>
                                     <Check className="size-3.5" />
-                                    Status
+                                    {t("table.status")}
                                 </ContextMenuSubTrigger>
                                 <ContextMenuSubContent className="w-52 pt-2">
                                     <MenuSearch
                                         value={statusQuery}
                                         onChange={setStatusQuery}
-                                        placeholder="Find a status"
+                                        placeholder={tt("pickers.findStatus")}
                                     />
                                     <div className="max-h-64 overflow-y-auto overscroll-contain">
                                         {matchingStatuses.length === 0 && (
                                             <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                                No status matches that.
+                                                {tt("pickers.noStatusMatches")}
                                             </p>
                                         )}
                                         {matchingStatuses.map((status) => (
@@ -568,7 +578,7 @@ export function TaskMenu({
                                                 onSelect={() => setDrafting(true)}
                                             >
                                                 <Plus className="size-3.5" />
-                                                New status
+                                                {t("menu.newStatus")}
                                             </ContextMenuItem>
                                         </>
                                     )}
@@ -578,7 +588,7 @@ export function TaskMenu({
                             <ContextMenuSub>
                                 <ContextMenuSubTrigger>
                                     <Flag className="size-3.5" />
-                                    Priority
+                                    {t("table.priority")}
                                 </ContextMenuSubTrigger>
                                 <ContextMenuSubContent className="w-44">
                                     {priorities.map((priority) => (
@@ -595,7 +605,7 @@ export function TaskMenu({
                                                 }}
                                             />
                                             <span className="flex-1">
-                                                {core.TASK_PRIORITY_LABELS[priority]}
+                                                {optionLabel(tt, "priority", priority)}
                                             </span>
                                             {sharedPriority === priority && (
                                                 <Check className="size-3.5 text-primary" />
@@ -607,7 +617,7 @@ export function TaskMenu({
                                         className="gap-2 text-muted-foreground"
                                     >
                                         <Ban className="size-3.5" />
-                                        Clear
+                                        {t("menu.clear")}
                                     </ContextMenuItem>
                                 </ContextMenuSubContent>
                             </ContextMenuSub>
@@ -615,26 +625,26 @@ export function TaskMenu({
                             <ContextMenuSub>
                                 <ContextMenuSubTrigger>
                                     <UserPlus className="size-3.5" />
-                                    Assign
+                                    {t("menu.assign")}
                                 </ContextMenuSubTrigger>
                                 <ContextMenuSubContent className="w-56 pt-2">
                                     {context.people.length > 0 && (
                                         <MenuSearch
                                             value={peopleQuery}
                                             onChange={setPeopleQuery}
-                                            placeholder="Find someone"
+                                            placeholder={tt("pickers.findSomeone")}
                                         />
                                     )}
                                     <div className="max-h-64 overflow-y-auto overscroll-contain">
                                         {context.people.length === 0 && (
                                             <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                                Nobody is on this space yet.
+                                                {tt("pickers.nobodyYet")}
                                             </p>
                                         )}
                                         {context.people.length > 0 &&
                                             matchingPeople.length === 0 && (
                                                 <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                                    Nobody matches that.
+                                                    {tt("pickers.nobodyMatches")}
                                                 </p>
                                             )}
                                         {matchingPeople.map((person) => {
@@ -682,7 +692,7 @@ export function TaskMenu({
                                 <ContextMenuSub>
                                     <ContextMenuSubTrigger>
                                         <Tag className="size-3.5" />
-                                        Tags
+                                        {tt("pickers.tags")}
                                     </ContextMenuSubTrigger>
                                     <ContextMenuSubContent className="w-56 pt-2">
                                         {(context.tags.length > 0 || commands.onCreateTag) && (
@@ -692,8 +702,8 @@ export function TaskMenu({
                                                 onSubmit={() => void applyTypedTag()}
                                                 placeholder={
                                                     commands.onCreateTag
-                                                        ? "Find or create a tag"
-                                                        : "Find a tag"
+                                                        ? tt("pickers.findOrCreateTag")
+                                                        : tt("pickers.findTag")
                                                 }
                                             />
                                         )}
@@ -702,12 +712,12 @@ export function TaskMenu({
                                                 matchingTags.length === 0 &&
                                                 !typedTagIsNew && (
                                                     <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                                        No tag matches that.
+                                                        {tt("pickers.noTagMatches")}
                                                     </p>
                                                 )}
                                             {context.tags.length === 0 && !typedTagIsNew && (
                                                 <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                                    Type a name to make the first one.
+                                                    {t("menu.firstTag")}
                                                 </p>
                                             )}
                                             {matchingTags.map((tag) => {
@@ -757,10 +767,10 @@ export function TaskMenu({
                                             >
                                                 <Plus className="size-3.5" />
                                                 <span className="flex-1 truncate">
-                                                    Create &ldquo;{tagQuery.trim()}&rdquo;
+                                                    {tt("pickers.createTag", { name: tagQuery.trim() })}
                                                 </span>
                                                 <span className="text-[0.625rem] text-muted-foreground">
-                                                    Enter
+                                                    {tt("pickers.enterKey")}
                                                 </span>
                                             </ContextMenuItem>
                                         )}
@@ -776,28 +786,28 @@ export function TaskMenu({
                                 <ContextMenuSub>
                                     <ContextMenuSubTrigger>
                                         <FolderInput className="size-3.5" />
-                                        Move to
+                                        {t("menu.moveTo")}
                                     </ContextMenuSubTrigger>
                                     <ContextMenuSubContent className="w-56 pt-2">
                                         {destinations.length > 0 && (
                                             <MenuSearch
                                                 value={listQuery}
                                                 onChange={setListQuery}
-                                                placeholder="Find a list"
+                                                placeholder={t("menu.findList")}
                                             />
                                         )}
                                         <div className="max-h-64 overflow-y-auto overscroll-contain">
                                             {destinations.length === 0 && (
                                                 <p className="px-2 py-3 text-center text-xs text-muted-foreground">
                                                     {many
-                                                        ? "Work only moves between lists of one space, and this selection spans more than one."
-                                                        : "This space has nowhere else to put it."}
+                                                        ? t("menu.spansSpaces")
+                                                        : t("menu.nowhere")}
                                                 </p>
                                             )}
                                             {destinations.length > 0 &&
                                                 matchingLists.length === 0 && (
                                                     <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                                        No list matches that.
+                                                        {t("menu.noListMatches")}
                                                     </p>
                                                 )}
                                             {matchingLists.map((list) => (
@@ -848,14 +858,14 @@ export function TaskMenu({
                                 // which is the same as it not existing.
                                 <ContextMenuItem onSelect={commands.onCopy}>
                                     <ClipboardCopy className="size-3.5" />
-                                    {many ? `Copy ${targets.length} tasks` : "Copy"}
+                                    {many ? t("menu.copyMany", { count: targets.length }) : t("menu.copy")}
                                     <MenuShortcut keys="Mod+C" />
                                 </ContextMenuItem>
                             )}
                             {!many && (
                                 <ContextMenuItem onSelect={commands.onDuplicate}>
                                     <Copy className="size-3.5" />
-                                    Duplicate
+                                    {t("menu.duplicate")}
                                 </ContextMenuItem>
                             )}
                             {/* Archiving is how work leaves a board without being
@@ -863,16 +873,16 @@ export function TaskMenu({
                                 beside it. */}
                             <ContextMenuItem onSelect={() => commands.onApply({ archived: true })}>
                                 <Archive className="size-3.5" />
-                                Archive
+                                {t("bulk.archive")}
                             </ContextMenuItem>
                             <ContextMenuSeparator />
                             <ContextMenuItem variant="danger" onSelect={commands.onDelete}>
                                 <Trash2 className="size-3.5" />
-                                {many ? `Delete ${targets.length} tasks` : "Delete"}
+                                {many ? t("menu.deleteMany", { count: targets.length }) : t("bulk.delete")}
                                 {/* The key that does the same thing to the same
                                     selection, said out loud - the way chat says
                                     it, and drawn by the same component. */}
-                                <MenuShortcut>Del</MenuShortcut>
+                                <MenuShortcut>{DELETE_SHORTCUT}</MenuShortcut>
                             </ContextMenuItem>
                         </>
                     )}

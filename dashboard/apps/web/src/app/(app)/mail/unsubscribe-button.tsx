@@ -40,6 +40,7 @@ import { useRouter } from "next/navigation";
 import type { ButtonProps } from "@polaris/ui";
 import { useState } from "react";
 import { useBusy } from "./use-busy";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { BellOff, ExternalLink, Loader2 } from "lucide-react";
 import { unsubscribeAction, unsubscribeFromMessageAction } from "./actions";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, useToast } from "@polaris/ui";
@@ -62,7 +63,7 @@ export interface UnsubscribeTarget {
 
 export function UnsubscribeButton({
     target,
-    label = "Unsubscribe",
+    label: given,
     variant = "secondary",
     size = "sm",
     iconOnly = false,
@@ -80,6 +81,8 @@ export function UnsubscribeButton({
 }) {
     const router = useRouter();
     const toast = useToast();
+    const t = useTranslations("mail");
+    const label = given ?? t("unsubscribe.label");
     const [asking, setAsking] = useState(false);
     /** Set when the only thing left is their page: a plain link nobody has
      *  opened yet, or a one-click their server would not take. */
@@ -103,8 +106,8 @@ export function UnsubscribeButton({
                 toast.show({
                     title:
                         outcome.kind === "mailto"
-                            ? `Asked ${target.sender} to stop, by mail.`
-                            : `Unsubscribed from ${target.sender}.`
+                            ? t("unsubscribe.askedByMail", { sender: target.sender })
+                            : t("unsubscribe.done", { sender: target.sender })
                 });
                 return;
             }
@@ -186,23 +189,22 @@ export function UnsubscribeButton({
                     <DialogHeader>
                         <DialogTitle>
                             {fallback
-                                ? "Finish this on their page"
-                                : `Unsubscribe from ${target.sender}?`}
+                                ? t("unsubscribe.finishTitle")
+                                : t("unsubscribe.question", { sender: target.sender })}
                         </DialogTitle>
                     </DialogHeader>
 
                     {fallback ? (
                         <p className="text-[13px] text-muted-foreground">
-                            Their server did not accept the request Polaris sent. The page below is
-                            the same address, opened as you rather than as this server.
+                            {t("unsubscribe.finishBody")}
                         </p>
                     ) : (
                         <p className="text-[13px] text-muted-foreground">
                             {target.kind !== "mailto"
-                                ? "Polaris will tell their server directly. Nothing is opened, and they learn nothing about you that this message did not already carry."
+                                ? t("unsubscribe.direct")
                                 : target.source === "body"
-                                  ? `Polaris will send a message from this mailbox to an address it found inside the mail, not in a header ${target.sender} published. If the mail was not really from them, sending it tells whoever wrote it that this address is read.`
-                                  : "Polaris will send them a message from this mailbox asking to be taken off. Nothing else is shared with them."}
+                                  ? t("unsubscribe.fromBody", { sender: target.sender })
+                                  : t("unsubscribe.byMail")}
                         </p>
                     )}
 
@@ -215,7 +217,7 @@ export function UnsubscribeButton({
                                 setFallback("");
                             }}
                         >
-                            {fallback ? "Close" : "Keep receiving"}
+                            {fallback ? t("unsubscribe.close") : t("unsubscribe.keep")}
                         </Button>
                         {fallback ? (
                             <Button size="sm" asChild>
@@ -226,7 +228,7 @@ export function UnsubscribeButton({
                                     onClick={() => setFallback("")}
                                 >
                                     <ExternalLink className="size-3.5 shrink-0" aria-hidden />
-                                    Open their page
+                                    {t("unsubscribe.openPage")}
                                 </a>
                             </Button>
                         ) : (
@@ -237,7 +239,7 @@ export function UnsubscribeButton({
                                         aria-hidden
                                     />
                                 ) : null}
-                                Unsubscribe
+                                {t("unsubscribe.label")}
                             </Button>
                         )}
                     </div>

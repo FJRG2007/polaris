@@ -20,6 +20,7 @@
 
 import * as core from "@polaris/core";
 import { useMail } from "./mail-shell";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useState } from "react";
 import { Check, Copy, Mail, Search, ShieldBan } from "lucide-react";
 import {
@@ -64,6 +65,7 @@ export function AddressChip({
     className?: string;
 }) {
     const toast = useToast();
+    const t = useTranslations("mail");
     const { openComposer } = useMail();
     const [copied, setCopied] = useState(false);
 
@@ -85,10 +87,10 @@ export function AddressChip({
                 // A browser that refuses the clipboard - no permission, an
                 // insecure origin - is not something to fail silently over:
                 // the address is right there to be selected instead.
-                toast.show({ title: "This browser would not let Polaris copy that." });
+                toast.show({ title: t("address.copyRefused") });
             }
         })();
-    }, [entry.address, toast]);
+    }, [entry.address, toast, t]);
 
     return (
         <ContextMenu>
@@ -119,8 +121,8 @@ export function AddressChip({
                             event.stopPropagation();
                             copy();
                         }}
-                        aria-label={`Copy ${entry.address}`}
-                        title={`Copy ${entry.address}`}
+                        aria-label={t("address.copyNamed", { address: entry.address })}
+                        title={t("address.copyNamed", { address: entry.address })}
                         // `self-center` because the row aligns on the text
                         // baseline and this button holds only an icon: a box with
                         // no text in it has no baseline of its own to sit on, so
@@ -145,7 +147,7 @@ export function AddressChip({
             <ContextMenuContent>
                 <ContextMenuItem onSelect={copy}>
                     <Copy className="size-3.5 shrink-0" aria-hidden />
-                    Copy address
+                    {t("address.copy")}
                 </ContextMenuItem>
                 <ContextMenuItem
                     onSelect={() =>
@@ -153,12 +155,12 @@ export function AddressChip({
                     }
                 >
                     <Mail className="size-3.5 shrink-0" aria-hidden />
-                    New message
+                    {t("address.newMessage")}
                 </ContextMenuItem>
                 <ContextMenuItem asChild>
                     <a href={`/mail?q=${encodeURIComponent(entry.address)}`}>
                         <Search className="size-3.5 shrink-0" aria-hidden />
-                        Find their mail
+                        {t("address.findMail")}
                     </a>
                 </ContextMenuItem>
                 {accountId && onBlock ? (
@@ -169,7 +171,7 @@ export function AddressChip({
                             onSelect={() => onBlock(accountId, entry.address)}
                         >
                             <ShieldBan className="size-3.5 shrink-0" aria-hidden />
-                            Block them
+                            {t("address.block")}
                         </ContextMenuItem>
                     </>
                 ) : null}

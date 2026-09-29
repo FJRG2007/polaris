@@ -18,6 +18,7 @@ import { cn, EmptyState } from "@polaris/ui";
 import { CustomFieldValue } from "../custom-fields";
 import { PriorityMark } from "@/components/priority-mark";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { clickMode, type SelectMode, type ViewProps } from "./shared";
 import { columnStatusIds, reorderColumns } from "./board";
@@ -207,6 +208,7 @@ function TaskLine({
 export function ListView(props: ViewProps) {
     const { groups, canEdit, context, groupBy, selection, onOpen, onSelect, onMove, onQuickCreate, orderable } =
         props;
+    const t = useTranslations("tasksViews");
     const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
     const [dragging, setDragging] = useState<string | null>(null);
     const [addingTo, setAddingTo] = useState<string | null>(null);
@@ -350,8 +352,8 @@ export function ListView(props: ViewProps) {
                                 onClick={() => toggleGroup(group.key)}
                                 aria-label={
                                     isCollapsed
-                                        ? `Expand ${group.label}`
-                                        : `Collapse ${group.label}`
+                                        ? t("list.expand", { name: group.label })
+                                        : t("list.collapse", { name: group.label })
                                 }
                                 className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                             >
@@ -370,8 +372,8 @@ export function ListView(props: ViewProps) {
                             {canEdit && (
                                 <button
                                     type="button"
-                                    aria-label={`Add a task to ${group.label}`}
-                                    title="Add a task"
+                                    aria-label={t("list.addTo", { name: group.label })}
+                                    title={t("empty.add")}
                                     onClick={() => {
                                         setAddingTo(group.key);
                                         setDraft("");
@@ -464,7 +466,7 @@ export function ListView(props: ViewProps) {
                                         <input
                                             autoFocus
                                             value={draft}
-                                            placeholder="Task name, then enter"
+                                            placeholder={t("list.quickPlaceholder")}
                                             onChange={(event) => setDraft(event.target.value)}
                                             onBlur={() => setAddingTo(null)}
                                             onKeyDown={(event) => {
@@ -480,7 +482,7 @@ export function ListView(props: ViewProps) {
                                 ) : (
                                     group.tasks.length === 0 && (
                                         <li className="px-4 py-4 text-xs text-muted-foreground">
-                                            Nothing here yet.
+                                            {t("empty.title")}
                                         </li>
                                     )
                                 )}
@@ -492,8 +494,8 @@ export function ListView(props: ViewProps) {
 
             {groups.length === 0 && (
                 <EmptyState
-                    title="No tasks match this view."
-                    description="Change the filters, or add the first one."
+                    title={t("list.noMatch")}
+                    description={t("list.noMatchDescription")}
                 />
             )}
         </div>
@@ -503,6 +505,7 @@ export function ListView(props: ViewProps) {
 export function TableView(props: ViewProps) {
     const { rows, context, selection, onOpen, onSelect } = props;
     const format = useDisplayFormat();
+    const t = useTranslations("tasksViews");
     // Every custom field gets a column here: being able to compare them side by
     // side is the whole reason to look at a table rather than a list.
     const columns = context.fields;
@@ -516,13 +519,13 @@ export function TableView(props: ViewProps) {
                 <thead className="sticky top-0 z-10">
                     <tr className="border-b border-border bg-surface text-left text-xs text-muted-foreground">
                         <th className="w-8 px-2 py-2" />
-                        <th className="px-2 py-2 font-medium">Task</th>
-                        <th className="px-2 py-2 font-medium">Status</th>
-                        <th className="px-2 py-2 font-medium">Assignees</th>
-                        <th className="px-2 py-2 font-medium">Priority</th>
-                        <th className="px-2 py-2 font-medium">Due</th>
-                        <th className="px-2 py-2 font-medium">Estimate</th>
-                        <th className="px-2 py-2 font-medium">Tracked</th>
+                        <th className="px-2 py-2 font-medium">{t("table.task")}</th>
+                        <th className="px-2 py-2 font-medium">{t("table.status")}</th>
+                        <th className="px-2 py-2 font-medium">{t("table.assignees")}</th>
+                        <th className="px-2 py-2 font-medium">{t("table.priority")}</th>
+                        <th className="px-2 py-2 font-medium">{t("table.due")}</th>
+                        <th className="px-2 py-2 font-medium">{t("table.estimate")}</th>
+                        <th className="px-2 py-2 font-medium">{t("table.tracked")}</th>
                         {columns.map((field) => (
                             <th key={field.id} className="px-2 py-2 font-medium">
                                 {field.name}
@@ -655,7 +658,7 @@ export function TableView(props: ViewProps) {
                                 colSpan={8 + columns.length}
                                 className="px-4 py-10 text-center text-sm text-muted-foreground"
                             >
-                                No tasks match this view.
+                                {t("list.noMatch")}
                             </td>
                         </tr>
                     )}

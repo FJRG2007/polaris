@@ -14,6 +14,9 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { FilterBar } from "./filter-bar";
 import { runAction } from "@/lib/run-action";
+import { optionLabel } from "./option-label";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Avatar } from "@/components/avatar";
 import { Plus, Trash2, Zap } from "lucide-react";
 import type { PersonRef } from "@/lib/tasks/facts";
@@ -34,6 +37,7 @@ interface RuleContext {
 
 /** The ids an action can point at, per action type. */
 function targetsFor(
+    t: NamespaceTranslator<"tasks">,
     type: core.AutomationActionType,
     context: RuleContext
 ): { value: string; label: string; icon?: React.ReactNode }[] | null {
@@ -43,7 +47,7 @@ function targetsFor(
         case "setPriority":
             return core.TASK_PRIORITIES.map((priority) => ({
                 value: priority,
-                label: core.TASK_PRIORITY_LABELS[priority]
+                label: optionLabel(t, "priority", priority)
             }));
         case "addAssignee":
         case "removeAssignee":
@@ -95,44 +99,46 @@ function RuleEditor({
     onCancel: () => void;
     error: string;
 }) {
+    const t = useTranslations("tasks");
+    const tc = useTranslations("common");
     return (
         <Card>
             <CardBody className="flex flex-col gap-3 p-4">
                 <Input
                     value={draft.name}
-                    placeholder="What this rule is for"
-                    aria-label="Rule name"
+                    placeholder={t("automations.namePlaceholder")}
+                    aria-label={t("automations.name")}
                     onChange={(event) => onChange({ ...draft, name: event.target.value })}
                     className="h-8 text-sm"
                 />
 
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>When</span>
+                    <span>{t("automations.when")}</span>
                     <Select
                         value={draft.trigger}
                         onValueChange={(trigger) => onChange({ ...draft, trigger: trigger as core.AutomationTrigger })}
                         options={core.AUTOMATION_TRIGGERS.map((trigger) => ({
                             value: trigger,
-                            label: core.AUTOMATION_TRIGGER_LABELS[trigger]
+                            label: optionLabel(t, "automationTrigger", trigger)
                         }))}
-                        aria-label="Trigger"
+                        aria-label={t("automations.trigger")}
                         className="h-8 w-56 text-xs"
                     />
-                    <span>in</span>
+                    <span>{t("automations.in")}</span>
                     <Select
                         value={draft.listId ?? ""}
                         onValueChange={(listId) => onChange({ ...draft, listId: listId || null })}
                         options={[
-                            { value: "", label: "Every list in the space" },
+                            { value: "", label: t("automations.everyList") },
                             ...context.lists.map((list) => ({ value: list.id, label: list.name }))
                         ]}
-                        aria-label="Which lists"
+                        aria-label={t("automations.whichLists")}
                         className="h-8 w-48 text-xs"
                     />
                 </div>
 
                 <div>
-                    <p className="mb-1 text-xs text-muted-foreground">Only for tasks matching</p>
+                    <p className="mb-1 text-xs text-muted-foreground">{t("automations.onlyMatching")}</p>
                     <FilterBar
                         filter={draft.conditions}
                         onChange={(conditions) => onChange({ ...draft, conditions })}
@@ -141,9 +147,9 @@ function RuleEditor({
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <p className="text-xs text-muted-foreground">Then</p>
+                    <p className="text-xs text-muted-foreground">{t("automations.then")}</p>
                     {draft.actions.map((action, index) => {
-                        const targets = targetsFor(action.type, context);
+                        const targets = targetsFor(t, action.type, context);
                         return (
                             <div key={index} className="flex flex-wrap items-center gap-2">
                                 <Select
@@ -160,9 +166,9 @@ function RuleEditor({
                                     }
                                     options={core.AUTOMATION_ACTIONS.map((type) => ({
                                         value: type,
-                                        label: core.AUTOMATION_ACTION_LABELS[type]
+                                        label: optionLabel(t, "automationAction", type)
                                     }))}
-                                    aria-label="Action"
+                                    aria-label={t("automations.action")}
                                     className="h-8 w-44 text-xs"
                                 />
 
@@ -178,8 +184,8 @@ function RuleEditor({
                                             })
                                         }
                                         options={targets}
-                                        placeholder="Pick one"
-                                        aria-label="Target"
+                                        placeholder={t("automations.pickOne")}
+                                        aria-label={t("automations.target")}
                                         className="h-8 w-44 text-xs"
                                     />
                                 )}
@@ -187,8 +193,12 @@ function RuleEditor({
                                 {(action.type === "addComment" || action.type === "createSubtask") && (
                                     <Input
                                         value={action.text ?? ""}
-                                        placeholder={action.type === "addComment" ? "Comment text" : "Subtask name"}
-                                        aria-label="Text"
+                                        placeholder={
+                                            action.type === "addComment"
+                                                ? t("automations.commentText")
+                                                : t("automations.subtaskName")
+                                        }
+                                        aria-label={t("automations.text")}
                                         onChange={(event) =>
                                             onChange({
                                                 ...draft,
@@ -206,7 +216,7 @@ function RuleEditor({
                                         <Input
                                             type="number"
                                             value={action.offsetDays ?? 0}
-                                            aria-label="Days from now"
+                                            aria-label={t("automations.daysFromNow")}
                                             onChange={(event) =>
                                                 onChange({
                                                     ...draft,
@@ -219,14 +229,14 @@ function RuleEditor({
                                             }
                                             className="h-8 w-20 text-xs"
                                         />
-                                        days from when the rule runs
+                                        {t("automations.daysHint")}
                                     </div>
                                 )}
 
                                 <button
                                     type="button"
-                                    aria-label="Remove this action"
-                                    title="Remove action"
+                                    aria-label={t("automations.removeThisAction")}
+                                    title={t("automations.removeAction")}
                                     onClick={() =>
                                         onChange({
                                             ...draft,
@@ -247,7 +257,7 @@ function RuleEditor({
                             onChange({ ...draft, actions: [...draft.actions, { type: "addTag" }] })
                         }
                     >
-                        <Plus className="size-3.5" /> Action
+                        <Plus className="size-3.5" /> {t("automations.action")}
                     </Button>
                 </div>
 
@@ -255,10 +265,10 @@ function RuleEditor({
 
                 <div className="flex gap-2">
                     <Button size="sm" onClick={onSave} disabled={!draft.name.trim() || draft.actions.length === 0}>
-                        Save rule
+                        {t("automations.saveRule")}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={onCancel}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                 </div>
             </CardBody>
@@ -273,6 +283,7 @@ export function AutomationsPanel({
     automations: readonly AutomationView[];
     context: RuleContext;
 }) {
+    const t = useTranslations("tasks");
     const [draft, setDraft] = useState<RuleDraft | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [error, setError] = useState("");
@@ -299,14 +310,12 @@ export function AutomationsPanel({
         <section className="flex flex-col gap-3">
             <header className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-sm font-medium">Automations</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Rules run once per event. A rule&apos;s own changes never set off another rule.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("automations.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("automations.hint")}</p>
                 </div>
                 {!draft && (
                     <Button size="sm" onClick={() => setDraft(BLANK_RULE)}>
-                        <Plus className="size-3.5" /> Rule
+                        <Plus className="size-3.5" /> {t("automations.rule")}
                     </Button>
                 )}
             </header>
@@ -327,7 +336,7 @@ export function AutomationsPanel({
 
             {automations.length === 0 && !draft && (
                 <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground">
-                    No rules yet. A common first one: when a task is completed, remove the &ldquo;in review&rdquo; tag.
+                    {t("automations.empty")}
                 </p>
             )}
 
@@ -340,14 +349,14 @@ export function AutomationsPanel({
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-medium">{rule.name}</p>
                                     <p className="truncate text-xs text-muted-foreground">
-                                        {core.AUTOMATION_TRIGGER_LABELS[rule.trigger]} -{" "}
-                                        {rule.actions.map((action) => core.AUTOMATION_ACTION_LABELS[action.type]).join(", ")}
-                                        {rule.runCount > 0 ? ` - ran ${rule.runCount} times` : ""}
+                                        {optionLabel(t, "automationTrigger", rule.trigger)} -{" "}
+                                        {rule.actions.map((action) => optionLabel(t, "automationAction", action.type)).join(", ")}
+                                        {rule.runCount > 0 ? t("automations.ran", { count: rule.runCount }) : ""}
                                     </p>
                                 </div>
                                 <Switch
                                     checked={rule.enabled}
-                                    aria-label={`Enable ${rule.name}`}
+                                    aria-label={t("automations.enable", { name: rule.name })}
                                     onChange={async (enabled) => {
                                         await runAction(
                                             () => actions.setAutomationEnabledAction(context.spaceId, rule.id, enabled),
@@ -369,12 +378,12 @@ export function AutomationsPanel({
                                     }}
                                     className="rounded-md border border-border px-2 py-1 text-xs transition-colors hover:bg-muted"
                                 >
-                                    Edit
+                                    {t("trackers.edit")}
                                 </button>
                                 <button
                                     type="button"
-                                    aria-label={`Delete ${rule.name}`}
-                                    title="Delete rule"
+                                    aria-label={t("automations.deleteNamed", { name: rule.name })}
+                                    title={t("automations.deleteRule")}
                                     onClick={async () => {
                                         await runAction(
                                             () => actions.deleteAutomationAction(context.spaceId, rule.id),
@@ -410,6 +419,8 @@ export function FormsPanel({
     /** The address Polaris hands out, so the link shown is the one to send. */
     baseUrl: string;
 }) {
+    const t = useTranslations("tasks");
+    const tc = useTranslations("common");
     const [creating, setCreating] = useState(false);
     const [name, setName] = useState("");
     const [listId, setListId] = useState(lists[0]?.id ?? "");
@@ -419,14 +430,12 @@ export function FormsPanel({
         <section className="flex flex-col gap-3">
             <header className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-sm font-medium">Intake forms</h2>
-                    <p className="text-xs text-muted-foreground">
-                        A public page that files what it collects as a task. Anyone with the link can send one.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("forms.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("forms.hint")}</p>
                 </div>
                 {!creating && lists.length > 0 && (
                     <Button size="sm" onClick={() => setCreating(true)}>
-                        <Plus className="size-3.5" /> Form
+                        <Plus className="size-3.5" /> {t("create.kind.form")}
                     </Button>
                 )}
             </header>
@@ -436,8 +445,8 @@ export function FormsPanel({
                     <CardBody className="flex flex-col gap-2 p-4">
                         <Input
                             value={name}
-                            placeholder="Form name, e.g. Bug report"
-                            aria-label="Form name"
+                            placeholder={t("forms.namePlaceholder")}
+                            aria-label={t("forms.name")}
                             onChange={(event) => setName(event.target.value)}
                             className="h-8 text-sm"
                         />
@@ -445,11 +454,11 @@ export function FormsPanel({
                             value={listId}
                             onValueChange={setListId}
                             options={lists.map((list) => ({ value: list.id, label: list.name }))}
-                            aria-label="Which list submissions land in"
+                            aria-label={t("forms.list")}
                             className="h-8 text-xs"
                         />
                         <p className="text-xs text-muted-foreground">
-                            It starts with two questions - a title and a description - which you can change afterwards.
+                            {t("forms.startsWith")}
                         </p>
                         {error && <p className="text-xs text-danger">{error}</p>}
                         <div className="flex gap-2">
@@ -466,7 +475,7 @@ export function FormsPanel({
                                                 fields: [
                                                     {
                                                         id: "title",
-                                                        label: "What is it?",
+                                                        label: t("forms.defaultTitle"),
                                                         type: "text",
                                                         required: true,
                                                         options: [],
@@ -474,7 +483,7 @@ export function FormsPanel({
                                                     },
                                                     {
                                                         id: "detail",
-                                                        label: "Tell us more",
+                                                        label: t("forms.defaultDetail"),
                                                         type: "longText",
                                                         required: false,
                                                         options: [],
@@ -491,10 +500,10 @@ export function FormsPanel({
                                     }
                                 }}
                             >
-                                Create form
+                                {t("forms.create")}
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setCreating(false)}>
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                         </div>
                     </CardBody>
@@ -503,7 +512,7 @@ export function FormsPanel({
 
             {forms.length === 0 && !creating && (
                 <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground">
-                    No forms yet.
+                    {t("forms.empty")}
                 </p>
             )}
 
@@ -517,18 +526,17 @@ export function FormsPanel({
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-sm font-medium">{form.name}</p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            Files into {form.listName} - {form.submissionCount}{" "}
-                                            {form.submissionCount === 1 ? "submission" : "submissions"}
+                                            {t("forms.filesInto", { list: form.listName, count: form.submissionCount })}
                                         </p>
                                     </div>
                                     <code className="hidden max-w-64 truncate rounded bg-muted px-2 py-1 text-[0.6875rem] md:block">
                                         {url}
                                     </code>
-                                    <CopyButton value={url} label="Copy the form link" />
+                                    <CopyButton value={url} label={t("forms.copyLink")} />
                                     <button
                                         type="button"
-                                        aria-label={`Delete ${form.name}`}
-                                        title="Delete form"
+                                        aria-label={t("automations.deleteNamed", { name: form.name })}
+                                        title={t("forms.delete")}
                                         onClick={async () => {
                                             await runAction(() => actions.deleteFormAction(spaceId, form.id), setError);
                                         }}

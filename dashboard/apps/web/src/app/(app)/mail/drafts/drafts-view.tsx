@@ -26,6 +26,8 @@ import { useMail } from "../mail-shell";
 import { useEffect, useState } from "react";
 import type { MailDraftView } from "@/lib/mailbox/compose";
 import { useDisplayFormat } from "@/components/display-format";
+import { mailRefusalText } from "@/lib/mailbox/refusal-text";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, EmptyState, cn, useToast } from "@polaris/ui";
 import { discardDraftAction, retrySendAction } from "../actions";
 import { Pencil, RotateCcw, Send, Trash2, TriangleAlert } from "lucide-react";
@@ -33,6 +35,7 @@ import { Pencil, RotateCcw, Send, Trash2, TriangleAlert } from "lucide-react";
 export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
     const toast = useToast();
     const format = useDisplayFormat();
+    const t = useTranslations("mail");
     const { openComposer, reloadLists } = useMail();
     /**
      * Drafts thrown away here, before the server has said so.
@@ -57,8 +60,8 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
             <div className="p-6">
                 <EmptyState
                     icon={<Pencil className="size-5 shrink-0" aria-hidden />}
-                    title="Nothing half-written"
-                    description="A message you start is saved here as you type, so you can close the composer and come back to it."
+                    title={t("drafts.emptyTitle")}
+                    description={t("drafts.emptyBody")}
                 />
             </div>
         );
@@ -67,10 +70,8 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
     return (
         <div className="flex h-full min-h-0 flex-col">
             <header className="shrink-0 border-b border-border px-3 py-2">
-                <h1 className="text-[17px] font-semibold tracking-tight">Drafts</h1>
-                <p className="text-[12px] text-muted-foreground">
-                    Saved as you write. Nothing here has been sent.
-                </p>
+                <h1 className="text-[17px] font-semibold tracking-tight">{t("drafts.title")}</h1>
+                <p className="text-[12px] text-muted-foreground">{t("drafts.subtitle")}</p>
             </header>
 
             <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -105,7 +106,7 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                                 >
                                     <span className="flex items-baseline gap-2">
                                         <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-                                            {draft.subject || "(no subject)"}
+                                            {draft.subject || t("noSubject")}
                                         </span>
                                         <span className="shrink-0 text-[11px] text-foreground-subtle">
                                             {format.dateTime(new Date(draft.updatedAt))}
@@ -119,21 +120,23 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                                                     aria-hidden
                                                 />
                                                 <span className="min-w-0">
-                                                    {draft.failure ||
-                                                        "It was not sent. Try it again."}
+                                                    {draft.failure
+                                                        ? mailRefusalText(t, draft.failure)
+                                                        : t("drafts.notSent")}
                                                 </span>
                                             </span>
                                         ) : waiting ? (
                                             <span className="flex items-center gap-1.5">
                                                 <Send className="size-3 shrink-0" aria-hidden />
-                                                Waiting to go out
                                                 {draft.sendAt
-                                                    ? ` at ${format.dateTime(new Date(draft.sendAt))}`
-                                                    : ""}
+                                                    ? t("drafts.waitingAt", { time: format.dateTime(new Date(draft.sendAt)) })
+                                                    : t("drafts.waiting")}
                                             </span>
                                         ) : (
                                             <span className="block truncate">
-                                                {`To ${draft.to.map((one) => one.address).join(", ") || "nobody yet"}`}
+                                                {draft.to.length > 0
+                                                    ? t("drafts.to", { names: draft.to.map((one) => one.address).join(", ") })
+                                                    : t("drafts.toNobody")}
                                             </span>
                                         )}
                                     </span>
@@ -142,8 +145,8 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        aria-label="Send this message again"
-                                        title="Send this message again"
+                                        aria-label={t("drafts.retry")}
+                                        title={t("drafts.retry")}
                                         disabled={retrying.includes(draft.id)}
                                         onClick={() => {
                                             setRetrying((held) => [...held, draft.id]);
@@ -160,8 +163,8 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                                                 toast.show({
                                                     title:
                                                         "queued" in answer && answer.queued
-                                                            ? "Sending it again."
-                                                            : "That message is no longer waiting to be sent."
+                                                            ? t("drafts.retrying")
+                                                            : t("drafts.notWaiting")
                                                 });
                                                 reloadLists();
                                             })();
@@ -173,8 +176,8 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    aria-label="Throw this draft away"
-                                    title="Throw this draft away"
+                                    aria-label={t("drafts.discard")}
+                                    title={t("drafts.discard")}
                                     disabled={waiting}
                                     onClick={() => {
                                         setDiscarded((held) => [...held, draft.id]);

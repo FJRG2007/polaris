@@ -20,6 +20,7 @@ import { z } from "zod";
 import Link from "next/link";
 import { cn } from "@polaris/ui";
 import { MAIL_VIEWS } from "./views";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { refusalOf } from "./refusal";
 import { Composer } from "./composer";
 import { MailRail } from "./mail-rail";
@@ -256,6 +257,7 @@ export function MailShell({
 }) {
     const router = useRouter();
     const toast = useToast();
+    const t = useTranslations("mail");
     /**
      * The rail, as it stands rather than as the server last rendered it.
      *
@@ -564,14 +566,12 @@ export function MailShell({
                 toast.show({
                     title:
                         said ??
-                        (messageIds.length === 1
-                            ? `Moved to ${folderName}.`
-                            : `${messageIds.length} moved to ${folderName}.`)
+                        t("shell.moved", { count: messageIds.length, folder: folderName })
                 });
                 if (!said) refreshMailbox();
             })();
         },
-        [refreshMailbox, toast]
+        [refreshMailbox, toast, t]
     );
 
     /**
@@ -730,7 +730,7 @@ export function MailShell({
                             ) : (
                                 <Plus className="size-4 shrink-0" aria-hidden />
                             )}
-                            {hasMailbox ? "Write" : "Connect a mailbox"}
+                            {hasMailbox ? t("shell.write") : t("onboarding.connect")}
                         </Button>
                     </div>
                     <MailRail onNavigate={() => setRailOpen(false)} />
@@ -739,7 +739,7 @@ export function MailShell({
                 {railOpen ? (
                     <button
                         type="button"
-                        aria-label="Close the mailbox list"
+                        aria-label={t("shell.closeRail")}
                         className="absolute inset-0 z-20 bg-black/40 md:hidden"
                         onClick={() => setRailOpen(false)}
                     />
@@ -750,8 +750,8 @@ export function MailShell({
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label="Mailboxes"
-                            title="Mailboxes"
+                            aria-label={t("shell.mailboxes")}
+                            title={t("shell.mailboxes")}
                             onClick={() => setRailOpen(true)}
                         >
                             <Menu className="size-4 shrink-0" aria-hidden />
@@ -761,7 +761,7 @@ export function MailShell({
                                 href={pathname.startsWith("/mail/t/") ? "/mail" : pathname}
                                 className="text-[13px] text-muted-foreground"
                             >
-                                Back to the list
+                                {t("shell.backToList")}
                             </Link>
                         ) : null}
                     </div>

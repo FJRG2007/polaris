@@ -21,6 +21,8 @@ import { useMail } from "./mail-shell";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useBusy } from "./use-busy";
+import { mailOptionLabel } from "./option-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { FolderPlus, Loader2 } from "lucide-react";
 import { createFolderForRoleAction, setFolderRoleAction } from "./actions";
 import {
@@ -54,9 +56,10 @@ export function FolderRoleDialog({
     const { accounts, folders } = useMail();
     const [chosen, setChosen] = useState("");
     const [working, startWorking] = useBusy();
+    const t = useTranslations("mail");
 
     const account = accounts.find((one) => one.id === missing.accountId);
-    const label = core.MAIL_FOLDER_ROLE_LABELS[missing.role] ?? missing.role;
+    const label = missing.role in core.MAIL_FOLDER_ROLE_LABELS ? mailOptionLabel(t, "folderRole", missing.role) : missing.role;
     // The account's own folders, minus the ones already spoken for, so the list
     // is the plausible answers rather than everything.
     const candidates = folders.filter(
@@ -83,13 +86,14 @@ export function FolderRoleDialog({
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Which folder is your {label}?</DialogTitle>
+                    <DialogTitle>{t("folderRole.title", { label })}</DialogTitle>
                 </DialogHeader>
 
                 <p className="text-[13px] text-muted-foreground">
-                    {account?.address ?? "This mailbox"} does not have a folder Polaris recognises
-                    as its {label.toLowerCase()}. Point at the one you already use and it will
-                    remember, on this mailbox and through every later check.
+                    {t("folderRole.body", {
+                        mailbox: account?.address ?? t("folderRole.thisMailbox"),
+                        label: label.toLowerCase()
+                    })}
                 </p>
 
                 {candidates.length > 0 ? (
@@ -114,7 +118,7 @@ export function FolderRoleDialog({
                     </ul>
                 ) : (
                     <p className="mt-3 text-[13px] text-foreground-subtle">
-                        This mailbox has no other folders to choose from.
+                        {t("folderRole.noOthers")}
                     </p>
                 )}
 
@@ -126,7 +130,7 @@ export function FolderRoleDialog({
                         {working ? (
                             <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
                         ) : null}
-                        Use this one
+                        {t("folderRole.use")}
                     </Button>
                     <Button
                         variant="secondary"
@@ -136,15 +140,14 @@ export function FolderRoleDialog({
                         }
                     >
                         <FolderPlus className="size-4 shrink-0" aria-hidden />
-                        Make one on the mail server
+                        {t("folderRole.make")}
                     </Button>
                     <Button variant="ghost" disabled={working} onClick={onClose}>
-                        Not now
+                        {t("folderRole.notNow")}
                     </Button>
                 </div>
                 <p className="mt-2 text-[12px] text-foreground-subtle">
-                    Making one adds a folder to your mail server, which you will see in every other
-                    mail client you use.
+                    {t("folderRole.makeHint")}
                 </p>
             </DialogContent>
         </Dialog>

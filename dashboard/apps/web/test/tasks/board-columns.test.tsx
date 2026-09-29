@@ -15,6 +15,7 @@ import type { ViewProps } from "@/app/(app)/tasks/views/shared";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { DISPLAY_DEFAULTS, statusColumns, type TaskGroupField } from "@polaris/core";
 import { BoardView, columnStatusIds, reorderColumns } from "@/app/(app)/tasks/views/board";
+import { withMessages } from "../setup/i18n";
 
 const CONTEXT: SpaceContext = {
     spaceId: "s1",
@@ -61,11 +62,11 @@ function props(overrides: Partial<ViewProps> = {}): ViewProps {
 }
 
 function render(overrides: Partial<ViewProps> = {}): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <DisplayFormatProvider preferences={DISPLAY_DEFAULTS}>
             <BoardView {...props(overrides)} />
         </DisplayFormatProvider>
-    );
+    ));
 }
 
 /** A board whose columns may be reshaped, removed and reordered. */

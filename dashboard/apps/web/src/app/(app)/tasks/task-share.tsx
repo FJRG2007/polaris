@@ -19,6 +19,8 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { schemaMessage } from "./schema-message";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AssigneePicker, Avatar } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
 import { CopyButton } from "@/components/copy-button";
@@ -93,6 +95,8 @@ export function ShareDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("tasksDetail");
+    const tt = useTranslations("tasks");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [privateUrl, setPrivateUrl] = useState("");
@@ -131,7 +135,7 @@ export function ShareDialog({
     const addEmail = () => {
         const parsed = core.emailField.safeParse(draftEmail);
         if (!parsed.success) {
-            setError(parsed.error.issues[0]?.message ?? "Enter a valid email");
+            setError(schemaMessage(tt, parsed.error.issues[0]?.message, t("share.validEmail")));
             return;
         }
         const address = parsed.data.toLowerCase();
@@ -181,7 +185,7 @@ export function ShareDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="w-[min(32rem,96vw)] max-w-[min(32rem,96vw)]">
                 <DialogHeader>
-                    <DialogTitle>Share this task</DialogTitle>
+                    <DialogTitle>{t("share.title")}</DialogTitle>
                     <DialogDescription className="truncate">{taskName}</DialogDescription>
                 </DialogHeader>
 
@@ -200,8 +204,8 @@ export function ShareDialog({
                         {canShare && (
                             <Section
                                 icon={<Mail className="size-4" />}
-                                title="Send it to someone"
-                                hint="People in this space get it in Polaris. Anyone else gets the public link."
+                                title={t("share.send.title")}
+                                hint={t("share.send.hint")}
                             >
                                 <div className="flex flex-wrap items-center gap-1.5">
                                     {chosen.map((person) => (
@@ -215,7 +219,7 @@ export function ShareDialog({
                                             <PersonName id={person.id} name={person.name} />
                                             <button
                                                 type="button"
-                                                aria-label={`Remove ${person.name}`}
+                                                aria-label={t("share.remove", { name: person.name })}
                                                 onClick={() =>
                                                     setUserIds((current) =>
                                                         current.filter((id) => id !== person.id)
@@ -235,7 +239,7 @@ export function ShareDialog({
                                             {address}
                                             <button
                                                 type="button"
-                                                aria-label={`Remove ${address}`}
+                                                aria-label={t("share.remove", { name: address })}
                                                 onClick={() =>
                                                     setEmails((current) =>
                                                         current.filter((entry) => entry !== address)
@@ -257,7 +261,7 @@ export function ShareDialog({
                                                 className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                             >
                                                 <UserPlus className="size-3.5" />
-                                                Add people
+                                                {t("share.addPeople")}
                                             </button>
                                         }
                                     />
@@ -267,8 +271,8 @@ export function ShareDialog({
                                     <Input
                                         type="email"
                                         value={draftEmail}
-                                        placeholder="Or an email address"
-                                        aria-label="Email address"
+                                        placeholder={t("share.emailPlaceholder")}
+                                        aria-label={t("share.email")}
                                         onChange={(event) => setDraftEmail(event.target.value)}
                                         onKeyDown={(event) => {
                                             if (event.key !== "Enter") return;
@@ -278,21 +282,21 @@ export function ShareDialog({
                                         className="h-8 flex-1 text-xs"
                                     />
                                     <Button size="sm" variant="ghost" disabled={!draftEmail.trim()} onClick={addEmail}>
-                                        Add
+                                        {t("share.add")}
                                     </Button>
                                 </div>
 
                                 <Textarea
                                     value={note}
                                     rows={2}
-                                    placeholder="Say why you are sending it (optional)"
-                                    aria-label="Note"
+                                    placeholder={t("share.notePlaceholder")}
+                                    aria-label={t("share.note")}
                                     onChange={(event) => setNote(event.target.value)}
                                 />
 
                                 {blockedOutside && (
                                     <p className="text-xs text-warning">
-                                        Turn the public link on to email someone outside Polaris.
+                                        {t("share.linkOff")}
                                     </p>
                                 )}
 
@@ -303,11 +307,11 @@ export function ShareDialog({
                                         onClick={() => void send()}
                                     >
                                         {sending && <Loader2 className="size-3.5 animate-spin" />}
-                                        Send
+                                        {t("share.sendButton")}
                                     </Button>
                                     {outcome && outcome.sent.length > 0 && (
                                         <span className="text-xs text-muted-foreground">
-                                            Sent to {outcome.sent.join(", ")}
+                                            {t("share.sentTo", { names: outcome.sent.join(", ") })}
                                         </span>
                                     )}
                                 </div>
@@ -322,41 +326,41 @@ export function ShareDialog({
 
                         <Section
                             icon={<Link2 className="size-4" />}
-                            title="Private link"
-                            hint="Opens for anyone who can already see this space."
+                            title={t("share.private.title")}
+                            hint={t("share.private.hint")}
                         >
-                            <LinkRow url={privateUrl} label="the private link" />
+                            <LinkRow url={privateUrl} label={t("share.private.label")} />
                         </Section>
 
                         {canShare && (
                             <Section
                                 icon={<Globe className="size-4" />}
-                                title="Public link"
-                                hint="Anyone holding it can read this task without signing in."
+                                title={t("share.public.title")}
+                                hint={t("share.public.hint")}
                             >
                                 <div className="flex items-center justify-between gap-3">
                                     <span className="text-sm">
-                                        {share ? "On" : "Off"}
+                                        {share ? t("share.public.on") : t("share.public.off")}
                                         {share && share.views > 0 && (
                                             <span className="ml-2 text-xs text-muted-foreground">
-                                                Opened {share.views} {share.views === 1 ? "time" : "times"}
+                                                {t("share.public.opened", { count: share.views })}
                                             </span>
                                         )}
                                     </span>
                                     <Switch
                                         checked={share !== null}
-                                        aria-label="Public link"
+                                        aria-label={t("share.public.title")}
                                         onChange={(checked) => void setPublic(checked, share?.showComments ?? false)}
                                     />
                                 </div>
                                 <div className={cn("flex flex-col gap-2", !share && "hidden")}>
-                                    {share?.url && <LinkRow url={share.url} label="the public link" />}
+                                    {share?.url && <LinkRow url={share.url} label={t("share.public.label")} />}
                                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
                                         <Checkbox
                                             checked={share?.showComments ?? false}
                                             onChange={(event) => void setPublic(true, event.target.checked)}
                                         />
-                                        Include the discussion
+                                        {t("share.public.comments")}
                                     </label>
                                 </div>
                             </Section>

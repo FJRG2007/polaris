@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function MailAwayPage() {
     const user = await requirePermission("mail.use");
     const accounts = await listAccountViews(user.id, await mailShelfFor(user.id));
-    if (accounts.length === 0) return <NoMailboxes what="An away message" />;
+    if (accounts.length === 0) return <NoMailboxes what="away" />;
 
     // The message bodies are not on the account view - nothing else needs them -
     // so they are read here for the form.

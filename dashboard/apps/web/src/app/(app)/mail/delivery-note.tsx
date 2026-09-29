@@ -19,10 +19,13 @@
 import Link from "next/link";
 import type { MailDeliveryView } from "@/lib/mailbox/delivery";
 import { useDisplayFormat } from "@/components/display-format";
+import { mailRefusalText } from "@/lib/mailbox/refusal-text";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Clock, MailCheck, TriangleAlert } from "lucide-react";
 
 export function DeliveryNote({ delivery }: { delivery: MailDeliveryView }) {
     const format = useDisplayFormat();
+    const t = useTranslations("mail");
     const settled = delivery.state === "bounced" || delivery.state === "delayed";
     const bad = delivery.state === "bounced" || delivery.state === "partial";
     const Icon = bad ? TriangleAlert : delivery.state === "delayed" ? Clock : MailCheck;
@@ -41,22 +44,21 @@ export function DeliveryNote({ delivery }: { delivery: MailDeliveryView }) {
             />
             <span className="min-w-0">
                 {settled || delivery.state === "partial" ? (
-                    delivery.detail
+                    mailRefusalText(t, delivery.detail)
                 ) : (
-                    <>
-                        Your outgoing server accepted it at{" "}
-                        {format.dateTime(new Date(delivery.sentAt))}, and nothing has come back
-                        since. That is as much as Polaris can know about a message once it is
-                        handed over.
-                    </>
+                    t("delivery.accepted", { time: format.dateTime(new Date(delivery.sentAt)) })
                 )}
-                {copyNote(delivery.sentCopy)}{" "}
+                {delivery.sentCopy === "failed"
+                    ? t("delivery.copyFailed")
+                    : delivery.sentCopy === "none"
+                      ? t("delivery.noSent")
+                      : ""}{" "}
                 {settled && delivery.reportThreadId ? (
                     <Link
                         href={`/mail/t/${delivery.reportThreadId}`}
                         className="underline underline-offset-2"
                     >
-                        Read the report
+                        {t("delivery.readReport")}
                     </Link>
                 ) : null}
             </span>
@@ -64,10 +66,3 @@ export function DeliveryNote({ delivery }: { delivery: MailDeliveryView }) {
     );
 }
 
-/** Said only when there is no copy, because "a copy was filed in Sent" is the
- *  ordinary case and the reader is looking at the copy while they read it. */
-function copyNote(copy: MailDeliveryView["sentCopy"]): string {
-    if (copy === "failed") return " The mail server would not keep a copy of it in Sent.";
-    if (copy === "none") return " This mailbox has no Sent folder, so no copy was kept.";
-    return "";
-}

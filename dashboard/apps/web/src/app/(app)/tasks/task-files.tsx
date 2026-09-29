@@ -23,6 +23,7 @@ import { asFiles } from "@/components/file-picker/as-files";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { RelativeTime } from "@/components/relative-time";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CommitLink } from "@/lib/tasks/commit-service";
 import type { AttachmentView } from "@/lib/tasks/attachment-service";
 import { FileText, GitCommitHorizontal, Loader2, Paperclip, Trash2, Upload, X } from "lucide-react";
@@ -61,6 +62,7 @@ export function AttachmentSection({
     onChanged: () => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("tasksDetail");
     const input = useRef<HTMLInputElement | null>(null);
     const [busy, setBusy] = useState(false);
     const [picking, setPicking] = useState(false);
@@ -97,9 +99,9 @@ export function AttachmentSection({
                         body: file
                     }
                 );
-                if (!response.ok) onError((await response.text()) || "Could not upload that file");
+                if (!response.ok) onError((await response.text()) || t("files.uploadFailed"));
             } catch {
-                onError("Could not upload that file");
+                onError(t("files.uploadFailed"));
             }
         }
         setBusy(false);
@@ -113,11 +115,11 @@ export function AttachmentSection({
     return (
         <section className="flex flex-col gap-2">
             <header className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">Files</h3>
+                <h3 className="text-sm font-medium">{t("files.title")}</h3>
                 {canEdit && (
                     <Button size="sm" variant="ghost" disabled={busy} onClick={() => setPicking(true)}>
                         {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Paperclip className="size-3.5" />}
-                        Attach
+                        {t("files.attach")}
                     </Button>
                 )}
             </header>
@@ -133,7 +135,7 @@ export function AttachmentSection({
 
             {picking && (
                 <FilePickerDialog
-                    title="Attach to this task"
+                    title={t("files.attachTitle")}
                     onClose={() => setPicking(false)}
                     onPick={(picked) => void takePicked(picked)}
                 />
@@ -157,7 +159,7 @@ export function AttachmentSection({
                     )}
                 >
                     <Upload className="mx-auto mb-1 size-4 opacity-60" />
-                    Drop a screenshot, a recording or a document here
+                    {t("files.drop")}
                 </div>
             )}
 
@@ -178,8 +180,8 @@ export function AttachmentSection({
                             {canEdit && (
                                 <button
                                     type="button"
-                                    aria-label={`Remove ${file.name}`}
-                                    title="Remove"
+                                    aria-label={t("files.removeNamed", { name: file.name })}
+                                    title={t("files.remove")}
                                     onClick={async () => {
                                         await runAction(
                                             () => actions.deleteAttachmentAction(taskId, file.id),
@@ -216,8 +218,8 @@ export function AttachmentSection({
                             {canEdit && (
                                 <button
                                     type="button"
-                                    aria-label={`Remove ${file.name}`}
-                                    title="Remove"
+                                    aria-label={t("files.removeNamed", { name: file.name })}
+                                    title={t("files.remove")}
                                     onClick={async () => {
                                         await runAction(
                                             () => actions.deleteAttachmentAction(taskId, file.id),
@@ -236,7 +238,7 @@ export function AttachmentSection({
             )}
 
             {attachments.length === 0 && !canEdit && (
-                <p className="text-xs text-muted-foreground">Nothing attached.</p>
+                <p className="text-xs text-muted-foreground">{t("files.nothing")}</p>
             )}
         </section>
     );
@@ -259,6 +261,7 @@ export function CommitSection({
     onChanged: () => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("tasksDetail");
     const [value, setValue] = useState("");
     const [busy, setBusy] = useState(false);
 
@@ -281,7 +284,7 @@ export function CommitSection({
 
     return (
         <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">Commits</h3>
+            <h3 className="text-sm font-medium">{t("commits.title")}</h3>
 
             {links.length > 0 && (
                 <ul className="divide-y divide-border rounded-md border border-border">
@@ -305,12 +308,12 @@ export function CommitSection({
                                     <RelativeTime iso={commit.committedAt} />
                                 </span>
                             )}
-                            <CopyButton value={commit.url} label="the commit link" className="md:opacity-0 md:group-hover:opacity-100" />
+                            <CopyButton value={commit.url} label={t("commits.linkLabel")} className="md:opacity-0 md:group-hover:opacity-100" />
                             {canEdit && (
                                 <button
                                     type="button"
-                                    aria-label={`Unlink ${commit.shortSha}`}
-                                    title="Unlink"
+                                    aria-label={t("commits.unlinkNamed", { sha: commit.shortSha })}
+                                    title={t("commits.unlink")}
                                     onClick={async () => {
                                         await runAction(() => actions.unlinkCommitAction(taskId, commit.id), onError);
                                         onChanged();
@@ -330,7 +333,7 @@ export function CommitSection({
                     <Input
                         value={value}
                         disabled={busy}
-                        placeholder="Paste a commit link, or owner/repo@sha"
+                        placeholder={t("commits.placeholder")}
                         onChange={(event) => setValue(event.target.value)}
                         onKeyDown={(event) => {
                             if (event.key === "Enter") void link();
@@ -338,7 +341,7 @@ export function CommitSection({
                         className="h-8 text-sm"
                     />
                     <Button size="sm" variant="ghost" disabled={busy || !value.trim()} onClick={() => void link()}>
-                        Link
+                        {t("commits.link")}
                     </Button>
                 </div>
             )}

@@ -16,6 +16,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { requirePermission, sessionCan } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import * as spaces from "@/lib/tasks/space-service";
 import { listTasks } from "@/lib/tasks/task-service";
 import type { SpaceContext } from "@/lib/tasks/facts";
@@ -135,6 +136,7 @@ export default async function EverythingPage({
         ? { match: "all", conditions: [{ field: "assignee", operator: "anyOf", values: [assigneeId] }] }
         : undefined;
 
+    const t = await getTranslations("tasksViews");
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
             <SpaceTree spaces={tree} canCreate canManage={mayManage} />
@@ -146,13 +148,13 @@ export default async function EverythingPage({
                 key={assigneeId ?? "everything"}
                 listId={null}
                 defaultListId={null}
-                title="Everything"
+                title={t("everything.title")}
                 subtitle={
                     assignee
-                        ? `Tasks assigned to ${assignee.name}`
+                        ? t("everything.assignedTo", { name: assignee.name })
                         : assigneeId
-                          ? "Tasks assigned to one person"
-                          : "Every task across every space you can see"
+                          ? t("everything.assignedToOne")
+                          : t("everything.subtitle")
                 }
                 tasks={tasks}
                 savedViews={[]}

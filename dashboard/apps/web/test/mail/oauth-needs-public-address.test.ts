@@ -16,6 +16,7 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import mail from "../../messages/en-US/mail.json";
 import { publicHostname } from "@/lib/domain-edge";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
@@ -62,6 +63,7 @@ describe("the flow refuses a trip it cannot finish", () => {
         expect(dialog).toContain("discovery.oauth && !publicAddress");
         expect(dialog).toContain("/admin/domains");
         // And for somebody who cannot set it themself, who to ask.
-        expect(dialog).toContain("Ask an administrator to give Polaris a public address.");
+        expect(dialog).toContain('t("connect.askAdmin")');
+        expect(mail.connect.askAdmin).toBe("Ask an administrator to give Polaris a public address.");
     });
 });

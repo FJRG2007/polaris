@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function MailPrivacyPage() {
     const user = await requirePermission("mail.use");
     const accounts = await listAccountViews(user.id, await mailShelfFor(user.id));
-    if (accounts.length === 0) return <NoMailboxes what="Privacy" />;
+    if (accounts.length === 0) return <NoMailboxes what="privacy" />;
 
     const trusted: Record<string, string[]> = {};
     for (const account of accounts) trusted[account.id] = await listTrustedSenders(account.id);

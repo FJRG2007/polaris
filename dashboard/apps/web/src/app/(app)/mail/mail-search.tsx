@@ -23,6 +23,7 @@ import { Button, Checkbox, Input, cn } from "@polaris/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** How long typing settles before the address changes. Long enough that a
  *  sentence is one navigation, short enough that it feels immediate. */
@@ -33,6 +34,7 @@ export function MailSearch() {
     const pathname = usePathname();
     const search = useSearchParams();
     const applied = search.get("q") ?? "";
+    const t = useTranslations("mail");
     const [typed, setTyped] = useState(applied);
     const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -77,16 +79,18 @@ export function MailSearch() {
                         if (event.key === "Enter") apply(typed);
                         if (event.key === "Escape") setFiltersOpen(false);
                     }}
-                    placeholder="Search mail"
-                    aria-label="Search mail"
+                    placeholder={t("searchBox.placeholder")}
+                    // What the list's keyboard looks for to hand "/" to the search.
+                    data-mail-search=""
+                    aria-label={t("searchBox.placeholder")}
                     className="h-8 pl-7 pr-14 text-[13px]"
                 />
                 <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center">
                     {typed ? (
                         <button
                             type="button"
-                            aria-label="Clear the search"
-                            title="Clear the search"
+                            aria-label={t("searchBox.clear")}
+                            title={t("searchBox.clear")}
                             className="p-1 text-foreground-subtle hover:text-foreground"
                             onClick={() => {
                                 setTyped("");
@@ -98,8 +102,9 @@ export function MailSearch() {
                     ) : null}
                     <button
                         type="button"
-                        aria-label="Search options"
-                        title="Search options"
+                        aria-label={t("searchBox.options")}
+                        title={t("searchBox.options")}
+                        data-search-options=""
                         aria-expanded={filtersOpen}
                         className={cn(
                             "p-1 text-foreground-subtle hover:text-foreground",
@@ -144,6 +149,8 @@ function SearchFilters({
     onSearch: (value: string) => void;
     onClose: () => void;
 }) {
+    const t = useTranslations("mail");
+    const tc = useTranslations("common");
     const [terms, setTerms] = useState<core.MailSearchTerms>(() => core.parseMailSearch(from));
     const panel = useRef<HTMLDivElement | null>(null);
 
@@ -154,7 +161,7 @@ function SearchFilters({
             if (!panel.current || panel.current.contains(event.target as Node)) return;
             // The button that opened it toggles on its own click; closing here
             // as well would reopen it.
-            if ((event.target as HTMLElement).closest('[aria-label="Search options"]')) return;
+            if ((event.target as HTMLElement).closest("[data-search-options]")) return;
             onClose();
         }
         document.addEventListener("mousedown", onDown);
@@ -174,38 +181,38 @@ function SearchFilters({
             className="absolute left-0 right-0 top-full z-30 mt-1 rounded-md border border-border bg-surface p-3 shadow-lg"
         >
             <div className="grid grid-cols-2 gap-2">
-                <Field label="From" value={one(terms.from)} onChange={(value) => set({ from: asList(value) })} />
-                <Field label="To" value={one(terms.to)} onChange={(value) => set({ to: asList(value) })} />
-                <Field label="Cc" value={one(terms.cc)} onChange={(value) => set({ cc: asList(value) })} />
+                <Field label={t("searchBox.from")} value={one(terms.from)} onChange={(value) => set({ from: asList(value) })} />
+                <Field label={t("searchBox.to")} value={one(terms.to)} onChange={(value) => set({ to: asList(value) })} />
+                <Field label={t("print.cc")} value={one(terms.cc)} onChange={(value) => set({ cc: asList(value) })} />
                 <Field
-                    label="Subject"
+                    label={t("print.subject")}
                     value={one(terms.subject)}
                     onChange={(value) => set({ subject: asList(value) })}
                 />
                 <Field
-                    label="Has the words"
+                    label={t("searchBox.words")}
                     value={terms.text}
                     onChange={(value) => set({ text: value })}
                 />
                 <Field
-                    label="Does not have"
+                    label={t("searchBox.without")}
                     value={one(terms.without)}
                     onChange={(value) => set({ without: asList(value) })}
                 />
                 <Field
-                    label="This exact wording"
+                    label={t("searchBox.exact")}
                     value={one(terms.phrases)}
                     onChange={(value) => set({ phrases: asList(value) })}
                 />
                 <div className="grid grid-cols-2 gap-2">
                     <Field
-                        label="After"
+                        label={t("searchBox.after")}
                         type="date"
                         value={terms.after}
                         onChange={(value) => set({ after: value })}
                     />
                     <Field
-                        label="Before"
+                        label={t("searchBox.before")}
                         type="date"
                         value={terms.before}
                         onChange={(value) => set({ before: value })}
@@ -215,18 +222,18 @@ function SearchFilters({
 
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
                 <Tick
-                    label="Has an attachment"
+                    label={t("searchBox.attachment")}
                     checked={terms.hasAttachment}
                     onChange={(next) => set({ hasAttachment: next })}
                 />
-                <Tick label="Has a link" checked={terms.hasLink} onChange={(next) => set({ hasLink: next })} />
+                <Tick label={t("searchBox.link")} checked={terms.hasLink} onChange={(next) => set({ hasLink: next })} />
                 <Tick
-                    label="Unread"
+                    label={t("labels.filter.unread")}
                     checked={terms.unread === true}
                     onChange={(next) => set({ unread: next ? true : null })}
                 />
                 <Tick
-                    label="Starred"
+                    label={t("labels.filter.starred")}
                     checked={terms.starred === true}
                     onChange={(next) => set({ starred: next ? true : null })}
                 />
@@ -238,22 +245,22 @@ function SearchFilters({
                     className="text-[12px] text-muted-foreground underline hover:text-foreground"
                     onClick={() => setTerms(core.EMPTY_SEARCH)}
                 >
-                    Clear everything
+                    {t("searchBox.clearAll")}
                 </button>
                 <div className="flex items-center gap-2">
                     <Button variant="ghost" size="sm" onClick={onClose}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button size="sm" onClick={() => onSearch(core.formatMailSearch(terms))}>
-                        Search
+                        {t("searchBox.search")}
                     </Button>
                 </div>
             </div>
 
             <p className="mt-2 text-[12px] text-foreground-subtle">
-                Anything here can be typed into the box instead: <code>from:ana</code>,{" "}
-                <code>has:attachment</code>, <code>after:2026-01-01</code>, <code>&quot;exact words&quot;</code>,{" "}
-                <code>-excluded</code>.
+                {t.rich("searchBox.syntax", {
+                    code: (chunks) => <code key={String(chunks)}>{chunks}</code>
+                })}
             </p>
         </div>
     );

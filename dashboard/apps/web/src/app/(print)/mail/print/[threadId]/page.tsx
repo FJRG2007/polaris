@@ -12,13 +12,17 @@ import type { Metadata } from "next";
 import { PrintView } from "./print-view";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
+import { Messages } from "@/components/i18n/messages";
 import { printableThread } from "@/lib/mailbox/printable";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Print - Polaris Mail" };
+export async function generateMetadata(): Promise<Metadata> {
+    return { title: (await getTranslations("mail"))("print.title") };
+}
 
 export default async function MailPrintPage({ params }: { params: Promise<{ threadId: string }> }) {
     const user = await requirePermission("mail.use");
@@ -35,7 +39,9 @@ export default async function MailPrintPage({ params }: { params: Promise<{ thre
     // provided - this page draws none of it.
     return (
         <DisplayFormatProvider preferences={display}>
-            <PrintView thread={thread} />
+            <Messages namespaces={["mail"]}>
+                <PrintView thread={thread} />
+            </Messages>
         </DisplayFormatProvider>
     );
 }

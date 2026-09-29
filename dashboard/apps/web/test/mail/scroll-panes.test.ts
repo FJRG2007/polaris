@@ -41,7 +41,7 @@ describe("the list and the message own their own scrollbars", () => {
         const list = classesNear(view, "aria-label={context.title}");
         expect(list).toContain("min-h-0");
         // The reading pane.
-        const reading = classesNear(view, 'aria-label="Conversation"');
+        const reading = classesNear(view, 'aria-label={t("list.conversation")}');
         expect(reading).toContain("min-h-0");
     });
 

@@ -10,6 +10,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { TaskRefusal } from "./refusal";
 
 export interface SavedView {
     readonly id: string;
@@ -127,8 +128,8 @@ export async function updateView(
     canModerate: boolean
 ): Promise<void> {
     const existing = await prisma.taskView.findUnique({ where: { id: viewId }, select: { ownerId: true } });
-    if (!existing) throw new Error("That view no longer exists");
-    if (existing.ownerId !== userId && !canModerate) throw new Error("Only the person who made this view can change it");
+    if (!existing) throw new TaskRefusal("refusals.viewGone");
+    if (existing.ownerId !== userId && !canModerate) throw new TaskRefusal("refusals.viewOwnerChange");
 
     await prisma.taskView.update({
         where: { id: viewId },
@@ -151,7 +152,7 @@ export async function deleteView(userId: string, viewId: string, canModerate: bo
     const deleted = await prisma.taskView.deleteMany({
         where: canModerate ? { id: viewId } : { id: viewId, ownerId: userId }
     });
-    if (deleted.count === 0) throw new Error("Only the person who made this view can remove it");
+    if (deleted.count === 0) throw new TaskRefusal("refusals.viewOwnerRemove");
 }
 
 /** The view a list opens on: its first shared view, or a board if it has none. */

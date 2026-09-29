@@ -24,6 +24,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useLiveRead } from "@/components/use-live-resource";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { Button, EmptyState, Select, useToast } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { exportSizeAction, importBatchAction, openImportAction } from "@/app/(app)/mail/actions";
 
 /** The archive ceiling as the screen says it, from the number the server
@@ -46,6 +47,8 @@ export function ArchiveView({
     folders: MailFolderView[];
 }) {
     const toast = useToast();
+    const t = useTranslations("mailSettings");
+    const tm = useTranslations("mail");
     const picker = useRef<HTMLInputElement | null>(null);
     const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
     const [busy, setBusy] = useState(false);
@@ -85,8 +88,8 @@ export function ArchiveView({
         return (
             <EmptyState
                 icon={<Upload className="size-5 shrink-0" aria-hidden />}
-                title="No mailbox yet"
-                description="Connect one and you can bring an archive into it."
+                title={t("blocked.noMailboxTitle")}
+                description={t("archive.noMailbox")}
             />
         );
     }
@@ -97,7 +100,7 @@ export function ArchiveView({
         // refused before it is uploaded rather than after.
         if (file.size > core.MAIL_MAX_ARCHIVE_BYTES) {
             toast.show({
-                title: `${ARCHIVE_LIMIT_MB} MB is the most Polaris can read in one file. Split the archive and bring the parts in one after another.`
+                title: t("archive.tooBig", { limit: ARCHIVE_LIMIT_MB })
             });
             if (picker.current) picker.current.value = "";
             return;
@@ -123,7 +126,7 @@ export function ArchiveView({
                 stored = {};
             }
             if (!sent.ok || !stored.upload) {
-                toast.show({ title: stored.error ?? "That file could not be read." });
+                toast.show({ title: stored.error ?? tm("errors.fileRead") });
                 return;
             }
 
@@ -136,7 +139,7 @@ export function ArchiveView({
             }
             const total = "count" in opened ? opened.count : 0;
             if (total === 0) {
-                toast.show({ title: "There are no messages in that file." });
+                toast.show({ title: t("archive.noMessages") });
                 return;
             }
 
@@ -160,8 +163,8 @@ export function ArchiveView({
             }
             toast.show({
                 title: failed
-                    ? `${done} messages are in ${account.address}. ${failed} could not be taken by the server.`
-                    : `${done} messages are in ${account.address}.`
+                    ? t("archive.importedSomeFailed", { done, address: account.address, failed })
+                    : t("archive.imported", { done, address: account.address })
             });
         } finally {
             setBusy(false);
@@ -178,7 +181,7 @@ export function ArchiveView({
             <AccountPicker accounts={accounts} value={account.id} onChange={setAccountId} />
 
             <label className="mt-3 block">
-                <span className="mb-1 block text-[12px] text-muted-foreground">Folder</span>
+                <span className="mb-1 block text-[12px] text-muted-foreground">{t("archive.folder")}</span>
                 <Select
                     value={target}
                     onValueChange={setFolderId}
@@ -188,14 +191,12 @@ export function ArchiveView({
 
             <section className="mt-4 rounded-md border border-border">
                 <div className="px-3 py-2.5">
-                    <h2 className="text-[13px] font-medium">Bring an archive in</h2>
+                    <h2 className="text-[13px] font-medium">{t("archive.inTitle")}</h2>
                     <p className="mt-1 text-[12px] text-muted-foreground">
-                        An <code>.mbox</code> file, or a single <code>.eml</code>, up to{" "}
-                        {ARCHIVE_LIMIT_MB} MB. Every message is put on your mail server in the
-                        folder above, so it is there on your phone and in everything else you read
-                        this mailbox with - not only here. They arrive already read, because an
-                        archive that lands as four thousand unread messages is an inbox nobody opens
-                        again.
+                        {t.rich("archive.inBody", {
+                            limit: ARCHIVE_LIMIT_MB,
+                            code: (chunks) => <code key={String(chunks)}>{chunks}</code>
+                        })}
                     </p>
                     <input
                         ref={picker}
@@ -215,7 +216,7 @@ export function ArchiveView({
                         onClick={() => picker.current?.click()}
                     >
                         <Upload className="size-4 shrink-0" aria-hidden />
-                        Choose a file
+                        {t("archive.choose")}
                     </Button>
                     {progress ? (
                         <div className="mt-3">
@@ -238,44 +239,39 @@ export function ArchiveView({
                                 />
                             </div>
                             <p className="mt-1 text-[12px] text-muted-foreground">
-                                {progress.finished ? "Done - " : ""}
-                                {progress.done} of {progress.total} imported
-                                {progress.failed
-                                    ? `, ${progress.failed} the server would not take`
-                                    : ""}
-                                .
+                                {t("archive.progress", {
+                                    finished: progress.finished ? "yes" : "no",
+                                    done: progress.done,
+                                    total: progress.total,
+                                    failed: progress.failed
+                                })}
                             </p>
                         </div>
                     ) : null}
                 </div>
                 <p className="border-t border-border px-3 py-2 text-[12px] text-foreground-subtle">
-                    Nothing is matched against what is already in the folder, so importing the same
-                    file twice puts everything in twice. That is on purpose: a message quietly
-                    missing from an archive is worse than one that is there twice.
+                    {t("archive.twice")}
                 </p>
             </section>
 
             <section className="mt-4 rounded-md border border-border">
                 <div className="px-3 py-2.5">
-                    <h2 className="text-[13px] font-medium">Take it out</h2>
+                    <h2 className="text-[13px] font-medium">{t("archive.outTitle")}</h2>
                     <p className="mt-1 text-[12px] text-muted-foreground">
-                        An <code>.mbox</code> of everything Polaris holds for this{" "}
-                        {folderId ? "folder" : "mailbox"}, which every other mail client can read.
-                        It is built from what has been synced here, with the headers Polaris keeps -
-                        an archive rather than a forensic copy. To save one message exactly as its
-                        server holds it, open it and use Save this message.
+                        {t.rich("archive.outBody", {
+                            scope: folderId ? "folder" : "mailbox",
+                            code: (chunks) => <code key={String(chunks)}>{chunks}</code>
+                        })}
                     </p>
                     <Button className="mt-2" size="sm" variant="secondary" asChild>
                         <a href={exportHref} download>
                             <Download className="size-4 shrink-0" aria-hidden />
-                            Download {folderId ? "this folder" : "this mailbox"}
+                            {folderId ? t("archive.downloadFolder") : t("archive.downloadMailbox")}
                         </a>
                     </Button>
                     {exportCount !== null ? (
                         <p className="mt-1 text-[12px] text-foreground-subtle">
-                            {exportCount === 0
-                                ? "There is nothing here to download yet."
-                                : `${exportCount.toLocaleString()} message${exportCount === 1 ? "" : "s"} in the file.`}
+                            {exportCount === 0 ? t("archive.nothingYet") : t("archive.inFile", { count: exportCount })}
                         </p>
                     ) : null}
                 </div>

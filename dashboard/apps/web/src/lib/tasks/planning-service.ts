@@ -10,6 +10,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { TaskRefusal } from "./refusal";
 
 // ---------------------------------------------------------------------------
 // Sprints
@@ -87,7 +88,7 @@ export async function listSprints(reach: {
 
 export async function createSprint(input: core.SprintInput): Promise<string> {
     if (new Date(input.endDate) <= new Date(input.startDate)) {
-        throw new Error("A sprint has to end after it starts");
+        throw new TaskRefusal("refusals.sprintEndsBeforeStart");
     }
     const sprint = await prisma.taskSprint.create({
         data: {
@@ -106,7 +107,7 @@ export async function createSprint(input: core.SprintInput): Promise<string> {
 /** A sprint id names no space, so every write keeps to the one the caller was
  *  cleared for - an id alone would reach every other space's sprints. */
 function sprintNotInSpace(): Error {
-    return new Error("That sprint is not in this space");
+    return new TaskRefusal("refusals.sprintNotInSpace");
 }
 
 /** Edits a sprint's own details. It deliberately cannot change which folder the
@@ -118,7 +119,7 @@ export async function updateSprint(
     input: Omit<core.SprintInput, "spaceId" | "folderId">
 ): Promise<void> {
     if (new Date(input.endDate) <= new Date(input.startDate)) {
-        throw new Error("A sprint has to end after it starts");
+        throw new TaskRefusal("refusals.sprintEndsBeforeStart");
     }
     const { count } = await prisma.taskSprint.updateMany({
         where: { id: sprintId, spaceId },
@@ -145,7 +146,7 @@ export async function setSprintStatus(
     sprintId: string,
     status: SprintView["status"]
 ): Promise<void> {
-    if (!SPRINT_STATUSES.includes(status)) throw new Error("That is not a sprint status");
+    if (!SPRINT_STATUSES.includes(status)) throw new TaskRefusal("refusals.notSprintStatus");
     if (typeof sprintId !== "string") throw sprintNotInSpace();
     const starting = await prisma.taskSprint.findFirst({
         where: { id: sprintId, spaceId },

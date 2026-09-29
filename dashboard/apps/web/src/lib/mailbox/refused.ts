@@ -17,6 +17,8 @@
 
 import { prisma } from "@polaris/db";
 import { refusedMailboxHref } from "./refusals";
+import { getUserLocale } from "@/lib/i18n/locale-service";
+import { translatorFor } from "@/lib/i18n/translate";
 
 const REFUSED_EVENT = "mail.account.refused";
 
@@ -55,15 +57,14 @@ export async function recordCredentialRefusal(accountId: string, detail: string)
         // drag the whole notification fan-out - mail, webhooks, texts - into
         // everything that imports them.
         const { notify } = await import("@/lib/notifications/dispatch");
+        const t = translatorFor(await getUserLocale(account.userId), "mail");
         await notify({
             userId: account.userId,
             event: REFUSED_EVENT,
             title: authorized
-                ? `${account.address} needs connecting again`
-                : `${account.address} stopped accepting its password`,
-            body: authorized
-                ? "Its authorization was refused or withdrawn, so Polaris paused checking it. Reconnect it in Mail to start again."
-                : "If you changed it recently, update it in Mail. Polaris paused checking this mailbox so the server does not lock it for repeated failed sign-ins.",
+                ? t("notify.reconnectTitle", { address: account.address })
+                : t("notify.passwordTitle", { address: account.address }),
+            body: authorized ? t("notify.reconnectBody") : t("notify.passwordBody"),
             href: refusedMailboxHref(accountId),
             // The shelf Mail lists this mailbox on.
             shelf: { orgId: account.orgId },

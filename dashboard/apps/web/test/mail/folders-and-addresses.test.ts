@@ -15,6 +15,7 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import mail from "../../messages/en-US/mail.json";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 
@@ -51,7 +52,8 @@ describe("renaming and deleting a folder", () => {
 
     it("says what deleting one actually does", async () => {
         const rail = await readFile(`${SRC}app/(app)/mail/mail-rail.tsx`, "utf8");
-        expect(rail).toContain(
+        expect(rail).toContain('t("rail.deleteBody")');
+        expect(mail.rail.deleteBody).toContain(
             "The folder and every message in it are deleted on the mail server."
         );
         // And offers neither on a folder that carries a role.
@@ -73,14 +75,21 @@ describe("an address in a header", () => {
 
     it("carries a copy button that the keyboard can reach", async () => {
         const source = await chip;
-        expect(source).toContain("aria-label={`Copy ${entry.address}`}");
+        expect(source).toContain('aria-label={t("address.copyNamed", { address: entry.address })}');
         expect(source).toContain("focus-visible:opacity-100");
     });
 
     it("offers what a mail client offers on the right-click", async () => {
         const source = await chip;
-        for (const item of ["Copy address", "New message", "Find their mail", "Block them"]) {
-            expect(source, item).toContain(item);
+        const offered = {
+            copy: "Copy address",
+            newMessage: "New message",
+            findMail: "Find their mail",
+            block: "Block them"
+        } as const;
+        for (const [key, english] of Object.entries(offered)) {
+            expect(source, key).toContain(`t("address.${key}")`);
+            expect(mail.address[key as keyof typeof offered], key).toBe(english);
         }
     });
 
@@ -94,7 +103,8 @@ describe("an address in a header", () => {
         // A message delivered with nobody in its To line is a blind copy, which
         // is a fact about it rather than a gap in the screen.
         const thread = await readFile(`${SRC}app/(app)/mail/thread-view.tsx`, "utf8");
-        expect(thread).toContain("undisclosed recipients");
+        expect(thread).toContain('t("view.undisclosed")');
+        expect(mail.view.undisclosed).toBe("undisclosed recipients");
         expect(thread).not.toContain('"nobody"');
     });
 });

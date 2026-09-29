@@ -15,6 +15,9 @@ import * as actions from "./actions";
 import { useRouter } from "next/navigation";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
+import { optionLabel } from "./option-label";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ProgressBar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
 import type { FormView } from "@/lib/tasks/form-service";
@@ -75,18 +78,20 @@ export interface SpaceScreenProps {
  * settings mean: `internal` is that roster and not the instance, and even a
  * private space is reachable by whoever runs the organization.
  */
-function visibilityLine(props: Pick<SpaceScreenProps, "visibility" | "orgName">): string {
+function visibilityLine(
+    t: NamespaceTranslator<"tasks">,
+    props: Pick<SpaceScreenProps, "visibility" | "orgName">
+): string {
     if (!props.orgName) {
-        return props.visibility === "internal"
-            ? "Anyone on this Polaris can see it"
-            : "Private to its members";
+        return props.visibility === "internal" ? t("space.visibility.instance") : t("space.visibility.private");
     }
     return props.visibility === "internal"
-        ? `Anyone in ${props.orgName} can see it`
-        : `${props.orgName} - its teams and members`;
+        ? t("space.visibility.org", { org: props.orgName })
+        : t("space.visibility.orgMembers", { org: props.orgName });
 }
 
 export function SpaceScreen(props: SpaceScreenProps) {
+    const t = useTranslations("tasks");
     const [tab, setTab] = useState<Tab>(
         TABS.includes(props.initialTab as Tab) ? (props.initialTab as Tab) : "Overview"
     );
@@ -109,7 +114,7 @@ export function SpaceScreen(props: SpaceScreenProps) {
                 <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground">
                     {props.prefix}
                 </span>
-                <span className="text-muted-foreground text-xs">{visibilityLine(props)}</span>
+                <span className="text-muted-foreground text-xs">{visibilityLine(t, props)}</span>
             </header>
             {props.description && (
                 <p className="max-w-2xl text-sm text-muted-foreground">{props.description}</p>
@@ -129,7 +134,7 @@ export function SpaceScreen(props: SpaceScreenProps) {
                                 : "border-transparent text-muted-foreground hover:text-foreground"
                         )}
                     >
-                        {entry}
+                        {t(`space.tabs.${entry}`)}
                     </button>
                 ))}
             </nav>
@@ -189,11 +194,12 @@ export function SpaceScreen(props: SpaceScreenProps) {
 }
 
 function OverviewTab({ lists }: { lists: readonly ListSummary[] }) {
+    const t = useTranslations("tasks");
     if (lists.length === 0) {
         return (
             <EmptyState
-                title="No lists yet."
-                description="Add one from the sidebar and its tasks appear here."
+                title={t("space.overview.emptyTitle")}
+                description={t("space.overview.emptyDescription")}
             />
         );
     }
@@ -216,7 +222,7 @@ function OverviewTab({ lists }: { lists: readonly ListSummary[] }) {
                                 </Link>
                                 <ProgressBar percent={percent} />
                                 <p className="text-xs text-muted-foreground">
-                                    {list.openCount} open of {list.totalCount}
+                                    {t("space.overview.openOf", { open: list.openCount, total: list.totalCount })}
                                 </p>
                             </CardBody>
                         </Card>
@@ -238,6 +244,8 @@ function StatusesTab({
     canManage: boolean;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("tasks");
+    const tc = useTranslations("common");
     const [name, setName] = useState("");
     const [type, setType] = useState<core.TaskStatusType>("open");
     const [color, setColor] = useState("#64748b");
@@ -311,9 +319,7 @@ function StatusesTab({
     return (
         <section className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
-                Every list in this space shares these. The kind decides what Polaris counts as
-                finished, whatever the status is called, and the order here is the order of the
-                columns on a board. Move one with the arrows, or drag its column on a board.
+                {t("space.statuses.hint")}
             </p>
 
             <ul className="divide-y divide-border rounded-lg border border-border">
@@ -323,7 +329,7 @@ function StatusesTab({
                             <input
                                 type="color"
                                 value={draft.color}
-                                aria-label="Status color"
+                                aria-label={t("space.statuses.color")}
                                 onChange={(event) =>
                                     setDraft({ ...draft, color: event.target.value })
                                 }
@@ -332,7 +338,7 @@ function StatusesTab({
                             <Input
                                 autoFocus
                                 value={draft.name}
-                                aria-label="Status name"
+                                aria-label={t("space.statuses.name")}
                                 onChange={(event) =>
                                     setDraft({ ...draft, name: event.target.value })
                                 }
@@ -349,9 +355,9 @@ function StatusesTab({
                                 }
                                 options={core.TASK_STATUS_TYPES.map((entry) => ({
                                     value: entry,
-                                    label: core.TASK_STATUS_TYPE_LABELS[entry]
+                                    label: optionLabel(t, "statusType", entry)
                                 }))}
-                                aria-label="Status kind"
+                                aria-label={t("space.statuses.kind")}
                                 className="h-8 w-40 text-xs"
                             />
                             <Button
@@ -359,10 +365,10 @@ function StatusesTab({
                                 disabled={!draft.name.trim() || saving}
                                 onClick={() => void save()}
                             >
-                                {saving ? "Saving..." : "Save"}
+                                {saving ? t("space.saving") : tc("actions.save")}
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                         </li>
                     ) : (
@@ -372,15 +378,15 @@ function StatusesTab({
                                 {status.name}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                {core.TASK_STATUS_TYPE_LABELS[status.type]}
+                                {optionLabel(t, "statusType", status.type)}
                             </span>
                             {canManage && (
                                 <>
                                     <button
                                         type="button"
                                         disabled={index === 0}
-                                        aria-label={`Move ${status.name} up`}
-                                        title="Move up"
+                                        aria-label={t("space.moveUpNamed", { name: status.name })}
+                                        title={t("space.moveUp")}
                                         onClick={() => void move(index, -1)}
                                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
                                     >
@@ -389,8 +395,8 @@ function StatusesTab({
                                     <button
                                         type="button"
                                         disabled={index === ordered.length - 1}
-                                        aria-label={`Move ${status.name} down`}
-                                        title="Move down"
+                                        aria-label={t("space.moveDownNamed", { name: status.name })}
+                                        title={t("space.moveDown")}
                                         onClick={() => void move(index, 1)}
                                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
                                     >
@@ -398,8 +404,8 @@ function StatusesTab({
                                     </button>
                                     <button
                                         type="button"
-                                        aria-label={`Edit ${status.name}`}
-                                        title="Edit status"
+                                        aria-label={t("space.editNamed", { name: status.name })}
+                                        title={t("space.statuses.edit")}
                                         onClick={() => {
                                             setEditing(status);
                                             setDraft({
@@ -414,8 +420,8 @@ function StatusesTab({
                                     </button>
                                     <button
                                         type="button"
-                                        aria-label={`Remove ${status.name}`}
-                                        title="Remove status"
+                                        aria-label={t("pickers.remove", { name: status.name })}
+                                        title={t("space.statuses.remove")}
                                         onClick={() => {
                                             setRemoving(status);
                                             setReplacement(
@@ -438,8 +444,8 @@ function StatusesTab({
                 <div className="flex flex-wrap items-end gap-2">
                     <Input
                         value={name}
-                        placeholder="Status name"
-                        aria-label="Status name"
+                        placeholder={t("space.statuses.name")}
+                        aria-label={t("space.statuses.name")}
                         onChange={(event) => setName(event.target.value)}
                         className="h-8 w-44 text-sm"
                     />
@@ -448,15 +454,15 @@ function StatusesTab({
                         onValueChange={(value) => setType(value as core.TaskStatusType)}
                         options={core.TASK_STATUS_TYPES.map((entry) => ({
                             value: entry,
-                            label: core.TASK_STATUS_TYPE_LABELS[entry]
+                            label: optionLabel(t, "statusType", entry)
                         }))}
-                        aria-label="Status kind"
+                        aria-label={t("space.statuses.kind")}
                         className="h-8 w-40 text-xs"
                     />
                     <input
                         type="color"
                         value={color}
-                        aria-label="Status color"
+                        aria-label={t("space.statuses.color")}
                         onChange={(event) => setColor(event.target.value)}
                         className="h-8 w-12 rounded border border-border bg-field"
                     />
@@ -477,10 +483,10 @@ function StatusesTab({
                             else setName("");
                         }}
                     >
-                        <Plus className="size-3.5" /> Add
+                        <Plus className="size-3.5" /> {t("goals.add")}
                     </Button>
                     <p className="w-full text-xs text-muted-foreground">
-                        {core.TASK_STATUS_TYPE_HINTS[type]}
+                        {optionLabel(t, "statusTypeHint", type)}
                     </p>
                 </div>
             )}
@@ -490,8 +496,9 @@ function StatusesTab({
                 onOpenChange={(open) => (open ? undefined : setRemoving(null))}
                 name={removing?.name ?? ""}
                 kind="status"
-                description="Tasks on it move to the status you pick, so nothing falls off the board."
-                confirmLabel="Remove status"
+                title={t("space.statuses.deleteTitle")}
+                description={t("space.statuses.removeDescription")}
+                confirmLabel={t("space.statuses.remove")}
                 onConfirm={async () => {
                     if (!removing || !replacement) return;
                     const result = await runAction(
@@ -507,14 +514,14 @@ function StatusesTab({
                 }}
             >
                 <label className="flex flex-col gap-1 text-sm">
-                    Move its tasks to
+                    {t("space.statuses.moveTasksTo")}
                     <Select
                         value={replacement}
                         onValueChange={setReplacement}
                         options={statuses
                             .filter((status) => status.id !== removing?.id)
                             .map((status) => ({ value: status.id, label: status.name }))}
-                        aria-label="Replacement status"
+                        aria-label={t("space.statuses.replacement")}
                         className="h-8 text-xs"
                     />
                 </label>
@@ -534,31 +541,31 @@ function FieldsTab({
     canManage: boolean;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("tasks");
     const [name, setName] = useState("");
     const [type, setType] = useState<core.CustomFieldType>("text");
 
     return (
         <section className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
-                Extra columns on every task in this space. They show in the table view and on the
-                task panel.
+                {t("space.fields.hint")}
             </p>
 
             <ul className="divide-y divide-border rounded-lg border border-border">
                 {fields.length === 0 && (
-                    <li className="px-3 py-4 text-xs text-muted-foreground">No fields yet.</li>
+                    <li className="px-3 py-4 text-xs text-muted-foreground">{t("space.fields.empty")}</li>
                 )}
                 {fields.map((field) => (
                     <li key={field.id} className="flex items-center gap-3 px-3 py-2">
                         <span className="flex-1 truncate text-sm">{field.name}</span>
                         <span className="text-xs text-muted-foreground">
-                            {core.CUSTOM_FIELD_LABELS[field.type]}
+                            {optionLabel(t, "customField", field.type)}
                         </span>
                         {canManage && (
                             <button
                                 type="button"
-                                aria-label={`Remove ${field.name}`}
-                                title="Remove field"
+                                aria-label={t("pickers.remove", { name: field.name })}
+                                title={t("space.fields.remove")}
                                 onClick={async () => {
                                     const result = await runAction(
                                         () => actions.deleteCustomFieldAction(spaceId, field.id),
@@ -579,8 +586,8 @@ function FieldsTab({
                 <div className="flex flex-wrap items-center gap-2">
                     <Input
                         value={name}
-                        placeholder="Field name"
-                        aria-label="Field name"
+                        placeholder={t("space.fields.name")}
+                        aria-label={t("space.fields.name")}
                         onChange={(event) => setName(event.target.value)}
                         className="h-8 w-44 text-sm"
                     />
@@ -589,9 +596,9 @@ function FieldsTab({
                         onValueChange={(value) => setType(value as core.CustomFieldType)}
                         options={core.CUSTOM_FIELD_TYPES.map((entry) => ({
                             value: entry,
-                            label: core.CUSTOM_FIELD_LABELS[entry]
+                            label: optionLabel(t, "customField", entry)
                         }))}
-                        aria-label="Field type"
+                        aria-label={t("space.fields.type")}
                         className="h-8 w-40 text-xs"
                     />
                     <Button
@@ -614,7 +621,7 @@ function FieldsTab({
                             else setName("");
                         }}
                     >
-                        <Plus className="size-3.5" /> Add
+                        <Plus className="size-3.5" /> {t("goals.add")}
                     </Button>
                 </div>
             )}
@@ -646,6 +653,8 @@ function TagsTab({
     canManage: boolean;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("tasks");
+    const tc = useTranslations("common");
     const [name, setName] = useState("");
     const [color, setColor] = useState("#7c5cff");
     /** The tag being renamed, and what it is being renamed to. Held apart from
@@ -676,13 +685,12 @@ function TagsTab({
     return (
         <section className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
-                Every list in this space shares these. Anybody can make one while tagging a task;
-                renaming or removing one here changes it on every task that carries it.
+                {t("space.tags.hint")}
             </p>
 
             <ul className="divide-y divide-border rounded-lg border border-border">
                 {tags.length === 0 && (
-                    <li className="px-3 py-2 text-xs text-muted-foreground">No tags yet.</li>
+                    <li className="px-3 py-2 text-xs text-muted-foreground">{t("space.tags.empty")}</li>
                 )}
                 {tags.map((tag) =>
                     editing?.id === tag.id && draft ? (
@@ -690,14 +698,14 @@ function TagsTab({
                             <input
                                 type="color"
                                 value={draft.color}
-                                aria-label="Tag color"
+                                aria-label={t("space.tags.color")}
                                 onChange={(event) => setDraft({ ...draft, color: event.target.value })}
                                 className="h-8 w-12 shrink-0 rounded border border-border bg-field"
                             />
                             <Input
                                 autoFocus
                                 value={draft.name}
-                                aria-label="Tag name"
+                                aria-label={t("space.tags.name")}
                                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                                 onKeyDown={(event) => {
                                     if (event.key === "Escape") setEditing(null);
@@ -706,10 +714,10 @@ function TagsTab({
                                 className="h-8 min-w-32 flex-1 text-sm"
                             />
                             <Button size="sm" disabled={!draft.name.trim() || saving} onClick={() => void save()}>
-                                {saving ? "Saving..." : "Save"}
+                                {saving ? t("space.saving") : tc("actions.save")}
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
-                                Cancel
+                                {tc("actions.cancel")}
                             </Button>
                         </li>
                     ) : (
@@ -725,8 +733,8 @@ function TagsTab({
                                 <>
                                     <button
                                         type="button"
-                                        aria-label={`Edit ${tag.name}`}
-                                        title="Edit tag"
+                                        aria-label={t("space.editNamed", { name: tag.name })}
+                                        title={t("space.tags.edit")}
                                         onClick={() => {
                                             setEditing(tag);
                                             setDraft({ name: tag.name, color: tag.color });
@@ -737,8 +745,8 @@ function TagsTab({
                                     </button>
                                     <button
                                         type="button"
-                                        aria-label={`Remove ${tag.name}`}
-                                        title="Remove tag"
+                                        aria-label={t("pickers.remove", { name: tag.name })}
+                                        title={t("space.tags.remove")}
                                         onClick={() => setRemoving(tag)}
                                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                     >
@@ -755,15 +763,15 @@ function TagsTab({
                 <div className="flex flex-wrap items-center gap-2">
                     <Input
                         value={name}
-                        placeholder="Tag name"
-                        aria-label="Tag name"
+                        placeholder={t("space.tags.name")}
+                        aria-label={t("space.tags.name")}
                         onChange={(event) => setName(event.target.value)}
                         className="h-8 w-44 text-sm"
                     />
                     <input
                         type="color"
                         value={color}
-                        aria-label="Tag color"
+                        aria-label={t("space.tags.color")}
                         onChange={(event) => setColor(event.target.value)}
                         className="h-8 w-12 rounded border border-border bg-field"
                     />
@@ -782,7 +790,7 @@ function TagsTab({
                             }
                         }}
                     >
-                        <Plus className="size-3.5" /> Add
+                        <Plus className="size-3.5" /> {t("goals.add")}
                     </Button>
                 </div>
             )}
@@ -795,8 +803,13 @@ function TagsTab({
                 // One row of many, and it holds no work of its own: typing the
                 // name back would be a ceremony for taking off a label.
                 requireTyping={false}
-                description="It comes off every task in this space that carries it. The tasks themselves stay."
-                confirmLabel="Remove tag"
+                title={t("space.tags.deleteTitle")}
+                question={t.rich("deleteTask.question", {
+                    name: removing?.name ?? "",
+                    strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                })}
+                description={t("space.tags.removeDescription")}
+                confirmLabel={t("space.tags.remove")}
                 onConfirm={async () => {
                     if (!removing) return;
                     const result = await runAction(
@@ -822,14 +835,14 @@ function PeopleTab({
     canManage: boolean;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("tasks");
     const [identifier, setIdentifier] = useState("");
     const [role, setRole] = useState<core.SpaceRole>("member");
 
     return (
         <section className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
-                Everyone here reaches the whole space. To give somebody one client or one project
-                instead, right-click that folder in the sidebar and choose who can reach it.
+                {t("space.people.hint")}
             </p>
             <ul className="divide-y divide-border rounded-lg border border-border">
                 {members.map((member) => (
@@ -851,7 +864,7 @@ function PeopleTab({
                             </p>
                         </div>
                         {member.role === "owner" ? (
-                            <span className="text-xs text-muted-foreground">Owner</span>
+                            <span className="text-xs text-muted-foreground">{t("access.owner")}</span>
                         ) : canManage ? (
                             <>
                                 <Select
@@ -870,15 +883,15 @@ function PeopleTab({
                                     }}
                                     options={core.SPACE_ROLES.map((entry) => ({
                                         value: entry,
-                                        label: core.SPACE_ROLE_LABELS[entry]
+                                        label: optionLabel(t, "spaceRole", entry)
                                     }))}
-                                    aria-label={`Role for ${member.name}`}
+                                    aria-label={t("access.roleFor", { name: member.name })}
                                     className="h-8 w-32 text-xs"
                                 />
                                 <button
                                     type="button"
-                                    aria-label={`Remove ${member.name}`}
-                                    title="Remove from space"
+                                    aria-label={t("pickers.remove", { name: member.name })}
+                                    title={t("space.people.remove")}
                                     onClick={async () => {
                                         const result = await runAction(
                                             () =>
@@ -897,7 +910,7 @@ function PeopleTab({
                             </>
                         ) : (
                             <span className="text-xs text-muted-foreground">
-                                {core.SPACE_ROLE_LABELS[member.role]}
+                                {optionLabel(t, "spaceRole", member.role)}
                             </span>
                         )}
                     </PersonRow>
@@ -908,8 +921,8 @@ function PeopleTab({
                 <div className="flex flex-wrap items-center gap-2">
                     <Input
                         value={identifier}
-                        placeholder="Email or username"
-                        aria-label="Person to add"
+                        placeholder={t("access.identifier")}
+                        aria-label={t("space.people.add")}
                         onChange={(event) => setIdentifier(event.target.value)}
                         className="h-8 w-56 text-sm"
                     />
@@ -918,9 +931,9 @@ function PeopleTab({
                         onValueChange={(value) => setRole(value as core.SpaceRole)}
                         options={core.SPACE_ROLES.map((entry) => ({
                             value: entry,
-                            label: core.SPACE_ROLE_LABELS[entry]
+                            label: optionLabel(t, "spaceRole", entry)
                         }))}
-                        aria-label="Role"
+                        aria-label={t("access.role")}
                         className="h-8 w-32 text-xs"
                     />
                     <Button
@@ -936,10 +949,10 @@ function PeopleTab({
                             else setIdentifier("");
                         }}
                     >
-                        <Plus className="size-3.5" /> Add
+                        <Plus className="size-3.5" /> {t("goals.add")}
                     </Button>
                     <p className="w-full text-xs text-muted-foreground">
-                        {core.SPACE_ROLE_HINTS[role]}
+                        {optionLabel(t, "spaceRoleHint", role)}
                     </p>
                 </div>
             )}
@@ -969,6 +982,7 @@ function SpaceTeams({
     const [granted, setGranted] = useState<
         { teamId: string; teamName: string; role: core.SpaceRole }[]
     >([]);
+    const t = useTranslations("tasks");
     const [available, setAvailable] = useState<{ id: string; name: string }[]>([]);
     const [loaded, setLoaded] = useState(false);
     const [pick, setPick] = useState("");
@@ -997,16 +1011,13 @@ function SpaceTeams({
     return (
         <section className="flex flex-col gap-3 border-t border-border pt-4">
             <div>
-                <h2 className="text-sm font-medium">Teams</h2>
-                <p className="text-xs text-muted-foreground">
-                    A team from the organization that owns this space. Everybody on it reaches the
-                    space at the role given here, and joining the team later is enough.
-                </p>
+                <h2 className="text-sm font-medium">{t("access.teams")}</h2>
+                <p className="text-xs text-muted-foreground">{t("space.teams.hint")}</p>
             </div>
 
             {granted.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                    No team has been given this space yet.
+                    {t("space.teams.empty")}
                 </p>
             ) : (
                 <ul className="divide-y divide-border rounded-lg border border-border">
@@ -1037,15 +1048,15 @@ function SpaceTeams({
                                         }}
                                         options={core.SPACE_ROLES.map((entry) => ({
                                             value: entry,
-                                            label: core.SPACE_ROLE_LABELS[entry]
+                                            label: optionLabel(t, "spaceRole", entry)
                                         }))}
-                                        aria-label={`Role for ${grant.teamName}`}
+                                        aria-label={t("access.roleFor", { name: grant.teamName })}
                                         className="h-8 w-32 text-xs"
                                     />
                                     <button
                                         type="button"
-                                        aria-label={`Remove ${grant.teamName}`}
-                                        title="Remove from space"
+                                        aria-label={t("pickers.remove", { name: grant.teamName })}
+                                        title={t("space.people.remove")}
                                         onClick={async () => {
                                             const result = await runAction(
                                                 () =>
@@ -1065,7 +1076,7 @@ function SpaceTeams({
                                 </>
                             ) : (
                                 <span className="text-xs text-muted-foreground">
-                                    {core.SPACE_ROLE_LABELS[grant.role]}
+                                    {optionLabel(t, "spaceRole", grant.role)}
                                 </span>
                             )}
                         </li>
@@ -1078,9 +1089,9 @@ function SpaceTeams({
                     <Select
                         value={pick}
                         onValueChange={setPick}
-                        placeholder="Choose a team"
+                        placeholder={t("access.chooseTeam")}
                         options={ungranted.map((team) => ({ value: team.id, label: team.name }))}
-                        aria-label="Team to add"
+                        aria-label={t("access.teamToAdd")}
                         className="h-8 w-56 text-sm"
                     />
                     <Select
@@ -1088,9 +1099,9 @@ function SpaceTeams({
                         onValueChange={(value) => setRole(value as core.SpaceRole)}
                         options={core.SPACE_ROLES.map((entry) => ({
                             value: entry,
-                            label: core.SPACE_ROLE_LABELS[entry]
+                            label: optionLabel(t, "spaceRole", entry)
                         }))}
-                        aria-label="Role for the team"
+                        aria-label={t("access.teamRole")}
                         className="h-8 w-32 text-xs"
                     />
                     <Button
@@ -1106,7 +1117,7 @@ function SpaceTeams({
                             await reload();
                         }}
                     >
-                        <Plus className="size-3.5" /> Give access
+                        <Plus className="size-3.5" /> {t("access.give")}
                     </Button>
                 </div>
             )}

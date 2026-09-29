@@ -12,6 +12,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import type { SpaceAccess, TaskScope } from "./access";
 import { contactLines } from "@/lib/privacy-service";
+import { TaskRefusal, folderMoveRefusal } from "./refusal";
 
 // ---------------------------------------------------------------------------
 // The sidebar tree
@@ -388,13 +389,13 @@ export async function addSpaceMember(
         where: { OR: [{ email: needle }, { username: needle }] },
         select: { id: true }
     });
-    if (!user) throw new Error("No account matches that email or username");
+    if (!user) throw new TaskRefusal("refusals.noAccountMatch");
 
     const space = await prisma.taskSpace.findUnique({
         where: { id: spaceId },
         select: { ownerId: true }
     });
-    if (space?.ownerId === user.id) throw new Error("That person already owns this space");
+    if (space?.ownerId === user.id) throw new TaskRefusal("refusals.alreadyOwner");
 
     await prisma.taskSpaceMember.upsert({
         where: { spaceId_userId: { spaceId, userId: user.id } },
@@ -587,13 +588,13 @@ export async function addFolderMember(
         where: { OR: [{ email: needle }, { username: needle }] },
         select: { id: true }
     });
-    if (!user) throw new Error("No account matches that email or username");
+    if (!user) throw new TaskRefusal("refusals.noAccountMatch");
 
     const folder = await prisma.taskFolder.findUnique({
         where: { id: folderId },
         select: { space: { select: { ownerId: true } } }
     });
-    if (folder?.space.ownerId === user.id) throw new Error("That person already owns this space");
+    if (folder?.space.ownerId === user.id) throw new TaskRefusal("refusals.alreadyOwner");
 
     await prisma.taskFolderMember.upsert({
         where: { folderId_userId: { folderId, userId: user.id } },
@@ -719,10 +720,10 @@ export async function createFolder(input: core.FolderInput): Promise<string> {
             select: { spaceId: true }
         });
         if (!parent || parent.spaceId !== input.spaceId)
-            throw new Error("That folder is not in this space");
+            throw new TaskRefusal("refusals.folderNotInSpace");
         const folders = await spaceFolders(input.spaceId);
         if (core.folderDepth(folders, input.parentId) + 1 >= core.FOLDER_DEPTH_LIMIT) {
-            throw new Error(`Folders can nest ${core.FOLDER_DEPTH_LIMIT} deep`);
+            throw new TaskRefusal("refusals.folderTooDeep", { limit: core.FOLDER_DEPTH_LIMIT });
         }
     }
     const folder = await prisma.taskFolder.create({
@@ -758,13 +759,13 @@ export async function moveFolder(
 ): Promise<void> {
     const folders = await spaceFolders(spaceId);
     if (move.parentId && !folders.some((folder) => folder.id === move.parentId)) {
-        throw new Error("That folder is not in this space");
+        throw new TaskRefusal("refusals.folderNotInSpace");
     }
     const refusal = core.folderMoveRefusal(folders, folderId, move.parentId);
-    if (refusal) throw new Error(refusal);
+    if (refusal) throw folderMoveRefusal(refusal, core.FOLDER_DEPTH_LIMIT);
 
     const order = await orderForDrop("folder", spaceId, move.parentId, move);
-    if (order === null) throw new Error("That spot has moved. Try again.");
+    if (order === null) throw new TaskRefusal("refusals.spotMoved");
     await prisma.taskFolder.update({
         where: { id: folderId },
         data: { parentId: move.parentId, order }
@@ -783,10 +784,10 @@ export async function moveList(
             select: { spaceId: true }
         });
         if (!parent || parent.spaceId !== spaceId)
-            throw new Error("That folder is not in this space");
+            throw new TaskRefusal("refusals.folderNotInSpace");
     }
     const order = await orderForDrop("list", spaceId, move.parentId, move);
-    if (order === null) throw new Error("That spot has moved. Try again.");
+    if (order === null) throw new TaskRefusal("refusals.spotMoved");
     await prisma.taskList.update({
         where: { id: listId },
         data: { folderId: move.parentId, order }
@@ -861,7 +862,7 @@ export async function createList(input: core.ListInput): Promise<string> {
             select: { spaceId: true }
         });
         if (!parent || parent.spaceId !== input.spaceId)
-            throw new Error("That folder is not in this space");
+            throw new TaskRefusal("refusals.folderNotInSpace");
     }
     const list = await prisma.taskList.create({
         data: {
@@ -1075,7 +1076,7 @@ export async function deleteStatus(
 ): Promise<void> {
     const replacementId = fate.kind === "move" ? fate.replacementId : null;
     if (replacementId && statusId === replacementId) {
-        throw new Error("Pick a different status to move the tasks to");
+        throw new TaskRefusal("refusals.pickOtherStatus");
     }
     // Both ends are checked, not just the one being removed: a replacement from
     // another space would move this space's work onto a column nobody here can
@@ -1092,7 +1093,7 @@ export async function deleteStatus(
     ]);
     if (!status) throw notInSpace("status");
     if (replacementId && !replacement) throw notInSpace("status");
-    if (remaining <= 1) throw new Error("A space needs at least one status");
+    if (remaining <= 1) throw new TaskRefusal("refusals.spaceNeedsStatus");
 
     if (fate.kind === "delete") {
         await prisma.$transaction([
@@ -1111,7 +1112,7 @@ export async function deleteStatus(
             orderBy: { order: "asc" },
             select: { id: true }
         });
-        if (!landing) throw new Error("A space needs at least one status");
+        if (!landing) throw new TaskRefusal("refusals.spaceNeedsStatus");
         await prisma.$transaction([
             prisma.task.updateMany({
                 where: { statusId, spaceId },

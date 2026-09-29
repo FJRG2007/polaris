@@ -16,6 +16,7 @@ import { ToastProvider } from "@polaris/ui";
 import { cleanup, render, screen } from "@testing-library/react";
 import { GeneralView } from "@/app/(app)/mail/settings/general/general-view";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { MessagesWrapper } from "../setup/i18n";
 
 vi.mock("@/app/(app)/mail/actions", () => ({
     setMailPreferencesAction: async () => ({})
@@ -62,8 +63,7 @@ describe("Mail's general settings, read aloud", () => {
         render(
             <ToastProvider>
                 <GeneralView preferences={core.MAIL_PREF_DEFAULTS} />
-            </ToastProvider>
-        );
+            </ToastProvider>, { wrapper: MessagesWrapper });
 
         for (const name of [
             "Sort lists by",

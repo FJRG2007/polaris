@@ -17,6 +17,8 @@ import { PriorityMark } from "@/components/priority-mark";
 import { Avatar, preloadAvatars } from "@/components/avatar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PersonName, PersonRow } from "@/components/person-name";
+import { optionLabel } from "./option-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PersonRef, TagRef, TaskRow } from "@/lib/tasks/facts";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
 import { Ban, CalendarPlus, Check, ChevronDown, Plus, Settings2, UserPlus, X } from "lucide-react";
@@ -60,6 +62,7 @@ export function AssigneePicker({
     disabled?: boolean;
     trigger?: React.ReactNode;
 }) {
+    const t = useTranslations("tasks");
     const [query, setQuery] = useState("");
     const matches = useMemo(
         () => people.filter((person) => menuSearchMatches(person.name, query)),
@@ -85,8 +88,8 @@ export function AssigneePicker({
                 {trigger ?? (
                     <button
                         type="button"
-                        aria-label="Assignees"
-                        title="Assign somebody"
+                        aria-label={t("pickers.assignees")}
+                        title={t("pickers.assign")}
                         // Always the plus, never the faces. Every caller already
                         // draws the people it has; a trigger that drew them too
                         // showed everybody assigned to the task twice.
@@ -98,14 +101,12 @@ export function AssigneePicker({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 pt-2">
                 {people.length > 0 && (
-                    <MenuSearch value={query} onChange={setQuery} placeholder="Find someone" />
+                    <MenuSearch value={query} onChange={setQuery} placeholder={t("pickers.findSomeone")} />
                 )}
                 <div className="max-h-64 overflow-y-auto overscroll-contain">
                     {matches.length === 0 && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                            {people.length === 0
-                                ? "Nobody is on this space yet."
-                                : "Nobody matches that."}
+                            {people.length === 0 ? t("pickers.nobodyYet") : t("pickers.nobodyMatches")}
                         </p>
                     )}
                     {matches.map((person) => (
@@ -355,6 +356,7 @@ export function StatusPicker({
      *  went looking for it. */
     spaceId?: string;
 }) {
+    const t = useTranslations("tasks");
     const [query, setQuery] = useState("");
     const current = statuses.find((status) => status.id === value);
     // A space names its own states and keeps adding them, so the list is as long
@@ -367,7 +369,7 @@ export function StatusPicker({
                 {trigger ?? (
                     <button
                         type="button"
-                        aria-label="Status"
+                        aria-label={t("pickers.status")}
                         className={cn(
                             "inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:bg-muted",
                             compact && "border-transparent px-1.5"
@@ -380,17 +382,17 @@ export function StatusPicker({
                             progress={core.statusProgress(statuses, value)}
                             size={14}
                         />
-                        <span className="truncate">{current?.name ?? "No status"}</span>
+                        <span className="truncate">{current?.name ?? t("groups.noStatus")}</span>
                         {!compact && <ChevronDown className="size-3 opacity-60" />}
                     </button>
                 )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 pt-2">
-                <MenuSearch value={query} onChange={setQuery} placeholder="Find a status" />
+                <MenuSearch value={query} onChange={setQuery} placeholder={t("pickers.findStatus")} />
                 <div className="max-h-64 overflow-y-auto overscroll-contain">
                     {matches.length === 0 && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                            No status matches that.
+                            {t("pickers.noStatusMatches")}
                         </p>
                     )}
                     {matches.map((status) => (
@@ -410,7 +412,7 @@ export function StatusPicker({
                                 <Check className="size-3.5 text-primary" />
                             ) : (
                                 <span className="text-[0.625rem] uppercase tracking-wide text-muted-foreground">
-                                    {core.TASK_STATUS_TYPE_LABELS[status.type]}
+                                    {optionLabel(t, "statusType", status.type)}
                                 </span>
                             )}
                         </DropdownMenuItem>
@@ -422,7 +424,7 @@ export function StatusPicker({
                         <DropdownMenuItem asChild className="gap-2 text-muted-foreground">
                             <Link href={`/tasks/s/${spaceId}?tab=Statuses`}>
                                 <Settings2 className="size-3.5" />
-                                Edit statuses
+                                {t("pickers.editStatuses")}
                             </Link>
                         </DropdownMenuItem>
                     </>
@@ -458,6 +460,7 @@ export function StatusMarker({
     disabled?: boolean;
     spaceId?: string;
 }) {
+    const t = useTranslations("tasks");
     return (
         <StatusPicker
             statuses={statuses}
@@ -469,7 +472,7 @@ export function StatusMarker({
                 <button
                     type="button"
                     title={statusName}
-                    aria-label={`Status: ${statusName}`}
+                    aria-label={t("pickers.statusNamed", { name: statusName })}
                     className="inline-flex size-5 shrink-0 items-center justify-center transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <StatusIcon
@@ -502,14 +505,15 @@ export function PriorityPicker({
     disabled?: boolean;
     trigger?: React.ReactNode;
 }) {
+    const t = useTranslations("tasks");
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild disabled={disabled}>
                 {trigger ?? (
                     <button
                         type="button"
-                        aria-label="Priority"
-                        title={core.TASK_PRIORITY_LABELS[value]}
+                        aria-label={t("pickers.priority")}
+                        title={optionLabel(t, "priority", value)}
                         className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         <PriorityMark priority={value} />
@@ -518,7 +522,7 @@ export function PriorityPicker({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-44">
                 <p className="px-2 pb-1 text-[0.625rem] uppercase tracking-wide text-muted-foreground">
-                    Priority
+                    {t("pickers.priority")}
                 </p>
                 {/* Every priority, "none" included and in its own place at the
                     bottom of the scale. It used to be a "Clear" row with a
@@ -532,7 +536,7 @@ export function PriorityPicker({
                         className="gap-2"
                     >
                         <PriorityMark priority={priority} />
-                        <span className="flex-1">{core.TASK_PRIORITY_LABELS[priority]}</span>
+                        <span className="flex-1">{optionLabel(t, "priority", priority)}</span>
                         {value === priority && <Check className="size-3.5 text-primary" />}
                     </DropdownMenuItem>
                 ))}
@@ -571,6 +575,7 @@ export function tagColorFor(name: string): string {
 }
 
 export function TagChip({ tag, onRemove }: { tag: TagRef | TagView; onRemove?: () => void }) {
+    const t = useTranslations("tasks");
     return (
         <Badge
             variant="neutral"
@@ -587,7 +592,7 @@ export function TagChip({ tag, onRemove }: { tag: TagRef | TagView; onRemove?: (
                 <button
                     type="button"
                     onClick={onRemove}
-                    aria-label={`Remove ${tag.name}`}
+                    aria-label={t("pickers.remove", { name: tag.name })}
                     className="opacity-70 hover:opacity-100"
                 >
                     <X className="size-3" />
@@ -623,6 +628,7 @@ export function TagPicker({
     spaceId?: string;
     disabled?: boolean;
 }) {
+    const t = useTranslations("tasks");
     const [query, setQuery] = useState("");
     const [creating, setCreating] = useState(false);
     // The same guard as `creating`, readable in the tick it is set. State is not:
@@ -682,10 +688,10 @@ export function TagPicker({
             <DropdownMenuTrigger asChild disabled={disabled}>
                 <button
                     type="button"
-                    aria-label="Tags"
+                    aria-label={t("pickers.tags")}
                     className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                    <Plus className="size-3.5" /> Tag
+                    <Plus className="size-3.5" /> {t("pickers.tag")}
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 pt-2">
@@ -694,13 +700,13 @@ export function TagPicker({
                         value={query}
                         onChange={setQuery}
                         onSubmit={() => void submit()}
-                        placeholder={onCreate ? "Find or create a tag" : "Find a tag"}
+                        placeholder={onCreate ? t("pickers.findOrCreateTag") : t("pickers.findTag")}
                     />
                 )}
                 <div className="max-h-56 overflow-y-auto overscroll-contain">
                     {matches.length === 0 && !onCreate && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                            No tag matches that.
+                            {t("pickers.noTagMatches")}
                         </p>
                     )}
                     {matches.map((tag) => (
@@ -730,9 +736,9 @@ export function TagPicker({
                         >
                             <Plus className="size-3.5" />
                             <span className="flex-1 truncate">
-                                Create &ldquo;{query.trim()}&rdquo;
+                                {t("pickers.createTag", { name: query.trim() })}
                             </span>
-                            <span className="text-[0.625rem] text-muted-foreground">Enter</span>
+                            <span className="text-[0.625rem] text-muted-foreground">{t("pickers.enterKey")}</span>
                         </DropdownMenuItem>
                     )}
                 </div>
@@ -742,7 +748,7 @@ export function TagPicker({
                         <DropdownMenuItem asChild className="gap-2 text-muted-foreground">
                             <Link href={`/tasks/s/${spaceId}?tab=Tags`}>
                                 <Settings2 className="size-3.5" />
-                                Edit tags
+                                {t("pickers.editTags")}
                             </Link>
                         </DropdownMenuItem>
                     </>
@@ -806,6 +812,7 @@ export function DateField({
     label: string;
     disabled?: boolean;
 }) {
+    const t = useTranslations("tasks");
     return (
         <div className="flex items-center gap-1">
             {/* Two date boxes stack on a phone, and stacked they are two identical
@@ -826,8 +833,8 @@ export function DateField({
                 <button
                     type="button"
                     onClick={() => onChange(null)}
-                    aria-label={`Clear ${label.toLowerCase()}`}
-                    title={`Clear ${label.toLowerCase()}`}
+                    aria-label={t("pickers.clearField", { label: label.toLowerCase() })}
+                    title={t("pickers.clearField", { label: label.toLowerCase() })}
                     className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <X className="size-3.5" />
@@ -853,6 +860,7 @@ export function DurationField({
     disabled?: boolean;
     placeholder?: string;
 }) {
+    const t = useTranslations("tasks");
     const [text, setText] = useState(core.formatDurationMinutes(minutes));
     const lastCommitted = useRef(minutes);
 
@@ -898,7 +906,7 @@ export function DurationField({
                 aria-invalid={invalid}
                 className="h-8 w-28 text-xs"
             />
-            {invalid && <p className="mt-1 text-[0.6875rem] text-danger">Try 2h 30m, 1d or 90</p>}
+            {invalid && <p className="mt-1 text-[0.6875rem] text-danger">{t("pickers.durationHint")}</p>}
         </div>
     );
 }
@@ -919,6 +927,7 @@ export function DueBadge({
     timed: boolean;
     format: (iso: string) => string;
 }) {
+    const t = useTranslations("tasks");
     if (!dueDate) return null;
     const bucket = core.dueBucket({ dueDate: new Date(dueDate), statusType, timed }, new Date());
     const tone =
@@ -930,7 +939,7 @@ export function DueBadge({
     return (
         <span
             className={cn("whitespace-nowrap text-xs", tone)}
-            title={core.DUE_BUCKET_LABELS[bucket]}
+            title={optionLabel(t, "dueBucket", bucket)}
         >
             {format(dueDate)}
         </span>
@@ -952,15 +961,16 @@ export function BlockedMarker({
     task: Pick<TaskRow, "blocked" | "blockedUntil" | "blockedNote">;
     format: (iso: string) => string;
 }) {
+    const t = useTranslations("tasks");
     if (!task.blocked) return null;
     const reasons = [
         task.blockedNote || null,
-        task.blockedUntil ? `until ${format(task.blockedUntil)}` : null
+        task.blockedUntil ? t("pickers.until", { date: format(task.blockedUntil) }) : null
     ].filter((reason): reason is string => reason !== null);
     // Nothing written down and no date means the block is an unfinished task,
     // which the panel lists and a row has no room for.
     const label =
-        reasons.length > 0 ? `Blocked ${reasons.join(" - ")}` : "Blocked by unfinished work";
+        reasons.length > 0 ? t("pickers.blockedReasons", { reasons: reasons.join(" - ") }) : t("pickers.blockedByWork");
 
     return (
         <span className="inline-flex shrink-0" title={label} aria-label={label} role="img">
@@ -998,14 +1008,15 @@ export function DuePicker({
     disabled?: boolean;
     trigger?: React.ReactNode;
 }) {
+    const t = useTranslations("tasks");
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild disabled={disabled}>
                 {trigger ?? (
                     <button
                         type="button"
-                        aria-label="Due date"
-                        title="Set a due date"
+                        aria-label={t("pickers.dueDate")}
+                        title={t("pickers.setDueDate")}
                         className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         <CalendarPlus className="size-3.5" />
@@ -1017,7 +1028,7 @@ export function DuePicker({
                     <input
                         autoFocus
                         type={timed ? "datetime-local" : "date"}
-                        aria-label="Due date"
+                        aria-label={t("pickers.dueDate")}
                         value={toDateInput(dueDate, timed)}
                         onChange={(event) => onChange(fromDateInput(event.target.value))}
                         className="rounded-md border border-border bg-field px-2 py-1 text-xs text-foreground hover:border-border-strong focus:border-border-strong"
@@ -1026,8 +1037,8 @@ export function DuePicker({
                         <button
                             type="button"
                             onClick={() => onChange(null)}
-                            aria-label="Clear the due date"
-                            title="Clear the due date"
+                            aria-label={t("pickers.clearDueDate")}
+                            title={t("pickers.clearDueDate")}
                             className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <X className="size-3.5" />

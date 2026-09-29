@@ -57,6 +57,7 @@ vi.mock("@/app/(app)/tasks/task-conversation", () => ({
 }));
 
 import * as actions from "@/app/(app)/tasks/actions";
+import { MessagesWrapper } from "../setup/i18n";
 
 const CONTEXT: SpaceContext = {
     spaceId: "s1",
@@ -143,7 +144,7 @@ afterEach(async () => {
 
 /** Open the panel and wait for the task to arrive in it. */
 async function openPanel(onClose = vi.fn()) {
-    render(<TaskPanel taskId="t1" context={CONTEXT} onClose={onClose} onChanged={() => {}} />);
+    render(<TaskPanel taskId="t1" context={CONTEXT} onClose={onClose} onChanged={() => {}} />, { wrapper: MessagesWrapper });
     await screen.findByDisplayValue("Add backup codes");
     return onClose;
 }

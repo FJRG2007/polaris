@@ -14,6 +14,7 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { settleTagIds, withCreatedTags } from "./tag-creation";
 import type { TaskBulkEdit, TaskEdit } from "./views/shared";
 import { dropEdge, neighbours, type DropEdge } from "./drop-edge";
@@ -115,6 +116,7 @@ function QuickAdd({
     onAdd: (value: string) => Promise<void>;
     disabled?: boolean;
 }) {
+    const t = useTranslations("tasksDetail");
     const [value, setValue] = useState("");
     const [busy, setBusy] = useState(false);
 
@@ -145,7 +147,7 @@ function QuickAdd({
                 disabled={disabled || busy || !value.trim()}
                 onClick={() => void submit()}
             >
-                Add
+                {t("subwork.add")}
             </Button>
         </div>
     );
@@ -176,6 +178,8 @@ export function SubtaskSection({
     onCreateTag?: (name: string, color: string) => Promise<string | null>;
 }) {
     const canEdit = context.canEdit;
+    const t = useTranslations("tasksDetail");
+    const tt = useTranslations("tasks");
     const [dragging, setDragging] = useState<string | null>(null);
     const [deleting, setDeleting] = useState<TaskRow | null>(null);
     // Optimistic overlay, exactly as the list and the board keep one: a subtask is a
@@ -281,10 +285,10 @@ export function SubtaskSection({
     return (
         <section className="flex flex-col gap-2">
             <header className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">Subtasks</h3>
+                <h3 className="text-sm font-medium">{t("subwork.subtasks")}</h3>
                 {progress.total > 0 && (
                     <span className="text-xs text-muted-foreground">
-                        {progress.done} of {progress.total}
+                        {t("subwork.progress", { done: progress.done, total: progress.total })}
                     </span>
                 )}
             </header>
@@ -293,7 +297,7 @@ export function SubtaskSection({
             <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                 {subtasks.length === 0 && (
                     <li className="px-3 py-2 text-xs text-muted-foreground">
-                        Break this down when a step needs its own owner or date.
+                        {t("subwork.subtasksEmpty")}
                     </li>
                 )}
                 {subtasks.map((subtask) => (
@@ -350,7 +354,7 @@ export function SubtaskSection({
 
             {canEdit && (
                 <QuickAdd
-                    placeholder="Add a subtask"
+                    placeholder={t("subwork.addSubtask")}
                     onAdd={async (name) => {
                         onError("");
                         const result = await runAction(
@@ -374,8 +378,13 @@ export function SubtaskSection({
                 name={deleting?.name ?? ""}
                 kind="task"
                 requireTyping={false}
-                description="Comments, checklists and tracked time go with it. Archiving keeps all of that and takes it off the board."
-                confirmLabel="Delete task"
+                title={tt("deleteTask.title")}
+                question={tt.rich("deleteTask.question", {
+                    name: deleting?.name ?? "",
+                    strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                })}
+                description={tt("deleteTask.description")}
+                confirmLabel={tt("deleteTask.title")}
                 onConfirm={async () => {
                     if (!deleting) return;
                     onError("");
@@ -409,6 +418,7 @@ export function ChecklistSection({
     onChanged: () => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("tasksDetail");
     const [adding, setAdding] = useState(false);
     // One at a time: a checklist and a step are never dragged together, and
     // keeping them apart is what stops a step being dropped onto a checklist
@@ -458,17 +468,17 @@ export function ChecklistSection({
     return (
         <section className="flex flex-col gap-3">
             <header className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">Checklists</h3>
+                <h3 className="text-sm font-medium">{t("subwork.checklists")}</h3>
                 {canEdit && !adding && (
                     <Button size="sm" variant="ghost" onClick={() => setAdding(true)}>
-                        <Plus className="size-3.5" /> Checklist
+                        <Plus className="size-3.5" /> {t("subwork.checklist")}
                     </Button>
                 )}
             </header>
 
             {adding && (
                 <QuickAdd
-                    placeholder="Checklist name"
+                    placeholder={t("subwork.checklistName")}
                     onAdd={async (name) => {
                         onError("");
                         const result = await runAction(
@@ -484,7 +494,7 @@ export function ChecklistSection({
 
             {checklists.length === 0 && !adding && (
                 <p className="text-xs text-muted-foreground">
-                    A checklist tracks steps that do not each need an owner or a date.
+                    {t("subwork.checklistsEmpty")}
                 </p>
             )}
 
@@ -512,8 +522,8 @@ export function ChecklistSection({
                                             {canEdit && (
                                                 <button
                                                     type="button"
-                                                    aria-label={`Remove ${checklist.name}`}
-                                                    title="Remove checklist"
+                                                    aria-label={t("subwork.removeNamed", { name: checklist.name })}
+                                                    title={t("subwork.removeChecklist")}
                                                     onClick={async () => {
                                                         await runAction(
                                                             () =>
@@ -600,8 +610,8 @@ export function ChecklistSection({
                                                     <span className="flex items-center gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                                                         <button
                                                             type="button"
-                                                            aria-label={`Turn ${item.name} into a task`}
-                                                            title="Turn into a task"
+                                                            aria-label={t("subwork.promoteNamed", { name: item.name })}
+                                                            title={t("subwork.promote")}
                                                             onClick={async () => {
                                                                 await runAction(
                                                                     () =>
@@ -619,8 +629,8 @@ export function ChecklistSection({
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            aria-label={`Remove ${item.name}`}
-                                                            title="Remove step"
+                                                            aria-label={t("subwork.removeNamed", { name: item.name })}
+                                                            title={t("subwork.removeStep")}
                                                             onClick={async () => {
                                                                 await runAction(
                                                                     () =>
@@ -644,7 +654,7 @@ export function ChecklistSection({
 
                                     {canEdit && (
                                         <QuickAdd
-                                            placeholder="Add a step"
+                                            placeholder={t("subwork.addStep")}
                                             onAdd={async (name) => {
                                                 const result = await runAction(
                                                     () =>
@@ -692,6 +702,7 @@ export function DependencySection({
     onChanged: () => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("tasksDetail");
     const [query, setQuery] = useState("");
     const [direction, setDirection] = useState<"blocking" | "waitingOn">("waitingOn");
 
@@ -730,8 +741,8 @@ export function DependencySection({
             {canEdit && (
                 <button
                     type="button"
-                    aria-label={`Unlink ${edge.name}`}
-                    title="Remove link"
+                    aria-label={t("subwork.unlinkNamed", { name: edge.name })}
+                    title={t("subwork.removeLink")}
                     onClick={async () => {
                         await runAction(
                             () => actions.removeDependencyAction(taskId, edge.id),
@@ -749,18 +760,17 @@ export function DependencySection({
 
     return (
         <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">Dependencies</h3>
+            <h3 className="text-sm font-medium">{t("subwork.dependencies")}</h3>
 
             {dependencies.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                    Link work that has to happen in order. A task waiting on something unfinished is
-                    marked on the board.
+                    {t("subwork.dependenciesEmpty")}
                 </p>
             )}
 
             {waitingOn.length > 0 && (
                 <div>
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">Waiting on</p>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">{t("subwork.waitingOn")}</p>
                     <ul className="divide-y divide-border rounded-md border border-border">
                         {waitingOn.map(row)}
                     </ul>
@@ -768,7 +778,7 @@ export function DependencySection({
             )}
             {blocking.length > 0 && (
                 <div>
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">Blocking</p>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">{t("subwork.blocking")}</p>
                     <ul className="divide-y divide-border rounded-md border border-border">
                         {blocking.map(row)}
                     </ul>
@@ -785,11 +795,11 @@ export function DependencySection({
                             }
                             className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
-                            {direction === "waitingOn" ? "This waits on" : "This blocks"}
+                            {direction === "waitingOn" ? t("subwork.thisWaitsOn") : t("subwork.thisBlocks")}
                         </button>
                         <Input
                             value={query}
-                            placeholder="Find a task by name or reference"
+                            placeholder={t("subwork.find")}
                             onChange={(event) => setQuery(event.target.value)}
                             className="h-8 flex-1 text-sm"
                         />

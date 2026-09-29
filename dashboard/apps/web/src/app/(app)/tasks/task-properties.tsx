@@ -12,11 +12,12 @@
 
 import { useState } from "react";
 import * as pickers from "./pickers";
-import * as core from "@polaris/core";
 import type { TaskRow } from "@/lib/tasks/facts";
 import { AvatarStack } from "@/components/avatar";
 import { TimerControl } from "./task-conversation";
 import { CustomFieldEditor } from "./custom-fields";
+import { optionLabel } from "./option-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { SpaceContext } from "@/lib/tasks/facts";
 import {
     Ban,
@@ -94,10 +95,12 @@ export function PropertyRows({
     onCreateTag: (name: string) => Promise<string | null>;
 }) {
     const disabled = !context.canEdit;
+    const t = useTranslations("tasksDetail");
+    const tt = useTranslations("tasks");
 
     return (
         <div className="flex flex-col">
-            <Property icon={<CircleDot className="size-3.5" />} label="Status">
+            <Property icon={<CircleDot className="size-3.5" />} label={t("props.status")}>
                 <pickers.StatusPicker
                     statuses={context.statuses}
                     value={task.statusId}
@@ -107,7 +110,7 @@ export function PropertyRows({
                 />
             </Property>
 
-            <Property icon={<UserRound className="size-3.5" />} label="Assignees">
+            <Property icon={<UserRound className="size-3.5" />} label={t("props.assignees")}>
                 <AvatarStack people={task.assignees} />
                 <pickers.AssigneePicker
                     people={context.people}
@@ -116,13 +119,13 @@ export function PropertyRows({
                     onChange={(assigneeIds) => patch({ assigneeIds })}
                 />
                 {task.assignees.length === 0 && (
-                    <span className="text-xs text-muted-foreground">Nobody yet</span>
+                    <span className="text-xs text-muted-foreground">{t("props.nobody")}</span>
                 )}
             </Property>
 
-            <Property icon={<CalendarDays className="size-3.5" />} label="Dates">
+            <Property icon={<CalendarDays className="size-3.5" />} label={t("props.dates")}>
                 <pickers.DateField
-                    label="Start date"
+                    label={t("props.startDate")}
                     value={task.startDate}
                     timed={task.timed}
                     disabled={disabled}
@@ -134,7 +137,7 @@ export function PropertyRows({
                     -
                 </span>
                 <pickers.DateField
-                    label="Due date"
+                    label={t("props.dueDate")}
                     value={task.dueDate}
                     timed={task.timed}
                     disabled={disabled}
@@ -147,11 +150,11 @@ export function PropertyRows({
                         disabled={disabled}
                         onChange={(event) => patch({ timed: event.target.checked })}
                     />
-                    Time of day
+                    {t("props.timeOfDay")}
                 </label>
             </Property>
 
-            <Property icon={<Signal className="size-3.5" />} label="Priority">
+            <Property icon={<Signal className="size-3.5" />} label={t("props.priority")}>
                 {/* The flag and the word are one control: pointing at "Normal"
                     and having nothing happen is the kind of small lie that makes
                     a panel feel unfinished. */}
@@ -162,11 +165,11 @@ export function PropertyRows({
                     trigger={
                         <button
                             type="button"
-                            aria-label="Priority"
+                            aria-label={t("props.priority")}
                             className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-muted"
                         >
                             <pickers.PriorityMark priority={task.priority} />
-                            {core.TASK_PRIORITY_LABELS[task.priority]}
+                            {optionLabel(tt, "priority", task.priority)}
                         </button>
                     }
                 />
@@ -177,10 +180,10 @@ export function PropertyRows({
                 task is an edge, so it is added under Dependencies and only
                 counted here; a date and a reason belong to the task and are
                 edited where they are read. */}
-            <Property icon={<Ban className="size-3.5" />} label="Blocked">
+            <Property icon={<Ban className="size-3.5" />} label={t("props.blocked")}>
                 <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                     <pickers.DateField
-                        label="Blocked until"
+                        label={t("props.blockedUntil")}
                         value={task.blockedUntil}
                         timed={false}
                         disabled={disabled}
@@ -191,8 +194,8 @@ export function PropertyRows({
                         defaultValue={task.blockedNote}
                         disabled={disabled}
                         maxLength={200}
-                        aria-label="Why this is blocked"
-                        placeholder="Why, if it is not a task or a date"
+                        aria-label={t("props.blockedWhy")}
+                        placeholder={t("props.blockedWhyPlaceholder")}
                         onChange={(event) => hold?.({ blockedNote: event.target.value.trim() })}
                         onBlur={(event) => patch({ blockedNote: event.target.value.trim() })}
                         // A floor under it, so a narrow row wraps the box onto its
@@ -201,13 +204,13 @@ export function PropertyRows({
                     />
                     {waitingOn > 0 && (
                         <span className="text-[0.6875rem] text-warning">
-                            Waiting on {waitingOn} unfinished {waitingOn === 1 ? "task" : "tasks"}
+                            {t("props.waitingOn", { count: waitingOn })}
                         </span>
                     )}
                 </span>
             </Property>
 
-            <Property icon={<Target className="size-3.5" />} label="Points">
+            <Property icon={<Target className="size-3.5" />} label={t("props.points")}>
                 <input
                     type="number"
                     min={0}
@@ -215,15 +218,15 @@ export function PropertyRows({
                     key={`${task.id}-points`}
                     defaultValue={task.points ?? ""}
                     disabled={disabled}
-                    aria-label="Story points"
-                    placeholder="Empty"
+                    aria-label={t("props.storyPoints")}
+                    placeholder={t("props.empty")}
                     onChange={(event) => hold?.({ points: pointsOf(event.target.value) })}
                     onBlur={(event) => patch({ points: pointsOf(event.target.value) })}
                     className="w-20 rounded-md border border-border bg-field px-2 py-1 text-xs hover:border-border-strong focus:border-border-strong"
                 />
             </Property>
 
-            <Property icon={<Hourglass className="size-3.5" />} label="Estimate">
+            <Property icon={<Hourglass className="size-3.5" />} label={t("props.estimate")}>
                 <pickers.DurationField
                     minutes={task.timeEstimate}
                     disabled={disabled}
@@ -232,7 +235,7 @@ export function PropertyRows({
             </Property>
 
             {timer && (
-                <Property icon={<Timer className="size-3.5" />} label="Track time">
+                <Property icon={<Timer className="size-3.5" />} label={t("props.trackTime")}>
                     <TimerControl
                         taskId={task.id}
                         trackedSeconds={task.trackedSeconds}
@@ -243,7 +246,7 @@ export function PropertyRows({
                 </Property>
             )}
 
-            <Property icon={<Tag className="size-3.5" />} label="Tags">
+            <Property icon={<Tag className="size-3.5" />} label={t("props.tags")}>
                 <span className="flex flex-wrap items-center gap-1">
                     {task.tags.map((tag) => (
                         <pickers.TagChip
@@ -300,6 +303,7 @@ export function FieldsSection({
     hold?: (fieldId: string, value: string) => void;
     onChange: (fieldId: string, value: string) => void;
 }) {
+    const t = useTranslations("tasksDetail");
     const [open, setOpen] = useState(true);
     const [showEmpty, setShowEmpty] = useState(false);
 
@@ -322,7 +326,7 @@ export function FieldsSection({
                 className="flex w-fit items-center gap-1 text-sm font-medium"
             >
                 {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                Fields
+                {t("props.fields")}
             </button>
 
             {open && (
@@ -350,8 +354,8 @@ export function FieldsSection({
                             className="w-fit py-1 text-xs text-muted-foreground hover:text-foreground"
                         >
                             {showEmpty
-                                ? `Hide ${empty.length} empty ${empty.length === 1 ? "field" : "fields"}`
-                                : `Show ${empty.length} empty ${empty.length === 1 ? "field" : "fields"}`}
+                                ? t("props.hideEmpty", { count: empty.length })
+                                : t("props.showEmpty", { count: empty.length })}
                         </button>
                     )}
                 </div>

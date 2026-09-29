@@ -19,6 +19,9 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { addressesFrom, asJson } from "./json";
+import { mailRefusalText } from "./refusal-text";
+import { getUserLocale } from "@/lib/i18n/locale-service";
+import { translatorFor } from "@/lib/i18n/translate";
 
 const BOUNCED_EVENT = "mail.message.bounced";
 const UNSENT_EVENT = "mail.message.unsent";
@@ -107,15 +110,21 @@ async function announceUncopied(accountId: string, deliveryId: string): Promise<
         select: { userId: true, address: true, orgId: true }
     });
     if (!account) return;
+    const t = await ownerWords(account.userId);
     await announce({
         userId: account.userId,
         orgId: account.orgId,
         event: UNCOPIED_EVENT,
-        title: `${account.address} is not keeping copies of what you send`,
-        body: "Your messages are going out, but the mail server would not file a copy in Sent, so they are not in your own record of them.",
+        title: t("notify.uncopiedTitle", { address: account.address }),
+        body: t("notify.uncopiedBody"),
         href: "/mail/settings/accounts",
         metadata: { accountId }
     });
+}
+
+/** The mailbox owner's words: a notice is read by them, whoever sent it off. */
+async function ownerWords(userId: string) {
+    return translatorFor(await getUserLocale(userId), "mail");
 }
 
 /** Say that a message was refused for good, so nothing is waiting on it. */
@@ -129,12 +138,13 @@ export async function announceUnsent(
         select: { userId: true, address: true, orgId: true }
     });
     if (!account) return;
+    const t = await ownerWords(account.userId);
     await announce({
         userId: account.userId,
         orgId: account.orgId,
         event: UNSENT_EVENT,
-        title: `"${subject || "(no subject)"}" was not sent`,
-        body: `${detail} It is in Drafts, where you can change it and try again.`,
+        title: t("notify.unsentTitle", { subject: subject || t("noSubject") }),
+        body: t("notify.unsentBody", { detail: mailRefusalText(t, detail) }),
         href: "/mail/drafts",
         metadata: { accountId }
     });
@@ -158,12 +168,13 @@ export async function announcePartial(
         select: { userId: true, address: true, orgId: true }
     });
     if (!account) return;
+    const t = await ownerWords(account.userId);
     await announce({
         userId: account.userId,
         orgId: account.orgId,
         event: UNSENT_EVENT,
-        title: `"${subject || "(no subject)"}" did not go to everybody`,
-        body: `${detail} Everyone else was sent it.`,
+        title: t("notify.partialTitle", { subject: subject || t("noSubject") }),
+        body: t("notify.partialBody", { detail: mailRefusalText(t, detail) }),
         href: "/mail",
         metadata: { accountId }
     });
@@ -181,12 +192,13 @@ export async function announceBounce(
         select: { userId: true, address: true, orgId: true }
     });
     if (!account) return;
+    const t = await ownerWords(account.userId);
     await announce({
         userId: account.userId,
         orgId: account.orgId,
         event: BOUNCED_EVENT,
-        title: `"${subject || "(no subject)"}" did not arrive`,
-        body: detail,
+        title: t("notify.bouncedTitle", { subject: subject || t("noSubject") }),
+        body: mailRefusalText(t, detail),
         href,
         metadata: { accountId }
     });

@@ -17,6 +17,7 @@ import { DISPLAY_DEFAULTS } from "@polaris/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { GoalsView, SprintsView } from "@/app/(app)/tasks/planning-view";
+import { withMessages } from "../setup/i18n";
 
 // The views reach for the server actions at import time, and those drag in the
 // database and the session. Nothing here presses a button, so they are stubbed.
@@ -60,9 +61,9 @@ const GOAL = {
 };
 
 function draw(node: React.ReactNode): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <DisplayFormatProvider preferences={DISPLAY_DEFAULTS}>{node}</DisplayFormatProvider>
-    );
+    ));
 }
 
 describe("sprints, for somebody who may not manage work", () => {

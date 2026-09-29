@@ -10,6 +10,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { PersonRef, SpaceContext, TaskRow } from "@/lib/tasks/facts";
+import { withMessages } from "../setup/i18n";
 
 // The rows reach for server actions on interaction only; rendering one needs
 // the module to exist, not to work.
@@ -78,7 +79,7 @@ function context(canEdit: boolean): SpaceContext {
 }
 
 function section(rows: TaskRow[], canEdit = true): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <SubtaskSection
             taskId="t1"
             listId="l1"
@@ -88,7 +89,7 @@ function section(rows: TaskRow[], canEdit = true): string {
             onChanged={() => {}}
             onError={() => {}}
         />
-    );
+    ));
 }
 
 describe("subtask rows", () => {

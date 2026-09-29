@@ -15,6 +15,8 @@ import { revalidatePath } from "next/cache";
 import * as access from "@/lib/tasks/access";
 import { requirePermission } from "@/lib/session";
 import { syncTracker } from "@/lib/tasks/trackers/sync";
+import { getTranslations } from "@/lib/i18n/request";
+import { trackerSentence } from "./tracker-sentence";
 import * as trackers from "@/lib/tasks/trackers/service";
 
 const TRACKERS_PATH = "/tasks/trackers";
@@ -22,7 +24,7 @@ const TRACKERS_PATH = "/tasks/trackers";
 const saveSchema = z.object({
     id: z.string().uuid().nullable().default(null),
     provider: z.enum(core.ISSUE_TRACKERS),
-    label: z.string().trim().min(1, "Give it a name").max(60),
+    label: z.string().trim().min(1, "trackers.errors.nameRequired").max(60),
     /** No space id: which space a connection writes into is the list's answer,
      *  not the caller's. Taking one from the form would let somebody who may
      *  admin one list have issues mirrored into any space on the instance. */
@@ -66,7 +68,11 @@ export async function listTrackersAction(): Promise<trackers.TrackerView[]> {
 export async function saveTrackerAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("tasks.manage");
     const parsed = saveSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
+    const t = await getTranslations("tasks");
+    if (!parsed.success) {
+        const message = parsed.error.issues[0]?.message;
+        return { error: message === "trackers.errors.nameRequired" ? t(message) : t("trackers.errors.checkForm") };
+    }
     const value = parsed.data;
 
     // Reaching a space is not permission to fill it with somebody else's issues.
@@ -79,17 +85,19 @@ export async function saveTrackerAction(input: unknown): Promise<{ error?: strin
         );
         spaceId = list.spaceId;
     } catch {
-        return { error: "You cannot add work to that list." };
+        return { error: t("trackers.errors.listNotYours") };
     }
 
     // Every field the provider says it needs, present. A Jira with no site is a
     // connection that fails on its first call with a worse message than this.
     for (const field of core.ISSUE_TRACKER_FIELDS[value.provider]) {
         if (field.secret) {
-            if (!value.id && !value.secret) return { error: `${field.label} is required.` };
+            if (!value.id && !value.secret)
+                return { error: t("trackers.errors.fieldRequired", { field: t(`trackers.fields.${field.key}.label` as Parameters<typeof t>[0]) }) };
             continue;
         }
-        if (!value.config[field.key]?.trim()) return { error: `${field.label} is required.` };
+        if (!value.config[field.key]?.trim())
+            return { error: t("trackers.errors.fieldRequired", { field: t(`trackers.fields.${field.key}.label` as Parameters<typeof t>[0]) }) };
     }
 
     const config = { ...value.config };
@@ -100,7 +108,7 @@ export async function saveTrackerAction(input: unknown): Promise<{ error?: strin
         config.site = core.normalizeTrackerSite(config.site ?? "");
         if (!core.isTrackerSite(config.site)) {
             return {
-                error: "That is not a Jira address. It should look like your-company.atlassian.net."
+                error: t("trackers.errors.notJiraSite")
             };
         }
     }
@@ -108,7 +116,7 @@ export async function saveTrackerAction(input: unknown): Promise<{ error?: strin
     try {
         await trackers.saveTracker(user.id, { ...value, spaceId, config });
     } catch (error) {
-        return { error: error instanceof Error ? error.message : "It could not be saved." };
+        return { error: error instanceof Error ? trackerSentence(t, error.message) : t("trackers.errors.notSaved") };
     }
     revalidatePath(TRACKERS_PATH);
     return {};
@@ -118,7 +126,8 @@ export async function checkTrackerAction(
     trackerId: string
 ): Promise<{ ok: boolean; detail: string }> {
     const user = await requirePermission("tasks.manage");
-    return trackers.checkTracker(user.id, trackerId);
+    const result = await trackers.checkTracker(user.id, trackerId);
+    return { ok: result.ok, detail: trackerSentence(await getTranslations("tasks"), result.detail) };
 }
 
 export async function syncTrackerAction(
@@ -129,13 +138,14 @@ export async function syncTrackerAction(
         where: { id: trackerId, ownerId: user.id },
         select: { id: true }
     });
-    if (!owned) return { error: "That connection is not one of yours." };
+    const t = await getTranslations("tasks");
+    if (!owned) return { error: t("trackers.reasons.notYours") };
     const result = await syncTracker(trackerId);
     revalidatePath(TRACKERS_PATH);
     return {
         added: result.added,
         updated: result.updated,
-        ...(result.error ? { error: result.error } : {})
+        ...(result.error ? { error: trackerSentence(t, result.error) } : {})
     };
 }
 

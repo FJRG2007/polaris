@@ -28,6 +28,7 @@ import { GoogleMark } from "@/components/brand-icons";
 import { commandsFor, TaskMenu } from "./task-actions";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
     useGoogleCalendarEvents,
@@ -51,6 +52,8 @@ const FIRST_VISIBLE_HOUR = 7;
 export function CalendarView(props: ViewProps) {
     const { rows, canEdit, onOpen, onQuickCreate } = props;
     const format = useDisplayFormat();
+    const locale = useLocale();
+    const t = useTranslations("tasksViews");
     const weekStartsOn = format.weekStartsOn;
 
     const [scope, setScope] = useState<CalendarScope>("month");
@@ -77,8 +80,8 @@ export function CalendarView(props: ViewProps) {
 
     const today = useMemo(() => core.startOfDay(new Date()), []);
     const { days, label, monthShown } = useMemo(
-        () => layout.buildRange(scope, offset, weekStartsOn, format),
-        [scope, offset, weekStartsOn, format]
+        () => layout.buildRange(scope, offset, weekStartsOn, format, new Date(), locale),
+        [scope, offset, weekStartsOn, format, locale]
     );
 
     const from = days[0] as Date;
@@ -103,7 +106,7 @@ export function CalendarView(props: ViewProps) {
         if (!canEdit) return;
         const at = new Date(day);
         if (hour !== undefined) at.setHours(hour, 0, 0, 0);
-        onQuickCreate(`date:${at.toISOString()}`, "New task");
+        onQuickCreate(`date:${at.toISOString()}`, t("toolbar.newTask"));
     };
 
     return (
@@ -112,8 +115,8 @@ export function CalendarView(props: ViewProps) {
                 <div className="flex items-center gap-1">
                     <button
                         type="button"
-                        aria-label={`Previous ${scope}`}
-                        title={`Previous ${scope}`}
+                        aria-label={t("calendar.previous", { scope })}
+                        title={t("calendar.previous", { scope })}
                         onClick={() => setOffset(offset - 1)}
                         className="rounded-md border border-border p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
@@ -121,8 +124,8 @@ export function CalendarView(props: ViewProps) {
                     </button>
                     <button
                         type="button"
-                        aria-label={`Next ${scope}`}
-                        title={`Next ${scope}`}
+                        aria-label={t("calendar.next", { scope })}
+                        title={t("calendar.next", { scope })}
                         onClick={() => setOffset(offset + 1)}
                         className="rounded-md border border-border p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
@@ -135,7 +138,7 @@ export function CalendarView(props: ViewProps) {
 
                 {offset !== 0 && (
                     <Button size="sm" variant="ghost" onClick={() => setOffset(0)}>
-                        Today
+                        {t("calendar.today")}
                     </Button>
                 )}
 
@@ -153,7 +156,7 @@ export function CalendarView(props: ViewProps) {
                                     : "text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            {layout.SCOPE_LABELS[entry]}
+                            {t(`calendar.scope.${entry}`)}
                         </button>
                     ))}
                 </div>
@@ -204,16 +207,17 @@ export function CalendarView(props: ViewProps) {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 {undated.length > 0 && (
                     <span>
-                        {undated.length} {undated.length === 1 ? "task has" : "tasks have"} no dates
-                        and are not shown here.
+                        {t("calendar.undated", { count: undated.length })}
                     </span>
                 )}
                 {canEdit && (
                     <span>
-                        Double-click {scope === "month" ? "a day" : "an hour"} to add a task there.
+                        {t("calendar.doubleClick", { scope: scope === "month" ? "month" : "time" })}
                     </span>
                 )}
-                {google.error ? <span className="text-danger">{google.error}</span> : null}
+                {google.status === "error" ? (
+                    <span className="text-danger">{google.error ?? t("calendar.googleUnreachable")}</span>
+                ) : null}
             </div>
         </div>
     );
@@ -245,6 +249,9 @@ function MonthGrid({
     props: ViewProps;
 }) {
     const headings = Array.from({ length: 7 }, (_, index) => (weekStartsOn + index) % 7);
+    const locale = useLocale();
+    const shortNames = core.weekdayNames(locale, "short");
+    const longNames = core.weekdayNames(locale, "long");
 
     return (
         // Sized to what is left of the viewport rather than to its contents: the
@@ -258,10 +265,8 @@ function MonthGrid({
                         key={index}
                         className="px-2 py-1.5 text-center text-[0.6875rem] text-muted-foreground"
                     >
-                        <span className="hidden sm:inline">{core.WEEKDAY_SHORT_NAMES[index]}</span>
-                        <span className="sm:hidden">
-                            {(core.WEEKDAY_SHORT_NAMES[index] as string).slice(0, 1)}
-                        </span>
+                        <span className="hidden sm:inline">{shortNames[index]}</span>
+                        <span className="sm:hidden">{(shortNames[index] as string).slice(0, 1)}</span>
                     </div>
                 ))}
             </div>
@@ -292,7 +297,7 @@ function MonthGrid({
                                 <button
                                     type="button"
                                     onClick={() => onSelectDay(day)}
-                                    aria-label={`${core.WEEKDAY_NAMES[day.getDay()]} ${day.getDate()}`}
+                                    aria-label={`${longNames[day.getDay()]} ${day.getDate()}`}
                                     aria-pressed={selected}
                                     className={cn(
                                         "rounded text-[0.6875rem]",
@@ -365,6 +370,9 @@ function TimeGrid({
     props: ViewProps;
 }) {
     const format = useDisplayFormat();
+    const locale = useLocale();
+    const t = useTranslations("tasksViews");
+    const shortNames = core.weekdayNames(locale, "short");
     const scroller = useRef<HTMLDivElement>(null);
 
     // Opens on the working day rather than on midnight, which is where the
@@ -397,7 +405,7 @@ function TimeGrid({
                                 className="min-w-0 flex-1 px-1 py-1.5 text-center"
                             >
                                 <div className="text-[0.6875rem] text-muted-foreground">
-                                    {core.WEEKDAY_SHORT_NAMES[column.day.getDay()]}
+                                    {shortNames[column.day.getDay()]}
                                 </div>
                                 <div
                                     className={cn(
@@ -415,7 +423,7 @@ function TimeGrid({
                     {columns.some((column) => column.allDay.length > 0) && (
                         <div className="flex border-b border-border">
                             <div className="w-12 shrink-0 px-1 py-1 text-right text-[0.625rem] text-muted-foreground sm:w-14">
-                                All day
+                                {t("calendar.allDay")}
                             </div>
                             {columns.map((column) => (
                                 <ul
@@ -520,6 +528,7 @@ function TimedEntry({
     props: ViewProps;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("tasksViews");
     const top = (layout.minutesInto(entry.start) / 60) * HOUR_HEIGHT;
     // A task is an instant, so it is drawn half an hour tall: a hairline block is
     // one nobody can hit with a pointer.
@@ -552,7 +561,7 @@ function TimedEntry({
                 href={entry.url ?? "#"}
                 target="_blank"
                 rel="noreferrer noopener"
-                title={`${entry.title} (Google Calendar)`}
+                title={t("calendar.googleEvent", { title: entry.title })}
                 style={style}
                 className="absolute z-[5] overflow-hidden rounded border border-l-2 border-border bg-card/95 px-1 py-0.5 transition-colors hover:bg-muted"
             >
@@ -582,6 +591,7 @@ function TimedEntry({
 
 /** One line in a month cell or an all-day strip. */
 function EntryChip({ entry, props }: { entry: CalendarEntry; props: ViewProps }) {
+    const t = useTranslations("tasksViews");
     if (!entry.task) {
         return (
             <li>
@@ -589,7 +599,7 @@ function EntryChip({ entry, props }: { entry: CalendarEntry; props: ViewProps })
                     href={entry.url ?? "#"}
                     target="_blank"
                     rel="noreferrer noopener"
-                    title={`${entry.title} (Google Calendar)`}
+                    title={t("calendar.googleEvent", { title: entry.title })}
                     className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-[0.6875rem] transition-colors hover:bg-muted"
                 >
                     <span
@@ -634,13 +644,15 @@ function DayList({
     onOpen: (taskId: string) => void;
     format: core.DisplayFormat;
 }) {
+    const locale = useLocale();
+    const t = useTranslations("tasksViews");
     return (
         <div className="rounded-lg border border-border">
             <p className="border-b border-border bg-muted/40 px-3 py-1.5 text-xs font-medium">
-                {core.WEEKDAY_NAMES[day.getDay()]} {format.date(day)}
+                {core.weekdayNames(locale, "long")[day.getDay()]} {format.date(day)}
             </p>
             {entries.length === 0 ? (
-                <p className="px-3 py-4 text-xs text-muted-foreground">Nothing on this day.</p>
+                <p className="px-3 py-4 text-xs text-muted-foreground">{t("calendar.nothingToday")}</p>
             ) : (
                 <ul className="divide-y divide-border">
                     {entries.map((entry) => (
@@ -656,7 +668,7 @@ function DayList({
                                 />
                                 <span className="min-w-0 flex-1 truncate">{entry.title}</span>
                                 <span className="shrink-0 text-xs text-muted-foreground">
-                                    {entry.allDay ? "All day" : format.time(entry.start)}
+                                    {entry.allDay ? t("calendar.allDay") : format.time(entry.start)}
                                 </span>
                             </button>
                         </li>
@@ -677,15 +689,14 @@ function GoogleControl({
     showing: boolean;
     onToggle: () => void;
 }) {
+    const t = useTranslations("tasksViews");
     if (state.status === "unavailable") return null;
     if (state.status === "unlinked" || state.status === "expired") {
         return (
             <Button size="sm" variant="secondary" asChild>
                 <a href="/api/connections/google/link">
                     <GoogleMark className="size-4" />
-                    {state.status === "expired"
-                        ? "Reconnect Google Calendar"
-                        : "Connect Google Calendar"}
+                    {state.status === "expired" ? t("calendar.reconnectGoogle") : t("calendar.connectGoogle")}
                 </a>
             </Button>
         );
@@ -695,14 +706,14 @@ function GoogleControl({
             type="button"
             onClick={onToggle}
             aria-pressed={showing}
-            title={showing ? "Hide Google Calendar events" : "Show Google Calendar events"}
+            title={showing ? t("calendar.hideGoogle") : t("calendar.showGoogle")}
             className={cn(
                 "inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs transition-colors hover:bg-muted",
                 showing ? "text-foreground" : "text-muted-foreground"
             )}
         >
             <GoogleMark className="size-3.5" />
-            {state.status === "loading" ? "Loading..." : `Google (${state.events.length})`}
+            {state.status === "loading" ? t("calendar.loading") : t("calendar.googleCount", { count: state.events.length })}
         </button>
     );
 }

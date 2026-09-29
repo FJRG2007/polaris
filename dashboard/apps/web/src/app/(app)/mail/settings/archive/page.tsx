@@ -19,7 +19,7 @@ export default async function MailArchivePage() {
     const user = await requirePermission("mail.use");
     const shelfOrgId = await mailShelfFor(user.id);
     const accounts = await listAccountViews(user.id, shelfOrgId);
-    if (accounts.length === 0) return <NoMailboxes what="Import and export" />;
+    if (accounts.length === 0) return <NoMailboxes what="archive" />;
 
     return <ArchiveView accounts={accounts} folders={await listFolders(user.id, shelfOrgId)} />;
 }

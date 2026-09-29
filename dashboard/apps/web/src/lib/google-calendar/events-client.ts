@@ -104,7 +104,9 @@ export function useGoogleCalendarEvents(from: Date, to: Date): GoogleCalendarSta
             })
             .catch(() => {
                 if (current) {
-                    setState({ status: "error", events: [], error: "Google Calendar could not be reached." });
+                    // No sentence of its own: the calendar says it could not be
+                    // reached, in the reader's language.
+                    setState({ status: "error", events: [], error: null });
                 }
             });
 

@@ -10,6 +10,7 @@
 
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { ownedAccount, MailAccessError } from "@/lib/mailbox/access";
 import { MailListPage, type MailSearchParams } from "@/app/(app)/mail/list-page";
 
@@ -29,15 +30,18 @@ export default async function MailAccountPage({
         throw caught;
     });
     if (!account) notFound();
+    const t = await getTranslations("mail");
 
     return (
         <MailListPage
             route={{
                 narrow: { accountId, role: "inbox" },
-                context: {
+                words: {
                     title: account.label || account.address,
-                    emptyTitle: "Nothing waiting",
-                    emptyBody: `Nothing new has arrived at ${account.address}.`,
+                    emptyTitle: t("views.inbox.emptyTitle"),
+                    emptyBody: t("routes.accountEmpty", { address: account.address })
+                },
+                context: {
                     canArchive: true,
                     permanentDelete: false,
                     restorable: false,

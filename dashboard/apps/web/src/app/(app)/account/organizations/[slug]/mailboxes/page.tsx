@@ -11,6 +11,7 @@ import { MailboxesView } from "./mailboxes-view";
 import { requireOrgPage } from "@/lib/orgs/page-access";
 import { listOrgMembers } from "@/lib/orgs/org-service";
 import { listOrgMailboxes } from "@/lib/mailbox/org-mailboxes";
+import { Messages } from "@/components/i18n/messages";
 
 export const dynamic = "force-dynamic";
 
@@ -31,11 +32,13 @@ export default async function OrganizationMailboxesPage({
     // authorization that could connect it is one only they can grant. What this
     // screen hands out takes a password.
     return (
-        <MailboxesView
-            orgId={org.id}
-            orgSlug={org.slug}
-            mailboxes={mailboxes}
-            members={members.map((member) => ({ id: member.userId, name: member.name }))}
-        />
+        <Messages namespaces={["mailCompose"]}>
+            <MailboxesView
+                orgId={org.id}
+                orgSlug={org.slug}
+                mailboxes={mailboxes}
+                members={members.map((member) => ({ id: member.userId, name: member.name }))}
+            />
+        </Messages>
     );
 }

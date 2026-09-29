@@ -19,6 +19,7 @@ import { PriorityMark, StatusIcon } from "../pickers";
 import { commandsFor, TaskMenu } from "./task-actions";
 import { toFacts, type TaskRow } from "@/lib/tasks/facts";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 // ---------------------------------------------------------------------------
 // Gantt
@@ -27,6 +28,7 @@ import { useDisplayFormat } from "@/components/display-format";
 export function GanttView(props: ViewProps) {
     const { rows, onOpen } = props;
     const format = useDisplayFormat();
+    const t = useTranslations("tasksViews");
     const now = new Date();
 
     const { bars, range, scheduled, undated } = useMemo(() => {
@@ -62,7 +64,7 @@ export function GanttView(props: ViewProps) {
             <div className="overflow-x-auto rounded-lg border border-border">
                 <div className="min-w-[48rem]">
                     <div className="relative flex border-b border-border bg-muted/40 text-[0.6875rem] text-muted-foreground">
-                        <div className="w-56 shrink-0 px-3 py-1.5">Task</div>
+                        <div className="w-56 shrink-0 px-3 py-1.5">{t("gantt.task")}</div>
                         <div className="relative flex-1 py-1.5">
                             {ticks.map((tick) => (
                                 <span
@@ -103,7 +105,11 @@ export function GanttView(props: ViewProps) {
                                         <button
                                             type="button"
                                             onClick={() => onOpen(task.id)}
-                                            title={`${task.name}: ${format.date(bar.start.toISOString())} to ${format.date(bar.end.toISOString())}`}
+                                            title={t("gantt.barTitle", {
+                                                name: task.name,
+                                                start: format.date(bar.start.toISOString()),
+                                                end: format.date(bar.end.toISOString())
+                                            })}
                                             className={cn(
                                                 "absolute top-1/2 flex h-5 -translate-y-1/2 items-center gap-1 rounded px-1.5 text-[0.625rem] text-white transition-opacity hover:opacity-90",
                                                 task.blocked && "ring-1 ring-warning"
@@ -124,7 +130,7 @@ export function GanttView(props: ViewProps) {
                         })}
                         {scheduled.length === 0 && (
                             <li className="px-4 py-10 text-center text-sm text-muted-foreground">
-                                Nothing is scheduled. Give a task a start or due date and it appears here.
+                                {t("gantt.empty")}
                             </li>
                         )}
                     </ul>
@@ -133,7 +139,7 @@ export function GanttView(props: ViewProps) {
 
             {undated > 0 && (
                 <p className="text-xs text-muted-foreground">
-                    {undated} {undated === 1 ? "task is" : "tasks are"} undated and not on the timeline.
+                    {t("gantt.undated", { count: undated })}
                 </p>
             )}
         </div>

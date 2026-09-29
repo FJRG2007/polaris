@@ -22,6 +22,7 @@ import { X } from "lucide-react";
 import * as core from "@polaris/core";
 import { Input, cn } from "@polaris/ui";
 import { suggestContactsAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 /** How long typing settles before contacts are asked for. */
@@ -38,6 +39,7 @@ export function RecipientField({
     onChange: (next: core.MailAddress[]) => void;
     autoFocus?: boolean;
 }) {
+    const t = useTranslations("mailCompose");
     const [typed, setTyped] = useState("");
     const [suggestions, setSuggestions] = useState<{ address: string; name: string }[]>([]);
     const [highlight, setHighlight] = useState(0);
@@ -103,8 +105,8 @@ export function RecipientField({
                             </span>
                             <button
                                 type="button"
-                                aria-label={`Remove ${entry.address}`}
-                                title={`Remove ${entry.address}`}
+                                aria-label={t("recipients.remove", { address: entry.address })}
+                                title={t("recipients.remove", { address: entry.address })}
                                 className="text-foreground-subtle hover:text-foreground"
                                 onClick={() =>
                                     onChange(value.filter((held) => held.address !== entry.address))
@@ -173,7 +175,7 @@ export function RecipientField({
                     />
                 </div>
                 {invalid ? (
-                    <p className="mt-0.5 text-[11px] text-danger">That is not an email address.</p>
+                    <p className="mt-0.5 text-[11px] text-danger">{t("recipients.invalid")}</p>
                 ) : null}
 
                 {suggestions.length > 0 ? (

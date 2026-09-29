@@ -8,16 +8,18 @@
 
 import Link from "next/link";
 import { SettingsNav } from "./settings-nav";
+import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
-export default function MailSettingsLayout({ children }: { children: React.ReactNode }) {
+export default async function MailSettingsLayout({ children }: { children: React.ReactNode }) {
+    const t = await getTranslations("mailSettings");
     return (
         <div className="mx-auto w-full max-w-4xl px-4 py-6">
             <div className="mb-4 flex items-baseline gap-3">
-                <h1 className="text-[17px] font-semibold tracking-tight">Mail settings</h1>
+                <h1 className="text-[17px] font-semibold tracking-tight">{t("layout.title")}</h1>
                 <Link href="/mail" className="text-[12px] text-muted-foreground hover:text-foreground">
-                    Back to the inbox
+                    {t("layout.back")}
                 </Link>
             </div>
             <SettingsNav />

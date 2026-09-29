@@ -15,6 +15,7 @@ import { Avatar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
 import { Input, Select, Textarea } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CustomFieldView } from "@/lib/tasks/space-service";
 
 /** A stored value as it reads in a cell or on a card. */
@@ -28,11 +29,12 @@ export function CustomFieldValue({
     people: readonly PersonRef[];
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("tasks");
     if (!value) return <span className="text-muted-foreground">-</span>;
 
     switch (field.type) {
         case "checkbox":
-            return <span>{value === "true" ? "Yes" : "No"}</span>;
+            return <span>{value === "true" ? t("fields.yes") : t("fields.no")}</span>;
         case "date":
             return <span>{format.date(value)}</span>;
         case "money":
@@ -42,7 +44,7 @@ export function CustomFieldValue({
             return <span>{Number(value)}%</span>;
         case "rating":
             return (
-                <span aria-label={`${value} out of ${field.config.max ?? 5}`}>
+                <span aria-label={t("fields.ratingOutOf", { value, max: field.config.max ?? 5 })}>
                     {"*".repeat(Number(value) || 0)}
                 </span>
             );
@@ -124,6 +126,7 @@ export function CustomFieldEditor({
     onEdit?: (value: string) => void;
     onChange: (value: string) => void;
 }) {
+    const t = useTranslations("tasks");
     const [draft, setDraft] = useState(value);
     const commit = (next: string) => {
         setDraft(next);
@@ -195,10 +198,10 @@ export function CustomFieldEditor({
                     value={value}
                     disabled={disabled}
                     aria-label={field.name}
-                    placeholder="Not set"
+                    placeholder={t("fields.notSet")}
                     onValueChange={commit}
                     options={[
-                        { value: "", label: "Not set" },
+                        { value: "", label: t("fields.notSet") },
                         ...options.map((option) => ({ value: option.id, label: option.label }))
                     ]}
                     className="h-8 text-xs"

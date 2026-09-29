@@ -40,6 +40,8 @@ import { runAction } from "@/lib/run-action";
 import { PropertyRows } from "./task-properties";
 import { TaskNameField } from "./task-name-field";
 import { useEffect, useMemo, useState } from "react";
+import { schemaMessage } from "./schema-message";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     clearTaskDraft,
     draftHasContent,
@@ -219,6 +221,9 @@ export function TaskCreateDialog({
     const [draft, setDraft] = useState<TaskRow>(() =>
         blank(defaultListId, firstStatus, { name: defaultName, dueDate: defaultDueDate })
     );
+    const t = useTranslations("tasksDetail");
+    const tt = useTranslations("tasks");
+    const tc = useTranslations("common");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     /** Open when the dialog was dismissed with something in it. */
@@ -348,7 +353,7 @@ export function TaskCreateDialog({
     };
 
     const nameIssue = draft.name.trim()
-        ? core.taskName.safeParse(draft.name).error?.issues[0]?.message
+        ? schemaMessage(tt, core.taskName.safeParse(draft.name).error?.issues[0]?.message, "") || undefined
         : null;
     const canSubmit =
         draft.name.trim().length > 0 && !nameIssue && Boolean(draft.listId) && !saving;
@@ -397,8 +402,8 @@ export function TaskCreateDialog({
                 cap this at a third of what the rows were laid out for. */}
                 <DialogContent className="flex max-h-[92vh] w-[min(56rem,96vw)] max-w-[min(56rem,96vw)] flex-col gap-0 overflow-hidden p-0">
                     <header className="flex flex-wrap items-center gap-2 border-b border-border py-3 pl-5 pr-14">
-                        <DialogTitle className="text-sm font-medium">New task</DialogTitle>
-                        <span className="text-xs text-muted-foreground">in</span>
+                        <DialogTitle className="text-sm font-medium">{t("create.title")}</DialogTitle>
+                        <span className="text-xs text-muted-foreground">{t("create.in")}</span>
                         <Select
                             value={draft.listId}
                             // The draft is filed under the list it is going into, so
@@ -409,7 +414,7 @@ export function TaskCreateDialog({
                                 setDraft((current) => ({ ...current, listId }));
                             }}
                             options={lists.map((list) => ({ value: list.id, label: list.name }))}
-                            aria-label="List"
+                            aria-label={t("create.list")}
                             className="h-7 w-48 text-xs"
                         />
                     </header>
@@ -419,8 +424,8 @@ export function TaskCreateDialog({
                             <TaskNameField
                                 autoFocus
                                 value={draft.name}
-                                aria-label="Task name"
-                                placeholder="What needs doing?"
+                                aria-label={t("create.name")}
+                                placeholder={t("create.namePlaceholder")}
                                 onChange={(event) =>
                                     setDraft((current) => ({
                                         ...current,
@@ -457,10 +462,10 @@ export function TaskCreateDialog({
                         />
 
                         <section className="flex flex-col gap-1 border-t border-border pt-4">
-                            <h3 className="text-sm font-medium">Description</h3>
+                            <h3 className="text-sm font-medium">{t("create.description")}</h3>
                             <RichTextEditor
                                 value={draft.description}
-                                placeholder="What does done look like? Type / for a block, @ for somebody, # for a task."
+                                placeholder={t("create.descriptionPlaceholder")}
                                 onChange={(description) =>
                                     setDraft((current) => ({ ...current, description }))
                                 }
@@ -480,7 +485,7 @@ export function TaskCreateDialog({
                     <footer className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
                         {restored && (
                             <span className="mr-auto text-xs text-muted-foreground">
-                                Picked up where you left off.{" "}
+                                {t("create.restored")}{" "}
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -495,15 +500,15 @@ export function TaskCreateDialog({
                                     }}
                                     className="underline hover:text-foreground"
                                 >
-                                    Start again
+                                    {t("create.startAgain")}
                                 </button>
                             </span>
                         )}
                         <Button variant="ghost" onClick={dismiss} disabled={saving}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button onClick={() => void submit()} disabled={!canSubmit}>
-                            {saving ? "Creating" : "Create task"}
+                            {saving ? t("create.creating") : t("create.submit")}
                         </Button>
                     </footer>
                 </DialogContent>
@@ -516,20 +521,17 @@ export function TaskCreateDialog({
             <Dialog open={asking} onOpenChange={(next) => (next ? undefined : setAsking(false))}>
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>Keep this draft?</DialogTitle>
-                        <DialogDescription>
-                            It stays in this browser and is offered back the next time you write a
-                            task in this list.
-                        </DialogDescription>
+                        <DialogTitle>{t("create.keepTitle")}</DialogTitle>
+                        <DialogDescription>{t("create.keepDescription")}</DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="gap-2">
                         <Button variant="ghost" onClick={throwAway}>
-                            Discard it
+                            {t("create.discard")}
                         </Button>
                         <Button variant="outline" onClick={() => setAsking(false)}>
-                            Keep writing
+                            {t("create.keepWriting")}
                         </Button>
-                        <Button onClick={keepDraft}>Save draft</Button>
+                        <Button onClick={keepDraft}>{t("create.saveDraft")}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

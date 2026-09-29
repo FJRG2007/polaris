@@ -24,6 +24,10 @@ import * as follow from "@/lib/follow/follow";
 import { notify } from "@/lib/notifications/dispatch";
 import { appBaseUrl, sharingBaseUrl } from "@/lib/domain-service";
 import { taskShelf } from "./shelf";
+import { translate } from "@/lib/i18n/translate";
+import { getUserLocale } from "@/lib/i18n/locale-service";
+import type { Locale } from "@polaris/core";
+import { TaskRefusal } from "./refusal";
 
 /** A task's public link as its owner sees it. */
 export interface TaskShareView {
@@ -237,7 +241,7 @@ export interface ShareDelivery {
     readonly failures: { readonly recipient: string; readonly reason: string }[];
 }
 
-function outsiderMessage(input: {
+function outsiderMessage(locale: Locale, input: {
     sender: string;
     reference: string;
     name: string;
@@ -246,22 +250,27 @@ function outsiderMessage(input: {
 }): { subject: string; text: string; html: string } {
     const escape = (value: string): string =>
         value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const readOnly = translate(locale, "tasks.shareMail.readOnly");
     const text = [
-        `${input.sender} shared a task with you: ${input.reference} ${input.name}`,
+        translate(locale, "tasks.shareMail.textIntro", {
+            sender: input.sender,
+            reference: input.reference,
+            name: input.name
+        }),
         ...(input.note ? ["", input.note] : []),
         "",
         input.url,
         "",
-        "The link is read-only and can be turned off at any time."
+        readOnly
     ].join("\n");
     const html = [
-        `<p>${escape(input.sender)} shared a task with you.</p>`,
+        `<p>${escape(translate(locale, "tasks.shareMail.htmlIntro", { sender: input.sender }))}</p>`,
         `<p><strong>${escape(input.reference)} ${escape(input.name)}</strong></p>`,
         input.note ? `<p>${escape(input.note)}</p>` : "",
-        `<p><a href="${escape(input.url)}">Open the task</a></p>`,
-        "<p>The link is read-only and can be turned off at any time.</p>"
+        `<p><a href="${escape(input.url)}">${escape(translate(locale, "tasks.shareMail.open"))}</a></p>`,
+        `<p>${escape(readOnly)}</p>`
     ].join("");
-    return { subject: `${input.sender} shared "${input.name}" with you`, text, html };
+    return { subject: translate(locale, "tasks.shareMail.subject", { sender: input.sender, name: input.name }), text, html };
 }
 
 /**
@@ -281,7 +290,7 @@ export async function sendTaskByEmail(
         where: { id: input.taskId },
         select: { name: true, number: true, space: { select: { prefix: true } } }
     });
-    if (!task) throw new Error("That task no longer exists");
+    if (!task) throw new TaskRefusal("refusals.taskGone");
     const reference = core.taskReference(task.space.prefix, task.number);
 
     // An address that belongs to an account is that account: it should get the
@@ -298,6 +307,9 @@ export async function sendTaskByEmail(
 
     const sent: string[] = [];
     const failures: { recipient: string; reason: string }[] = [];
+    // The sender reads the failures, and an outsider has no language of their
+    // own on file: the sender's is the one they were written to in.
+    const senderLocale = await getUserLocale(sender.id);
 
     const members = memberIds.length
         ? await prisma.user.findMany({
@@ -313,14 +325,18 @@ export async function sendTaskByEmail(
         try {
             await access.requireTask({ id: member.id, isAdmin: member.isAdmin }, input.taskId, "guest");
         } catch {
-            failures.push({ recipient: member.name, reason: "They do not have access to this space" });
+            failures.push({ recipient: member.name, reason: translate(senderLocale, "tasks.shareMail.noAccess") });
             continue;
         }
         await follow.follow("task", input.taskId, member.id, "explicit");
         await notify({
             userId: member.id,
             event: "tasks.shared",
-            title: `${sender.name} sent you ${reference}: ${task.name}`,
+            title: translate(await getUserLocale(member.id), "tasks.notify.sentYou", {
+                sender: sender.name,
+                reference,
+                name: task.name
+            }),
             body: input.note || null,
             href: `/tasks/t/${input.taskId}`,
             shelf: await taskShelf(input.taskId)
@@ -335,11 +351,11 @@ export async function sendTaskByEmail(
         });
         if (!share) {
             for (const address of outsiders) {
-                failures.push({ recipient: address, reason: "Turn the public link on to email someone outside Polaris" });
+                failures.push({ recipient: address, reason: translate(senderLocale, "tasks.shareMail.linkOff") });
             }
         } else {
             const url = await publicUrl(share.token);
-            const message = outsiderMessage({
+            const message = outsiderMessage(senderLocale, {
                 sender: sender.name,
                 reference,
                 name: task.name,

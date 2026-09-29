@@ -13,6 +13,8 @@ import { ProgressBar } from "./pickers";
 import { Card, CardBody, cn } from "@polaris/ui";
 import type { TaskReport } from "@/lib/tasks/report-service";
 import { useDisplayFormat } from "@/components/display-format";
+import { optionLabel } from "./option-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PersonName, PersonRow } from "@/components/person-name";
 import { CircleAlert, CircleCheck, Clock, ListTodo } from "lucide-react";
 
@@ -51,6 +53,7 @@ export function ReportsView({
     timeByPerson: readonly { userId: string; name: string; seconds: number }[];
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("tasks");
     const { summary } = report;
     const totalStatus = report.byStatus.reduce((sum, slice) => sum + slice.count, 0);
     const maxCompleted = Math.max(1, ...report.completion.map((point) => point.completed));
@@ -58,34 +61,32 @@ export function ReportsView({
     return (
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <header>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Reporting</h1>
-                <p className="text-sm text-muted-foreground">
-                    Across every space you can see. Archived work is left out of all of it.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("reports.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("reports.subtitle")}</p>
             </header>
 
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Stat label="Open tasks" value={summary.open} icon={ListTodo} />
-                <Stat label="Overdue" value={summary.overdue} tone="text-danger" icon={CircleAlert} />
+                <Stat label={t("reports.open")} value={summary.open} icon={ListTodo} />
+                <Stat label={t("home.overdue")} value={summary.overdue} tone="text-danger" icon={CircleAlert} />
                 <Stat
-                    label="Completed this week"
+                    label={t("reports.completedThisWeek")}
                     value={summary.completedThisWeek}
                     tone="text-success"
                     icon={CircleCheck}
                 />
                 <Stat
-                    label="Tracked this week"
+                    label={t("timesheet.trackedThisWeek")}
                     value={core.formatTrackedSeconds(summary.trackedThisWeek)}
-                    hint={`${summary.dueThisWeek} due this week`}
+                    hint={t("reports.dueThisWeek", { count: summary.dueThisWeek })}
                     icon={Clock}
                 />
             </div>
 
             <Card>
                 <CardBody className="flex flex-col gap-3 p-4">
-                    <h2 className="text-sm font-medium">By status</h2>
+                    <h2 className="text-sm font-medium">{t("reports.byStatus")}</h2>
                     {totalStatus === 0 ? (
-                        <p className="text-xs text-muted-foreground">No tasks yet.</p>
+                        <p className="text-xs text-muted-foreground">{t("reports.noTasks")}</p>
                     ) : (
                         <>
                             <div className="flex h-3 w-full overflow-hidden rounded-full">
@@ -121,8 +122,8 @@ export function ReportsView({
             <div className="grid gap-3 lg:grid-cols-2">
                 <Card>
                     <CardBody className="flex flex-col gap-3 p-4">
-                        <h2 className="text-sm font-medium">Completed, last 30 days</h2>
-                        <svg viewBox="0 0 300 60" preserveAspectRatio="none" className="h-20 w-full" role="img" aria-label="Tasks completed per day">
+                        <h2 className="text-sm font-medium">{t("reports.completed30")}</h2>
+                        <svg viewBox="0 0 300 60" preserveAspectRatio="none" className="h-20 w-full" role="img" aria-label={t("reports.perDay")}>
                             {report.completion.map((point, index) => (
                                 <rect
                                     key={point.date}
@@ -139,19 +140,20 @@ export function ReportsView({
                             ))}
                         </svg>
                         <p className="text-xs text-muted-foreground">
-                            {report.completion.reduce((sum, point) => sum + point.completed, 0)} finished in the last
-                            month.
+                            {t("reports.finishedLastMonth", {
+                                count: report.completion.reduce((sum, point) => sum + point.completed, 0)
+                            })}
                         </p>
                     </CardBody>
                 </Card>
 
                 <Card>
                     <CardBody className="flex flex-col gap-3 p-4">
-                        <h2 className="text-sm font-medium">Open work by priority</h2>
+                        <h2 className="text-sm font-medium">{t("reports.byPriority")}</h2>
                         <ul className="flex flex-col gap-2">
                             {report.byPriority.map((slice) => (
                                 <li key={slice.priority} className="flex items-center gap-2 text-xs">
-                                    <span className="w-20 shrink-0">{core.TASK_PRIORITY_LABELS[slice.priority]}</span>
+                                    <span className="w-20 shrink-0">{optionLabel(t, "priority", slice.priority)}</span>
                                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                                         <span
                                             className="block h-full rounded-full"
@@ -165,7 +167,7 @@ export function ReportsView({
                                 </li>
                             ))}
                             {report.byPriority.length === 0 && (
-                                <li className="text-xs text-muted-foreground">Nothing open.</li>
+                                <li className="text-xs text-muted-foreground">{t("reports.nothingOpen")}</li>
                             )}
                         </ul>
                     </CardBody>
@@ -174,7 +176,7 @@ export function ReportsView({
 
             <Card>
                 <CardBody className="flex flex-col gap-3 p-4">
-                    <h2 className="text-sm font-medium">Who is carrying what</h2>
+                    <h2 className="text-sm font-medium">{t("reports.load")}</h2>
                     <ul className="flex flex-col gap-2">
                         {report.load.map((person) => (
                             <PersonRow
@@ -191,13 +193,17 @@ export function ReportsView({
                                         percent={(person.open / Math.max(1, report.load[0]?.open ?? 1)) * 100}
                                     />
                                 </div>
-                                <span className="text-muted-foreground">{person.open} open</span>
-                                {person.overdue > 0 && <span className="text-danger">{person.overdue} overdue</span>}
-                                {person.points > 0 && <span className="text-muted-foreground">{person.points} pts</span>}
+                                <span className="text-muted-foreground">{t("reports.openCount", { count: person.open })}</span>
+                                {person.overdue > 0 && (
+                                    <span className="text-danger">{t("reports.overdueCount", { count: person.overdue })}</span>
+                                )}
+                                {person.points > 0 && (
+                                    <span className="text-muted-foreground">{t("reports.points", { count: person.points })}</span>
+                                )}
                             </PersonRow>
                         ))}
                         {report.load.length === 0 && (
-                            <li className="text-xs text-muted-foreground">Nothing is assigned to anybody yet.</li>
+                            <li className="text-xs text-muted-foreground">{t("reports.noLoad")}</li>
                         )}
                     </ul>
                 </CardBody>
@@ -205,7 +211,7 @@ export function ReportsView({
 
             <Card>
                 <CardBody className="flex flex-col gap-3 p-4">
-                    <h2 className="text-sm font-medium">Time tracked this week</h2>
+                    <h2 className="text-sm font-medium">{t("reports.timeThisWeek")}</h2>
                     <ul className="flex flex-col gap-2">
                         {timeByPerson.map((person) => (
                             <PersonRow
@@ -228,7 +234,7 @@ export function ReportsView({
                             </PersonRow>
                         ))}
                         {timeByPerson.length === 0 && (
-                            <li className="text-xs text-muted-foreground">No time tracked this week.</li>
+                            <li className="text-xs text-muted-foreground">{t("reports.noTime")}</li>
                         )}
                     </ul>
                 </CardBody>

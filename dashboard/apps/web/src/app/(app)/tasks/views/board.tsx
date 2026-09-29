@@ -22,6 +22,8 @@ import * as core from "@polaris/core";
 import type { TaskRow } from "@/lib/tasks/facts";
 import { useEffect, useMemo, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
+import { optionLabel } from "../option-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { clickMode, type BoardMove, type ColumnWorkFate, type SelectMode, type ViewProps } from "./shared";
 import { dropEdge, neighbours as edgeNeighbours, type DropEdge } from "../drop-edge";
 import { commandsFor, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
@@ -142,6 +144,9 @@ function ColumnEditor({
     onSubmit: (draft: ColumnDraft) => Promise<void>;
     onCancel: () => void;
 }) {
+    const t = useTranslations("tasksViews");
+    const tt = useTranslations("tasks");
+    const tc = useTranslations("common");
     const [draft, setDraft] = useState(initial);
     const [busy, setBusy] = useState(false);
     // Opened from a menu whose focus trap is still up when this mounts, so
@@ -161,8 +166,8 @@ function ColumnEditor({
             <input
                 ref={nameField}
                 value={draft.name}
-                placeholder="Column name"
-                aria-label="Column name"
+                placeholder={t("board.columnName")}
+                aria-label={t("board.columnName")}
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                 onKeyDown={(event) => {
                     if (event.key === "Escape") onCancel();
@@ -180,7 +185,7 @@ function ColumnEditor({
                         type="button"
                         onClick={() => setDraft({ ...draft, type })}
                         aria-pressed={draft.type === type}
-                        title={core.TASK_STATUS_TYPE_HINTS[type]}
+                        title={optionLabel(tt, "statusTypeHint", type)}
                         className={cn(
                             "rounded-md border px-2 py-1 text-[0.6875rem] transition-colors",
                             draft.type === type
@@ -188,7 +193,7 @@ function ColumnEditor({
                                 : "border-border text-muted-foreground hover:text-foreground"
                         )}
                     >
-                        {core.TASK_STATUS_TYPE_LABELS[type]}
+                        {optionLabel(tt, "statusType", type)}
                     </button>
                 ))}
             </div>
@@ -196,7 +201,7 @@ function ColumnEditor({
                 <input
                     type="color"
                     value={draft.color}
-                    aria-label="Column color"
+                    aria-label={t("board.columnColor")}
                     onChange={(event) => setDraft({ ...draft, color: event.target.value })}
                     className="size-8 cursor-pointer rounded border border-border bg-transparent"
                 />
@@ -206,14 +211,14 @@ function ColumnEditor({
                     onClick={() => void submit()}
                     className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50"
                 >
-                    {busy ? "Saving..." : submitLabel}
+                    {busy ? t("board.saving") : submitLabel}
                 </button>
                 <button
                     type="button"
                     onClick={onCancel}
                     className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
                 >
-                    Cancel
+                    {tc("actions.cancel")}
                 </button>
             </div>
         </div>
@@ -274,6 +279,7 @@ export function TaskCard({
     onSelect: (mode: SelectMode) => void;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("tasksViews");
     const [over, setOver] = useState<DropEdge | null>(null);
     const { task, context, canEdit, onOpen } = commands;
     // The bottom line only earns its space when there is something on it.
@@ -361,7 +367,7 @@ export function TaskCard({
                         {task.recurring && (
                             <Repeat
                                 className="size-3.5 shrink-0 text-muted-foreground"
-                                aria-label="Repeats"
+                                aria-label={t("board.repeats")}
                             />
                         )}
                         {/* Who it is on and how urgent it is, in the corner rather
@@ -384,7 +390,7 @@ export function TaskCard({
                                         task.assignees.length > 0 ? (
                                             <button
                                                 type="button"
-                                                aria-label="Assignees"
+                                                aria-label={t("table.assignees")}
                                                 className="flex items-center rounded-full transition-opacity hover:opacity-75"
                                             >
                                                 <AvatarStack people={task.assignees} size={18} />
@@ -444,7 +450,7 @@ export function TaskCard({
                             {task.subtaskCount > 0 && (
                                 <span
                                     className="inline-flex items-center gap-0.5"
-                                    title={`${task.subtaskCount} subtasks`}
+                                    title={t("board.subtasks", { count: task.subtaskCount })}
                                 >
                                     <Paperclip className="size-3" />
                                     {task.subtaskCount}
@@ -453,13 +459,13 @@ export function TaskCard({
                             {task.commentCount > 0 && (
                                 <span
                                     className="inline-flex items-center gap-0.5"
-                                    title={`${task.commentCount} comments`}
+                                    title={t("board.comments", { count: task.commentCount })}
                                 >
                                     <MessageSquare className="size-3" />
                                     {task.commentCount}
                                 </span>
                             )}
-                            {task.points !== null && <span title="Points">{task.points} pts</span>}
+                            {task.points !== null && <span title={t("board.points")}>{t("board.pts", { count: task.points })}</span>}
                         </div>
                     )}
                 </div>
@@ -477,6 +483,9 @@ export function TaskCard({
  * lives here: an item this board cannot do is not rendered rather than rendered
  * dead, so a column that only takes new work shows one line.
  */
+/** The key that deletes a focused column, drawn beside the menu item. */
+const DELETE_SHORTCUT = "Del"; // i18n-ignore
+
 function ColumnMenu({
     label,
     canEdit,
@@ -509,6 +518,7 @@ function ColumnMenu({
     const manage = canRename || canMoveLeft || canMoveRight || canDelete;
     // A menu with nothing in it is worse than no menu: it takes the browser's
     // away and gives back an empty box.
+    const t = useTranslations("tasksViews");
     if (!canEdit && !manage && !canAddColumn) return <>{children}</>;
 
     return (
@@ -518,26 +528,26 @@ function ColumnMenu({
                 {canEdit && (
                     <ContextMenuItem className="gap-2" onSelect={onAddTask}>
                         <Plus className="size-3.5" />
-                        Add a task
+                        {t("empty.add")}
                     </ContextMenuItem>
                 )}
                 {canEdit && manage && <ContextMenuSeparator />}
                 {canRename && (
                     <ContextMenuItem className="gap-2" onSelect={onRename}>
                         <Pencil className="size-3.5" />
-                        Edit column
+                        {t("board.editColumn")}
                     </ContextMenuItem>
                 )}
                 {canMoveLeft && (
                     <ContextMenuItem className="gap-2" onSelect={() => onMove(-1)}>
                         <ChevronLeft className="size-3.5" />
-                        Move left
+                        {t("board.moveLeft")}
                     </ContextMenuItem>
                 )}
                 {canMoveRight && (
                     <ContextMenuItem className="gap-2" onSelect={() => onMove(1)}>
                         <ChevronRight className="size-3.5" />
-                        Move right
+                        {t("board.moveRight")}
                     </ContextMenuItem>
                 )}
                 {canAddColumn && (
@@ -545,7 +555,7 @@ function ColumnMenu({
                         {(canEdit || manage) && <ContextMenuSeparator />}
                         <ContextMenuItem className="gap-2" onSelect={onAddColumn}>
                             <Plus className="size-3.5" />
-                            New column
+                            {t("board.newColumn")}
                         </ContextMenuItem>
                     </>
                 )}
@@ -554,11 +564,11 @@ function ColumnMenu({
                         <ContextMenuSeparator />
                         <ContextMenuItem variant="danger" className="gap-2" onSelect={onDelete}>
                             <Trash2 className="size-3.5" />
-                            Delete {label}
+                            {t("board.deleteNamed", { name: label })}
                             {/* The key that does the same thing to the column
                                 whose header has the focus, said out loud - the
                                 way chat says it, drawn by the same component. */}
-                            <MenuShortcut>Del</MenuShortcut>
+                            <MenuShortcut>{DELETE_SHORTCUT}</MenuShortcut>
                         </ContextMenuItem>
                     </>
                 )}
@@ -570,6 +580,8 @@ function ColumnMenu({
 export function BoardView(props: ViewProps) {
     const { context, groups, selection, onSelect, onMove, onQuickCreate, canEdit, orderable } =
         props;
+    const t = useTranslations("tasksViews");
+    const tc = useTranslations("common");
     const [dragging, setDragging] = useState<string | null>(null);
     const [addingTo, setAddingTo] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
@@ -762,7 +774,7 @@ export function BoardView(props: ViewProps) {
                                             type: status?.type ?? "open",
                                             color: group.color ?? "#64748b"
                                         }}
-                                        submitLabel="Save"
+                                        submitLabel={tc("actions.save")}
                                         onCancel={() => setEditing(null)}
                                         onSubmit={async (next) => {
                                             const saved = await Promise.all(
@@ -831,8 +843,8 @@ export function BoardView(props: ViewProps) {
                                         {canEdit && (
                                             <button
                                                 type="button"
-                                                aria-label={`Add a task to ${group.label}`}
-                                                title="Add a task"
+                                                aria-label={t("list.addTo", { name: group.label })}
+                                                title={t("empty.add")}
                                                 onClick={() => {
                                                     setAddingTo(group.key);
                                                     setDraft("");
@@ -847,8 +859,8 @@ export function BoardView(props: ViewProps) {
                                                 <DropdownMenuTrigger asChild>
                                                     <button
                                                         type="button"
-                                                        aria-label={`Column options for ${group.label}`}
-                                                        title="Column options"
+                                                        aria-label={t("board.optionsFor", { name: group.label })}
+                                                        title={t("board.options")}
                                                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                                                     >
                                                         <MoreHorizontal className="size-3.5" />
@@ -868,7 +880,7 @@ export function BoardView(props: ViewProps) {
                                                             onSelect={() => setEditing(group.key)}
                                                         >
                                                             <Pencil className="size-3.5" />
-                                                            Edit column
+                                                            {t("board.editColumn")}
                                                         </DropdownMenuItem>
                                                     )}
                                                     {props.onDeleteStatus && (
@@ -882,7 +894,7 @@ export function BoardView(props: ViewProps) {
                                                             onSelect={() => askToRemove(group)}
                                                         >
                                                             <Trash2 className="size-3.5" />
-                                                            Delete column
+                                                            {t("board.deleteColumn")}
                                                         </DropdownMenuItem>
                                                     )}
                                                 </DropdownMenuContent>
@@ -897,7 +909,7 @@ export function BoardView(props: ViewProps) {
                                             <input
                                                 autoFocus
                                                 value={draft}
-                                                placeholder="Task name, then enter"
+                                                placeholder={t("list.quickPlaceholder")}
                                                 onChange={(event) => setDraft(event.target.value)}
                                                 onBlur={() => setAddingTo(null)}
                                                 onKeyDown={(event) => {
@@ -928,7 +940,7 @@ export function BoardView(props: ViewProps) {
                                     ))}
                                     {group.tasks.length === 0 && addingTo !== group.key && (
                                         <li className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                                            Drop work here
+                                            {t("board.dropHere")}
                                         </li>
                                     )}
                                 </ul>
@@ -942,7 +954,7 @@ export function BoardView(props: ViewProps) {
                         <section className="flex w-72 shrink-0 flex-col rounded-lg border border-dashed border-primary/50 bg-muted/20">
                             <ColumnEditor
                                 initial={{ name: "", type: "open", color: "#64748b" }}
-                                submitLabel="Add"
+                                submitLabel={t("board.add")}
                                 onCancel={() => setCreating(false)}
                                 onSubmit={async (next) => {
                                     const id = await props.onCreateStatus?.(
@@ -960,7 +972,7 @@ export function BoardView(props: ViewProps) {
                             onClick={() => setCreating(true)}
                             className="flex h-10 w-56 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
                         >
-                            <Plus className="size-3.5" /> New column
+                            <Plus className="size-3.5" /> {t("board.newColumn")}
                         </button>
                     ))}
             </div>
@@ -970,12 +982,9 @@ export function BoardView(props: ViewProps) {
                 onOpenChange={(open) => (open ? undefined : setRemoving(null))}
                 name={removing?.label ?? ""}
                 kind="column"
-                description={
-                    doomedCount === 0
-                        ? "Nothing is on it."
-                        : "Say what happens to the work on it - it is not taken with the column unless you ask for that."
-                }
-                confirmLabel="Delete column"
+                title={t("board.deleteColumn")}
+                description={doomedCount === 0 ? t("board.nothingOnIt") : t("board.sayWhatHappens")}
+                confirmLabel={t("board.deleteColumn")}
                 confirmDisabled={fate === "move" && !replacement}
                 onConfirm={async () => {
                     if (!removing) return;
@@ -1000,23 +1009,23 @@ export function BoardView(props: ViewProps) {
                 {doomedCount > 0 && (
                     <div className="flex flex-col gap-2 text-sm">
                         <span className="text-xs text-muted-foreground">
-                            {doomedCount === 1 ? "One task is on it" : `${doomedCount} tasks are on it`}
+                            {t("board.onIt", { count: doomedCount })}
                         </span>
                         <label className="flex items-center gap-2">
                             <Checkbox
                                 checked={fate === "delete"}
-                                aria-label="Delete them with the column"
+                                aria-label={t("board.fateDelete")}
                                 onChange={() => setFate("delete")}
                             />
-                            Delete them with the column
+                            {t("board.fateDelete")}
                         </label>
                         <label className="flex items-center gap-2">
                             <Checkbox
                                 checked={fate === "move"}
-                                aria-label="Move them to"
+                                aria-label={t("board.fateMove")}
                                 onChange={() => setFate("move")}
                             />
-                            Move them to
+                            {t("board.fateMove")}
                             <Select
                                 value={replacement}
                                 onValueChange={(value) => {
@@ -1026,17 +1035,17 @@ export function BoardView(props: ViewProps) {
                                 options={columns
                                     .filter((column) => column.id !== removing?.key)
                                     .map((column) => ({ value: column.id, label: column.name }))}
-                                aria-label="Replacement column"
+                                aria-label={t("board.replacement")}
                                 className="h-8 w-44 text-xs"
                             />
                         </label>
                         <label className="flex items-center gap-2">
                             <Checkbox
                                 checked={fate === "archive"}
-                                aria-label="Archive them, and take the column"
+                                aria-label={t("board.fateArchive")}
                                 onChange={() => setFate("archive")}
                             />
-                            Archive them, and take the column
+                            {t("board.fateArchive")}
                         </label>
                     </div>
                 )}

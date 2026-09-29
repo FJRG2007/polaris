@@ -18,6 +18,7 @@ import { refusalOf } from "@/app/(app)/mail/refusal";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { Button, EmptyState, Switch, useToast } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { forgetSpamAction, setSpamFilterAction } from "@/app/(app)/mail/actions";
 
 interface Learning {
@@ -34,6 +35,7 @@ export function JunkView({
     learning: Record<string, Learning>;
 }) {
     const toast = useToast();
+    const t = useTranslations("mailSettings");
     const [confirm, confirmDialog] = useConfirm();
     const [busy, startBusy] = useBusy();
     const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
@@ -47,8 +49,8 @@ export function JunkView({
         return (
             <EmptyState
                 icon={<ShieldCheck className="size-5 shrink-0" aria-hidden />}
-                title="No mailbox yet"
-                description="Connect one and Polaris can start judging what arrives in it."
+                title={t("blocked.noMailboxTitle")}
+                description={t("junk.noMailbox")}
             />
         );
     }
@@ -70,10 +72,9 @@ export function JunkView({
 
     async function forget(): Promise<void> {
         const sure = await confirm({
-            title: "Forget what this filter has learned?",
-            description:
-                "Every Junk and Not junk you have pressed on this mailbox is taken back, and it starts again knowing nothing about your mail. Nothing moves: what is in Junk stays in Junk.",
-            confirmLabel: "Forget it",
+            title: t("junk.forgetTitle"),
+            description: t("junk.forgetBody"),
+            confirmLabel: t("junk.forgetConfirm"),
             danger: true
         });
         if (!sure) return;
@@ -87,7 +88,7 @@ export function JunkView({
             if ("learning" in answer && answer.learning) {
                 setTaught((held) => ({ ...held, [account!.id]: answer.learning }));
             }
-            toast.show({ title: "It starts again from nothing." });
+            toast.show({ title: t("junk.forgotten") });
         });
     }
 
@@ -96,56 +97,40 @@ export function JunkView({
             <AccountPicker accounts={accounts} value={account.id} onChange={setAccountId} />
 
             <p className="rounded-md border border-border bg-card px-3 py-2 text-[13px] text-muted-foreground">
-                Your provider filters this mailbox before Polaris ever sees it, so what this catches
-                is what got through - and it catches it using things your provider cannot know: who
-                you write to, what you have already called junk, and what you fished back out. It
-                runs here, on this machine, and no message is sent anywhere to be scored. If an
-                address-reputation service is switched on in Integrations, the sender&apos;s address
-                and the domain behind it are checked against it - the address, never the message.
+                {t("junk.explain")}
             </p>
 
             <section className="mt-4 rounded-md border border-border">
                 <div className="flex items-center gap-3 px-3 py-2.5">
                     <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium">Judge arriving mail</p>
-                        <p className="text-[12px] text-muted-foreground">
-                            Anything clearly junk goes to the Junk folder. Anything only doubtful
-                            stays where it is and says so when you open it.
-                        </p>
+                        <p className="text-[13px] font-medium">{t("junk.judge")}</p>
+                        <p className="text-[12px] text-muted-foreground">{t("junk.judgeHint")}</p>
                     </div>
                     <Switch
                         checked={enabled}
                         disabled={busy}
                         onChange={toggle}
-                        aria-label="Judge arriving mail"
+                        aria-label={t("junk.judge")}
                     />
                 </div>
                 <p className="border-t border-border px-3 py-2 text-[12px] text-foreground-subtle">
-                    Switching this off changes what happens to mail arriving afterwards. It never
-                    moves or re-reads what is already here.
+                    {t("junk.offHint")}
                 </p>
             </section>
 
             <section className="mt-4">
-                <h2 className="text-[13px] font-medium">What it has learned</h2>
+                <h2 className="text-[13px] font-medium">{t("junk.learned")}</h2>
                 {state.junk + state.good === 0 ? (
                     <p className="mt-1 text-[12px] text-muted-foreground">
-                        Nothing yet. Pressing Junk on a message teaches it, and Not junk on one in
-                        the Junk folder teaches it the other way. Until then it goes on what it can
-                        check: who the sending server says the message is from, whether the name on
-                        it belongs to the address behind it, where its links go, and whether you
-                        have written to the sender.
+                        {t("junk.nothingYet")}
                     </p>
                 ) : (
                     <>
                         <p className="mt-1 text-[13px]">
-                            {state.junk} marked as junk, {state.good} marked as not junk, and{" "}
-                            {state.words} {state.words === 1 ? "word" : "words"} it has an opinion
-                            about.
+                            {t("junk.counts", { junk: state.junk, good: state.good, words: state.words })}
                         </p>
                         <p className="mt-1 text-[12px] text-foreground-subtle">
-                            Changing your mind about a message takes the first answer back, so
-                            pressing the wrong one is not permanent.
+                            {t("junk.changeMind")}
                         </p>
                     </>
                 )}
@@ -157,7 +142,7 @@ export function JunkView({
                         disabled={busy}
                         onClick={() => void forget()}
                     >
-                        Forget it all
+                        {t("junk.forgetAll")}
                     </Button>
                 ) : null}
             </section>

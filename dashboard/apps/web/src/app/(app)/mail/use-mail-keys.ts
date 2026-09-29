@@ -23,6 +23,8 @@
 
 import * as core from "@polaris/core";
 import { useEffect, useMemo, useRef } from "react";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { mailCommandLabel, mailKeyName } from "./option-label";
 
 /** What a screen can be asked to do from the keyboard. Anything a screen does
  *  not pass is simply not bound. */
@@ -104,18 +106,21 @@ export function useMailKeys(actions: MailKeyActions, keymap: core.MailKeymap = D
  * person actually has - a moved shortcut is shown where it now is. Built from
  * the same table the hook reads, so the two cannot drift.
  */
-export function mailShortcuts(keymap: core.MailKeymap): readonly { keys: string; what: string }[] {
+export function mailShortcuts(
+    t: NamespaceTranslator<"mail">,
+    keymap: core.MailKeymap
+): readonly { keys: string; what: string }[] {
     const rows = core.MAIL_KEY_COMMANDS.map((command) => {
         const definition = core.MAIL_KEY_DEFINITIONS[command];
         const keys = [core.mailKeyFor(command, keymap), ...definition.fixed]
             .filter(Boolean)
-            .map(core.mailKeyLabel)
-            .join(" or ");
-        return { keys, what: definition.label };
+            .map((key) => mailKeyName(t, core.mailKeyLabel(key)))
+            .join(t("keys.or"));
+        return { keys, what: mailCommandLabel(t, command) };
     });
     return [
         ...rows,
-        { keys: "Mod+a", what: "Select everything shown" },
-        { keys: "Shift+click", what: "Select a run of conversations" }
+        { keys: "Mod+a", what: t("keys.selectAll") },
+        { keys: t("keys.shiftClick"), what: t("keys.selectRun") }
     ];
 }

@@ -23,6 +23,9 @@ import dynamic from "next/dynamic";
 import * as core from "@polaris/core";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
+import { spamReasonText } from "./spam-reason";
+import { mailRefusalText } from "@/lib/mailbox/refusal-text";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AddressChip } from "./address-chip";
 import { forwardSeed, replySeed } from "./answering";
 import { leavesTheView, scopeOf } from "./mail-actions";
@@ -138,6 +141,7 @@ export function ThreadView({
     const { refreshMailbox, reloadLists, openComposer, accounts, accountColor, askFolderRole } =
         useMail();
     const toast = useToast();
+    const t = useTranslations("mail");
     const [busy, startBusy] = useBusy();
     const [answering, startAnswering] = useBusy();
     const newest = messages.at(-1);
@@ -241,9 +245,9 @@ export function ThreadView({
                 const opened = await readMessage(newest.id).catch((caught: unknown) => {
                     toast.show({
                         title:
-                            caught instanceof Error
-                                ? caught.message
-                                : "That message could not be opened."
+                            caught instanceof Error && caught.message
+                                ? mailRefusalText(t, caught.message)
+                                : t("thread.openFailed")
                     });
                     return null;
                 });
@@ -271,9 +275,7 @@ export function ThreadView({
     if (!newest) {
         return (
             <div className="flex flex-1 items-center justify-center p-8">
-                <p className="text-[13px] text-foreground-subtle">
-                    This conversation is no longer here.
-                </p>
+                <p className="text-[13px] text-foreground-subtle">{t("view.gone")}</p>
             </div>
         );
     }
@@ -292,8 +294,8 @@ export function ThreadView({
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Back to the list"
-                        title="Back to the list"
+                        aria-label={t("shell.backToList")}
+                        title={t("shell.backToList")}
                         onClick={onBack}
                     >
                         <ArrowLeft className="size-4 shrink-0" aria-hidden />
@@ -301,7 +303,7 @@ export function ThreadView({
                 ) : null}
                 <div className="min-w-0 flex-1">
                     <h2 className="truncate text-[17px] font-semibold tracking-tight">
-                        {thread.subject || "(no subject)"}
+                        {thread.subject || t("noSubject")}
                     </h2>
                     {accounts.length > 1 && account ? (
                         <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-foreground-subtle">
@@ -326,8 +328,8 @@ export function ThreadView({
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Reply"
-                        title="Reply"
+                        aria-label={t("thread.reply")}
+                        title={t("thread.reply")}
                         disabled={answering}
                         onClick={() => answer("reply")}
                     >
@@ -337,8 +339,8 @@ export function ThreadView({
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label="Reply to everybody"
-                            title="Reply to everybody"
+                            aria-label={t("thread.replyAll")}
+                            title={t("thread.replyAll")}
                             disabled={answering}
                             onClick={() => answer("reply-all")}
                         >
@@ -348,8 +350,8 @@ export function ThreadView({
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Forward"
-                        title="Forward"
+                        aria-label={t("thread.forward")}
+                        title={t("thread.forward")}
                         disabled={answering}
                         onClick={() => answer("forward")}
                     >
@@ -359,8 +361,8 @@ export function ThreadView({
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label={thread.starred ? "Unstar" : "Star"}
-                        title={thread.starred ? "Unstar" : "Star"}
+                        aria-label={thread.starred ? t("view.unstar") : t("view.star")}
+                        title={thread.starred ? t("view.unstar") : t("view.star")}
                         disabled={busy}
                         onClick={() => act(thread.starred ? "unstar" : "star")}
                     >
@@ -375,8 +377,8 @@ export function ThreadView({
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label={thread.important ? "Mark not important" : "Mark important"}
-                        title={thread.important ? "Mark not important" : "Mark important"}
+                        aria-label={thread.important ? t("view.unimportant") : t("view.important")}
+                        title={thread.important ? t("view.unimportant") : t("view.important")}
                         disabled={busy}
                         onClick={() => act(thread.important ? "unimportant" : "important")}
                     >
@@ -391,8 +393,8 @@ export function ThreadView({
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Mark as unread"
-                        title="Mark as unread"
+                        aria-label={t("view.markUnread")}
+                        title={t("view.markUnread")}
                         disabled={busy}
                         onClick={() => act("unread")}
                     >
@@ -402,8 +404,8 @@ export function ThreadView({
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label="Archive"
-                            title="Archive"
+                            aria-label={t("view.archive")}
+                            title={t("view.archive")}
                             disabled={busy}
                             onClick={() => act("archive")}
                         >
@@ -415,8 +417,8 @@ export function ThreadView({
                         <Button
                             variant="ghost"
                             size="icon"
-                            aria-label="Put back where it was"
-                            title="Put back where it was"
+                            aria-label={t("view.restore")}
+                            title={t("view.restore")}
                             disabled={busy}
                             onClick={() => act("restore")}
                         >
@@ -426,8 +428,8 @@ export function ThreadView({
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label={context.permanentDelete ? "Delete for ever" : "Move to trash"}
-                        title={context.permanentDelete ? "Delete for ever" : "Move to trash"}
+                        aria-label={context.permanentDelete ? t("view.deleteForever") : t("view.trash")}
+                        title={context.permanentDelete ? t("view.deleteForever") : t("view.trash")}
                         disabled={busy}
                         onClick={() => act(context.permanentDelete ? "delete" : "trash")}
                     >
@@ -451,8 +453,7 @@ export function ThreadView({
                                     onClick={() => setExpandAll(true)}
                                 >
                                     <MoreHorizontal className="size-3.5 shrink-0" aria-hidden />
-                                    {entry.count} earlier{" "}
-                                    {entry.count === 1 ? "message" : "messages"}
+                                    {t("view.earlier", { count: entry.count })}
                                 </button>
                             </li>
                         ) : (
@@ -484,7 +485,7 @@ export function ThreadView({
                         onClick={() => answer("reply")}
                     >
                         <CornerUpLeft className="size-4 shrink-0" aria-hidden />
-                        Reply
+                        {t("thread.reply")}
                     </Button>
                     {newest.to.length + newest.cc.length > 1 ? (
                         <Button
@@ -493,12 +494,12 @@ export function ThreadView({
                             onClick={() => answer("reply-all")}
                         >
                             <CornerUpRight className="size-4 shrink-0" aria-hidden />
-                            Reply to all
+                            {t("view.replyAll")}
                         </Button>
                     ) : null}
                     <Button variant="ghost" disabled={answering} onClick={() => answer("forward")}>
                         <Forward className="size-4 shrink-0" aria-hidden />
-                        Forward
+                        {t("thread.forward")}
                     </Button>
                 </div>
             </div>
@@ -525,7 +526,7 @@ function ConversationMenu({
 }) {
     const { refreshMailbox } = useMail();
     const toast = useToast();
-
+    const t = useTranslations("mail");
     const change = (state: { pinned?: boolean; muted?: boolean }, announce: string) => {
         void (async () => {
             const outcome = await setConversationStateAction({ messageIds, ...state });
@@ -545,8 +546,8 @@ function ConversationMenu({
                 <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="More for this conversation"
-                    title="More for this conversation"
+                    aria-label={t("view.more")}
+                    title={t("view.more")}
                 >
                     <MoreHorizontal className="size-4 shrink-0" aria-hidden />
                 </Button>
@@ -556,7 +557,7 @@ function ConversationMenu({
                     onSelect={() =>
                         change(
                             { pinned: !thread.pinned },
-                            thread.pinned ? "Unpinned." : "Pinned to the top."
+                            thread.pinned ? t("thread.announce.unpinned") : t("thread.announce.pinned")
                         )
                     }
                 >
@@ -565,15 +566,15 @@ function ConversationMenu({
                     ) : (
                         <Pin className="size-3.5 shrink-0" aria-hidden />
                     )}
-                    {thread.pinned ? "Unpin" : "Pin to the top"}
+                    {thread.pinned ? t("view.unpin") : t("view.pin")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                     onSelect={() =>
                         change(
                             { muted: !thread.muted },
                             thread.muted
-                                ? "Unmuted."
-                                : "Muted. New messages in it will not be announced."
+                                ? t("thread.announce.unmuted")
+                                : t("thread.announce.muted")
                         )
                     }
                 >
@@ -582,13 +583,13 @@ function ConversationMenu({
                     ) : (
                         <BellOff className="size-3.5 shrink-0" aria-hidden />
                     )}
-                    {thread.muted ? "Unmute" : "Mute"}
+                    {thread.muted ? t("view.unmute") : t("view.mute")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                     onSelect={() => window.open(`/mail/print/${thread.id}`, "_blank", "noopener")}
                 >
                     <Printer className="size-3.5 shrink-0" aria-hidden />
-                    Print
+                    {t("print.print")}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
@@ -606,15 +607,15 @@ function ConversationMenu({
 function LabelMenu({ messageIds }: { messageIds: string[] }) {
     const { labels, refreshMailbox } = useMail();
     const toast = useToast();
-
+    const t = useTranslations("mail");
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Label this conversation"
-                    title="Label this conversation"
+                    aria-label={t("view.label")}
+                    title={t("view.label")}
                 >
                     <Tag className="size-4 shrink-0" aria-hidden />
                 </Button>
@@ -622,7 +623,7 @@ function LabelMenu({ messageIds }: { messageIds: string[] }) {
             <DropdownMenuContent align="end">
                 {labels.length === 0 ? (
                     <DropdownMenuItem asChild>
-                        <Link href="/mail/settings/labels">Make your first label</Link>
+                        <Link href="/mail/settings/labels">{t("view.firstLabel")}</Link>
                     </DropdownMenuItem>
                 ) : (
                     labels.map((label) => (
@@ -640,7 +641,7 @@ function LabelMenu({ messageIds }: { messageIds: string[] }) {
                                         toast.show({ title: said });
                                         return;
                                     }
-                                    toast.show({ title: `Labelled ${label.name}.` });
+                                    toast.show({ title: t("view.labelled", { name: label.name }) });
                                     refreshMailbox();
                                 })()
                             }
@@ -703,6 +704,7 @@ function RecipientRow({
     people: readonly core.MailAddress[];
     empty?: string;
 }) {
+    const t = useTranslations("mail");
     const [all, setAll] = useState(false);
     const long = people.length > SHOWN_RECIPIENTS;
     const drawn = all || !long ? people : people.slice(0, SHOWN_RECIPIENTS);
@@ -724,7 +726,7 @@ function RecipientRow({
                     className="shrink-0 rounded underline-offset-2 hover:text-foreground hover:underline"
                     onClick={() => setAll((was) => !was)}
                 >
-                    {all ? "Show fewer" : `+${hidden} more`}
+                    {all ? t("view.showFewer") : t("view.more2", { count: hidden })}
                 </button>
             ) : null}
         </p>
@@ -754,6 +756,7 @@ function MessageCard({
     onRead?: () => void;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("mail");
     const { refreshMailbox } = useMail();
     const [viewing, setViewing] = useState<ViewerTarget | null>(null);
     /** The files the viewer steps through, and where the open one is among them. */
@@ -777,7 +780,9 @@ function MessageCard({
             } catch (caught) {
                 if (!live) return;
                 setFailed(
-                    caught instanceof Error ? caught.message : "That message could not be opened."
+                    caught instanceof Error && caught.message
+                        ? mailRefusalText(t, caught.message)
+                        : t("thread.openFailed")
                 );
             }
         })();
@@ -871,7 +876,7 @@ function MessageCard({
                                     onBlock={onBlock}
                                 />
                             ) : (
-                                <span className="truncate">(nobody)</span>
+                                <span className="truncate">{t("view.nobody")}</span>
                             )}
                         </div>
                         {/* A message delivered with nobody in its To line is a
@@ -881,12 +886,12 @@ function MessageCard({
                             it actually ends; see `after` in `address-chip`. */}
                         <div className="mt-0.5 flex flex-col gap-0.5 text-[12px] text-foreground-subtle">
                             <RecipientRow
-                                label="to"
+                                label={t("view.to")}
                                 people={message.to}
-                                empty="undisclosed recipients"
+                                empty={t("view.undisclosed")}
                             />
                             {message.cc.length > 0 ? (
-                                <RecipientRow label="copy to" people={message.cc} />
+                                <RecipientRow label={t("view.copyTo")} people={message.cc} />
                             ) : null}
                         </div>
                     </div>
@@ -900,7 +905,7 @@ function MessageCard({
                                     : "font-semibold text-foreground"
                             )}
                         >
-                            {sender ? core.addressName(sender) : "(nobody)"}
+                            {sender ? core.addressName(sender) : t("view.nobody")}
                         </span>
                         <span className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle">
                             {message.snippet}
@@ -915,8 +920,8 @@ function MessageCard({
                                 title={files.map((file) => file.name).join(", ")}
                                 aria-label={
                                     files.length === 1
-                                        ? `1 attachment: ${files[0]!.name}`
-                                        : `${files.length} attachments`
+                                        ? t("view.oneAttachment", { name: files[0]!.name })
+                                        : t("view.attachments", { count: files.length })
                                 }
                             >
                                 <Paperclip className="size-3.5 shrink-0" aria-hidden />
@@ -965,13 +970,10 @@ function MessageCard({
                                     />
                                     <div className="min-w-0">
                                         <p>
-                                            {message.folderRole === "junk"
-                                                ? "Polaris filed this as junk. "
-                                                : "This one looks off. "}
-                                            {message.spamReason}.{" "}
-                                            {message.folderRole === "junk"
-                                                ? "Not junk puts it back and teaches the filter."
-                                                : "Junk files it and teaches the filter."}
+                                            {t("view.spam", {
+                                                filed: message.folderRole === "junk" ? "yes" : "no",
+                                                reason: spamReasonText(t, message.spamReason)
+                                            })}
                                         </p>
                                         {/* The rest of the case, and only for a
                                             message that was actually filed
@@ -986,7 +988,7 @@ function MessageCard({
                                         message.spamReasons.length > 1 ? (
                                             <ul className="mt-1 list-disc space-y-0.5 pl-4 text-foreground-subtle">
                                                 {message.spamReasons.slice(1).map((said) => (
-                                                    <li key={said}>{said}</li>
+                                                    <li key={said}>{spamReasonText(t, said)}</li>
                                                 ))}
                                             </ul>
                                         ) : null}
@@ -1004,8 +1006,8 @@ function MessageCard({
                                     <BellOff className="size-3.5 shrink-0" aria-hidden />
                                     <span className="min-w-0 flex-1">
                                         {sender
-                                            ? `${core.addressName(sender)} sends this as a mailing list.`
-                                            : "This arrived as a mailing list."}
+                                            ? t("view.listFrom", { name: core.addressName(sender) })
+                                            : t("view.list")}
                                     </span>
                                     <UnsubscribeButton
                                         size="xs"
@@ -1015,7 +1017,7 @@ function MessageCard({
                                             source: readable.unsubscribeSource || "header",
                                             sender: sender
                                                 ? core.addressName(sender)
-                                                : "this sender",
+                                                : t("view.thisSender"),
                                             messageId: message.id
                                         }}
                                     />
@@ -1024,8 +1026,7 @@ function MessageCard({
                             {readable.wantsReceipt ? (
                                 <p className="mb-3 flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-[12px] text-muted-foreground">
                                     <UserRoundX className="size-3.5 shrink-0" aria-hidden />
-                                    The sender asked to be told when this was opened. Polaris did
-                                    not tell them.
+                                    {t("view.receipt")}
                                 </p>
                             ) : null}
                             <MessageBody
@@ -1103,8 +1104,8 @@ function MessageCard({
                                                     );
                                                 }}
                                                 className="shrink-0 rounded p-1 text-foreground-subtle hover:text-foreground"
-                                                aria-label={`Save ${file.name}`}
-                                                title={`Save ${file.name}`}
+                                                aria-label={t("view.saveNamed", { name: file.name })}
+                                                title={t("view.saveNamed", { name: file.name })}
                                                 download
                                             >
                                                 <Download
@@ -1136,7 +1137,7 @@ function MessageCard({
                                                     className="size-3.5 shrink-0"
                                                     aria-hidden
                                                 />
-                                                Save all as a .zip
+                                                {t("view.saveZip")}
                                             </a>
                                         </li>
                                     ) : null}
@@ -1162,14 +1163,14 @@ function MessageCard({
                                     download
                                 >
                                     <Download className="size-3 shrink-0" aria-hidden />
-                                    Save this message
+                                    {t("view.saveMessage")}
                                 </a>
                             </p>
                         </>
                     ) : (
                         <div
                             className="h-24 animate-pulse rounded-md bg-surface"
-                            aria-label="Opening the message"
+                            aria-label={t("body.opening")}
                         />
                     )}
                 </div>
