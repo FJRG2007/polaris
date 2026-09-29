@@ -20,7 +20,6 @@ import { BlockAfterReport } from "@/components/block-after-report";
 import { reportMessageAction } from "./actions";
 import type { ChatReportReason } from "@polaris/core";
 import {
-    CHAT_REPORT_LABELS,
     CHAT_REPORT_REASONS,
     MAX_CHAT_REPORT_NOTE,
     PLEASANTRY_REFUSAL,
@@ -122,7 +121,7 @@ export function ReportDialog({
                                 onValueChange={(next) => setReason(next as ChatReportReason)}
                                 options={CHAT_REPORT_REASONS.map((entry) => ({
                                     value: entry,
-                                    label: CHAT_REPORT_LABELS[entry]
+                                    label: t(`report.reasons.${entry}`)
                                 }))}
                                 aria-label={t("report.whatIsWrongWithIt")}
                             />

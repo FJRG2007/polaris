@@ -56,7 +56,6 @@ import type { FilteredMic, MicFilter } from "./mic-filter";
 import {
     REACTIONS,
     REACTION_GLYPHS,
-    REACTION_LABELS,
     handPlaces,
     type Reaction,
     type ShownReaction
@@ -1892,7 +1891,7 @@ function Face({
                         aria-live="polite"
                     >
                         {reactions.map((shown) => (
-                            <span key={shown.id} aria-label={REACTION_LABELS[shown.reaction]}>
+                            <span key={shown.id} aria-label={t(`callRoom.reactions.${shown.reaction}`)}>
                                 {REACTION_GLYPHS[shown.reaction]}
                             </span>
                         ))}
@@ -2260,7 +2259,7 @@ function Tile({
                     aria-live="polite"
                 >
                     {reactions.map((shown) => (
-                        <span key={shown.id} aria-label={REACTION_LABELS[shown.reaction]}>
+                        <span key={shown.id} aria-label={t(`callRoom.reactions.${shown.reaction}`)}>
                             {REACTION_GLYPHS[shown.reaction]}
                         </span>
                     ))}
@@ -2624,8 +2623,8 @@ function ReactionMenu({ onReact }: { onReact: (reaction: Reaction) => void }) {
                     <DropdownMenuItem
                         key={reaction}
                         onSelect={() => onReact(reaction)}
-                        aria-label={REACTION_LABELS[reaction]}
-                        title={REACTION_LABELS[reaction]}
+                        aria-label={t(`callRoom.reactions.${reaction}`)}
+                        title={t(`callRoom.reactions.${reaction}`)}
                         className="justify-center px-2 text-lg"
                     >
                         {REACTION_GLYPHS[reaction]}

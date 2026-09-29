@@ -372,6 +372,14 @@
             "camera": "Camera",
             "screen": "Screen",
             "output": "Output"
+        },
+        "reactions": {
+            "+1": "Yes",
+            "-1": "No",
+            "clap": "Applause",
+            "laugh": "Funny",
+            "surprise": "Surprised",
+            "heart": "Love it"
         }
     },
     "meetingRoom": {
@@ -806,7 +814,13 @@
         "onOrBefore": "On or before",
         "typeSomethingOrPickWho": "Type something, or pick who said it.",
         "pressSearchWhenTheFilters": "Press Search when the filters are right.",
-        "nothingMatchesThat": "Nothing matches that."
+        "nothingMatchesThat": "Nothing matches that.",
+        "attachments": {
+            "any": "Anything",
+            "file": "Files",
+            "image": "Images",
+            "link": "Links"
+        }
     },
     "newChannel": {
         "newChannel": "New channel",
@@ -888,7 +902,20 @@
         "used": "{count} used",
         "until": " - until {date}",
         "noEnd": " - no end",
-        "sentTo": "Sent to {name}."
+        "sentTo": "Sent to {name}.",
+        "durations": {
+            "m30": "30 minutes",
+            "h1": "1 hour",
+            "h6": "6 hours",
+            "h12": "12 hours",
+            "d1": "1 day",
+            "d7": "7 days",
+            "never": "Never"
+        },
+        "uses": {
+            "count": "{count, plural, one {1 use} other {{count} uses}}",
+            "unlimited": "No limit"
+        }
     },
     "groupSettings": {
         "groupSettings": "Group settings",
@@ -931,7 +958,17 @@
         "done": "Done",
         "close": "Close",
         "cancel": "Cancel",
-        "report": "Report"
+        "report": "Report",
+        "reasons": {
+            "spam": "Spam or a scam",
+            "abuse": "Harassment or hate",
+            "sexual": "Sexual content",
+            "violence": "Violence or self-harm",
+            "illegal": "Something illegal",
+            "other": "Something else"
+        },
+        "alertTitle": "A message has been reported",
+        "alertBody": "Reported as: {reason}. It is waiting in the safety queue."
     },
     "forward": {
         "forwardThisMessage": "Forward this message",
@@ -1240,7 +1277,15 @@
     "muteMenu": {
         "unmute": "Unmute",
         "mute": "Mute",
-        "unmuteUntil": "Unmute (quiet until {time})"
+        "unmuteUntil": "Unmute (quiet until {time})",
+        "durations": {
+            "m15": "For 15 minutes",
+            "h1": "For 1 hour",
+            "h3": "For 3 hours",
+            "h8": "For 8 hours",
+            "h24": "For 24 hours",
+            "forever": "Until I turn it back on"
+        }
     },
     "diagnosis": {
         "whatIsHappeningAtThe": "What is happening at the other end",

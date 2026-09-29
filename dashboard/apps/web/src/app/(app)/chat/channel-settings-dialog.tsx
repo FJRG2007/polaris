@@ -16,6 +16,7 @@
 
 import * as actions from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { spokenWait } from "@/lib/chat/durations";
 import * as core from "@polaris/core";
 import { useChat } from "./chat-context";
 import { ShareDialog } from "@/components/access/share-dialog";
@@ -168,7 +169,7 @@ export function ChannelSettingsDialog({
                                 aria-label={t("channelSettings.waitBetweenMessages")}
                                 options={core.CHAT_SLOWMODE_STEPS.map((seconds) => ({
                                     value: String(seconds),
-                                    label: seconds === 0 ? t("channelSettings.off") : core.slowmodeSpoken(seconds)
+                                    label: seconds === 0 ? t("channelSettings.off") : t(spokenWait(seconds).key, spokenWait(seconds).params)
                                 }))}
                             />
                         </label>

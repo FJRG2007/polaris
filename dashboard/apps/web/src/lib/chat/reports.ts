@@ -24,6 +24,7 @@
  */
 
 import { remove } from "./messages";
+import { translate } from "@/lib/i18n/translate";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { knownPreviews, type KnownPreview } from "./link-preview";
@@ -197,9 +198,17 @@ export async function reportMessage(
     // Re-reporting is silent for the same reason: it updates the row it already
     // has, so there is no new work to announce.
     if (await claimQueueAnnouncement()) {
+        // Each administrator reads it in their own language; the default one is
+        // what is said when theirs cannot be looked up.
+        const said = (locale: core.Locale) => ({
+            title: translate(locale, "chat.report.alertTitle"),
+            body: translate(locale, "chat.report.alertBody", {
+                reason: translate(locale, `chat.report.reasons.${input.reason}`)
+            })
+        });
         await alertAdmins({
-            title: "A message has been reported",
-            body: `Reported as: ${core.CHAT_REPORT_LABELS[input.reason]}. It is waiting in the safety queue.`,
+            ...said(core.DEFAULT_LOCALE),
+            say: said,
             // It is a decision waiting on a person, which is what this queue is.
             actionRequired: true
         }).catch(releaseQueueAnnouncement);

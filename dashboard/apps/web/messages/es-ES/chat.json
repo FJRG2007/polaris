@@ -372,6 +372,14 @@
             "camera": "Cámara",
             "screen": "Pantalla",
             "output": "Salida"
+        },
+        "reactions": {
+            "+1": "Sí",
+            "-1": "No",
+            "clap": "Aplausos",
+            "laugh": "Gracioso",
+            "surprise": "Sorpresa",
+            "heart": "Me encanta"
         }
     },
     "meetingRoom": {
@@ -806,7 +814,13 @@
         "onOrBefore": "Hasta el día",
         "typeSomethingOrPickWho": "Escribe algo o elige quién lo dijo.",
         "pressSearchWhenTheFilters": "Pulsa Buscar cuando los filtros estén bien.",
-        "nothingMatchesThat": "Nada coincide."
+        "nothingMatchesThat": "Nada coincide.",
+        "attachments": {
+            "any": "Cualquiera",
+            "file": "Archivos",
+            "image": "Imágenes",
+            "link": "Enlaces"
+        }
     },
     "newChannel": {
         "newChannel": "Nuevo canal",
@@ -888,7 +902,20 @@
         "used": "{count} usos",
         "until": " - hasta el {date}",
         "noEnd": " - sin fin",
-        "sentTo": "Enviado a {name}."
+        "sentTo": "Enviado a {name}.",
+        "durations": {
+            "m30": "30 minutos",
+            "h1": "1 hora",
+            "h6": "6 horas",
+            "h12": "12 horas",
+            "d1": "1 día",
+            "d7": "7 días",
+            "never": "Nunca"
+        },
+        "uses": {
+            "count": "{count, plural, one {1 uso} other {{count} usos}}",
+            "unlimited": "Sin límite"
+        }
     },
     "groupSettings": {
         "groupSettings": "Ajustes del grupo",
@@ -931,7 +958,17 @@
         "done": "Hecho",
         "close": "Cerrar",
         "cancel": "Cancelar",
-        "report": "Denunciar"
+        "report": "Denunciar",
+        "reasons": {
+            "spam": "Spam o estafa",
+            "abuse": "Acoso u odio",
+            "sexual": "Contenido sexual",
+            "violence": "Violencia o autolesión",
+            "illegal": "Algo ilegal",
+            "other": "Otra cosa"
+        },
+        "alertTitle": "Se ha denunciado un mensaje",
+        "alertBody": "Denunciado como: {reason}. Espera en la cola de seguridad."
     },
     "forward": {
         "forwardThisMessage": "Reenviar mensaje",
@@ -1240,7 +1277,15 @@
     "muteMenu": {
         "unmute": "Activar",
         "mute": "Apagar",
-        "unmuteUntil": "Activar (en silencio hasta las {time})"
+        "unmuteUntil": "Activar (en silencio hasta las {time})",
+        "durations": {
+            "m15": "15 minutos",
+            "h1": "1 hora",
+            "h3": "3 horas",
+            "h8": "8 horas",
+            "h24": "24 horas",
+            "forever": "Hasta que lo reactive"
+        }
     },
     "diagnosis": {
         "whatIsHappeningAtThe": "Qué pasa en el otro extremo",

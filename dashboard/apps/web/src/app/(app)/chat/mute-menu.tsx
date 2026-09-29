@@ -15,6 +15,16 @@
 
 import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+/** Each offered mute, by its length in minutes. */
+const MUTE_KEYS: Readonly<Record<number, NamespaceKey<"chat">>> = {
+    15: "muteMenu.durations.m15",
+    60: "muteMenu.durations.h1",
+    180: "muteMenu.durations.h3",
+    480: "muteMenu.durations.h8",
+    1440: "muteMenu.durations.h24"
+};
 import { Bell, BellOff } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { useDisplayFormat } from "@/components/display-format";
@@ -67,11 +77,11 @@ export function MuteOptions({
             <SubContent>
                 {core.MUTE_DURATIONS.map((minutes) => (
                     <Item key={minutes} onSelect={() => onChoose(minutes)}>
-                        {core.MUTE_LABELS[minutes]}
+                        {t(MUTE_KEYS[minutes] ?? "muteMenu.durations.forever")}
                     </Item>
                 ))}
                 <Item onSelect={() => onChoose(core.MUTE_FOREVER)}>
-                    {core.MUTE_LABELS[core.MUTE_FOREVER]}
+                    {t("muteMenu.durations.forever")}
                 </Item>
             </SubContent>
         </Sub>

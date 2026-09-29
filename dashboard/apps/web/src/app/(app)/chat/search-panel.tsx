@@ -157,7 +157,7 @@ export function SearchPanel({
                         onValueChange={setHas}
                         options={core.CHAT_SEARCH_ATTACHMENTS.map((value) => ({
                             value,
-                            label: core.CHAT_SEARCH_ATTACHMENT_LABELS[value]
+                            label: t(`search.attachments.${value}`)
                         }))}
                     />
                 </label>

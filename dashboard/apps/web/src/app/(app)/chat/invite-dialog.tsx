@@ -17,6 +17,17 @@
 
 import * as actions from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+/** How long an invitation lasts, by its length in minutes. */
+const INVITE_DURATION_KEYS: Readonly<Record<number, NamespaceKey<"chat">>> = {
+    30: "invite.durations.m30",
+    60: "invite.durations.h1",
+    360: "invite.durations.h6",
+    720: "invite.durations.h12",
+    1440: "invite.durations.d1",
+    10080: "invite.durations.d7"
+};
 import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
@@ -123,7 +134,7 @@ export function InviteDialog({
                                     options={[...core.INVITE_DURATIONS, core.INVITE_FOREVER].map(
                                         (minutes) => ({
                                             value: String(minutes),
-                                            label: core.INVITE_DURATION_LABELS[minutes] ?? ""
+                                            label: minutes === core.INVITE_FOREVER ? t("invite.durations.never") : t(INVITE_DURATION_KEYS[minutes] ?? "invite.durations.never")
                                         })
                                     )}
                                 />
@@ -138,7 +149,7 @@ export function InviteDialog({
                                     options={[core.INVITE_UNLIMITED, ...core.INVITE_USE_LIMITS].map(
                                         (limit) => ({
                                             value: String(limit),
-                                            label: core.INVITE_USE_LABELS[limit] ?? ""
+                                            label: limit === core.INVITE_UNLIMITED ? t("invite.uses.unlimited") : t("invite.uses.count", { count: limit })
                                         })
                                     )}
                                 />
