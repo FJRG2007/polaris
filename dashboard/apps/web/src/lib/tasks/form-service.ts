@@ -13,6 +13,7 @@ import * as core from "@polaris/core";
 import { createTask } from "./task-service";
 import { generateToken } from "@polaris/core/tokens";
 import { TaskRefusal } from "./refusal";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 export interface FormView {
     readonly id: string;
@@ -190,7 +191,7 @@ export async function submitForm(
     });
     // Read by whoever is filling the form in, in their language: the only
     // caller is the public form's own action.
-    const t = await (await import("@/lib/i18n/request")).getTranslations("tasks");
+    const t = await readerWords("tasks");
     if (!form || !form.enabled) return { ok: false, error: t("forms.closed") };
     if (form.requireLogin && !submittedById) return { ok: false, error: t("forms.signIn") };
 
