@@ -14,6 +14,7 @@
  */
 
 import * as actions from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { useProfileStyleRefresh } from "@/components/profile-style-store";
@@ -43,6 +44,7 @@ export function NicknameDialog({
     person: { id: string; name: string } | null;
     onSaved: () => void;
 }) {
+    const t = useTranslations("chat");
     const [nickname, setNickname] = useState("");
     const [error, setError] = useState("");
     // The store keeps what everybody on screen is called, and its answer beats the
@@ -61,24 +63,23 @@ export function NicknameDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>What you call them</DialogTitle>
+                    <DialogTitle>{t("nickname.whatYouCallThem")}</DialogTitle>
                 </DialogHeader>
                 <Input
                     value={nickname}
                     autoFocus
                     maxLength={MAX_NICKNAME}
-                    aria-label="What you call them"
-                    placeholder="Leave it empty to use their own name"
+                    aria-label={t("nickname.whatYouCallThem")}
+                    placeholder={t("nickname.leaveItEmptyToUse")}
                     onChange={(event) => setNickname(event.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                    Only you see this. They are not told, and everybody else goes on seeing their
-                    own name.
+                    {t("nickname.onlyYouSeeThisThey")}
                 </p>
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {t("nickname.cancel")}
                     </Button>
                     <Button
                         size="sm"
@@ -103,7 +104,7 @@ export function NicknameDialog({
                             onSaved();
                         }}
                     >
-                        Save
+                        {t("nickname.save")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

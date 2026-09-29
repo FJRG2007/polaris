@@ -35,10 +35,12 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AlertTriangle, Info } from "lucide-react";
 import type { CallAudioReport } from "./call-diagnosis";
 
 export function CallDiagnosisPanel({ audio }: { audio: CallAudioReport }) {
+    const t = useTranslations("chat");
     if (audio.ok || !audio.headline) return null;
 
     const theirs = audio.blame === "theirs";
@@ -48,7 +50,7 @@ export function CallDiagnosisPanel({ audio }: { audio: CallAudioReport }) {
         <section
             role="status"
             aria-label={
-                theirs ? "What is happening at the other end" : "Why this call has no sound"
+                theirs ? t("diagnosis.whatIsHappeningAtThe") : t("diagnosis.whyThisCallHasNo")
             }
             className={cn(
                 "flex flex-col gap-2 rounded-md border px-3 py-2 text-xs",
@@ -71,7 +73,7 @@ export function CallDiagnosisPanel({ audio }: { audio: CallAudioReport }) {
                 may have very few to spare. */}
             <details className="pl-[1.375rem]">
                 <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground">
-                    What was checked
+                    {t("diagnosis.whatWasChecked")}
                 </summary>
             <dl className="mt-1 flex flex-col gap-1">
                 {audio.lines.map((line) => (

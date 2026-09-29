@@ -30,6 +30,7 @@
 
 import { withCameraDevice } from "./camera-device";
 import { useCallback, useEffect, useState } from "react";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 /** A rung, once auto has resolved to one. */
 export type CallLevel = "low" | "medium" | "high" | "max";
@@ -49,10 +50,12 @@ export interface QualityRung {
     readonly height?: number;
     readonly frameRate: number;
     readonly maxBitrate: number;
-    /** What the reader sees on the bar. */
-    readonly label: string;
+    /** What the reader sees on the bar, as a key of the chat catalog. */
+    readonly label: NamespaceKey<"chat">;
     /** The size, said plainly, for the line under the bar. */
     readonly detail: string;
+    /** The same, when it has words in it rather than only numbers. */
+    readonly detailKey?: NamespaceKey<"chat">;
 }
 
 export interface QualityLadder {
@@ -81,7 +84,7 @@ export const CAMERA_LADDER: QualityLadder = {
             height: 180,
             frameRate: 20,
             maxBitrate: 250_000,
-            label: "Low",
+            label: "callQuality.low",
             detail: "180p"
         },
         medium: {
@@ -89,7 +92,7 @@ export const CAMERA_LADDER: QualityLadder = {
             height: 360,
             frameRate: 24,
             maxBitrate: 800_000,
-            label: "Medium",
+            label: "callQuality.medium",
             detail: "360p"
         },
         high: {
@@ -97,7 +100,7 @@ export const CAMERA_LADDER: QualityLadder = {
             height: 720,
             frameRate: 30,
             maxBitrate: 2_500_000,
-            label: "High",
+            label: "callQuality.high",
             detail: "720p"
         },
         max: {
@@ -105,7 +108,7 @@ export const CAMERA_LADDER: QualityLadder = {
             height: 1080,
             frameRate: 30,
             maxBitrate: 5_000_000,
-            label: "Highest",
+            label: "callQuality.highest",
             detail: "1080p"
         }
     },
@@ -134,7 +137,7 @@ export const SCREEN_LADDER: QualityLadder = {
             height: 720,
             frameRate: 5,
             maxBitrate: 800_000,
-            label: "Low",
+            label: "callQuality.low",
             detail: "720p, 5 fps"
         },
         medium: {
@@ -142,7 +145,7 @@ export const SCREEN_LADDER: QualityLadder = {
             height: 1080,
             frameRate: 15,
             maxBitrate: 3_000_000,
-            label: "Medium",
+            label: "callQuality.medium",
             detail: "1080p, 15 fps"
         },
         high: {
@@ -150,14 +153,15 @@ export const SCREEN_LADDER: QualityLadder = {
             height: 1080,
             frameRate: 30,
             maxBitrate: 6_000_000,
-            label: "High",
+            label: "callQuality.high",
             detail: "1080p, 30 fps"
         },
         max: {
             frameRate: 30,
             maxBitrate: 10_000_000,
-            label: "Highest",
-            detail: "Full size, 30 fps"
+            label: "callQuality.highest",
+            detail: "Full size, 30 fps",
+            detailKey: "callQuality.fullSize"
         }
     },
     ceiling: "max",

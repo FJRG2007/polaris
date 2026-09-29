@@ -7,15 +7,17 @@
  */
 
 import { EmptyState } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { MessageCircle } from "lucide-react";
 
 export default function ChatIndexPage() {
+    const t = useTranslations("chat");
     return (
         <div className="flex flex-1 items-center justify-center p-6">
             <EmptyState
                 icon={<MessageCircle />}
-                title="Pick a conversation."
-                description="Or start one: a direct message to somebody, or a space with channels in it."
+                title={t("home.pickAConversation")}
+                description={t("home.orStartOneADirect")}
             />
         </div>
     );

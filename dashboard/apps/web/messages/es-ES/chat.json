@@ -154,7 +154,8 @@
         "notDone": "No se pudo hacer",
         "notCreated": "No se pudo crear",
         "pickToInvite": "Elige a quién invitar",
-        "notAsked": "No se pudo preguntar"
+        "notAsked": "No se pudo preguntar",
+        "callUnreachable": "No se pudo llegar a la llamada. Vuelve a intentarlo."
     },
     "media": {
         "refused": {
@@ -887,5 +888,373 @@
         "cancel": "Cancelar",
         "makeOwner": "Hacer dueño",
         "close": "Cerrar"
+    },
+    "newDirect": {
+        "newMessage": "Nuevo mensaje",
+        "onePersonOrSeveralFor": "Una persona, o varias para un grupo.",
+        "pickWhoToWriteTo": "Elige a quién escribir.",
+        "directMessage": "Directo",
+        "group": "Grupo",
+        "whoToMessage": "A quién escribir",
+        "changeTheGroupPicture": "Cambiar la imagen del grupo",
+        "addAGroupPicture": "Añadir imagen al grupo",
+        "whatThisGroupIsCalled": "Cómo se llama el grupo",
+        "cancel": "Cancelar",
+        "startGroup": "Crear grupo"
+    },
+    "report": {
+        "reportThisMessage": "Denunciar mensaje",
+        "itHasGoneToWhoever": "Ha llegado a quien gestiona esta instancia. No se avisa a nadie de la conversación.",
+        "thereIsNothingHereFor": "Aquí no hay nada que decida un moderador.",
+        "itGoesToWhoeverRuns": "Llega a quien gestiona esta instancia. No se avisa a nadie de la conversación de que lo has denunciado.",
+        "whatIsWrongWithIt": "Qué le pasa",
+        "anythingElseOptional": "Algo más (opcional)",
+        "whatShouldWhoeverReadsThis": "¿Qué debería saber quien lo lea?",
+        "done": "Hecho",
+        "close": "Cerrar",
+        "cancel": "Cancelar",
+        "report": "Denunciar"
+    },
+    "forward": {
+        "forwardThisMessage": "Reenviar mensaje",
+        "itArrivesQuotedSoWho": "Llega citado, así que quién lo dijo y cuándo va con él.",
+        "findAPersonAGroup": "Busca una persona, un grupo o un canal",
+        "back": "Volver",
+        "nothingMatchesThat": "Nada coincide.",
+        "nothingToForwardToYet": "Aún no hay a dónde reenviar.",
+        "saySomethingAboutItOptional": "Di algo sobre él (opcional)",
+        "saySomethingAboutIt": "Di algo sobre él",
+        "cancel": "Cancelar",
+        "forward": "Reenviar",
+        "forwardTo": "Reenviar a {count}"
+    },
+    "voiceNote": {
+        "pause": "Pausar",
+        "playThisMessage": "Reproducir mensaje",
+        "skipToAPointIn": "Saltar a un punto del mensaje",
+        "position": "Posición",
+        "playbackSpeed": "Velocidad",
+        "volume": "Volumen",
+        "recordingsVolume": "Volumen de audios",
+        "everyRecordingInEveryConversation": "Todas las grabaciones de todas las conversaciones, en este dispositivo.",
+        "speed": "Reproduciendo a {speed}x. Pulsa para cambiar.",
+        "volumePercent": "Volumen, {value} por ciento"
+    },
+    "scheduledBar": {
+        "aScheduledMessageCouldNot": "Un mensaje programado no se pudo enviar",
+        "seeThem": "Verlos",
+        "waitingToBeSent": "Pendientes de envío",
+        "onlyYouCanSeeThese": "Solo tú los ves. Nada está en la conversación hasta que sale.",
+        "sendNow": "Enviar ya",
+        "delete": "Borrar",
+        "failedMany": "{count} mensajes programados no se pudieron enviar",
+        "scheduledFor": "Programado para el {date}",
+        "scheduledMany": "{count} programados, el próximo el {date}",
+        "sends": "Se envía el {date}"
+    },
+    "messageInfo": {
+        "messageInformation": "Información del mensaje",
+        "howFarThisMessageGot": "Hasta dónde llegó este mensaje.",
+        "looking": "Buscando",
+        "thereIsNothingToShow": "Ya no hay nada que mostrar de este mensaje.",
+        "sent": "Enviado",
+        "delivered": "Entregado",
+        "read": "Leído",
+        "theTimeWasNotRecorded": "No se registró la hora.",
+        "notYet": "Todavía no."
+    },
+    "savedDrafts": {
+        "savedDrafts": "Borradores",
+        "onlyYouCanSeeThese": "Solo tú los ves, y solo en este navegador. Cada uno se guarda 30 días.",
+        "restore": "Recuperar",
+        "delete": "Borrar",
+        "one": "Un borrador guardado: {excerpt}",
+        "many": "{count} borradores guardados",
+        "see": "{count, plural, one {Verlo} other {Verlos}}",
+        "savedAt": "Guardado el {date}"
+    },
+    "recording": {
+        "recordingReady": "Grabación lista",
+        "sendItToTheConversation": "Envíala a la conversación para que la tengan todos los que estuvieron en la llamada, o guárdala aquí.",
+        "thisMeetingHasNoConversation": "Esta reunión no tiene conversación donde ponerla, así que se queda en este equipo cuando la guardes.",
+        "discard": "Descartar",
+        "download": "Descargar",
+        "sending": "Enviando",
+        "sendToTheConversation": "Enviar a la conversación"
+    },
+    "pollCard": {
+        "pollClosed": "Cerrada",
+        "pickAsManyAsApply": "Elige todas las que encajen",
+        "pickOne": "Elige una",
+        "closedEarly": "Cerrada antes",
+        "closed": "Cerrada",
+        "openUntilItIsClosed": "Abierta hasta que se cierre",
+        "resultsShowWhenItCloses": "Resultados al cerrarse",
+        "savingYourVote": "Guardando tu voto",
+        "closing": "Cerrando...",
+        "endPoll": "Cerrar",
+        "votes": "{count, plural, one {1 voto} other {{count} votos}}",
+        "closes": "Se cierra <time></time>"
+    },
+    "newSpace": {
+        "newSpace": "Otro espacio",
+        "aSpaceHoldsChannelsIt": "Un espacio tiene canales. Empieza con uno llamado general.",
+        "spaceName": "Nombre",
+        "engineering": "Ingeniería",
+        "whoIsInIt": "Quién está",
+        "inviteOnly": "Con invitación",
+        "everybodyHere": "Todos aquí",
+        "onlyThePeopleYouAdd": "Solo lo ven las personas que añadas.",
+        "everybodySignedInToPolaris": "Todos los que inician sesión en Polaris están dentro sin que se les añada.",
+        "cancel": "Cancelar",
+        "createSpace": "Crear espacio",
+        "everybodyInOrg": "Todos en {name} están dentro sin que se les añada.",
+        "thisOrganization": "esta organización"
+    },
+    "serverRail": {
+        "directMessages": "Mensajes directos",
+        "newSpace": "Otro espacio",
+        "invitePeople": "Invitar a gente",
+        "newChannel": "Nuevo canal",
+        "spacePicture": "Imagen de espacio",
+        "teamsAndRoles": "Equipos y roles",
+        "keptOut": "Vetados",
+        "leaveThisSpace": "Salir del espacio"
+    },
+    "leave": {
+        "leaveQuietly": "Salir sin avisar",
+        "leaveWithoutNotifyingOtherMembers": "Salir sin avisar a los demás miembros.",
+        "stay": "Seguir",
+        "leaving": "Saliendo...",
+        "group": {
+            "title": "¿Salir de este grupo?",
+            "description": "Desaparece de tu lista y dejas de recibir sus mensajes. Cualquiera que siga dentro puede volver a añadirte.",
+            "confirm": "Salir"
+        },
+        "space": {
+            "title": "¿Salir de este espacio?",
+            "description": "Pierdes todos sus canales, también los que te añadieron a mano. Para volver hace falta otra invitación.",
+            "confirm": "Salir"
+        }
+    },
+    "personCard": {
+        "editProfile": "Editar perfil",
+        "message": "Mensaje",
+        "more": "Más",
+        "viewFullProfile": "Ver perfil completo",
+        "openProfilePage": "Abrir perfil",
+        "actionsFor": "Qué puedes hacer con {name}"
+    },
+    "inviteView": {
+        "thatInvitationDoesNotLead": "Esa invitación no lleva a ninguna parte.",
+        "itMayHaveBeenWithdrawn": "Puede que se haya retirado, o que el espacio al que apuntaba ya no exista.",
+        "youHaveBeenInvited": "Te han invitado.",
+        "openIt": "Abrir",
+        "thisInvitationHasRunOut": "Esta invitación se ha agotado. Pide otra a quien te la envió.",
+        "invitedBy": "{name} te ha invitado.",
+        "join": "Entrar en {name}"
+    },
+    "editHistory": {
+        "editHistory": "Historial",
+        "whatThisMessageSaidBefore": "Lo que decía este mensaje antes de cambiarlo.",
+        "readingItBack": "Leyéndolo",
+        "now": "Ahora",
+        "nothingEarlierWasRecordedFor": "No se registró nada anterior de este.",
+        "earlierVersionsAreNotKept": "En este tipo de conversación no se guardan versiones anteriores.",
+        "until": "Hasta <time></time>"
+    },
+    "directProfile": {
+        "more": "Más",
+        "profile": "Perfil",
+        "profileWidth": "Ancho",
+        "closeTheProfile": "Cerrar el perfil",
+        "close": "Cerrar"
+    },
+    "hands": {
+        "you": "Tú",
+        "lowerIt": "Bajarla",
+        "lowerAll": "Bajar todas",
+        "lowerNamed": "Bajar la mano de {name}",
+        "lowerMine": "Bajar la mía",
+        "lowerMyHand": "Bajar mi mano"
+    },
+    "sendButton": {
+        "send": "Enviar",
+        "moreWaysToSend": "Más formas de enviar",
+        "scheduleMessage": "Programar mensaje",
+        "saveAsDraft": "Guardar borrador"
+    },
+    "nickname": {
+        "whatYouCallThem": "Cómo le llamas",
+        "leaveItEmptyToUse": "Déjalo vacío para usar su propio nombre",
+        "onlyYouSeeThisThey": "Solo lo ves tú. No se le avisa, y los demás siguen viendo su propio nombre.",
+        "cancel": "Cancelar",
+        "save": "Guardar"
+    },
+    "callModeration": {
+        "moderation": "Moderación",
+        "serverUnmute": "Quitar silencio",
+        "serverMute": "Silenciar",
+        "serverUndeafen": "Dejarle oír",
+        "serverDeafen": "Ensordecer",
+        "disconnect": "Desconectar"
+    },
+    "meetingDetails": {
+        "meetingDetails": "Detalles",
+        "whatItIsAbout": "De qué va",
+        "when": "Cuándo",
+        "clearItForARoom": "Déjalo vacío para una sala abierta siempre que tú lo estés. El enlace no cambia en ningún caso.",
+        "cancel": "Cancelar",
+        "save": "Guardar"
+    },
+    "meetingChat": {
+        "meetingChat": "Chat",
+        "nothingSaidHereYetAnything": "Aún no se ha dicho nada. Lo que se escriba se va cuando termine la reunión.",
+        "saySomething": "Di algo",
+        "theAnswersAreHiddenUntil": "Las respuestas se ocultan hasta el cierre",
+        "closeIt": "Cerrarla",
+        "answers": "{count, plural, one {1 respuesta} other {{count} respuestas}}"
+    },
+    "callPreview": {
+        "callInProgress": "Llamada en curso",
+        "hideTheCall": "Ocultar llamada",
+        "hideTheCallItKeeps": "Ocultar la llamada - sigue en marcha y vuelve la conversación",
+        "join": "Entrar",
+        "withVideo": "Con vídeo",
+        "show": "Mostrar"
+    },
+    "saved": {
+        "backToConversations": "Volver a conversaciones",
+        "saved": "Guardado",
+        "nothingSaved": "Nada guardado.",
+        "hoverAMessageAndPress": "Pasa por encima de un mensaje y pulsa la estrella para guardarlo. Solo lo ves tú.",
+        "removeFromSaved": "Quitar de guardados"
+    },
+    "elsewhere": {
+        "thatCallCouldNotBe": "No se pudo llegar a esa llamada.",
+        "youAreInACall": "Estás en una llamada en otro dispositivo",
+        "movingItHereHangsUp": "Traerla aquí la cuelga allí. Una llamada está en un sitio a la vez.",
+        "moving": "Moviendo",
+        "moveItHere": "Traerla aquí",
+        "leaveIt": "Dejarla"
+    },
+    "bans": {
+        "lettingSomebodyBackInAllows": "Dejar volver a alguien le permite regresar. No le vuelve a meter - eso lo decide él.",
+        "nobodyIsKeptOut": "No hay nadie vetado.",
+        "banningSomebodyFromThisSpace": "Vetar a alguien de este espacio lo pone aquí, para poder dejarle volver.",
+        "noReasonGiven": "Sin motivo",
+        "letBackIn": "Dejar volver",
+        "title": "Vetados de {name}"
+    },
+    "addPeople": {
+        "addPeople": "Añadir gente",
+        "theyJoinTheGroupAnd": "Entran en el grupo y pueden leer todo lo que ya se ha dicho.",
+        "theyWillSeeThisChannel": "Verán este canal y todo lo que ya se ha dicho en él.",
+        "anybodyInTheSpaceCan": "Cualquiera del espacio ya puede leer este canal. Añadirle lo pone en su lista.",
+        "cancel": "Cancelar",
+        "add": "Añadir"
+    },
+    "picture": {
+        "spacePicture": "Imagen de espacio",
+        "groupPicture": "Imagen del grupo",
+        "shownInTheColumnOn": "Se muestra en la columna de la izquierda, en lugar de las iniciales.",
+        "shownWhereverThisConversationAppears": "Se muestra donde aparezca esta conversación. Sin ella, las caras de quienes están.",
+        "pngJpegWebpOrGif": "PNG, JPEG, WebP o GIF. Tú eliges qué parte se usa."
+    },
+    "micSettings": {
+        "microphone": "Micrófono",
+        "backgroundNoise": "Ruido de fondo",
+        "microphoneVolume": "Volumen del micro",
+        "howLoudYouGoOut": "Con cuánto volumen sales. Súbelo si te dicen que se te oye bajo."
+    },
+    "members": {
+        "owner": "Dueño",
+        "membersListWidth": "Ancho de miembros",
+        "hideTheMembers": "Ocultar miembros"
+    },
+    "thread": {
+        "threadWidth": "Ancho del hilo",
+        "thread": "Hilo",
+        "closeTheThread": "Cerrar el hilo",
+        "replyInThisThread": "Responder en el hilo"
+    },
+    "spoiler": {
+        "showTheHiddenText": "Mostrar el texto oculto",
+        "spoiler": "Spoiler",
+        "showThis": "Mostrar {kind, select, picture {esta imagen} video {este vídeo} file {este archivo} text {este texto} content {este contenido} other {{kind}}}"
+    },
+    "noAudio": {
+        "yourMicrophoneHasNotPicked": "Tu micrófono lleva un rato sin captar nada. Comprueba que no esté silenciado en el propio equipo y que esté elegido el correcto en Cuenta > Dispositivos.",
+        "dismiss": "Cerrar"
+    },
+    "openDirect": {
+        "noConversationToOpen": "No hay conversación que abrir.",
+        "backToConversations": "Volver a conversaciones"
+    },
+    "home": {
+        "pickAConversation": "Elige una conversación.",
+        "orStartOneADirect": "O empieza una: un mensaje directo a alguien, o un espacio con canales."
+    },
+    "micLevel": {
+        "microphoneLevel": "Nivel del micro",
+        "anythingPastThisCountsAs": "Lo que pase de aquí cuenta como que hablas"
+    },
+    "profileDetails": {
+        "about": "Sobre mí"
+    },
+    "notifyMenu": {
+        "notifications": "Avisos"
+    },
+    "elsewhereLabel": {
+        "somewhereElse": "En otro sitio"
+    },
+    "shell": {
+        "conversationListWidth": "Ancho de la lista"
+    },
+    "callAudio": {
+        "pressToHearTheCall": "Pulsa para oír la llamada"
+    },
+    "roster": {
+        "sharingAScreen": "Comparte pantalla",
+        "live": "Directo",
+        "inTheCall": "En la llamada"
+    },
+    "muteMenu": {
+        "unmute": "Activar",
+        "mute": "Apagar",
+        "unmuteUntil": "Activar (en silencio hasta las {time})"
+    },
+    "diagnosis": {
+        "whatIsHappeningAtThe": "Qué pasa en el otro extremo",
+        "whyThisCallHasNo": "Por qué la llamada no suena",
+        "whatWasChecked": "Qué se ha comprobado"
+    },
+    "linkCard": {
+        "play": "Reproducir en {provider}, aquí",
+        "playHint": "Se reproduce aquí. {provider} te ve en cuanto lo pulsas."
+    },
+    "gameLink": {
+        "server": "el servidor de {game} {name}",
+        "linkedTo": "Vinculado a {servers}",
+        "and": " y ",
+        "open": "{label}. Abrir su página."
+    },
+    "audioFormats": {
+        "mp3": "MP3",
+        "wav": "WAV",
+        "original": "Original"
+    },
+    "callQuality": {
+        "low": "Baja",
+        "medium": "Media",
+        "high": "Alta",
+        "highest": "Máxima",
+        "fullSize": "Tamaño real, 30 fps"
+    },
+    "devices": {
+        "cameraN": "Cámara {n}",
+        "microphoneN": "Micrófono {n}",
+        "systemDefault": "Predeterminado",
+        "outputN": "Salida {n}"
     }
 }

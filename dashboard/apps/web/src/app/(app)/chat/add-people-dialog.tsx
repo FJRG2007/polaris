@@ -9,6 +9,7 @@
  */
 
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
@@ -35,6 +36,7 @@ export function AddPeopleDialog({
     channel: ChatChannelView;
     onAdded: () => void;
 }) {
+    const t = useTranslations("chat");
     const [already, setAlready] = useState<readonly string[]>([]);
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [busy, setBusy] = useState(false);
@@ -69,13 +71,13 @@ export function AddPeopleDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add people</DialogTitle>
+                    <DialogTitle>{t("addPeople.addPeople")}</DialogTitle>
                     <DialogDescription>
                         {channel.kind === "group"
-                            ? "They join the group and can read everything already said in it."
+                            ? t("addPeople.theyJoinTheGroupAnd")
                             : channel.private
-                              ? "They will see this channel and everything already said in it."
-                              : "Anybody in the space can already read this channel. Adding them puts it in their list."}
+                              ? t("addPeople.theyWillSeeThisChannel")
+                              : t("addPeople.anybodyInTheSpaceCan")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -94,7 +96,7 @@ export function AddPeopleDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {t("addPeople.cancel")}
                     </Button>
                     <Button
                         size="sm"
@@ -102,7 +104,7 @@ export function AddPeopleDialog({
                         onClick={() => void add()}
                     >
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        Add
+                        {t("addPeople.add")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

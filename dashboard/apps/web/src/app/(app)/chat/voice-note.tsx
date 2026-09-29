@@ -21,6 +21,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useAudioVolume } from "./audio-volume";
 import { useEffect, useRef, useState } from "react";
 import { barsOf, spokenLength } from "./voice-recorder";
@@ -78,6 +79,7 @@ export function VoiceNote({
     durationMs: number | null;
     waveform: string | null;
 }) {
+    const t = useTranslations("chat");
     const audio = useRef<HTMLAudioElement | null>(null);
     const [playing, setPlaying] = useState(false);
     const [at, setAt] = useState(0);
@@ -235,7 +237,7 @@ export function VoiceNote({
                 <button
                     type="button"
                     onClick={toggle}
-                    aria-label={playing ? "Pause" : "Play this message"}
+                    aria-label={playing ? t("voiceNote.pause") : t("voiceNote.playThisMessage")}
                     className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform hover:scale-105"
                 >
                     {playing ? (
@@ -257,7 +259,7 @@ export function VoiceNote({
                     // stops a scrub getting stuck on a fast movement.
                     <button
                         type="button"
-                        aria-label="Skip to a point in this message"
+                        aria-label={t("voiceNote.skipToAPointIn")}
                         onPointerDown={(event) => {
                             scrubbing.current = true;
                             event.currentTarget.setPointerCapture(event.pointerId);
@@ -304,7 +306,7 @@ export function VoiceNote({
                         step={0.05}
                         value={at}
                         disabled={length === 0}
-                        aria-label="Position"
+                        aria-label={t("voiceNote.position")}
                         onChange={(event) => seekTo(Number(event.target.value) / (length || 1))}
                         style={{ backgroundSize: `${done * 100}% 100%` }}
                         className={cn(
@@ -325,8 +327,8 @@ export function VoiceNote({
                 <button
                     type="button"
                     onClick={faster}
-                    aria-label={`Playing at ${speed} times speed. Press to change.`}
-                    title="Playback speed"
+                    aria-label={t("voiceNote.speed", { speed })}
+                    title={t("voiceNote.playbackSpeed")}
                     className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[0.625rem] font-medium tabular-nums text-muted-foreground transition-colors hover:bg-card-hover"
                 >
                     {speed}x
@@ -340,8 +342,8 @@ export function VoiceNote({
                     <DropdownMenuTrigger asChild>
                         <button
                             type="button"
-                            aria-label={`Volume, ${Math.round(volume * 100)} per cent`}
-                            title="Volume"
+                            aria-label={t("voiceNote.volumePercent", { value: Math.round(volume * 100) })}
+                            title={t("voiceNote.volume")}
                             className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
                         >
                             {volume === 0 ? (
@@ -356,7 +358,7 @@ export function VoiceNote({
                     <DropdownMenuContent align="end" side="top" className="w-56 p-3">
                         <span className="flex items-center justify-between gap-2 pb-2 text-xs">
                             <span className="font-medium text-foreground-subtle">
-                                Recordings volume
+                                {t("voiceNote.recordingsVolume")}
                             </span>
                             <span className="tabular-nums text-muted-foreground">
                                 {Math.round(volume * 100)}%
@@ -368,12 +370,12 @@ export function VoiceNote({
                             max={100}
                             step={5}
                             value={Math.round(volume * 100)}
-                            aria-label="Recordings volume"
+                            aria-label={t("voiceNote.recordingsVolume")}
                             onChange={(event) => setVolume(Number(event.target.value) / 100)}
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-primary"
                         />
                         <p className="pt-2 text-[0.6875rem] text-muted-foreground">
-                            Every recording in every conversation, on this device.
+                            {t("voiceNote.everyRecordingInEveryConversation")}
                         </p>
                     </DropdownMenuContent>
                 </DropdownMenu>

@@ -17,6 +17,7 @@
  */
 
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
@@ -62,6 +63,7 @@ export function MeetingDetailsDialog({
     onSaved: () => void | Promise<void>;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("chat");
     const [name, setName] = useState(title);
     const [when, setWhen] = useState(() => toLocalInput(scheduledAt));
     const [busy, setBusy] = useState(false);
@@ -101,38 +103,37 @@ export function MeetingDetailsDialog({
         <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Meeting details</DialogTitle>
+                    <DialogTitle>{t("meetingDetails.meetingDetails")}</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs font-medium">
-                            Name<span className="text-danger"> *</span>
+                            {t("meetings.name")}<span className="text-danger"> *</span>
                         </span>
                         <Input
                             autoFocus
                             value={name}
                             maxLength={MAX_MEETING_TITLE}
-                            placeholder="What it is about"
+                            placeholder={t("meetingDetails.whatItIsAbout")}
                             onChange={(event) => setName(event.target.value)}
                         />
                     </label>
 
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium">When</span>
+                        <span className="text-xs font-medium">{t("meetingDetails.when")}</span>
                         <Input
                             type="datetime-local"
                             value={when}
                             onChange={(event) => setWhen(event.target.value)}
                         />
                         <span className="text-[0.6875rem] text-muted-foreground">
-                            Clear it for a room that is open whenever you are. The link does not
-                            change either way.
+                            {t("meetingDetails.clearItForARoom")}
                         </span>
                     </label>
                 </div>
                 <DialogFooter>
                     <Button variant="secondary" size="sm" onClick={onClose}>
-                        Cancel
+                        {t("meetingDetails.cancel")}
                     </Button>
                     <Button
                         size="sm"
@@ -140,7 +141,7 @@ export function MeetingDetailsDialog({
                         onClick={() => void save()}
                     >
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        Save
+                        {t("meetingDetails.save")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

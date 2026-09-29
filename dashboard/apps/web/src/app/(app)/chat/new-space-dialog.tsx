@@ -10,6 +10,7 @@
  */
 
 import { useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Loader2 } from "lucide-react";
 import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
@@ -36,6 +37,7 @@ export function NewSpaceDialog({
     onOpenChange: (open: boolean) => void;
     onCreated: () => void;
 }) {
+    const t = useTranslations("chat");
     const router = useRouter();
     const { orgId, orgName } = useChat();
     const [name, setName] = useState("");
@@ -62,9 +64,9 @@ export function NewSpaceDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>New space</DialogTitle>
+                    <DialogTitle>{t("newSpace.newSpace")}</DialogTitle>
                     <DialogDescription>
-                        A space holds channels. It starts with one called general.
+                        {t("newSpace.aSpaceHoldsChannelsIt")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -72,8 +74,8 @@ export function NewSpaceDialog({
                     <Input
                         value={name}
                         autoFocus
-                        aria-label="Space name"
-                        placeholder="Engineering"
+                        aria-label={t("newSpace.spaceName")}
+                        placeholder={t("newSpace.engineering")}
                         maxLength={60}
                         onChange={(event) => setName(event.target.value)}
                         onKeyDown={(event) => {
@@ -84,18 +86,18 @@ export function NewSpaceDialog({
                     <SegmentedControl
                         value={visibility}
                         onValueChange={setVisibility}
-                        aria-label="Who is in it"
+                        aria-label={t("newSpace.whoIsInIt")}
                         options={[
-                            { value: "private", label: "Invite only" },
-                            { value: "internal", label: "Everybody here" }
+                            { value: "private", label: t("newSpace.inviteOnly") },
+                            { value: "internal", label: t("newSpace.everybodyHere") }
                         ]}
                     />
                     <p className="text-xs text-muted-foreground">
                         {visibility === "private"
-                            ? "Only the people you add can see it."
+                            ? t("newSpace.onlyThePeopleYouAdd")
                             : orgId
-                              ? `Everybody in ${orgName ?? "this organization"} is in it, without being added.`
-                              : "Everybody signed in to Polaris is in it, without being added."}
+                              ? t("newSpace.everybodyInOrg", { name: orgName ?? t("newSpace.thisOrganization") })
+                              : t("newSpace.everybodySignedInToPolaris")}
                     </p>
 
                     {error && (
@@ -107,11 +109,11 @@ export function NewSpaceDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {t("newSpace.cancel")}
                     </Button>
                     <Button size="sm" disabled={busy || !name.trim()} onClick={() => void create()}>
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        Create space
+                        {t("newSpace.createSpace")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

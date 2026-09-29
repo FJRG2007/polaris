@@ -14,6 +14,7 @@
  */
 
 import { useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { runAction } from "@/lib/run-action";
 import { BlockAfterReport } from "@/components/block-after-report";
 import { reportMessageAction } from "./actions";
@@ -58,6 +59,7 @@ export function ReportDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("chat");
     const nothingToReport = isPleasantry(body);
     const [reason, setReason] = useState<ChatReportReason>("spam");
     const [note, setNote] = useState("");
@@ -93,13 +95,13 @@ export function ReportDialog({
         <Dialog open={open} onOpenChange={close}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Report this message</DialogTitle>
+                    <DialogTitle>{t("report.reportThisMessage")}</DialogTitle>
                     <DialogDescription>
                         {sent
-                            ? "It has gone to whoever runs this instance. Nobody in the conversation is told."
+                            ? t("report.itHasGoneToWhoever")
                             : nothingToReport
-                              ? "There is nothing here for a moderator to decide about."
-                              : "It goes to whoever runs this instance. Nobody in the conversation is told you reported it."}
+                              ? t("report.thereIsNothingHereFor")
+                              : t("report.itGoesToWhoeverRuns")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -114,7 +116,7 @@ export function ReportDialog({
                 {!sent && !nothingToReport && (
                     <div className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">What is wrong with it</span>
+                            <span className="font-medium">{t("report.whatIsWrongWithIt")}</span>
                             <Select
                                 value={reason}
                                 onValueChange={(next) => setReason(next as ChatReportReason)}
@@ -122,17 +124,17 @@ export function ReportDialog({
                                     value: entry,
                                     label: CHAT_REPORT_LABELS[entry]
                                 }))}
-                                aria-label="What is wrong with it"
+                                aria-label={t("report.whatIsWrongWithIt")}
                             />
                         </label>
 
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Anything else (optional)</span>
+                            <span className="font-medium">{t("report.anythingElseOptional")}</span>
                             <Textarea
                                 value={note}
                                 rows={3}
                                 maxLength={MAX_CHAT_REPORT_NOTE}
-                                placeholder="What should whoever reads this know?"
+                                placeholder={t("report.whatShouldWhoeverReadsThis")}
                                 onChange={(event) => setNote(event.target.value)}
                             />
                         </label>
@@ -150,7 +152,7 @@ export function ReportDialog({
                         variant={sent ? "primary" : "ghost"}
                         onClick={() => close(false)}
                     >
-                        {sent ? "Done" : nothingToReport ? "Close" : "Cancel"}
+                        {sent ? t("report.done") : nothingToReport ? t("report.close") : t("report.cancel")}
                     </Button>
                     {!sent && !nothingToReport && (
                         <Button
@@ -159,7 +161,7 @@ export function ReportDialog({
                             onClick={() => void send()}
                             className={cn(busy && "opacity-70")}
                         >
-                            Report
+                            {t("report.report")}
                         </Button>
                     )}
                 </DialogFooter>

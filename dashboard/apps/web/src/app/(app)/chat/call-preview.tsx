@@ -21,6 +21,7 @@
  */
 
 import { Button } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { LiveBadge, callBadgeOf } from "./call-roster";
 import { Avatar } from "@/components/avatar";
 import { Mic, Video, X } from "lucide-react";
@@ -56,13 +57,14 @@ export function CallPreview({
     /** Put it away. The line it leaves behind is what brings it back. */
     onHide: () => void;
 }) {
+    const t = useTranslations("chat");
     return (
         // The same frame the call draws once somebody is in it - a band over the
         // conversation, the faces in the middle of it and the way in under
         // them - so joining changes what the band holds rather than what it
         // looks like.
         <section
-            aria-label="Call in progress"
+            aria-label={t("callPreview.callInProgress")}
             className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3"
         >
             <div className="flex items-center gap-2">
@@ -72,8 +74,8 @@ export function CallPreview({
                 <button
                     type="button"
                     onClick={onHide}
-                    aria-label="Hide the call"
-                    title="Hide the call - it keeps going, and the conversation comes back"
+                    aria-label={t("callPreview.hideTheCall")}
+                    title={t("callPreview.hideTheCallItKeeps")}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <X className="size-4" />
@@ -112,7 +114,7 @@ export function CallPreview({
                 <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
                     <Button size="sm" disabled={busy} onClick={() => onJoin(false)}>
                         <Mic className="size-3.5" />
-                        Join
+                        {t("callPreview.join")}
                     </Button>
                     <Button
                         size="sm"
@@ -121,7 +123,7 @@ export function CallPreview({
                         onClick={() => onJoin(true)}
                     >
                         <Video className="size-3.5" />
-                        With video
+                        {t("callPreview.withVideo")}
                     </Button>
                 </div>
             )}
@@ -149,16 +151,17 @@ export function CallPreviewLine({
     onJoin: (withVideo: boolean) => void;
     onShow: () => void;
 }) {
+    const t = useTranslations("chat");
     return (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-2">
             <span className="min-w-0 flex-1 truncate text-sm">{callSummary(count)}</span>
             <Button size="xs" variant="ghost" onClick={onShow}>
-                Show
+                {t("callPreview.show")}
             </Button>
             {canJoin && (
                 <Button size="xs" disabled={busy} onClick={() => onJoin(false)}>
                     <Mic className="size-3.5" />
-                    Join
+                    {t("callPreview.join")}
                 </Button>
             )}
         </div>

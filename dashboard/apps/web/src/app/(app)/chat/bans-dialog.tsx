@@ -15,6 +15,7 @@
  */
 
 import * as actions from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
@@ -41,6 +42,7 @@ export function BansDialog({
     space: { id: string; name: string } | null;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("chat");
     const [bans, setBans] = useState<readonly ChatBanView[] | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState("");
@@ -74,10 +76,9 @@ export function BansDialog({
             <Dialog open={space !== null} onOpenChange={onOpenChange}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Kept out of {space?.name}</DialogTitle>
+                        <DialogTitle>{t("bans.title", { name: space?.name ?? "" })}</DialogTitle>
                         <DialogDescription>
-                            Letting somebody back in allows them to return. It does not put them back in
-                            - that is theirs to decide.
+                            {t("bans.lettingSomebodyBackInAllows")}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -92,8 +93,8 @@ export function BansDialog({
                         </div>
                     ) : bans.length === 0 ? (
                         <EmptyState
-                            title="Nobody is kept out."
-                            description="Banning somebody from this space puts them here, so they can be let back in."
+                            title={t("bans.nobodyIsKeptOut")}
+                            description={t("bans.banningSomebodyFromThisSpace")}
                         />
                     ) : (
                         <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto overscroll-contain">
@@ -110,7 +111,7 @@ export function BansDialog({
                                             <PersonName id={ban.userId} name={ban.name} />
                                         </span>
                                         <span className="truncate text-[0.6875rem] text-muted-foreground">
-                                            {ban.reason || "No reason given"}
+                                            {ban.reason || t("bans.noReasonGiven")}
                                             {ban.byName ? ` - ${ban.byName}` : ""},{" "}
                                             <RelativeTime iso={ban.at} />
                                         </span>
@@ -121,7 +122,7 @@ export function BansDialog({
                                         disabled={busy !== null}
                                         onClick={() => void lift(ban.userId)}
                                     >
-                                        Let back in
+                                        {t("bans.letBackIn")}
                                     </Button>
                                 </PersonRow>
                             ))}

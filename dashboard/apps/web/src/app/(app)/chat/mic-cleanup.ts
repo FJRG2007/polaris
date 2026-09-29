@@ -30,6 +30,7 @@ import { micDevice } from "./mic-device";
 import { voiceSettings } from "./voice-settings";
 import type { MicFilter } from "./mic-filter";
 import { useCallback, useEffect, useState } from "react";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 const KEY = "polaris.call.mic-cleanup";
 
@@ -47,23 +48,11 @@ const LEVELS: readonly MicFilter[] = ["off", "standard", "enhanced", "licensed"]
  * Written as what each one does to the room rather than as what it is: nobody
  * choosing a microphone setting wants to be told the name of a model.
  */
-export const NOISE_LEVELS: readonly { value: MicFilter; label: string; help: string }[] = [
-    {
-        value: "enhanced",
-        label: "Remove background noise",
-        help: "Keeps your voice and takes out the rest - typing, a fan, a dog, somebody talking behind you. Costs a little battery."
-    },
-    {
-        value: "standard",
-        label: "Standard",
-        help: "The browser's own echo and noise handling. Enough for a quiet room."
-    },
-    {
-        value: "licensed",
-        label: "Enhanced (licensed)",
-        help: "The filter your administrator connected."
-    },
-    { value: "off", label: "Off", help: "Send exactly what the microphone hears." }
+export const NOISE_LEVELS: readonly { value: MicFilter; label: NamespaceKey<"chat">; help: NamespaceKey<"chat"> }[] = [
+    { value: "enhanced", label: "callSettings.noise.enhanced.label", help: "callSettings.noise.enhanced.help" },
+    { value: "standard", label: "callSettings.noise.standard.label", help: "callSettings.noise.standard.help" },
+    { value: "licensed", label: "callSettings.noise.licensed.label", help: "callSettings.noise.licensed.help" },
+    { value: "off", label: "callSettings.noise.off.label", help: "callSettings.noise.off.help" }
 ];
 
 export function micCleanup(): MicFilter {

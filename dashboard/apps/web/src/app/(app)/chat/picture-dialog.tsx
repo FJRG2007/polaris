@@ -13,6 +13,7 @@
  */
 
 import { chatAvatarUrl } from "@/lib/avatar-url";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChatAvatar } from "@/components/chat-avatar";
 import type { AvatarPerson } from "@/components/avatar";
 import { PictureField } from "@/components/picture-field";
@@ -44,22 +45,23 @@ export function ChatPictureDialog({
     color?: string | null;
     onChanged: () => void;
 }) {
+    const t = useTranslations("chat");
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{kind === "space" ? "Space picture" : "Group picture"}</DialogTitle>
+                    <DialogTitle>{kind === "space" ? t("picture.spacePicture") : t("picture.groupPicture")}</DialogTitle>
                     <DialogDescription>
                         {kind === "space"
-                            ? "Shown in the column on the left, in place of the initials."
-                            : "Shown wherever this conversation appears. Without one, the faces of the people in it."}
+                            ? t("picture.shownInTheColumnOn")
+                            : t("picture.shownWhereverThisConversationAppears")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <PictureField
                     endpoint={chatAvatarUrl(kind, id)}
                     shape={kind === "space" ? TILE_CROP : FACE_CROP}
-                    hint="PNG, JPEG, WebP or GIF. You choose which part of it is used."
+                    hint={t("picture.pngJpegWebpOrGif")}
                     preview={
                         <ChatAvatar
                             kind={kind}

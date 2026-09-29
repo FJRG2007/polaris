@@ -24,6 +24,7 @@
  */
 
 import { useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Download, Send } from "lucide-react";
 import type { CallRecording } from "./call-recorder";
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@polaris/ui";
@@ -46,6 +47,7 @@ export function RecordingPanel({
     recording: CallRecording;
     channelId: string;
 }) {
+    const t = useTranslations("chat");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState("");
 
@@ -92,12 +94,12 @@ export function RecordingPanel({
         <Dialog open onOpenChange={(open) => !open && recording.discard()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Recording ready</DialogTitle>
+                    <DialogTitle>{t("recording.recordingReady")}</DialogTitle>
                     <DialogDescription>
                         {clock(recording.seconds)}, {megabytes(file.size)}.{" "}
                         {channelId
-                            ? "Send it to the conversation so everybody who was in the call has it, or keep it here."
-                            : "This meeting has no conversation to put it in, so it lives on this machine once you save it."}
+                            ? t("recording.sendItToTheConversation")
+                            : t("recording.thisMeetingHasNoConversation")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -109,16 +111,16 @@ export function RecordingPanel({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={recording.discard} disabled={sending}>
-                        Discard
+                        {t("recording.discard")}
                     </Button>
                     <Button variant="secondary" onClick={save} disabled={sending}>
                         <Download className="size-4" />
-                        Download
+                        {t("recording.download")}
                     </Button>
                     {channelId && (
                         <Button onClick={send} disabled={sending}>
                             <Send className="size-4" />
-                            {sending ? "Sending" : "Send to the conversation"}
+                            {sending ? t("recording.sending") : t("recording.sendToTheConversation")}
                         </Button>
                     )}
                 </DialogFooter>

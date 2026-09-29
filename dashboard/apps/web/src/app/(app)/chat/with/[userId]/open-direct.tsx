@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -16,6 +17,7 @@ export function OpenDirect({
      *  is, and nothing is asked again. */
     refused?: string;
 }) {
+    const t = useTranslations("chat");
     const router = useRouter();
     const [error, setError] = useState(refused ?? "");
 
@@ -41,11 +43,11 @@ export function OpenDirect({
             <div className="flex flex-1 items-center justify-center p-6">
                 <EmptyState
                     icon={<MessageCircle />}
-                    title="No conversation to open."
+                    title={t("openDirect.noConversationToOpen")}
                     description={error}
                     action={
                         <Button asChild size="sm" variant="secondary">
-                            <Link href="/chat">Back to conversations</Link>
+                            <Link href="/chat">{t("openDirect.backToConversations")}</Link>
                         </Button>
                     }
                 />

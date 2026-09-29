@@ -9,6 +9,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Play } from "lucide-react";
 import { usableAccent } from "@/lib/chat/accent";
 import { useState, useSyncExternalStore } from "react";
@@ -48,6 +49,7 @@ const assumeSecure = () => true;
  * card does not announce the reader to whoever runs the page.
  */
 export function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]> }) {
+    const t = useTranslations("chat");
     const [playing, setPlaying] = useState(false);
 
     // Twitch plays only in a page served over HTTPS (or on localhost), which is
@@ -130,8 +132,8 @@ export function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["pr
                     <button
                         type="button"
                         onClick={() => setPlaying(true)}
-                        aria-label={`Play this on ${embed.provider}, here`}
-                        title={`Plays here. ${embed.provider} sees you once you press it.`}
+                        aria-label={t("linkCard.play", { provider: embed.provider })}
+                        title={t("linkCard.playHint", { provider: embed.provider })}
                         className={cn(
                             "group/play relative overflow-hidden rounded bg-muted transition-colors hover:bg-card-hover",
                             SHAPES[embed.shape]

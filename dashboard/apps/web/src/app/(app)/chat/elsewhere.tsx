@@ -13,6 +13,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { ArrowLeftRight } from "lucide-react";
@@ -28,6 +29,7 @@ export function Elsewhere({
 }: {
     revision: unknown;
 }) {
+    const t = useTranslations("chat");
     const [chats, setChats] = useState<readonly ChatElsewhere[]>([]);
     const [pending, setPending] = useState(false);
 
@@ -57,7 +59,7 @@ export function Elsewhere({
 
     return (
         <div className="mt-3 flex flex-col gap-0.5 border-t border-border pt-3">
-            <p className="text-foreground-subtle px-2 pb-1 text-xs">Somewhere else</p>
+            <p className="text-foreground-subtle px-2 pb-1 text-xs">{t("elsewhereLabel.somewhereElse")}</p>
             {chats.map((chat) => (
                 <button
                     key={chat.orgId ?? "shared"}

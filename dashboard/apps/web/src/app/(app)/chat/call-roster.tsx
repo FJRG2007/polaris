@@ -11,6 +11,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Avatar } from "@/components/avatar";
 import { HeadphoneOff, MicOff } from "lucide-react";
 import type { VoicePresence } from "@/lib/chat/meetings";
@@ -33,17 +34,18 @@ export function callBadgeOf(person: Seated): "muted" | "deafened" | null {
  * not sent a frame of it. Watching it is joining the call and pressing it there.
  */
 export function LiveBadge({ className }: { className?: string }) {
+    const t = useTranslations("chat");
     return (
         <span
             role="img"
-            aria-label="Sharing a screen"
-            title="Sharing a screen"
+            aria-label={t("roster.sharingAScreen")}
+            title={t("roster.sharingAScreen")}
             className={cn(
                 "shrink-0 rounded bg-danger px-1 text-[0.625rem] font-bold uppercase leading-4 text-danger-foreground",
                 className
             )}
         >
-            Live
+            {t("roster.live")}
         </span>
     );
 }
@@ -75,10 +77,11 @@ export function VoiceStateIcons({ person }: { person: Seated }) {
 
 /** The faces in a call, in the order they arrived, each with its mark. */
 export function CallRoster({ people }: { people: readonly VoicePresence[] }) {
+    const t = useTranslations("chat");
     if (people.length === 0) return null;
     return (
         <ul
-            aria-label="In the call"
+            aria-label={t("roster.inTheCall")}
             className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
         >
             {people.map((person) => (

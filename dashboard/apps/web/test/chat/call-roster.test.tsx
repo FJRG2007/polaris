@@ -8,6 +8,7 @@
  * nothing when they can be heard.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { CallRoster, VoiceStateIcons, callBadgeOf } from "@/app/(app)/chat/call-roster";
@@ -51,7 +52,7 @@ describe("the roster outside a call", () => {
                     person("p2", "Grace", true, false),
                     person("p3", "Linus", true, true)
                 ]}
-            />
+            />, { wrapper: MessagesWrapper }
         );
         expect(screen.getByText("Ada")).toBeTruthy();
         expect(screen.getByText("Grace")).toBeTruthy();
@@ -60,18 +61,18 @@ describe("the roster outside a call", () => {
     });
 
     it("draws nothing for an empty room", () => {
-        const { container } = render(<CallRoster people={[]} />);
+        const { container } = render(<CallRoster people={[]} />, { wrapper: MessagesWrapper });
         expect(container.innerHTML).toBe("");
     });
 
     it("marks a row too small for a badge with an icon", () => {
-        render(<VoiceStateIcons person={{ muted: true, deafened: false }} />);
+        render(<VoiceStateIcons person={{ muted: true, deafened: false }} />, { wrapper: MessagesWrapper });
         expect(screen.getByLabelText("Microphone off")).toBeTruthy();
     });
 
     it("draws a guest from the name they gave, asking for no picture", () => {
         const { container } = render(
-            <CallRoster people={[person("s2", "Visitor", false, false)]} />
+            <CallRoster people={[person("s2", "Visitor", false, false)]} />, { wrapper: MessagesWrapper }
         );
         expect(screen.getByText("Visitor")).toBeTruthy();
         expect(container.querySelector("img")).toBeNull();

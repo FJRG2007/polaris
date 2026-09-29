@@ -44,6 +44,7 @@
  */
 
 import { MoreHorizontal, X } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { SidePane } from "./side-pane";
 import { useWideScreen } from "./use-wide-screen";
@@ -88,6 +89,7 @@ function PersonMenu({
     onNickname: (member: MenuPerson) => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("chat");
     const { viewerId, refresh } = useChat();
 
     return (
@@ -107,8 +109,8 @@ function PersonMenu({
             <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label={`What you can do about ${person.name}`}
-                title="More"
+                aria-label={t("personCard.actionsFor", { name: person.name })}
+                title={t("directProfile.more")}
             >
                 <MoreHorizontal className="size-4" />
             </Button>
@@ -147,6 +149,7 @@ export function DirectProfile({
      *  says what to drop in it. */
     onMention: (text: string) => void;
 }) {
+    const t = useTranslations("chat");
     // Before the early return, which is where a hook has to be: the same
     // question the roster asks, answered by the same hook so the two panels can
     // never disagree about whether there is room for a column.
@@ -192,7 +195,7 @@ export function DirectProfile({
                         {/* Room left on the right for the dialog's own close,
                             which sits in the corner this would otherwise be in. */}
                         <DialogTitle className="flex items-center justify-between gap-2 pr-6">
-                            Profile
+                            {t("directProfile.profile")}
                             {menu}
                         </DialogTitle>
                     </DialogHeader>
@@ -211,20 +214,20 @@ export function DirectProfile({
         <SidePane
             pane="profile"
             bounds={PROFILE_PANE}
-            label="Profile width"
+            label={t("directProfile.profileWidth")}
             className="border-l border-border"
         >
             <div className="flex items-center justify-between gap-1 border-b border-border px-3 py-2">
                 <p className="text-xs font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                    Profile
+                    {t("directProfile.profile")}
                 </p>
                 <span className="flex items-center gap-0.5">
                     {menu}
                     <button
                         type="button"
                         onClick={() => onOpenChange(false)}
-                        aria-label="Close the profile"
-                        title="Close"
+                        aria-label={t("directProfile.closeTheProfile")}
+                        title={t("directProfile.close")}
                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         <X className="size-3.5" />

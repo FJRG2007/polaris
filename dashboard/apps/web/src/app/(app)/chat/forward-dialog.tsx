@@ -27,6 +27,7 @@
  */
 
 import Fuse from "fuse.js";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { forwardAction } from "./actions";
 import { runAction } from "@/lib/run-action";
@@ -59,6 +60,7 @@ export function ForwardDialog({
     onOpenChange: (open: boolean) => void;
     onSent: () => void;
 }) {
+    const t = useTranslations("chat");
     const { channels, spaces } = useChat();
     const [chosen, setChosen] = useState<readonly string[]>([]);
     /** The server being looked inside, or null at the top level. */
@@ -189,17 +191,17 @@ export function ForwardDialog({
         <Dialog open={message !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Forward this message</DialogTitle>
+                    <DialogTitle>{t("forward.forwardThisMessage")}</DialogTitle>
                     <DialogDescription>
-                        It arrives quoted, so who said it and when goes with it.
+                        {t("forward.itArrivesQuotedSoWho")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <Input
                         value={query}
-                        placeholder="Find a person, a group or a channel"
-                        aria-label="Find a person, a group or a channel"
+                        placeholder={t("forward.findAPersonAGroup")}
+                        aria-label={t("forward.findAPersonAGroup")}
                         onChange={(event) => setQuery(event.target.value)}
                     />
 
@@ -210,7 +212,7 @@ export function ForwardDialog({
                             className="flex items-center gap-1.5 self-start text-xs text-muted-foreground transition-colors hover:text-foreground"
                         >
                             <ChevronLeft className="size-3.5 shrink-0" />
-                            {place?.name ?? "Back"}
+                            {place?.name ?? t("forward.back")}
                         </button>
                     )}
 
@@ -251,7 +253,7 @@ export function ForwardDialog({
 
                         {listed.length === 0 && !openServers ? (
                             <li className="px-3 py-6 text-center text-xs text-muted-foreground">
-                                {searching ? "Nothing matches that." : "Nothing to forward to yet."}
+                                {searching ? t("forward.nothingMatchesThat") : t("forward.nothingToForwardToYet")}
                             </li>
                         ) : (
                             listed.map((target) => {
@@ -304,8 +306,8 @@ export function ForwardDialog({
 
                     <Input
                         value={note}
-                        placeholder="Say something about it (optional)"
-                        aria-label="Say something about it"
+                        placeholder={t("forward.saySomethingAboutItOptional")}
+                        aria-label={t("forward.saySomethingAboutIt")}
                         onChange={(event) => setNote(event.target.value)}
                     />
 
@@ -318,7 +320,7 @@ export function ForwardDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {t("forward.cancel")}
                     </Button>
                     <Button
                         size="sm"
@@ -330,7 +332,7 @@ export function ForwardDialog({
                         ) : (
                             <Forward className="size-4" />
                         )}
-                        {chosen.length > 1 ? `Forward to ${chosen.length}` : "Forward"}
+                        {chosen.length > 1 ? t("forward.forwardTo", { count: chosen.length }) : t("forward.forward")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

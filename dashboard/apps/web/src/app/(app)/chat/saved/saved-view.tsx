@@ -14,6 +14,7 @@
  */
 
 import Link from "next/link";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "../chat-context";
 import { Avatar } from "@/components/avatar";
 import { EmptyState, Skeleton } from "@polaris/ui";
@@ -26,6 +27,7 @@ import { RichText } from "@/components/rich-text/rich-text";
 import { ArrowLeft, Hash, Star, Users } from "lucide-react";
 
 export function SavedView() {
+    const t = useTranslations("chat");
     const { channels } = useChat();
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
 
@@ -40,13 +42,13 @@ export function SavedView() {
             <div className="flex h-header shrink-0 items-center gap-2 border-b border-border px-3">
                 <Link
                     href="/chat"
-                    aria-label="Back to conversations"
+                    aria-label={t("saved.backToConversations")}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
                 >
                     <ArrowLeft className="size-4" />
                 </Link>
                 <Star className="size-4 shrink-0 text-primary" />
-                <span className="text-sm font-semibold">Saved</span>
+                <span className="text-sm font-semibold">{t("saved.saved")}</span>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
@@ -59,8 +61,8 @@ export function SavedView() {
                 ) : messages.length === 0 ? (
                     <EmptyState
                         icon={<Star />}
-                        title="Nothing saved."
-                        description="Hover a message and press the star to keep it. Only you see this."
+                        title={t("saved.nothingSaved")}
+                        description={t("saved.hoverAMessageAndPress")}
                     />
                 ) : (
                     <ul className="flex flex-col gap-2">
@@ -114,8 +116,8 @@ export function SavedView() {
                                             )}
                                             <button
                                                 type="button"
-                                                aria-label="Remove from saved"
-                                                title="Remove from saved"
+                                                aria-label={t("saved.removeFromSaved")}
+                                                title={t("saved.removeFromSaved")}
                                                 onClick={async () => {
                                                     // Taken off the list here
                                                     // rather than by asking for

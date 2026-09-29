@@ -14,6 +14,7 @@
  * nobody watching would know which of the two they were reading.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import type { ChatPollView } from "@/lib/chat/polls";
 import { PollCard } from "@/app/(app)/chat/poll-card";
@@ -71,7 +72,7 @@ function card(view: ChatPollView, options: { canPost?: boolean; canEnd?: boolean
             canPost={options.canPost ?? true}
             canEnd={options.canEnd ?? false}
             onError={() => undefined}
-        />
+        />, { wrapper: MessagesWrapper }
     );
 }
 

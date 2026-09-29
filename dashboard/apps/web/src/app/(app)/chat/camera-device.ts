@@ -17,6 +17,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const KEY = "polaris.camera.device";
 
@@ -71,6 +72,7 @@ export function useCameras(): {
     readonly chosenId: string | null;
     readonly choose: (deviceId: string | null) => void;
 } {
+    const t = useTranslations("chat");
     const [devices, setDevices] = useState<readonly CameraDevice[]>([]);
     const [chosenId, setChosenId] = useState<string | null>(null);
 
@@ -82,7 +84,7 @@ export function useCameras(): {
                 .filter((device) => device.kind === "videoinput" && device.deviceId)
                 .map((device, index) => ({
                     id: device.deviceId,
-                    label: device.label || `Camera ${index + 1}`
+                    label: device.label || t("devices.cameraN", { n: index + 1 })
                 }))
         );
     }, []);

@@ -7,6 +7,7 @@
  * typed - picking one writes it, ready to send.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { menuItems as blocksFor, type SlashCommand } from "@/components/rich-text/block-menu";
@@ -73,20 +74,20 @@ describe("the / list", () => {
 
 describe("the mark", () => {
     it("says which server, in the rail", () => {
-        render(<GameLinkMark links={[LINK]} />);
+        render(<GameLinkMark links={[LINK]} />, { wrapper: MessagesWrapper });
         expect(
             screen.getByRole("img", { name: "Linked to the Minecraft server Survival" })
         ).toBeTruthy();
     });
 
     it("opens the server's page from the header for somebody who may open it", () => {
-        render(<GameLinkChips links={[LINK]} />);
+        render(<GameLinkChips links={[LINK]} />, { wrapper: MessagesWrapper });
         const chip = screen.getByRole("link", { name: /Minecraft server Survival/ });
         expect(chip.getAttribute("href")).toBe("/apps/installed/survival");
     });
 
     it("is only words for everybody else", () => {
-        render(<GameLinkChips links={[{ ...LINK, href: null }]} />);
+        render(<GameLinkChips links={[{ ...LINK, href: null }]} />, { wrapper: MessagesWrapper });
         expect(screen.queryByRole("link")).toBeNull();
         expect(screen.getByText("Survival")).toBeTruthy();
     });
@@ -96,7 +97,7 @@ describe("the mark", () => {
             <>
                 <GameLinkMark links={[]} />
                 <GameLinkChips links={[]} />
-            </>
+            </>, { wrapper: MessagesWrapper }
         );
         expect(container.innerHTML).toBe("");
     });

@@ -18,6 +18,7 @@
  * yours whatever your seat in it.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
@@ -74,7 +75,7 @@ afterEach(cleanup);
 
 describe("the menu on a space", () => {
     it("opens on a right-click", () => {
-        render(<ServerRail />);
+        render(<ServerRail />, { wrapper: MessagesWrapper });
         // The tile is the space's initials; its name is written out nowhere
         // until the menu that is headed by it opens.
         expect(screen.queryByText("Engineering")).toBeNull();
@@ -84,7 +85,7 @@ describe("the menu on a space", () => {
     });
 
     it("offers the notification setting to somebody who only reads the space", () => {
-        render(<ServerRail />);
+        render(<ServerRail />, { wrapper: MessagesWrapper });
         fireEvent.contextMenu(screen.getByRole("button", { name: "Engineering" }));
 
         // Not an administrator's: what a space is allowed to interrupt you with

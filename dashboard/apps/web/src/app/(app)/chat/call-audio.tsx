@@ -31,6 +31,7 @@
  */
 
 import { Volume2 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CallState } from "./use-call";
 import { useCallVolume } from "./call-volumes";
 import { useVoiceSettings } from "./voice-settings";
@@ -48,6 +49,7 @@ import {
 } from "./call-stream-audio";
 
 export function CallAudio({ call }: { call: CallState }) {
+    const t = useTranslations("chat");
     /**
      * Whether this browser plays the call at all.
      *
@@ -219,7 +221,7 @@ export function CallAudio({ call }: { call: CallState }) {
                         className="pointer-events-auto flex items-center gap-2 rounded-full border border-border-strong bg-elevated px-3 py-1.5 text-xs font-medium shadow-modal"
                     >
                         <Volume2 className="size-4 shrink-0" />
-                        Press to hear the call
+                        {t("callAudio.pressToHearTheCall")}
                     </button>
                 </div>
             )}

@@ -19,6 +19,7 @@
  */
 
 import { Button } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { useCallHold } from "./call-session";
 import { Phone, PhoneOff } from "lucide-react";
@@ -34,6 +35,7 @@ import { callElsewhereAction, joinCallAction } from "./meeting-actions";
 const ASKED = "polaris.call.elsewhere.dismissed";
 
 export function CallElsewhere() {
+    const t = useTranslations("chat");
     const router = useRouter();
     const { session, enter } = useCallHold();
     const [found, setFound] = useState<Found | null>(null);
@@ -92,7 +94,7 @@ export function CallElsewhere() {
         setMoving(true);
         setFailed("");
         const result = await joinCallAction(found.meetingId).catch(() => ({
-            error: "That call could not be reached."
+            error: t("elsewhere.thatCallCouldNotBe")
         }));
         setMoving(false);
         if (result.error) {
@@ -132,20 +134,20 @@ export function CallElsewhere() {
                 <span className="flex items-center gap-2.5">
                     <Phone className="size-4 shrink-0 animate-pulse text-success" />
                     <span className="min-w-0 flex-1 text-sm font-medium">
-                        You are in a call on another device
+                        {t("elsewhere.youAreInACall")}
                     </span>
                 </span>
                 <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
-                    Moving it here hangs up there. A call is in one place at a time.
+                    {t("elsewhere.movingItHereHangsUp")}
                 </p>
                 {failed ? <p className="text-[0.75rem] text-danger">{failed}</p> : null}
 
                 <span className="flex items-center gap-2">
                     <Button size="sm" className="flex-1" disabled={moving} onClick={move}>
                         <Phone className="size-4" />
-                        {moving ? "Moving" : "Move it here"}
+                        {moving ? t("elsewhere.moving") : t("elsewhere.moveItHere")}
                     </Button>
-                    <Button size="sm" variant="secondary" aria-label="Leave it" onClick={dismiss}>
+                    <Button size="sm" variant="secondary" aria-label={t("elsewhere.leaveIt")} onClick={dismiss}>
                         <PhoneOff className="size-4" />
                     </Button>
                 </span>

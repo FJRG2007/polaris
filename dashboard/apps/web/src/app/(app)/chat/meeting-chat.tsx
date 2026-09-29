@@ -27,6 +27,7 @@
  */
 
 import { Composer } from "./composer";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Avatar } from "@/components/avatar";
 import type { CallState } from "./call-state";
 import { useAppUrl } from "@/components/app-url";
@@ -66,6 +67,7 @@ export function MeetingChat({
     call: CallState;
     className?: string;
 }) {
+    const t = useTranslations("chat");
     const baseUrl = useAppUrl();
     const [lines, setLines] = useState<readonly MeetingLine[] | null>(null);
     const [error, setError] = useState("");
@@ -196,7 +198,7 @@ export function MeetingChat({
 
     return (
         <section
-            aria-label="Meeting chat"
+            aria-label={t("meetingChat.meetingChat")}
             className={cn("flex min-h-0 flex-col border-border", className)}
         >
             <div
@@ -212,7 +214,7 @@ export function MeetingChat({
                 ) : lines.length === 0 ? (
                     <p className="flex items-center gap-2 py-6 text-xs text-muted-foreground">
                         <MessageSquare className="size-3.5 shrink-0" />
-                        Nothing said here yet. Anything typed goes when the meeting does.
+                        {t("meetingChat.nothingSaidHereYetAnything")}
                     </p>
                 ) : (
                     <ol className="flex flex-col gap-2">
@@ -306,7 +308,7 @@ export function MeetingChat({
                     rules={rules}
                     disabled={false}
                     mentionSource={mentions}
-                    placeholder="Say something"
+                    placeholder={t("meetingChat.saySomething")}
                     onSend={send}
                     onPoll={ask}
                 />
@@ -408,6 +410,7 @@ function Poll({
     onChanged: () => void | Promise<void>;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("chat");
     const [busy, setBusy] = useState(false);
 
     const vote = async (optionId: string): Promise<void> => {
@@ -465,10 +468,10 @@ function Poll({
             <span className="flex items-center justify-between gap-2 pt-0.5 text-[0.625rem] text-foreground-subtle">
                 <span>
                     {poll.hidden
-                        ? "The answers are hidden until it closes"
+                        ? t("meetingChat.theAnswersAreHiddenUntil")
                         : poll.total === 1
-                          ? "1 answer"
-                          : `${poll.total} answers`}
+                          ? t("meetingChat.answers", { count: 1 })
+                          : t("meetingChat.answers", { count: poll.total })}
                     {poll.closed && " - closed"}
                     {!poll.closed && poll.multiple && " - pick as many as you like"}
                 </span>
@@ -485,7 +488,7 @@ function Poll({
                             await onChanged();
                         }}
                     >
-                        Close it
+                        {t("meetingChat.closeIt")}
                     </Button>
                 )}
             </span>

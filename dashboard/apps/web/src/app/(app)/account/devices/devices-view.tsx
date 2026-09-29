@@ -505,8 +505,8 @@ function CameraCard() {
                             <button
                                 key={scene.id}
                                 type="button"
-                                title={sceneLabel(tChat, scene.id, scene.label)}
-                                aria-label={sceneLabel(tChat, scene.id, scene.label)}
+                                title={tChat(scene.label)}
+                                aria-label={tChat(scene.label)}
                                 aria-pressed={image === scene.src}
                                 onClick={() => chooseScene(scene)}
                                 className={cn(
@@ -798,11 +798,6 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
 
 /** A shipped background's name in the reader's language; one the catalog does
  *  not know yet keeps the name it was shipped with. */
-function sceneLabel(t: NamespaceTranslator<"chat">, id: string, fallback: string): string {
-    const key = `callSettings.scenes.${id.replace(/-(\w)/g, (_, letter: string) => letter.toUpperCase())}`;
-    return t.has(key) ? t(key) : fallback;
-}
-
 /** One switch and what it is for. Repeated six times, which is why it is one
  *  component: six near-copies is six chances for one of them to look different. */
 function Toggle({

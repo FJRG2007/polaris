@@ -23,6 +23,7 @@
  */
 
 import Link from "next/link";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { useChat } from "./chat-context";
 import { placeCard } from "./card-placement";
@@ -155,6 +156,7 @@ function PersonActions({
     onDone: () => void;
     extra?: ReactNode;
 }) {
+    const t = useTranslations("chat");
     const { refresh } = useChat();
     const router = useRouter();
     const [error, setError] = useState("");
@@ -169,7 +171,7 @@ function PersonActions({
                     <Button asChild size="sm" variant="secondary">
                         <Link href="/account" onClick={onDone}>
                             <Pencil className="size-4" />
-                            Edit profile
+                            {t("personCard.editProfile")}
                         </Link>
                     </Button>
                 ) : here ? null : (
@@ -186,7 +188,7 @@ function PersonActions({
                         }
                     >
                         <MessageSquare className="size-4" />
-                        Message
+                        {t("personCard.message")}
                     </Button>
                 )}
                 {extra}
@@ -204,8 +206,8 @@ function PersonActions({
                         <Button
                             variant="ghost"
                             size="icon-sm"
-                            aria-label={`What you can do about ${person.name}`}
-                            title="More"
+                            aria-label={t("personCard.actionsFor", { name: person.name })}
+                            title={t("personCard.more")}
                         >
                             <MoreHorizontal className="size-4" />
                         </Button>
@@ -241,6 +243,7 @@ function PersonCard({
     onClose: () => void;
     onExpand: () => void;
 }) {
+    const t = useTranslations("chat");
     const { channels } = useChat();
     const channel = channels.find((entry) => entry.id === channelId);
     const { profile, loading } = useChatProfile(channelId, person.id);
@@ -317,8 +320,8 @@ function PersonCard({
                     <button
                         type="button"
                         onClick={onExpand}
-                        aria-label="View full profile"
-                        title="View full profile"
+                        aria-label={t("personCard.viewFullProfile")}
+                        title={t("personCard.viewFullProfile")}
                         className="absolute right-2 top-2 z-10 rounded-md bg-black/35 p-1.5 text-white transition-colors hover:bg-black/55"
                     >
                         <Maximize2 className="size-3.5" />
@@ -365,6 +368,7 @@ function PersonProfileDialog({
     onNickname: (person: MenuPerson) => void;
     onClose: () => void;
 }) {
+    const t = useTranslations("chat");
     const { channels } = useChat();
     const channel = channels.find((entry) => entry.id === channelId);
     const { profile, loading } = useChatProfile(channelId, person.id);
@@ -394,7 +398,7 @@ function PersonProfileDialog({
                                     <Button asChild size="sm" variant="secondary">
                                         <Link href={`/u/${profile.username}`} onClick={onClose}>
                                             <ArrowUpRight className="size-4" />
-                                            Open profile page
+                                            {t("personCard.openProfilePage")}
                                         </Link>
                                     </Button>
                                 ) : null

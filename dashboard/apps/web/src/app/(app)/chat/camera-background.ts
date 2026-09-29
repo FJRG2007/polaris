@@ -34,6 +34,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 const KEY = "polaris.call.camera-background";
 const IMAGE_KEY = "polaris.call.camera-background-image";
@@ -55,23 +56,15 @@ const CHOICES: readonly CameraBackground[] = ["off", "blur", "strong", "image"];
  * Written as what each one does to the room rather than as what it is: nobody
  * choosing a camera setting wants to be told the name of a segmentation model.
  */
-export const BACKGROUNDS: readonly { value: CameraBackground; label: string; help: string }[] = [
-    {
-        value: "blur",
-        label: "Blur my background",
-        help: "Everything except you goes out of focus. Costs a little battery."
-    },
-    {
-        value: "strong",
-        label: "Blur it heavily",
-        help: "The same, blurred until nothing behind you can be read."
-    },
-    {
-        value: "image",
-        label: "Use a picture",
-        help: "Replaces the room with an image of yours. It stays on this machine."
-    },
-    { value: "off", label: "Off", help: "Send the room as the camera sees it." }
+export const BACKGROUNDS: readonly {
+    value: CameraBackground;
+    label: NamespaceKey<"chat">;
+    help: NamespaceKey<"chat">;
+}[] = [
+    { value: "blur", label: "callSettings.backgrounds.blur.label", help: "callSettings.backgrounds.blur.help" },
+    { value: "strong", label: "callSettings.backgrounds.strong.label", help: "callSettings.backgrounds.strong.help" },
+    { value: "image", label: "callSettings.backgrounds.image.label", help: "callSettings.backgrounds.image.help" },
+    { value: "off", label: "callSettings.backgrounds.off.label", help: "callSettings.backgrounds.off.help" }
 ];
 
 /** Where the pictures Polaris ships are served from. */
@@ -80,7 +73,8 @@ const SCENES_AT = "/backgrounds";
 /** One of them: the file, and what it is called on screen. */
 export interface BackgroundScene {
     readonly id: string;
-    readonly label: string;
+    /** What it is called on screen, as a key of the chat catalog. */
+    readonly label: NamespaceKey<"chat">;
     /** What is drawn behind somebody. */
     readonly src: string;
     /** And the small copy the picker draws, which is a twentieth of the size.
@@ -101,17 +95,19 @@ export interface BackgroundScene {
  * Photographs are from Unsplash under its licence; who took each one is in
  * `public/backgrounds/NOTICE.txt`, beside the files.
  */
-export const BACKGROUND_SCENES: readonly BackgroundScene[] = [
-    { id: "meeting-room", label: "Meeting room" },
-    { id: "desk", label: "Desk by a window" },
-    { id: "warm-hallway", label: "Warm lights" },
-    { id: "library", label: "Library" },
-    { id: "shelves-window", label: "Reading room" },
-    { id: "shelves-plants", label: "Shelves and plants" },
-    { id: "gradient-dusk", label: "Dusk" },
-    { id: "gradient-amber", label: "Amber" },
-    { id: "gradient-waves", label: "Waves" }
-].map((scene) => ({
+export const BACKGROUND_SCENES: readonly BackgroundScene[] = (
+    [
+        { id: "meeting-room", label: "callSettings.scenes.meetingRoom" },
+        { id: "desk", label: "callSettings.scenes.desk" },
+        { id: "warm-hallway", label: "callSettings.scenes.warmHallway" },
+        { id: "library", label: "callSettings.scenes.library" },
+        { id: "shelves-window", label: "callSettings.scenes.shelvesWindow" },
+        { id: "shelves-plants", label: "callSettings.scenes.shelvesPlants" },
+        { id: "gradient-dusk", label: "callSettings.scenes.gradientDusk" },
+        { id: "gradient-amber", label: "callSettings.scenes.gradientAmber" },
+        { id: "gradient-waves", label: "callSettings.scenes.gradientWaves" }
+    ] as const
+).map((scene) => ({
     ...scene,
     src: `${SCENES_AT}/${scene.id}.webp`,
     thumb: `${SCENES_AT}/${scene.id}-thumb.webp`

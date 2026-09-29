@@ -11,6 +11,7 @@
  */
 
 import { useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useToast } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { moderateCallAction } from "./meeting-actions";
@@ -66,19 +67,20 @@ export function useModerate(): {
 
 /** The items themselves, for inside a context menu that already exists. */
 export function ModerationItems({ seat, name }: { seat: SeatModeration; name: string }) {
+    const t = useTranslations("chat");
     const { moderate, busy } = useModerate();
     const { serverMuted, serverDeafened } = seat.restriction;
 
     return (
         <>
             <ContextMenuSeparator />
-            <ContextMenuLabel className="text-xs text-muted-foreground">Moderation</ContextMenuLabel>
+            <ContextMenuLabel className="text-xs text-muted-foreground">{t("callModeration.moderation")}</ContextMenuLabel>
             <ContextMenuItem
                 disabled={busy}
                 onSelect={() => void moderate(seat, serverMuted ? "unmute" : "mute", name)}
             >
                 {serverMuted ? <Mic className="size-3.5" /> : <MicOff className="size-3.5" />}
-                {serverMuted ? "Server unmute" : "Server mute"}
+                {serverMuted ? t("callModeration.serverUnmute") : t("callModeration.serverMute")}
             </ContextMenuItem>
             <ContextMenuItem
                 disabled={busy}
@@ -89,7 +91,7 @@ export function ModerationItems({ seat, name }: { seat: SeatModeration; name: st
                 ) : (
                     <HeadphoneOff className="size-3.5" />
                 )}
-                {serverDeafened ? "Server undeafen" : "Server deafen"}
+                {serverDeafened ? t("callModeration.serverUndeafen") : t("callModeration.serverDeafen")}
             </ContextMenuItem>
             <ContextMenuItem
                 disabled={busy}
@@ -97,7 +99,7 @@ export function ModerationItems({ seat, name }: { seat: SeatModeration; name: st
                 onSelect={() => void moderate(seat, "disconnect", name)}
             >
                 <PhoneOff className="size-3.5" />
-                Disconnect
+                {t("callModeration.disconnect")}
             </ContextMenuItem>
         </>
     );

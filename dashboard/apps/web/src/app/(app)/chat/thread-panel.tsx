@@ -13,6 +13,7 @@
  */
 
 import { X } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
@@ -67,6 +68,7 @@ export function ThreadPanel({
      *  on the message this thread hangs off. */
     onChanged: () => void;
 }) {
+    const t = useTranslations("chat");
     const { may } = useChat();
     // Held to what the row can spare: a remembered width from a wider window, or
     // a second panel opened beside this one, is how the conversation gets
@@ -138,7 +140,7 @@ export function ThreadPanel({
                 onChange={resize}
                 onReset={reset}
                 onResetAll={resetPaneLayout}
-                label="Thread width"
+                label={t("thread.threadWidth")}
                 className="hidden md:block"
             />
             <aside
@@ -147,10 +149,10 @@ export function ThreadPanel({
                 className="flex w-full shrink-0 flex-col border-l border-border md:w-[var(--thread-pane)]"
             >
                 <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-3">
-                    <span className="text-sm font-semibold">Thread</span>
+                    <span className="text-sm font-semibold">{t("thread.thread")}</span>
                     <button
                         type="button"
-                        aria-label="Close the thread"
+                        aria-label={t("thread.closeTheThread")}
                         onClick={onClose}
                         className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
@@ -225,7 +227,7 @@ export function ThreadPanel({
                     insert={inserting}
                     disabled={!canPost}
                     attachable={may.attach}
-                    placeholder="Reply in this thread"
+                    placeholder={t("thread.replyInThisThread")}
                     // A poll belongs in a thread as readily as anywhere else: a side
                     // conversation is exactly where somebody asks the room to pick
                     // between the two things being argued about.

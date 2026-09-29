@@ -15,6 +15,7 @@
  */
 
 import { CalendarClock, ChevronDown, FilePen, SendHorizontal } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     cn,
     DropdownMenu,
@@ -42,6 +43,7 @@ export function SendButton({
      *  item rather than hiding it, since the reason is something to fix. */
     draftRefusal?: string;
 }) {
+    const t = useTranslations("chat");
     const menu = onSchedule !== undefined || onSaveDraft !== undefined;
 
     return (
@@ -50,8 +52,8 @@ export function SendButton({
                 type="button"
                 disabled={disabled}
                 onClick={onSend}
-                aria-label="Send"
-                title="Send"
+                aria-label={t("sendButton.send")}
+                title={t("sendButton.send")}
                 className={cn(
                     "rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40",
                     menu && "rounded-r-none pr-1"
@@ -65,8 +67,8 @@ export function SendButton({
                         <button
                             type="button"
                             disabled={disabled}
-                            aria-label="More ways to send"
-                            title="More ways to send"
+                            aria-label={t("sendButton.moreWaysToSend")}
+                            title={t("sendButton.moreWaysToSend")}
                             className="rounded rounded-l-none py-1.5 pl-0.5 pr-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
                         >
                             <ChevronDown className="size-3" />
@@ -78,7 +80,7 @@ export function SendButton({
                         {onSchedule && (
                             <DropdownMenuItem onSelect={onSchedule}>
                                 <CalendarClock />
-                                Schedule message
+                                {t("sendButton.scheduleMessage")}
                             </DropdownMenuItem>
                         )}
                         {onSaveDraft && (
@@ -89,7 +91,7 @@ export function SendButton({
                             >
                                 <FilePen className="mt-0.5" />
                                 <span className="flex flex-col">
-                                    Save as draft
+                                    {t("sendButton.saveAsDraft")}
                                     {draftRefusal && (
                                         <span className="text-[0.6875rem] text-muted-foreground">
                                             {draftRefusal}

@@ -20,6 +20,7 @@
  */
 
 import Link from "next/link";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AtSign } from "lucide-react";
 import { profileAction } from "./actions";
 import { useEffect, useState } from "react";
@@ -98,6 +99,7 @@ export function ProfileDetails({
     /** What can be done about them, drawn under their name. */
     actions?: React.ReactNode;
 }) {
+    const t = useTranslations("chat");
     const where = usePresence(person.id);
     const name = profile?.name || person.name;
     const full = size === "full";
@@ -208,7 +210,7 @@ export function ProfileDetails({
                 {profile?.description && (
                     <div className="w-full text-left">
                         <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                            About
+                            {t("profileDetails.about")}
                         </p>
                         <p
                             className={cn(

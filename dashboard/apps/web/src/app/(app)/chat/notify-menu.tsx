@@ -17,6 +17,7 @@
  */
 
 import * as core from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Bell, Check } from "lucide-react";
 import type { MenuParts } from "./mute-menu";
 
@@ -34,6 +35,7 @@ export function NotifyOptions({
     inheritable?: boolean;
     onChoose: (level: core.ChatChannelNotifyLevel) => void;
 }) {
+    const t = useTranslations("chat");
     const { Item, Sub, SubTrigger, SubContent } = parts;
     const offered: core.ChatChannelNotifyLevel[] = inheritable
         ? [...core.CHAT_CHANNEL_NOTIFY_LEVELS]
@@ -47,7 +49,7 @@ export function NotifyOptions({
         <Sub>
             <SubTrigger>
                 <Bell className="size-3.5" />
-                Notifications
+                {t("notifyMenu.notifications")}
             </SubTrigger>
             <SubContent>
                 {offered.map((option) => (

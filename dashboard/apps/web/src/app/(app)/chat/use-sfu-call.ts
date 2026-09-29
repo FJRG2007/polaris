@@ -36,6 +36,7 @@
  */
 
 import { z } from "zod";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as quality from "./call-quality";
 import { volumeFor } from "./call-volumes";
 import { setMicDevice } from "./mic-device";
@@ -332,6 +333,7 @@ function sameReport(left: CallAudioReport, right: CallAudioReport): boolean {
 type CallTicket = Awaited<ReturnType<typeof actions.callTokenAction>>;
 
 export function useSfuCall(meetingId: string | null, options?: { video?: boolean }): CallState {
+    const t = useTranslations("chat");
     const withVideo = options?.video ?? true;
 
     const [meeting, setMeeting] = useState<MeetingView | null>(null);
@@ -1478,7 +1480,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             const ticket = await actions
                 .callTokenAction(inCall)
                 .catch(
-                    () => ({ error: "The call could not be reached. Try again." }) as CallTicket
+                    () => ({ error: t("errors.callUnreachable") }) as CallTicket
                 );
             // Released on every path that gives up before there is a room to guard
             // the attempt instead. `waiting` in particular: somebody in the lobby is

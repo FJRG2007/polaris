@@ -8,19 +8,20 @@
  * carries no duration in it and reading one out means downloading all of it.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { VoiceNote } from "@/app/(app)/chat/voice-note";
 
 describe("a recording", () => {
     const markup = renderToStaticMarkup(
-        <VoiceNote
+        withMessages(<VoiceNote
             href="/api/chat/attachments/x"
             name="voice-message.webm"
             recorded={true}
             durationMs={7400}
             waveform="0123456789"
-        />
+        />)
     );
 
     it("asks for nothing until it is played", () => {
@@ -48,13 +49,13 @@ describe("a recording", () => {
 
 describe("a track somebody attached", () => {
     const markup = renderToStaticMarkup(
-        <VoiceNote
+        withMessages(<VoiceNote
             href="/api/chat/attachments/y"
             name="interview.mp3"
             recorded={false}
             durationMs={null}
             waveform={null}
-        />
+        />)
     );
 
     it("keeps its name", () => {
@@ -70,13 +71,13 @@ describe("a track somebody attached", () => {
 describe("how fast it plays", () => {
     it("starts at ordinary speed, with the way to change it in reach", () => {
         const markup = renderToStaticMarkup(
-            <VoiceNote
+            withMessages(<VoiceNote
                 href="/api/chat/attachments/z"
                 name="voice-message.webm"
                 recorded={true}
                 durationMs={4000}
                 waveform="55"
-            />
+            />)
         );
         // One times, drawn as the button that walks through 1, 1.5 and 2 - the
         // same three every messenger settled on.

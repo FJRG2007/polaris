@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { editHistoryAction } from "./actions";
 import { History, Loader2 } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
@@ -36,6 +37,7 @@ export function EditHistoryDialog({
     message: ChatMessageView | null;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("chat");
     const format = useDisplayFormat();
     const [history, setHistory] = useState<ChatEditHistory | null>(null);
     const [error, setError] = useState("");
@@ -64,9 +66,9 @@ export function EditHistoryDialog({
         <Dialog open={message !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Edit history</DialogTitle>
+                    <DialogTitle>{t("editHistory.editHistory")}</DialogTitle>
                     <DialogDescription>
-                        What this message said before it was changed.
+                        {t("editHistory.whatThisMessageSaidBefore")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -77,13 +79,13 @@ export function EditHistoryDialog({
                 ) : !history ? (
                     <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
                         <Loader2 className="size-4 animate-spin" />
-                        Reading it back
+                        {t("editHistory.readingItBack")}
                     </p>
                 ) : (
                     <ol className="flex max-h-80 flex-col gap-3 overflow-y-auto overscroll-contain">
                         <li className="rounded-md border border-border-strong bg-card p-3">
                             <p className="mb-1 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
-                                Now
+                                {t("editHistory.now")}
                             </p>
                             <div className="text-sm">
                                 <RichText value={message?.body ?? ""} />
@@ -99,7 +101,9 @@ export function EditHistoryDialog({
                                     className="mb-1 text-[0.6875rem] text-muted-foreground"
                                     title={format.dateTime(version.replacedAt)}
                                 >
-                                    Until <RelativeTime iso={version.replacedAt} />
+                                    {t.rich("editHistory.until", {
+                                        time: () => <RelativeTime key="time" iso={version.replacedAt} />
+                                    })}
                                 </p>
                                 <div className="text-sm text-muted-foreground">
                                     <RichText value={version.body} />
@@ -111,8 +115,8 @@ export function EditHistoryDialog({
                             <li className="flex items-start gap-2 px-1 text-sm text-muted-foreground">
                                 <History className="mt-0.5 size-4 shrink-0" />
                                 {history.kept
-                                    ? "Nothing earlier was recorded for this one."
-                                    : "Earlier versions are not kept in this kind of conversation."}
+                                    ? t("editHistory.nothingEarlierWasRecordedFor")
+                                    : t("editHistory.earlierVersionsAreNotKept")}
                             </li>
                         )}
                     </ol>

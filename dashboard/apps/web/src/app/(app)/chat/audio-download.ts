@@ -25,14 +25,15 @@
 
 import { downloadFile } from "./links";
 import { downloadBytes } from "@/lib/download";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 export type AudioFormat = "mp3" | "wav" | "original";
 
 /** What the menu lists, in the order it lists it. The first is the default. */
-export const AUDIO_FORMATS: readonly { format: AudioFormat; label: string }[] = [
-    { format: "mp3", label: "MP3" },
-    { format: "wav", label: "WAV" },
-    { format: "original", label: "Original" }
+export const AUDIO_FORMATS: readonly { format: AudioFormat; label: NamespaceKey<"chat"> }[] = [
+    { format: "mp3", label: "audioFormats.mp3" },
+    { format: "wav", label: "audioFormats.wav" },
+    { format: "original", label: "audioFormats.original" }
 ];
 
 /**

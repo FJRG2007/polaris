@@ -14,6 +14,7 @@
  */
 
 import * as core from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Bell, BellOff } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { useDisplayFormat } from "@/components/display-format";
@@ -40,6 +41,7 @@ export function MuteOptions({
     /** Minutes, `MUTE_FOREVER`, or null to let it through again. */
     onChoose: (minutes: number | null) => void;
 }) {
+    const t = useTranslations("chat");
     const { Item, Sub, SubTrigger, SubContent } = parts;
     const format = useDisplayFormat();
 
@@ -50,8 +52,8 @@ export function MuteOptions({
             <Item onSelect={() => onChoose(null)}>
                 <Bell className="size-3.5" />
                 {channel.mutedUntil
-                    ? `Unmute (quiet until ${format.time(channel.mutedUntil)})`
-                    : "Unmute"}
+                    ? t("muteMenu.unmuteUntil", { time: format.time(channel.mutedUntil) })
+                    : t("muteMenu.unmute")}
             </Item>
         );
     }
@@ -60,7 +62,7 @@ export function MuteOptions({
         <Sub>
             <SubTrigger>
                 <BellOff className="size-3.5" />
-                Mute
+                {t("muteMenu.mute")}
             </SubTrigger>
             <SubContent>
                 {core.MUTE_DURATIONS.map((minutes) => (

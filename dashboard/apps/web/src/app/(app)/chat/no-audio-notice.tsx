@@ -15,6 +15,7 @@
  */
 
 import { AlertTriangle, X } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { measureVoice } from "./voice-level";
 import { useEffect, useState } from "react";
 import { useVoiceSettings } from "./voice-settings";
@@ -36,6 +37,7 @@ export function NoAudioNotice({
     /** Whether the reader wants to be heard. Muted is not a fault. */
     micOn: boolean;
 }) {
+    const t = useTranslations("chat");
     const [voice] = useVoiceSettings();
     const [watch, setWatch] = useState<NoAudioWatch>(NO_AUDIO_START);
     const source = device ?? track;
@@ -103,14 +105,13 @@ export function NoAudioNotice({
         >
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             <span className="min-w-0 flex-1">
-                Your microphone has not picked anything up for a while. Check that it is not muted
-                on the machine itself, and that the right one is chosen under Account &gt; Devices.
+                {t("noAudio.yourMicrophoneHasNotPicked")}
             </span>
             <button
                 type="button"
                 onClick={() => setWatch(dismissNoAudio)}
-                aria-label="Dismiss"
-                title="Dismiss"
+                aria-label={t("noAudio.dismiss")}
+                title={t("noAudio.dismiss")}
                 className="-m-1 shrink-0 rounded p-1 opacity-70 transition-opacity hover:opacity-100"
             >
                 <X className="size-3.5" />

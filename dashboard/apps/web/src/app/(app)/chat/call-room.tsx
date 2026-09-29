@@ -1485,8 +1485,10 @@ function Split({
                                             was asked for: under Automatic those
                                             are different, and the one worth
                                             reading is the one being sent. */}
-                                        <span>{showing.label}</span>
-                                        <span className="tabular-nums">{showing.detail}</span>
+                                        <span>{t(showing.label)}</span>
+                                        <span className="tabular-nums">
+                                            {showing.detailKey ? t(showing.detailKey) : showing.detail}
+                                        </span>
                                     </span>
                                     <input
                                         type="range"
@@ -1539,9 +1541,9 @@ function Split({
                                             )}
                                         />
                                         <span className="flex min-w-0 flex-col">
-                                            <span>{choice.label}</span>
+                                            <span>{t(choice.label)}</span>
                                             <span className="text-xs text-muted-foreground">
-                                                {choice.help}
+                                                {t(choice.help)}
                                             </span>
                                         </span>
                                         {choice.value === "image" && backgroundImage && (
@@ -1573,8 +1575,8 @@ function Split({
                                                 <button
                                                     key={scene.id}
                                                     type="button"
-                                                    title={scene.label}
-                                                    aria-label={scene.label}
+                                                    title={t(scene.label)}
+                                                    aria-label={t(scene.label)}
                                                     aria-pressed={backgroundImage === scene.src}
                                                     onClick={() => onScene(scene)}
                                                     className={cn(
@@ -1659,9 +1661,9 @@ function Split({
                                             )}
                                         />
                                         <span className="flex min-w-0 flex-col">
-                                            <span>{level.label}</span>
+                                            <span>{t(level.label)}</span>
                                             <span className="text-xs text-muted-foreground">
-                                                {level.help}
+                                                {t(level.help)}
                                             </span>
                                         </span>
                                     </DropdownMenuItem>

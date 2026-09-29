@@ -14,6 +14,7 @@
  * never put in front of somebody whose request would be dropped.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { HandStrip } from "@/app/(app)/chat/call-hands-panel";
@@ -37,7 +38,7 @@ function call(over: { hands?: string[]; hosting?: boolean } = {}): CallState {
     } as unknown as CallState;
 }
 
-const render = (state: CallState): string => renderToStaticMarkup(<HandStrip call={state} />);
+const render = (state: CallState): string => renderToStaticMarkup(withMessages(<HandStrip call={state} />));
 
 /** What somebody actually reads off the strip. Asserted instead of the markup
  *  wherever the question is about order or wording: an icon's `viewBox` carries

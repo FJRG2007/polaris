@@ -17,6 +17,7 @@
  */
 
 import { ServerRail } from "./server-rail";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChatSidebar } from "./chat-sidebar";
 import { usePathname } from "next/navigation";
 import { useChatPane } from "./use-chat-pane";
@@ -77,6 +78,7 @@ export function ChatShell({
 }
 
 function ChatColumns({ children }: { children: ReactNode }) {
+    const t = useTranslations("chat");
     const pathname = usePathname();
     const { refresh, refreshChannels, viewerId } = useChat();
     // Written as it moves, not on release: a drag that ends by closing the tab
@@ -153,7 +155,7 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 onChange={resize}
                 onReset={reset}
                 onResetAll={resetPaneLayout}
-                label="Conversation list width"
+                label={t("shell.conversationListWidth")}
                 className="hidden md:block"
             />
             <div

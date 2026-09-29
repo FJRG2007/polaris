@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { messageDeliveryAction } from "./actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { Check, CheckCheck, Loader2, SendHorizontal } from "lucide-react";
@@ -33,6 +34,7 @@ export function MessageInfoDialog({
     message: ChatMessageView | null;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("chat");
     const [delivery, setDelivery] = useState<MessageDelivery | null>(null);
     const [error, setError] = useState("");
     // Whether the answer has arrived, kept apart from the answer itself. There is
@@ -64,8 +66,8 @@ export function MessageInfoDialog({
         <Dialog open={message !== null} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Message information</DialogTitle>
-                    <DialogDescription>How far this message got.</DialogDescription>
+                    <DialogTitle>{t("messageInfo.messageInformation")}</DialogTitle>
+                    <DialogDescription>{t("messageInfo.howFarThisMessageGot")}</DialogDescription>
                 </DialogHeader>
 
                 {error ? (
@@ -75,32 +77,32 @@ export function MessageInfoDialog({
                 ) : !asked ? (
                     <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
                         <Loader2 className="size-4 animate-spin" />
-                        Looking
+                        {t("messageInfo.looking")}
                     </p>
                 ) : !delivery ? (
                     // Answered, with nothing in it. The ticks stopped being this
                     // reader's to see between opening the conversation and opening
                     // this, or the message is no longer there.
                     <p className="py-6 text-sm text-muted-foreground">
-                        There is nothing to show for this message any more.
+                        {t("messageInfo.thereIsNothingToShow")}
                     </p>
                 ) : (
                     <ol className="flex flex-col gap-3">
                         <Step
-                            label="Sent"
+                            label={t("messageInfo.sent")}
                             icon={<SendHorizontal className="size-4" />}
                             iso={delivery.sentAt}
                             reached
                         />
                         <Step
-                            label="Delivered"
+                            label={t("messageInfo.delivered")}
                             icon={<Check className="size-4" />}
                             iso={delivery.deliveredAt}
                             reached={delivery.state !== "sent"}
                             waiting="Not on their device yet."
                         />
                         <Step
-                            label="Read"
+                            label={t("messageInfo.read")}
                             icon={<CheckCheck className="size-4" />}
                             iso={delivery.readAt}
                             reached={delivery.state === "read"}
@@ -134,6 +136,7 @@ function Step({
     reached: boolean;
     waiting?: string;
 }) {
+    const t = useTranslations("chat");
     const format = useDisplayFormat();
 
     return (
@@ -150,7 +153,7 @@ function Step({
                     <span className="text-xs text-muted-foreground">{format.dateTime(iso)}</span>
                 ) : (
                     <span className="text-xs text-muted-foreground">
-                        {reached ? "The time was not recorded." : (waiting ?? "Not yet.")}
+                        {reached ? t("messageInfo.theTimeWasNotRecorded") : (waiting ?? t("messageInfo.notYet"))}
                     </span>
                 )}
             </span>

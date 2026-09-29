@@ -373,7 +373,7 @@ export function MessageMenu({
                                         disabled={saving === file.id}
                                         onSelect={() => void save(file, choice.format)}
                                     >
-                                        {choice.label}
+                                        {t(choice.label)}
                                         {choice.format === "original" && (
                                             <span className="ml-auto pl-4 text-[0.6875rem] uppercase text-foreground-subtle">
                                                 {extensionOf(file.name)}

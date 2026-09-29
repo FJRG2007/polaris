@@ -19,6 +19,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const KEY = "polaris.mic.device";
 
@@ -66,6 +67,7 @@ export function useMicrophones(): {
     readonly chosenId: string | null;
     readonly choose: (deviceId: string) => void;
 } {
+    const t = useTranslations("chat");
     const [devices, setDevices] = useState<readonly MicDevice[]>([]);
     const [chosenId, setChosenId] = useState<string | null>(null);
 
@@ -77,7 +79,7 @@ export function useMicrophones(): {
                 .filter((device) => device.kind === "audioinput" && device.deviceId)
                 .map((device, index) => ({
                     id: device.deviceId,
-                    label: device.label || `Microphone ${index + 1}`
+                    label: device.label || t("devices.microphoneN", { n: index + 1 })
                 }))
         );
     }, []);

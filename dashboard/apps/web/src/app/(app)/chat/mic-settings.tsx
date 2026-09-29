@@ -17,6 +17,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Check } from "lucide-react";
 import { useMicrophones } from "./mic-device";
 import { useMicGain, GAIN_MAX, GAIN_MIN } from "./mic-gain";
@@ -28,6 +29,7 @@ function percent(gain: number): string {
 }
 
 export function MicSettings({ className }: { className?: string }) {
+    const t = useTranslations("chat");
     const { devices, chosenId, choose } = useMicrophones();
     const [cleanup, setCleanup] = useMicCleanup();
     const [gain, setGain] = useMicGain();
@@ -36,7 +38,7 @@ export function MicSettings({ className }: { className?: string }) {
         <div className={cn("flex flex-col gap-3 text-xs", className)}>
             {devices.length > 1 && (
                 <div className="flex flex-col gap-1">
-                    <p className="font-medium text-foreground-subtle">Microphone</p>
+                    <p className="font-medium text-foreground-subtle">{t("micSettings.microphone")}</p>
                     {devices.map((device) => (
                         <button
                             key={device.id}
@@ -59,13 +61,13 @@ export function MicSettings({ className }: { className?: string }) {
             )}
 
             <div className="flex flex-col gap-1">
-                <p className="font-medium text-foreground-subtle">Background noise</p>
+                <p className="font-medium text-foreground-subtle">{t("micSettings.backgroundNoise")}</p>
                 {NOISE_LEVELS.map((level) => (
                     <button
                         key={level.value}
                         type="button"
                         onClick={() => setCleanup(level.value)}
-                        title={level.help}
+                        title={t(level.help)}
                         className="flex items-center gap-2 rounded px-1 py-1 text-left transition-colors hover:bg-muted"
                     >
                         <Check
@@ -81,7 +83,7 @@ export function MicSettings({ className }: { className?: string }) {
 
             <div className="flex flex-col gap-1">
                 <span className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-foreground-subtle">Microphone volume</span>
+                    <span className="font-medium text-foreground-subtle">{t("micSettings.microphoneVolume")}</span>
                     <span className="tabular-nums text-muted-foreground">{percent(gain)}</span>
                 </span>
                 <input
@@ -90,12 +92,12 @@ export function MicSettings({ className }: { className?: string }) {
                     max={GAIN_MAX * 100}
                     step={5}
                     value={Math.round(gain * 100)}
-                    aria-label="Microphone volume"
+                    aria-label={t("micSettings.microphoneVolume")}
                     onChange={(event) => setGain(Number(event.target.value) / 100)}
                     className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-primary"
                 />
                 <p className="text-muted-foreground">
-                    How loud you go out. Turn it up if people say you are quiet.
+                    {t("micSettings.howLoudYouGoOut")}
                 </p>
             </div>
         </div>

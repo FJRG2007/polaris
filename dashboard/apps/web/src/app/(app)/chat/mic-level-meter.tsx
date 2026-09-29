@@ -23,6 +23,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { measureVoice } from "./voice-level";
 import { micConstraints } from "./mic-cleanup";
@@ -68,6 +69,7 @@ export function MicLevelMeter({
     threshold?: number;
     className?: string;
 }) {
+    const t = useTranslations("chat");
     const [level, setLevel] = useState(0);
 
     useEffect(() => {
@@ -121,7 +123,7 @@ export function MicLevelMeter({
     return (
         <div
             role="meter"
-            aria-label="Microphone level"
+            aria-label={t("micLevel.microphoneLevel")}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={level}
@@ -140,7 +142,7 @@ export function MicLevelMeter({
             {threshold !== undefined && (
                 <span
                     aria-hidden
-                    title="Anything past this counts as you speaking"
+                    title={t("micLevel.anythingPastThisCountsAs")}
                     className="absolute -inset-y-0.5 w-0.5 rounded-full bg-foreground/70"
                     style={{ left: `${threshold}%` }}
                 />

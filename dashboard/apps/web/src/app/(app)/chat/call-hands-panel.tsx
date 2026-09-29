@@ -24,12 +24,14 @@
  */
 
 import type { CallState } from "./call-state";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Hand } from "lucide-react";
 import { Button, ScrollRow } from "@polaris/ui";
 import { handsSummary, type HandInQueue } from "./call-signals";
 import { useMemo } from "react";
 
 export function HandStrip({ call }: { call: CallState }) {
+    const t = useTranslations("chat");
     const participants = call.meeting?.participants;
     const seat = call.participantId;
     /** The queue, named. Built once for the strip rather than looked up per
@@ -97,13 +99,13 @@ export function HandStrip({ call }: { call: CallState }) {
                                     {index + 1}
                                 </span>
                                 <span className={person.own ? "font-medium" : undefined}>
-                                    {person.own ? "You" : person.name}
+                                    {person.own ? t("hands.you") : person.name}
                                 </span>
                                 {call.hosting && !person.own && (
                                     <button
                                         type="button"
-                                        aria-label={`Lower ${person.name}'s hand`}
-                                        title={`Lower ${person.name}'s hand`}
+                                        aria-label={t("hands.lowerNamed", { name: person.name })}
+                                        title={t("hands.lowerNamed", { name: person.name })}
                                         onClick={() => call.lowerHand(person.id)}
                                         className="rounded-full px-1 text-muted-foreground transition-colors hover:text-foreground"
                                     >
@@ -119,13 +121,13 @@ export function HandStrip({ call }: { call: CallState }) {
                     worth offering is the one thing you would do about it. */}
                 {only && !only.own && call.hosting && (
                     <Button size="sm" variant="secondary" onClick={() => call.lowerHand(only.id)}>
-                        Lower it
+                        {t("hands.lowerIt")}
                     </Button>
                 )}
 
                 {mine && (
                     <Button size="sm" variant="secondary" onClick={() => call.setHandRaised(false)}>
-                        Lower {hands.length > 1 ? "mine" : "my hand"}
+                        {hands.length > 1 ? t("hands.lowerMine") : t("hands.lowerMyHand")}
                     </Button>
                 )}
 
@@ -138,7 +140,7 @@ export function HandStrip({ call }: { call: CallState }) {
                         variant="secondary"
                         onClick={() => hands.forEach((person) => call.lowerHand(person.id))}
                     >
-                        Lower all
+                        {t("hands.lowerAll")}
                     </Button>
                 )}
             </div>

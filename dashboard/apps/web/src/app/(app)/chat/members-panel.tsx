@@ -24,6 +24,7 @@
  */
 
 import * as actions from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
 import { Crown, Users, X } from "lucide-react";
@@ -271,6 +272,7 @@ function MemberRow({
     onChanged: () => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("chat");
     const role = ROLE_WORDS[member.role];
     // What they are showing right now. Already on screen for the avatar's dot,
     // so this costs nothing: the store asked about them either way.
@@ -303,10 +305,10 @@ function MemberRow({
                     disabled={press ? false : you || busy}
                     title={
                         press
-                            ? `View ${member.name}'s profile`
+                            ? t("messageList.viewProfile", { name: member.name })
                             : you
                               ? member.name
-                              : `Message ${member.name}`
+                              : t("messageList.messageNamed", { name: member.name })
                     }
                     onClick={(event) =>
                         press
@@ -346,7 +348,7 @@ function MemberRow({
                             {member.role === "owner" && (
                                 <Crown
                                     role="img"
-                                    aria-label="Owner"
+                                    aria-label={t("members.owner")}
                                     className="size-3.5 text-warning"
                                 />
                             )}
@@ -387,6 +389,7 @@ export function ChannelMembers({
      *  this only says what to drop in it - see `MemberMenu`. */
     onMention: (text: string) => void;
 }) {
+    const t = useTranslations("chat");
     const { viewerId, refresh } = useChat();
     const wide = useWideScreen();
     const { members, loading } = useRoster(channel.id, channel.ownerId, open);
@@ -439,7 +442,7 @@ export function ChannelMembers({
                 onChange={resize}
                 onReset={reset}
                 onResetAll={resetPaneLayout}
-                label="Members list width"
+                label={t("members.membersListWidth")}
             />
             <aside
                 ref={measure}
@@ -450,7 +453,7 @@ export function ChannelMembers({
                     <span className="text-sm font-semibold">{heading}</span>
                     <button
                         type="button"
-                        aria-label="Hide the members"
+                        aria-label={t("members.hideTheMembers")}
                         onClick={() => onOpenChange(false)}
                         className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >

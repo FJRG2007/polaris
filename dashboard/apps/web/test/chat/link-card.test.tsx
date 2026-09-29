@@ -11,6 +11,7 @@
  * the card it always did.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { LinkCard } from "@/app/(app)/chat/link-card";
 import { afterEach, describe, expect, it } from "vitest";
@@ -36,7 +37,7 @@ describe("a link Polaris can play", () => {
         const { container } = render(
             <LinkCard
                 preview={preview("https://www.tiktok.com/@someone/video/7232918429372394779")}
-            />
+            />, { wrapper: MessagesWrapper }
         );
         expect(container.querySelector("iframe")).toBeNull();
 
@@ -56,7 +57,7 @@ describe("a link Polaris can play", () => {
 
     it("keeps a vertical video upright before and after play", async () => {
         const { container } = render(
-            <LinkCard preview={preview("https://www.youtube.com/shorts/dQw4w9WgXcQ")} />
+            <LinkCard preview={preview("https://www.youtube.com/shorts/dQw4w9WgXcQ")} />, { wrapper: MessagesWrapper }
         );
         const play = screen.getByRole("button", { name: "Play this on YouTube, here" });
         expect(play.className).toContain("aspect-[9/16]");
@@ -74,7 +75,7 @@ describe("a link Polaris can play", () => {
             ["https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT", "h-[166px]"]
         ];
         for (const [url, room] of shapes) {
-            render(<LinkCard preview={preview(url)} />);
+            render(<LinkCard preview={preview(url)} />, { wrapper: MessagesWrapper });
             expect(screen.getByRole("button").className, url).toContain(room);
             cleanup();
         }
@@ -82,7 +83,7 @@ describe("a link Polaris can play", () => {
 
     it("tells Twitch which site it is being shown on", async () => {
         const { container } = render(
-            <LinkCard preview={preview("https://www.twitch.tv/somestreamer")} />
+            <LinkCard preview={preview("https://www.twitch.tv/somestreamer")} />, { wrapper: MessagesWrapper }
         );
         await userEvent.click(screen.getByRole("button", { name: "Play this on Twitch, here" }));
         expect(container.querySelector("iframe")?.getAttribute("src")).toBe(
@@ -93,7 +94,7 @@ describe("a link Polaris can play", () => {
 
 describe("a link Polaris cannot play", () => {
     it("is the ordinary card, with its description", () => {
-        const { container } = render(<LinkCard preview={preview("https://example.com/article")} />);
+        const { container } = render(<LinkCard preview={preview("https://example.com/article")} />, { wrapper: MessagesWrapper });
         expect(screen.queryByRole("button")).toBeNull();
         expect(container.querySelector("iframe")).toBeNull();
         expect(screen.getByRole("link").getAttribute("href")).toBe("https://example.com/article");
@@ -101,7 +102,7 @@ describe("a link Polaris cannot play", () => {
     });
 
     it("includes a share-button short link, which names nothing on its own", () => {
-        render(<LinkCard preview={preview("https://vm.tiktok.com/ZMabcdef/")} />);
+        render(<LinkCard preview={preview("https://vm.tiktok.com/ZMabcdef/")} />, { wrapper: MessagesWrapper });
         expect(screen.queryByRole("button")).toBeNull();
         expect(screen.getByRole("link").getAttribute("href")).toBe(
             "https://vm.tiktok.com/ZMabcdef/"
@@ -113,10 +114,10 @@ describe("a link Polaris cannot play", () => {
         // button would only lead to its refusal. Other players do not care.
         Object.defineProperty(window, "isSecureContext", { value: false, configurable: true });
         try {
-            render(<LinkCard preview={preview("https://www.twitch.tv/somestreamer")} />);
+            render(<LinkCard preview={preview("https://www.twitch.tv/somestreamer")} />, { wrapper: MessagesWrapper });
             expect(screen.queryByRole("button")).toBeNull();
             cleanup();
-            render(<LinkCard preview={preview("https://youtu.be/dQw4w9WgXcQ")} />);
+            render(<LinkCard preview={preview("https://youtu.be/dQw4w9WgXcQ")} />, { wrapper: MessagesWrapper });
             expect(screen.getByRole("button", { name: "Play this on YouTube, here" })).toBeTruthy();
         } finally {
             Object.defineProperty(window, "isSecureContext", { value: true, configurable: true });

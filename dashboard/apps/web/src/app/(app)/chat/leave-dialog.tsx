@@ -20,6 +20,8 @@
  */
 
 import { useEffect, useState } from "react";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     Checkbox,
@@ -34,20 +36,21 @@ import {
 /** What is being left. The consequences differ enough to be worth saying. */
 export type LeavingKind = "group" | "space";
 
-const WHAT: Record<LeavingKind, { title: string; description: string; confirm: string }> = {
+const WHAT = {
     group: {
-        title: "Leave this group?",
-        description:
-            "It goes out of your list and you stop getting its messages. Anybody still in it can add you back.",
-        confirm: "Leave group"
+        title: "leave.group.title",
+        description: "leave.group.description",
+        confirm: "leave.group.confirm"
     },
     space: {
-        title: "Leave this space?",
-        description:
-            "You lose every channel in it, including the ones you were added to by hand. Getting back in takes another invitation.",
-        confirm: "Leave space"
+        title: "leave.space.title",
+        description: "leave.space.description",
+        confirm: "leave.space.confirm"
     }
-};
+} as const satisfies Record<
+    LeavingKind,
+    { title: NamespaceKey<"chat">; description: NamespaceKey<"chat">; confirm: NamespaceKey<"chat"> }
+>;
 
 export function LeaveDialog({
     open,
@@ -70,6 +73,7 @@ export function LeaveDialog({
     /** Do it. The flag is whether the room is left in silence. */
     onLeave: (quietly: boolean) => Promise<void> | void;
 }) {
+    const t = useTranslations("chat");
     const [quietly, setQuietly] = useState(false);
     const [busy, setBusy] = useState(false);
     const words = WHAT[kind];
@@ -88,10 +92,10 @@ export function LeaveDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{words.title}</DialogTitle>
+                    <DialogTitle>{t(words.title)}</DialogTitle>
                     <DialogDescription>
                         {name ? `${name}. ` : ""}
-                        {words.description}
+                        {t(words.description)}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -102,9 +106,9 @@ export function LeaveDialog({
                         onChange={(event) => setQuietly(event.target.checked)}
                     />
                     <span>
-                        Leave quietly
+                        {t("leave.leaveQuietly")}
                         <span className="block text-xs text-muted-foreground">
-                            Leave without notifying other members.
+                            {t("leave.leaveWithoutNotifyingOtherMembers")}
                         </span>
                     </span>
                 </label>
@@ -117,7 +121,7 @@ export function LeaveDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-                        Stay
+                        {t("leave.stay")}
                     </Button>
                     <Button
                         size="sm"
@@ -129,7 +133,7 @@ export function LeaveDialog({
                             setBusy(false);
                         }}
                     >
-                        {busy ? "Leaving..." : words.confirm}
+                        {busy ? t("leave.leaving") : t(words.confirm)}
                     </Button>
                 </DialogFooter>
             </DialogContent>

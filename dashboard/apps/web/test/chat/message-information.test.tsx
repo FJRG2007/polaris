@@ -9,6 +9,7 @@
  * would ever take down, which is the one state a panel must not have.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { ChatMessageView } from "@/lib/chat/messages";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MessageInfoDialog } from "@/app/(app)/chat/message-info-dialog";
@@ -32,7 +33,7 @@ describe("message information", () => {
     it("says there is nothing to show rather than spinning forever", async () => {
         // What the action answers when the ticks are no longer this reader's to
         // see: no delivery, and no error either.
-        render(<MessageInfoDialog message={message} onOpenChange={() => undefined} />);
+        render(<MessageInfoDialog message={message} onOpenChange={() => undefined} />, { wrapper: MessagesWrapper });
         expect(await screen.findByText(/nothing to show/i)).toBeTruthy();
         expect(screen.queryByText("Looking")).toBeNull();
     });
@@ -46,7 +47,7 @@ describe("message information", () => {
                 state: "read"
             }
         };
-        render(<MessageInfoDialog message={message} onOpenChange={() => undefined} />);
+        render(<MessageInfoDialog message={message} onOpenChange={() => undefined} />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("Read")).toBeTruthy();
         expect(screen.queryByText(/nothing to show/i)).toBeNull();
     });

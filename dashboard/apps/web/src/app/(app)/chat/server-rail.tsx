@@ -27,6 +27,7 @@
  */
 
 import { useChat } from "./chat-context";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { forwardRef, useMemo, useState, type ComponentPropsWithoutRef } from "react";
 import { lastChannelIn } from "./recents";
 import { useRouter } from "next/navigation";
@@ -88,6 +89,7 @@ function hex(color: string | undefined): string | null {
 }
 
 export function ServerRail() {
+    const t = useTranslations("chat");
     const router = useRouter();
     const { spaces, channels, activeSpaceId, setActiveSpaceId, refresh, may } = useChat();
     const [newSpace, setNewSpace] = useState(false);
@@ -177,7 +179,7 @@ export function ServerRail() {
     return (
         <div className="flex h-full w-14 shrink-0 flex-col items-center gap-1.5 border-r border-border bg-surface py-2">
             <Pill
-                label="Direct messages"
+                label={t("serverRail.directMessages")}
                 active={activeSpaceId === null}
                 unread={waiting.get(null) ?? 0}
                 onClick={() => openSpace(null)}
@@ -222,8 +224,8 @@ export function ServerRail() {
             {may.spaces && (
                 <button
                     type="button"
-                    aria-label="New space"
-                    title="New space"
+                    aria-label={t("serverRail.newSpace")}
+                    title={t("serverRail.newSpace")}
                     onClick={() => setNewSpace(true)}
                     className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors duration-fast hover:border-border-strong hover:bg-card-hover hover:text-foreground"
                 >
@@ -434,6 +436,7 @@ function SpaceMenu({
     onNotify: (level: core.ChatChannelNotifyLevel) => void;
     children: React.ReactNode;
 }) {
+    const t = useTranslations("chat");
     const administers = space.access !== "member";
     const mayInvite = administers || space.visibility !== "private";
     // Leaving is only real where the roster is what lets somebody in. An
@@ -461,19 +464,19 @@ function SpaceMenu({
                 {mayInvite && (
                     <ContextMenuItem onSelect={onInvite}>
                         <UserPlus className="size-3.5" />
-                        Invite people
+                        {t("serverRail.invitePeople")}
                     </ContextMenuItem>
                 )}
                 {administers && (
                     <ContextMenuItem onSelect={onNewChannel}>
                         <Hash className="size-3.5" />
-                        New channel
+                        {t("serverRail.newChannel")}
                     </ContextMenuItem>
                 )}
                 {administers && (
                     <ContextMenuItem onSelect={onPicture}>
                         <ImageIcon className="size-3.5" />
-                        Space picture
+                        {t("serverRail.spacePicture")}
                     </ContextMenuItem>
                 )}
                 {/* The one moderation decision that never ends on its own and
@@ -486,13 +489,13 @@ function SpaceMenu({
                 {administers && (
                     <ContextMenuItem onSelect={onShare}>
                         <Users className="size-3.5" />
-                        Teams and roles
+                        {t("serverRail.teamsAndRoles")}
                     </ContextMenuItem>
                 )}
                 {administers && (
                     <ContextMenuItem onSelect={onBans}>
                         <Ban className="size-3.5" />
-                        Kept out
+                        {t("serverRail.keptOut")}
                     </ContextMenuItem>
                 )}
                 {mayLeave && (
@@ -500,7 +503,7 @@ function SpaceMenu({
                         {(mayInvite || administers) && <ContextMenuSeparator />}
                         <ContextMenuItem variant="danger" onSelect={onLeave}>
                             <LogOut className="size-3.5" />
-                            Leave this space
+                            {t("serverRail.leaveThisSpace")}
                         </ContextMenuItem>
                     </>
                 )}

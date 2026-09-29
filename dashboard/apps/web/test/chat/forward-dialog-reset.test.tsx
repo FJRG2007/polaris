@@ -14,6 +14,7 @@
  * meant to send it to, one press away.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -86,7 +87,7 @@ describe("the forward dialog reopened on a different message", () => {
                 message={message("m1")}
                 onOpenChange={() => undefined}
                 onSent={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         const field = screen.getByLabelText("Say something about it") as HTMLInputElement;
@@ -121,7 +122,7 @@ describe("the forward dialog reopened on a different message", () => {
                 message={message("m1")}
                 onOpenChange={() => undefined}
                 onSent={() => undefined}
-            />
+            />, { wrapper: MessagesWrapper }
         );
 
         await user.click(screen.getByRole("button", { name: "GRGrace" }));

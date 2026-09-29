@@ -21,6 +21,7 @@
  */
 
 import * as actions from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, cn } from "@polaris/ui";
 import { useChatStream } from "./use-chat-stream";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -46,6 +47,7 @@ export function PollCard({
     canEnd: boolean;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("chat");
     /**
      * What the card is drawing, which is the server's answer until somebody
      * presses something and this reader's guess for the moment after that.
@@ -136,7 +138,7 @@ export function PollCard({
         <div className="mt-1 max-w-md rounded-md border border-border bg-card p-3">
             <p className="mb-2 flex items-center gap-1.5 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
                 <BarChart3 className="size-3" />
-                {closed ? "Poll closed" : shown.multiple ? "Pick as many as apply" : "Pick one"}
+                {closed ? t("pollCard.pollClosed") : shown.multiple ? t("pollCard.pickAsManyAsApply") : t("pollCard.pickOne")}
             </p>
 
             <ul className="flex flex-col gap-1">
@@ -204,25 +206,27 @@ export function PollCard({
 
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                 <span className="tabular-nums">
-                    {shown.voters === 1 ? "1 vote" : `${shown.voters} votes`}
+                    {t("pollCard.votes", { count: shown.voters })}
                 </span>
                 <span aria-hidden="true">-</span>
                 {closed ? (
-                    <span>{shown.endedEarly ? "Closed early" : "Closed"}</span>
+                    <span>{shown.endedEarly ? t("pollCard.closedEarly") : t("pollCard.closed")}</span>
                 ) : shown.closesAt ? (
                     <span>
-                        Closes <RelativeTime iso={shown.closesAt} tense="future" />
+                        {t.rich("pollCard.closes", {
+                            time: () => <RelativeTime key="time" iso={shown.closesAt!} tense="future" />
+                        })}
                     </span>
                 ) : (
-                    <span>Open until it is closed</span>
+                    <span>{t("pollCard.openUntilItIsClosed")}</span>
                 )}
                 {!shown.results && !closed && (
                     <>
                         <span aria-hidden="true">-</span>
-                        <span>Results show when it closes</span>
+                        <span>{t("pollCard.resultsShowWhenItCloses")}</span>
                     </>
                 )}
-                {busy && <Loader2 className="size-3 animate-spin" aria-label="Saving your vote" />}
+                {busy && <Loader2 className="size-3 animate-spin" aria-label={t("pollCard.savingYourVote")} />}
                 {canEnd && !closed && (
                     <Button
                         size="xs"
@@ -232,7 +236,7 @@ export function PollCard({
                         className="ml-auto"
                     >
                         <CircleSlash />
-                        {ending ? "Closing..." : "End poll"}
+                        {ending ? t("pollCard.closing") : t("pollCard.endPoll")}
                     </Button>
                 )}
             </div>

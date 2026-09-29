@@ -18,6 +18,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
@@ -46,6 +47,7 @@ export function NewDirectDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("chat");
     const router = useRouter();
     const { viewerId, refresh, may } = useChat();
     const [kind, setKind] = useState<"direct" | "group">("direct");
@@ -115,11 +117,11 @@ export function NewDirectDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>New message</DialogTitle>
+                    <DialogTitle>{t("newDirect.newMessage")}</DialogTitle>
                     <DialogDescription>
                         {may.groups
-                            ? "One person, or several for a group."
-                            : "Pick who to write to."}
+                            ? t("newDirect.onePersonOrSeveralFor")
+                            : t("newDirect.pickWhoToWriteTo")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -150,7 +152,7 @@ export function NewDirectDialog({
                                 ) : (
                                     <Users className="size-3.5" />
                                 )}
-                                {option === "direct" ? "Direct message" : "Group"}
+                                {option === "direct" ? t("newDirect.directMessage") : t("newDirect.group")}
                             </button>
                         ))}
                     </div>
@@ -172,7 +174,7 @@ export function NewDirectDialog({
                     // Messaging yourself is not what anybody means by this, and
                     // the room it would open has nobody else in it.
                     exclude={[viewerId]}
-                    label="Who to message"
+                    label={t("newDirect.whoToMessage")}
                 />
 
                 {/* Only once there is a group to name. Both of these are the
@@ -187,9 +189,9 @@ export function NewDirectDialog({
                             onClick={() => file.current?.click()}
                             className="relative size-12 shrink-0 overflow-hidden rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:border-primary"
                             aria-label={
-                                picture ? "Change the group picture" : "Add a group picture"
+                                picture ? t("newDirect.changeTheGroupPicture") : t("newDirect.addAGroupPicture")
                             }
-                            title={picture ? "Change the group picture" : "Add a group picture"}
+                            title={picture ? t("newDirect.changeTheGroupPicture") : t("newDirect.addAGroupPicture")}
                         >
                             {preview ? (
                                 <img src={preview} alt="" className="size-full object-cover" />
@@ -211,7 +213,7 @@ export function NewDirectDialog({
                         <Input
                             value={name}
                             maxLength={MAX_CHAT_CHANNEL_NAME}
-                            aria-label="What this group is called"
+                            aria-label={t("newDirect.whatThisGroupIsCalled")}
                             placeholder={fallbackName}
                             onChange={(event) => {
                                 setTouched(true);
@@ -248,7 +250,7 @@ export function NewDirectDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {t("newDirect.cancel")}
                     </Button>
                     {kind === "group" && (
                         <Button
@@ -268,7 +270,7 @@ export function NewDirectDialog({
                             onClick={() => void open_(picked.map((person) => person.id))}
                         >
                             {busy && <Loader2 className="size-4 animate-spin" />}
-                            Start group
+                            {t("newDirect.startGroup")}
                         </Button>
                     )}
                 </DialogFooter>

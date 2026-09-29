@@ -19,6 +19,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const KEY = "polaris.call.speaker";
 
@@ -91,6 +92,7 @@ export function useSpeakers(): {
     readonly chosenId: string | null;
     readonly choose: (deviceId: string) => void;
 } {
+    const t = useTranslations("chat");
     const [devices, setDevices] = useState<readonly SpeakerDevice[]>([]);
     const [chosenId, setChosenId] = useState<string | null>(null);
 
@@ -106,7 +108,9 @@ export function useSpeakers(): {
                     // "default" is a real device id and the one most people are
                     // on; the browser's own label for it is usually good, and
                     // this is the fallback when it is empty.
-                    label: device.label || (device.deviceId === "default" ? "System default" : `Output ${index + 1}`)
+                    label:
+                        device.label ||
+                        (device.deviceId === "default" ? t("devices.systemDefault") : t("devices.outputN", { n: index + 1 }))
                 }))
         );
     }, []);

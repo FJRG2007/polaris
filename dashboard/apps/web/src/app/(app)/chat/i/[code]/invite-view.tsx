@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import type { ChatInviteOffer } from "@/lib/chat/invites";
@@ -22,6 +23,7 @@ import { Loader2, MessageSquare, TriangleAlert } from "lucide-react";
 import { acceptInviteAction, readInviteAction } from "@/app/(app)/chat/actions";
 
 export function InviteView({ code }: { code: string }) {
+    const t = useTranslations("chat");
     const router = useRouter();
     const [offer, setOffer] = useState<ChatInviteOffer | null | undefined>(undefined);
     const [busy, setBusy] = useState(false);
@@ -66,10 +68,10 @@ export function InviteView({ code }: { code: string }) {
             <div className="flex flex-1 items-center justify-center p-6">
                 <EmptyState
                     icon={<TriangleAlert />}
-                    title="That invitation does not lead anywhere."
+                    title={t("inviteView.thatInvitationDoesNotLead")}
                     description={
                         error ||
-                        "It may have been withdrawn, or the space it pointed at may be gone."
+                        t("inviteView.itMayHaveBeenWithdrawn")
                     }
                 />
             </div>
@@ -87,23 +89,23 @@ export function InviteView({ code }: { code: string }) {
                     )}
                     <p className="text-xs text-muted-foreground">
                         {offer.invitedBy
-                            ? `${offer.invitedBy} invited you.`
-                            : "You have been invited."}
+                            ? t("inviteView.invitedBy", { name: offer.invitedBy })
+                            : t("inviteView.youHaveBeenInvited")}
                     </p>
                 </div>
 
                 {offer.alreadyIn ? (
                     <Button size="sm" onClick={() => router.push("/chat")}>
-                        Open it
+                        {t("inviteView.openIt")}
                     </Button>
                 ) : offer.usable ? (
                     <Button size="sm" disabled={busy} onClick={() => void accept()}>
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        Join {offer.spaceName}
+                        {t("inviteView.join", { name: offer.spaceName })}
                     </Button>
                 ) : (
                     <p className="text-sm text-danger">
-                        This invitation has run out. Ask whoever sent it for another.
+                        {t("inviteView.thisInvitationHasRunOut")}
                     </p>
                 )}
 

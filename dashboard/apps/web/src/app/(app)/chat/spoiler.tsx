@@ -33,6 +33,7 @@
  */
 
 import { useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { cn } from "@polaris/ui";
 import { EyeOff } from "lucide-react";
 import { useSpoilersShown } from "./spoilers-shown";
@@ -53,6 +54,7 @@ export function Spoiler({
     className?: string;
     children: React.ReactNode;
 }) {
+    const t = useTranslations("chat");
     const always = useSpoilersShown();
     const [shown, setShown] = useState(false);
     const open = always || shown;
@@ -76,7 +78,7 @@ export function Spoiler({
             <button
                 type="button"
                 onClick={() => setShown(true)}
-                aria-label="Show the hidden text"
+                aria-label={t("spoiler.showTheHiddenText")}
                 className={cn(
                     // Transparent ink rather than removed text: the block has to
                     // be exactly as wide as what it hides, or uncovering it
@@ -116,12 +118,12 @@ export function Spoiler({
                 <button
                     type="button"
                     onClick={() => setShown(true)}
-                    aria-label={`Show this ${kind}`}
+                    aria-label={t("spoiler.showThis", { kind })}
                     className="absolute inset-0 flex items-center justify-center"
                 >
                     <span className="flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-wide text-white uppercase">
                         <EyeOff className="size-3.5 shrink-0" />
-                        Spoiler
+                        {t("spoiler.spoiler")}
                     </span>
                 </button>
             )}

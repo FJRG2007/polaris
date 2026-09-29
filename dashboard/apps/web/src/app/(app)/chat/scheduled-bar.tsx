@@ -16,6 +16,7 @@
  */
 
 import { useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import { CalendarClock, SendHorizontal, Trash2 } from "lucide-react";
@@ -45,6 +46,7 @@ export function ScheduledBar({
     onSendNow: (id: string) => Promise<void>;
     onCancel: (id: string) => Promise<void>;
 }) {
+    const t = useTranslations("chat");
     const format = useDisplayFormat();
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState("");
@@ -75,25 +77,25 @@ export function ScheduledBar({
                 {failed.length > 0 ? (
                     <span className="text-danger">
                         {failed.length === 1
-                            ? "A scheduled message could not be sent"
-                            : `${failed.length} scheduled messages could not be sent`}
+                            ? t("scheduledBar.aScheduledMessageCouldNot")
+                            : t("scheduledBar.failedMany", { count: failed.length })}
                     </span>
                 ) : (
                     <span>
                         {scheduled.length === 1
-                            ? `Scheduled for ${format.dateTime(next.sendAt)}`
-                            : `${scheduled.length} scheduled, next at ${format.dateTime(next.sendAt)}`}
+                            ? t("scheduledBar.scheduledFor", { date: format.dateTime(next.sendAt) })
+                            : t("scheduledBar.scheduledMany", { count: scheduled.length, date: format.dateTime(next.sendAt) })}
                     </span>
                 )}
-                <span className="ml-auto underline-offset-2 hover:underline">See them</span>
+                <span className="ml-auto underline-offset-2 hover:underline">{t("scheduledBar.seeThem")}</span>
             </button>
 
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>Waiting to be sent</DialogTitle>
+                        <DialogTitle>{t("scheduledBar.waitingToBeSent")}</DialogTitle>
                         <DialogDescription>
-                            Only you can see these. Nothing is in the conversation until it goes.
+                            {t("scheduledBar.onlyYouCanSeeThese")}
                         </DialogDescription>
                     </DialogHeader>
                     <ul className="flex max-h-80 flex-col gap-2 overflow-y-auto overscroll-contain">
@@ -113,7 +115,7 @@ export function ScheduledBar({
                                                 : "text-xs text-muted-foreground"
                                         }
                                     >
-                                        {entry.failure ?? `Sends ${format.dateTime(entry.sendAt)}`}
+                                        {entry.failure ?? t("scheduledBar.sends", { date: format.dateTime(entry.sendAt) })}
                                     </span>
                                     <span className="ml-auto flex items-center gap-1">
                                         <Button
@@ -125,7 +127,7 @@ export function ScheduledBar({
                                             }
                                         >
                                             <SendHorizontal className="size-3.5" />
-                                            Send now
+                                            {t("scheduledBar.sendNow")}
                                         </Button>
                                         <Button
                                             size="xs"
@@ -136,7 +138,7 @@ export function ScheduledBar({
                                             }
                                         >
                                             <Trash2 className="size-3.5" />
-                                            Delete
+                                            {t("scheduledBar.delete")}
                                         </Button>
                                     </span>
                                 </div>

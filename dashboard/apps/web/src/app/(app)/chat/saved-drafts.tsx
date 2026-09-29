@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { FilePen, RotateCcw, Trash2 } from "lucide-react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { useDisplayFormat } from "@/components/display-format";
@@ -80,6 +81,7 @@ export function SavedDraftsBar({
     onRestore: (draft: SavedDraft) => void;
     onDelete: (key: string) => void;
 }) {
+    const t = useTranslations("chat");
     const format = useDisplayFormat();
     const [open, setOpen] = useState(false);
 
@@ -100,21 +102,20 @@ export function SavedDraftsBar({
                 <FilePen className="size-3.5 shrink-0" />
                 <span className="min-w-0 truncate">
                     {drafts.length === 1
-                        ? `A saved draft: ${plainExcerpt(drafts[0]!.body, 80)}`
-                        : `${drafts.length} saved drafts`}
+                        ? t("savedDrafts.one", { excerpt: plainExcerpt(drafts[0]!.body, 80) })
+                        : t("savedDrafts.many", { count: drafts.length })}
                 </span>
                 <span className="ml-auto shrink-0 underline-offset-2 hover:underline">
-                    See {drafts.length === 1 ? "it" : "them"}
+                    {t("savedDrafts.see", { count: drafts.length })}
                 </span>
             </button>
 
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>Saved drafts</DialogTitle>
+                        <DialogTitle>{t("savedDrafts.savedDrafts")}</DialogTitle>
                         <DialogDescription>
-                            Only you can see these, and only in this browser. Each one is kept for
-                            30 days.
+                            {t("savedDrafts.onlyYouCanSeeThese")}
                         </DialogDescription>
                     </DialogHeader>
                     <ul className="flex max-h-80 flex-col gap-2 overflow-y-auto overscroll-contain">
@@ -128,7 +129,7 @@ export function SavedDraftsBar({
                                 </p>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-xs text-muted-foreground">
-                                        Saved {format.dateTime(new Date(draft.at).toISOString())}
+                                        {t("savedDrafts.savedAt", { date: format.dateTime(new Date(draft.at).toISOString()) })}
                                     </span>
                                     <span className="ml-auto flex items-center gap-1">
                                         <Button
@@ -140,7 +141,7 @@ export function SavedDraftsBar({
                                             }}
                                         >
                                             <RotateCcw className="size-3.5" />
-                                            Restore
+                                            {t("savedDrafts.restore")}
                                         </Button>
                                         <Button
                                             size="xs"
@@ -148,7 +149,7 @@ export function SavedDraftsBar({
                                             onClick={() => onDelete(draft.key)}
                                         >
                                             <Trash2 className="size-3.5" />
-                                            Delete
+                                            {t("savedDrafts.delete")}
                                         </Button>
                                     </span>
                                 </div>
