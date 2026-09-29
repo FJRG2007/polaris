@@ -1092,7 +1092,7 @@ export async function getPlayerLevels(
         if (server.edition !== "java") return {};
         const script = wanted.map((name) => `rcon-cli data get entity ${name} XpLevel`).join("; ");
         const result = await server.run(["sh", "-c", script]);
-        return Object.fromEntries(parse.parsePlayerLevels(result.output));
+        return Object.fromEntries(parse.parsePlayerLevels(result.output, wanted));
     });
 }
 

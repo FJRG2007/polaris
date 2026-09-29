@@ -342,7 +342,7 @@ export const GAME_MODES = "execute as @a run data get entity @s playerGameType";
 
 export function readGameModes(output: string): Map<string, number> {
     const found = new Map<string, number>();
-    const pattern = /([A-Za-z0-9_]{1,16}) has the following entity data: (-?\d+)(?![\d.])/g;
+    const pattern = /(\.?[A-Za-z0-9_]{1,16}) has the following entity data: (-?\d+)(?![\d.])/g;
     for (const match of stripFormatting(output).matchAll(pattern)) {
         found.set(match[1] as string, Number(match[2]));
     }

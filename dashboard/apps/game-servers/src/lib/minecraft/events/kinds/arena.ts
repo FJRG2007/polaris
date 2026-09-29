@@ -228,7 +228,7 @@ export const READ_UUIDS = "execute as @a run data get entity @s UUID";
 /** `Ana has the following entity data: 0` - 0 survival, 1 creative, 2 adventure, 3 spectator. */
 export function readGamemodes(output: string): Map<string, Gamemode> {
     const found = new Map<string, Gamemode>();
-    const pattern = /([A-Za-z0-9_]{1,16}) has the following entity data: ([0-3])(?![\d.])/g;
+    const pattern = /(\.?[A-Za-z0-9_]{1,16}) has the following entity data: ([0-3])(?![\d.])/g;
     for (const match of stripFormatting(output).matchAll(pattern)) {
         found.set(match[1] as string, GAMEMODES[Number(match[2])] as Gamemode);
     }
@@ -239,7 +239,7 @@ export function readGamemodes(output: string): Map<string, Gamemode> {
 export function readUuids(output: string): Map<string, number[]> {
     const found = new Map<string, number[]>();
     const pattern =
-        /([A-Za-z0-9_]{1,16}) has the following entity data: \[I;\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\d+)\]/g;
+        /(\.?[A-Za-z0-9_]{1,16}) has the following entity data: \[I;\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\d+)\]/g;
     for (const match of stripFormatting(output).matchAll(pattern)) {
         found.set(match[1] as string, [match[2], match[3], match[4], match[5]].map(Number));
     }

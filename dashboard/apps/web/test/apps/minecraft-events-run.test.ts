@@ -112,6 +112,15 @@ interface World {
     essentials: boolean;
     /** Lines a plugin answered instead of the game. */
     pluginGot: string[];
+    /** Answers run together with nothing between, as vanilla, Fabric and Paper
+     *  send them; NeoForge ends each with a newline. */
+    glued: boolean;
+    /** A team's prefix and suffix around a player's name, as the game prints it. */
+    display: Record<string, [string, string]>;
+    /** The side panel's title: the bracket in every score read. */
+    scoreTitle: string;
+    /** Players carrying each tag. */
+    tags: Record<string, Set<string>>;
     /** How long the storm lasts, in ticks, as the last `weather thunder` left it. */
     stormTicks: number;
 }
@@ -174,6 +183,10 @@ const world: World = {
     bukkit: false,
     essentials: false,
     pluginGot: [],
+    glued: false,
+    display: {},
+    scoreTitle: "Event title",
+    tags: {},
     stormTicks: 0
 };
 let config: Record<string, unknown> = {};
@@ -509,14 +522,14 @@ function answer(sent: string): string {
     if (line === "execute as @a run scoreboard players get @s pe_score") {
         return world.online
             .filter((name) => world.scores[name] !== undefined)
-            .map((name) => `${name} has ${world.scores[name]} [Event title]`)
+            .map((name) => `${name} has ${world.scores[name]} [${world.scoreTitle}]`)
             .join("\n");
     }
     const one = /^scoreboard players get (\S+) pe_score$/.exec(line);
     if (one) {
         const name = one[1] as string;
         return world.scores[name] !== undefined
-            ? `${name} has ${world.scores[name]} [Event title]`
+            ? `${name} has ${world.scores[name]} [${world.scoreTitle}]`
             : `Can't get value of pe_score for ${name}; none is set`;
     }
     // The heightmap under the trees: water stops it too, and the ground check refuses that.
@@ -639,14 +652,71 @@ function answer(sent: string): string {
     return "";
 }
 
+/** Who carries a tag. */
+function tagged(tag: string): Set<string> {
+    return (world.tags[tag] ??= new Set());
+}
+
+/**
+ * A line as the server takes it and its answer as RCON hands it back: display
+ * names, answers run together, and at most one 4096-character packet - or, when
+ * that packet is more than 4096 bytes, nothing but the console tool's complaint.
+ * The event's page tags are the game's too.
+ */
+function heard(line: string): string {
+    const page = /^(.*)\[(?:(.*),)?tag=!pe_seen,limit=20\] run tag @s add pe_page$/.exec(line);
+    if (page) {
+        world.sent.push(line);
+        const next = world.online.filter((name) => !tagged("pe_seen").has(name)).slice(0, 20);
+        for (const name of next) tagged("pe_page").add(name);
+        return next.map((name) => `Added tag 'pe_page' to ${name}`).join(world.glued ? "" : "\n");
+    }
+    const tagging = /^tag @a(\[tag=(pe_\w+)\])? (add|remove) (pe_\w+)$/.exec(line);
+    if (tagging) {
+        world.sent.push(line);
+        const who = tagging[2] ? [...tagged(tagging[2])] : world.online;
+        for (const name of who) {
+            if (tagging[3] === "add") tagged(tagging[4]!).add(name);
+            else tagged(tagging[4]!).delete(name);
+        }
+        return "";
+    }
+    if (line === "list uuids") {
+        world.sent.push(line);
+        return `There are ${world.online.length} of a max of 100 players online: ${world.online
+            .map((name, index) => `${name} (00000000-0000-0000-0000-${String(index).padStart(12, "0")})`)
+            .join(", ")}`;
+    }
+    let out: string;
+    if (/tag=pe_page\]/.test(line)) {
+        const whole = line.replace(",tag=pe_page]", "]").replace("[tag=pe_page]", "");
+        const inPage = tagged("pe_page");
+        out = answer(whole)
+            .split("\n")
+            .filter((entry) => inPage.has(/^(\S+) has /.exec(entry)?.[1] ?? ""))
+            .join("\n");
+        world.sent[world.sent.length - 1] = line;
+    } else out = answer(line);
+    for (const [name, [before, after]] of Object.entries(world.display))
+        out = out.replace(new RegExp(`(^|\\n)${name} has `, "g"), `$1${before}${name}${after} has `);
+    if (world.glued) out = out.replace(/\n(?=\S+.* has )/g, "");
+    if (out.length > 4096) {
+        const first = out.slice(0, 4096);
+        out = /[^\x00-\x7f]/.test(first)
+            ? "Failed to read command: rcon: response too long\n"
+            : first;
+    }
+    return out;
+}
+
 const server = {
     installedAppId: "s",
     applicationId: "a",
     edition: "java",
     running: true,
-    say: async (argv: readonly string[]) => answer(argv.join(" ")),
+    say: async (argv: readonly string[]) => heard(argv.join(" ")),
     sayAll: async (lines: readonly string[]) => {
-        for (const line of lines) answer(line);
+        for (const line of lines) heard(line);
     },
     run: async (argv: readonly string[]) => {
         if (argv[0] === "stat") return { code: 0, output: String(world.log.length) };
@@ -811,6 +881,10 @@ beforeEach(() => {
     world.bukkit = false;
     world.essentials = false;
     world.pluginGot = [];
+    world.glued = false;
+    world.display = {};
+    world.scoreTitle = "Event title";
+    world.tags = {};
     world.stormTicks = 0;
     events.forgetPlayers();
     held.length = 0;
@@ -2015,6 +2089,51 @@ describe("what the audit found", () => {
         const entry = state().history[0];
         expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 15 }]);
         expect(entry?.disqualified).toEqual(["Ana"]);
+    });
+
+    it("reads a podium out of a crowd too big for one answer, with an accent in the title", async () => {
+        world.online = Array.from({ length: 100 }, (_, index) => `Pescador${String(index).padStart(2, "0")}`);
+        world.glued = true;
+        world.scoreTitle = "Gran concurso de pesca en el r\u00edo del norte";
+        const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 3 };
+        setUp([fish]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "fish",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        world.scores = Object.fromEntries(world.online.map((name, index) => [name, index === 95 ? 90 : 1]));
+        await play(3 * 60_000);
+        expect(state().history[0]?.podium[0]).toEqual({ place: 1, name: "Pescador95", score: 90 });
+        // The page tags are gone again.
+        expect(world.tags.pe_seen?.size ?? 0).toBe(0);
+        expect(world.tags.pe_page?.size ?? 0).toBe(0);
+    });
+
+    it("reads each player by name through a team's prefix and suffix, and a Bedrock player as themselves", async () => {
+        world.online = ["Ana", "Ben", ".Cy", "Cy"];
+        world.glued = true;
+        world.display = { Ana: ["[VIP] ", ""], Ben: ["", " [AFK]"] };
+        const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 3 };
+        setUp([fish]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "fish",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        world.scores = { Ana: 7, Ben: 5, ".Cy": 9, Cy: 1 };
+        await play(3 * 60_000);
+        expect(state().history[0]?.podium).toEqual([
+            { place: 1, name: ".Cy", score: 9 },
+            { place: 2, name: "Ana", score: 7 },
+            { place: 3, name: "Ben", score: 5 }
+        ]);
     });
 
     it("leaves somebody AFK the whole time off a fishing podium", async () => {

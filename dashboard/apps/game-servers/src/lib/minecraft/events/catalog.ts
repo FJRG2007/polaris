@@ -46,8 +46,9 @@ export const EVENTS_KEY = "events";
 export const EVENT_STATE_KEY = "eventState";
 
 /** A player's name as the game allows it - the only thing ever put into a
- *  command in place of a selector. */
-export const PLAYER_NAME = /^[A-Za-z0-9_]{1,16}$/;
+ *  command in place of a selector. A Bedrock player's through Floodgate has a
+ *  `.` in front, and is that player, not the Java one without it. */
+export const PLAYER_NAME = /^\.?[A-Za-z0-9_]{1,16}$/;
 
 /** A namespaced item id, `minecraft:diamond` or a mod's own. */
 const ITEM_ID = /^[a-z0-9_.-]+:[a-z0-9_./-]+$/;

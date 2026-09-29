@@ -83,13 +83,29 @@ export function parsePlayerListFromLog(log: string): PlayerList | null {
  * the replies are collected from one shell and nothing guarantees they come back
  * in the order they were sent, and a level shown against the wrong player is
  * worse than no level at all.
+ *
+ * What the game prints is the DISPLAY name - a team's prefix and suffix around
+ * it, `[VIP] Ada [AFK]` - so the name is the one asked about that is in it, or
+ * else the last word in it that can be a name, a Bedrock player's `.` included.
  */
-export function parsePlayerLevels(output: string): Map<string, number> {
+export function parsePlayerLevels(
+    output: string,
+    asked: readonly string[] = []
+): Map<string, number> {
     const found = new Map<string, number>();
-    for (const match of stripFormatting(output).matchAll(
-        /^(\S{1,40}) has the following entity data:\s*(\d{1,7})\b/gm
-    )) {
-        const [, name, level] = match;
+    for (const match of stripFormatting(output)
+        .replace(/\u001b/g, "")
+        .matchAll(/^(.{1,80}?) has the following entity data:\s*(\d{1,7})(?!\d)/gm)) {
+        const [, display = "", level] = match;
+        const name =
+            asked
+                .filter((one) => display.includes(one))
+                .sort((left, right) => right.length - left.length)[0] ??
+            display
+                .trim()
+                .split(/\s+/)
+                .filter((word) => /^\.?[A-Za-z0-9_]{1,16}$/.test(word))
+                .at(-1);
         if (name && level) found.set(name, Number(level));
     }
     return found;

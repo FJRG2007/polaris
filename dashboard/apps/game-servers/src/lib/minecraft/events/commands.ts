@@ -374,7 +374,7 @@ export function readScoreCommand(name: string): string {
  */
 export function readScores(output: string): Map<string, number> {
     const found = new Map<string, number>();
-    const pattern = /([A-Za-z0-9_]{1,16}) has (-?\d+) \[[^\n]*?\]/g;
+    const pattern = /(\.?[A-Za-z0-9_]{1,16}) has (-?\d+) \[[^\n]*?\]/g;
     for (const match of stripFormatting(output).matchAll(pattern)) {
         found.set(match[1] as string, Number(match[2]));
     }
@@ -385,7 +385,7 @@ export function readScores(output: string): Map<string, number> {
 
 /** A chat line in the server log: `[12:00:01] [Server thread/INFO]: <Alice> hello`,
  *  NeoForge's extra bracket and the "Not Secure" mark allowed for. */
-export const CHAT_LINE = /\]: (?:\[Not Secure\] )?<([A-Za-z0-9_]{1,16})> (.+)$/gm;
+export const CHAT_LINE = /\]: (?:\[Not Secure\] )?<(\.?[A-Za-z0-9_]{1,16})> (.+)$/gm;
 
 // ------------------------------------------------------------------ who is where
 
@@ -410,7 +410,7 @@ const NUMBERED_WORLDS: Readonly<Record<string, string>> = {
 export function readDimensions(output: string): Map<string, string> {
     const found = new Map<string, string>();
     const pattern =
-        /([A-Za-z0-9_]{1,16}) has the following entity data: (?:"([a-z0-9_:./-]+)"|(-?\d+)(?![\d.]))/g;
+        /(\.?[A-Za-z0-9_]{1,16}) has the following entity data: (?:"([a-z0-9_:./-]+)"|(-?\d+)(?![\d.]))/g;
     for (const match of stripFormatting(output).matchAll(pattern)) {
         const world = match[2] ?? NUMBERED_WORLDS[match[3] as string];
         if (world) found.set(match[1] as string, world);
@@ -436,7 +436,7 @@ export const READ_HIT = `execute as @a run scoreboard players get @s ${HIT}`;
 export function readWhere(output: string): { name: string; x: number; y: number; z: number }[] {
     const found: { name: string; x: number; y: number; z: number }[] = [];
     const pattern =
-        /([A-Za-z0-9_]{1,16}) has the following entity data: \[(-?[\d.E-]+)d, (-?[\d.E-]+)d, (-?[\d.E-]+)d\]/g;
+        /(\.?[A-Za-z0-9_]{1,16}) has the following entity data: \[(-?[\d.E-]+)d, (-?[\d.E-]+)d, (-?[\d.E-]+)d\]/g;
     for (const match of stripFormatting(output).matchAll(pattern)) {
         const [x, y, z] = [match[2], match[3], match[4]].map(Number) as [number, number, number];
         if ([x, y, z].every(Number.isFinite)) found.push({ name: match[1] as string, x, y, z });
@@ -448,7 +448,7 @@ export function readWhere(output: string): { name: string; x: number; y: number;
 export function readFacing(output: string): Map<string, { yaw: number; pitch: number }> {
     const found = new Map<string, { yaw: number; pitch: number }>();
     const pattern =
-        /([A-Za-z0-9_]{1,16}) has the following entity data: \[(-?[\d.E-]+)f, (-?[\d.E-]+)f\]/g;
+        /(\.?[A-Za-z0-9_]{1,16}) has the following entity data: \[(-?[\d.E-]+)f, (-?[\d.E-]+)f\]/g;
     for (const match of stripFormatting(output).matchAll(pattern)) {
         const yaw = Number(match[2]);
         const pitch = Number(match[3]);
@@ -679,7 +679,7 @@ export function readHomes(
 ): { x: number; z: number }[] {
     const each = (output: string) => {
         const found = new Map<string, number>();
-        const pattern = /([A-Za-z0-9_]{1,16}) has the following entity data: (-?\d+)(?![\d.])/g;
+        const pattern = /(\.?[A-Za-z0-9_]{1,16}) has the following entity data: (-?\d+)(?![\d.])/g;
         for (const match of stripFormatting(output).matchAll(pattern)) {
             found.set(match[1] as string, Number(match[2]));
         }
@@ -697,7 +697,7 @@ export function readHomes(
         if (z !== undefined && overworld(legacyWorlds, name)) homes.push({ x, z });
     }
     const modern =
-        /([A-Za-z0-9_]{1,16}) has the following entity data: \[I;\s*(-?\d+),\s*-?\d+,\s*(-?\d+)\]/g;
+        /(\.?[A-Za-z0-9_]{1,16}) has the following entity data: \[I;\s*(-?\d+),\s*-?\d+,\s*(-?\d+)\]/g;
     for (const match of stripFormatting(respawn).matchAll(modern)) {
         if (overworld(modernWorlds, match[1] as string))
             homes.push({ x: Number(match[2]), z: Number(match[3]) });

@@ -19,6 +19,8 @@ import * as stored from "./state";
 import { readXray } from "../xray";
 import { prisma } from "@polaris/db";
 import * as catalog from "./catalog";
+import * as replies from "./replies";
+import * as service from "../service";
 import * as waves from "./kinds/waves";
 import * as commands from "./commands";
 import * as messages from "./messages";
@@ -38,10 +40,9 @@ import * as rareCatch from "./kinds/rare-catch";
 import * as meteors from "./kinds/meteor-shower";
 import * as stageService from "./kinds/stage-service";
 import * as arenaService from "./kinds/arena-service";
+import { editionOf, type ServerContainer } from "../service";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
-import * as service from "../service";
-import { editionOf, type ServerContainer } from "../service";
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -54,8 +55,13 @@ const bukkitServers = new Map<string, { at: number; bukkit: boolean }>();
  * command on a Bukkit-family server (`commands.namespaced`), where a plugin's
  * command of the same name would otherwise answer instead. Which kind it is is
  * asked once and remembered; a server that does not answer is asked again.
+ *
+ * And every answer to a read of all the players made readable by name
+ * (`replies`): asked again a page at a time when it came back cut short, and
+ * split by the names online when the game ran the answers together or wrote
+ * them with a team's prefix.
  */
-function vanillaCommands(server: ServerContainer): ServerContainer {
+function eventServer(server: ServerContainer): ServerContainer {
     const bukkit = async (): Promise<boolean> => {
         const known = bukkitServers.get(server.installedAppId);
         if (known && Date.now() - known.at < KIND_KNOWN_MS) return known.bukkit;
@@ -67,9 +73,35 @@ function vanillaCommands(server: ServerContainer): ServerContainer {
     };
     const named = async (lines: readonly string[]) =>
         (await bukkit()) ? lines.map(commands.namespaced) : lines;
+    const one = async (line: string) => server.say(await named([line]));
+    const paged = async (line: string, whole: string): Promise<string> => {
+        const pages = replies.pagedRead(line);
+        if (!pages) return whole;
+        await server.sayAll(await named(pages.start));
+        const read: string[] = [];
+        try {
+            for (let page = 0; page < 25; page += 1) {
+                if (!replies.pageTagged(await one(pages.tagPage))) break;
+                read.push(await one(pages.readPage));
+                await server.sayAll(await named(pages.next));
+            }
+        } finally {
+            await server.sayAll(await named([...pages.next.slice(1), ...pages.end]));
+        }
+        return read.join("\n");
+    };
     return {
         ...server,
-        say: async (argv) => server.say(await named([argv.join(" ")])),
+        say: async (argv) => {
+            const line = argv.join(" ");
+            const said = await one(line);
+            if (!replies.isPlayerRead(line)) return said;
+            const whole = replies.cutShort(said) ? await paged(line, said) : said;
+            const read = replies.canonicalReplies(whole, null);
+            if (!read.needsRoster) return read.text;
+            const roster = replies.rosterNames(await one(replies.ROSTER).catch(() => ""));
+            return replies.canonicalReplies(whole, roster).text;
+        },
         sayAll: async (lines) => server.sayAll(await named(lines))
     };
 }
@@ -80,7 +112,7 @@ function withServerContainer<T>(
     work: (server: ServerContainer) => Promise<T>
 ): Promise<T> {
     return service.withServerContainer(ownerId, installedAppId, (server) =>
-        work(vanillaCommands(server))
+        work(eventServer(server))
     );
 }
 
@@ -89,7 +121,7 @@ async function openServerContainer(
     installedAppId: string
 ): Promise<{ server: ServerContainer; close: () => Promise<void> }> {
     const link = await service.openServerContainer(ownerId, installedAppId);
-    return { server: vanillaCommands(link.server), close: link.close };
+    return { server: eventServer(link.server), close: link.close };
 }
 
 const TICK_MS = 2_000;

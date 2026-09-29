@@ -13,6 +13,7 @@ import type { PlayerList } from "./parse";
 import type { Recipient, SendContext } from "./announcement";
 import type { ServerContainer } from "./service";
 import * as events from "./player-events";
+import * as replies from "./events/replies";
 import { linkedChannels, readChatLink, type ChatLink } from "./chat-link";
 import { searchContainerTail } from "../container-files";
 import { eventWins, readEventState } from "./events/state";
@@ -125,7 +126,15 @@ export async function liveContext(
         lists[name] = rows;
     };
     if ((used.has(LEVELS_VARIABLE) || used.has(LEVEL_RANKING)) && server) {
-        const levels = events.readLevels(await server.say([events.LEVELS_COMMAND]).catch(() => ""));
+        // One answer per player, run together on most servers: split by the
+        // names online where a level meets the next name.
+        const said = await server.say([events.LEVELS_COMMAND]).catch(() => "");
+        let read = replies.canonicalReplies(said, null);
+        if (read.needsRoster) {
+            const roster = replies.rosterNames(await server.say([replies.ROSTER]).catch(() => ""));
+            read = replies.canonicalReplies(said, roster);
+        }
+        const levels = events.readLevels(read.text);
         const rows = levels.map(events.levelText);
         list(LEVELS_VARIABLE, rows);
         const ranked = rankLines(levels.map((one) => ({ name: one.name, value: one.level })));

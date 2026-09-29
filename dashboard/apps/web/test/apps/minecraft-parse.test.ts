@@ -207,6 +207,19 @@ describe("parsePlayerLevels", () => {
         expect(found.size).toBe(1);
     });
 
+    it("reads the player's own name through a team's prefix and suffix", () => {
+        const output = [
+            "[VIP] Ada [AFK] has the following entity data: 30",
+            "Grace Admin has the following entity data: 7",
+            ".Bedrock has the following entity data: 2"
+        ].join("\n");
+        expect(Object.fromEntries(parse.parsePlayerLevels(output, ["Ada", "Grace"]))).toEqual({
+            Ada: 30,
+            Grace: 7,
+            ".Bedrock": 2
+        });
+    });
+
     it("reads through the console's own colouring", () => {
         expect(parse.parsePlayerLevels("\u001b[0;37mAda has the following entity data: 12").get("Ada")).toBe(12);
     });
