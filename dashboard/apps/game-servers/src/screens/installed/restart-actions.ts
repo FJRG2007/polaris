@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { gameWords } from "../game-words";
 import { revalidatePath } from "next/cache";
 import { MAX_RESTART_REASON, type PendingRestart } from "../../lib/games-restart";
 import {
@@ -57,7 +58,7 @@ export async function scheduleGameRestartAction(input: {
     reason?: string;
 }): Promise<{ pending?: PendingRestart; error?: string }> {
     const parsed = bookSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the time and try again" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheTimeAndTry") };
     try {
         const { user } = await requireGameServer("games.manage", parsed.data.installedAppId);
         const pending = await requestRestart(parsed.data.installedAppId, {
@@ -75,7 +76,7 @@ export async function scheduleGameRestartAction(input: {
         });
         return { pending };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That restart could not be booked" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatRestartCouldNotBe") };
     }
 }
 
@@ -92,7 +93,7 @@ export async function cancelGameRestartAction(installedAppId: string): Promise<{
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That restart could not be called off" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatRestartCouldNotBe2") };
     }
 }
 
@@ -116,6 +117,6 @@ export async function restartGameNowAction(installedAppId: string): Promise<{ er
         revalidatePath(`/apps/installed/${installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server could not be restarted" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerCouldNotBe") };
     }
 }

@@ -1,4 +1,5 @@
 import { after, NextResponse } from "next/server";
+import { gameWords } from "../../../../../../screens/game-words";
 import { reachAdviceFor } from "../../../../../../lib/minecraft/reach";
 import { readLastSeen } from "../../../../../../lib/games-activity-service";
 import { idleSince, lookIfDue } from "../../../../../../lib/minecraft/activity";
@@ -242,7 +243,7 @@ export async function GET(
         });
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : "Could not read the server" },
+            { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotReadTheServer") },
             { status: 400 }
         );
     }

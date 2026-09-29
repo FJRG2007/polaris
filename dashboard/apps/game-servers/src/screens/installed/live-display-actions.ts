@@ -10,6 +10,7 @@
  */
 
 import { z } from "zod";
+import { gameWords } from "../game-words";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { linkedChannels, readChatLink } from "../../lib/minecraft/chat-link";
@@ -68,12 +69,12 @@ export async function readLiveDisplayAction(
     installedAppId: string
 ): Promise<{ state?: LiveDisplayState; error?: string }> {
     const parsed = idSchema.safeParse(installedAppId);
-    if (!parsed.success) return { error: "That server is not here" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.thatServerIsNotHere") };
     try {
         await requireGameServer("games.console", parsed.data);
         return { state: await stateOf(parsed.data) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That could not be read" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeRead") };
     }
 }
 
@@ -82,7 +83,7 @@ export async function stopPinnedAction(
     installedAppId: string
 ): Promise<{ ok?: true; error?: string }> {
     const parsed = idSchema.safeParse(installedAppId);
-    if (!parsed.success) return { error: "That server is not here" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.thatServerIsNotHere") };
     try {
         const { user, access } = await requireGameServer("games.console", parsed.data);
         await unpinAnnouncement(access.ownerId, parsed.data);
@@ -94,7 +95,7 @@ export async function stopPinnedAction(
         });
         return { ok: true };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The server did not take that" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerDidNotTake") };
     }
 }
 
@@ -108,13 +109,13 @@ export async function saveLiveDisplayAction(
     input: z.input<typeof sidebarInput>
 ): Promise<{ state?: LiveDisplayState; error?: string }> {
     const parsed = sidebarInput.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the panel" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkThePanel") };
     const { installedAppId, sidebar } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         const current = await stateOf(installedAppId);
         if (hasSidebarProblems(sidebar, current.known)) {
-            return { error: "Fix what is marked on the panel first" };
+            return { error: (await gameWords("games"))("errors.fixWhatIsMarkedOn") };
         }
         if (sidebar.enabled && current.sidebarRefusal) return { error: current.sidebarRefusal };
         await patchInstallConfig(installedAppId, { [SIDEBAR_KEY]: sidebar });
@@ -128,6 +129,6 @@ export async function saveLiveDisplayAction(
         });
         return { state: await stateOf(installedAppId) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That could not be saved" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeSaved") };
     }
 }

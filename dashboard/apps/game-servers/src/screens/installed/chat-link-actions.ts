@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { gameWords } from "../game-words";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
@@ -66,12 +67,12 @@ export async function readChatLinkAction(
     installedAppId: string
 ): Promise<{ state?: ChatLinkState; error?: string }> {
     const parsed = idSchema.safeParse(installedAppId);
-    if (!parsed.success) return { error: "That server is not here" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.thatServerIsNotHere") };
     try {
         const { user } = await requireGameServer("games.manage", parsed.data);
         return { state: await stateOf(parsed.data, user.id) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That could not be read" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeRead") };
     }
 }
 
@@ -85,7 +86,7 @@ export async function saveChatLinkAction(
     input: z.input<typeof saveInput>
 ): Promise<{ state?: ChatLinkState; error?: string }> {
     const parsed = saveInput.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the link" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheLink") };
     const { installedAppId, link } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
@@ -95,7 +96,7 @@ export async function saveChatLinkAction(
             if (refused) return { error: refused };
         }
         if (link?.relay && !current.java) {
-            return { error: "Only a Java server can show a channel's messages in the game" };
+            return { error: (await gameWords("games"))("errors.onlyAJavaServerCan") };
         }
         await patchInstallConfig(installedAppId, chatLinkPatch(link));
         forgetLinkedServers();
@@ -119,6 +120,6 @@ export async function saveChatLinkAction(
         });
         return { state: await stateOf(installedAppId, user.id) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That could not be saved" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeSaved") };
     }
 }

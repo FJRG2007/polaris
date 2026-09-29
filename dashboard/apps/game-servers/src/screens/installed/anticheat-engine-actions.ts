@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { gameWords } from "../game-words";
 import { host } from "@polaris/app-host";
 import { revalidatePath } from "next/cache";
 import * as service from "../../lib/minecraft/polaris-anticheat-service";
@@ -25,11 +26,11 @@ export async function anticheatStateAction(
     installedAppId: string
 ): Promise<{ state?: service.AnticheatState; error?: string }> {
     const parsed = serverId.safeParse(installedAppId);
-    if (!parsed.success) return { error: "Server not found" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.serverNotFound") };
     try {
         const { access } = await requireGameServer("games.read", parsed.data);
         const applicationId = access.install.applicationId;
-        if (!applicationId) return { error: "This server has not been deployed yet" };
+        if (!applicationId) return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
         return { state: await service.anticheatState(applicationId, access.ownerId) };
     } catch (caught) {
         return { error: failure(caught, "Could not read the anti-cheat") };
@@ -44,14 +45,14 @@ export async function setAnticheatAction(input: {
     on: boolean;
 }): Promise<{ error?: string }> {
     const parsed = switchSchema.safeParse(input);
-    if (!parsed.success) return { error: "Server not found" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.serverNotFound") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
             parsed.data.installedAppId
         );
         const applicationId = access.install.applicationId;
-        if (!applicationId) throw new Error("This server has not been deployed yet");
+        if (!applicationId) throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
         await service.setAnticheat(
             parsed.data.installedAppId,
             applicationId,

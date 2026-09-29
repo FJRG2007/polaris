@@ -9,6 +9,7 @@
  */
 
 import { MAX_CONSOLE_LINE } from "../../lib/console-queue";
+import { gameWords } from "../game-words";
 import { gameOfServer, isModpackReference, routesByHostname } from "@polaris/core";
 import { z } from "zod";
 import { prisma } from "@polaris/db";
@@ -213,7 +214,7 @@ export async function setGamemodeAction(input: {
 }): Promise<{ applied?: number; error?: string }> {
     const parsed = gamemodeSchema.safeParse({ ...input, players: [...input.players] });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.moderate",
@@ -240,7 +241,7 @@ export async function setGamemodeAction(input: {
         return { applied };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.theServerDidNotAccept")
         };
     }
 }
@@ -270,7 +271,7 @@ export async function moderatePlayerAction(
 ): Promise<{ output?: string; error?: string }> {
     const parsed = moderationSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.moderate",
@@ -291,7 +292,7 @@ export async function moderatePlayerAction(
         return { output: output.trim() };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.theServerDidNotAccept")
         };
     }
 }
@@ -351,7 +352,7 @@ export async function givePlayerItemAction(
 ): Promise<{ output?: string; error?: string; queued?: true }> {
     const parsed = giveSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     const { installedAppId, player, item, count } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -385,7 +386,7 @@ export async function givePlayerItemAction(
         return { output: output.trim() };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.theServerDidNotAccept")
         };
     }
 }
@@ -413,7 +414,7 @@ export async function setPlayerExperienceAction(
 ): Promise<{ output?: string; error?: string }> {
     const parsed = experienceSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     const { installedAppId, player, mode, amount, unit } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -433,7 +434,7 @@ export async function setPlayerExperienceAction(
         return { output };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.theServerDidNotAccept")
         };
     }
 }
@@ -458,7 +459,7 @@ export async function teleportPlayerAction(
 ): Promise<{ output?: string; error?: string }> {
     const parsed = teleportSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     const { installedAppId, player, destination } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -479,7 +480,7 @@ export async function teleportPlayerAction(
         return { output: output.trim() };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.theServerDidNotAccept")
         };
     }
 }
@@ -521,7 +522,7 @@ export async function readPlayerInventoryAction(
             player
         });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
         // One handshake for the whole read. A bag too big for a single RCON reply
@@ -546,7 +547,7 @@ export async function readPlayerInventoryAction(
             // server's "No entity was found" at somebody reads as one.
             if (isMissingEntityReply(reading.said)) {
                 return {
-                    error: "This player is not on the server, and Polaris has no copy of their bag yet. It keeps one every ten minutes while they are playing."
+                    error: (await gameWords("minecraft"))("errors.thisPlayerIsNotOn")
                 };
             }
             const said = reading.said.trim().replace(/\s+/g, " ").slice(0, 160);
@@ -555,13 +556,13 @@ export async function readPlayerInventoryAction(
             // is quoting a fact about their server version at them sideways.
             if (/unknown or incomplete command/i.test(said)) {
                 return {
-                    error: "This server does not have the /data command, so it cannot report what a player is carrying. Java 1.13 or newer can."
+                    error: (await gameWords("minecraft"))("errors.thisServerDoesNotHave")
                 };
             }
             return {
                 error: said
-                    ? `The server did not answer with an inventory: ${said}`
-                    : "The server did not answer, and Polaris has no copy of this player's bag yet"
+                    ? (await gameWords("minecraft"))("errors.noInventoryAnswer", { said })
+                    : (await gameWords("minecraft"))("errors.theServerDidNotAnswer")
             };
         }
         // A live reading is also worth keeping: this is the one moment the bag is
@@ -590,7 +591,7 @@ export async function readPlayerInventoryAction(
             error:
                 caught instanceof Error
                     ? caught.message
-                    : "Could not read the inventory, and Polaris has no copy of this player's bag yet"
+                    : (await gameWords("minecraft"))("errors.couldNotReadTheInventory")
         };
     }
 }
@@ -611,7 +612,7 @@ export async function readPlayerPositionAction(
         .object({ installedAppId: z.string().uuid(), player: playerNameSchema })
         .safeParse({ installedAppId, player });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
         const output = await runServerCommand(access.ownerId, parsed.data.installedAppId, [
@@ -624,7 +625,7 @@ export async function readPlayerPositionAction(
         const coordinates = parsePosition(stripFormatting(output));
         if (coordinates === null) {
             return {
-                error: "The server did not report a position - the player has to be on the server"
+                error: (await gameWords("minecraft"))("errors.theServerDidNotReport")
             };
         }
         const dimension = await runServerCommand(access.ownerId, parsed.data.installedAppId, [
@@ -643,7 +644,7 @@ export async function readPlayerPositionAction(
             error:
                 caught instanceof Error
                     ? caught.message
-                    : "Could not read the position - the player has to be on the server"
+                    : (await gameWords("minecraft"))("errors.couldNotReadThePosition")
         };
     }
 }
@@ -666,7 +667,7 @@ export async function readPlayerRecordAction(
         .object({ installedAppId: z.string().uuid(), player: playerNameSchema })
         .safeParse({ installedAppId, player });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
         const [record, stats] = await Promise.all([
@@ -678,7 +679,7 @@ export async function readPlayerRecordAction(
         return { record, stats };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not read this player's history"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotReadThisPlayer")
         };
     }
 }
@@ -689,7 +690,7 @@ export async function timeoutPlayerAction(
 ): Promise<{ until?: string; error?: string }> {
     const parsed = timeoutSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     const { installedAppId, player, minutes, reason } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -704,7 +705,7 @@ export async function timeoutPlayerAction(
         return { until: entry.until };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.theServerDidNotAccept")
         };
     }
 }
@@ -721,7 +722,7 @@ export async function liftTimeoutAction(
             player
         });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.moderate",
@@ -737,7 +738,7 @@ export async function liftTimeoutAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not lift the timeout" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotLiftTheTimeout") };
     }
 }
 
@@ -812,7 +813,7 @@ export async function saveGameScheduleAction(
 ): Promise<{ error?: string }> {
     const parsed = scheduleSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         // The schedule is written straight to the install's config, so nothing else
         // on the way would refuse a server this person may not touch.
@@ -831,7 +832,7 @@ export async function saveGameScheduleAction(
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the schedule" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotSaveTheSchedule") };
     }
 }
 
@@ -849,7 +850,7 @@ export async function setWakeOnJoinAction(
     wake: boolean
 ): Promise<{ error?: string }> {
     if (!z.string().uuid().safeParse(installedAppId).success) {
-        return { error: "That server does not exist" };
+        return { error: (await gameWords("minecraft"))("errors.thatServerDoesNotExist") };
     }
     try {
         await requireGameServer("games.manage", installedAppId);
@@ -858,7 +859,7 @@ export async function setWakeOnJoinAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not change that"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotChangeThat")
         };
     }
 }
@@ -878,7 +879,7 @@ export async function setWhitelistEnforcedAction(
         return { output: output.trim() };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not change the whitelist"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotChangeTheWhitelist")
         };
     }
 }
@@ -904,7 +905,7 @@ export async function grantPlayerAccessAction(
 ): Promise<{ error?: string }> {
     const parsed = accessSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -924,7 +925,7 @@ export async function grantPlayerAccessAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not add that player" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotAddThatPlayer") };
     }
 }
 
@@ -959,12 +960,12 @@ export async function findMinecraftPlayerByUserAction(
     error?: string;
 }> {
     const parsed = z.string().trim().min(1).max(120).safeParse(query);
-    if (!parsed.success) return { error: "Type a Polaris username or email address" };
+    if (!parsed.success) return { error: (await gameWords("minecraft"))("errors.typeAPolarisUsernameOr") };
     try {
         await requireGameServer("games.manage", installedAppId);
         const found = await findGameIdentity(parsed.data, "minecraft");
         if (!found)
-            return { error: "Nobody here goes by that. Check the username or the email address." };
+            return { error: (await gameWords("minecraft"))("errors.nobodyHereGoesByThat") };
         // Only the ones a rule can be written against. A session that arrived
         // over something this build cannot parse is not an address to offer.
         // Where somebody else signs in from is theirs; an administrator decides
@@ -988,7 +989,7 @@ export async function findMinecraftPlayerByUserAction(
                 : {})
         };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not look that up" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotLookThatUp") };
     }
 }
 
@@ -1010,7 +1011,7 @@ export async function linkPlayerAccountAction(
 ): Promise<{ error?: string }> {
     const parsed = linkSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -1035,7 +1036,7 @@ export async function linkPlayerAccountAction(
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not link that player" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotLinkThatPlayer") };
     }
 }
 
@@ -1056,7 +1057,7 @@ export async function invitePlayerAccountAction(
 ): Promise<{ linked?: true; invite?: { url?: string; sendError?: string }; error?: string }> {
     const parsed = inviteSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const result = await invitePlayer({
             installedAppId: parsed.data.installedAppId,
@@ -1077,7 +1078,7 @@ export async function invitePlayerAccountAction(
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return { invite: result.invite ?? {} };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not invite them" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotInviteThem") };
     }
 }
 
@@ -1089,7 +1090,7 @@ export async function unlinkPlayerAccountAction(
     const parsed = z
         .object({ installedAppId: z.string().uuid(), username: z.string().trim().min(1).max(16) })
         .safeParse({ installedAppId, username });
-    if (!parsed.success) return { error: "That player is not on this server" };
+    if (!parsed.success) return { error: (await gameWords("minecraft"))("errors.thatPlayerIsNotOn") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -1110,7 +1111,7 @@ export async function unlinkPlayerAccountAction(
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not unlink that player" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotUnlinkThatPlayer") };
     }
 }
 
@@ -1160,7 +1161,7 @@ export async function revokePlayerAccessAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not remove that player" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotRemoveThatPlayer") };
     }
 }
 
@@ -1185,7 +1186,7 @@ export async function revokePlayerAddressAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not remove that address"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotRemoveThatAddress")
         };
     }
 }
@@ -1212,7 +1213,7 @@ export async function setAddressBindingAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change that" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotChangeThat") };
     }
 }
 
@@ -1228,7 +1229,7 @@ export async function setGameHostnameAction(
     subdomain: string
 ): Promise<{ hostname?: string | null; error?: string }> {
     const parsed = z.string().trim().max(63).safeParse(subdomain);
-    if (!parsed.success) return { error: "That subdomain is too long" };
+    if (!parsed.success) return { error: (await gameWords("minecraft"))("errors.thatSubdomainIsTooLong") };
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         const install = access.install;
@@ -1251,7 +1252,7 @@ export async function setGameHostnameAction(
         revalidatePath(`/apps/installed/${installedAppId}`);
         return { hostname };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not set that address" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotSetThatAddress") };
     }
 }
 
@@ -1280,7 +1281,7 @@ export async function setGameRoutedAction(
         revalidatePath(`/apps/installed/${installedAppId}`);
         return { ok: true };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change that" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotChangeThat") };
     }
 }
 
@@ -1298,7 +1299,7 @@ export async function renameGameServerAction(
 ): Promise<{ name?: string; error?: string }> {
     const parsed = z.string().trim().min(1, "Give the server a name").max(60).safeParse(name);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That name will not do" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.thatNameWillNotDo") };
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         const install = access.install;
@@ -1317,7 +1318,7 @@ export async function renameGameServerAction(
         revalidatePath("/apps/games");
         return { name: parsed.data };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not rename the server" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotRenameTheServer") };
     }
 }
 
@@ -1357,7 +1358,7 @@ export async function setServerIconAction(input: {
 }): Promise<{ error?: string }> {
     const parsed = iconSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That image will not do" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.thatImageWillNotDo") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -1372,7 +1373,7 @@ export async function setServerIconAction(input: {
             throw new Error(`A server icon has to be ${ICON_SIDE}x${ICON_SIDE}`);
         }
 
-        if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
+        if (!access.install.applicationId) throw new Error((await gameWords("minecraft"))("errors.thisServerHasNotBeen"));
         await writeContainerFile(access.install.applicationId, access.ownerId, ICON_PATH, bytes);
         // What the panel shows without reaching into the container for it.
         await patchInstallConfig(parsed.data.installedAppId, {
@@ -1387,7 +1388,7 @@ export async function setServerIconAction(input: {
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not set the icon" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotSetTheIcon") };
     }
 }
 
@@ -1423,7 +1424,7 @@ export async function applyFirewallBansAction(
         }
         return { banned };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not apply the firewall" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotApplyTheFirewall") };
     }
 }
 
@@ -1436,7 +1437,7 @@ export async function saveWorldAction(
         const output = await runServerCommand(access.ownerId, installedAppId, ["save-all"]);
         return { output: output.trim() };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the world" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotSaveTheWorld") };
     }
 }
 
@@ -1459,7 +1460,7 @@ const worldNameSchema = z.object({
         .trim()
         .min(1)
         .max(64)
-        .refine(isLevelName, "That is not a world on this server")
+        .refine(isLevelName, (await gameWords("minecraft"))("errors.thatIsNotAWorld"))
 });
 
 const backupNameSchema = z.object({
@@ -1469,7 +1470,7 @@ const backupNameSchema = z.object({
         .trim()
         .min(1)
         .max(64)
-        .refine(isBackupName, "That is not a backup of this server")
+        .refine(isBackupName, (await gameWords("minecraft"))("errors.thatIsNotABackup"))
 });
 
 const newWorldSchema = z.object({
@@ -1502,7 +1503,7 @@ export async function backUpWorldAction(
         });
         return { name: backup.name };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not back up the world" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotBackUpThe") };
     }
 }
 
@@ -1521,7 +1522,7 @@ export async function previewWorldTrimAction(
     const { previewWorldTrim } = await import("../../lib/minecraft/world-trim-service");
     const { describeTrim } = await import("../../lib/minecraft/world-trim");
     const outcome = await previewWorldTrim(access.ownerId, installedAppId);
-    if (!outcome.report) return { error: outcome.failure ?? "Could not measure the world" };
+    if (!outcome.report) return { error: outcome.failure ?? (await gameWords("minecraft"))("errors.couldNotMeasureTheWorld") };
     return {
         summary: describeTrim(outcome.report),
         removed: outcome.report.removed,
@@ -1538,7 +1539,7 @@ export async function optimizeWorldAction(
     const { optimizeWorldNow } = await import("../../lib/minecraft/world-trim-service");
     const { describeTrim } = await import("../../lib/minecraft/world-trim");
     const outcome = await optimizeWorldNow(access.ownerId, installedAppId, options);
-    if (!outcome.report) return { error: outcome.failure ?? "Could not optimize the world" };
+    if (!outcome.report) return { error: outcome.failure ?? (await gameWords("minecraft"))("errors.couldNotOptimizeTheWorld") };
     await recordAudit({
         actorId: user.id,
         action: "games.world-optimize",
@@ -1568,7 +1569,7 @@ export type WorldTrimInput = z.infer<typeof worldTrimSchema>;
 export async function saveWorldTrimAction(input: WorldTrimInput): Promise<{ error?: string }> {
     const parsed = worldTrimSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     const { installedAppId, ...settings } = parsed.data;
     await requireGameServer("games.manage", installedAppId);
     const { WORLD_TRIM_KEY } = await import("../../lib/minecraft/world-trim");
@@ -1612,7 +1613,7 @@ export async function setModpackAction(
 ): Promise<{ error?: string }> {
     const parsed = modpackSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the pack and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkThePackAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -1622,7 +1623,7 @@ export async function setModpackAction(
             where: { id: parsed.data.installedAppId, ownerId: access.ownerId },
             select: { applicationId: true }
         });
-        if (!install?.applicationId) throw new Error("This server has not been deployed yet");
+        if (!install?.applicationId) throw new Error((await gameWords("minecraft"))("errors.thisServerHasNotBeen"));
 
         const pack = parsed.data.modpack.trim();
         if (pack.length > 0 && !isModpackReference(pack))
@@ -1653,7 +1654,7 @@ export async function setModpackAction(
             await deployApplication(install.applicationId, access.ownerId, user.id);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change the modpack" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotChangeTheModpack") };
     }
 }
 
@@ -1697,7 +1698,7 @@ export async function saveSpigotPluginsAction(
 ): Promise<{ error?: string }> {
     const parsed = spigotListSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the list and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheListAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -1707,7 +1708,7 @@ export async function saveSpigotPluginsAction(
             where: { id: parsed.data.installedAppId, ownerId: access.ownerId },
             select: { applicationId: true }
         });
-        if (!install?.applicationId) throw new Error("This server has not been deployed yet");
+        if (!install?.applicationId) throw new Error((await gameWords("minecraft"))("errors.thisServerHasNotBeen"));
         const { formatSpigetList, SPIGET_KEY } = await import("../../lib/minecraft/spiget");
         await setEnvVars("application", install.applicationId, access.ownerId, [
             { key: SPIGET_KEY, value: formatSpigetList(parsed.data.ids), isSecret: false }
@@ -1721,7 +1722,7 @@ export async function saveSpigotPluginsAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the list" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotSaveTheList") };
     }
 }
 
@@ -1744,7 +1745,7 @@ export async function saveBackupPolicyAction(
 ): Promise<{ error?: string }> {
     const parsed = backupPolicySchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     const { installedAppId, ...rules } = parsed.data;
     try {
         // The policy is written straight to the install's config, so nothing else
@@ -1771,7 +1772,7 @@ export async function saveBackupPolicyAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not save the backup schedule"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotSaveTheBackup")
         };
     }
 }
@@ -1783,7 +1784,7 @@ export async function deleteWorldBackupAction(
 ): Promise<{ error?: string }> {
     const parsed = backupNameSchema.safeParse({ installedAppId, name });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That is not a backup of this server" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.thatIsNotABackup") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -1799,7 +1800,7 @@ export async function deleteWorldBackupAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not delete the backup" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotDeleteTheBackup") };
     }
 }
 
@@ -1810,7 +1811,7 @@ export async function restoreWorldBackupAction(
 ): Promise<{ level?: string; error?: string }> {
     const parsed = backupNameSchema.safeParse({ installedAppId, name });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That is not a backup of this server" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.thatIsNotABackup") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -1833,7 +1834,7 @@ export async function restoreWorldBackupAction(
         return { level: restored.level };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not restore that backup"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotRestoreThatBackup")
         };
     }
 }
@@ -1856,7 +1857,7 @@ export async function resetServerConfigAction(
 ): Promise<{ moved?: boolean; error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
-        if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
+        if (!access.install.applicationId) throw new Error((await gameWords("minecraft"))("errors.thisServerHasNotBeen"));
         const aside = await setAsideVersionedConfig(access.ownerId, installedAppId);
         // Cleared before the start, or the server comes up under a banner saying
         // it is stopped for a crash it is currently being given a chance to avoid.
@@ -1875,7 +1876,7 @@ export async function resetServerConfigAction(
     } catch (caught) {
         return {
             error:
-                caught instanceof Error ? caught.message : "Could not reset the server's settings"
+                caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotResetTheServer")
         };
     }
 }
@@ -1886,7 +1887,7 @@ export async function newWorldAction(
 ): Promise<{ level?: string; carried?: boolean; error?: string }> {
     const parsed = newWorldSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -1917,7 +1918,7 @@ export async function newWorldAction(
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return { level: created.level, carried: created.carried };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not start a new world" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotStartANew") };
     }
 }
 
@@ -1935,7 +1936,7 @@ export async function resetGameServerAction(
 ): Promise<{ level?: string; version?: string; carried?: boolean; error?: string }> {
     const parsed = resetMinecraftServerSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -1964,7 +1965,7 @@ export async function resetGameServerAction(
         revalidatePath(`/apps/installed/${installedAppId}`);
         return { level: done.level, version: done.version, carried: done.carried };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not reset the server" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotResetTheServer2") };
     }
 }
 
@@ -1975,7 +1976,7 @@ export async function switchWorldAction(
 ): Promise<{ error?: string }> {
     const parsed = worldNameSchema.safeParse({ installedAppId, level });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That is not a world on this server" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.thatIsNotAWorld") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -1992,7 +1993,7 @@ export async function switchWorldAction(
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not switch world" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotSwitchWorld") };
     }
 }
 
@@ -2003,7 +2004,7 @@ export async function deleteWorldAction(
 ): Promise<{ error?: string }> {
     const parsed = worldNameSchema.safeParse({ installedAppId, level });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That is not a world on this server" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.thatIsNotAWorld") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -2019,7 +2020,7 @@ export async function deleteWorldAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not delete that world" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotDeleteThatWorld") };
     }
 }
 
@@ -2030,7 +2031,7 @@ export async function sendConsoleCommandAction(
 ): Promise<{ output?: string; error?: string }> {
     const parsed = consoleSchema.safeParse({ installedAppId, line });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That command is not valid" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.thatCommandIsNotValid") };
     try {
         // The console runs any command the server takes, op included, so it is not
         // the moderator grant - but it is no longer the full one either. Somebody
@@ -2074,7 +2075,7 @@ export async function sendConsoleCommandAction(
     } catch (caught) {
         return {
             error:
-                caught instanceof Error ? caught.message : "The server did not accept that command"
+                caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.theServerDidNotAccept2")
         };
     }
 }
@@ -2120,7 +2121,7 @@ export async function projectFitsAction(input: {
     if (!parsed.success) {
         return {
             fits: false,
-            error: parsed.error.issues[0]?.message ?? "Check the details and try again"
+            error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry")
         };
     }
     try {
@@ -2161,7 +2162,7 @@ export async function updateClientModsAction(
     entries: string[]
 ): Promise<{ error?: string }> {
     const parsed = clientModsSchema.safeParse({ installedAppId, entries });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the list" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheList") };
     try {
         const { user } = await requireGameServer("games.manage", parsed.data.installedAppId);
         await patchInstallConfig(parsed.data.installedAppId, {
@@ -2179,7 +2180,7 @@ export async function updateClientModsAction(
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return {};
     } catch (error) {
-        return { error: error instanceof Error ? error.message : "Could not save the list" };
+        return { error: error instanceof Error ? error.message : (await gameWords("minecraft"))("errors.couldNotSaveTheList") };
     }
 }
 
@@ -2203,14 +2204,14 @@ export async function updateServerSettingsAction(
 }> {
     const parsed = settingsSchema.safeParse({ installedAppId, values });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the settings and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheSettingsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
             parsed.data.installedAppId
         );
         const install = access.install;
-        if (!install.applicationId) throw new Error("This server has not been deployed yet");
+        if (!install.applicationId) throw new Error((await gameWords("minecraft"))("errors.thisServerHasNotBeen"));
         const manifest = findApp(install.catalogId);
         if (!manifest) throw new Error("Unknown app");
 
@@ -2283,7 +2284,7 @@ export async function updateServerSettingsAction(
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return memory ?? {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the settings" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotSaveTheSettings") };
     }
 }
 
@@ -2326,7 +2327,7 @@ export async function setMemoryPlanAction(
     input: { mode: "auto" | "fixed"; ceilingMb: number }
 ): Promise<{ plan?: MemoryPlanView; error?: string }> {
     const parsed = memoryPlanSchema.safeParse({ installedAppId, ...input });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the values" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheValues") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -2350,7 +2351,7 @@ export async function setMemoryPlanAction(
         revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return await readMemoryPlanAction(parsed.data.installedAppId);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the plan" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotSaveThePlan") };
     }
 }
 
@@ -2376,13 +2377,13 @@ export async function readMemoryPlanAction(
     installedAppId: string
 ): Promise<{ plan?: MemoryPlanView; error?: string }> {
     const parsed = z.string().uuid().safeParse(installedAppId);
-    if (!parsed.success) return { error: "That server does not exist" };
+    if (!parsed.success) return { error: (await gameWords("minecraft"))("errors.thatServerDoesNotExist") };
     try {
         const { access } = await requireGameServer("games.read", parsed.data);
         const context = await planContextFor(parsed.data, access.ownerId);
-        if (!context) return { error: "This server has not been deployed yet" };
+        if (!context) return { error: (await gameWords("minecraft"))("errors.thisServerHasNotBeen") };
         const planned = await plannedMemoryFor(context);
-        if (!planned) return { error: "This server has no heap to plan" };
+        if (!planned) return { error: (await gameWords("minecraft"))("errors.thisServerHasNoHeap") };
         const config = readInstallConfig(context.config);
         return {
             plan: {
@@ -2394,7 +2395,7 @@ export async function readMemoryPlanAction(
             }
         };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not read the plan" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotReadThePlan") };
     }
 }
 /**
@@ -2408,12 +2409,12 @@ export async function readWorldRulesAction(
     installedAppId: string
 ): Promise<{ rules?: WorldRules; error?: string }> {
     const parsed = z.string().uuid().safeParse(installedAppId);
-    if (!parsed.success) return { error: "That server does not exist" };
+    if (!parsed.success) return { error: (await gameWords("minecraft"))("errors.thatServerDoesNotExist") };
     try {
         const { access } = await requireGameServer("games.read", parsed.data);
         return { rules: await readRulesFor(access.ownerId, parsed.data) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not read the rules" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotReadTheRules") };
     }
 }
 
@@ -2425,12 +2426,12 @@ export async function storedWorldRulesAction(
     installedAppId: string
 ): Promise<{ rules?: WorldRules; error?: string }> {
     const parsed = z.string().uuid().safeParse(installedAppId);
-    if (!parsed.success) return { error: "That server does not exist" };
+    if (!parsed.success) return { error: (await gameWords("minecraft"))("errors.thatServerDoesNotExist") };
     try {
         await requireGameServer("games.read", parsed.data);
         return { rules: await storedRulesFor(parsed.data) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not read the rules" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotReadTheRules") };
     }
 }
 
@@ -2454,7 +2455,7 @@ export async function setWorldRuleAction(
             value: z.string().trim().min(1).max(16)
         })
         .safeParse({ installedAppId, rule, value });
-    if (!parsed.success) return { error: "Check the value and try again" };
+    if (!parsed.success) return { error: (await gameWords("minecraft"))("errors.checkTheValueAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -2476,7 +2477,7 @@ export async function setWorldRuleAction(
         });
         return { value: applied.value, queued: applied.queued };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change that rule" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotChangeThatRule") };
     }
 }
 
@@ -2517,7 +2518,7 @@ export async function setWorldDifficultyAction(
     const parsed = z
         .object({ installedAppId: z.string().uuid(), difficulty: z.enum(DIFFICULTIES) })
         .safeParse({ installedAppId, difficulty });
-    if (!parsed.success) return { error: "That is not a difficulty" };
+    if (!parsed.success) return { error: (await gameWords("minecraft"))("errors.thatIsNotADifficulty") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -2546,13 +2547,13 @@ export async function setWorldDifficultyAction(
             await writeDifficultyEnv(access.install, access.ownerId, parsed.data.difficulty);
         } catch {
             return {
-                error: "The difficulty changed, but Polaris could not store it - a restart will put it back."
+                error: (await gameWords("minecraft"))("errors.theDifficultyChangedButPolaris")
             };
         }
         return { queued: changed.queued };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not change the difficulty"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotChangeTheDifficulty")
         };
     }
 }
@@ -2586,7 +2587,7 @@ export type MoveSlotInput = z.infer<typeof moveSchema>;
 export async function moveInventorySlotAction(input: MoveSlotInput): Promise<{ error?: string }> {
     const parsed = moveSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.moderate",
@@ -2610,7 +2611,7 @@ export async function moveInventorySlotAction(input: MoveSlotInput): Promise<{ e
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not move that stack" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotMoveThatStack") };
     }
 }
 
@@ -2644,7 +2645,7 @@ export async function setInventorySlotAction(
 ): Promise<{ queued?: true; error?: string }> {
     const parsed = slotItemSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     const { installedAppId, player, slot, item, count } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -2668,7 +2669,7 @@ export async function setInventorySlotAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not put that in the slot"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotPutThatIn")
         };
     }
 }
@@ -2687,7 +2688,7 @@ export async function clearInventorySlotAction(
         })
         .safeParse({ installedAppId, player, slot });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.moderate",
@@ -2708,7 +2709,7 @@ export async function clearInventorySlotAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not empty that slot" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotEmptyThatSlot") };
     }
 }
 
@@ -2729,7 +2730,7 @@ export async function clearPlayerItemAction(
 ): Promise<{ queued?: true; output?: string; error?: string }> {
     const parsed = takeSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     const { installedAppId, player, item, count } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -2752,7 +2753,7 @@ export async function clearPlayerItemAction(
         });
         return { output: output.trim() };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not take that away" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotTakeThatAway") };
     }
 }
 
@@ -2765,7 +2766,7 @@ export async function clearPlayerInventoryAction(input: {
         .object({ installedAppId: z.string().uuid(), player: playerNameSchema })
         .safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     const { installedAppId, player } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -2789,7 +2790,7 @@ export async function clearPlayerInventoryAction(input: {
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not empty the inventory"
+            error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotEmptyTheInventory")
         };
     }
 }
@@ -2811,7 +2812,7 @@ export async function transferStackAction(
 ): Promise<{ error?: string }> {
     const parsed = transferStackSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     const { installedAppId, from, to, slot, expected, count } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -2831,7 +2832,7 @@ export async function transferStackAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not send that stack" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotSendThatStack") };
     }
 }
 
@@ -2845,7 +2846,7 @@ export async function transferInventoryAction(input: {
         .object({ installedAppId: z.string().uuid(), from: playerNameSchema, to: playerNameSchema })
         .safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
     const { installedAppId, from, to } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -2859,7 +2860,7 @@ export async function transferInventoryAction(input: {
         });
         return result;
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not send the inventory" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotSendTheInventory") };
     }
 }
 
@@ -2883,7 +2884,7 @@ export async function cancelQueuedActionAction(
     const parsed = z
         .object({ installedAppId: z.string().uuid(), id: z.string().uuid() })
         .safeParse({ installedAppId, id });
-    if (!parsed.success) return { error: "That is not a waiting action on this server" };
+    if (!parsed.success) return { error: (await gameWords("minecraft"))("errors.thatIsNotAWaiting") };
     try {
         const { user } = await requireGameServer("games.moderate", parsed.data.installedAppId);
         await cancelAction(parsed.data.installedAppId, parsed.data.id);
@@ -2896,6 +2897,6 @@ export async function cancelQueuedActionAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not cancel that" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("minecraft"))("errors.couldNotCancelThat") };
     }
 }

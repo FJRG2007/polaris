@@ -15,6 +15,7 @@
  */
 
 import { z } from "zod";
+import { gameWords } from "../game-words";
 import { randomUUID } from "node:crypto";
 import {
     deleteConsoleCommand,
@@ -61,13 +62,13 @@ export async function saveConsoleCommandAction(
     input: SaveConsoleCommandInput
 ): Promise<{ commands?: SavedCommand[]; error?: string }> {
     const parsed = saveSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the command and try again" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheCommandAndTry") };
     const entry = normalizeSavedCommand({
         id: parsed.data.id ?? randomUUID(),
         label: parsed.data.label ?? null,
         command: parsed.data.command
     });
-    if (!entry) return { error: "That command cannot be kept" };
+    if (!entry) return { error: (await gameWords("games"))("errors.thatCommandCannotBeKept") };
     try {
         const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
         const commands = await saveConsoleCommand(parsed.data.installedAppId, entry);
@@ -80,7 +81,7 @@ export async function saveConsoleCommandAction(
         });
         return { commands };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That command could not be kept" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCommandCouldNotBe") };
     }
 }
 
@@ -92,7 +93,7 @@ export async function deleteConsoleCommandAction(
         installedAppId,
         id
     });
-    if (!parsed.success) return { error: "That command could not be removed" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.thatCommandCouldNotBe2") };
     try {
         const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
         const commands = await deleteConsoleCommand(parsed.data.installedAppId, parsed.data.id);
@@ -105,6 +106,6 @@ export async function deleteConsoleCommandAction(
         });
         return { commands };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That command could not be removed" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCommandCouldNotBe2") };
     }
 }

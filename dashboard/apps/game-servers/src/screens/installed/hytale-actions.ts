@@ -13,6 +13,7 @@
  */
 
 import { host } from "@polaris/app-host";
+import { gameWords } from "../game-words";
 import { readHytaleFiles } from "../../lib/hytale/service";
 import type { HytaleFiles } from "../../lib/hytale/paths";
 
@@ -25,6 +26,6 @@ export async function hytaleFilesAction(
         const { access } = await requireGameServer("games.read", installedAppId);
         return { files: await readHytaleFiles(access.ownerId, installedAppId) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That server did not answer." };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatServerDidNotAnswer") };
     }
 }

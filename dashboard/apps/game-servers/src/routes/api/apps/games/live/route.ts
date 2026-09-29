@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gameWords } from "../../../../../screens/game-words";
 import { listGameServerLive } from "../../../../../lib/games-service";
 import { sweepWatchedGameSchedules } from "../../../../../lib/minecraft/schedule-service";
 import { host } from "@polaris/app-host";
@@ -35,7 +36,7 @@ export async function GET(): Promise<Response> {
     } catch (caught) {
         return NextResponse.json(
             {
-                error: caught instanceof Error ? caught.message : "Could not read your game servers"
+                error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotReadYourGame")
             },
             { status: 400 }
         );

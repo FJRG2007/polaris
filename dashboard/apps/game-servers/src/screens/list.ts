@@ -14,6 +14,7 @@
  */
 
 import { type GameId } from "@polaris/core";
+import type { GameKey } from "../../messages";
 import type { GameServerFacts, GameServerLive } from "../lib/games-service";
 
 
@@ -65,13 +66,16 @@ export const STATUS_ORDER = ["failed", "down", "starting", "online", "stopped", 
 export type StatusKind = (typeof STATUS_ORDER)[number];
 
 /** What each status is called on the row, and how the badge is toned. */
-export const STATUS_BADGE: Record<StatusKind, { label: string; variant?: "danger" | "warning" | "success" }> = {
-    failed: { label: "Failed", variant: "danger" },
-    down: { label: "Not running", variant: "danger" },
-    starting: { label: "Starting", variant: "warning" },
-    online: { label: "Online", variant: "success" },
-    stopped: { label: "Stopped" },
-    unknown: { label: "Loading" }
+export const STATUS_BADGE: Record<
+    StatusKind,
+    { label: GameKey<"games">; variant?: "danger" | "warning" | "success" }
+> = {
+    failed: { label: "status.failed", variant: "danger" },
+    down: { label: "status.down", variant: "danger" },
+    starting: { label: "status.starting", variant: "warning" },
+    online: { label: "status.online", variant: "success" },
+    stopped: { label: "status.stopped" },
+    unknown: { label: "status.unknown" }
 };
 
 /** The status filter's groups. Narrower than the badge: somebody filtering for what
@@ -172,11 +176,11 @@ export function sortServers(servers: readonly ServerView[], key: SortKey, dir: S
  * that has never been seen up, where there is nothing to say rather than a nothing
  * to print.
  */
-export function uptimeLine(server: ServerView): { prefix: string; at: string } | null {
+export function uptimeLine(server: ServerView): { prefix: GameKey<"games">; at: string } | null {
     const { facts, live } = server;
     if (!facts) return null;
-    if (live?.answering === true) return facts.onlineSince ? { prefix: "up since", at: facts.onlineSince } : null;
-    return facts.lastOnlineAt ? { prefix: "last up", at: facts.lastOnlineAt } : null;
+    if (live?.answering === true) return facts.onlineSince ? { prefix: "status.upSince", at: facts.onlineSince } : null;
+    return facts.lastOnlineAt ? { prefix: "status.lastUp", at: facts.lastOnlineAt } : null;
 }
 
 /**

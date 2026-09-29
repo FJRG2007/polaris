@@ -15,6 +15,7 @@
  */
 
 import { z } from "zod";
+import { gameWords } from "../game-words";
 import { revalidatePath } from "next/cache";
 import { PLAYER_NAME } from "../../lib/minecraft/polaris-login";
 import * as service from "../../lib/minecraft/polaris-login-service";
@@ -33,11 +34,11 @@ export async function loginStateAction(
     installedAppId: string
 ): Promise<{ state?: service.LoginState; error?: string }> {
     const parsed = serverId.safeParse(installedAppId);
-    if (!parsed.success) return { error: "Server not found" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.serverNotFound") };
     try {
         const { access } = await requireGameServer("games.read", parsed.data);
         const applicationId = access.install.applicationId;
-        if (!applicationId) return { error: "This server has not been deployed yet" };
+        if (!applicationId) return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
         return { state: await service.loginState(parsed.data, applicationId, access.ownerId) };
     } catch (caught) {
         return { error: failure(caught, "Could not read the login state") };
@@ -52,14 +53,14 @@ export async function setLoginAction(input: {
     on: boolean;
 }): Promise<{ error?: string }> {
     const parsed = switchSchema.safeParse(input);
-    if (!parsed.success) return { error: "Server not found" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.serverNotFound") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
             parsed.data.installedAppId
         );
         const applicationId = access.install.applicationId;
-        if (!applicationId) throw new Error("This server has not been deployed yet");
+        if (!applicationId) throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
         await service.setLogin(
             parsed.data.installedAppId,
             applicationId,
@@ -91,11 +92,11 @@ export async function forgetLoginAction(input: {
     player: string;
 }): Promise<{ error?: string }> {
     const parsed = forgetSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the name" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheName") };
     try {
         const { user } = await requireGameServer("games.manage", parsed.data.installedAppId);
         const removed = await service.forgetPlayer(parsed.data.installedAppId, parsed.data.player);
-        if (!removed) return { error: `${parsed.data.player} has no password on this server` };
+        if (!removed) return { error: (await gameWords("games"))("errors.noLoginPassword", { name: parsed.data.player }) };
         await recordAudit({
             actorId: user.id,
             action: "minecraft.login.forget",

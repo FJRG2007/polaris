@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { gameWords } from "../../../../../../../screens/game-words";
 import { NextResponse } from "next/server";
 import {
     isCategoryFor,
@@ -135,7 +136,7 @@ export async function GET(
         });
         if (!parsed.success)
             return NextResponse.json(
-                { error: "Could not read this server's lists" },
+                { error: (await gameWords("games"))("errors.couldNotReadThisServer") },
                 { status: 400 }
             );
         const server = entriesOf(parsed.data.server);
@@ -157,7 +158,7 @@ export async function GET(
         const parsed = installedSchema.safeParse({ ...asked, installed });
         if (!parsed.success)
             return NextResponse.json(
-                { error: "Could not read this server's list" },
+                { error: (await gameWords("games"))("errors.couldNotReadThisServer2") },
                 { status: 400 }
             );
         const entries = entriesOf(parsed.data.installed);
@@ -199,7 +200,7 @@ export async function GET(
 
     const parsed = searchSchema.safeParse(asked);
     if (!parsed.success || !isCategoryFor(parsed.data.loader, parsed.data.category)) {
-        return NextResponse.json({ error: "Search for a mod or plugin by name" }, { status: 400 });
+        return NextResponse.json({ error: (await gameWords("games"))("errors.searchForAModOr") }, { status: 400 });
     }
     return NextResponse.json({
         projects: await searchModrinth(parsed.data.query, parsed.data.loader, {

@@ -31,6 +31,7 @@ export async function GET(request: Request): Promise<Response> {
     // A non-200 makes EventSource give up rather than reconnect every few seconds
     // against a session that is gone.
     const user = await requirePermissionAny("games.read").catch(() => null);
+    // i18n-ignore: EventSource status body; never shown
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const granted = await reachableInstallIds(user, "games.read").catch(() => []);
     // Which servers this connection is about. A server's own page names itself, so

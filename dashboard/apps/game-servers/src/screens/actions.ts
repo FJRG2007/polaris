@@ -8,6 +8,7 @@
  */
 
 import { type GameId, GAMES } from "@polaris/core";
+import { gameWords } from "./game-words";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { clearResourceGrants } from "@polaris/auth";
@@ -199,7 +200,7 @@ export async function createGameServerAction(
     const user = await requirePermission("games.manage");
     const parsed = createGameServerSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         // A saved server's settings, if this one is being built from one. Read here
         // rather than trusted from the form: what the browser sends is which
@@ -221,7 +222,7 @@ export async function createGameServerAction(
         revalidatePath("/apps/games");
         return { installedAppId: created.installedAppId, hostname: created.hostname };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not create the server" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotCreateTheServer") };
     }
 }
 
@@ -262,7 +263,7 @@ export async function saveServerAsTemplateAction(
     name: string,
     summary: string
 ): Promise<{ id?: string; error?: string }> {
-    if (!isTemplateName(name)) return { error: "Give the template a name" };
+    if (!isTemplateName(name)) return { error: (await gameWords("games"))("errors.giveTheTemplateAName") };
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         const saved = await saveServerAsTemplate(access.ownerId, installedAppId, name, summary);
@@ -279,7 +280,7 @@ export async function saveServerAsTemplateAction(
         return saved;
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not save this as a template"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotSaveThisAs")
         };
     }
 }
@@ -292,7 +293,7 @@ export async function deleteServerTemplateAction(id: string): Promise<{ error?: 
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not delete that template"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotDeleteThatTemplate")
         };
     }
 }
@@ -315,7 +316,7 @@ export async function setGameServerPrefAction(
         revalidatePath("/apps/games");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not update your list" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotUpdateYourList") };
     }
 }
 
@@ -326,7 +327,7 @@ export async function setGameServerRunningAction(
 ): Promise<{ error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
-        if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
+        if (!access.install.applicationId) throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
         // Written out before it goes down. A stop that does not finish gracefully
         // is killed, and what a kill costs is the last few minutes everyone played.
         if (!running) await flushGameWorld(access.ownerId, installedAppId);
@@ -344,7 +345,7 @@ export async function setGameServerRunningAction(
         revalidatePath("/apps/games");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change the server" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotChangeTheServer") };
     }
 }
 
@@ -354,7 +355,7 @@ export async function redeployGameServerAction(
 ): Promise<{ error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
-        if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
+        if (!access.install.applicationId) throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
         // A redeploy tears the container down and builds it again, so it costs the
         // same unwritten minutes a stop does - and used to take them silently.
         await flushGameWorld(access.ownerId, installedAppId);
@@ -363,7 +364,7 @@ export async function redeployGameServerAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not redeploy the server"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotRedeployTheServer")
         };
     }
 }
@@ -406,7 +407,7 @@ export async function deleteGameServerAction(installedAppId: string): Promise<{ 
         revalidatePath("/apps/games");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not delete the server" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotDeleteTheServer") };
     }
 }
 
@@ -428,7 +429,7 @@ export async function installGameServersAction(): Promise<{ error?: string }> {
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not turn game servers on"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotTurnGameServers")
         };
     }
 }

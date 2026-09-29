@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import { gameWords } from "../game-words";
 import * as fivem from "../../lib/fivem/service";
 import { isIdentifier } from "../../lib/fivem/players";
 import { isLicenseKey, LICENSE_KEY_HINT } from "../../lib/fivem/config";
@@ -34,7 +35,7 @@ const { requireGameServer, requireGameServerOwner } = host.appsInstallAccess;
 /** Every row on the players screen is addressed by an identifier, never a name. */
 const playerSchema = z.object({
     installedAppId: z.string().uuid(),
-    identifier: z.string().trim().refine(isIdentifier, "That is not a player identifier"),
+    identifier: z.string().trim().refine(isIdentifier, (await gameWords("games"))("errors.thatIsNotAPlayer")),
     label: z.string().trim().max(48).default("")
 });
 
@@ -59,7 +60,7 @@ export async function addFivemPlayerAction(
     label: string
 ): Promise<AccessResult> {
     const parsed = playerSchema.safeParse({ installedAppId, identifier, label });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
         const view = await fivem.addAllowedPlayer(access.ownerId, parsed.data.installedAppId, {
@@ -75,13 +76,13 @@ export async function addFivemPlayerAction(
         });
         return { access: view };
     } catch (caught) {
-        return failed(caught, "Could not add that player");
+        return failed(caught, (await gameWords("games"))("errors.couldNotAddThatPlayer"));
     }
 }
 
 export async function removeFivemPlayerAction(installedAppId: string, identifier: string): Promise<AccessResult> {
     const parsed = playerSchema.safeParse({ installedAppId, identifier, label: "" });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a player identifier" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.thatIsNotAPlayer") };
     try {
         const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
         const view = await fivem.removeAllowedPlayer(access.ownerId, parsed.data.installedAppId, parsed.data.identifier);
@@ -94,7 +95,7 @@ export async function removeFivemPlayerAction(installedAppId: string, identifier
         });
         return { access: view };
     } catch (caught) {
-        return failed(caught, "Could not remove that player");
+        return failed(caught, (await gameWords("games"))("errors.couldNotRemoveThatPlayer"));
     }
 }
 
@@ -118,7 +119,7 @@ export async function banFivemPlayerAction(
     minutes?: number
 ): Promise<AccessResult> {
     const parsed = banSchema.safeParse({ installedAppId, identifier, label, reason, minutes });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
         const until =
@@ -153,7 +154,7 @@ export async function banFivemPlayerAction(
 
 export async function unbanFivemPlayerAction(installedAppId: string, identifier: string): Promise<AccessResult> {
     const parsed = playerSchema.safeParse({ installedAppId, identifier, label: "" });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a player identifier" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.thatIsNotAPlayer") };
     try {
         const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
         const view = await fivem.unbanFivemPlayer(access.ownerId, parsed.data.installedAppId, parsed.data.identifier);
@@ -181,7 +182,7 @@ export async function kickFivemPlayerAction(
     const parsed = connectedSchema
         .extend({ reason: z.string().trim().max(MAX_BAN_REASON).refine(isBanReason, REASON_HINT) })
         .safeParse({ installedAppId, playerId, reason });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
         await fivem.kickFivemPlayer(
@@ -217,7 +218,7 @@ export async function messageFivemPlayerAction(
     message: string
 ): Promise<{ error?: string }> {
     const parsed = connectedSchema.merge(messageSchema).safeParse({ installedAppId, playerId, message });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
         await fivem.messageFivemPlayer(
@@ -228,7 +229,7 @@ export async function messageFivemPlayerAction(
         );
         return {};
     } catch (caught) {
-        return failed(caught, "Could not send that message");
+        return failed(caught, (await gameWords("games"))("errors.couldNotSendThatMessage"));
     }
 }
 
@@ -238,13 +239,13 @@ export async function broadcastFivemAction(installedAppId: string, message: stri
         .object({ installedAppId: z.string().uuid() })
         .merge(messageSchema)
         .safeParse({ installedAppId, message });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
         await fivem.broadcastToFivem(access.ownerId, parsed.data.installedAppId, parsed.data.message);
         return {};
     } catch (caught) {
-        return failed(caught, "Could not send that message");
+        return failed(caught, (await gameWords("games"))("errors.couldNotSendThatMessage"));
     }
 }
 
@@ -261,7 +262,7 @@ export async function setFivemExclusiveJoinAction(installedAppId: string, closed
         });
         return { access: view };
     } catch (caught) {
-        return failed(caught, "Could not change who may join");
+        return failed(caught, (await gameWords("games"))("errors.couldNotChangeWhoMay"));
     }
 }
 
@@ -273,7 +274,7 @@ export async function setFivemAdminAction(
     isAdmin: boolean
 ): Promise<AccessResult> {
     const parsed = playerSchema.safeParse({ installedAppId, identifier, label });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That is not a player identifier" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.thatIsNotAPlayer") };
     try {
         const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
         const view = await fivem.setFivemAdmin(
@@ -303,7 +304,7 @@ export async function readFivemRulesAction(
         const { access } = await requireGameServer("games.read", installedAppId);
         const rules = await fivem.readFivemRules(access.ownerId, installedAppId);
         return rules === null
-            ? { error: "The server has not written its config yet. Start it once and the rules appear here." }
+            ? { error: (await gameWords("games"))("errors.theServerHasNotWritten") }
             : { rules };
     } catch (caught) {
         return failed(caught, "Could not read the server's rules");
@@ -318,7 +319,7 @@ export async function saveFivemRulesAction(
 ): Promise<{ error?: string }> {
     const entries = Object.entries(changes);
     if (entries.length === 0) return {};
-    if (entries.length > 64) return { error: "That is more settings than this screen has" };
+    if (entries.length > 64) return { error: (await gameWords("games"))("errors.thatIsMoreSettingsThan") };
     try {
         // Before anything is judged about the values: somebody who may not touch
         // this server should be told that, not told their value is wrong. What a
@@ -366,7 +367,7 @@ export async function actOnFivemResourceAction(
             action: z.enum(["start", "stop", "restart", "ensure"])
         })
         .safeParse({ installedAppId, name, action });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
         const output = await fivem.actOnResource(
@@ -384,7 +385,7 @@ export async function actOnFivemResourceAction(
         });
         return { output: output.trim() };
     } catch (caught) {
-        return failed(caught, "The server did not accept that");
+        return failed(caught, (await gameWords("games"))("errors.theServerDidNotAccept"));
     }
 }
 
@@ -412,7 +413,7 @@ export async function installFivemResourceAction(
             name: z.string().trim().refine(isResourceName, "That is not a resource name")
         })
         .safeParse({ installedAppId, url, name });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
         await fivem.installResourceFromUrl(

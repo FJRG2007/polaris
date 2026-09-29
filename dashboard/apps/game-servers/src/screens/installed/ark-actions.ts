@@ -15,6 +15,7 @@
  */
 
 import { z } from "zod";
+import { gameWords } from "../game-words";
 import { revalidatePath } from "next/cache";
 import * as ark from "../../lib/ark/service";
 import { isModId, MAX_MODS } from "../../lib/ark/mods";
@@ -57,7 +58,7 @@ const { requireGameServer, requireGameServerOwner } = host.appsInstallAccess;
 
 const playerSchema = z.object({
     installedAppId: z.string().trim().min(1),
-    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    steamId: z.string().trim().refine(isSteamId, (await gameWords("games"))("errors.thatIsNotASteam")),
     label: z.string().trim().max(48).default(""),
     /** The Polaris account to follow; null stops following one. */
     userId: z.string().uuid().nullable().optional()
@@ -73,7 +74,7 @@ export async function addArkPlayerAction(
 ): Promise<{ access?: ark.ArkAccessView; error?: string }> {
     const parsed = playerSchema.safeParse({ installedAppId, steamId, label, userId });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.moderate",
@@ -93,7 +94,7 @@ export async function addArkPlayerAction(
         });
         return { access: view };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not add that player" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotAddThatPlayer") };
     }
 }
 
@@ -126,7 +127,7 @@ export async function readArkPlayerRecordAction(
                 .nullable()
         })
         .safeParse({ installedAppId, player, steamId });
-    if (!parsed.success) return { error: "Check the details and try again" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         await requireGameServer("games.read", parsed.data.installedAppId);
         return {
@@ -137,7 +138,7 @@ export async function readArkPlayerRecordAction(
         };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not read this player's history"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotReadThisPlayer")
         };
     }
 }
@@ -148,7 +149,7 @@ export async function removeArkPlayerAction(
 ): Promise<{ access?: ark.ArkAccessView; error?: string }> {
     const parsed = playerSchema.safeParse({ installedAppId, steamId, label: "" });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That is not a Steam id" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.thatIsNotASteam") };
     try {
         const { user, access } = await requireGameServer(
             "games.moderate",
@@ -168,7 +169,7 @@ export async function removeArkPlayerAction(
         });
         return { access: view };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not remove that player" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotRemoveThatPlayer") };
     }
 }
 
@@ -191,7 +192,7 @@ export async function setArkExclusiveJoinAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not change who may join"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotChangeWhoMay")
         };
     }
 }
@@ -202,7 +203,7 @@ export async function setArkJoinPasswordAction(
     password: string
 ): Promise<{ error?: string }> {
     const parsed = z.string().trim().refine(isJoinPassword).safeParse(password);
-    if (!parsed.success) return { error: "8 to 32 letters and digits, and nothing else" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.8To32LettersAnd") };
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         await ark.setJoinPassword(access.ownerId, installedAppId, parsed.data);
@@ -216,7 +217,7 @@ export async function setArkJoinPasswordAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not change the password"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotChangeThePassword")
         };
     }
 }
@@ -244,7 +245,7 @@ export async function setArkGameLogAction(
         revalidatePath(`/apps/installed/${installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not change the log" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotChangeTheLog") };
     }
 }
 
@@ -254,7 +255,7 @@ export async function setArkAdminPasswordAction(
     password: string
 ): Promise<{ error?: string }> {
     const parsed = z.string().trim().refine(isJoinPassword).safeParse(password);
-    if (!parsed.success) return { error: "8 to 32 letters and digits, and nothing else" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.8To32LettersAnd") };
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         await ark.setAdminPassword(access.ownerId, installedAppId, parsed.data);
@@ -268,7 +269,7 @@ export async function setArkAdminPasswordAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "Could not change the password"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotChangeThePassword")
         };
     }
 }
@@ -294,7 +295,7 @@ export async function revealArkPasswordsAction(
         });
         return passwords;
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not read the passwords" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotReadThePasswords") };
     }
 }
 
@@ -308,7 +309,7 @@ export async function revealArkPasswordsAction(
  */
 const moderateSchema = z.object({
     installedAppId: z.string().trim().min(1),
-    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    steamId: z.string().trim().refine(isSteamId, (await gameWords("games"))("errors.thatIsNotASteam")),
     verb: z.enum(["kick", "ban", "unban"])
 });
 
@@ -319,7 +320,7 @@ export async function moderateArkPlayerAction(
 ): Promise<{ error?: string }> {
     const parsed = moderateSchema.safeParse({ installedAppId, steamId, verb });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.moderate",
@@ -349,7 +350,7 @@ export async function moderateArkPlayerAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
 }
@@ -364,7 +365,7 @@ export async function moderateArkPlayerAction(
  */
 const survivorSchema = z.object({
     installedAppId: z.string().trim().min(1),
-    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    steamId: z.string().trim().refine(isSteamId, (await gameWords("games"))("errors.thatIsNotASteam")),
     verb: z.enum(["kill", "strip"])
 });
 
@@ -375,7 +376,7 @@ export async function actOnArkSurvivorAction(
 ): Promise<{ error?: string }> {
     const parsed = survivorSchema.safeParse({ installedAppId, steamId, verb });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.moderate",
@@ -398,14 +399,14 @@ export async function actOnArkSurvivorAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
 }
 
 const experienceSchema = z.object({
     installedAppId: z.string().trim().min(1),
-    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    steamId: z.string().trim().refine(isSteamId, (await gameWords("games"))("errors.thatIsNotASteam")),
     amount: z.number().int().min(1).max(MAX_ARK_EXPERIENCE)
 });
 
@@ -424,7 +425,7 @@ export async function giveArkExperienceAction(
 ): Promise<{ error?: string }> {
     const parsed = experienceSchema.safeParse({ installedAppId, steamId, amount });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.moderate",
@@ -451,14 +452,14 @@ export async function giveArkExperienceAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
 }
 
 const giveSchema = z.object({
     installedAppId: z.string().trim().min(1),
-    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    steamId: z.string().trim().refine(isSteamId, (await gameWords("games"))("errors.thatIsNotASteam")),
     /** Everything to hand over in this one errand. A list rather than an item,
      *  because a set of gear is four or five things and reopening the form
      *  between each was the whole complaint. */
@@ -496,7 +497,7 @@ export async function giveArkItemsAction(
 ): Promise<{ items?: string[]; error?: string }> {
     const parsed = giveSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     const { installedAppId, steamId, items } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -519,7 +520,7 @@ export async function giveArkItemsAction(
         return { items: given.map((result) => result.item.name) };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
 }
@@ -575,7 +576,7 @@ export async function setArkRulesAction(
 ): Promise<{ rules?: ArkRules; error?: string }> {
     const parsed = rulesSchema.safeParse({ installedAppId, changes });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the settings and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheSettingsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -596,7 +597,7 @@ export async function setArkRulesAction(
         return { rules };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
 }
@@ -609,7 +610,7 @@ export async function readArkModsAction(
         const { access } = await requireGameServer("games.read", installedAppId);
         return { mods: await readArkMods(access.ownerId, installedAppId) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The mods could not be read" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theModsCouldNotBe") };
     }
 }
 
@@ -630,7 +631,7 @@ export async function setArkModsAction(
 ): Promise<{ mods?: ArkModsView; error?: string }> {
     const parsed = modListSchema.safeParse({ installedAppId, ids });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the mods and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheModsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -656,7 +657,7 @@ export async function setArkModsAction(
         );
         return { mods };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The mods could not be saved" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theModsCouldNotBe2") };
     }
 }
 
@@ -672,7 +673,7 @@ export async function setArkMapModAction(
         })
         .safeParse({ installedAppId, id });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the map and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheMapAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -688,7 +689,7 @@ export async function setArkMapModAction(
         });
         return { mods: await readArkMods(access.ownerId, parsed.data.installedAppId) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The map could not be saved" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theMapCouldNotBe") };
     }
 }
 
@@ -700,14 +701,14 @@ export async function lookUpArkModAction(
     try {
         await requireGameServer("games.manage", installedAppId);
         const id = parseWorkshopId(query);
-        if (!id) return { error: "Paste a Workshop link or its id" };
+        if (!id) return { error: (await gameWords("games"))("errors.pasteAWorkshopLinkOr") };
         const item = await readWorkshopItem(id);
-        if (!item) return { error: "Steam does not know that id" };
-        if (item.gone) return { error: "That item has been taken down on Steam" };
-        if (!item.forArk) return { error: `${item.title} is not an ARK mod` };
+        if (!item) return { error: (await gameWords("games"))("errors.steamDoesNotKnowThat") };
+        if (item.gone) return { error: (await gameWords("games"))("errors.thatItemHasBeenTaken") };
+        if (!item.forArk) return { error: (await gameWords("games"))("errors.notAnArkMod", { name: item.title }) };
         return { item };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Steam could not be reached" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.steamCouldNotBeReached") };
     }
 }
 
@@ -755,7 +756,7 @@ export async function searchArkModsAction(
         const found = await searchWorkshop(query.slice(0, 100));
         return { items: [...found.items], needsKey: found.needsKey };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Steam could not be reached" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.steamCouldNotBeReached") };
     }
 }
 
@@ -770,10 +771,10 @@ export async function searchArkModsAction(
  */
 export async function restartArkServerAction(installedAppId: string): Promise<{ error?: string }> {
     const parsed = z.string().trim().min(1).safeParse(installedAppId);
-    if (!parsed.success) return { error: "That server does not exist" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.thatServerDoesNotExist") };
     try {
         const { user, access } = await requireGameServer("games.manage", parsed.data);
-        if (!access.install.applicationId) throw new Error("This server has not been deployed yet");
+        if (!access.install.applicationId) throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
         // The world first. A restart that lost the last few minutes of everybody's
         // evening because a settings change was applied is not a trade anybody
         // agreed to.
@@ -789,14 +790,14 @@ export async function restartArkServerAction(installedAppId: string): Promise<{ 
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server could not be restarted"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerCouldNotBe")
         };
     }
 }
 
 const adminSchema = z.object({
     installedAppId: z.string().trim().min(1),
-    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    steamId: z.string().trim().refine(isSteamId, (await gameWords("games"))("errors.thatIsNotASteam")),
     admin: z.boolean()
 });
 
@@ -818,7 +819,7 @@ export async function setArkAdminAction(
 ): Promise<{ admins?: string[]; error?: string }> {
     const parsed = adminSchema.safeParse({ installedAppId, steamId, admin });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.manage",
@@ -840,7 +841,7 @@ export async function setArkAdminAction(
         return { admins };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
 }
@@ -855,7 +856,7 @@ export async function setArkAdminAction(
  */
 const timeoutSchema = z.object({
     installedAppId: z.string().trim().min(1),
-    steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+    steamId: z.string().trim().refine(isSteamId, (await gameWords("games"))("errors.thatIsNotASteam")),
     minutes: z.number().int().min(1).max(MAX_TIMEOUT_MINUTES),
     reason: z.string().trim().max(200).default("")
 });
@@ -868,7 +869,7 @@ export async function timeoutArkPlayerAction(input: {
 }): Promise<{ until?: string; error?: string }> {
     const parsed = timeoutSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer(
             "games.moderate",
@@ -895,7 +896,7 @@ export async function timeoutArkPlayerAction(input: {
         return { until: entry.until };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : "The server did not accept that"
+            error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.theServerDidNotAccept")
         };
     }
 }
@@ -908,11 +909,11 @@ export async function liftArkTimeoutAction(
     const parsed = z
         .object({
             installedAppId: z.string().trim().min(1),
-            steamId: z.string().trim().refine(isSteamId, "That is not a Steam id")
+            steamId: z.string().trim().refine(isSteamId, (await gameWords("games"))("errors.thatIsNotASteam"))
         })
         .safeParse({ installedAppId, steamId });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "That is not a Steam id" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.thatIsNotASteam") };
     try {
         const { user, access } = await requireGameServer(
             "games.moderate",
@@ -928,7 +929,7 @@ export async function liftArkTimeoutAction(
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not lift that" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotLiftThat") };
     }
 }
 
@@ -942,12 +943,12 @@ export async function messageArkPlayerAction(
     const parsed = z
         .object({
             installedAppId: z.string().trim().min(1),
-            steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
+            steamId: z.string().trim().refine(isSteamId, (await gameWords("games"))("errors.thatIsNotASteam")),
             message: z.string().trim().min(1, "Say something").max(200)
         })
         .safeParse({ installedAppId, steamId, message });
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+        return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheDetailsAndTry") };
     try {
         const { access } = await requireGameServer("games.moderate", parsed.data.installedAppId);
         await ark.messageArkPlayer(
@@ -958,7 +959,7 @@ export async function messageArkPlayerAction(
         );
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not send that message" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotSendThatMessage") };
     }
 }
 
@@ -969,7 +970,7 @@ export async function saveArkWorldAction(installedAppId: string): Promise<{ erro
         await ark.saveArkWorld(access.ownerId, installedAppId);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not save the world" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotSaveTheWorld") };
     }
 }
 
@@ -979,13 +980,13 @@ export async function broadcastArkAction(
     message: string
 ): Promise<{ error?: string }> {
     const parsed = z.string().trim().min(1).max(200).safeParse(message);
-    if (!parsed.success) return { error: "Say something up to 200 characters" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.saySomethingUpTo200") };
     try {
         const { access } = await requireGameServer("games.moderate", installedAppId);
         await ark.broadcastToArk(access.ownerId, installedAppId, parsed.data);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not send that message" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotSendThatMessage") };
     }
 }
 
@@ -1006,12 +1007,12 @@ export async function findArkPlayerByUserAction(
     query: string
 ): Promise<{ userId?: string; steamId?: string; name?: string; label?: string; error?: string }> {
     const parsed = z.string().trim().min(1).max(120).safeParse(query);
-    if (!parsed.success) return { error: "Type a Polaris username or email address" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.typeAPolarisUsernameOr") };
     try {
         await requireGameServer("games.moderate", installedAppId);
         const found = await findGameIdentity(parsed.data, "steam");
         if (!found)
-            return { error: "Nobody here goes by that. Check the username or the email address." };
+            return { error: (await gameWords("games"))("errors.nobodyHereGoesByThat") };
         if (!found.identity) {
             // Somebody who plays through Epic has no Steam id at all, and ARK's
             // own list refuses anything else - so the answer is about the server
@@ -1019,11 +1020,11 @@ export async function findArkPlayerByUserAction(
             const epic = await findGameIdentity(parsed.data, "epic").catch(() => null);
             if (epic?.identity) {
                 return {
-                    error: `${found.name} has linked Epic Games rather than Steam. An ARK server's list only takes Steam ids, so they have to be let in another way.`
+                    error: (await gameWords("games"))("errors.linkedEpic", { name: found.name })
                 };
             }
             return {
-                error: `${found.name} has not linked a Steam account yet. They can do it under Connected accounts.`
+                error: (await gameWords("games"))("errors.noSteam", { name: found.name })
             };
         }
         return {
@@ -1033,6 +1034,6 @@ export async function findArkPlayerByUserAction(
             label: found.identity.label
         };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not look that up" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotLookThatUp") };
     }
 }

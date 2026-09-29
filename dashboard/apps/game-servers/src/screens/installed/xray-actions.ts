@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { gameWords } from "../game-words";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { editionOf, onlinePlayers } from "../../lib/minecraft/service";
@@ -115,7 +116,7 @@ async function viewOf(
             }))
             .filter((player) => player.incidents.length > 0),
         teleportCheck: state.settings.movement ? state.teleportCheck : null,
-        refusal: bedrock ? "Bedrock keeps no per-player mining counters Polaris can watch" : null,
+        refusal: bedrock ? (await gameWords("games"))("errors.bedrockKeepsNoPerPlayer") : null,
         engine
     };
 }
@@ -126,12 +127,12 @@ export async function readXrayAction(
     installedAppId: string
 ): Promise<{ view?: XrayView; error?: string }> {
     const parsed = idSchema.safeParse(installedAppId);
-    if (!parsed.success) return { error: "That server is not here" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.thatServerIsNotHere") };
     try {
         const { access } = await requireGameServer("games.moderate", parsed.data);
         return { view: await viewOf(access.ownerId, parsed.data, true) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That could not be read" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeRead") };
     }
 }
 
@@ -141,7 +142,7 @@ export async function saveXraySettingsAction(
     input: z.input<typeof saveSchema>
 ): Promise<{ view?: XrayView; error?: string }> {
     const parsed = saveSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the settings" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await gameWords("games"))("errors.checkTheSettings") };
     const { installedAppId, settings } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
@@ -150,10 +151,10 @@ export async function saveXraySettingsAction(
             select: { config: true, catalogId: true }
         });
         if (editionOf(row?.catalogId ?? "minecraft") === "bedrock") {
-            return { error: "Bedrock keeps no per-player mining counters Polaris can watch" };
+            return { error: (await gameWords("games"))("errors.bedrockKeepsNoPerPlayer") };
         }
         const saved = await updateXray(installedAppId, (state) => ({ ...state, settings }));
-        if (!saved) return { error: "That server is not here" };
+        if (!saved) return { error: (await gameWords("games"))("errors.thatServerIsNotHere") };
         // On or off, the loop does the work: placing honeypots, or putting the
         // rock back where they were.
         startXrayTraps(access.ownerId, installedAppId);
@@ -170,7 +171,7 @@ export async function saveXraySettingsAction(
         });
         return { view: await viewOf(access.ownerId, installedAppId, false) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That could not be saved" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeSaved") };
     }
 }
 
@@ -185,7 +186,7 @@ export async function clearXrayPlayerAction(
     input: z.input<typeof clearSchema>
 ): Promise<{ view?: XrayView; error?: string }> {
     const parsed = clearSchema.safeParse(input);
-    if (!parsed.success) return { error: "Choose a player" };
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.chooseAPlayer") };
     const { installedAppId, player } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
@@ -195,7 +196,7 @@ export async function clearXrayPlayerAction(
             const { [key]: __, ...movement } = state.movement;
             return { ...state, evidence, movement };
         });
-        if (!cleared) return { error: "That server is not here" };
+        if (!cleared) return { error: (await gameWords("games"))("errors.thatServerIsNotHere") };
         await clearEngineFlags(installedAppId, player);
         await recordAudit({
             actorId: user.id,
@@ -206,6 +207,6 @@ export async function clearXrayPlayerAction(
         });
         return { view: await viewOf(access.ownerId, installedAppId, false) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "That could not be cleared" };
+        return { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.thatCouldNotBeCleared") };
     }
 }

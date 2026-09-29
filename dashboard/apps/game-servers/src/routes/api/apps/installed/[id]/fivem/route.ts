@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gameWords } from "../../../../../../screens/game-words";
 import { gameServerFacts } from "../../../../../../lib/games-service";
 import { reachAdviceFor } from "../../../../../../lib/minecraft/reach";
 import { primaryIdentifier } from "../../../../../../lib/fivem/players";
@@ -102,7 +103,7 @@ export async function GET(
         return NextResponse.json({ status, reach, access, seen, address: facts?.address ?? null });
     } catch (caught) {
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : "Could not read the server" },
+            { error: caught instanceof Error ? caught.message : (await gameWords("games"))("errors.couldNotReadTheServer") },
             { status: 400 }
         );
     }

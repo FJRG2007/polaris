@@ -1031,16 +1031,17 @@ function AddressCell({
  * a restart loop from a world that has been fine all week.
  */
 function StatusCell({ server }: { server: list.ServerView }) {
+    const t = useGameText("games");
     const format = useDisplayFormat();
     const badge = list.STATUS_BADGE[list.statusOf(server)];
     const line = list.uptimeLine(server);
 
     return (
         <div className="flex flex-col items-start gap-0.5">
-            <Badge {...(badge.variant ? { variant: badge.variant } : {})}>{badge.label}</Badge>
+            <Badge {...(badge.variant ? { variant: badge.variant } : {})}>{t(badge.label)}</Badge>
             {line && (
                 <span className="text-xs text-muted-foreground" title={format.dateTime(line.at)}>
-                    {line.prefix} {relativeTime(line.at, format)}
+                    {t(line.prefix)} {relativeTime(line.at, format)}
                 </span>
             )}
         </div>

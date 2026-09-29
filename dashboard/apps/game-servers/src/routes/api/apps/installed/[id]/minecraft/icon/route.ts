@@ -1,4 +1,5 @@
 import { prisma } from "@polaris/db";
+import { gameWords } from "../../../../../../../screens/game-words";
 import { NextResponse } from "next/server";
 import { host } from "@polaris/app-host";
 
@@ -30,7 +31,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         where: { id, ownerId: access.ownerId, status: { not: "removed" } },
         select: { applicationId: true }
     });
-    if (!install?.applicationId) return NextResponse.json({ error: "No icon" }, { status: 404 });
+    if (!install?.applicationId) return NextResponse.json({ error: (await gameWords("games"))("errors.noIcon") }, { status: 404 });
     try {
         const stream = await readContainerFile(install.applicationId, access.ownerId, ICON_PATH);
         const chunks: Buffer[] = [];
@@ -38,7 +39,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         const bytes = Buffer.concat(chunks);
         // `cat` on a path that is not there exits non-zero and prints to stderr,
         // which reaches here as an empty body rather than as a throw.
-        if (bytes.length === 0 || !isPng(bytes)) return NextResponse.json({ error: "No icon" }, { status: 404 });
+        if (bytes.length === 0 || !isPng(bytes)) return NextResponse.json({ error: (await gameWords("games"))("errors.noIcon") }, { status: 404 });
         return new Response(new Uint8Array(bytes), {
             headers: {
                 "content-type": "image/png",
@@ -48,7 +49,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
             }
         });
     } catch {
-        return NextResponse.json({ error: "No icon" }, { status: 404 });
+        return NextResponse.json({ error: (await gameWords("games"))("errors.noIcon") }, { status: 404 });
     }
 }
 

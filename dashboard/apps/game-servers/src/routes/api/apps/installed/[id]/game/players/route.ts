@@ -12,6 +12,7 @@
  */
 
 import { readPlayerCounts } from "../../../../../../../lib/games-activity-service";
+import { gameWords } from "../../../../../../../screens/game-words";
 import { host } from "@polaris/app-host";
 
 const { resolveRange } = host.metricsShared;
@@ -25,7 +26,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     try {
         await requireGameServer("games.read", id);
     } catch {
-        return Response.json({ error: "Not found" }, { status: 404 });
+        return Response.json({ error: (await gameWords("games"))("errors.notFound") }, { status: 404 });
     }
 
     const url = new URL(request.url);
