@@ -22,6 +22,8 @@
  */
 
 import Link from "next/link";
+import type { GameKey } from "../../../messages";
+import { useGameText } from "../game-text";
 import * as actions from "./fivem-actions";
 import { FivemRules } from "./fivem-rules";
 import { GameConsole } from "./game-console";
@@ -43,7 +45,7 @@ import { PlayerIconAction, PlayersTable } from "../../components/game-players-ta
 import { IDENTIFIER_LABEL, isIdentifier, kindOf } from "../../lib/fivem/players";
 import { PlayerFormDialog, PlayerFormField } from "../../components/player-form-dialog";
 import { isLicenseKey, KEYMASTER_URL, LICENSE_KEY_HINT } from "../../lib/fivem/config";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import {
     foldFivemPlayers,
     matchesFivemFilter,
@@ -158,6 +160,7 @@ export function FivemPanel({
     held: readonly Permission[];
     onStatus?: (label: string | null) => void;
 }) {
+    const t = useGameText("fivem");
     const router = useRouter();
     const pathname = usePathname();
     const tab = useMemo(() => {
@@ -311,7 +314,7 @@ export function FivemPanel({
                     applicationId={applicationId}
                     running={isRunning}
                     logName="fivem"
-                    hint="status, or say Server restarting in 5"
+                    hint={t("panel.statusOrSayServerRestarting")}
                     game="fivem"
                     players={(status?.players ?? []).map((player) => player.name)}
                 />
@@ -363,7 +366,7 @@ export function FivemPanel({
                 ) : (
                     <Card>
                         <CardBody className="py-10 text-center text-sm text-muted-foreground">
-                            Usage is measured once the server has deployed.
+                            {t("panel.usageIsMeasuredOnceThe")}
                         </CardBody>
                     </Card>
                 ))}
@@ -476,13 +479,14 @@ function statusLabel(status: FivemStatus | null, running: boolean): string | nul
 }
 
 function StatusBadge({ status, running }: { status: FivemStatus | null; running: boolean }) {
+    const t = useGameText("fivem");
     const label = statusLabel(status, running);
     if (label === null) return <Skeleton className="h-6 w-20" />;
-    if (label === "Crash loop") return <Badge variant="danger">Crash loop</Badge>;
-    if (label === "Not running") return <Badge variant="danger">Not running</Badge>;
-    if (label === "Starting") return <Badge className="border-warning-edge text-warning">Starting</Badge>;
-    if (label === "Stopped") return <Badge>Stopped</Badge>;
-    return <Badge className="border-success-edge text-success">Online</Badge>;
+    if (label === "Crash loop") return <Badge variant="danger">{t("panel.crashLoop")}</Badge>;
+    if (label === "Not running") return <Badge variant="danger">{t("panel.notRunning")}</Badge>;
+    if (label === "Starting") return <Badge className="border-warning-edge text-warning">{t("panel.starting")}</Badge>;
+    if (label === "Stopped") return <Badge>{t("panel.stopped")}</Badge>;
+    return <Badge className="border-success-edge text-success">{t("panel.online")}</Badge>;
 }
 
 /** The address with the port on it, which is what a FiveM player actually types -
@@ -512,6 +516,7 @@ function ConnectCard({
     access: FivemAccessView | null;
     onOpenSecurity: () => void;
 }) {
+    const t = useGameText("fivem");
     const joined = address === null ? null : withPort(address, status?.port ?? port);
     return (
         <Card>
@@ -522,19 +527,19 @@ function ConnectCard({
                             <Skeleton className="h-7 w-56" />
                         ) : (
                             <span className="text-sm text-muted-foreground">
-                                Not published yet - the address appears once the server has deployed.
+                                {t("panel.notPublishedYetTheAddress")}
                             </span>
                         )
                     ) : (
                         <div className="flex flex-col gap-1">
                             <span className="text-xs text-muted-foreground">
-                                In FiveM, press F8 and type this - or paste it into the direct connect box.
+                                {t("panel.inFivemPressF8And")}
                             </span>
                             <span className="flex min-w-0 items-center gap-1">
                                 <code className="min-w-0 truncate rounded bg-surface px-2 py-1 font-mono text-sm">
                                     connect {joined}
                                 </code>
-                                <CopyButton value={`connect ${joined}`} label="the connect command" />
+                                <CopyButton value={`connect ${joined}`} label={t("panel.theConnectCommand")} />
                             </span>
                         </div>
                     )}
@@ -549,7 +554,7 @@ function ConnectCard({
                     {access !== null && (
                         <Button size="sm" variant="secondary" onClick={onOpenSecurity}>
                             <DoorOpen className="size-4" />
-                            {access.exclusiveJoin ? "Closed" : "Open to everyone"}
+                            {access.exclusiveJoin ? t("panel.closed") : t("panel.openToEveryone")}
                         </Button>
                     )}
                     <StatusBadge status={status} running={running} />
@@ -560,15 +565,16 @@ function ConnectCard({
 }
 
 function OverviewTab({ status }: { status: FivemStatus | null }) {
+    const t = useGameText("fivem");
     const figures: { label: string; value: string }[] = [
         {
-            label: "Players",
+            label: t("panel.players"),
             value: status?.answering ? `${status.players.length} / ${status.max || "?"}` : "-"
         },
-        { label: "Resources running", value: status?.resourcesRunning?.toString() ?? "-" },
-        { label: "Name in the browser", value: status?.hostname || "-" },
+        { label: t("panel.resourcesRunning"), value: status?.resourcesRunning?.toString() ?? "-" },
+        { label: t("panel.nameInTheBrowser"), value: status?.hostname || "-" },
         {
-            label: "Memory",
+            label: t("panel.memory"),
             value:
                 status?.memUsedBytes === null || status?.memUsedBytes === undefined
                     ? "-"
@@ -605,11 +611,11 @@ function OverviewTab({ status }: { status: FivemStatus | null }) {
     );
 }
 
-const PLAYER_COLUMNS = [
-    { label: "Player" },
-    { label: "Known by", className: "hidden md:table-cell" },
-    { label: "Standing" },
-    { label: "Last seen", className: "hidden sm:table-cell" }
+const PLAYER_COLUMNS: { label: GameKey<"fivem">; className?: string }[] = [
+    { label: "panel.columns.player" },
+    { label: "panel.columns.knownBy", className: "hidden md:table-cell" },
+    { label: "panel.columns.standing" },
+    { label: "panel.columns.lastSeen", className: "hidden sm:table-cell" }
 ];
 
 function PlayersTab({
@@ -629,6 +635,7 @@ function PlayersTab({
     canManage: boolean;
     onChanged: (access?: FivemAccessView) => void;
 }) {
+    const t = useGameText("fivem");
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState("all");
     const [busy, setBusy] = useState<string | null>(null);
@@ -664,7 +671,7 @@ function PlayersTab({
             {error && <p className="text-sm text-danger">{error}</p>}
 
             <PlayersTable
-                columns={PLAYER_COLUMNS}
+                columns={PLAYER_COLUMNS.map((column) => ({ ...column, label: t(column.label) }))}
                 minWidth="46rem"
                 search={query}
                 onSearch={setQuery}
@@ -676,7 +683,7 @@ function PlayersTab({
                     canModerate ? (
                         <div className="flex items-center gap-1">
                             <Button size="sm" variant="secondary" onClick={() => setBroadcasting(true)}>
-                                <Megaphone className="size-4" /> Announce
+                                <Megaphone className="size-4" /> {t("panel.announce")}
                             </Button>
                             <Button size="sm" onClick={() => setAdding(true)}>
                                 <UserPlus className="size-4" /> {playerAction.add}
@@ -709,7 +716,7 @@ function PlayersTab({
                         onDisallow={async () => {
                             if (!entry.identifier) return;
                             const question = playerConfirm.remove(entry.name);
-                            if (!(await confirm({ ...question, confirmLabel: "Remove", danger: true }))) return;
+                            if (!(await confirm({ ...question, confirmLabel: t("panel.remove"), danger: true }))) return;
                             void run(entry.identifier, () =>
                                 actions.removeFivemPlayerAction(installedAppId, entry.identifier!)
                             );
@@ -717,7 +724,7 @@ function PlayersTab({
                         onKick={async () => {
                             if (entry.playerId === null) return;
                             const question = playerConfirm.kick(entry.name);
-                            if (!(await confirm({ ...question, confirmLabel: "Kick", danger: true }))) return;
+                            if (!(await confirm({ ...question, confirmLabel: t("panel.kick"), danger: true }))) return;
                             void run(entry.identifier ?? entry.name, async () =>
                                 actions.kickFivemPlayerAction(
                                     installedAppId,
@@ -729,7 +736,7 @@ function PlayersTab({
                         onBan={async () => {
                             if (!entry.identifier) return;
                             const question = playerConfirm.ban(entry.name);
-                            if (!(await confirm({ ...question, confirmLabel: "Ban", danger: true }))) return;
+                            if (!(await confirm({ ...question, confirmLabel: t("panel.ban"), danger: true }))) return;
                             void run(entry.identifier, () =>
                                 actions.banFivemPlayerAction(
                                     installedAppId,
@@ -758,8 +765,7 @@ function PlayersTab({
             />
 
             <p className="text-xs text-muted-foreground">
-                A player is matched by the identifiers their game hands over, never by the name they chose - two people
-                can pick the same name, and either can change it.
+                {t("panel.aPlayerIsMatchedBy")}
             </p>
 
             {adding && (
@@ -850,6 +856,7 @@ function PlayerRow({
     onMessage: () => void;
     onAdmin: (isAdmin: boolean) => void;
 }) {
+    const t = useGameText("fivem");
     // What the line under the name says - see `presenceLine`.
     const line = presenceLine({ online: entry.online, seen, addedAt: entry.addedAt });
     const standing = entry.banned
@@ -902,7 +909,7 @@ function PlayerRow({
                 </span>
                 {entry.waiting && (
                     <span className="block text-xs text-muted-foreground">
-                        Added here; the server is told as soon as it answers.
+                        {t("panel.addedHereTheServerIs")}
                     </span>
                 )}
             </td>
@@ -912,14 +919,11 @@ function PlayerRow({
                 {line === null ? (
                     playerPresence.never
                 ) : line.kind === "added" ? (
-                    <>
-                        Added <RelativeTime iso={line.iso} />
-                    </>
+                    t.rich<ReactNode>("panel.addedAt", { time: () => <RelativeTime key="time" iso={line.iso} /> })
                 ) : (
-                    <>
-                        {line.kind === "since" ? "Playing since " : "Last on "}
-                        <RelativeTime iso={line.iso} />
-                    </>
+                    t.rich<ReactNode>(line.kind === "since" ? "panel.playingSince" : "panel.lastOn", {
+                        time: () => <RelativeTime key="time" iso={line.iso} />
+                    })
                 )}
             </td>
             <td className="px-3 py-2">
@@ -990,11 +994,11 @@ function PlayerRow({
                                         <DropdownMenuItem onSelect={() => onAdmin(!entry.admin)}>
                                             {entry.admin ? (
                                                 <>
-                                                    <ShieldMinus className="size-4" /> Stop them administering it
+                                                    <ShieldMinus className="size-4" /> {t("panel.stopThemAdministeringIt")}
                                                 </>
                                             ) : (
                                                 <>
-                                                    <ShieldPlus className="size-4" /> Let them administer it
+                                                    <ShieldPlus className="size-4" /> {t("panel.letThemAdministerIt")}
                                                 </>
                                             )}
                                         </DropdownMenuItem>
@@ -1017,6 +1021,7 @@ function AddPlayerDialog({
     onClose: () => void;
     onAdd: (identifier: string, label: string) => void;
 }) {
+    const t = useGameText("fivem");
     const [identifier, setIdentifier] = useState("");
     const [label, setLabel] = useState("");
     const invalid = identifier.trim().length > 0 && !isIdentifier(identifier);
@@ -1024,14 +1029,14 @@ function AddPlayerDialog({
     return (
         <PlayerFormDialog
             title={playerAction.add}
-            description="They are let in the next time they connect, whether or not they have ever been on this server."
+            description={t("panel.theyAreLetInThe")}
             onClose={onClose}
             pending={false}
             ready={isIdentifier(identifier)}
-            confirmLabel="Add"
+            confirmLabel={t("panel.add")}
             onConfirm={() => onAdd(identifier.trim(), label.trim())}
         >
-            <PlayerFormField label="Identifier">
+            <PlayerFormField label={t("panel.identifier")}>
                 <Input
                     value={identifier}
                     onChange={(event) => setIdentifier(event.target.value)}
@@ -1042,12 +1047,12 @@ function AddPlayerDialog({
                 />
                 <span className={cn("text-xs", invalid ? "text-danger" : "text-muted-foreground")}>
                     {invalid
-                        ? "Paste it whole, as the game gives it: license:... or discord:..."
-                        : "Whatever the game hands over - a licence, a Discord id, a Steam id. It is shown beside anybody who has connected."}
+                        ? t("panel.pasteItWholeAsThe")
+                        : t("panel.whateverTheGameHandsOver")}
                 </span>
             </PlayerFormField>
-            <PlayerFormField label="Name on the list">
-                <Input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Optional" />
+            <PlayerFormField label={t("panel.nameOnTheList")}>
+                <Input value={label} onChange={(event) => setLabel(event.target.value)} placeholder={t("panel.optional")} />
             </PlayerFormField>
         </PlayerFormDialog>
     );
@@ -1062,19 +1067,20 @@ function MessageDialog({
     onClose: () => void;
     onSend: (message: string) => void;
 }) {
+    const t = useGameText("fivem");
     const [message, setMessage] = useState("");
     const invalid = message.length > 0 && !isBanReason(message);
     return (
         <PlayerFormDialog
-            title={`Message ${player}`}
-            description="It appears in the game's chat."
+            title={t("panel.messageNamed", { name: player })}
+            description={t("panel.itAppearsInTheGame")}
             onClose={onClose}
             pending={false}
             ready={message.trim().length > 0 && !invalid}
-            confirmLabel="Send"
+            confirmLabel={t("panel.send")}
             onConfirm={() => onSend(message.trim())}
         >
-            <PlayerFormField label="Message">
+            <PlayerFormField label={t("panel.message")}>
                 <Input value={message} onChange={(event) => setMessage(event.target.value)} maxLength={200} />
                 {invalid && <span className="text-xs text-danger">{REASON_HINT}</span>}
             </PlayerFormField>
@@ -1099,6 +1105,7 @@ function ClosedServerCard({
     onChanged: (access?: FivemAccessView) => void;
     onOpenPlayers: () => void;
 }) {
+    const t = useGameText("fivem");
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const closed = access?.exclusiveJoin ?? false;
@@ -1108,16 +1115,15 @@ function ClosedServerCard({
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">Only players you add can join</p>
+                        <p className="text-sm font-medium">{t("panel.onlyPlayersYouAddCan")}</p>
                         <p className="text-xs text-muted-foreground">
-                            Everyone else is turned away as they connect, with a line telling them why. FiveM has no
-                            list of its own, so this is Polaris&apos; and it is enforced inside the server.
+                            {t("panel.everyoneElseIsTurnedAway")}
                         </p>
                     </div>
                     <Switch
                         checked={closed}
                         disabled={!canManage || pending || access === null}
-                        aria-label="Only players you add can join"
+                        aria-label={t("panel.onlyPlayersYouAddCan")}
                         onChange={(next: boolean) =>
                             startTransition(async () => {
                                 setError(null);
@@ -1140,17 +1146,16 @@ function ClosedServerCard({
                     <p className="flex items-start gap-2 text-sm text-warning">
                         <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                         <span>
-                            The server is not running what turns people away, so anyone with the address can join
-                            right now. Polaris puts it back within a few seconds; if this stays, restart the server.
+                            {t("panel.theServerIsNotRunning")}
                         </span>
                     </p>
                 )}
                 <p className="text-xs text-muted-foreground">
                     {access === null
-                        ? "Reading the list..."
-                        : `${access.allowList.length} on the list, ${access.bans.length} banned.`}{" "}
+                        ? t("panel.readingTheList")
+                        : t("panel.listCounts", { listed: access.allowList.length, banned: access.bans.length })}{" "}
                     <button type="button" onClick={onOpenPlayers} className="text-primary hover:underline">
-                        Open the players screen
+                        {t("panel.openThePlayersScreen")}
                     </button>
                     .
                 </p>
@@ -1168,6 +1173,7 @@ function ConsolePasswordCard({
     canManage: boolean;
     running: boolean;
 }) {
+    const t = useGameText("fivem");
     const [shown, setShown] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
     const [pending, startTransition] = useTransition();
@@ -1180,11 +1186,10 @@ function ConsolePasswordCard({
             <CardBody className="flex flex-col gap-3">
                 <div className="min-w-0">
                     <p className="flex items-center gap-2 text-sm font-medium">
-                        <KeyRound className="size-4" /> Console password
+                        <KeyRound className="size-4" /> {t("panel.consolePassword")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                        What opens the server&apos;s own console. Polaris uses it for everything on these screens; you
-                        only need it for a tool of your own.
+                        {t("panel.whatOpensTheServerS")}
                     </p>
                 </div>
 
@@ -1206,14 +1211,14 @@ function ConsolePasswordCard({
                                 })
                             }
                         >
-                            <Eye className="size-4" /> Show it
+                            <Eye className="size-4" /> {t("panel.showIt")}
                         </Button>
                     ) : (
                         <span className="flex min-w-0 items-center gap-1">
                             <code className="min-w-0 truncate rounded bg-surface px-2 py-1 font-mono text-sm">
-                                {shown || "There is none recorded"}
+                                {shown || t("panel.thereIsNoneRecorded")}
                             </code>
-                            {shown && <CopyButton value={shown} label="the console password" />}
+                            {shown && <CopyButton value={shown} label={t("panel.theConsolePassword")} />}
                         </span>
                     )}
                 </div>
@@ -1221,7 +1226,7 @@ function ConsolePasswordCard({
                 {canManage && (
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                            <span className="text-muted-foreground">Change it</span>
+                            <span className="text-muted-foreground">{t("panel.changeIt")}</span>
                             <div className="flex items-center gap-1">
                                 <Input
                                     value={draft}
@@ -1233,8 +1238,8 @@ function ConsolePasswordCard({
                                 <Button
                                     size="icon"
                                     variant="ghost"
-                                    aria-label="Generate another password"
-                                    title="Generate another password"
+                                    aria-label={t("panel.generateAnotherPassword")}
+                                    title={t("panel.generateAnotherPassword")}
                                     onClick={() =>
                                         setDraft(
                                             generateConsolePassword((size) =>
@@ -1247,7 +1252,7 @@ function ConsolePasswordCard({
                                 </Button>
                             </div>
                             <span className={cn("text-xs", invalid ? "text-danger" : "text-muted-foreground")}>
-                                {invalid ? CONSOLE_PASSWORD_HINT : "It takes effect at once on a running server."}
+                                {invalid ? CONSOLE_PASSWORD_HINT : t("panel.itTakesEffectAtOnce")}
                             </span>
                         </label>
                         <Button
@@ -1269,13 +1274,13 @@ function ConsolePasswordCard({
                             }
                         >
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            Change
+                            {t("panel.change")}
                         </Button>
                     </div>
                 )}
                 {!running && canManage && (
                     <p className="text-xs text-muted-foreground">
-                        The server has to be running to be told a new one.
+                        {t("panel.theServerHasToBe")}
                     </p>
                 )}
                 {note && <p className="text-sm text-success">{note}</p>}
@@ -1286,6 +1291,7 @@ function ConsolePasswordCard({
 }
 
 function ServerKeyCard({ installedAppId, canManage }: { installedAppId: string; canManage: boolean }) {
+    const t = useGameText("fivem");
     const [draft, setDraft] = useState("");
     const [pending, startTransition] = useTransition();
     const [note, setNote] = useState<string | null>(null);
@@ -1296,20 +1302,21 @@ function ServerKeyCard({ installedAppId, canManage }: { installedAppId: string; 
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div className="min-w-0">
-                    <p className="text-sm font-medium">Server key</p>
+                    <p className="text-sm font-medium">{t("panel.serverKey")}</p>
                     <p className="text-xs text-muted-foreground">
-                        The free key from{" "}
-                        <Link href={KEYMASTER_URL} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                            keymaster
-                        </Link>
-                        . A key is tied to the address it was issued for, so a server that has moved needs a new one.
-                        It is never shown back.
+                        {t.rich<ReactNode>("panel.keyHelp", {
+                            link: (chunks) => (
+                                <Link key="keymaster" href={KEYMASTER_URL} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                                    {chunks}
+                                </Link>
+                            )
+                        })}
                     </p>
                 </div>
                 {canManage && (
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                            <span className="text-muted-foreground">Replace it</span>
+                            <span className="text-muted-foreground">{t("panel.replaceIt")}</span>
                             <Input
                                 value={draft}
                                 onChange={(event) => setDraft(event.target.value)}
@@ -1319,7 +1326,7 @@ function ServerKeyCard({ installedAppId, canManage }: { installedAppId: string; 
                                 spellCheck={false}
                             />
                             <span className={cn("text-xs", invalid ? "text-danger" : "text-muted-foreground")}>
-                                {invalid ? LICENSE_KEY_HINT : "The server picks it up the next time it starts."}
+                                {invalid ? LICENSE_KEY_HINT : t("panel.theServerPicksItUp")}
                             </span>
                         </label>
                         <Button
@@ -1340,7 +1347,7 @@ function ServerKeyCard({ installedAppId, canManage }: { installedAppId: string; 
                             }
                         >
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            Save
+                            {t("panel.save")}
                         </Button>
                     </div>
                 )}

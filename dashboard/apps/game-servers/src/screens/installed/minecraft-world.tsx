@@ -16,6 +16,7 @@
  */
 
 import { formatBytes } from "@polaris/core";
+import { useGameText } from "../game-text";
 import * as world from "../../lib/minecraft/world";
 import { useCallback, useEffect, useState } from "react";
 import type { WorldView } from "../../lib/minecraft/world-service";
@@ -161,6 +162,7 @@ function WorldsCard({
     error: string | null;
     onChanged: () => Promise<void>;
 }) {
+    const t = useGameText("minecraft");
     const [creating, setCreating] = useState(false);
     const [busy, setBusy] = useState<string | null>(null);
     const [failed, setFailed] = useState<string | null>(null);
@@ -196,7 +198,7 @@ function WorldsCard({
                 <div className="flex items-center justify-between gap-2">
                     <CardTitle className="flex items-center gap-2">
                         <Sprout className="size-4 text-primary" />
-                        World
+                        {t("world.world")}
                     </CardTitle>
                     <Button
                         size="sm"
@@ -204,7 +206,7 @@ function WorldsCard({
                         onClick={() => setCreating(true)}
                         disabled={view === null}
                     >
-                        New world
+                        {t("world.newWorld")}
                     </Button>
                 </div>
             </CardHeader>
@@ -214,13 +216,13 @@ function WorldsCard({
                 ) : (
                     <dl className="flex flex-col gap-1 text-sm">
                         <div className="flex items-baseline justify-between gap-3">
-                            <dt className="text-muted-foreground">Playing on</dt>
+                            <dt className="text-muted-foreground">{t("world.playingOn")}</dt>
                             <dd className="truncate font-mono" title={view.level}>
                                 {view.level}
                             </dd>
                         </div>
                         <div className="flex items-baseline justify-between gap-3">
-                            <dt className="text-muted-foreground">Seed</dt>
+                            <dt className="text-muted-foreground">{t("world.seed")}</dt>
                             {/* What the map was actually generated from, asked of
                                 the server. The configured value only says what the
                                 next world would use, and a world created without
@@ -238,18 +240,18 @@ function WorldsCard({
                                         </span>
                                         <CopyButton
                                             value={view.worldSeed ?? view.seed}
-                                            label="Copy the world seed"
+                                            label={t("world.copyTheWorldSeed")}
                                         />
                                     </>
                                 ) : (
                                     <span className="text-muted-foreground">
-                                        {view.edition === "bedrock" ? "Random" : "Not read yet"}
+                                        {view.edition === "bedrock" ? t("world.random") : t("world.notReadYet")}
                                     </span>
                                 )}
                             </dd>
                         </div>
                         <div className="flex items-baseline justify-between gap-3">
-                            <dt className="text-muted-foreground">Size</dt>
+                            <dt className="text-muted-foreground">{t("world.size")}</dt>
                             <dd>
                                 {current?.sizeBytes != null ? formatBytes(current.sizeBytes) : "-"}
                             </dd>
@@ -262,7 +264,7 @@ function WorldsCard({
                 {others.length > 0 && (
                     <div className="flex flex-col gap-1.5">
                         <p className="text-xs text-muted-foreground">
-                            Maps this server has played before. Switching restarts it.
+                            {t("world.mapsThisServerHasPlayed")}
                         </p>
                         {others.map((entry) => (
                             <div
@@ -276,15 +278,15 @@ function WorldsCard({
                                     <p className="text-xs text-muted-foreground">
                                         {entry.sizeBytes != null
                                             ? formatBytes(entry.sizeBytes)
-                                            : "Size unknown"}
+                                            : t("world.sizeUnknown")}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        aria-label={`Play on ${entry.level}`}
-                                        title="Play on this map"
+                                        aria-label={t("world.playOn", { name: entry.level })}
+                                        title={t("world.playOnThisMap")}
                                         disabled={busy !== null}
                                         onClick={() => void switchTo(entry.level)}
                                     >
@@ -297,8 +299,8 @@ function WorldsCard({
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        aria-label={`Delete ${entry.level}`}
-                                        title="Delete this map"
+                                        aria-label={t("world.deleteNamed", { name: entry.level })}
+                                        title={t("world.deleteThisMap")}
                                         disabled={busy !== null}
                                         onClick={() => setDeleting(entry.level)}
                                     >
@@ -325,7 +327,7 @@ function WorldsCard({
                 onOpenChange={(open) => !open && setDeleting(null)}
                 name={deleting ?? ""}
                 kind="world"
-                description="Everything built on this map goes with it, and it is not the map the server is playing on. Back it up first if you might want it."
+                description={t("world.everythingBuiltOnThisMap")}
                 pending={busy !== null}
                 onConfirm={() => deleting && void remove(deleting)}
             />
@@ -345,6 +347,7 @@ function NewWorldDialog({
     onClose: () => void;
     onDone: () => Promise<void>;
 }) {
+    const t = useGameText("minecraft");
     const [seed, setSeed] = useState("");
     const [levelType, setLevelType] = useState(world.DEFAULT_LEVEL_TYPE);
     const [biome, setBiome] = useState(world.DEFAULT_BIOME);
@@ -378,26 +381,26 @@ function NewWorldDialog({
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Sprout className="size-4" /> New world
+                        <Sprout className="size-4" /> {t("world.newWorld")}
                     </DialogTitle>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Seed</span>
+                        <span className="font-medium">{t("world.seed")}</span>
                         <Input
                             value={seed}
                             onChange={(event) => setSeed(event.target.value)}
-                            placeholder="Leave blank for a random world"
+                            placeholder={t("world.leaveBlankForARandom")}
                         />
                         <span className="text-xs text-muted-foreground">
-                            A number or any words. The same seed always generates the same map.
+                            {t("world.aNumberOrAnyWords")}
                         </span>
                     </label>
 
                     {carriesPlayers && (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">World type</span>
+                            <span className="font-medium">{t("world.worldType")}</span>
                             <Select
                                 value={levelType}
                                 onValueChange={setLevelType}
@@ -417,7 +420,7 @@ function NewWorldDialog({
 
                     {carriesPlayers && world.usesBiome(levelType) && (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Biome</span>
+                            <span className="font-medium">{t("world.biome")}</span>
                             <Select
                                 value={biome}
                                 onValueChange={setBiome}
@@ -427,8 +430,7 @@ function NewWorldDialog({
                                 }))}
                             />
                             <span className="text-xs text-muted-foreground">
-                                The whole overworld is this one biome. The Nether and the End are
-                                unchanged.
+                                {t("world.theWholeOverworldIsThis")}
                             </span>
                         </label>
                     )}
@@ -446,11 +448,11 @@ function NewWorldDialog({
                             className="mt-0.5"
                         />
                         <span className="flex flex-col gap-0.5">
-                            <span className="font-medium">Keep what players are carrying</span>
+                            <span className="font-medium">{t("world.keepWhatPlayersAreCarrying")}</span>
                             <span className="text-xs text-muted-foreground">
                                 {carriesPlayers
-                                    ? "Inventories, ender chests, stats and advancements come across. Everyone spawns fresh on the new map."
-                                    : "Bedrock keeps player data inside the world itself, so a new map always starts everyone over."}
+                                    ? t("world.inventoriesEnderChestsStatsAnd")
+                                    : t("world.bedrockKeepsPlayerDataInside")}
                             </span>
                         </span>
                     </label>
@@ -458,8 +460,7 @@ function NewWorldDialog({
                     <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
                         <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
                         <span className="text-muted-foreground">
-                            The server restarts to generate it, so anybody playing is disconnected.
-                            The map it is on now is kept and you can switch back to it.
+                            {t("world.theServerRestartsToGenerate")}
                         </span>
                     </p>
 
@@ -467,11 +468,11 @@ function NewWorldDialog({
 
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
+                            {t("world.cancel")}
                         </Button>
                         <Button onClick={() => void submit()} disabled={pending}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            Generate world
+                            {t("world.generateWorld")}
                         </Button>
                     </div>
                 </div>
@@ -501,6 +502,7 @@ export function GameServerBackups({
     /** What the card is called. The Backups app names the server instead. */
     heading?: string;
 }) {
+    const t = useGameText("minecraft");
     const format = useDisplayFormat();
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -551,8 +553,8 @@ export function GameServerBackups({
                 <div className="flex items-center justify-between gap-2">
                     <CardTitle className="flex min-w-0 items-center gap-2">
                         <Archive className="size-4 text-primary" />
-                        <span className="truncate" title={heading ?? "Backups"}>
-                            {heading ?? "Backups"}
+                        <span className="truncate" title={heading ?? t("world.backups")}>
+                            {heading ?? t("world.backups")}
                         </span>
                         {view && view.backups.length > 0 && (
                             <Badge variant="neutral">{view.backups.length}</Badge>
@@ -566,15 +568,13 @@ export function GameServerBackups({
                         <HardDriveDownload
                             className={cn("size-4", busy === "new" && "animate-pulse")}
                         />
-                        {busy === "new" ? "Backing up..." : "Back up now"}
+                        {busy === "new" ? t("world.backingUp") : t("world.backUpNow")}
                     </Button>
                 </div>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-xs text-muted-foreground">
-                    A copy of the world kept on the server&apos;s own disk, taken with saving paused
-                    so it is not caught mid-write. That covers a mistake, not a dead disk - download
-                    the ones that matter.
+                    {t("world.aCopyOfTheWorld")}
                 </p>
 
                 {error && <p className="text-sm text-danger">{error}</p>}
@@ -584,7 +584,7 @@ export function GameServerBackups({
                     <Skeleton className="h-16 w-full" />
                 ) : view.backups.length === 0 ? (
                     <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                        No backups yet.
+                        {t("world.noBackupsYet")}
                     </p>
                 ) : (
                     <ul className="flex flex-col gap-1.5">
@@ -609,14 +609,14 @@ export function GameServerBackups({
                                         size="icon"
                                         variant="ghost"
                                         asChild
-                                        aria-label="Download this backup"
+                                        aria-label={t("world.downloadThisBackup")}
                                     >
                                         {/* A plain anchor: a router link prefetches what it
                                             points at, and here that is the whole archive -
                                             every backup on screen downloading at once. */}
                                         <a
                                             href={`/api/apps/installed/${installedAppId}/minecraft/world/${encodeURIComponent(backup.name)}`}
-                                            title="Download this backup"
+                                            title={t("world.downloadThisBackup")}
                                             download
                                         >
                                             <Download className="size-4" />
@@ -625,8 +625,8 @@ export function GameServerBackups({
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        aria-label="Restore this backup"
-                                        title="Restore this backup"
+                                        aria-label={t("world.restoreThisBackup")}
+                                        title={t("world.restoreThisBackup")}
                                         disabled={busy !== null}
                                         onClick={() => setRestoring(backup.name)}
                                     >
@@ -639,8 +639,8 @@ export function GameServerBackups({
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        aria-label="Delete this backup"
-                                        title="Delete this backup"
+                                        aria-label={t("world.deleteThisBackup")}
+                                        title={t("world.deleteThisBackup")}
                                         disabled={busy !== null}
                                         onClick={() => setDeleting(backup.name)}
                                     >
@@ -668,7 +668,7 @@ export function GameServerBackups({
                 name={deleting ?? ""}
                 requireTyping={false}
                 kind="backup"
-                description="The archive goes; the world it was taken from is not touched."
+                description={t("world.theArchiveGoesTheWorld")}
                 pending={busy !== null}
                 onConfirm={() => deleting && void remove(deleting)}
             />
@@ -689,27 +689,26 @@ function RestoreDialog({
     onClose: () => void;
     onConfirm: () => void;
 }) {
+    const t = useGameText("minecraft");
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <RotateCcw className="size-4" /> Restore this backup
+                        <RotateCcw className="size-4" /> {t("world.restoreThisBackup")}
                     </DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
                     <p className="text-sm text-muted-foreground">
-                        {serverName} restarts onto the world in this backup, so anybody playing is
-                        disconnected. The map it is on now is kept as it is - if this was the wrong
-                        backup, switch back to it under World.
+                        {t("world.restoreBody", { name: serverName })}
                     </p>
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
+                            {t("world.cancel")}
                         </Button>
                         <Button onClick={onConfirm} disabled={pending}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
-                            Restore
+                            {t("world.restore")}
                         </Button>
                     </div>
                 </div>
@@ -738,6 +737,7 @@ function BackupScheduleCard({
     view: WorldView | null;
     onChanged: () => Promise<void>;
 }) {
+    const t = useGameText("minecraft");
     const saved = view?.policy ?? null;
     const [every, setEvery] = useState<BackupEvery>("off");
     const [keepLast, setKeepLast] = useState(0);
@@ -793,7 +793,7 @@ function BackupScheduleCard({
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <CalendarClock className="size-4 text-primary" />
-                    Automatic backups
+                    {t("world.automaticBackups")}
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
@@ -803,7 +803,7 @@ function BackupScheduleCard({
                     <>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Back up</span>
+                                <span className="font-medium">{t("world.backUp")}</span>
                                 <Select
                                     value={every}
                                     onValueChange={(value) => setEvery(value as BackupEvery)}
@@ -814,13 +814,13 @@ function BackupScheduleCard({
                                 />
                                 <span className="text-xs text-muted-foreground">
                                     {view.nextBackupAt
-                                        ? `Next one due ${new Date(view.nextBackupAt).toLocaleString()}.`
-                                        : "Copies are taken only when you press the button."}
+                                        ? t("world.nextDue", { date: new Date(view.nextBackupAt).toLocaleString() })
+                                        : t("world.copiesAreTakenOnlyWhen")}
                                 </span>
                             </label>
 
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Keep the last</span>
+                                <span className="font-medium">{t("world.keepTheLast")}</span>
                                 <Input
                                     type="number"
                                     min={0}
@@ -832,27 +832,25 @@ function BackupScheduleCard({
                                 />
                                 <span className="text-xs text-muted-foreground">
                                     {keepLast > 0
-                                        ? `Older ones go once there are more than ${keepLast}.`
-                                        : "No limit on how many are kept."}
+                                        ? t("world.olderGo", { count: keepLast })
+                                        : t("world.noLimitOnHowMany")}
                                 </span>
                             </label>
                         </div>
 
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Size budget</span>
+                            <span className="font-medium">{t("world.sizeBudget")}</span>
                             <SizeField
                                 value={budgetBytes}
                                 stored="B"
                                 min={0}
-                                aria-label="Size budget"
+                                aria-label={t("world.sizeBudget")}
                                 onChange={setBudgetBytes}
                             />
                             <span className="text-xs text-muted-foreground">
-                                {`Nought is no limit. The oldest go as the total approaches it${
-                                    view.backups.length > 0
-                                        ? ` - they take up ${formatBytes(view.backupBytes)} now`
-                                        : ""
-                                }. The newest copy is never deleted.`}
+                                {view.backups.length > 0
+                                    ? t("world.budgetHintUsed", { size: formatBytes(view.backupBytes) })
+                                    : t("world.budgetHint")}
                             </span>
                         </label>
 
@@ -863,11 +861,9 @@ function BackupScheduleCard({
                                 className="mt-0.5"
                             />
                             <span className="flex flex-col gap-0.5">
-                                <span className="font-medium">Copy the world before stopping</span>
+                                <span className="font-medium">{t("world.copyTheWorldBeforeStopping")}</span>
                                 <span className="text-xs text-muted-foreground">
-                                    Taken after the server saves and before the container goes down,
-                                    so the copy holds the last thing that happened rather than the
-                                    last scheduled one.
+                                    {t("world.takenAfterTheServerSaves")}
                                 </span>
                             </span>
                         </label>
@@ -879,10 +875,9 @@ function BackupScheduleCard({
                                 className="mt-0.5"
                             />
                             <span className="flex flex-col gap-0.5">
-                                <span className="font-medium">Tell me if one fails</span>
+                                <span className="font-medium">{t("world.tellMeIfOneFails")}</span>
                                 <span className="text-xs text-muted-foreground">
-                                    A notification when a scheduled copy could not be taken. A
-                                    server that is simply stopped is skipped quietly.
+                                    {t("world.aNotificationWhenAScheduled")}
                                 </span>
                             </span>
                         </label>
@@ -896,7 +891,7 @@ function BackupScheduleCard({
                                 disabled={pending || !dirty}
                             >
                                 {pending && <Loader2 className="size-4 animate-spin" />}
-                                Save
+                                {t("world.save")}
                             </Button>
                         </div>
                     </>

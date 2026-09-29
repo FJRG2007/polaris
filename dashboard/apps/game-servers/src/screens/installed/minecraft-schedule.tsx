@@ -18,7 +18,9 @@
  * coming back is a window that says on, or somebody pressing start.
  */
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
+import type { GameKey } from "../../../messages";
+import { useGameText, type GameText } from "../game-text";
 import { saveGameScheduleAction, setWakeOnJoinAction } from "./minecraft-actions";
 import { Button, Card, CardBody, Input, Select, Switch } from "@polaris/ui";
 import { CalendarClock, Loader2, Moon, Plus, Power, Trash2 } from "lucide-react";
@@ -37,17 +39,22 @@ import {
 } from "../../lib/minecraft/schedule";
 
 /** What each mode does, in the words the operator has to choose between. */
-const MODES: { value: GameScheduleMode; label: string; hint: string }[] = [
-    { value: "on", label: "Keep running", hint: "Started if it is down." },
-    {
-        value: "sleep",
-        label: "Sleep when empty",
-        hint: "Stopped once nobody has played for a while. It gives its memory back, and somebody trying to join starts it again where that is possible."
-    },
-    { value: "off", label: "Keep stopped", hint: "Stopped even if somebody is on." }
+const MODES: { value: GameScheduleMode; label: GameKey<"minecraft">; hint: GameKey<"minecraft"> }[] = [
+    { value: "on", label: "schedule.modes.on", hint: "schedule.modes.onHint" },
+    { value: "sleep", label: "schedule.modes.sleep", hint: "schedule.modes.sleepHint" },
+    { value: "off", label: "schedule.modes.off", hint: "schedule.modes.offHint" }
 ];
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** The days, Sunday first, the way the stored window numbers them. */
+const DAYS: GameKey<"minecraft">[] = [
+    "schedule.days.sun",
+    "schedule.days.mon",
+    "schedule.days.tue",
+    "schedule.days.wed",
+    "schedule.days.thu",
+    "schedule.days.fri",
+    "schedule.days.sat"
+];
 
 /** A first window that is the rule almost everybody is here to write. */
 const OVERNIGHT: GameScheduleWindow = { days: [], from: "00:00", to: "10:00", mode: "sleep" };
@@ -79,6 +86,7 @@ export function MinecraftSchedule({
      *  read it. */
     state?: ScheduleState | null;
 }) {
+    const t = useGameText("minecraft");
     const [schedule, setSchedule] = useState<GameSchedule>(saved);
     const [wakes, setWakes] = useState(wakeOnJoin);
     const [error, setError] = useState<string | null>(null);
@@ -139,11 +147,10 @@ export function MinecraftSchedule({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <p className="flex items-center gap-2 text-sm font-medium">
-                            <CalendarClock className="size-4" /> Schedule
+                            <CalendarClock className="size-4" /> {t("schedule.schedule")}
                         </p>
                         <p className="max-w-xl text-xs text-muted-foreground">
-                            Hours the server is kept up, and hours it may stop once nobody is playing. Times are read
-                            where you say, not where the machine is. Nothing here restarts the server to take effect.
+                            {t("schedule.hoursTheServerIsKept")}
                         </p>
                         {/* The distinction people arrive here looking for and do
                             not find: stopping a server frees its memory and needs
@@ -152,36 +159,39 @@ export function MinecraftSchedule({
                             somebody wants from "stop it when nobody is playing" is
                             the second one. */}
                         <p className="max-w-xl text-xs text-muted-foreground">
-                            To have it go quiet without anybody starting it again, leave the schedule off and set{" "}
-                            <span className="font-medium text-foreground">Pause when nobody is playing</span> under
-                            Settings. The server keeps its address, stops using the processor, and comes back the
-                            moment somebody joins.
+                            {t.rich<ReactNode>("schedule.quietHint", {
+                                setting: (chunks) => (
+                                    <span key="setting" className="font-medium text-foreground">
+                                        {chunks}
+                                    </span>
+                                )
+                            })}
                         </p>
                     </div>
                     <Switch
                         checked={schedule.enabled}
                         onChange={(enabled) => update({ enabled })}
-                        aria-label="Follow this schedule"
+                        aria-label={t("schedule.followThisSchedule")}
                     />
                 </div>
 
                 {schedule.enabled && (
                     <>
                         <div className="grid gap-3 sm:grid-cols-3">
-                            <Field label="Time zone">
+                            <Field label={t("schedule.timeZone")}>
                                 <Select
                                     value={schedule.timezone}
                                     onValueChange={(timezone) => update({ timezone })}
-                                    aria-label="The zone the times are read in"
-                                    options={timezoneOptions(schedule.timezone)}
+                                    aria-label={t("schedule.theZoneTheTimesAre")}
+                                    options={timezoneOptions(schedule.timezone, t)}
                                 />
                             </Field>
-                            <Field label="The rest of the time">
+                            <Field label={t("schedule.theRestOfTheTime")}>
                                 <Select
                                     value={schedule.otherwise}
                                     onValueChange={(otherwise) => update({ otherwise: otherwise as GameScheduleMode })}
-                                    aria-label="What happens outside every window"
-                                    options={MODES.map((mode) => ({ value: mode.value, label: mode.label }))}
+                                    aria-label={t("schedule.whatHappensOutsideEveryWindow")}
+                                    options={MODES.map((mode) => ({ value: mode.value, label: t(mode.label) }))}
                                 />
                             </Field>
                             {/* Only a rule that says "sleep when empty" ever reads
@@ -189,7 +199,7 @@ export function MinecraftSchedule({
                                 number somebody sets and then waits for nothing to
                                 happen. Shown greyed with the reason rather than
                                 hidden: disappearing fields are their own puzzle. */}
-                            <Field label="Empty for">
+                            <Field label={t("schedule.emptyFor")}>
                                 <div className="flex items-center gap-2">
                                     <Input
                                         type="number"
@@ -197,7 +207,7 @@ export function MinecraftSchedule({
                                         max={MAX_IDLE_MINUTES}
                                         value={String(schedule.idleMinutes)}
                                         disabled={!sleeps}
-                                        aria-label="Minutes with nobody playing before a sleeping window stops it"
+                                        aria-label={t("schedule.minutesWithNobodyPlayingBefore")}
                                         onChange={(event) =>
                                             update({ idleMinutes: Number.parseInt(event.target.value, 10) || 0 })
                                         }
@@ -206,7 +216,7 @@ export function MinecraftSchedule({
                                 </div>
                                 {!sleeps && (
                                     <span className="text-xs text-muted-foreground">
-                                        Used only by a rule set to Sleep when empty.
+                                        {t("schedule.usedOnlyByARule")}
                                     </span>
                                 )}
                             </Field>
@@ -221,32 +231,30 @@ export function MinecraftSchedule({
                             (routed ? (
                                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
                                     <div>
-                                        <p className="text-sm font-medium">Start it when somebody joins</p>
+                                        <p className="text-sm font-medium">{t("schedule.startItWhenSomebodyJoins")}</p>
                                         <p className="max-w-xl text-xs text-muted-foreground">
-                                            While it is asleep the server list says so, and a player joining starts
-                                            it. That attempt of theirs ends straight away - the server is only
-                                            beginning to load - and joining again a minute later gets them in.
+                                            {t("schedule.whileItIsAsleepThe")}
                                         </p>
                                     </div>
                                     <Switch
                                         checked={wakes}
                                         onChange={setWake}
                                         disabled={pending}
-                                        aria-label="Start this server when somebody tries to join it"
+                                        aria-label={t("schedule.startThisServerWhenSomebody")}
                                     />
                                 </div>
                             ) : (
                                 <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
                                     {canRoute
-                                        ? "While this server is asleep its port is closed, so nobody can start it by joining. Turn on sharing the port under Address and a player arriving by name starts it again."
-                                        : "While this server is asleep its port is closed and nothing can see somebody trying to reach it, so it is started from here or by a window that says Keep running."}
+                                        ? t("schedule.whileThisServerIsAsleep")
+                                        : t("schedule.whileThisServerIsAsleep2")}
                                 </p>
                             ))}
 
                         <div className="flex flex-col gap-2">
                             {schedule.windows.length === 0 ? (
                                 <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                                    No windows yet, so the whole week follows the rule above.
+                                    {t("schedule.noWindowsYetSoThe")}
                                 </p>
                             ) : (
                                 schedule.windows.map((window, index) => (
@@ -266,7 +274,7 @@ export function MinecraftSchedule({
                                 className="w-fit"
                                 onClick={() => update({ windows: [...schedule.windows, OVERNIGHT] })}
                             >
-                                <Plus className="size-4" /> Add a window
+                                <Plus className="size-4" /> {t("schedule.addAWindow")}
                             </Button>
                         </div>
 
@@ -275,9 +283,9 @@ export function MinecraftSchedule({
                             while it is. */}
                         <div className="flex flex-col gap-2 border-t border-border pt-4">
                             <div>
-                                <p className="text-sm font-medium">Routines</p>
+                                <p className="text-sm font-medium">{t("schedule.routines")}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    Things to do at a time: restart it, warn everyone, take a backup, run a command.
+                                    {t("schedule.thingsToDoAtA")}
                                 </p>
                             </div>
                             {schedule.routines.map((routine, index) => (
@@ -317,7 +325,7 @@ export function MinecraftSchedule({
                                     })
                                 }
                             >
-                                <Plus className="size-4" /> Add a routine
+                                <Plus className="size-4" /> {t("schedule.addARoutine")}
                             </Button>
                         </div>
 
@@ -346,11 +354,11 @@ export function MinecraftSchedule({
 
                 <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-muted-foreground">
-                        {saved_ && !changed ? "Saved." : changed ? "Not saved yet." : "This is what the server follows."}
+                        {saved_ && !changed ? t("schedule.saved") : changed ? t("schedule.notSavedYet") : t("schedule.thisIsWhatTheServer")}
                     </span>
                     <Button onClick={save} disabled={pending || !changed}>
                         {pending && <Loader2 className="size-4 animate-spin" />}
-                        Save schedule
+                        {t("schedule.saveSchedule")}
                     </Button>
                 </div>
             </CardBody>
@@ -367,36 +375,37 @@ function WindowRow({
     onChange: (patch: Partial<GameScheduleWindow>) => void;
     onRemove: () => void;
 }) {
+    const t = useGameText("minecraft");
     const wraps = window.to <= window.from;
 
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border p-3">
             <div className="flex flex-wrap items-end gap-2">
-                <Field label="From">
+                <Field label={t("schedule.from")}>
                     <Input
                         type="time"
                         className="w-28"
                         value={window.from}
-                        aria-label="When the window starts"
+                        aria-label={t("schedule.whenTheWindowStarts")}
                         onChange={(event) => onChange({ from: event.target.value })}
                     />
                 </Field>
-                <Field label="To">
+                <Field label={t("schedule.to")}>
                     <Input
                         type="time"
                         className="w-28"
                         value={window.to}
-                        aria-label="When the window ends"
+                        aria-label={t("schedule.whenTheWindowEnds")}
                         onChange={(event) => onChange({ to: event.target.value })}
                     />
                 </Field>
-                <Field label="Then">
+                <Field label={t("schedule.then")}>
                     <Select
                         className="w-48"
                         value={window.mode}
                         onValueChange={(mode) => onChange({ mode: mode as GameScheduleMode })}
-                        aria-label="What the server does in this window"
-                        options={MODES.map((mode) => ({ value: mode.value, label: mode.label }))}
+                        aria-label={t("schedule.whatTheServerDoesIn")}
+                        options={MODES.map((mode) => ({ value: mode.value, label: t(mode.label) }))}
                     />
                 </Field>
                 <Button
@@ -404,8 +413,8 @@ function WindowRow({
                     variant="ghost"
                     className="ml-auto text-danger hover:text-danger"
                     onClick={onRemove}
-                    aria-label="Remove this window"
-                    title="Remove this window"
+                    aria-label={t("schedule.removeThisWindow")}
+                    title={t("schedule.removeThisWindow")}
                 >
                     <Trash2 className="size-4" />
                 </Button>
@@ -435,7 +444,7 @@ function WindowRow({
                                     : "border-border text-muted-foreground hover:text-foreground"
                             }`}
                         >
-                            {label}
+                            {t(label)}
                         </button>
                     );
                 })}
@@ -457,7 +466,7 @@ function WindowRow({
  * anybody coordinating across places, and whatever the server was already set to
  * so a saved schedule never silently reads as something else.
  */
-function timezoneOptions(current: string): { value: string; label: string }[] {
+function timezoneOptions(current: string, t: GameText<"minecraft">): { value: string; label: string }[] {
     const here = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     const supported =
         typeof Intl.supportedValuesOf === "function"
@@ -466,7 +475,7 @@ function timezoneOptions(current: string): { value: string; label: string }[] {
     const preferred = [...new Set([here, current, "UTC"])];
     return [...preferred, ...supported.filter((zone) => !preferred.includes(zone))].map((zone) => ({
         value: zone,
-        label: zone === here ? `${zone} (yours)` : zone
+        label: zone === here ? t("schedule.yourZone", { zone }) : zone
     }));
 }
 
@@ -504,11 +513,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 
 /** The words for each kind of step, in the order somebody would think of them. */
-const ACTION_LABELS: { value: RoutineActionKind; label: string; needs: boolean; placeholder: string }[] = [
-    { value: "restart", label: "Restart the server", needs: false, placeholder: "" },
-    { value: "broadcast", label: "Tell everyone", needs: true, placeholder: "Restarting in 5 minutes" },
-    { value: "command", label: "Run a command", needs: true, placeholder: "time set day" },
-    { value: "backup", label: "Take a backup", needs: false, placeholder: "" }
+const ACTION_LABELS: {
+    value: RoutineActionKind;
+    label: GameKey<"minecraft">;
+    needs: boolean;
+    placeholder: GameKey<"minecraft"> | null;
+}[] = [
+    { value: "restart", label: "schedule.actions.restart", needs: false, placeholder: null },
+    { value: "broadcast", label: "schedule.actions.broadcast", needs: true, placeholder: "schedule.actions.broadcastExample" },
+    { value: "command", label: "schedule.actions.command", needs: true, placeholder: "schedule.actions.commandExample" },
+    { value: "backup", label: "schedule.actions.backup", needs: false, placeholder: null }
 ];
 
 /** One routine: when, and what it does in order. */
@@ -523,18 +537,19 @@ function RoutineRow({
     onChange: (patch: Partial<ScheduledRoutine>) => void;
     onRemove: () => void;
 }) {
+    const t = useGameText("minecraft");
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border p-3">
             <div className="flex flex-wrap items-end gap-2">
-                <Field label="Name">
+                <Field label={t("schedule.name")}>
                     <Input
                         value={routine.name}
                         onChange={(event) => onChange({ name: event.target.value })}
-                        placeholder="Nightly restart"
+                        placeholder={t("schedule.nightlyRestart")}
                         className="w-48"
                     />
                 </Field>
-                <Field label="At">
+                <Field label={t("schedule.at")}>
                     <Input
                         type="time"
                         value={routine.at}
@@ -544,14 +559,14 @@ function RoutineRow({
                 </Field>
                 <label className="flex items-center gap-2 pb-2 text-xs text-muted-foreground">
                     <Switch checked={routine.enabled} onChange={(on: boolean) => onChange({ enabled: on })} />
-                    On
+                    {t("schedule.on")}
                 </label>
                 <Button
                     size="sm"
                     variant="ghost"
                     className="ml-auto"
                     onClick={onRemove}
-                    aria-label={`Remove ${routine.name || "this routine"}`}
+                    aria-label={t("schedule.removeNamed", { name: routine.name || t("schedule.thisRoutine") })}
                 >
                     <Trash2 className="size-4" />
                 </Button>
@@ -572,7 +587,7 @@ function RoutineRow({
                                         )
                                     })
                                 }
-                                options={ACTION_LABELS.map((entry) => ({ value: entry.value, label: entry.label }))}
+                                options={ACTION_LABELS.map((entry) => ({ value: entry.value, label: t(entry.label) }))}
                                 className="w-48"
                             />
                             {spec?.needs && (
@@ -585,13 +600,13 @@ function RoutineRow({
                                             )
                                         })
                                     }
-                                    placeholder={spec.placeholder}
+                                    placeholder={spec.placeholder ? t(spec.placeholder) : ""}
                                     className="w-64 font-mono"
                                 />
                             )}
                             {action.kind === "broadcast" && (
                                 <span className="text-xs text-muted-foreground">
-                                    reaches the game as [Polaris] {action.value || spec?.placeholder}
+                                    {t("schedule.reachesAs", { text: action.value || (spec?.placeholder ? t(spec.placeholder) : "") })}
                                 </span>
                             )}
                             <Button
@@ -601,7 +616,7 @@ function RoutineRow({
                                 onClick={() =>
                                     onChange({ actions: routine.actions.filter((_, at) => at !== index) })
                                 }
-                                aria-label="Remove this step"
+                                aria-label={t("schedule.removeThisStep")}
                             >
                                 <Trash2 className="size-4" />
                             </Button>
@@ -615,7 +630,7 @@ function RoutineRow({
                     disabled={routine.actions.length >= 8}
                     onClick={() => onChange({ actions: [...routine.actions, { kind: "broadcast", value: "" }] })}
                 >
-                    <Plus className="size-4" /> Add a step
+                    <Plus className="size-4" /> {t("schedule.addAStep")}
                 </Button>
             </div>
 
@@ -624,7 +639,7 @@ function RoutineRow({
                 screen says which. */}
             {run && (
                 <p className={`text-xs ${run.ok ? "text-muted-foreground" : "text-danger"}`}>
-                    Last run {new Date(run.at).toLocaleString()}: {run.ok ? "went through" : run.detail || "failed"}
+                    {t("schedule.lastRun", { date: new Date(run.at).toLocaleString(), result: run.ok ? t("schedule.wentThrough") : run.detail || t("schedule.failed") })}
                 </p>
             )}
         </div>
