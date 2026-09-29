@@ -902,7 +902,30 @@
         },
         "event": "{what}{hasActor, select, yes { por {actor}} other {}}{hasHow, select, yes { {how}} other {}}",
         "failedBecause": "{line} - {note}",
-        "failed": "{line} - no terminó"
+        "failed": "{line} - no terminó",
+        "readings": {
+            "open": "Abierto",
+            "closed": "Cerrado",
+            "unlocked": "Sin cerrojo",
+            "locked": "Cerrado",
+            "movement": "Movimiento",
+            "still": "Quieto",
+            "occupied": "Hay alguien",
+            "empty": "Vacío",
+            "home": "En casa",
+            "away": "Fuera",
+            "wet": "Mojado",
+            "dry": "Seco",
+            "smoke": "Humo",
+            "clear": "Normal",
+            "gas": "Gas",
+            "problem": "Problema",
+            "fine": "Bien",
+            "low": "Baja",
+            "connected": "Conectado",
+            "disconnected": "Desconectado",
+            "tampered": "Manipulado"
+        }
     },
     "devicesView": {
         "disconnectName": "Desconectar {name}",
@@ -1012,5 +1035,11 @@
         "forget": "Olvidarla",
         "rename": "Renombrar",
         "forgetBody": "Sus fotos también se borran del reconocedor. Desde entonces las cámaras avisarán de ella como desconocida."
+    },
+    "sighting": {
+        "face": "{name} está en {camera}",
+        "tamper": "Puede que hayan manipulado la cámara {camera}",
+        "person": "Hay alguien en {camera}",
+        "other": "{kind, select, vehicle {Un vehículo} animal {Un animal} package {Un paquete} other {Algo}} en {camera}"
     }
 }

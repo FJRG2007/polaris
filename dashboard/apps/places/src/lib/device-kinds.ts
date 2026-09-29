@@ -127,12 +127,41 @@ export interface DeviceReading {
 /** The reading as one line, or an empty string for a device that has none. The
  *  space before a unit is dropped for the ones that are written closed up, which
  *  is every symbol and no word. */
-export function readingLine(reading: DeviceReading | null): string {
+export function readingLine(reading: DeviceReading | null, t: PlacesTranslator = en): string {
     if (!reading || !reading.value) return "";
-    if (!reading.unit) return reading.value;
+    // A word a driver wrote for an on/off sensor reads in the reader's language;
+    // a value the device sent itself is shown as it came.
+    const known = READING_KEYS[reading.value];
+    const value = known ? t(known) : reading.value;
+    if (!reading.unit) return value;
     const closed = /^[%\u00b0]/.test(reading.unit);
-    return closed ? `${reading.value}${reading.unit}` : `${reading.value} ${reading.unit}`;
+    return closed ? `${value}${reading.unit}` : `${value} ${reading.unit}`;
 }
+
+/** The words `mqtt-discovery` gives a two-state sensor, by their English. */
+const READING_KEYS: Readonly<Record<string, PlacesKey>> = {
+    "Open": "devices.readings.open",
+    "Closed": "devices.readings.closed",
+    "Unlocked": "devices.readings.unlocked",
+    "Locked": "devices.readings.locked",
+    "Movement": "devices.readings.movement",
+    "Still": "devices.readings.still",
+    "Somebody there": "devices.readings.occupied",
+    "Empty": "devices.readings.empty",
+    "Home": "devices.readings.home",
+    "Away": "devices.readings.away",
+    "Wet": "devices.readings.wet",
+    "Dry": "devices.readings.dry",
+    "Smoke": "devices.readings.smoke",
+    "Clear": "devices.readings.clear",
+    "Gas": "devices.readings.gas",
+    "Problem": "devices.readings.problem",
+    "Fine": "devices.readings.fine",
+    "Low": "devices.readings.low",
+    "Connected": "devices.readings.connected",
+    "Disconnected": "devices.readings.disconnected",
+    "Tampered": "devices.readings.tampered"
+};
 
 export type DeviceTone = "success" | "active" | "warning" | "danger" | "muted";
 

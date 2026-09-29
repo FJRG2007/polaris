@@ -412,7 +412,7 @@ export function DevicesView({
                                                     {!device.online
                                                         ? t("devices.states.unknown")
                                                         : kinds.deviceKind(device.kind) === "sensor"
-                                                          ? kinds.readingLine(device.reading) ||
+                                                          ? kinds.readingLine(device.reading, t) ||
                                                             t("devicesView.nothingRead")
                                                           : kinds.stateLabel(
                                                                 device.kind,

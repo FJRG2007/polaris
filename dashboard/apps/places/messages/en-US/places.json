@@ -902,7 +902,30 @@
         },
         "event": "{what}{hasActor, select, yes { by {actor}} other {}}{hasHow, select, yes { {how}} other {}}",
         "failedBecause": "{line} - {note}",
-        "failed": "{line} - it did not finish"
+        "failed": "{line} - it did not finish",
+        "readings": {
+            "open": "Open",
+            "closed": "Closed",
+            "unlocked": "Unlocked",
+            "locked": "Locked",
+            "movement": "Movement",
+            "still": "Still",
+            "occupied": "Somebody there",
+            "empty": "Empty",
+            "home": "Home",
+            "away": "Away",
+            "wet": "Wet",
+            "dry": "Dry",
+            "smoke": "Smoke",
+            "clear": "Clear",
+            "gas": "Gas",
+            "problem": "Problem",
+            "fine": "Fine",
+            "low": "Low",
+            "connected": "Connected",
+            "disconnected": "Disconnected",
+            "tampered": "Tampered"
+        }
     },
     "devicesView": {
         "disconnectName": "Disconnect {name}",
@@ -1012,5 +1035,11 @@
         "forget": "Forget them",
         "rename": "Rename",
         "forgetBody": "Their photographs are deleted from the recognizer as well. The cameras will report them as a stranger from then on."
+    },
+    "sighting": {
+        "face": "{name} is at the {camera}",
+        "tamper": "The {camera} camera may have been tampered with",
+        "person": "Somebody is at the {camera}",
+        "other": "A {kind} at the {camera}"
     }
 }

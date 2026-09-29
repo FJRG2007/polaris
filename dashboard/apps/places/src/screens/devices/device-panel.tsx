@@ -112,7 +112,7 @@ function StatePill({ device }: { device: DeviceView }) {
     // badge is for on one. A sensor whose reading has not arrived says so rather
     // than borrowing the word a lock uses for the same silence.
     const t = usePlacesT();
-    const reading = kinds.readingLine(device.reading);
+    const reading = kinds.readingLine(device.reading, t);
     return (
         <Badge className={cn("gap-1.5", stateClass(device))}>
             {device.state === "moving" && <Loader2 className="size-3 animate-spin" />}

@@ -19,6 +19,7 @@ import type { ObjectClass } from "./detection";
 import { deleteStill, storeStill } from "./stills";
 import { MOTION_SECONDS, recordClip } from "./recording";
 import { host } from "@polaris/app-host";
+import { placesTFor } from "./i18n";
 
 const { notify } = host.notificationsDispatch;
 const { ruleFor } = host.notificationsPreferences;
@@ -397,14 +398,16 @@ async function announce(
     // camera, which is not a history.
     if (isMuted(await ruleFor(install.ownerId, event))) return;
 
+    // In the language of whoever the house belongs to.
+    const t = await placesTFor(install.ownerId);
     const what =
         detection.kind === "face" && detection.label
-            ? `${known?.name ?? detection.label} is at the ${cameraName}`
+            ? t("sighting.face", { name: known?.name ?? detection.label, camera: cameraName })
             : detection.kind === "tamper"
-              ? `The ${cameraName} camera may have been tampered with`
+              ? t("sighting.tamper", { camera: cameraName })
               : detection.kind === "person"
-                ? `Somebody is at the ${cameraName}`
-                : `A ${detection.kind} at the ${cameraName}`;
+                ? t("sighting.person", { camera: cameraName })
+                : t("sighting.other", { kind: detection.kind, camera: cameraName });
 
     await notify({
         userId: install.ownerId,
