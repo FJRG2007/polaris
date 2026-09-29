@@ -800,5 +800,28 @@
             "files": "Archivos",
             "text": "Texto"
         }
+    },
+    "share": {
+        "createFailed": "No se pudo crear el enlace.",
+        "titleMany": "Compartir {count} elementos",
+        "titleFolder": "Compartir",
+        "titleFile": "Compartir",
+        "onceMany": "Cualquiera con estos enlaces puede acceder dentro de los límites que pongas. Cópialos ahora - solo se muestran una vez.",
+        "onceOne": "Cualquiera con este enlace puede acceder dentro de los límites que pongas. Cópialo ahora - solo se muestra una vez.",
+        "copyLink": "Copiar el enlace a {name}",
+        "copyAll": "Copiar todos",
+        "done": "Hecho",
+        "eachItem": "Cada elemento tiene su propio enlace con los ajustes de abajo.",
+        "password": "Contraseña (opcional)",
+        "noPassword": "Sin contraseña",
+        "cidrs": "Solo estas IP o rangos (opcional)",
+        "cidrsHint": "Separados por comas o espacios. Vacío significa cualquiera con el enlace.",
+        "location": "Solo estos lugares (opcional)",
+        "allowPreview": "Permitir verlo en el navegador",
+        "allowUploadMany": "Permitir subir a las carpetas compartidas (buzón)",
+        "allowUploadOne": "Permitir subir a esta carpeta (buzón)",
+        "creating": "Creando...",
+        "createMany": "Crear {count} enlaces",
+        "create": "Crear enlace"
     }
 }

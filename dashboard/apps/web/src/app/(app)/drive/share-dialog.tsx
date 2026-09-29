@@ -13,6 +13,7 @@
  */
 
 import { Check, Copy, Link2 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { GeoPicker } from "@/components/geo-picker";
 import { createShareAction } from "./share-actions";
 import { useEffect, useState, type FormEvent } from "react";
@@ -48,6 +49,7 @@ export function ShareDialog({
     targets: ShareTarget[] | null;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("drive");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [results, setResults] = useState<ShareResult[] | null>(null);
@@ -122,7 +124,7 @@ export function ShareDialog({
         }
         setPending(false);
         if (created.every((result) => result.error)) {
-            setError(created[0]?.error ?? "Could not create the link.");
+            setError(created[0]?.error ?? t("share.createFailed"));
             return;
         }
         setResults(created);
@@ -139,8 +141,10 @@ export function ShareDialog({
                 <DialogHeader>
                     <DialogTitle>
                         {many
-                            ? `Share ${items.length} items`
-                            : `Share ${items[0]?.isDir ? "folder" : "file"}`}
+                            ? t("share.titleMany", { count: items.length })
+                            : items[0]?.isDir
+                              ? t("share.titleFolder")
+                              : t("share.titleFile")}
                     </DialogTitle>
                     <DialogDescription className="truncate">
                         {many ? items.map((target) => target.name).join(", ") : items[0]?.name}
@@ -150,10 +154,7 @@ export function ShareDialog({
                 {results ? (
                     <div className="flex flex-col gap-3">
                         <p className="text-sm text-muted-foreground">
-                            Anyone with {many ? "these links" : "this link"} can access{" "}
-                            {many ? "them" : "it"} under the limits you set. Copy{" "}
-                            {many ? "them" : "it"} now - {many ? "they are" : "it is"} shown only
-                            once.
+                            {many ? t("share.onceMany") : t("share.onceOne")}
                         </p>
                         <div className="flex max-h-64 flex-col gap-2 overflow-auto overscroll-contain">
                             {results.map((result) => (
@@ -177,8 +178,8 @@ export function ShareDialog({
                                                 onClick={() =>
                                                     onCopy(result.path, result.url ?? "")
                                                 }
-                                                title={`Copy the link to ${result.name}`}
-                                                aria-label={`Copy the link to ${result.name}`}
+                                                title={t("share.copyLink", { name: result.name })}
+                                                aria-label={t("share.copyLink", { name: result.name })}
                                             >
                                                 {copied === result.path ? (
                                                     <Check className="size-4 text-success" />
@@ -207,11 +208,11 @@ export function ShareDialog({
                                     ) : (
                                         <Copy className="size-4" />
                                     )}
-                                    Copy all links
+                                    {t("share.copyAll")}
                                 </Button>
                             ) : null}
                             <Button type="button" onClick={() => onOpenChange(false)}>
-                                Done
+                                {t("share.done")}
                             </Button>
                         </div>
                     </div>
@@ -219,46 +220,46 @@ export function ShareDialog({
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         {many ? (
                             <p className="text-sm text-muted-foreground">
-                                Each item gets its own link under the settings below.
+                                {t("share.eachItem")}
                             </p>
                         ) : null}
                         <label className="flex flex-col gap-1 text-sm">
-                            Password (optional)
+                            {t("share.password")}
                             <Input
                                 name="password"
                                 type="password"
-                                placeholder="No password"
+                                placeholder={t("share.noPassword")}
                                 autoComplete="off"
                             />
                         </label>
                         <div className="grid grid-cols-2 gap-3">
                             <label className="flex flex-col gap-1 text-sm">
-                                Max downloads
+                                {t("sharedLinks.maxDownloads")}
                                 <Input
                                     name="maxDownloads"
                                     type="number"
                                     min="1"
-                                    placeholder="Unlimited"
+                                    placeholder={t("sharedLinks.unlimited")}
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                Expires
+                                {t("sharedLinks.expiresField")}
                                 <Input name="expiresAt" type="date" />
                             </label>
                         </div>
                         <label className="flex flex-col gap-1 text-sm">
-                            Restrict to IPs / ranges (optional)
+                            {t("share.cidrs")}
                             <Input
                                 name="allowedCidrs"
-                                placeholder="e.g. 203.0.113.4, 10.0.0.0/24"
+                                placeholder={t("sharedLinks.cidrsPlaceholder")}
                                 autoComplete="off"
                             />
                             <span className="text-xs text-muted-foreground">
-                                Comma or space separated. Empty means anyone with the link.
+                                {t("share.cidrsHint")}
                             </span>
                         </label>
                         <div className="flex flex-col gap-1 text-sm">
-                            Restrict by location (optional)
+                            {t("share.location")}
                             <GeoPicker
                                 countries={geoCountries}
                                 continents={geoContinents}
@@ -274,7 +275,7 @@ export function ShareDialog({
                                     defaultChecked
                                     className="size-4"
                                 />
-                                Allow downloading
+                                {t("sharedLinks.allowDownload")}
                             </label>
                             <label className="flex items-center gap-2">
                                 <input
@@ -283,7 +284,7 @@ export function ShareDialog({
                                     defaultChecked
                                     className="size-4"
                                 />
-                                Allow previewing in the browser
+                                {t("share.allowPreview")}
                             </label>
                             {anyDir ? (
                                 <>
@@ -293,8 +294,7 @@ export function ShareDialog({
                                             name="allowUpload"
                                             className="size-4"
                                         />
-                                        Allow uploading into{" "}
-                                        {many ? "the shared folders" : "this folder"} (drop box)
+                                        {many ? t("share.allowUploadMany") : t("share.allowUploadOne")}
                                     </label>
                                     <label className="flex items-center gap-2">
                                         <input
@@ -302,7 +302,7 @@ export function ShareDialog({
                                             name="allowOverwrite"
                                             className="size-4"
                                         />
-                                        Let an upload replace a file of the same name
+                                        {t("sharedLinks.allowOverwrite")}
                                     </label>
                                     <label className="flex items-center gap-2">
                                         <input
@@ -310,7 +310,7 @@ export function ShareDialog({
                                             name="allowCreateFolder"
                                             className="size-4"
                                         />
-                                        Allow creating folders
+                                        {t("sharedLinks.allowMkdir")}
                                     </label>
                                     <label className="flex items-center gap-2">
                                         <input
@@ -318,7 +318,7 @@ export function ShareDialog({
                                             name="allowRename"
                                             className="size-4"
                                         />
-                                        Allow renaming and moving items
+                                        {t("sharedLinks.allowRename")}
                                     </label>
                                     <label className="flex items-center gap-2">
                                         <input
@@ -326,7 +326,7 @@ export function ShareDialog({
                                             name="allowDelete"
                                             className="size-4"
                                         />
-                                        Allow deleting items (permanent)
+                                        {t("sharedLinks.allowDelete")}
                                     </label>
                                 </>
                             ) : null}
@@ -336,10 +336,10 @@ export function ShareDialog({
                             <Button type="submit" disabled={pending}>
                                 <Link2 className="size-4" />
                                 {pending
-                                    ? "Creating..."
+                                    ? t("share.creating")
                                     : many
-                                      ? `Create ${items.length} links`
-                                      : "Create link"}
+                                      ? t("share.createMany", { count: items.length })
+                                      : t("share.create")}
                             </Button>
                         </div>
                     </form>

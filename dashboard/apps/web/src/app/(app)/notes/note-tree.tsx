@@ -19,6 +19,7 @@
  */
 
 import { saveFile } from "@/components/transfers/move-file";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import Fuse from "fuse.js";
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
@@ -162,6 +163,7 @@ export function NoteTree({
     onMoveNote: (noteId: string) => void;
     onShareNote: (noteId: string) => void;
 }) {
+    const t = useTranslations("notes");
     const router = useRouter();
     const [query, setQuery] = useState("");
     const [error, setError] = useState("");
@@ -210,7 +212,7 @@ export function NoteTree({
         parentId?: string | null;
     }) => {
         const result = await runAction(
-            () => actions.createNoteAction({ title: "Untitled", body: "", ...where }),
+            () => actions.createNoteAction({ title: t("tree.untitled"), body: "", ...where }),
             setError
         );
         if (result?.id) open(result.id);
@@ -284,7 +286,7 @@ export function NoteTree({
             <aside className="flex w-full flex-col gap-2 md:w-72 md:shrink-0">
                 <TreeSearch query={query} onQuery={setQuery} onNew={() => void create({ spaceId: null, folderId: null })} />
                 {hits.length === 0 ? (
-                    <Empty>No note matches that.</Empty>
+                    <Empty>{t("tree.noMatch")}</Empty>
                 ) : (
                     <ul className="flex flex-col gap-0.5">
                         {hits.map((hit) => (
@@ -299,7 +301,7 @@ export function NoteTree({
                                 >
                                     <span className="truncate text-sm font-medium" title={hit.title}>{hit.title}</span>
                                     <span className="truncate text-xs text-muted-foreground">
-                                        {hit.shelf.space?.name ?? "My notes"}
+                                        {hit.shelf.space?.name ?? t("tree.myNotes")}
                                         {hit.excerpt ? ` - ${hit.excerpt}` : ""}
                                     </span>
                                 </button>
@@ -406,7 +408,7 @@ export function NoteTree({
 
             <Button size="sm" variant="ghost" onClick={onNewNotebook} className="justify-start">
                 <Plus className="size-4" />
-                New notebook
+                {t("tree.newNotebook")}
             </Button>
 
             <ConfirmDeleteDialog
@@ -415,12 +417,25 @@ export function NoteTree({
                 name={removing?.name ?? ""}
                 kind={removing?.kind === "space" ? "notebook" : "folder"}
                 requireTyping={removing?.kind === "space"}
+                title={removing?.kind === "space" ? t("tree.deleteNotebook") : t("tree.deleteFolder")}
+                question={
+                    removing?.kind === "space"
+                        ? undefined
+                        : t.rich("tree.deleteFolderQuestion", {
+                              name: removing?.name ?? "",
+                              strong: (chunks) => (
+                                  <span key="name" className="font-medium text-foreground">
+                                      {chunks}
+                                  </span>
+                              )
+                          })
+                }
                 description={
                     removing?.kind === "space"
-                        ? "Everything on it goes with it: its folders and every note anybody wrote there."
-                        : "What is filed in it is kept, and moves up to where the folder was."
+                        ? t("tree.deleteNotebookBody")
+                        : t("tree.deleteFolderBody")
                 }
-                confirmLabel={removing?.kind === "space" ? "Delete notebook" : "Delete folder"}
+                confirmLabel={removing?.kind === "space" ? t("tree.deleteNotebook") : t("tree.deleteFolder")}
                 onConfirm={async () => {
                     if (!removing) return;
                     await act(() =>
@@ -452,6 +467,7 @@ function TreeSearch({
     onQuery: (value: string) => void;
     onNew: () => void;
 }) {
+    const t = useTranslations("notes");
     return (
         <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -459,15 +475,15 @@ function TreeSearch({
                 <input
                     value={query}
                     onChange={(event) => onQuery(event.target.value)}
-                    placeholder="Find a note"
-                    aria-label="Find a note"
+                    placeholder={t("tree.find")}
+                    aria-label={t("tree.find")}
                     className="h-8 w-full rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                 />
             </div>
             <button
                 type="button"
-                aria-label="New note"
-                title="New note"
+                aria-label={t("tree.newNote")}
+                title={t("tree.newNote")}
                 onClick={onNew}
                 className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
@@ -490,6 +506,7 @@ function RowName({
     onCommit: (value: string) => void;
     className?: string;
 }) {
+    const t = useTranslations("notes");
     const [draft, setDraft] = useState(name);
     const field = useRef<HTMLInputElement>(null);
     useEffect(() => {
@@ -512,7 +529,7 @@ function RowName({
             ref={field}
             bare
             value={draft}
-            aria-label={`Rename ${name}`}
+            aria-label={t("tree.renameNamed", { name })}
             onChange={(event) => setDraft(event.target.value)}
             onBlur={() => onCommit(draft.trim())}
             onKeyDown={(event) => {
@@ -561,7 +578,8 @@ function ShelfRow({
     onDragLeave: () => void;
     onDrop: () => void;
 }) {
-    const name = shelf.space?.name ?? "My notes";
+    const t = useTranslations("notes");
+    const name = shelf.space?.name ?? t("tree.myNotes");
     const writable = canWrite(shelf);
     return (
         <ContextMenu>
@@ -592,7 +610,7 @@ function ShelfRow({
                         type="button"
                         onClick={onToggle}
                         aria-expanded={!folded}
-                        aria-label={folded ? `Show ${name}` : `Hide ${name}`}
+                        aria-label={folded ? t("tree.showNamed", { name }) : t("tree.hideNamed", { name })}
                         className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                     >
                         <ChevronRight className={cn("size-3.5 transition-transform", !folded && "rotate-90")} />
@@ -615,8 +633,8 @@ function ShelfRow({
                     {writable && (
                         <button
                             type="button"
-                            aria-label={`New note in ${name}`}
-                            title="New note"
+                            aria-label={t("tree.newNoteIn", { name })}
+                            title={t("tree.newNote")}
                             onClick={onNewNote}
                             className="ml-auto rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                         >
@@ -630,39 +648,40 @@ function ShelfRow({
                     <>
                         <ContextMenuItem onSelect={onNewNote}>
                             <FilePlus2 className="size-3.5" />
-                            New note
+                            {t("tree.newNote")}
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={onNewFolder}>
                             <FolderPlus className="size-3.5" />
-                            New folder
+                            {t("tree.newFolder")}
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={onImport}>
                             <Import className="size-3.5" />
-                            Import Markdown here
+                            {t("tree.import")}
                         </ContextMenuItem>
                     </>
                 )}
                 <ContextMenuItem onSelect={onExport}>
                     <Download className="size-3.5" />
-                    Export as Markdown
+                    {t("tree.export")}
                 </ContextMenuItem>
                 {shelf.space && canAdminister(shelf) && (
                     <>
                         <ContextMenuSeparator />
                         <ContextMenuItem onSelect={onStartRename}>
                             <Pencil className="size-3.5" />
-                            Rename
+                            {t("tree.rename")}
+                            {/* i18n-ignore: a key on the keyboard */}
                             <MenuShortcut>F2</MenuShortcut>
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={onPeople}>
                             <Users className="size-3.5" />
-                            Who can reach this
+                            {t("tree.people")}
                         </ContextMenuItem>
                         <ContextMenuSeparator />
                         <ContextMenuItem variant="danger" onSelect={onDelete}>
                             <Trash2 className="size-3.5" />
-                            Delete notebook
-                            <MenuShortcut>Del</MenuShortcut>
+                            {t("tree.deleteNotebook")}
+                            <MenuShortcut>{t("tree.deleteKey")}</MenuShortcut>
                         </ContextMenuItem>
                     </>
                 )}
@@ -727,6 +746,7 @@ function Branch({
     onOver: (key: string | null) => void;
     onDrop: (target: { spaceId: string | null; folderId: string | null }) => void;
 }) {
+    const t = useTranslations("notes");
     const spaceId = shelf.space?.id ?? null;
     const writable = canWrite(shelf);
     const folders = shelf.folders.filter((folder) => folder.parentId === parentId);
@@ -736,7 +756,7 @@ function Branch({
 
     if (folders.length === 0 && notes.length === 0) {
         return parentId === null ? (
-            <p className="px-2 py-3 text-xs text-muted-foreground">Nothing here yet.</p>
+            <p className="px-2 py-3 text-xs text-muted-foreground">{t("tree.emptyShelf")}</p>
         ) : null;
     }
 
@@ -789,7 +809,7 @@ function Branch({
                                         type="button"
                                         onClick={() => onToggle(key)}
                                         aria-expanded={!folded}
-                                        aria-label={folded ? `Open ${folder.name}` : `Close ${folder.name}`}
+                                        aria-label={folded ? t("tree.openNamed", { name: folder.name }) : t("tree.closeNamed", { name: folder.name })}
                                         className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                                     >
                                         <ChevronRight
@@ -814,8 +834,8 @@ function Branch({
                                     {writable && (
                                         <button
                                             type="button"
-                                            aria-label={`New note in ${folder.name}`}
-                                            title="New note"
+                                            aria-label={t("tree.newNoteIn", { name: folder.name })}
+                                            title={t("tree.newNote")}
                                             onClick={() => onCreateNote({ spaceId, folderId: folder.id })}
                                             className="ml-auto rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                                         >
@@ -830,28 +850,29 @@ function Branch({
                                         onSelect={() => onCreateNote({ spaceId, folderId: folder.id })}
                                     >
                                         <FilePlus2 className="size-3.5" />
-                                        New note
+                                        {t("tree.newNote")}
                                     </ContextMenuItem>
                                     <ContextMenuItem
                                         onSelect={() => onCreateFolder({ spaceId, parentId: folder.id })}
                                     >
                                         <FolderPlus className="size-3.5" />
-                                        New folder inside
+                                        {t("tree.newFolderInside")}
                                     </ContextMenuItem>
                                     <ContextMenuItem
                                         onSelect={() => onImport({ spaceId, folderId: folder.id })}
                                     >
                                         <Import className="size-3.5" />
-                                        Import Markdown here
+                                        {t("tree.import")}
                                     </ContextMenuItem>
                                     <ContextMenuItem onSelect={() => download("folder", folder.id)}>
                                         <Download className="size-3.5" />
-                                        Export as Markdown
+                                        {t("tree.export")}
                                     </ContextMenuItem>
                                     <ContextMenuSeparator />
                                     <ContextMenuItem onSelect={() => onStartRename(key)}>
                                         <Pencil className="size-3.5" />
-                                        Rename
+                                        {t("tree.rename")}
+                                        {/* i18n-ignore: a key on the keyboard */}
                                         <MenuShortcut>F2</MenuShortcut>
                                     </ContextMenuItem>
                                     <ContextMenuSeparator />
@@ -867,8 +888,8 @@ function Branch({
                                         }
                                     >
                                         <Trash2 className="size-3.5" />
-                                        Delete folder
-                                        <MenuShortcut>Del</MenuShortcut>
+                                        {t("tree.deleteFolder")}
+                                        <MenuShortcut>{t("tree.deleteKey")}</MenuShortcut>
                                     </ContextMenuItem>
                                 </ContextMenuContent>
                             )}
@@ -966,6 +987,7 @@ function NoteBranch({
     onDragStart: (dragged: Dragged) => void;
     onDragEnd: () => void;
 }) {
+    const t = useTranslations("notes");
     const spaceId = shelf.space?.id ?? null;
     const writable = canWrite(shelf);
     const key = `note:${note.id}`;
@@ -1000,7 +1022,9 @@ function NoteBranch({
                                 onClick={() => onToggle(key)}
                                 aria-expanded={!folded}
                                 aria-label={
-                                    folded ? `Show what is under ${note.title}` : `Hide what is under ${note.title}`
+                                    folded
+                                        ? t("tree.showUnder", { name: note.title })
+                                        : t("tree.hideUnder", { name: note.title })
                                 }
                                 className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                             >
@@ -1051,11 +1075,12 @@ function NoteBranch({
                             }
                         >
                             <CornerDownRight className="size-3.5" />
-                            Add a note under this
+                            {t("tree.addUnder")}
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => onStartRename(key)}>
                             <Pencil className="size-3.5" />
-                            Rename
+                            {t("tree.rename")}
+                            {/* i18n-ignore: a key on the keyboard */}
                             <MenuShortcut>F2</MenuShortcut>
                         </ContextMenuItem>
                         <ContextMenuItem
@@ -1066,19 +1091,19 @@ function NoteBranch({
                             }
                         >
                             {note.pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
-                            {note.pinned ? "Unpin" : "Pin to the top"}
+                            {note.pinned ? t("tree.unpin") : t("tree.pin")}
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => onMoveNote(note.id)}>
                             <FolderPlus className="size-3.5" />
-                            Move to...
+                            {t("tree.moveTo")}
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => onShareNote(note.id)}>
                             <Share2 className="size-3.5" />
-                            Share by link...
+                            {t("tree.shareLink")}
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => download("note", note.id)}>
                             <Download className="size-3.5" />
-                            Export as Markdown
+                            {t("tree.export")}
                         </ContextMenuItem>
                         <ContextMenuSeparator />
                         <ContextMenuItem
@@ -1089,15 +1114,15 @@ function NoteBranch({
                             }
                         >
                             <Archive className="size-3.5" />
-                            Archive
+                            {t("tree.archive")}
                         </ContextMenuItem>
                         <ContextMenuItem
                             variant="danger"
                             onSelect={() => void onAct(() => actions.deleteNoteAction(note.id))}
                         >
                             <Trash2 className="size-3.5" />
-                            Delete
-                            <MenuShortcut>Del</MenuShortcut>
+                            {t("tree.delete")}
+                            <MenuShortcut>{t("tree.deleteKey")}</MenuShortcut>
                         </ContextMenuItem>
                     </ContextMenuContent>
                 )}

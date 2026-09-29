@@ -800,5 +800,28 @@
             "files": "Files",
             "text": "Text"
         }
+    },
+    "share": {
+        "createFailed": "Could not create the link.",
+        "titleMany": "Share {count} items",
+        "titleFolder": "Share folder",
+        "titleFile": "Share file",
+        "onceMany": "Anyone with these links can access them under the limits you set. Copy them now - they are shown only once.",
+        "onceOne": "Anyone with this link can access it under the limits you set. Copy it now - it is shown only once.",
+        "copyLink": "Copy the link to {name}",
+        "copyAll": "Copy all links",
+        "done": "Done",
+        "eachItem": "Each item gets its own link under the settings below.",
+        "password": "Password (optional)",
+        "noPassword": "No password",
+        "cidrs": "Restrict to IPs / ranges (optional)",
+        "cidrsHint": "Comma or space separated. Empty means anyone with the link.",
+        "location": "Restrict by location (optional)",
+        "allowPreview": "Allow previewing in the browser",
+        "allowUploadMany": "Allow uploading into the shared folders (drop box)",
+        "allowUploadOne": "Allow uploading into this folder (drop box)",
+        "creating": "Creating...",
+        "createMany": "Create {count} links",
+        "create": "Create link"
     }
 }
