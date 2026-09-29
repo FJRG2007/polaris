@@ -16,22 +16,22 @@
 import { Check, ScanLine, X } from "lucide-react";
 import { Badge, Card, CardBody } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { QrSignInAnswer } from "@/lib/qr-sign-in-service";
 
 export function ScanHistory({ answers }: { answers: readonly QrSignInAnswer[] }) {
+    const t = useTranslations("account");
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div>
-                    <h2 className="text-sm font-medium">Codes you have answered</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Each one signed a device in as you, or turned it away.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("scan.history.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("scan.history.description")}</p>
                 </div>
 
                 {answers.length === 0 ? (
                     <p className="py-4 text-center text-xs text-muted-foreground">
-                        You have not answered a sign-in code yet.
+                        {t("scan.history.empty")}
                     </p>
                 ) : (
                     <ul className="flex flex-col gap-2">
@@ -49,7 +49,7 @@ export function ScanHistory({ answers }: { answers: readonly QrSignInAnswer[] })
                                     <p className="flex flex-wrap items-center gap-1.5 text-sm">
                                         <span className="min-w-0 truncate">{answer.device}</span>
                                         <Badge variant={answer.allowed ? "success" : "neutral"}>
-                                            {answer.allowed ? "Signed in" : "Refused"}
+                                            {answer.allowed ? t("scan.history.signedIn") : t("scan.history.refused")}
                                         </Badge>
                                     </p>
                                     {answer.origin || answer.host ? (
@@ -63,12 +63,12 @@ export function ScanHistory({ answers }: { answers: readonly QrSignInAnswer[] })
                                         <ScanLine className="size-3 shrink-0" aria-hidden />
                                         {answer.scannedOn ? (
                                             <span className="min-w-0 truncate">
-                                                Read on {answer.scannedOn}
+                                                {t("scan.history.readOn", { device: answer.scannedOn })}
                                             </span>
                                         ) : (
-                                            <span>Read on a device that is no longer signed in</span>
+                                            <span>{t("scan.history.readOnGone")}</span>
                                         )}
-                                        {answer.here ? <Badge variant="neutral">This device</Badge> : null}
+                                        {answer.here ? <Badge variant="neutral">{t("scan.history.thisDevice")}</Badge> : null}
                                     </p>
                                 </div>
                                 <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">

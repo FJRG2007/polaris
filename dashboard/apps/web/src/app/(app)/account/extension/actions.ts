@@ -10,6 +10,8 @@
 
 import { z } from "zod";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
+import { localized } from "../security/action-messages";
 import { readUserCode } from "@/lib/device-code";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
@@ -47,13 +49,14 @@ async function lookup(
     typed: unknown
 ): Promise<{ code?: string; pending?: PendingConnection; error?: string }> {
     const throttle = await rateLimit(`extension-code:${userId}`, LOOKUP_LIMIT, LOOKUP_WINDOW_MS);
-    if (!throttle.ok) return { error: "Too many codes tried. Wait a few minutes." };
+    const t = await getTranslations("account");
+    if (!throttle.ok) return { error: t("extension.errors.tooMany") };
 
     const code = typeof typed === "string" ? readUserCode(typed) : null;
-    if (!code) return { error: "That is not a code from the Polaris extension." };
+    if (!code) return { error: t("extension.errors.notACode") };
     const pending = await describeExtensionConnection(code);
     if (!pending) {
-        return { error: "Nothing is waiting on that code. Ask the extension for a new one." };
+        return { error: t("extension.errors.nothingWaiting") };
     }
     return { code, pending };
 }
@@ -77,17 +80,17 @@ export async function answerConnectionAction(
     // a standing credential to an extension while the account is still deciding
     // whether it is the owner's - the same gate the other device actions pass.
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
 
     const parsed = answerSchema.safeParse(input);
-    if (!parsed.success) return { error: "That request cannot be answered." };
+    if (!parsed.success) return { error: (await getTranslations("account"))("extension.errors.cannotAnswer") };
 
     // Read before answering, so what the log records is what the person saw -
     // and through the same throttle the screen's own lookup passes, or answering
     // would be a way to try codes that the screen is not.
     const found = await lookup(user.id, parsed.data.userCode);
     if (found.error || !found.code || !found.pending) {
-        return { error: found.error ?? "That request cannot be answered." };
+        return { error: found.error ?? (await getTranslations("account"))("extension.errors.cannotAnswer") };
     }
     const { code, pending } = found;
 

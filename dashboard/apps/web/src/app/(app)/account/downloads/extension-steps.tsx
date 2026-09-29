@@ -18,6 +18,7 @@
 import { Select } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import { CopyButton } from "@/components/copy-button";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     BROWSER_GUIDES,
     browserGuide,
@@ -56,6 +57,7 @@ export function ExtensionSteps() {
     // Detected in an effect, not during render: this is rendered on the server
     // too, where there is no navigator, and seeding from one would have the
     // browser hydrate something the HTML does not contain.
+    const t = useTranslations("account");
     const [browser, setBrowser] = useState<BrowserId>("chrome");
     const [detected, setDetected] = useState<BrowserId | null | undefined>(undefined);
     // A browser the reader picked outranks the one that was detected. They may
@@ -85,10 +87,10 @@ export function ExtensionSteps() {
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end gap-2">
                 <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-muted-foreground">
-                    Your browser
+                    {t("downloads.steps.yourBrowser")}
                     <Select
                         value={browser}
-                        aria-label="Which browser you are loading it into"
+                        aria-label={t("downloads.steps.whichBrowser")}
                         onValueChange={(value) => {
                             picked.current = true;
                             setBrowser(value as BrowserId);
@@ -106,8 +108,7 @@ export function ExtensionSteps() {
                 they would have to open instead. */}
             {detected === null ? (
                 <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                    There is no build for the browser you are reading this in. Pick the one you are
-                    installing into.
+                    {t("downloads.steps.noBuild")}
                 </p>
             ) : null}
 
@@ -117,37 +118,37 @@ export function ExtensionSteps() {
                 reader has to find their place in twice. */}
             <ol className="ml-5 flex list-decimal flex-col gap-5 text-sm leading-relaxed marker:text-muted-foreground">
                 <li>
-                    Download the <Press text={guide.file} /> file above.
-                    {guide.unpack ? (
-                        <> Unpack it - what gets loaded is the folder inside, not the .zip.</>
-                    ) : (
-                        <> Leave it zipped; Firefox takes the .zip as it is.</>
-                    )}
+                    {t.rich(guide.unpack ? "downloads.steps.downloadUnpack" : "downloads.steps.downloadZipped", {
+                        press: (chunks) => <Press key="press" text={chunks.join("")} />,
+                        file: guide.file
+                    })}
                 </li>
                 <li>
-                    Open the extensions page in {guide.label}. Copy this and paste it into the
-                    address bar yourself - no page is allowed to open that address, which is why
-                    there is no button here that does it for you.
+                    {t("downloads.steps.openPage", { browser: guide.label })}
                     <AddressToPaste text={guide.page} />
                 </li>
                 {guide.id === "firefox" ? (
                     <li>
-                        You land on <Press text={guide.pageLabel} />, which is the pane that can
-                        load one.
+                        {t.rich("downloads.steps.landOn", {
+                            press: (chunks) => <Press key="press" text={chunks.join("")} />,
+                            pane: guide.pageLabel
+                        })}
                     </li>
                 ) : (
                     <li>
-                        Turn on <Press text="Developer mode" />, top right. Without it the next
-                        button is not there.
+                        {t.rich("downloads.steps.developerMode", {
+                            press: (chunks) => <Press key="press" text={chunks.join("")} />
+                        })}
                     </li>
                 )}
                 <li>
-                    Press <Press text={guide.action} /> and choose the{" "}
-                    {guide.unpack ? "unpacked folder" : "file you downloaded"}.
+                    {t.rich(guide.unpack ? "downloads.steps.pressFolder" : "downloads.steps.pressFile", {
+                        press: (chunks) => <Press key="press" text={chunks.join("")} />,
+                        action: guide.action
+                    })}
                 </li>
                 <li>
-                    Open the extension and point it at this Polaris. It asks for permission to talk
-                    to this address and no other.
+                    {t("downloads.steps.pointIt")}
                 </li>
             </ol>
 

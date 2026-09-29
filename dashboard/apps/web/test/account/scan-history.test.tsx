@@ -8,6 +8,7 @@
  * refused once and matters more than the twenty that were allowed.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { QrSignInAnswer } from "@/lib/qr-sign-in-service";
@@ -27,7 +28,7 @@ function answer(overrides: Partial<QrSignInAnswer> = {}): QrSignInAnswer {
     };
 }
 
-const render = (answers: QrSignInAnswer[]) => renderToStaticMarkup(<ScanHistory answers={answers} />);
+const render = (answers: QrSignInAnswer[]) => renderToStaticMarkup(withMessages(<ScanHistory answers={answers} />));
 
 describe("the scan history", () => {
     it("says what was let in, from where, and which device read the code", () => {

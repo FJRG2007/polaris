@@ -174,7 +174,18 @@
         "page": {
             "title": "Activity",
             "intro": "What has been done with your account, and which device did it."
-        }
+        },
+        "outside": "Outside a session",
+        "signedOutOn": "{name} - signed out {date}",
+        "signedOut": "{name} - signed out",
+        "thisDevice": "{name} - {label} (this device)",
+        "named": "{name} - {label}",
+        "session": "Session",
+        "empty": "Nothing recorded yet.",
+        "emptySession": "Nothing recorded from this session yet.",
+        "signedOutSession": "Signed-out session",
+        "filter": "Filter by session",
+        "allSessions": "All sessions"
     },
     "apiKeys": {
         "page": {
@@ -529,24 +540,133 @@
         "page": {
             "title": "Connect the extension",
             "intro": "Type the code the extension is showing. Nothing is connected until you say so."
+        },
+        "connected": "Connected.",
+        "turnedAway": "Turned away.",
+        "connectedHint": "The extension has what it needs. You can close this page - it appears under Sessions, and you can end it there.",
+        "turnedAwayHint": "Nothing was handed over.",
+        "code": "Code {code}",
+        "browser": "Browser",
+        "browserOn": "{browser} on {os}",
+        "askedFrom": "Asked from",
+        "on": "On",
+        "unknown": "Unknown",
+        "consent": "Saying yes lets this extension act for your account until you end it from Sessions. It does not open your vault: letting it into one is a second decision, made in the vault.",
+        "working": "Working",
+        "connect": "Connect it",
+        "turnAway": "Turn it away",
+        "codeLabel": "The code the extension is showing",
+        "looking": "Looking",
+        "find": "Find it",
+        "errors": {
+            "tooMany": "Too many codes tried. Wait a few minutes.",
+            "notACode": "That is not a code from the Polaris extension.",
+            "nothingWaiting": "Nothing is waiting on that code. Ask the extension for a new one.",
+            "cannotAnswer": "That request cannot be answered."
         }
     },
     "friends": {
         "page": {
             "title": "Friends",
             "intro": "Who sees what you show your friends. Being friends grants nothing else."
-        }
+        },
+        "removeTitle": "Stop being friends with {name}?",
+        "removeDescription": "They keep whatever else reaches them - a shared space, a conversation - and lose only what you show your friends. Either of you can ask again.",
+        "remove": "Stop being friends",
+        "removeNamed": "Stop being friends with {name}",
+        "youAsked": "You asked them",
+        "wantsAdding": "Wants to be added",
+        "accept": "Accept",
+        "withdraw": "Withdraw",
+        "turnDown": "Turn down",
+        "empty": "Nobody yet. Until there is, \"friends only\" is the same as \"nobody\".",
+        "showMore": "Show more",
+        "searchPlaceholder": "Name, email or username",
+        "add": "Add somebody",
+        "askTitle": "Ask by exact username",
+        "ask": "Ask",
+        "hint": "Somebody who keeps themselves out of the search can still be asked, if they have given you their exact username."
     },
     "scan": {
         "page": {
             "title": "Scan a code",
             "intro": "Let a sign-in through on a device that cannot ask for your password."
+        },
+        "errors": {
+            "notACode": "That is not a Polaris sign-in code."
+        },
+        "cameraUnavailable": "The camera is not available here. Browsers only allow it over a secure (https) address - type the code instead.",
+        "stale": "That code is no longer valid. Ask for a new one on the sign-in screen and scan it again.",
+        "stopCamera": "Stop the camera",
+        "startCamera": "Scan with the camera",
+        "typeCode": "Or type the code under the QR",
+        "continue": "Continue",
+        "approved": "That device is signed in. It may take a moment to move on.",
+        "refused": "That sign-in was refused.",
+        "another": "Scan another code",
+        "expired": "This code has expired.",
+        "askNew": "Ask for a new one on the sign-in screen and scan it again.",
+        "again": "Scan again",
+        "decide": {
+            "title": "Allow this sign-in?",
+            "description": "It gets in as you. Allow it only if it is you at that screen.",
+            "device": "Device",
+            "from": "From",
+            "openedOn": "Opened on",
+            "asked": "Asked",
+            "pin": "Unlock PIN",
+            "needsPin": "Allowing a sign-in this way needs a quick unlock PIN. <link>Set one in Security</link>, then scan the code again.",
+            "refuse": "Refuse",
+            "checking": "Checking...",
+            "allow": "Allow"
+        },
+        "history": {
+            "title": "Codes you have answered",
+            "description": "Each one signed a device in as you, or turned it away.",
+            "empty": "You have not answered a sign-in code yet.",
+            "signedIn": "Signed in",
+            "refused": "Refused",
+            "readOn": "Read on {device}",
+            "readOnGone": "Read on a device that is no longer signed in",
+            "thisDevice": "This device"
         }
     },
     "standing": {
         "page": {
             "title": "Account standing",
             "intro": "Where your account stands here, and anything in force against it."
+        },
+        "yourAccount": "Your account is <word>{standing}</word>",
+        "words": {
+            "good": "all good",
+            "limited": "limited",
+            "veryLimited": "very limited",
+            "atRisk": "at risk",
+            "suspended": "suspended"
+        },
+        "labels": {
+            "good": "All good!",
+            "limited": "Limited",
+            "veryLimited": "Very limited",
+            "atRisk": "At risk",
+            "suspended": "Suspended"
+        },
+        "notes": {
+            "good": "Nothing has been upheld against your account. If a moderator ever takes something of yours down, it shows up here.",
+            "limited": "One thing you posted was taken down after somebody reported it.",
+            "veryLimited": "Two things you posted were taken down after somebody reported them.",
+            "atRisk": "Several things you posted have been taken down after being reported. Another may cost you the account.",
+            "suspended": "This account has been suspended and cannot sign in."
+        },
+        "countedSince": "Counted since {date}. Older decisions no longer count.",
+        "inForce": {
+            "title": "In force now",
+            "description": "A timeout ends by itself. A ban is lifted by whoever runs that space.",
+            "none": "Nothing. You can post everywhere you are a member.",
+            "banned": "Banned from <where>{place}</where>",
+            "timedOut": "Timed out in <where>{place}</where>",
+            "until": "until {time}",
+            "untilLifted": "until it is lifted"
         }
     },
     "profile": {
@@ -758,5 +878,89 @@
         "removeTitle": "Remove your number",
         "removeDescription": "Confirm your password. WhatsApp stops being one of your sign-in options.",
         "removing": "Removing..."
+    },
+    "aiKeys": {
+        "page": {
+            "title": "AI provider keys",
+            "intro": "The provider accounts your AI work bills to. A key you add here is used before anything the deployment holds."
+        },
+        "keys": {
+            "title": "Your provider keys",
+            "hint": "Tried from the top. The first key whose provider serves the model is the one a run uses.",
+            "emptyShared": "No keys of your own. Runs use the deployment's.",
+            "empty": "No keys yet. A run needs one to reach a provider.",
+            "adding": "The provider account your runs bill to. Polaris adds nothing to that bill."
+        },
+        "accounts": {
+            "title": "Your agent accounts",
+            "add": "Add account",
+            "hint": "Tried from the top. The first that signs the agent in is the one a session on this box uses.",
+            "emptyShared": "None of your own. Sessions use the ones this deployment provides.",
+            "empty": "None yet. A session on this box needs one to sign an agent in.",
+            "adding": "The account a session signs an agent in with. A subscription costs nothing extra; an API key is metered."
+        },
+        "fallback": {
+            "title": "What a run falls back to",
+            "shared": "For a provider you have no key of your own for, runs use the deployment's.",
+            "noKeys": "This deployment holds no provider keys, so a run can only use one you add here.",
+            "notShared": "This deployment does not share its own provider keys, so a run can only use one you add here."
+        },
+        "errors": {
+            "notAssisted": "That is not a sign-in Polaris can run for you.",
+            "couldNotStart": "Polaris could not start a machine for the sign-in. Try again in a moment.",
+            "notOpen": "That sign-in is no longer open.",
+            "typeSomething": "Type something"
+        }
+    },
+    "dns": {
+        "errors": {
+            "readZones": "Could not read the zones",
+            "readRecords": "Could not read the records",
+            "saveRecord": "Could not save the record",
+            "removeRecord": "Could not remove the record",
+            "askResolvers": "Could not ask the resolvers",
+            "adminOnly": "Only an administrator can edit this Polaris's DNS zones",
+            "unreadable": "That record could not be read"
+        }
+    },
+    "downloads": {
+        "page": {
+            "title": "Downloads",
+            "intro": "Polaris on your desktop, in your browser, and on your own machine."
+        },
+        "extension": {
+            "title": "Browser extension",
+            "description": "Fills a login, saves a new one, and unlocks from your vault. It asks the browser for permission to talk to this Polaris and no other, and holds no standing access to the pages you open.",
+            "store": "From your browser's store",
+            "notYet": "Not there yet",
+            "storeHint": "The store version is the one that keeps itself up to date, so it is worth waiting for if you can.",
+            "loadYourself": "Load it yourself",
+            "alreadyHave": "Already have it? <link>Connect it to this account</link>. Your vault is the second step, from the extension itself."
+        },
+        "later": {
+            "title": "Not here yet",
+            "mobile": "Android and iOS",
+            "mobileHint": "No app yet. Installing Polaris as an app above puts it on your home screen from the browser, which is most of the way there.",
+            "cli": "Command line",
+            "cliHint": "For managing your things from your own computer, and for opening a tunnel from it to a service here. Nothing to install yet, so there is no command to copy."
+        },
+        "command": {
+            "title": "One line, and the same one to update",
+            "system": "Which system you are installing on",
+            "hint": "Paste it into {shell}. It puts the extension in one fixed folder, so the first run is the only one that needs Load unpacked - after that, run the same line and press the refresh arrow on the Polaris card. Firefox is not covered: its temporary add-on is gone when Firefox closes, so there is nothing for a script to keep current."
+        },
+        "steps": {
+            "yourBrowser": "Your browser",
+            "whichBrowser": "Which browser you are loading it into",
+            "noBuild": "There is no build for the browser you are reading this in. Pick the one you are installing into.",
+            "downloadUnpack": "Download the <press>{file}</press> file above. Unpack it - what gets loaded is the folder inside, not the .zip.",
+            "downloadZipped": "Download the <press>{file}</press> file above. Leave it zipped; Firefox takes the .zip as it is.",
+            "openPage": "Open the extensions page in {browser}. Copy this and paste it into the address bar yourself - no page is allowed to open that address, which is why there is no button here that does it for you.",
+            "landOn": "You land on <press>{pane}</press>, which is the pane that can load one.",
+            "developerMode": "Turn on <press>Developer mode</press>, top right. Without it the next button is not there.",
+            "pressFolder": "Press <press>{action}</press> and choose the unpacked folder.",
+            "pressFile": "Press <press>{action}</press> and choose the file you downloaded.",
+            "pointIt": "Open the extension and point it at this Polaris. It asks for permission to talk to this address and no other."
+        }
     }
 }

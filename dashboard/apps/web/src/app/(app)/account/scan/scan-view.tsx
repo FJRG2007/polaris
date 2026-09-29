@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { decideQrSignInAction } from "./actions";
 import { codeDigits } from "@/components/code-input";
 import { RelativeTime } from "@/components/relative-time";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { Camera, Check, ShieldQuestion, X } from "lucide-react";
 import type { QrSignInRequest } from "@/lib/qr-sign-in-service";
@@ -58,6 +59,7 @@ function codeFromScan(text: string): string | null {
 /** The camera, and the typed code for when it is not an option. */
 function ReadCard({ stale }: { stale: boolean }) {
     const router = useRouter();
+    const t = useTranslations("account");
     const videoRef = useRef<HTMLVideoElement>(null);
     const [scanning, setScanning] = useState(false);
     const [typed, setTyped] = useState("");
@@ -88,9 +90,7 @@ function ReadCard({ stale }: { stale: boolean }) {
             } catch {
                 if (!live) return;
                 setScanning(false);
-                setError(
-                    "The camera is not available here. Browsers only allow it over a secure (https) address - type the code instead."
-                );
+                setError(t("scan.cameraUnavailable"));
                 return;
             }
 
@@ -129,7 +129,7 @@ function ReadCard({ stale }: { stale: boolean }) {
         event.preventDefault();
         const code = codeFromScan(typed);
         if (!code) {
-            setError("That is not a Polaris sign-in code.");
+            setError(t("scan.errors.notACode"));
             return;
         }
         open(code);
@@ -140,8 +140,7 @@ function ReadCard({ stale }: { stale: boolean }) {
             <CardBody className="flex flex-col gap-4">
                 {stale ? (
                     <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                        That code is no longer valid. Ask for a new one on the sign-in screen and scan it
-                        again.
+                        {t("scan.stale")}
                     </p>
                 ) : null}
 
@@ -159,23 +158,24 @@ function ReadCard({ stale }: { stale: boolean }) {
                     </div>
                     {scanning ? (
                         <Button variant="outline" onClick={() => setScanning(false)}>
-                            Stop the camera
+                            {t("scan.stopCamera")}
                         </Button>
                     ) : (
                         <Button onClick={() => setScanning(true)}>
                             <Camera className="size-4" />
-                            Scan with the camera
+                            {t("scan.startCamera")}
                         </Button>
                     )}
                 </div>
 
                 <form onSubmit={onSubmit} className="flex flex-col gap-2 border-t border-border pt-4">
                     <label className="text-sm" htmlFor="qr-code">
-                        Or type the code under the QR
+                        {t("scan.typeCode")}
                     </label>
                     <div className="flex gap-2">
                         <Input
                             id="qr-code"
+                            // i18n-ignore: the shape of a sign-in code
                             placeholder="ABCD-1234"
                             autoComplete="off"
                             autoCapitalize="characters"
@@ -187,7 +187,7 @@ function ReadCard({ stale }: { stale: boolean }) {
                             }}
                         />
                         <Button type="submit" disabled={typed.trim().length === 0}>
-                            Continue
+                            {t("scan.continue")}
                         </Button>
                     </div>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -199,6 +199,7 @@ function ReadCard({ stale }: { stale: boolean }) {
 
 /** What is asking to be let in, and the PIN that lets it. */
 function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boolean }) {
+    const t = useTranslations("account");
     const [pin, setPin] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -238,15 +239,13 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
                         <X className="size-8 text-muted-foreground" aria-hidden />
                     )}
                     <p className="text-sm">
-                        {done === "approved"
-                            ? "That device is signed in. It may take a moment to move on."
-                            : "That sign-in was refused."}
+                        {done === "approved" ? t("scan.approved") : t("scan.refused")}
                     </p>
                     <Link
                         href="/account/scan"
                         className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
                     >
-                        Scan another code
+                        {t("scan.another")}
                     </Link>
                 </CardBody>
             </Card>
@@ -257,12 +256,10 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
         return (
             <Card>
                 <CardBody className="flex flex-col items-center gap-3 py-8 text-center">
-                    <p className="text-sm">This code has expired.</p>
-                    <p className="text-xs text-muted-foreground">
-                        Ask for a new one on the sign-in screen and scan it again.
-                    </p>
+                    <p className="text-sm">{t("scan.expired")}</p>
+                    <p className="text-xs text-muted-foreground">{t("scan.askNew")}</p>
                     <Link href="/account/scan">
-                        <Button variant="outline">Scan again</Button>
+                        <Button variant="outline">{t("scan.again")}</Button>
                     </Link>
                 </CardBody>
             </Card>
@@ -275,19 +272,17 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
                 <div className="flex items-start gap-3">
                     <ShieldQuestion className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
                     <div className="min-w-0">
-                        <h2 className="text-sm font-medium">Allow this sign-in?</h2>
-                        <p className="text-xs text-muted-foreground">
-                            It gets in as you. Allow it only if it is you at that screen.
-                        </p>
+                        <h2 className="text-sm font-medium">{t("scan.decide.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{t("scan.decide.description")}</p>
                     </div>
                 </div>
 
                 <dl className="grid gap-2 rounded-md border border-border p-3 text-sm">
-                    <Detail label="Device" value={request.device} />
-                    <Detail label="From" value={request.origin} />
-                    {request.host ? <Detail label="Opened on" value={request.host} /> : null}
+                    <Detail label={t("scan.decide.device")} value={request.device} />
+                    <Detail label={t("scan.decide.from")} value={request.origin} />
+                    {request.host ? <Detail label={t("scan.decide.openedOn")} value={request.host} /> : null}
                     <div className="flex justify-between gap-3">
-                        <dt className="text-muted-foreground">Asked</dt>
+                        <dt className="text-muted-foreground">{t("scan.decide.asked")}</dt>
                         <dd className="text-right">
                             <RelativeTime iso={request.requestedAt} />
                         </dd>
@@ -296,7 +291,7 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
 
                 {hasPin ? (
                     <label className="flex flex-col gap-1 text-sm">
-                        Unlock PIN
+                        {t("scan.decide.pin")}
                         <Input
                             type="password"
                             inputMode="numeric"
@@ -308,14 +303,17 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
                     </label>
                 ) : (
                     <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                        Allowing a sign-in this way needs a quick unlock PIN.{" "}
-                        <Link
-                            href="/account/security"
-                            className="underline underline-offset-2 hover:text-foreground"
-                        >
-                            Set one in Security
-                        </Link>
-                        , then scan the code again.
+                        {t.rich("scan.decide.needsPin", {
+                            link: (chunks) => (
+                                <Link
+                                    key="link"
+                                    href="/account/security"
+                                    className="underline underline-offset-2 hover:text-foreground"
+                                >
+                                    {chunks}
+                                </Link>
+                            )
+                        })}
                     </p>
                 )}
 
@@ -324,11 +322,11 @@ function DecideCard({ request, hasPin }: { request: QrSignInRequest; hasPin: boo
                 <div className="flex justify-end gap-2">
                     <Button variant="outline" disabled={busy} onClick={() => void decide(false)}>
                         <X className="size-4" />
-                        Refuse
+                        {t("scan.decide.refuse")}
                     </Button>
                     <Button disabled={busy || !hasPin || pin.length < 4} onClick={() => void decide(true)}>
                         <Check className="size-4" />
-                        {busy ? "Checking..." : "Allow"}
+                        {busy ? t("scan.decide.checking") : t("scan.decide.allow")}
                     </Button>
                 </div>
             </CardBody>

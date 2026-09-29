@@ -174,7 +174,18 @@
         "page": {
             "title": "Actividad",
             "intro": "Lo que se ha hecho con tu cuenta y desde qué dispositivo."
-        }
+        },
+        "outside": "Fuera de una sesión",
+        "signedOutOn": "{name} - sesión cerrada el {date}",
+        "signedOut": "{name} - sesión cerrada",
+        "thisDevice": "{name} - {label} (este dispositivo)",
+        "named": "{name} - {label}",
+        "session": "Sesión",
+        "empty": "Todavía no hay nada registrado.",
+        "emptySession": "Todavía no hay nada registrado desde esta sesión.",
+        "signedOutSession": "Sesión cerrada",
+        "filter": "Filtrar por sesión",
+        "allSessions": "Todas las sesiones"
     },
     "apiKeys": {
         "page": {
@@ -529,24 +540,133 @@
         "page": {
             "title": "Conectar la extensión",
             "intro": "Escribe el código que muestra la extensión. No se conecta nada hasta que tú lo digas."
+        },
+        "connected": "Conectada.",
+        "turnedAway": "Rechazada.",
+        "connectedHint": "La extensión ya tiene lo que necesita. Puedes cerrar esta página: aparece en Sesiones, y ahí puedes terminarla.",
+        "turnedAwayHint": "No se ha entregado nada.",
+        "code": "Código {code}",
+        "browser": "Navegador",
+        "browserOn": "{browser} en {os}",
+        "askedFrom": "Solicitado desde",
+        "on": "En",
+        "unknown": "Desconocido",
+        "consent": "Si dices que sí, esta extensión actuará en nombre de tu cuenta hasta que la termines desde Sesiones. No abre tu bóveda: dejarla entrar en una es una segunda decisión, que se toma en la bóveda.",
+        "working": "Procesando",
+        "connect": "Conectarla",
+        "turnAway": "Rechazarla",
+        "codeLabel": "El código que muestra la extensión",
+        "looking": "Buscando",
+        "find": "Buscarla",
+        "errors": {
+            "tooMany": "Se han probado demasiados códigos. Espera unos minutos.",
+            "notACode": "Eso no es un código de la extensión de Polaris.",
+            "nothingWaiting": "No hay nada esperando con ese código. Pide uno nuevo a la extensión.",
+            "cannotAnswer": "No se puede responder a esa solicitud."
         }
     },
     "friends": {
         "page": {
             "title": "Amigos",
             "intro": "Quién ve lo que muestras a tus amigos. Ser amigos no concede nada más."
-        }
+        },
+        "removeTitle": "¿Dejar de ser amigo de {name}?",
+        "removeDescription": "Conserva todo lo demás que le llega (un espacio compartido, una conversación) y solo pierde lo que muestras a tus amigos. Cualquiera de los dos puede volver a pedirlo.",
+        "remove": "Dejar de ser amigos",
+        "removeNamed": "Dejar de ser amigo de {name}",
+        "youAsked": "Se lo pediste tú",
+        "wantsAdding": "Quiere que le añadas",
+        "accept": "Aceptar",
+        "withdraw": "Retirar",
+        "turnDown": "Rechazar",
+        "empty": "Todavía nadie. Mientras tanto, «solo amigos» es lo mismo que «nadie».",
+        "showMore": "Mostrar más",
+        "searchPlaceholder": "Nombre, correo o nombre de usuario",
+        "add": "Añadir a alguien",
+        "askTitle": "Pedir por nombre de usuario exacto",
+        "ask": "Pedir",
+        "hint": "A alguien que no aparece en la búsqueda se le puede pedir igualmente si te ha dado su nombre de usuario exacto."
     },
     "scan": {
         "page": {
             "title": "Escanear un código",
             "intro": "Deja pasar un inicio de sesión en un dispositivo que no puede pedirte la contraseña."
+        },
+        "errors": {
+            "notACode": "Eso no es un código de inicio de sesión de Polaris."
+        },
+        "cameraUnavailable": "La cámara no está disponible aquí. Los navegadores solo la permiten en una dirección segura (https): escribe el código en su lugar.",
+        "stale": "Ese código ya no es válido. Pide uno nuevo en la pantalla de inicio de sesión y vuelve a escanearlo.",
+        "stopCamera": "Parar la cámara",
+        "startCamera": "Escanear con la cámara",
+        "typeCode": "O escribe el código que hay bajo el QR",
+        "continue": "Continuar",
+        "approved": "Ese dispositivo ya tiene la sesión iniciada. Puede tardar un momento en continuar.",
+        "refused": "Se ha rechazado ese inicio de sesión.",
+        "another": "Escanear otro código",
+        "expired": "Este código ha caducado.",
+        "askNew": "Pide uno nuevo en la pantalla de inicio de sesión y vuelve a escanearlo.",
+        "again": "Volver a escanear",
+        "decide": {
+            "title": "¿Permitir este inicio de sesión?",
+            "description": "Entrará como tú. Permítelo solo si eres tú quien está en esa pantalla.",
+            "device": "Dispositivo",
+            "from": "Desde",
+            "openedOn": "Abierto en",
+            "asked": "Solicitado",
+            "pin": "PIN de desbloqueo",
+            "needsPin": "Permitir un inicio de sesión así requiere un PIN de desbloqueo rápido. <link>Configura uno en Seguridad</link> y vuelve a escanear el código.",
+            "refuse": "Rechazar",
+            "checking": "Comprobando...",
+            "allow": "Permitir"
+        },
+        "history": {
+            "title": "Códigos que has respondido",
+            "description": "Cada uno inició la sesión de un dispositivo como tú, o lo rechazó.",
+            "empty": "Todavía no has respondido a ningún código de inicio de sesión.",
+            "signedIn": "Sesión iniciada",
+            "refused": "Rechazado",
+            "readOn": "Leído en {device}",
+            "readOnGone": "Leído en un dispositivo que ya no tiene la sesión iniciada",
+            "thisDevice": "Este dispositivo"
         }
     },
     "standing": {
         "page": {
             "title": "Estado de la cuenta",
             "intro": "Cómo está tu cuenta aquí y cualquier medida en vigor contra ella."
+        },
+        "yourAccount": "Tu cuenta está <word>{standing}</word>",
+        "words": {
+            "good": "en buen estado",
+            "limited": "limitada",
+            "veryLimited": "muy limitada",
+            "atRisk": "en riesgo",
+            "suspended": "suspendida"
+        },
+        "labels": {
+            "good": "¡Todo bien!",
+            "limited": "Limitada",
+            "veryLimited": "Muy limitada",
+            "atRisk": "En riesgo",
+            "suspended": "Suspendida"
+        },
+        "notes": {
+            "good": "No se ha confirmado nada contra tu cuenta. Si algún día un moderador retira algo tuyo, aparecerá aquí.",
+            "limited": "Se retiró algo que publicaste después de que alguien lo denunciara.",
+            "veryLimited": "Se retiraron dos cosas que publicaste después de que alguien las denunciara.",
+            "atRisk": "Se han retirado varias cosas que publicaste después de ser denunciadas. Otra más puede costarte la cuenta.",
+            "suspended": "Esta cuenta se ha suspendido y no puede iniciar sesión."
+        },
+        "countedSince": "Se cuenta desde el {date}. Las decisiones anteriores ya no cuentan.",
+        "inForce": {
+            "title": "En vigor ahora",
+            "description": "Una expulsión temporal termina sola. Un veto lo levanta quien gestiona ese espacio.",
+            "none": "Nada. Puedes publicar en todos los sitios de los que eres miembro.",
+            "banned": "Vetado en <where>{place}</where>",
+            "timedOut": "Expulsado temporalmente de <where>{place}</where>",
+            "until": "hasta el {time}",
+            "untilLifted": "hasta que se levante"
         }
     },
     "profile": {
@@ -758,5 +878,89 @@
         "removeTitle": "Quitar tu número",
         "removeDescription": "Confirma tu contraseña. WhatsApp dejará de ser una de tus opciones de inicio de sesión.",
         "removing": "Quitando..."
+    },
+    "aiKeys": {
+        "page": {
+            "title": "Claves de proveedores de IA",
+            "intro": "Las cuentas de proveedor a las que se factura tu trabajo con IA. Una clave que añadas aquí se usa antes que cualquiera de las del despliegue."
+        },
+        "keys": {
+            "title": "Tus claves de proveedor",
+            "hint": "Se prueban de arriba abajo. La primera clave cuyo proveedor sirve el modelo es la que usa una ejecución.",
+            "emptyShared": "No tienes claves propias. Las ejecuciones usan las del despliegue.",
+            "empty": "Todavía no hay claves. Una ejecución necesita una para llegar a un proveedor.",
+            "adding": "La cuenta de proveedor a la que se facturan tus ejecuciones. Polaris no añade nada a esa factura."
+        },
+        "accounts": {
+            "title": "Tus cuentas de agente",
+            "add": "Añadir cuenta",
+            "hint": "Se prueban de arriba abajo. La primera que inicia la sesión del agente es la que usa una sesión en esta máquina.",
+            "emptyShared": "No tienes ninguna propia. Las sesiones usan las que ofrece este despliegue.",
+            "empty": "Todavía ninguna. Una sesión en esta máquina necesita una para iniciar la sesión de un agente.",
+            "adding": "La cuenta con la que una sesión inicia la sesión de un agente. Una suscripción no cuesta nada más; una clave de API se factura por uso."
+        },
+        "fallback": {
+            "title": "A qué recurre una ejecución",
+            "shared": "Para un proveedor del que no tienes clave propia, las ejecuciones usan la del despliegue.",
+            "noKeys": "Este despliegue no tiene claves de proveedor, así que una ejecución solo puede usar una que añadas aquí.",
+            "notShared": "Este despliegue no comparte sus propias claves de proveedor, así que una ejecución solo puede usar una que añadas aquí."
+        },
+        "errors": {
+            "notAssisted": "Ese no es un inicio de sesión que Polaris pueda hacer por ti.",
+            "couldNotStart": "Polaris no ha podido arrancar una máquina para el inicio de sesión. Vuelve a intentarlo en un momento.",
+            "notOpen": "Ese inicio de sesión ya no está abierto.",
+            "typeSomething": "Escribe algo"
+        }
+    },
+    "dns": {
+        "errors": {
+            "readZones": "No se han podido leer las zonas",
+            "readRecords": "No se han podido leer los registros",
+            "saveRecord": "No se ha podido guardar el registro",
+            "removeRecord": "No se ha podido quitar el registro",
+            "askResolvers": "No se ha podido consultar a los resolvedores",
+            "adminOnly": "Solo un administrador puede editar las zonas DNS de este Polaris",
+            "unreadable": "No se ha podido leer ese registro"
+        }
+    },
+    "downloads": {
+        "page": {
+            "title": "Descargas",
+            "intro": "Polaris en tu escritorio, en tu navegador y en tu propio ordenador."
+        },
+        "extension": {
+            "title": "Extensión del navegador",
+            "description": "Rellena un inicio de sesión, guarda uno nuevo y desbloquea desde tu bóveda. Pide permiso al navegador para hablar con este Polaris y con ningún otro, y no tiene acceso permanente a las páginas que abres.",
+            "store": "Desde la tienda de tu navegador",
+            "notYet": "Todavía no está",
+            "storeHint": "La versión de la tienda es la que se actualiza sola, así que merece la pena esperarla si puedes.",
+            "loadYourself": "Cárgala tú mismo",
+            "alreadyHave": "¿Ya la tienes? <link>Conéctala a esta cuenta</link>. Tu bóveda es el segundo paso, desde la propia extensión."
+        },
+        "later": {
+            "title": "Todavía no está aquí",
+            "mobile": "Android e iOS",
+            "mobileHint": "Todavía no hay app. Instalar Polaris como app, arriba, lo pone en tu pantalla de inicio desde el navegador, que es casi lo mismo.",
+            "cli": "Línea de comandos",
+            "cliHint": "Para gestionar tus cosas desde tu propio ordenador y abrir desde él un túnel a un servicio de aquí. Todavía no hay nada que instalar, así que no hay ningún comando que copiar."
+        },
+        "command": {
+            "title": "Una línea, y la misma para actualizar",
+            "system": "En qué sistema la instalas",
+            "hint": "Pégala en {shell}. Pone la extensión en una carpeta fija, así que solo la primera vez hace falta Cargar descomprimida; después, ejecuta la misma línea y pulsa la flecha de recargar en la tarjeta de Polaris. Firefox no está incluido: su complemento temporal desaparece al cerrar Firefox, así que no hay nada que un script pueda mantener al día."
+        },
+        "steps": {
+            "yourBrowser": "Tu navegador",
+            "whichBrowser": "En qué navegador la cargas",
+            "noBuild": "No hay versión para el navegador en el que estás leyendo esto. Elige aquel en el que la vas a instalar.",
+            "downloadUnpack": "Descarga el archivo <press>{file}</press> de arriba. Descomprímelo: lo que se carga es la carpeta de dentro, no el .zip.",
+            "downloadZipped": "Descarga el archivo <press>{file}</press> de arriba. Déjalo comprimido; Firefox acepta el .zip tal cual.",
+            "openPage": "Abre la página de extensiones de {browser}. Copia esto y pégalo tú mismo en la barra de direcciones: ninguna página puede abrir esa dirección, por eso aquí no hay un botón que lo haga por ti.",
+            "landOn": "Llegas a <press>{pane}</press>, que es el panel desde el que se puede cargar una.",
+            "developerMode": "Activa el <press>Modo de desarrollador</press>, arriba a la derecha. Sin él, el siguiente botón no aparece.",
+            "pressFolder": "Pulsa <press>{action}</press> y elige la carpeta descomprimida.",
+            "pressFile": "Pulsa <press>{action}</press> y elige el archivo que descargaste.",
+            "pointIt": "Abre la extensión y apúntala a este Polaris. Pide permiso para hablar con esta dirección y con ninguna otra."
+        }
     }
 }

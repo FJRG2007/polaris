@@ -15,6 +15,8 @@ import { useCallback, useState } from "react";
 import { AuditFeed } from "@/components/audit-feed";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { sessionName, type DisplayFormat } from "@polaris/core";
 
 /** The filter value standing for no narrowing at all. Radix refuses an empty
@@ -43,24 +45,32 @@ interface ActivitySession {
  * something the payload already carries, so shipping it would be shipping a
  * second copy of the same fact.
  */
-function sessionLabel(session: ActivitySession, format: DisplayFormat): string {
-    if (session.id === NO_SESSION) return "Outside a session";
+function sessionLabel(
+    session: ActivitySession,
+    format: DisplayFormat,
+    t: NamespaceTranslator<"account">
+): string {
+    if (session.id === NO_SESSION) return t("activity.outside");
     const name = sessionName(session.id);
     // Nothing names a session that has ended, so the row has to. The derived name
     // still leads - it is what this session was called in the list while it was
     // live, which is how somebody recognises it here - but it cannot stand on its
     // own, or a session that is gone reads exactly like one still signed in.
     if (!session.label) {
-        return session.lastAt ? `${name} - signed out ${format.date(session.lastAt)}` : `${name} - signed out`;
+        return session.lastAt
+            ? t("activity.signedOutOn", { name, date: format.date(session.lastAt) })
+            : t("activity.signedOut", { name });
     }
-    const named = `${name} - ${session.label}`;
-    return session.current ? `${named} (this device)` : named;
+    return session.current
+        ? t("activity.thisDevice", { name, label: session.label })
+        : t("activity.named", { name, label: session.label });
 }
 
 export function ActivityView() {
     const router = useRouter();
     const params = useSearchParams();
     const format = useDisplayFormat();
+    const t = useTranslations("account");
     const selected = params.get("session") ?? ALL;
     const [sessions, setSessions] = useState<ActivitySession[]>([]);
 
@@ -71,7 +81,7 @@ export function ActivityView() {
         if (Array.isArray(listed)) setSessions(listed as ActivitySession[]);
     }, []);
 
-    const names = new Map(sessions.map((session) => [session.id, sessionLabel(session, format)]));
+    const names = new Map(sessions.map((session) => [session.id, sessionLabel(session, format, t)]));
 
     function filterBy(value: string) {
         const next = new URLSearchParams(params.toString());
@@ -87,10 +97,10 @@ export function ActivityView() {
             exportEndpoint="/api/account/activity/export"
             path={PATH}
             cacheKey="account.activity"
-            contextLabel="Session"
-            emptyLabel={selected === ALL ? "Nothing recorded yet." : "Nothing recorded from this session yet."}
+            contextLabel={t("activity.session")}
+            emptyLabel={selected === ALL ? t("activity.empty") : t("activity.emptySession")}
             showActor={false}
-            context={(entry) => names.get(entry.sessionId ?? NO_SESSION) ?? "Signed-out session"}
+            context={(entry) => names.get(entry.sessionId ?? NO_SESSION) ?? t("activity.signedOutSession")}
             detail={(entry) =>
                 entry.targetType ? [entry.targetType, entry.targetId].filter(Boolean).join(" ") : ""
             }
@@ -100,11 +110,11 @@ export function ActivityView() {
                 <Select
                     value={selected}
                     onValueChange={filterBy}
-                    aria-label="Filter by session"
+                    aria-label={t("activity.filter")}
                     className="h-8 w-full sm:w-72"
                     options={[
-                        { value: ALL, label: "All sessions" },
-                        ...sessions.map((session) => ({ value: session.id, label: sessionLabel(session, format) }))
+                        { value: ALL, label: t("activity.allSessions") },
+                        ...sessions.map((session) => ({ value: session.id, label: sessionLabel(session, format, t) }))
                     ]}
                 />
             }

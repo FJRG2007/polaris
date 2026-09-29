@@ -20,9 +20,11 @@ import { formatUserCode } from "@/lib/device-code";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import type { PendingConnection } from "@/lib/extension/sessions";
 import { answerConnectionAction, describeConnectionAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function ExtensionConnectView() {
     const asked = useSearchParams().get("code") ?? "";
+    const t = useTranslations("account");
     const [typed, setTyped] = useState(asked);
     const [pending, setPending] = useState<PendingConnection | null>(null);
     const [error, setError] = useState("");
@@ -73,12 +75,10 @@ export function ExtensionConnectView() {
             <Card>
                 <CardBody className="flex flex-col gap-2">
                     <p className="text-sm font-medium">
-                        {answered === "in" ? "Connected." : "Turned away."}
+                        {answered === "in" ? t("extension.connected") : t("extension.turnedAway")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                        {answered === "in"
-                            ? "The extension has what it needs. You can close this page - it appears under Sessions, and you can end it there."
-                            : "Nothing was handed over."}
+                        {answered === "in" ? t("extension.connectedHint") : t("extension.turnedAwayHint")}
                     </p>
                 </CardBody>
             </Card>
@@ -93,23 +93,21 @@ export function ExtensionConnectView() {
                         <div className="flex flex-col gap-1">
                             <p className="text-sm font-medium">{pending.device}</p>
                             <p className="text-xs text-muted-foreground">
-                                Code {formatUserCode(pending.userCode)}
+                                {t("extension.code", { code: formatUserCode(pending.userCode) })}
                             </p>
                         </div>
                         <dl className="flex flex-col gap-1 text-xs">
-                            <Row label="Browser" value={`${pending.browser} on ${pending.os}`} />
+                            <Row label={t("extension.browser")} value={t("extension.browserOn", { browser: pending.browser, os: pending.os })} />
                             {/* The whole address, because this is half the
                                 decision and an IPv6 one does not fit the row. */}
-                            <Row label="Asked from" value={pending.requestIp ?? "Unknown"} />
+                            <Row label={t("extension.askedFrom")} value={pending.requestIp ?? t("extension.unknown")} />
                             {/* And the whole name it was asked on: which of a
                                 deployment's addresses saw the request is the
                                 other half, and the tail is where they differ. */}
-                            <Row label="On" value={pending.host ?? "Unknown"} />
+                            <Row label={t("extension.on")} value={pending.host ?? t("extension.unknown")} />
                         </dl>
                         <p className="text-xs text-muted-foreground">
-                            Saying yes lets this extension act for your account until you end it
-                            from Sessions. It does not open your vault: letting it into one is a
-                            second decision, made in the vault.
+                            {t("extension.consent")}
                         </p>
                         {error ? (
                             <p role="alert" className="text-sm text-danger">
@@ -118,7 +116,7 @@ export function ExtensionConnectView() {
                         ) : null}
                         <div className="flex items-center gap-2">
                             <Button size="sm" disabled={busy} onClick={() => void answer(true)}>
-                                {busy ? "Working" : "Connect it"}
+                                {busy ? t("extension.working") : t("extension.connect")}
                             </Button>
                             <Button
                                 size="sm"
@@ -126,7 +124,7 @@ export function ExtensionConnectView() {
                                 disabled={busy}
                                 onClick={() => void answer(false)}
                             >
-                                Turn it away
+                                {t("extension.turnAway")}
                             </Button>
                         </div>
                     </>
@@ -136,7 +134,8 @@ export function ExtensionConnectView() {
                             autoFocus
                             value={typed}
                             maxLength={16}
-                            aria-label="The code the extension is showing"
+                            aria-label={t("extension.codeLabel")}
+                            // i18n-ignore: the shape of the code
                             placeholder="XXXX-XXXX"
                             onChange={(event) => setTyped(event.target.value)}
                             onKeyDown={(event) => event.key === "Enter" && void look(typed)}
@@ -151,7 +150,7 @@ export function ExtensionConnectView() {
                             disabled={busy || typed.trim() === ""}
                             onClick={() => void look(typed)}
                         >
-                            {busy ? "Looking" : "Find it"}
+                            {busy ? t("extension.looking") : t("extension.find")}
                         </Button>
                     </>
                 )}

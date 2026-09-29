@@ -16,6 +16,7 @@
 
 import { z } from "zod";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { domainCallerFor } from "@/lib/owner-domain-caller";
 import { dnsRecordDraftSchema } from "@/lib/dns/record-schema";
@@ -67,23 +68,30 @@ async function resolve(input: unknown): Promise<Resolved> {
     return { scope: { kind: "owner", owner: caller.owner, domainId: ref.domainId }, userId: caller.userId, orgId: caller.orgId };
 }
 
-function failure(caught: unknown, fallback: string): { error: string; problems?: Record<string, string> } {
+type DnsFailure =
+    | "dns.errors.readZones"
+    | "dns.errors.readRecords"
+    | "dns.errors.saveRecord"
+    | "dns.errors.removeRecord"
+    | "dns.errors.askResolvers";
+
+async function failure(caught: unknown, key: DnsFailure): Promise<{ error: string; problems?: Record<string, string> }> {
     if (caught instanceof DnsEditError) return { error: caught.message, problems: caught.problems };
     // Cloudflare's own refusal is worth showing: it names the field it disliked.
     if (caught instanceof CloudflareApiError) return { error: caught.message.slice(0, 300) };
     // Anything else can name internals, so it is logged and replaced.
     console.error(caught);
-    return { error: fallback };
+    return { error: (await getTranslations("account"))(key) };
 }
 
 /** The zones an administrator can pick from. */
 export async function listDnsZonesAction(): Promise<{ zones?: { id: string; name: string }[]; error?: string }> {
     try {
         const user = await requireUser();
-        if (!user.isAdmin) return { error: "Only an administrator can edit this Polaris's DNS zones" };
+        if (!user.isAdmin) return { error: (await getTranslations("account"))("dns.errors.adminOnly") };
         return { zones: await editableZones() };
     } catch (caught) {
-        return failure(caught, "Could not read the zones");
+        return failure(caught, "dns.errors.readZones");
     }
 }
 
@@ -92,7 +100,7 @@ export async function zoneRecordsAction(scope: DnsScopeRef): Promise<{ zone?: Zo
         const resolved = await resolve(scope);
         return { zone: await zoneRecords(resolved.scope) };
     } catch (caught) {
-        return failure(caught, "Could not read the records");
+        return failure(caught, "dns.errors.readRecords");
     }
 }
 
@@ -104,8 +112,10 @@ export async function saveDnsRecordAction(
     try {
         const resolved = await resolve(scope);
         const parsed = dnsRecordDraftSchema.safeParse(draft);
-        if (!parsed.success) return { error: "That record could not be read" };
-        if (recordId !== null && typeof recordId !== "string") return { error: "That record could not be read" };
+        if (!parsed.success) return { error: (await getTranslations("account"))("dns.errors.unreadable") };
+        if (recordId !== null && typeof recordId !== "string") {
+            return { error: (await getTranslations("account"))("dns.errors.unreadable") };
+        }
         // The same schema the form checked with, run again here against the zone
         // as it is now - see `saveZoneRecord`.
         const record = await saveZoneRecord(resolved.scope, recordId, parsed.data);
@@ -119,7 +129,7 @@ export async function saveDnsRecordAction(
         });
         return { record };
     } catch (caught) {
-        return failure(caught, "Could not save the record");
+        return failure(caught, "dns.errors.saveRecord");
     }
 }
 
@@ -136,7 +146,7 @@ export async function deleteDnsRecordAction(scope: DnsScopeRef, recordId: string
         });
         return {};
     } catch (caught) {
-        return failure(caught, "Could not remove the record");
+        return failure(caught, "dns.errors.removeRecord");
     }
 }
 
@@ -148,6 +158,6 @@ export async function dnsPropagationAction(
         const resolved = await resolve(scope);
         return { report: await recordPropagation(resolved.scope, String(recordId)) };
     } catch (caught) {
-        return failure(caught, "Could not ask the resolvers");
+        return failure(caught, "dns.errors.askResolvers");
     }
 }

@@ -17,12 +17,14 @@
 import { Select } from "@polaris/ui";
 import { useEffect, useState } from "react";
 import { CopyButton } from "@/components/copy-button";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { INSTALL_OSES, detectOs, installCommand, type InstallOs } from "@/lib/install-command";
 
 export function ExtensionCommand({ repo }: { repo: string }) {
     // Detected in an effect rather than during render: this is rendered on the
     // server too, where there is no navigator, and seeding from one would have
     // the browser hydrate something the HTML does not contain.
+    const t = useTranslations("account");
     const [os, setOs] = useState<InstallOs>("unix");
 
     useEffect(() => {
@@ -34,11 +36,11 @@ export function ExtensionCommand({ repo }: { repo: string }) {
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-medium">One line, and the same one to update</p>
+                <p className="font-medium">{t("downloads.command.title")}</p>
                 <Select
                     className="w-44"
                     value={os}
-                    aria-label="Which system you are installing on"
+                    aria-label={t("downloads.command.system")}
                     onValueChange={(value) => setOs(value as InstallOs)}
                     options={INSTALL_OSES.map((entry) => ({
                         value: entry,
@@ -55,11 +57,7 @@ export function ExtensionCommand({ repo }: { repo: string }) {
             </div>
 
             <p className="text-xs text-muted-foreground">
-                Paste it into {chosen.shell}. It puts the extension in one fixed folder, so the
-                first run is the only one that needs Load unpacked - after that, run the same line
-                and press the refresh arrow on the Polaris card. Firefox is not covered: its
-                temporary add-on is gone when Firefox closes, so there is nothing for a script to
-                keep current.
+                {t("downloads.command.hint", { shell: chosen.shell })}
             </p>
         </div>
     );

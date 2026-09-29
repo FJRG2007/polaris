@@ -17,11 +17,9 @@ import { Check } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Card, CardBody, cn } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     ACCOUNT_STANDINGS,
-    ACCOUNT_STANDING_LABELS,
-    ACCOUNT_STANDING_NOTES,
-    ACCOUNT_STANDING_WORDS,
     standingIndex,
     type AccountStanding
 } from "@polaris/core";
@@ -68,6 +66,7 @@ export function StandingView({
     restrictions: readonly Restriction[];
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("account");
     const current = standingIndex(standing);
 
     return (
@@ -78,17 +77,21 @@ export function StandingView({
                         <Avatar person={person} size={64} status={false} className="mt-0.5 shrink-0" />
                         <div className="flex min-w-0 flex-col gap-1">
                             <h2 className="text-[0.9375rem] font-medium">
-                                Your account is{" "}
-                                <span className={cn("font-semibold", WORD_COLOURS[standing])}>
-                                    {ACCOUNT_STANDING_WORDS[standing]}
-                                </span>
+                                {t.rich("standing.yourAccount", {
+                                    word: (chunks) => (
+                                        <span key="word" className={cn("font-semibold", WORD_COLOURS[standing])}>
+                                            {chunks}
+                                        </span>
+                                    ),
+                                    standing: t(`standing.words.${standing}` as const)
+                                })}
                             </h2>
                             <p className="text-sm text-muted-foreground">
-                                {ACCOUNT_STANDING_NOTES[standing]}
+                                {t(`standing.notes.${standing}` as const)}
                             </p>
                             {upheld > 0 && (
                                 <p className="text-xs text-muted-foreground">
-                                    Counted since {format.date(since)}. Older decisions no longer count.
+                                    {t("standing.countedSince", { date: format.date(since) })}
                                 </p>
                             )}
                         </div>
@@ -155,7 +158,7 @@ export function StandingView({
                                             lit ? "font-medium text-foreground" : "text-muted-foreground"
                                         )}
                                     >
-                                        {ACCOUNT_STANDING_LABELS[step]}
+                                        {t(`standing.labels.${step}` as const)}
                                     </span>
                                 </li>
                             );
@@ -167,14 +170,12 @@ export function StandingView({
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     <div>
-                        <h2 className="text-sm font-medium">In force now</h2>
-                        <p className="text-xs text-muted-foreground">
-                            A timeout ends by itself. A ban is lifted by whoever runs that space.
-                        </p>
+                        <h2 className="text-sm font-medium">{t("standing.inForce.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{t("standing.inForce.description")}</p>
                     </div>
                     {restrictions.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            Nothing. You can post everywhere you are a member.
+                            {t("standing.inForce.none")}
                         </p>
                     ) : (
                         <ul className="flex flex-col gap-2">
@@ -184,13 +185,19 @@ export function StandingView({
                                     className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
                                 >
                                     <span className="min-w-0 truncate">
-                                        {restriction.kind === "ban" ? "Banned from" : "Timed out in"}{" "}
-                                        <span className="font-medium">{restriction.where}</span>
+                                        {t.rich(restriction.kind === "ban" ? "standing.inForce.banned" : "standing.inForce.timedOut", {
+                                            where: (chunks) => (
+                                                <span key="where" className="font-medium">
+                                                    {chunks}
+                                                </span>
+                                            ),
+                                            place: restriction.where
+                                        })}
                                     </span>
                                     <span className="shrink-0 text-xs text-muted-foreground">
                                         {restriction.until
-                                            ? `until ${format.dateTime(restriction.until)}`
-                                            : "until it is lifted"}
+                                            ? t("standing.inForce.until", { time: format.dateTime(restriction.until) })
+                                            : t("standing.inForce.untilLifted")}
                                     </span>
                                 </li>
                             ))}

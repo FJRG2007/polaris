@@ -23,6 +23,7 @@
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PersonName, PersonRow } from "@/components/person-name";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -76,6 +77,7 @@ function FriendsCard({
     more: FriendCursor | null;
 }) {
     const [confirm, confirmElement] = useConfirm();
+    const t = useTranslations("account");
     const { items: alerts } = useNotificationFeed();
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
@@ -159,10 +161,9 @@ function FriendsCard({
 
     const askToRemove = async (friend: FriendView) => {
         const sure = await confirm({
-            title: `Stop being friends with ${friend.name}?`,
-            description:
-                "They keep whatever else reaches them - a shared space, a conversation - and lose only what you show your friends. Either of you can ask again.",
-            confirmLabel: "Stop being friends",
+            title: t("friends.removeTitle", { name: friend.name }),
+            description: t("friends.removeDescription"),
+            confirmLabel: t("friends.remove"),
             danger: true
         });
         if (!sure) return;
@@ -195,7 +196,7 @@ function FriendsCard({
                                         />
                                     </span>
                                     <span className="block text-xs text-muted-foreground">
-                                        {request.outgoing ? "You asked them" : "Wants to be added"}
+                                        {request.outgoing ? t("friends.youAsked") : t("friends.wantsAdding")}
                                     </span>
                                 </span>
                                 {!request.outgoing && (
@@ -207,14 +208,14 @@ function FriendsCard({
                                         }
                                     >
                                         <UserPlus className="size-3.5" />
-                                        Accept
+                                        {t("friends.accept")}
                                     </Button>
                                 )}
                                 <Button
                                     size="xs"
                                     variant="ghost"
                                     disabled={busy}
-                                    aria-label={request.outgoing ? "Withdraw" : "Turn down"}
+                                    aria-label={request.outgoing ? t("friends.withdraw") : t("friends.turnDown")}
                                     onClick={() =>
                                         void act(() => respondToRequestAction(request.id, false))
                                     }
@@ -228,8 +229,7 @@ function FriendsCard({
 
                 {people.length === 0 ? (
                     <p className="text-xs text-muted-foreground">
-                        Nobody yet. Until there is, &quot;friends only&quot; is the same as
-                        &quot;nobody&quot;.
+                        {t("friends.empty")}
                     </p>
                 ) : (
                     <>
@@ -254,8 +254,8 @@ function FriendsCard({
                                         size="xs"
                                         variant="ghost"
                                         disabled={busy}
-                                        aria-label={`Stop being friends with ${friend.name}`}
-                                        title="Stop being friends"
+                                        aria-label={t("friends.removeNamed", { name: friend.name })}
+                                        title={t("friends.remove")}
                                         onClick={() => void askToRemove(friend)}
                                     >
                                         <UserMinus className="size-3.5" />
@@ -266,7 +266,7 @@ function FriendsCard({
                         <MoreWhenSeen enabled={cursor !== null} loading={loading} onReach={loadMore}>
                             <Button size="sm" variant="ghost" onClick={() => void loadMore()} disabled={loading}>
                                 {loading ? <Loader2 className="size-4 animate-spin" /> : null}
-                                Show more
+                                {t("friends.showMore")}
                             </Button>
                         </MoreWhenSeen>
                     </>
@@ -359,6 +359,7 @@ function AddFriend({
     exclude: readonly string[];
     onAsk: (run: () => Promise<{ error?: string }>) => void;
 }) {
+    const t = useTranslations("account");
     const [query, setQuery] = useState("");
     const [found, setFound] = useState<readonly { id: string; name: string }[]>([]);
     const [looking, setLooking] = useState(false);
@@ -411,8 +412,8 @@ function AddFriend({
                             event.preventDefault();
                             void askByHandle();
                         }}
-                        placeholder="Name, email or username"
-                        aria-label="Add somebody"
+                        placeholder={t("friends.searchPlaceholder")}
+                        aria-label={t("friends.add")}
                         className="pl-7"
                     />
                     {looking && (
@@ -423,9 +424,9 @@ function AddFriend({
                     variant="secondary"
                     disabled={!query.trim()}
                     onClick={() => void askByHandle()}
-                    title="Ask by exact username"
+                    title={t("friends.askTitle")}
                 >
-                    Ask
+                    {t("friends.ask")}
                 </Button>
             </div>
 
@@ -457,7 +458,7 @@ function AddFriend({
 
             <span className="text-xs text-muted-foreground">
                 {said ||
-                    "Somebody who keeps themselves out of the search can still be asked, if they have given you their exact username."}
+                    t("friends.hint")}
             </span>
         </div>
     );

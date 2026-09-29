@@ -9,7 +9,9 @@
  */
 
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { Badge, Card, CardBody } from "@polaris/ui";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { assistedSignins } from "@/lib/agents/signin-runtime";
 import { signinProviderRows } from "@/lib/agents/agent-signins";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
@@ -38,6 +40,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AiKeysPage() {
     const user = await requireUser();
+    const t = await getTranslations("account");
     // Two listings rather than one filtered afterwards: agent sign-ins live in
     // the same table as provider keys and would otherwise be drawn in the
     // provider table as a credential for a provider that does not exist.
@@ -60,11 +63,8 @@ export default async function AiKeysPage() {
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">AI provider keys</h1>
-                <p className="text-muted-foreground text-sm">
-                    The provider accounts your AI work bills to. A key you add here is used before anything the
-                    deployment holds.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("aiKeys.page.title")}</h1>
+                <p className="text-muted-foreground text-sm">{t("aiKeys.page.intro")}</p>
             </div>
             <ModelKeysView
                 providers={modelProviderRows()}
@@ -76,15 +76,12 @@ export default async function AiKeysPage() {
                     reorder: reorderModelKeysAction
                 }}
                 copy={{
-                    title: "Your provider keys",
-                    hint: "Tried from the top. The first key whose provider serves the model is the one a run uses.",
-                    empty:
-                        shared && covered.length > 0
-                            ? "No keys of your own. Runs use the deployment's."
-                            : "No keys yet. A run needs one to reach a provider.",
-                    adding: "The provider account your runs bill to. Polaris adds nothing to that bill."
+                    title: t("aiKeys.keys.title"),
+                    hint: t("aiKeys.keys.hint"),
+                    empty: shared && covered.length > 0 ? t("aiKeys.keys.emptyShared") : t("aiKeys.keys.empty"),
+                    adding: t("aiKeys.keys.adding")
                 }}
-                footer={<FallbackCard providers={covered} shared={shared} />}
+                footer={<FallbackCard providers={covered} shared={shared} t={t} />}
             />
 
             {/* The same table, for the accounts an agent signs in with. A second
@@ -104,14 +101,11 @@ export default async function AiKeysPage() {
                     reorder: reorderModelKeysAction
                 }}
                 copy={{
-                    title: "Your agent accounts",
-                    action: "Add account",
-                    hint: "Tried from the top. The first that signs the agent in is the one a session on this box uses.",
-                    empty:
-                        fromPlatform.size > 0
-                            ? "None of your own. Sessions use the ones this deployment provides."
-                            : "None yet. A session on this box needs one to sign an agent in.",
-                    adding: "The account a session signs an agent in with. A subscription costs nothing extra; an API key is metered."
+                    title: t("aiKeys.accounts.title"),
+                    action: t("aiKeys.accounts.add"),
+                    hint: t("aiKeys.accounts.hint"),
+                    empty: fromPlatform.size > 0 ? t("aiKeys.accounts.emptyShared") : t("aiKeys.accounts.empty"),
+                    adding: t("aiKeys.accounts.adding")
                 }}
                 assist={{
                     signins: assistedSignins(),
@@ -129,16 +123,22 @@ export default async function AiKeysPage() {
 }
 
 /** What happens for a provider this account has brought no key for. */
-function FallbackCard({ providers, shared }: { providers: string[]; shared: boolean }) {
+function FallbackCard({
+    providers,
+    shared,
+    t
+}: {
+    providers: string[];
+    shared: boolean;
+    t: NamespaceTranslator<"account">;
+}) {
     return (
         <Card>
             <CardBody className="flex flex-col gap-1">
-                <h2 className="text-sm font-medium">What a run falls back to</h2>
+                <h2 className="text-sm font-medium">{t("aiKeys.fallback.title")}</h2>
                 {shared && providers.length > 0 ? (
                     <>
-                        <p className="text-muted-foreground text-xs">
-                            For a provider you have no key of your own for, runs use the deployment&apos;s.
-                        </p>
+                        <p className="text-muted-foreground text-xs">{t("aiKeys.fallback.shared")}</p>
                         <div className="mt-1 flex flex-wrap gap-1">
                             {providers.map((name) => (
                                 <Badge key={name} variant="neutral">
@@ -149,9 +149,7 @@ function FallbackCard({ providers, shared }: { providers: string[]; shared: bool
                     </>
                 ) : (
                     <p className="text-muted-foreground text-xs">
-                        {shared
-                            ? "This deployment holds no provider keys, so a run can only use one you add here."
-                            : "This deployment does not share its own provider keys, so a run can only use one you add here."}
+                        {shared ? t("aiKeys.fallback.noKeys") : t("aiKeys.fallback.notShared")}
                     </p>
                 )}
             </CardBody>

@@ -25,6 +25,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { ExtensionSteps } from "./extension-steps";
 import { ExtensionCommand } from "./extension-command";
 import { InstallAppCard } from "@/components/installed-app";
@@ -47,15 +48,14 @@ function FilesSkeleton() {
 
 export default async function DownloadsPage() {
     await requireUser();
+    const t = await getTranslations("account");
     const repo = loadEnv().POLARIS_REPO;
 
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Downloads</h1>
-                <p className="text-sm text-muted-foreground">
-                    Polaris on your desktop, in your browser, and on your own machine.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("downloads.page.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("downloads.page.intro")}</p>
             </div>
 
             {/* The PWA install and the native builds, in the card that already held
@@ -72,29 +72,22 @@ export default async function DownloadsPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Puzzle className="size-4" />
-                        Browser extension
+                        {t("downloads.extension.title")}
                     </CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-4 text-sm">
-                    <p className="text-muted-foreground">
-                        Fills a login, saves a new one, and unlocks from your vault. It asks the
-                        browser for permission to talk to this Polaris and no other, and holds no
-                        standing access to the pages you open.
-                    </p>
+                    <p className="text-muted-foreground">{t("downloads.extension.description")}</p>
 
                     <div className="flex flex-col gap-2">
                         <p className="flex items-center gap-2 font-medium">
-                            From your browser&apos;s store
-                            <Badge variant="neutral">Not there yet</Badge>
+                            {t("downloads.extension.store")}
+                            <Badge variant="neutral">{t("downloads.extension.notYet")}</Badge>
                         </p>
-                        <p className="text-muted-foreground">
-                            The store version is the one that keeps itself up to date, so it is
-                            worth waiting for if you can.
-                        </p>
+                        <p className="text-muted-foreground">{t("downloads.extension.storeHint")}</p>
                     </div>
 
                     <div className="flex flex-col gap-4 border-t border-border/60 pt-4">
-                        <p className="font-medium">Load it yourself</p>
+                        <p className="font-medium">{t("downloads.extension.loadYourself")}</p>
                         {/* First, because it is the only way on this screen that
                             makes the next version a refresh arrow instead of the
                             whole install again. The zip and the steps stay under
@@ -112,18 +105,20 @@ export default async function DownloadsPage() {
                     </div>
 
                     <p className="border-t border-border/60 pt-4 text-muted-foreground">
-                        Already have it?{" "}
-                        <Link className="underline" href="/account/extension">
-                            Connect it to this account
-                        </Link>
-                        . Your vault is the second step, from the extension itself.
+                        {t.rich("downloads.extension.alreadyHave", {
+                            link: (chunks) => (
+                                <Link key="link" className="underline" href="/account/extension">
+                                    {chunks}
+                                </Link>
+                            )
+                        })}
                     </p>
                 </CardBody>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Not here yet</CardTitle>
+                    <CardTitle>{t("downloads.later.title")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-4 text-sm">
                     {/* Present, unlinked and honest. Each of these is a real plan with
@@ -133,22 +128,15 @@ export default async function DownloadsPage() {
                     <div className="flex items-start gap-3">
                         <Smartphone className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                         <div>
-                            <p className="font-medium">Android and iOS</p>
-                            <p className="text-muted-foreground">
-                                No app yet. Installing Polaris as an app above puts it on your home
-                                screen from the browser, which is most of the way there.
-                            </p>
+                            <p className="font-medium">{t("downloads.later.mobile")}</p>
+                            <p className="text-muted-foreground">{t("downloads.later.mobileHint")}</p>
                         </div>
                     </div>
                     <div className="flex items-start gap-3">
                         <Terminal className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                         <div>
-                            <p className="font-medium">Command line</p>
-                            <p className="text-muted-foreground">
-                                For managing your things from your own computer, and for opening a
-                                tunnel from it to a service here. Nothing to install yet, so there
-                                is no command to copy.
-                            </p>
+                            <p className="font-medium">{t("downloads.later.cli")}</p>
+                            <p className="text-muted-foreground">{t("downloads.later.cliHint")}</p>
                         </div>
                     </div>
                 </CardBody>

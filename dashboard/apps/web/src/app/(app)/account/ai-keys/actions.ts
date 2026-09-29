@@ -10,6 +10,7 @@
  */
 
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import {
     canAssistSignin,
     answerSignin,
@@ -70,8 +71,9 @@ export async function reorderModelKeysAction(input: unknown): Promise<KeyActionR
 export async function beginAgentSigninAction(env: unknown): Promise<{ id?: string; error?: string }> {
     const user = await requireUser();
     const parsed = agentSigninEnvSchema.safeParse(env);
-    if (!parsed.success) return { error: "That is not a sign-in Polaris can run for you." };
-    if (!canAssistSignin(parsed.data)) return { error: "That is not a sign-in Polaris can run for you." };
+    const t = await getTranslations("account");
+    if (!parsed.success) return { error: t("aiKeys.errors.notAssisted") };
+    if (!canAssistSignin(parsed.data)) return { error: t("aiKeys.errors.notAssisted") };
     try {
         const attempt = await beginSignin(user.id, parsed.data);
         return { id: attempt.id };
@@ -82,7 +84,7 @@ export async function beginAgentSigninAction(env: unknown): Promise<{ id?: strin
             return { error: error.message };
         }
         console.error("[agent-signin] could not start:", error);
-        return { error: "Polaris could not start a machine for the sign-in. Try again in a moment." };
+        return { error: t("aiKeys.errors.couldNotStart") };
     }
 }
 
@@ -91,25 +93,27 @@ export async function agentSigninScreenAction(
 ): Promise<{ view?: SigninView; error?: string }> {
     const user = await requireUser();
     const parsed = agentSigninIdSchema.safeParse(id);
-    if (!parsed.success) return { error: "That sign-in is no longer open." };
+    if (!parsed.success) return { error: (await getTranslations("account"))("aiKeys.errors.notOpen") };
     try {
         return { view: await signinScreen(user.id, parsed.data) };
     } catch {
         // Includes the minute before the container answers at all, which is not a
         // failure - the dialog reads a missing view as "still starting".
-        return { error: "That sign-in is no longer open." };
+        return { error: (await getTranslations("account"))("aiKeys.errors.notOpen") };
     }
 }
 
 export async function answerAgentSigninAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = agentSigninAnswerSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Type something" };
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("account"))("aiKeys.errors.typeSomething") };
+    }
     try {
         await answerSignin(user.id, parsed.data.id, parsed.data.text);
         return {};
     } catch {
-        return { error: "That sign-in is no longer open." };
+        return { error: (await getTranslations("account"))("aiKeys.errors.notOpen") };
     }
 }
 
