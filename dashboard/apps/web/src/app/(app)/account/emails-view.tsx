@@ -30,6 +30,7 @@ import {
     cn
 } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     addEmailAction,
     promoteEmailAction,
@@ -40,6 +41,7 @@ import {
 
 export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mailReady: boolean }) {
     const router = useRouter();
+    const t = useTranslations("account");
     const [confirm, confirmElement] = useConfirm();
     const [adding, setAdding] = useState("");
     const [busy, setBusy] = useState<string | null>(null);
@@ -75,7 +77,7 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
             setError(result.error);
             return;
         }
-        setNotice(`Confirmation link sent to ${entry.email}.`);
+        setNotice(t("emails.linkSent", { email: entry.email }));
     }
 
     async function onAdd(event: FormEvent<HTMLFormElement>) {
@@ -87,9 +89,9 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
 
     async function remove(entry: UserEmailView) {
         const ok = await confirm({
-            title: "Remove this address?",
-            description: `${entry.email} will no longer be on your account.`,
-            confirmLabel: "Remove",
+            title: t("emails.removeTitle"),
+            description: t("emails.removeDescription", { email: entry.email }),
+            confirmLabel: t("emails.remove"),
             danger: true
         });
         if (!ok || !entry.id) return;
@@ -111,12 +113,12 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                             </span>
                         </div>
                         <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                            {entry.primary ? <Badge variant="primary">Primary</Badge> : null}
-                            {entry.recovery ? <Badge>Recovery</Badge> : null}
+                            {entry.primary ? <Badge variant="primary">{t("emails.primary")}</Badge> : null}
+                            {entry.recovery ? <Badge>{t("emails.recovery")}</Badge> : null}
                             {entry.verified ? (
-                                <Badge className="border-success-edge text-success">Verified</Badge>
+                                <Badge className="border-success-edge text-success">{t("emails.verified")}</Badge>
                             ) : (
-                                <Badge className="border-warning-edge text-warning">Unverified</Badge>
+                                <Badge className="border-warning-edge text-warning">{t("emails.unverified")}</Badge>
                             )}
                             {entry.verified ? null : (
                                 <Button
@@ -126,11 +128,11 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                                     title={
                                         mailReady
                                             ? undefined
-                                            : "No email channel is set up, so Polaris cannot send the link."
+                                            : t("emails.noChannel")
                                     }
                                     onClick={() => void verify(entry)}
                                 >
-                                    Verify
+                                    {t("emails.verify")}
                                 </Button>
                             )}
                             {entry.primary ? null : (
@@ -140,10 +142,10 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                                         size="icon"
                                         aria-label={
                                             entry.recovery
-                                                ? `Stop using ${entry.email} for recovery`
-                                                : `Use ${entry.email} for recovery`
+                                                ? t("emails.stopRecovery", { email: entry.email })
+                                                : t("emails.useRecovery", { email: entry.email })
                                         }
-                                        title={entry.recovery ? "Not for recovery" : "Use for recovery"}
+                                        title={entry.recovery ? t("emails.notForRecovery") : t("emails.forRecovery")}
                                         disabled={busy === entry.id}
                                         onClick={() =>
                                             void run(entry.id ?? "", () =>
@@ -156,8 +158,8 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        aria-label={`Make ${entry.email} primary`}
-                                        title="Make primary"
+                                        aria-label={t("emails.makePrimaryNamed", { email: entry.email })}
+                                        title={t("emails.makePrimary")}
                                         onClick={() => setPromoting(entry)}
                                     >
                                         <Star className="size-4" />
@@ -165,8 +167,8 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        aria-label={`Remove ${entry.email}`}
-                                        title="Remove"
+                                        aria-label={t("emails.removeNamed", { email: entry.email })}
+                                        title={t("emails.remove")}
                                         disabled={busy === entry.id}
                                         onClick={() => void remove(entry)}
                                     >
@@ -190,15 +192,13 @@ export function EmailsView({ emails, mailReady }: { emails: UserEmailView[]; mai
                     />
                     <Button type="submit" disabled={busy === "add" || !candidate.success || duplicate}>
                         <Plus className="size-4" />
-                        Add
+                        {t("emails.add")}
                     </Button>
                 </div>
                 {duplicate ? (
-                    <p className="text-xs text-danger">That address is already on your account.</p>
+                    <p className="text-xs text-danger">{t("emails.duplicate")}</p>
                 ) : (
-                    <p className="text-xs text-muted-foreground">
-                        A recovery address is where an operator can reach you if you lose access.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("emails.recoveryHint")}</p>
                 )}
             </form>
 
@@ -228,6 +228,8 @@ function PromoteEmailDialog({
     onOpenChange: (open: boolean) => void;
     onDone: () => void;
 }) {
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -250,23 +252,21 @@ function PromoteEmailDialog({
         <Dialog open={entry !== null} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Make this your primary address?</DialogTitle>
-                    <DialogDescription>
-                        You will sign in with {entry?.email}. The current one stays on your account.
-                    </DialogDescription>
+                    <DialogTitle>{t("emails.promoteTitle")}</DialogTitle>
+                    <DialogDescription>{t("emails.promoteDescription", { email: entry?.email ?? "" })}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Current password
+                        {t("emails.currentPassword")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={busy}>
-                            {busy ? "Working..." : "Make primary"}
+                            {busy ? t("emails.working") : t("emails.makePrimary")}
                         </Button>
                     </div>
                 </form>

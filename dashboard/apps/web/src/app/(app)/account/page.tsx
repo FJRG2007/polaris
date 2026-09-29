@@ -21,6 +21,7 @@
  */
 
 import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { prisma } from "@polaris/db";
 import { AppearanceCard } from "./appearance-card";
 import { requireUser } from "@/lib/session";
@@ -38,11 +39,21 @@ import { getProfileStyle } from "@/lib/profile-style-service";
 import {
     usernameChangeAllowedAt,
     usernameCooldownDays,
-    usernameCooldownRemaining,
     USERNAME_COOLDOWN_KEY
 } from "@polaris/core";
 
 export const dynamic = "force-dynamic";
+
+/** How long until the handle may change again, the way `usernameCooldownRemaining`
+ *  in @polaris/core says it, in the reader's language. */
+function cooldownLeft(allowedAt: Date, now: Date, t: NamespaceTranslator<"accountSecurity">): string {
+    const left = allowedAt.getTime() - now.getTime();
+    const minutes = Math.ceil(left / 60_000);
+    if (minutes < 60) return t("duration.minutes", { count: minutes });
+    const hours = Math.ceil(left / (60 * 60_000));
+    if (hours < 24) return t("duration.hours", { count: hours });
+    return t("duration.days", { count: Math.ceil(left / (24 * 60 * 60_000)) });
+}
 
 export default async function AccountPage() {
     const session = await requireUser();
@@ -90,7 +101,7 @@ export default async function AccountPage() {
     );
     const usernameChangeIn =
         allowedAt && allowedAt.getTime() > now.getTime()
-            ? usernameCooldownRemaining(allowedAt, now)
+            ? cooldownLeft(allowedAt, now, await getTranslations("accountSecurity"))
             : undefined;
 
     return (

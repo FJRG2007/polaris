@@ -28,6 +28,8 @@ import { useMemo, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { saveProfileStyleAction } from "./actions";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Choice, Tile } from "./appearance-choice";
 import { avatarUrl, bannerUrl } from "@/lib/avatar-url";
 import { PictureEditor, usePicture } from "./avatar-card";
@@ -53,6 +55,18 @@ const SECOND_COLOR = "#a06bff";
 
 type Background = "photo" | "solid" | "gradient";
 
+/** A decoration's, a plate's or an effect's name in the reader's language; one
+ *  this catalog does not know yet keeps the name @polaris/core gives it. */
+function styleName(
+    t: NamespaceTranslator<"account">,
+    kind: "decorations" | "nameplates" | "effects",
+    id: string,
+    fallback: string
+): string {
+    const key = `appearance.${kind}.${id}`;
+    return t.has(key) ? t(key) : fallback;
+}
+
 export function AppearanceCard({
     userId,
     name,
@@ -68,6 +82,8 @@ export function AppearanceCard({
     hasBanner: boolean;
     initial: core.ProfileStyle;
 }) {
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
     const [style, setStyle] = useState<core.ProfileStyle>(initial);
     const [saved, setSaved] = useState<core.ProfileStyle>(initial);
     const [busy, setBusy] = useState(false);
@@ -114,12 +130,8 @@ export function AppearanceCard({
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Appearance</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                    How your profile looks to everybody else. Without a photo, Polaris uses the
-                    picture your email address has on Gravatar and your initials if it has none;
-                    without a banner, a colour taken from your photo.
-                </p>
+                <CardTitle>{t("appearance.title")}</CardTitle>
+                <p className="text-xs text-muted-foreground">{t("pictures.personHint")}</p>
             </CardHeader>
             <CardBody className="flex flex-col gap-5">
                 {/* Drawn by the same components your profile is drawn by, so what
@@ -222,31 +234,31 @@ export function AppearanceCard({
 
                 <section className="flex flex-col gap-2">
                     <Field
-                        label="Banner"
-                        hint="The band across the top of your profile, under your banner picture."
+                        label={t("appearance.banner.label")}
+                        hint={t("appearance.banner.hint")}
                     />
                     <div className="flex flex-wrap gap-1.5">
                         <Choice
                             chosen={background === "photo"}
                             onClick={() => setBackground("photo")}
-                            label="From your photo"
+                            label={t("appearance.banner.fromPhoto")}
                         />
                         <Choice
                             chosen={background === "solid"}
                             onClick={() => setBackground("solid")}
-                            label="One colour"
+                            label={t("appearance.banner.oneColour")}
                         />
                         <Choice
                             chosen={background === "gradient"}
                             onClick={() => setBackground("gradient")}
-                            label="Two colours"
+                            label={t("appearance.banner.twoColours")}
                         />
                     </div>
 
                     {style.banner?.kind === "solid" ? (
                         <ColorPicker
                             className="max-w-sm"
-                            label="Background"
+                            label={t("appearance.banner.background")}
                             value={style.banner.color}
                             onChange={(color) => set({ banner: { kind: "solid", color } })}
                         />
@@ -256,7 +268,7 @@ export function AppearanceCard({
                         <div className="flex flex-col gap-3">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <ColorPicker
-                                    label="From"
+                                    label={t("appearance.from")}
                                     value={style.banner.from}
                                     onChange={(from) =>
                                         set({
@@ -270,7 +282,7 @@ export function AppearanceCard({
                                     }
                                 />
                                 <ColorPicker
-                                    label="To"
+                                    label={t("appearance.to")}
                                     value={style.banner.to}
                                     onChange={(to) =>
                                         set({
@@ -285,13 +297,13 @@ export function AppearanceCard({
                                 />
                             </div>
                             <label className="flex items-center gap-3 text-xs text-muted-foreground">
-                                Angle
+                                {t("appearance.banner.angle")}
                                 <input
                                     type="range"
                                     min={0}
                                     max={359}
                                     value={style.banner.angle}
-                                    aria-label="The angle the two colours run at"
+                                    aria-label={t("appearance.banner.angleLabel")}
                                     onChange={(event) =>
                                         set({
                                             banner: {
@@ -314,8 +326,8 @@ export function AppearanceCard({
 
                 <section className="flex flex-col gap-2">
                     <Field
-                        label="Avatar decoration"
-                        hint="Drawn on your picture wherever you're introduced - your profile, messages, member lists - not in pickers or tables. Every one of them is free."
+                        label={t("appearance.decoration.label")}
+                        hint={t("appearance.decoration.hint")}
                     />
                     {/* A gallery rather than a row of chips, because a decoration
                         is a drawing and the only useful way to choose between
@@ -327,7 +339,7 @@ export function AppearanceCard({
                         <Tile
                             chosen={!style.decoration}
                             onClick={() => set({ decoration: null })}
-                            label="None"
+                            label={t("appearance.none")}
                         >
                             <Avatar
                                 person={{ id: userId, name }}
@@ -341,11 +353,11 @@ export function AppearanceCard({
                                 key={decoration.id}
                                 chosen={style.decoration === decoration.id}
                                 onClick={() => set({ decoration: decoration.id })}
-                                label={decoration.label}
+                                label={styleName(t, "decorations", decoration.id, decoration.label)}
                                 // Said out loud rather than left to be discovered
                                 // one press at a time, for somebody choosing
                                 // between them who does not want movement.
-                                note={core.decorationMoves(decoration) ? "Moves" : undefined}
+                                note={core.decorationMoves(decoration) ? t("appearance.decoration.moves") : undefined}
                             >
                                 <Avatar
                                     person={{ id: userId, name }}
@@ -360,21 +372,21 @@ export function AppearanceCard({
 
                 <section className="flex flex-col gap-2">
                     <Field
-                        label="Nameplate"
-                        hint="Where your name appears in a list of people, like the members of a conversation."
+                        label={t("appearance.nameplate.label")}
+                        hint={t("appearance.nameplate.hint")}
                     />
                     <div className="flex flex-wrap gap-1.5">
                         <Choice
                             chosen={!style.nameplate}
                             onClick={() => set({ nameplate: null })}
-                            label="None"
+                            label={t("appearance.none")}
                         />
                         {core.NAMEPLATES.map((entry) => (
                             <Choice
                                 key={entry.id}
                                 chosen={style.nameplate === entry.id}
                                 onClick={() => set({ nameplate: entry.id })}
-                                label={entry.label}
+                                label={styleName(t, "nameplates", entry.id, entry.label)}
                             >
                                 <span
                                     aria-hidden="true"
@@ -390,8 +402,8 @@ export function AppearanceCard({
 
                 <section className="flex flex-col gap-2">
                     <Field
-                        label="Display name style"
-                        hint="What the paint does, and in which colours. Nothing here changes the size, so a name is never taller than the row it is in."
+                        label={t("appearance.nameStyle.label")}
+                        hint={t("appearance.nameStyle.hint")}
                     />
                     <NameEffectPicker
                         value={style.nameStyle}
@@ -406,8 +418,8 @@ export function AppearanceCard({
                     first choosing paint. */}
                 <section className="flex flex-col gap-2">
                     <Field
-                        label="Font"
-                        hint="The letterforms your display name is set in, wherever it appears. Only downloaded when somebody's name on the screen is actually set in one."
+                        label={t("appearance.font.label")}
+                        hint={t("appearance.font.hint")}
                     />
                     <NameFontPicker
                         value={style.nameStyle}
@@ -417,21 +429,21 @@ export function AppearanceCard({
 
                 <section className="flex flex-col gap-2">
                     <Field
-                        label="Profile effect"
-                        hint="An edge, a slow band of light, or both. It stops for anybody who has asked their machine for less motion."
+                        label={t("appearance.effect.label")}
+                        hint={t("appearance.effect.hint")}
                     />
                     <div className="flex flex-wrap gap-1.5">
                         <Choice
                             chosen={!style.effect}
                             onClick={() => set({ effect: null })}
-                            label="None"
+                            label={t("appearance.none")}
                         />
                         {core.PROFILE_EFFECTS.map((entry) => (
                             <Choice
                                 key={entry.id}
                                 chosen={style.effect === entry.id}
                                 onClick={() => set({ effect: entry.id })}
-                                label={entry.label}
+                                label={styleName(t, "effects", entry.id, entry.label)}
                             >
                                 <span
                                     aria-hidden="true"
@@ -452,7 +464,7 @@ export function AppearanceCard({
                     {error || pictureError ? (
                         <p className="text-danger text-sm">{error || pictureError}</p>
                     ) : null}
-                    {done && !error ? <p className="text-success text-sm">Saved.</p> : null}
+                    {done && !error ? <p className="text-success text-sm">{t("appearance.saved")}</p> : null}
                     <div className="ml-auto flex items-center gap-2">
                         <Button
                             type="button"
@@ -470,7 +482,7 @@ export function AppearanceCard({
                             }
                         >
                             <RotateCcw className="size-4 shrink-0" />
-                            Clear it all
+                            {t("appearance.clearAll")}
                         </Button>
                         <Button
                             type="button"
@@ -499,7 +511,7 @@ export function AppearanceCard({
                                 refreshFaces();
                             }}
                         >
-                            {busy ? "Saving..." : "Save"}
+                            {busy ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
                 </div>

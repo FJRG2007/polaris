@@ -21,6 +21,7 @@ import { SectionCard } from "./section-card";
 import { MAX_DESCRIPTION } from "@polaris/core";
 import { updateProfileAction } from "./actions";
 import { UsernameField } from "./username-field";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState, type FormEvent } from "react";
 import { Button, Input, Textarea } from "@polaris/ui";
 
@@ -74,6 +75,8 @@ export function ProfileView({
     description: string;
 }) {
     const router = useRouter();
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
 
     // The server decides for real; this is what stops somebody typing into a
     // field whose Save was never going to work.
@@ -100,7 +103,7 @@ export function ProfileView({
             description: profile.description
         });
         setBusy(false);
-        setResult(answer.error ? answer : { ok: "Profile updated." });
+        setResult(answer.error ? answer : { ok: t("profile.updated") });
         if (!answer.error) {
             setSaved(profile);
             router.refresh();
@@ -108,14 +111,14 @@ export function ProfileView({
     }
 
     return (
-        <SectionCard title="Profile" description="Your name, your username, and what your page says.">
+        <SectionCard title={t("profile.page.title")} description={t("profile.cardDescription")}>
             <form onSubmit={onSubmit} className="flex flex-col gap-3">
                 {/* First, because it is the one everybody else sees. It is
                     neither of the two fields on the account screen: not the name
                     on your documents, not the handle you sign in with - whatever
                     you want to be called, left exactly as you typed it. */}
                 <label className="flex flex-col gap-1 text-sm">
-                    Display name
+                    {t("profile.displayName")}
                     <Input
                         value={profile.name}
                         required
@@ -125,7 +128,7 @@ export function ProfileView({
                         onChange={(event) => setProfile({ ...profile, name: event.target.value })}
                     />
                     <span className="text-xs text-muted-foreground">
-                        Shown wherever your name appears. It does not have to be your name.
+                        {t("profile.displayNameHint")}
                     </span>
                 </label>
                 {/* Answered while it is typed, with a way out when the name is
@@ -138,29 +141,29 @@ export function ProfileView({
                     firstName={firstName}
                     lastName={lastName}
                     locked={usernameLocked}
-                    lockedNote={`Other people find and address you by this, so it can only be changed once in a while. You can change it again in ${usernameChangeIn}.`}
+                    lockedNote={t("profile.usernameLocked", { when: usernameChangeIn ?? "" })}
                     onChange={(next) => setProfile({ ...profile, username: next })}
                 />
                 <label className="flex flex-col gap-1 text-sm">
-                    About you
+                    {t("details.title")}
                     <Textarea
                         rows={3}
                         value={profile.description}
-                        placeholder="Optional"
+                        placeholder={t("access.groups.optional")}
                         maxLength={MAX_DESCRIPTION}
                         onChange={(event) =>
                             setProfile({ ...profile, description: event.target.value })
                         }
                     />
                     <span className="text-xs text-muted-foreground">
-                        Shown to anybody who opens your profile.
+                        {t("profile.aboutHint")}
                     </span>
                 </label>
                 <div className="flex items-center justify-between gap-2">
                     {result?.error ? <p className="text-sm text-danger">{result.error}</p> : null}
                     {result?.ok ? <p className="text-sm text-success">{result.ok}</p> : null}
                     <Button type="submit" disabled={busy || !changed} className="ml-auto">
-                        {busy ? "Saving..." : "Save"}
+                        {busy ? tc("actions.saving") : tc("actions.save")}
                     </Button>
                 </div>
             </form>

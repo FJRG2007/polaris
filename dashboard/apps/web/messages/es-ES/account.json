@@ -132,6 +132,42 @@
         "page": {
             "title": "Reglas de acceso",
             "intro": "Limita desde dónde se pueden usar tu cuenta y tus claves de API."
+        },
+        "summary": {
+            "groups": "{count, plural, one {# grupo} other {# grupos}}",
+            "addresses": "{count, plural, one {# regla de dirección} other {# reglas de dirección}}",
+            "locations": "{count, plural, one {# ubicación} other {# ubicaciones}}",
+            "none": "Sin restricción: accesible desde cualquier sitio"
+        },
+        "deleteTitle": "¿Eliminar «{name}»?",
+        "deleteInUse": "Está en uso; las reglas que aporta dejarán de aplicarse.",
+        "deleteFinal": "Esto no se puede deshacer.",
+        "signIn": {
+            "title": "Restricciones de inicio de sesión",
+            "description": "Déjalo todo vacío para permitir iniciar sesión desde cualquier sitio. Si no, un inicio de sesión tiene que cumplir tus reglas de dirección y tus ubicaciones permitidas.",
+            "none": "Sin restricción: se puede iniciar sesión en tu cuenta desde cualquier dirección."
+        },
+        "connectingFrom": "Te estás conectando desde <ip>{address}</ip>",
+        "enforced": "Un administrador también limita esta cuenta a {rules}.",
+        "groups": {
+            "title": "Grupos de acceso",
+            "description": "Conjuntos de reglas con nombre que puedes aplicar a tus inicios de sesión y a las claves de API.",
+            "new": "Nuevo grupo",
+            "empty": "Todavía no hay grupos. Crea uno para reutilizar la misma lista de permitidos en más de un sitio.",
+            "signIn": "Inicio de sesión",
+            "keys": "{count, plural, one {# clave} other {# claves}}",
+            "deleteNamed": "Eliminar {name}",
+            "editTitle": "Editar «{name}»",
+            "newTitle": "Nuevo grupo de acceso",
+            "dialogDescription": "Un conjunto de direcciones y ubicaciones con nombre que puedes reutilizar donde se restrinja el acceso.",
+            "namePlaceholder": "Casa",
+            "optional": "Opcional",
+            "create": "Crear grupo"
+        },
+        "errors": {
+            "lockout": "Eso bloquearía la dirección que estás usando ahora mismo. Añádela primero a las reglas, o déjalas vacías.",
+            "checkRules": "Revisa las reglas.",
+            "checkGroup": "Revisa el grupo."
         }
     },
     "activity": {
@@ -356,6 +392,38 @@
         "page": {
             "title": "Cuenta",
             "intro": "Cómo inicias sesión y cómo te contacta Polaris. Nada de esto aparece en tu perfil."
+        },
+        "title": "Sobre ti",
+        "description": "Lo que aparece junto a tu nombre en tu página, y dónde más se te puede encontrar.",
+        "headline": "Titular",
+        "headlineHint": "Una línea, bajo tu nombre. A qué te dedicas, no tu vida entera: el párrafo va en la descripción de arriba.",
+        "pronouns": "Pronombres",
+        "preferNot": "Prefiero no decirlo",
+        "ownWords": "Con mis propias palabras",
+        "pronounsPlaceholder": "p. ej. elle",
+        "yourPronouns": "Tus pronombres",
+        "pronounsHint": "Aparecen junto a tu nombre. Si no dices nada, no aparece nada.",
+        "links": {
+            "title": "Enlaces",
+            "namePlaceholder": "Nombre (opcional)",
+            "name": "Nombre del enlace {number}",
+            "address": "Dirección del enlace {number}",
+            "remove": "Quitar el enlace {number}",
+            "add": "Añadir un enlace",
+            "hint": "Un portfolio, una web, un linktree. Basta con escribir la web (se añade https:// por ti), y una dirección sin nombre se muestra con su propio dominio.",
+            "problems": {
+                "empty": "Escribe una dirección web",
+                "invalid": "Eso no es una dirección web",
+                "scheme": "Solo direcciones http:// y https://",
+                "noSite": "Esa dirección no incluye ningún sitio"
+            }
+        },
+        "accountUpdated": "Cuenta actualizada.",
+        "name": {
+            "title": "Tu nombre",
+            "description": "Se guarda en la cuenta. No es lo que ven los demás, salvo que lo digas en Privacidad.",
+            "first": "Nombre",
+            "last": "Apellidos"
         }
     },
     "devices": {
@@ -485,6 +553,210 @@
         "page": {
             "title": "Perfil",
             "intro": "Cómo te ven todos los demás en Polaris."
+        },
+        "updated": "Perfil actualizado.",
+        "cardDescription": "Tu nombre, tu nombre de usuario y lo que dice tu página.",
+        "displayName": "Nombre visible",
+        "displayNameHint": "Aparece dondequiera que aparezca tu nombre. No tiene por qué ser tu nombre.",
+        "usernameLocked": "Los demás te encuentran y se dirigen a ti con él, así que solo se puede cambiar de vez en cuando. Podrás volver a cambiarlo dentro de {when}.",
+        "aboutHint": "Lo ve cualquiera que abra tu perfil.",
+        "username": "Nombre de usuario",
+        "usernameFree": "{username} está disponible",
+        "usernameHint": "De 3 a 30 caracteres: letras, números, - o _. Se usa para iniciar sesión.",
+        "try": "Prueba",
+        "errors": {
+            "unknownAddress": "Dirección desconocida.",
+            "tooManyRequests": "Demasiadas solicitudes. Vuelve a intentarlo dentro de {minutes, plural, one {# minuto} other {# minutos}}.",
+            "notUsername": "Eso no es un nombre de usuario",
+            "usernameUnusable": "Ese nombre de usuario no se puede usar",
+            "usernameTaken": "Ese nombre de usuario ya está cogido",
+            "tooManyChecks": "Demasiadas comprobaciones. Espera un momento.",
+            "checkPicked": "Revisa lo que has elegido",
+            "checkTyped": "Revisa lo que has escrito",
+            "validEmail": "Escribe un correo válido",
+            "addressGone": "Esa dirección ya no está en tu cuenta."
         }
+    },
+    "pictures": {
+        "errors": {
+            "notSaved": "No se ha podido guardar",
+            "unreachable": "No se ha podido contactar con el servidor",
+            "reopen": "No se ha podido volver a abrir esa imagen",
+            "animated": "Una imagen animada no se puede reencuadrar: sustitúyela para cambiar cómo queda"
+        },
+        "reframe": "Reencuadrar",
+        "reframeNote": "Mover y escalar lo que ya hay",
+        "replace": "Sustituir",
+        "upload": "Subir {kind, select, banner {portada} other {foto}}",
+        "uploadNote": "Elige una imagen de este dispositivo; un GIF sigue moviéndose",
+        "remove": "Quitar",
+        "removeNote": "Volver a la {kind, select, banner {portada} other {foto}} predeterminada",
+        "edit": "Editar {kind, select, banner {portada} other {foto}}",
+        "title": "{kind, select, banner {Portada} other {Foto}}",
+        "cardTitle": "Foto y portada",
+        "personHint": "Cómo ven tu perfil todos los demás. Sin foto, Polaris usa la imagen que tiene tu correo en Gravatar, y tus iniciales si no tiene ninguna; sin portada, un color sacado de tu foto.",
+        "orgHint": "Cómo se ve esta organización en todas partes: el selector, las plantillas de su gente y su propia página. Sin foto, Polaris dibuja sus iniciales; sin portada, un color sacado de la foto."
+    },
+    "appearance": {
+        "title": "Apariencia",
+        "from": "Desde",
+        "to": "Hasta",
+        "colour": "Color",
+        "none": "Ninguno",
+        "saved": "Guardado.",
+        "clearAll": "Quitarlo todo",
+        "banner": {
+            "label": "Portada",
+            "hint": "La franja de la parte superior de tu perfil, debajo de tu imagen de portada.",
+            "fromPhoto": "De tu foto",
+            "oneColour": "Un color",
+            "twoColours": "Dos colores",
+            "background": "Fondo",
+            "angle": "Ángulo",
+            "angleLabel": "El ángulo de los dos colores"
+        },
+        "decoration": {
+            "label": "Decoración del avatar",
+            "hint": "Se dibuja sobre tu foto allí donde se te presenta (tu perfil, los mensajes, las listas de miembros), no en selectores ni en tablas. Todas son gratis.",
+            "moves": "Animada"
+        },
+        "nameplate": {
+            "label": "Placa de nombre",
+            "hint": "Donde aparece tu nombre en una lista de personas, como los miembros de una conversación."
+        },
+        "nameStyle": {
+            "label": "Estilo del nombre visible",
+            "hint": "Qué hace la pintura y en qué colores. Nada de esto cambia el tamaño, así que un nombre nunca es más alto que su fila."
+        },
+        "font": {
+            "label": "Tipografía",
+            "hint": "Las letras con las que se escribe tu nombre visible, allí donde aparezca. Solo se descarga cuando un nombre en pantalla la usa de verdad."
+        },
+        "effect": {
+            "label": "Efecto del perfil",
+            "hint": "Un borde, una franja de luz lenta, o las dos. Se detiene para quien haya pedido a su equipo menos movimiento."
+        },
+        "nameEffects": {
+            "plain": "Ninguno",
+            "solid": "Sólido",
+            "gradient": "Degradado",
+            "neon": "Neón",
+            "toon": "Cómic",
+            "pop": "Pop",
+            "gummy": "Gominola",
+            "prism": "Prisma"
+        },
+        "nameFonts": {
+            "sans": "Predeterminada",
+            "caps": "Versalitas",
+            "serif": "Con serifa",
+            "mono": "Monoespaciada",
+            "rounded": "Redondeada",
+            "hand": "Manuscrita",
+            "comic": "Cómic",
+            "script": "Caligráfica",
+            "block": "Bloque",
+            "bubble": "Burbuja",
+            "techno": "Tecno",
+            "pixel": "Píxel"
+        },
+        "decorations": {
+            "aurora": "Aurora",
+            "ember": "Brasa",
+            "frost": "Escarcha",
+            "gold": "Oro",
+            "moss": "Musgo",
+            "rose": "Rosa",
+            "ink": "Tinta",
+            "orbit": "Órbita",
+            "pulse": "Pulso",
+            "circuit": "Circuito",
+            "nova": "Nova",
+            "bloom": "Flor",
+            "eclipse": "Eclipse",
+            "tide": "Marea",
+            "cat": "Orejas de gato",
+            "horns": "Cuernos",
+            "wings": "Alas",
+            "flowers": "Corona de flores",
+            "headphones": "Auriculares",
+            "halo": "Halo",
+            "crown": "Corona"
+        },
+        "nameplates": {
+            "dusk": "Atardecer",
+            "tide": "Marea",
+            "ember": "Brasa",
+            "moss": "Musgo",
+            "slate": "Pizarra",
+            "gold": "Oro",
+            "rose": "Rosa"
+        },
+        "effects": {
+            "sheen": "Destello",
+            "halo": "Halo",
+            "gilded": "Dorado",
+            "current": "Corriente",
+            "coal": "Carbón"
+        }
+    },
+    "companies": {
+        "title": "Dónde trabajas",
+        "seePage": "Ver tu página",
+        "description": "Quién ve todo esto es un solo ajuste de tu pantalla de privacidad. No se muestra nada hasta que lo marques.",
+        "organizations": "Organizaciones de aquí. Llevan un tick en tu página: Polaris tiene la plantilla y estás en ella.",
+        "elsewhere": "En otro sitio",
+        "addAnother": "Añadir otra",
+        "company": "Empresa {number}",
+        "remove": "Quitar {name}",
+        "typedHint": "Aparecen sin tick, porque Polaris no sabe de ellas nada más que lo que has escrito."
+    },
+    "emails": {
+        "title": "Direcciones de correo",
+        "description": "La dirección con la que inicias sesión y cualquier otra de esta cuenta.",
+        "linkSent": "Enlace de confirmación enviado a {email}.",
+        "removeTitle": "¿Quitar esta dirección?",
+        "removeDescription": "{email} dejará de estar en tu cuenta.",
+        "remove": "Quitar",
+        "primary": "Principal",
+        "recovery": "Recuperación",
+        "verified": "Verificada",
+        "unverified": "Sin verificar",
+        "noChannel": "No hay ningún canal de correo configurado, así que Polaris no puede enviar el enlace.",
+        "verify": "Verificar",
+        "stopRecovery": "Dejar de usar {email} para recuperación",
+        "useRecovery": "Usar {email} para recuperación",
+        "notForRecovery": "No usar para recuperación",
+        "forRecovery": "Usar para recuperación",
+        "makePrimaryNamed": "Hacer principal {email}",
+        "makePrimary": "Hacer principal",
+        "removeNamed": "Quitar {email}",
+        "add": "Añadir",
+        "duplicate": "Esa dirección ya está en tu cuenta.",
+        "recoveryHint": "Una dirección de recuperación es donde un operador puede contactarte si pierdes el acceso.",
+        "promoteTitle": "¿Hacer esta tu dirección principal?",
+        "promoteDescription": "Iniciarás sesión con {email}. La actual sigue en tu cuenta.",
+        "currentPassword": "Contraseña actual",
+        "working": "Procesando..."
+    },
+    "phone": {
+        "title": "Número de teléfono",
+        "description": "Se confirma a través de uno de tus propios canales de WhatsApp, que también es el que lleva un código de inicio de sesión cuando lo usas.",
+        "remove": "Quitar",
+        "change": "Cambiar",
+        "add": "Añadir",
+        "confirmed": "Confirmado",
+        "unconfirmed": "Sin confirmar",
+        "code": "Código de confirmación",
+        "confirm": "Confirmar",
+        "codeSent": "Código enviado por WhatsApp.",
+        "sendCode": "Enviar código",
+        "checkNumber": "Revisa el número.",
+        "changeTitle": "Cambiar tu número",
+        "addTitle": "Añadir un número de teléfono",
+        "setDescription": "Empieza sin confirmar. Confírmalo antes de que pueda llevar un código de inicio de sesión.",
+        "removeTitle": "Quitar tu número",
+        "removeDescription": "Confirma tu contraseña. WhatsApp dejará de ser una de tus opciones de inicio de sesión.",
+        "removing": "Quitando..."
     }
 }

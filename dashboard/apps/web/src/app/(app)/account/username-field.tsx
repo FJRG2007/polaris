@@ -25,6 +25,8 @@
 import { Input, cn } from "@polaris/ui";
 import { usernameField } from "@polaris/core";
 import { checkUsernameAction } from "./actions";
+import { knownMessage } from "./security/known-sentences";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Check, Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -59,6 +61,9 @@ export function UsernameField({
     lockedNote: string;
     onChange: (next: string) => void;
 }) {
+    const t = useTranslations("account");
+    const ts = useTranslations("accountSecurity");
+    const tv = useTranslations("validation");
     const [verdict, setVerdict] = useState<Verdict>({ kind: "idle" });
 
     // Which question an answer belongs to. Typing quickly leaves two in flight,
@@ -86,7 +91,7 @@ export function UsernameField({
         if (!shape.success) {
             setVerdict({
                 kind: "taken",
-                problem: shape.error.issues[0]?.message ?? "That username cannot be used",
+                problem: shape.error.issues[0]?.message ?? t("profile.errors.usernameUnusable"),
                 suggestions: []
             });
             return;
@@ -114,7 +119,7 @@ export function UsernameField({
                     ? { kind: "free" }
                     : {
                           kind: "taken",
-                          problem: answer.problem || "That username is taken",
+                          problem: answer.problem || t("profile.errors.usernameTaken"),
                           suggestions: answer.suggestions ?? []
                       }
             );
@@ -126,11 +131,11 @@ export function UsernameField({
 
     return (
         <label className="flex flex-col gap-1 text-sm">
-            Username
+            {t("profile.username")}
             <div className="relative">
                 <Input
                     value={value}
-                    placeholder="Optional"
+                    placeholder={t("access.groups.optional")}
                     autoComplete="off"
                     autoCapitalize="none"
                     spellCheck={false}
@@ -160,14 +165,14 @@ export function UsernameField({
                 {locked
                     ? lockedNote
                     : verdict.kind === "free"
-                      ? `${value.trim().toLowerCase()} is available`
+                      ? t("profile.usernameFree", { username: value.trim().toLowerCase() })
                       : taken
-                        ? verdict.problem
-                        : "3-30 characters: letters, numbers, - or _. Used to sign in."}
+                        ? knownMessage(ts, tv, verdict.problem)
+                        : t("profile.usernameHint")}
             </span>
             {taken && verdict.suggestions.length > 0 ? (
                 <span className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                    <span className="text-muted-foreground text-xs">Try</span>
+                    <span className="text-muted-foreground text-xs">{t("profile.try")}</span>
                     {verdict.suggestions.map((suggestion) => (
                         <button
                             key={suggestion}

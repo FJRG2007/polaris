@@ -20,6 +20,8 @@ import * as core from "@polaris/core";
 import { emailField, USERNAME_COOLDOWN_KEY, usernameCooldownDays } from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
+import { localized } from "./security/action-messages";
 import { recordAudit } from "@/lib/audit-service";
 import { setProfileStyle } from "@/lib/profile-style-service";
 import { getSetting } from "@/lib/setting-store";
@@ -55,16 +57,20 @@ const VERIFY_WINDOW_MS = 15 * 60 * 1000;
 export async function verifyEmailAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = emailField.safeParse(input);
-    if (!parsed.success) return { error: "Unknown address." };
+    if (!parsed.success) return { error: (await getTranslations("account"))("profile.errors.unknownAddress") };
     const throttle = await rateLimit(`email-verify:${user.id}`, VERIFY_LIMIT, VERIFY_WINDOW_MS);
     if (!throttle.ok) {
-        return { error: `Too many requests. Try again in ${Math.ceil(throttle.retryAfterMs / 60000)} minutes.` };
+        return {
+            error: (await getTranslations("account"))("profile.errors.tooManyRequests", {
+                minutes: Math.ceil(throttle.retryAfterMs / 60000)
+            })
+        };
     }
     const result = await requestEmailVerification(user.id, parsed.data);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.email.verification-sent" });
     }
-    return result;
+    return localized(result);
 }
 
 /**
@@ -116,18 +122,25 @@ export async function checkUsernameAction(
 ): Promise<{ free?: boolean; problem?: string; suggestions?: string[]; error?: string }> {
     const user = await requireUser();
     const parsed = usernameCheckSchema.safeParse(input);
-    if (!parsed.success) return { error: "That is not a username" };
+    if (!parsed.success) return { error: (await getTranslations("account"))("profile.errors.notUsername") };
 
     const shape = core.usernameField.safeParse(parsed.data.username);
     if (!shape.success) {
         // The schema's own sentence, which is the one the form is already
         // showing. Answered rather than refused, so the field has one place to
         // read its verdict from.
-        return { free: false, problem: shape.error.issues[0]?.message ?? "That username cannot be used", suggestions: [] };
+        const problem = shape.error.issues[0]?.message;
+        return {
+            free: false,
+            problem: problem
+                ? (await localized({ error: problem })).error
+                : (await getTranslations("account"))("profile.errors.usernameUnusable"),
+            suggestions: []
+        };
     }
 
     const allowed = await rateLimit(`username-check:${user.id}`, USERNAME_CHECKS_PER_MINUTE, 60_000);
-    if (!allowed.ok) return { error: "Too many checks. Wait a moment." };
+    if (!allowed.ok) return { error: (await getTranslations("account"))("profile.errors.tooManyChecks") };
 
     const { checkUsername } = await import("@/lib/username-availability");
     const verdict = await checkUsername(user.id, shape.data, {
@@ -136,7 +149,11 @@ export async function checkUsernameAction(
         lastName: parsed.data.lastName,
         email: user.email
     });
-    return { free: verdict.free, problem: verdict.problem, suggestions: [...verdict.suggestions] };
+    return {
+        free: verdict.free,
+        problem: verdict.problem ? (await localized({ error: verdict.problem })).error : verdict.problem,
+        suggestions: [...verdict.suggestions]
+    };
 }
 
 export async function updateProfileAction(input: {
@@ -150,7 +167,7 @@ export async function updateProfileAction(input: {
     const user = await requireUser();
     if (await changesUsername(user.id, input.username)) {
         const blocked = await newDeviceRefusal(user);
-        if (blocked) return { error: blocked };
+        if (blocked) return localized({ error: blocked });
     }
     const result = await updateUserProfile(
         user.id,
@@ -173,7 +190,7 @@ export async function updateProfileAction(input: {
         revalidatePath("/account");
         revalidatePath("/account/details");
     }
-    return result;
+    return localized(result);
 }
 
 /**
@@ -208,7 +225,9 @@ const companiesSchema = z.object({
 export async function saveProfileStyleAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = core.profileStyleSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check what you picked" };
+    if (!parsed.success) {
+        return localized({ error: parsed.error.issues[0]?.message ?? (await getTranslations("account"))("profile.errors.checkPicked") });
+    }
 
     await setProfileStyle(user.id, parsed.data);
     // Everybody else's screens, without a reload and without telling anybody who
@@ -244,7 +263,9 @@ export async function saveProfileStyleAction(input: unknown): Promise<{ error?: 
 export async function saveCompaniesAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = companiesSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check what you typed" };
+    if (!parsed.success) {
+        return localized({ error: parsed.error.issues[0]?.message ?? (await getTranslations("account"))("profile.errors.checkTyped") });
+    }
 
     await setProfileCompanies(user.id, parsed.data.companies);
     await setProfileOrganizations(user.id, parsed.data.organizationIds);
@@ -270,7 +291,9 @@ const detailsSchema = z.object({
 export async function saveProfileDetailsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = detailsSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check what you typed" };
+    if (!parsed.success) {
+        return localized({ error: parsed.error.issues[0]?.message ?? (await getTranslations("account"))("profile.errors.checkTyped") });
+    }
     await saveProfileDetails(user.id, parsed.data);
     revalidatePath("/account");
     return {};
@@ -279,37 +302,39 @@ export async function saveProfileDetailsAction(input: unknown): Promise<{ error?
 export async function addEmailAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = emailField.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a valid email" };
+    if (!parsed.success) {
+        return localized({ error: parsed.error.issues[0]?.message ?? (await getTranslations("account"))("profile.errors.validEmail") });
+    }
     const result = await addUserEmail(user.id, parsed.data);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.email.added" });
         revalidatePath("/account/details");
     }
-    return result;
+    return localized(result);
 }
 
 export async function removeEmailAction(emailId: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = emailIdSchema.safeParse(emailId);
-    if (!parsed.success) return { error: "That address is no longer on your account." };
+    if (!parsed.success) return { error: (await getTranslations("account"))("profile.errors.addressGone") };
     const result = await removeUserEmail(user.id, parsed.data);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.email.removed" });
         revalidatePath("/account/details");
     }
-    return result;
+    return localized(result);
 }
 
 export async function setEmailRecoveryAction(emailId: unknown, recovery: boolean): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = emailIdSchema.safeParse(emailId);
-    if (!parsed.success) return { error: "That address is no longer on your account." };
+    if (!parsed.success) return { error: (await getTranslations("account"))("profile.errors.addressGone") };
     const result = await setUserEmailRecovery(user.id, parsed.data, recovery === true);
     if (!result.error) {
         await recordAudit({
@@ -318,19 +343,19 @@ export async function setEmailRecoveryAction(emailId: unknown, recovery: boolean
         });
         revalidatePath("/account/details");
     }
-    return result;
+    return localized(result);
 }
 
 export async function promoteEmailAction(emailId: unknown, currentPassword: string): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = emailIdSchema.safeParse(emailId);
-    if (!parsed.success) return { error: "That address is no longer on your account." };
+    if (!parsed.success) return { error: (await getTranslations("account"))("profile.errors.addressGone") };
     const result = await promoteUserEmail(auth, user.id, parsed.data, String(currentPassword));
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.email.primary-changed" });
         revalidatePath("/account/details");
     }
-    return result;
+    return localized(result);
 }

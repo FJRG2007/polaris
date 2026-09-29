@@ -31,6 +31,8 @@ import { recordAudit } from "@/lib/audit-service";
 import { evaluateNetworkRules } from "@/lib/network-rules";
 import { clientIp } from "@/lib/request-context";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
+import { localized } from "../security/action-messages";
 import { newDeviceRefusal } from "@/lib/device-grace";
 
 type ActionResult = { error?: string };
@@ -54,22 +56,29 @@ async function wouldLockOut(projected: EffectiveAccessRules): Promise<boolean> {
     return !decision.allowed;
 }
 
-const LOCKOUT_MESSAGE =
-    "That would block the address you are using right now. Add it to the rules first, or leave them empty.";
+/** The refusal for a change that would shut this very browser out. */
+async function lockout(): Promise<ActionResult> {
+    return { error: (await getTranslations("account"))("access.errors.lockout") };
+}
+
+/** A schema's first complaint, or the given sentence of this screen's own. */
+async function checkThe(issue: string | undefined, key: "access.errors.checkRules" | "access.errors.checkGroup"): Promise<ActionResult> {
+    return { error: issue ?? (await getTranslations("account"))(key) };
+}
 
 export async function saveSignInRulesAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = accessRulesSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the rules." };
+    if (!parsed.success) return checkThe(parsed.error.issues[0]?.message, "access.errors.checkRules");
 
     const groups = await prisma.accessGroup.findMany({
         where: { ownerId: user.id, id: { in: parsed.data.groupIds } },
         select: { allowedCidrs: true, allowedCountries: true, allowedContinents: true }
     });
     if (await wouldLockOut(unionRules([toColumns(parsed.data), ...groups]))) {
-        return { error: LOCKOUT_MESSAGE };
+        return lockout();
     }
 
     await updateSignInRules(user.id, parsed.data);
@@ -106,9 +115,9 @@ async function projectWithGroupChange(
 export async function createAccessGroupAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = accessGroupSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the group." };
+    if (!parsed.success) return checkThe(parsed.error.issues[0]?.message, "access.errors.checkGroup");
     // A new group is not attached to anything yet, so it cannot lock anyone out.
     const result = await createAccessGroup(user.id, parsed.data);
     if (result.error) return { error: result.error };
@@ -120,12 +129,12 @@ export async function createAccessGroupAction(input: unknown): Promise<ActionRes
 export async function updateAccessGroupAction(id: string, input: unknown): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const parsed = accessGroupSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the group." };
+    if (!parsed.success) return checkThe(parsed.error.issues[0]?.message, "access.errors.checkGroup");
 
     const projected = await projectWithGroupChange(user.id, String(id), toColumns(parsed.data));
-    if (await wouldLockOut(projected)) return { error: LOCKOUT_MESSAGE };
+    if (await wouldLockOut(projected)) return lockout();
 
     const result = await updateAccessGroup(user.id, String(id), parsed.data);
     if (result.error) return result;
@@ -137,9 +146,9 @@ export async function updateAccessGroupAction(id: string, input: unknown): Promi
 export async function deleteAccessGroupAction(id: string): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
-    if (blocked) return { error: blocked };
+    if (blocked) return localized({ error: blocked });
     const projected = await projectWithGroupChange(user.id, String(id), null);
-    if (await wouldLockOut(projected)) return { error: LOCKOUT_MESSAGE };
+    if (await wouldLockOut(projected)) return lockout();
 
     await deleteAccessGroup(user.id, String(id));
     await recordAudit({ actorId: user.id, action: "account.access-group.deleted", targetId: String(id) });

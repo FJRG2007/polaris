@@ -15,6 +15,8 @@ import { namePlaces } from "@polaris/core";
 import { useRouter } from "next/navigation";
 import type { AccessGroupView } from "@polaris/auth";
 import { useConfirm } from "@/components/confirm-dialog";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Globe, Pencil, Plus, Trash2 } from "lucide-react";
 import {
     createAccessGroupAction,
@@ -43,20 +45,24 @@ import {
 } from "@polaris/ui";
 
 /** One-line summary of what a rule set restricts. */
-function summarize(value: {
-    allowedCidrs: string[];
-    allowedCountries: string[];
-    allowedContinents: string[];
-    groupIds?: string[];
-}): string {
+function summarize(
+    value: {
+        allowedCidrs: string[];
+        allowedCountries: string[];
+        allowedContinents: string[];
+        groupIds?: string[];
+    },
+    t: NamespaceTranslator<"account">
+): string {
     const parts: string[] = [];
-    if (value.groupIds?.length) parts.push(`${value.groupIds.length} group${value.groupIds.length === 1 ? "" : "s"}`);
+    if (value.groupIds?.length) parts.push(t("access.summary.groups", { count: value.groupIds.length }));
     if (value.allowedCidrs.length) {
-        parts.push(`${value.allowedCidrs.length} address rule${value.allowedCidrs.length === 1 ? "" : "s"}`);
+        parts.push(t("access.summary.addresses", { count: value.allowedCidrs.length }));
     }
     const places = value.allowedCountries.length + value.allowedContinents.length;
-    if (places) parts.push(`${places} location${places === 1 ? "" : "s"}`);
-    return parts.length > 0 ? parts.join(", ") : "No restriction - reachable from anywhere";
+    if (places) parts.push(t("access.summary.locations", { count: places }));
+    // A list of counts, one per kind of rule.
+    return parts.length > 0 ? parts.join(", ") : t("access.summary.none");
 }
 
 /**
@@ -86,6 +92,7 @@ export function AccessView({
     enforced: { allowedCidrs: string[]; allowedCountries: string[]; allowedContinents: string[] };
 }) {
     const router = useRouter();
+    const t = useTranslations("account");
     const [confirm, confirmElement] = useConfirm();
     const [signInOpen, setSignInOpen] = useState(false);
     const [groupDialog, setGroupDialog] = useState<{ mode: "create" } | { mode: "edit"; group: AccessGroupView } | null>(
@@ -96,12 +103,10 @@ export function AccessView({
 
     async function removeGroup(group: AccessGroupView) {
         const ok = await confirm({
-            title: `Delete "${group.name}"?`,
+            title: t("access.deleteTitle", { name: group.name }),
             description:
-                group.apiKeyCount > 0 || group.appliedToSignIn
-                    ? "It is in use; the rules it contributes will stop applying."
-                    : "This cannot be undone.",
-            confirmLabel: "Delete",
+                group.apiKeyCount > 0 || group.appliedToSignIn ? t("access.deleteInUse") : t("access.deleteFinal"),
+            confirmLabel: t("apiKeys.list.delete"),
             danger: true
         });
         if (!ok) return;
@@ -117,24 +122,31 @@ export function AccessView({
             <Card>
                 <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
-                        <h2 className="text-sm font-medium">Sign-in restrictions</h2>
-                        <p className="text-xs text-muted-foreground">{summarize(signInRules)}</p>
+                        <h2 className="text-sm font-medium">{t("access.signIn.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{summarize(signInRules, t)}</p>
                         {currentIp ? (
                             <p className="pt-1 text-xs text-muted-foreground">
-                                You are connecting from <span className="font-mono">{currentIp}</span>
+                                {t.rich("access.connectingFrom", {
+                                    ip: (chunks) => (
+                                        <span key="ip" className="font-mono">
+                                            {chunks}
+                                        </span>
+                                    ),
+                                    address: currentIp
+                                })}
                             </p>
                         ) : null}
                         {/* Not editable here, but a sign-in it refuses is otherwise
                             unexplainable from this page. */}
                         {enforcedSummary ? (
                             <p className="pt-1 text-xs text-warning">
-                                An administrator also limits this account to {enforcedSummary}.
+                                {t("access.enforced", { rules: enforcedSummary })}
                             </p>
                         ) : null}
                     </div>
                     <Button onClick={() => setSignInOpen(true)}>
                         <Pencil className="size-4" />
-                        Edit
+                        {t("apiKeys.list.edit")}
                     </Button>
                 </CardBody>
             </Card>
@@ -143,20 +155,18 @@ export function AccessView({
                 <CardBody className="flex flex-col gap-3">
                     <div className="flex items-center justify-between gap-2">
                         <div>
-                            <h2 className="text-sm font-medium">Access groups</h2>
-                            <p className="text-xs text-muted-foreground">
-                                Named rule sets you can attach to your sign-ins and to API keys.
-                            </p>
+                            <h2 className="text-sm font-medium">{t("access.groups.title")}</h2>
+                            <p className="text-xs text-muted-foreground">{t("access.groups.description")}</p>
                         </div>
                         <Button size="sm" onClick={() => setGroupDialog({ mode: "create" })}>
                             <Plus className="size-4" />
-                            New group
+                            {t("access.groups.new")}
                         </Button>
                     </div>
 
                     {groups.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            No groups yet. Create one to reuse the same allowlist in more than one place.
+                            {t("access.groups.empty")}
                         </p>
                     ) : (
                         groups.map((group) => (
@@ -169,15 +179,15 @@ export function AccessView({
                                     <div className="min-w-0">
                                         <p className="flex items-center gap-2 text-sm">
                                             <span className="truncate">{group.name}</span>
-                                            {group.appliedToSignIn ? <Badge variant="primary">Sign-in</Badge> : null}
+                                            {group.appliedToSignIn ? <Badge variant="primary">{t("access.groups.signIn")}</Badge> : null}
                                             {group.apiKeyCount > 0 ? (
                                                 <Badge>
-                                                    {group.apiKeyCount} key{group.apiKeyCount === 1 ? "" : "s"}
+                                                    {t("access.groups.keys", { count: group.apiKeyCount })}
                                                 </Badge>
                                             ) : null}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {group.description || summarize(group)}
+                                            {group.description || summarize(group, t)}
                                         </p>
                                     </div>
                                 </div>
@@ -185,7 +195,7 @@ export function AccessView({
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        aria-label={`Edit ${group.name}`}
+                                        aria-label={t("apiKeys.list.editNamed", { name: group.name })}
                                         onClick={() => setGroupDialog({ mode: "edit", group })}
                                     >
                                         <Pencil className="size-4" />
@@ -193,7 +203,7 @@ export function AccessView({
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        aria-label={`Delete ${group.name}`}
+                                        aria-label={t("access.groups.deleteNamed", { name: group.name })}
                                         onClick={() => void removeGroup(group)}
                                     >
                                         <Trash2 className="size-4" />
@@ -241,6 +251,8 @@ function SignInRulesDialog({
     initial: AccessRulesValue;
     onSaved: () => void;
 }) {
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
     const [value, setValue] = useState<AccessRulesValue>(initial);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -271,26 +283,23 @@ function SignInRulesDialog({
         >
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Sign-in restrictions</DialogTitle>
-                    <DialogDescription>
-                        Leave everything empty to allow sign-in from anywhere. Otherwise a sign-in must match your
-                        address rules and your allowed locations.
-                    </DialogDescription>
+                    <DialogTitle>{t("access.signIn.title")}</DialogTitle>
+                    <DialogDescription>{t("access.signIn.description")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
                     <AccessRulesEditor value={value} groups={groups} onChange={setValue} />
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     {accessRulesAreEmpty(value) ? (
                         <p className="text-xs text-muted-foreground">
-                            No restriction: your account can be signed in from any address.
+                            {t("access.signIn.none")}
                         </p>
                     ) : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button onClick={() => void save()} disabled={busy || accessRulesEqual(value, initial)}>
-                            {busy ? "Saving..." : "Save"}
+                            {busy ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
                 </div>
@@ -310,6 +319,8 @@ function GroupDialog({
     group: AccessGroupView | null;
     onSaved: () => void;
 }) {
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
     const [name, setName] = useState(group?.name ?? "");
     const [description, setDescription] = useState(group?.description ?? "");
     const [value, setValue] = useState<AccessRulesValue>(
@@ -362,26 +373,26 @@ function GroupDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{group ? `Edit "${group.name}"` : "New access group"}</DialogTitle>
-                    <DialogDescription>
-                        A named set of addresses and locations you can reuse anywhere access is restricted.
-                    </DialogDescription>
+                    <DialogTitle>
+                        {group ? t("access.groups.editTitle", { name: group.name }) : t("access.groups.newTitle")}
+                    </DialogTitle>
+                    <DialogDescription>{t("access.groups.dialogDescription")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Name
+                        {t("apiKeys.list.columns.name")}
                         <Input
                             value={name}
-                            placeholder="Home"
+                            placeholder={t("access.groups.namePlaceholder")}
                             onChange={(event) => setName(event.target.value)}
                             autoComplete="off"
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        Description
+                        {t("apiKeys.form.description")}
                         <Input
                             value={description}
-                            placeholder="Optional"
+                            placeholder={t("access.groups.optional")}
                             onChange={(event) => setDescription(event.target.value)}
                             autoComplete="off"
                         />
@@ -390,10 +401,10 @@ function GroupDialog({
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button onClick={() => void save()} disabled={busy || name.trim() === "" || unchanged}>
-                            {busy ? "Saving..." : group ? "Save changes" : "Create group"}
+                            {busy ? tc("actions.saving") : group ? t("apiKeys.form.saveChanges") : t("access.groups.create")}
                         </Button>
                     </div>
                 </div>

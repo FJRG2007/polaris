@@ -25,34 +25,9 @@
 import * as core from "@polaris/core";
 import { ColorPicker } from "@polaris/ui";
 import { Choice } from "./appearance-choice";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { nameLookCss, nameStyleClass } from "@/lib/profile-style-css";
 
-/** What each effect is called on the button it paints. */
-const EFFECT_LABELS: Record<core.NameEffect, string> = {
-    plain: "None",
-    solid: "Solid",
-    gradient: "Gradient",
-    neon: "Neon",
-    toon: "Toon",
-    pop: "Pop",
-    gummy: "Gummy",
-    prism: "Prism"
-};
-
-const FONT_LABELS: Record<core.NameFont, string> = {
-    sans: "Default",
-    caps: "Small caps",
-    serif: "Serif",
-    mono: "Mono",
-    rounded: "Rounded",
-    hand: "Handwritten",
-    comic: "Comic",
-    script: "Script",
-    block: "Block",
-    bubble: "Bubble",
-    techno: "Techno",
-    pixel: "Pixel"
-};
 
 /** Where a name starts when somebody turns one on, so the first thing they see
  *  is a painted name rather than black on black. */
@@ -92,6 +67,7 @@ export function NameEffectPicker({
     onChange: (next: string | null) => void;
 }) {
     const { effect, font, first, second } = read(value);
+    const t = useTranslations("account");
     const put = (next: core.NameEffect, colors: string[] = [first, second]) =>
         onChange(compose(next, font, colors));
 
@@ -103,7 +79,7 @@ export function NameEffectPicker({
                         key={entry}
                         chosen={effect === entry}
                         onClick={() => put(entry)}
-                        label={EFFECT_LABELS[entry]}
+                        label={t(`appearance.nameEffects.${entry}` as const)}
                         // Painted as the thing it selects, in the colours
                         // already chosen and the face already chosen, so the
                         // choice is made by looking rather than by guessing.
@@ -124,13 +100,13 @@ export function NameEffectPicker({
             {core.effectTakesColor(effect) ? (
                 <div className="flex flex-wrap items-center gap-3">
                     <ColorPicker
-                        label={core.effectTakesTwo(effect) ? "From" : "Colour"}
+                        label={core.effectTakesTwo(effect) ? t("appearance.from") : t("appearance.colour")}
                         value={first}
                         onChange={(next) => put(effect, [next, second])}
                     />
                     {core.effectTakesTwo(effect) ? (
                         <ColorPicker
-                            label="To"
+                            label={t("appearance.to")}
                             value={second}
                             onChange={(next) => put(effect, [first, next])}
                         />
@@ -149,6 +125,7 @@ export function NameFontPicker({
     onChange: (next: string | null) => void;
 }) {
     const { effect, font, first, second } = read(value);
+    const t = useTranslations("account");
 
     return (
         <div className="flex flex-wrap gap-1.5">
@@ -157,7 +134,7 @@ export function NameFontPicker({
                     key={entry}
                     chosen={font === entry}
                     onClick={() => onChange(compose(effect, entry, [first, second]))}
-                    label={FONT_LABELS[entry]}
+                    label={t(`appearance.nameFonts.${entry}` as const)}
                     // Set in the face it selects and in no colour of its own:
                     // this row answers "what does my name look like", and a row
                     // of eleven words in eleven colours answers a question

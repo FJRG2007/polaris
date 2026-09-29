@@ -15,6 +15,7 @@
  * The failure this replaces is a card that previews one thing and edits another.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BLANK_AVATAR_ETAG } from "@/lib/avatar-blank";
@@ -123,14 +124,14 @@ afterEach(() => {
 
 describe("the profile pictures card", () => {
     it("draws the band and the face together, as the profile does", () => {
-        const { container } = render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />);
+        const { container } = render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />, { wrapper: MessagesWrapper });
         expect(container.querySelector(`img[src='/api/banner/${PERSON.userId}']`)).not.toBeNull();
         expect(container.querySelector(`img[src='/api/avatar/${PERSON.userId}']`)).not.toBeNull();
         expect(screen.getByText("Ada Lovelace")).toBeDefined();
     });
 
     it("puts a handle on each picture rather than a row of buttons under both", () => {
-        render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />);
+        render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />, { wrapper: MessagesWrapper });
         expect(screen.getByRole("button", { name: "Edit photo" })).toBeDefined();
         expect(screen.getByRole("button", { name: "Edit banner" })).toBeDefined();
     });
@@ -140,7 +141,7 @@ describe("the profile pictures card", () => {
     // opposite of what this card shipped with, where the ordinary press dropped
     // a menu out of the corner of a 72-pixel circle.
     it("opens a dialog when the picture is pressed", async () => {
-        render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />);
+        render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />, { wrapper: MessagesWrapper });
         const rows = await dialogFor("Edit photo");
         expect(rows.some((row) => row.startsWith("Reframe"))).toBe(true);
         expect(rows.some((row) => row.startsWith("Replace"))).toBe(true);
@@ -148,16 +149,16 @@ describe("the profile pictures card", () => {
     });
 
     it("opens the menu when the picture is right-clicked", async () => {
-        render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />);
+        render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />, { wrapper: MessagesWrapper });
         expect(await menuFor("Edit photo")).toEqual(["Reframe", "Replace", "Remove"]);
     });
 
     it("offers only to upload the one that is not there, on both surfaces", async () => {
-        render(<ProfilePicturesCard {...PERSON} hasPhoto={false} hasBanner={false} />);
+        render(<ProfilePicturesCard {...PERSON} hasPhoto={false} hasBanner={false} />, { wrapper: MessagesWrapper });
         expect(await menuFor("Edit banner")).toEqual(["Upload banner"]);
         cleanup();
 
-        render(<ProfilePicturesCard {...PERSON} hasPhoto={false} hasBanner={false} />);
+        render(<ProfilePicturesCard {...PERSON} hasPhoto={false} hasBanner={false} />, { wrapper: MessagesWrapper });
         const rows = await dialogFor("Edit banner");
         expect(rows.filter((row) => row.startsWith("Upload banner"))).toHaveLength(1);
         expect(rows.some((row) => row.startsWith("Remove"))).toBe(false);
@@ -169,7 +170,7 @@ describe("the profile pictures card", () => {
         // kept rather than pretending to have the original back.
         const asked = stubTheBrowser(() => pictureReply());
 
-        render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />);
+        render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />, { wrapper: MessagesWrapper });
         await chooseInDialog("Edit photo", /^Reframe/);
 
         expect(await screen.findByText("Frame the picture")).toBeDefined();
@@ -183,7 +184,7 @@ describe("the profile pictures card", () => {
         // one-pixel picture and post it over the photo that is still there.
         stubTheBrowser(() => pictureReply(BLANK_AVATAR_ETAG));
 
-        render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />);
+        render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />, { wrapper: MessagesWrapper });
         await chooseInDialog("Edit photo", /^Reframe/);
 
         expect(await screen.findByText("Could not open that picture again")).toBeDefined();

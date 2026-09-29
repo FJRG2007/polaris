@@ -23,6 +23,7 @@ import { useRouter } from "next/navigation";
 import { EmailsView } from "../emails-view";
 import { Button, Input } from "@polaris/ui";
 import { SectionCard } from "../section-card";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { updateProfileAction } from "../actions";
 import type { UserEmailView, UserPhoneView } from "@polaris/auth";
 import { useState, type ChangeEvent, type FormEvent } from "react";
@@ -76,6 +77,8 @@ export function AccountView({
     canSendWhatsApp: boolean;
 }) {
     const router = useRouter();
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
 
     const stored: Named = { firstName, lastName };
     const [named, setNamed] = useState<Named>(stored);
@@ -96,7 +99,7 @@ export function AccountView({
             lastName: named.lastName
         });
         setBusy(false);
-        setResult(answer.error ? answer : { ok: "Account updated." });
+        setResult(answer.error ? answer : { ok: t("details.accountUpdated") });
         if (!answer.error) {
             setSaved(named);
             router.refresh();
@@ -106,16 +109,16 @@ export function AccountView({
     return (
         <div className="flex flex-col gap-4">
             <SectionCard
-                title="Your name"
-                description="Held on the account. Not what other people see, unless you say so in Privacy."
+                title={t("details.name.title")}
+                description={t("details.name.description")}
             >
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1 text-sm">
-                            First name
+                            {t("details.name.first")}
                             <Input
                                 value={named.firstName}
-                                placeholder="Optional"
+                                placeholder={t("access.groups.optional")}
                                 autoComplete="given-name"
                                 autoCapitalize="words"
                                 autoCorrect="off"
@@ -139,10 +142,10 @@ export function AccountView({
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Last name
+                            {t("details.name.last")}
                             <Input
                                 value={named.lastName}
-                                placeholder="Optional"
+                                placeholder={t("access.groups.optional")}
                                 autoComplete="family-name"
                                 autoCapitalize="words"
                                 autoCorrect="off"
@@ -163,15 +166,15 @@ export function AccountView({
                         {result?.error ? <p className="text-sm text-danger">{result.error}</p> : null}
                         {result?.ok ? <p className="text-sm text-success">{result.ok}</p> : null}
                         <Button type="submit" disabled={busy || !changed} className="ml-auto">
-                            {busy ? "Saving..." : "Save"}
+                            {busy ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
                 </form>
             </SectionCard>
 
             <SectionCard
-                title="Email addresses"
-                description="The address you sign in with, and any others this account owns."
+                title={t("emails.title")}
+                description={t("emails.description")}
             >
                 <EmailsView emails={emails} mailReady={mailReady} />
             </SectionCard>

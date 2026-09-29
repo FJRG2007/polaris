@@ -132,6 +132,42 @@
         "page": {
             "title": "Access rules",
             "intro": "Restrict where your account and your API keys may be used from."
+        },
+        "summary": {
+            "groups": "{count, plural, one {# group} other {# groups}}",
+            "addresses": "{count, plural, one {# address rule} other {# address rules}}",
+            "locations": "{count, plural, one {# location} other {# locations}}",
+            "none": "No restriction - reachable from anywhere"
+        },
+        "deleteTitle": "Delete \"{name}\"?",
+        "deleteInUse": "It is in use; the rules it contributes will stop applying.",
+        "deleteFinal": "This cannot be undone.",
+        "signIn": {
+            "title": "Sign-in restrictions",
+            "description": "Leave everything empty to allow sign-in from anywhere. Otherwise a sign-in must match your address rules and your allowed locations.",
+            "none": "No restriction: your account can be signed in from any address."
+        },
+        "connectingFrom": "You are connecting from <ip>{address}</ip>",
+        "enforced": "An administrator also limits this account to {rules}.",
+        "groups": {
+            "title": "Access groups",
+            "description": "Named rule sets you can attach to your sign-ins and to API keys.",
+            "new": "New group",
+            "empty": "No groups yet. Create one to reuse the same allowlist in more than one place.",
+            "signIn": "Sign-in",
+            "keys": "{count, plural, one {# key} other {# keys}}",
+            "deleteNamed": "Delete {name}",
+            "editTitle": "Edit \"{name}\"",
+            "newTitle": "New access group",
+            "dialogDescription": "A named set of addresses and locations you can reuse anywhere access is restricted.",
+            "namePlaceholder": "Home",
+            "optional": "Optional",
+            "create": "Create group"
+        },
+        "errors": {
+            "lockout": "That would block the address you are using right now. Add it to the rules first, or leave them empty.",
+            "checkRules": "Check the rules.",
+            "checkGroup": "Check the group."
         }
     },
     "activity": {
@@ -356,6 +392,38 @@
         "page": {
             "title": "Account",
             "intro": "How you sign in and how Polaris reaches you. None of it is on your profile."
+        },
+        "title": "About you",
+        "description": "What sits beside your name on your page, and where else you can be found.",
+        "headline": "Headline",
+        "headlineHint": "One line, under your name. What you do, not your life story - the paragraph goes in the description above.",
+        "pronouns": "Pronouns",
+        "preferNot": "Prefer not to say",
+        "ownWords": "In my own words",
+        "pronounsPlaceholder": "e.g. ze/hir",
+        "yourPronouns": "Your pronouns",
+        "pronounsHint": "Drawn beside your name. Nothing is drawn when you have not said.",
+        "links": {
+            "title": "Links",
+            "namePlaceholder": "Name (optional)",
+            "name": "Link {number} name",
+            "address": "Link {number} address",
+            "remove": "Remove link {number}",
+            "add": "Add a link",
+            "hint": "A portfolio, a site, a linktree. Typing the site is enough - https:// is added for you - and an address with no name is drawn as its own host.",
+            "problems": {
+                "empty": "Enter a web address",
+                "invalid": "That is not a web address",
+                "scheme": "Only http:// and https:// addresses",
+                "noSite": "That address has no site in it"
+            }
+        },
+        "accountUpdated": "Account updated.",
+        "name": {
+            "title": "Your name",
+            "description": "Held on the account. Not what other people see, unless you say so in Privacy.",
+            "first": "First name",
+            "last": "Last name"
         }
     },
     "devices": {
@@ -485,6 +553,210 @@
         "page": {
             "title": "Profile",
             "intro": "How you appear to everybody else in Polaris."
+        },
+        "updated": "Profile updated.",
+        "cardDescription": "Your name, your username, and what your page says.",
+        "displayName": "Display name",
+        "displayNameHint": "Shown wherever your name appears. It does not have to be your name.",
+        "usernameLocked": "Other people find and address you by this, so it can only be changed once in a while. You can change it again in {when}.",
+        "aboutHint": "Shown to anybody who opens your profile.",
+        "username": "Username",
+        "usernameFree": "{username} is available",
+        "usernameHint": "3-30 characters: letters, numbers, - or _. Used to sign in.",
+        "try": "Try",
+        "errors": {
+            "unknownAddress": "Unknown address.",
+            "tooManyRequests": "Too many requests. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+            "notUsername": "That is not a username",
+            "usernameUnusable": "That username cannot be used",
+            "usernameTaken": "That username is taken",
+            "tooManyChecks": "Too many checks. Wait a moment.",
+            "checkPicked": "Check what you picked",
+            "checkTyped": "Check what you typed",
+            "validEmail": "Enter a valid email",
+            "addressGone": "That address is no longer on your account."
         }
+    },
+    "pictures": {
+        "errors": {
+            "notSaved": "Could not save that",
+            "unreachable": "Could not reach the server",
+            "reopen": "Could not open that picture again",
+            "animated": "A moving picture cannot be reframed - replace it to change how it sits"
+        },
+        "reframe": "Reframe",
+        "reframeNote": "Move and scale what is already there",
+        "replace": "Replace",
+        "upload": "Upload {kind, select, banner {banner} other {photo}}",
+        "uploadNote": "Choose a picture from this device - a GIF keeps moving",
+        "remove": "Remove",
+        "removeNote": "Go back to the default {kind, select, banner {banner} other {photo}}",
+        "edit": "Edit {kind, select, banner {banner} other {photo}}",
+        "title": "{kind, select, banner {Banner} other {Photo}}",
+        "cardTitle": "Photo and banner",
+        "personHint": "How your profile looks to everybody else. Without a photo, Polaris uses the picture your email address has on Gravatar and your initials if it has none; without a banner, a colour taken from your photo.",
+        "orgHint": "How this organization looks wherever it appears - the switcher, its people's rosters, and its own page. Without a photo, Polaris draws its initials; without a banner, a colour taken from the photo."
+    },
+    "appearance": {
+        "title": "Appearance",
+        "from": "From",
+        "to": "To",
+        "colour": "Colour",
+        "none": "None",
+        "saved": "Saved.",
+        "clearAll": "Clear it all",
+        "banner": {
+            "label": "Banner",
+            "hint": "The band across the top of your profile, under your banner picture.",
+            "fromPhoto": "From your photo",
+            "oneColour": "One colour",
+            "twoColours": "Two colours",
+            "background": "Background",
+            "angle": "Angle",
+            "angleLabel": "The angle the two colours run at"
+        },
+        "decoration": {
+            "label": "Avatar decoration",
+            "hint": "Drawn on your picture wherever you're introduced - your profile, messages, member lists - not in pickers or tables. Every one of them is free.",
+            "moves": "Moves"
+        },
+        "nameplate": {
+            "label": "Nameplate",
+            "hint": "Where your name appears in a list of people, like the members of a conversation."
+        },
+        "nameStyle": {
+            "label": "Display name style",
+            "hint": "What the paint does, and in which colours. Nothing here changes the size, so a name is never taller than the row it is in."
+        },
+        "font": {
+            "label": "Font",
+            "hint": "The letterforms your display name is set in, wherever it appears. Only downloaded when somebody's name on the screen is actually set in one."
+        },
+        "effect": {
+            "label": "Profile effect",
+            "hint": "An edge, a slow band of light, or both. It stops for anybody who has asked their machine for less motion."
+        },
+        "nameEffects": {
+            "plain": "None",
+            "solid": "Solid",
+            "gradient": "Gradient",
+            "neon": "Neon",
+            "toon": "Toon",
+            "pop": "Pop",
+            "gummy": "Gummy",
+            "prism": "Prism"
+        },
+        "nameFonts": {
+            "sans": "Default",
+            "caps": "Small caps",
+            "serif": "Serif",
+            "mono": "Mono",
+            "rounded": "Rounded",
+            "hand": "Handwritten",
+            "comic": "Comic",
+            "script": "Script",
+            "block": "Block",
+            "bubble": "Bubble",
+            "techno": "Techno",
+            "pixel": "Pixel"
+        },
+        "decorations": {
+            "aurora": "Aurora",
+            "ember": "Ember",
+            "frost": "Frost",
+            "gold": "Gold",
+            "moss": "Moss",
+            "rose": "Rose",
+            "ink": "Ink",
+            "orbit": "Orbit",
+            "pulse": "Pulse",
+            "circuit": "Circuit",
+            "nova": "Nova",
+            "bloom": "Bloom",
+            "eclipse": "Eclipse",
+            "tide": "Tide",
+            "cat": "Cat ears",
+            "horns": "Horns",
+            "wings": "Wings",
+            "flowers": "Flower crown",
+            "headphones": "Headphones",
+            "halo": "Halo",
+            "crown": "Crown"
+        },
+        "nameplates": {
+            "dusk": "Dusk",
+            "tide": "Tide",
+            "ember": "Ember",
+            "moss": "Moss",
+            "slate": "Slate",
+            "gold": "Gold",
+            "rose": "Rose"
+        },
+        "effects": {
+            "sheen": "Sheen",
+            "halo": "Halo",
+            "gilded": "Gilded",
+            "current": "Current",
+            "coal": "Coal"
+        }
+    },
+    "companies": {
+        "title": "Where you work",
+        "seePage": "See your page",
+        "description": "Who sees any of this is one setting on your privacy screen. Nothing here is shown until you tick it.",
+        "organizations": "Organizations here. These carry a tick on your page: Polaris holds the roster and you are on it.",
+        "elsewhere": "Somewhere else",
+        "addAnother": "Add another",
+        "company": "Company {number}",
+        "remove": "Remove {name}",
+        "typedHint": "Drawn without a tick, because Polaris knows nothing about these beyond that you typed them."
+    },
+    "emails": {
+        "title": "Email addresses",
+        "description": "The address you sign in with, and any others this account owns.",
+        "linkSent": "Confirmation link sent to {email}.",
+        "removeTitle": "Remove this address?",
+        "removeDescription": "{email} will no longer be on your account.",
+        "remove": "Remove",
+        "primary": "Primary",
+        "recovery": "Recovery",
+        "verified": "Verified",
+        "unverified": "Unverified",
+        "noChannel": "No email channel is set up, so Polaris cannot send the link.",
+        "verify": "Verify",
+        "stopRecovery": "Stop using {email} for recovery",
+        "useRecovery": "Use {email} for recovery",
+        "notForRecovery": "Not for recovery",
+        "forRecovery": "Use for recovery",
+        "makePrimaryNamed": "Make {email} primary",
+        "makePrimary": "Make primary",
+        "removeNamed": "Remove {email}",
+        "add": "Add",
+        "duplicate": "That address is already on your account.",
+        "recoveryHint": "A recovery address is where an operator can reach you if you lose access.",
+        "promoteTitle": "Make this your primary address?",
+        "promoteDescription": "You will sign in with {email}. The current one stays on your account.",
+        "currentPassword": "Current password",
+        "working": "Working..."
+    },
+    "phone": {
+        "title": "Phone number",
+        "description": "Confirmed through one of your own WhatsApp channels, which is also what carries a sign-in code when you use one.",
+        "remove": "Remove",
+        "change": "Change",
+        "add": "Add",
+        "confirmed": "Confirmed",
+        "unconfirmed": "Unconfirmed",
+        "code": "Confirmation code",
+        "confirm": "Confirm",
+        "codeSent": "Code sent on WhatsApp.",
+        "sendCode": "Send code",
+        "checkNumber": "Check the number.",
+        "changeTitle": "Change your number",
+        "addTitle": "Add a phone number",
+        "setDescription": "It starts unconfirmed. Confirm it before it can carry a sign-in code.",
+        "removeTitle": "Remove your number",
+        "removeDescription": "Confirm your password. WhatsApp stops being one of your sign-in options.",
+        "removing": "Removing..."
     }
 }

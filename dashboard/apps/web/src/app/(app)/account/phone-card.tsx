@@ -35,10 +35,15 @@ import {
     verifyPhoneAction
 } from "./security/two-factor-actions";
 import { Feedback } from "./security/setting-card";
+import { knownMessage } from "./security/known-sentences";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CodeInput, isWholeCode } from "@/components/code-input";
 
 export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; canSend: boolean }) {
     const router = useRouter();
+    const t = useTranslations("account");
+    const ts = useTranslations("accountSecurity");
+    const tv = useTranslations("validation");
     const [dialog, setDialog] = useState<"set" | "remove" | null>(null);
     const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
@@ -64,7 +69,8 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
         event.preventDefault();
         const parsed = otpCodeField.safeParse(code);
         if (!parsed.success) {
-            setError(parsed.error.issues[0]?.message ?? "Enter the 6-digit code.");
+            const issue = parsed.error.issues[0]?.message;
+            setError(issue ? knownMessage(ts, tv, issue) : ts("errors.enterCode"));
             return;
         }
         if (await run(() => verifyPhoneAction(parsed.data))) setCode("");
@@ -75,19 +81,16 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <h2 className="text-sm font-medium">Phone number</h2>
-                        <p className="text-xs text-muted-foreground">
-                            Confirmed through one of your own WhatsApp channels, which is also what
-                            carries a sign-in code when you use one.
-                        </p>
+                        <h2 className="text-sm font-medium">{t("phone.title")}</h2>
+                        <p className="text-xs text-muted-foreground">{t("phone.description")}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                         {phone ? (
                             <Button variant="ghost" size="sm" onClick={() => setDialog("remove")}>
-                                Remove
+                                {t("phone.remove")}
                             </Button>
                         ) : null}
-                        <Button onClick={() => setDialog("set")}>{phone ? "Change" : "Add"}</Button>
+                        <Button onClick={() => setDialog("set")}>{phone ? t("phone.change") : t("phone.add")}</Button>
                     </div>
                 </div>
 
@@ -96,9 +99,9 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                         <Phone className="size-4 shrink-0 text-muted-foreground" />
                         <span className="truncate text-sm">{phone.phone}</span>
                         {phone.verified ? (
-                            <Badge className="border-success-edge text-success">Confirmed</Badge>
+                            <Badge className="border-success-edge text-success">{t("phone.confirmed")}</Badge>
                         ) : (
-                            <Badge className="border-warning-edge text-warning">Unconfirmed</Badge>
+                            <Badge className="border-warning-edge text-warning">{t("phone.unconfirmed")}</Badge>
                         )}
                     </div>
                 ) : null}
@@ -108,11 +111,11 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                         <div className="flex items-start gap-2">
                             <CodeInput
                                 value={code}
-                                aria-label="Confirmation code"
+                                aria-label={t("phone.code")}
                                 onValueChange={setCode}
                             />
                             <Button type="submit" disabled={busy || !isWholeCode(code)}>
-                                Confirm
+                                {t("phone.confirm")}
                             </Button>
                             <Button
                                 type="button"
@@ -121,11 +124,11 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                                 title={
                                     canSend
                                         ? undefined
-                                        : "Connect one of your WhatsApp channels first - the code is sent through it."
+                                        : ts("errors.connectWhatsAppFirst")
                                 }
-                                onClick={() => void run(sendPhoneCodeAction, "Code sent on WhatsApp.")}
+                                onClick={() => void run(sendPhoneCodeAction, t("phone.codeSent"))}
                             >
-                                Send code
+                                {t("phone.sendCode")}
                             </Button>
                         </div>
                     </form>
@@ -167,6 +170,10 @@ function SetPhoneDialog({
     onOpenChange: (open: boolean) => void;
     onDone: () => void;
 }) {
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
+    const ts = useTranslations("accountSecurity");
+    const tv = useTranslations("validation");
     const [phone, setPhone] = useState(current);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -176,7 +183,8 @@ function SetPhoneDialog({
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!candidate.success) {
-            setError(candidate.error.issues[0]?.message ?? "Check the number.");
+            const issue = candidate.error.issues[0]?.message;
+            setError(issue ? knownMessage(ts, tv, issue) : t("phone.checkNumber"));
             return;
         }
         const password = String(new FormData(event.currentTarget).get("password") ?? "");
@@ -195,14 +203,12 @@ function SetPhoneDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>{current ? "Change your number" : "Add a phone number"}</DialogTitle>
-                    <DialogDescription>
-                        It starts unconfirmed. Confirm it before it can carry a sign-in code.
-                    </DialogDescription>
+                    <DialogTitle>{current ? t("phone.changeTitle") : t("phone.addTitle")}</DialogTitle>
+                    <DialogDescription>{t("phone.setDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Phone number
+                        {t("phone.title")}
                         <Input
                             value={phone}
                             placeholder="+34600111222"
@@ -211,21 +217,21 @@ function SetPhoneDialog({
                         />
                         {phone && !candidate.success ? (
                             <span className="text-xs text-danger">
-                                {candidate.error.issues[0]?.message}
+                                {knownMessage(ts, tv, candidate.error.issues[0]?.message)}
                             </span>
                         ) : null}
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        Current password
+                        {t("emails.currentPassword")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={busy || !candidate.success}>
-                            {busy ? "Saving..." : "Save"}
+                            {busy ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
                 </form>
@@ -243,6 +249,8 @@ function RemovePhoneDialog({
     onOpenChange: (open: boolean) => void;
     onDone: () => void;
 }) {
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -264,23 +272,21 @@ function RemovePhoneDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Remove your number</DialogTitle>
-                    <DialogDescription>
-                        Confirm your password. WhatsApp stops being one of your sign-in options.
-                    </DialogDescription>
+                    <DialogTitle>{t("phone.removeTitle")}</DialogTitle>
+                    <DialogDescription>{t("phone.removeDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        Current password
+                        {t("emails.currentPassword")}
                         <Input name="password" type="password" required autoComplete="current-password" />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" variant="danger" disabled={busy}>
-                            {busy ? "Removing..." : "Remove"}
+                            {busy ? t("phone.removing") : t("phone.remove")}
                         </Button>
                     </div>
                 </form>

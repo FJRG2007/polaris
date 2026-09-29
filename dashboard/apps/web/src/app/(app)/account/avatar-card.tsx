@@ -39,6 +39,8 @@ import { BLANK_AVATAR_ETAG } from "@/lib/avatar-blank";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { useRef, useState, type ReactNode } from "react";
 import { ProfileBanner } from "@/components/profile-banner";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { avatarUrl, bannerUrl, orgAvatarUrl, orgBannerUrl } from "@/lib/avatar-url";
 import {
     Camera,
@@ -110,6 +112,7 @@ interface Picture {
  * the sentence when it fails - is the same for both.
  */
 export function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Picture {
+    const t = useTranslations("account");
     const input = useRef<HTMLInputElement>(null);
     const [chosen, setChosen] = useState<Blob | null>(null);
     const [sending, setSending] = useState(false);
@@ -122,7 +125,7 @@ export function usePicture(endpoint: string, pictureUrl: string, shape: CropShap
         try {
             const response = await work();
             if (!response.ok) {
-                setError((await response.text()) || "Could not save that");
+                setError((await response.text()) || t("pictures.errors.notSaved"));
                 setSending(false);
                 return;
             }
@@ -134,7 +137,7 @@ export function usePicture(endpoint: string, pictureUrl: string, shape: CropShap
             await fetch(pictureUrl, { cache: "reload" }).catch(() => undefined);
             window.location.reload();
         } catch {
-            setError("Could not reach the server");
+            setError(t("pictures.errors.unreachable"));
             setSending(false);
         }
     };
@@ -173,19 +176,19 @@ export function usePicture(endpoint: string, pictureUrl: string, shape: CropShap
             // cannot read - whereas refusing anything whose content type did not
             // survive the round trip refuses pictures that are perfectly fine.
             if (!blob || blob.size === 0) {
-                setError("Could not open that picture again");
+                setError(t("pictures.errors.reopen"));
                 return;
             }
             // The same reason as above, said at the point somebody would find
             // out the hard way: reframing this would replace a moving picture
             // with one still frame of itself.
             if (animated(blob.type)) {
-                setError("A moving picture cannot be reframed - replace it to change how it sits");
+                setError(t("pictures.errors.animated"));
                 return;
             }
             setChosen(blob);
         } catch {
-            setError("Could not reach the server");
+            setError(t("pictures.errors.unreachable"));
         } finally {
             setOpening(false);
         }
@@ -269,31 +272,39 @@ interface PictureAction {
     readonly danger?: boolean;
 }
 
-function actionsFor(label: string, picture: Picture, exists: boolean): PictureAction[] {
+/** Which picture a handle is for, which is also how its words are chosen. */
+type PictureKind = "photo" | "banner";
+
+function actionsFor(
+    kind: PictureKind,
+    picture: Picture,
+    exists: boolean,
+    t: NamespaceTranslator<"account">
+): PictureAction[] {
     return [
         ...(exists
             ? [
                   {
-                      label: "Reframe",
-                      note: "Move and scale what is already there",
+                      label: t("pictures.reframe"),
+                      note: t("pictures.reframeNote"),
                       Icon: Crop,
                       onSelect: picture.reframe
                   }
               ]
             : []),
         {
-            label: exists ? "Replace" : `Upload ${label}`,
+            label: exists ? t("pictures.replace") : t("pictures.upload", { kind }),
             // Said here because it is where somebody decides which file to
             // reach for, which is the only moment the answer is useful.
-            note: "Choose a picture from this device - a GIF keeps moving",
+            note: t("pictures.uploadNote"),
             Icon: Upload,
             onSelect: picture.choose
         },
         ...(exists
             ? [
                   {
-                      label: "Remove",
-                      note: `Go back to the default ${label}`,
+                      label: t("pictures.remove"),
+                      note: t("pictures.removeNote", { kind }),
                       Icon: Trash2,
                       onSelect: picture.remove,
                       danger: true
@@ -346,7 +357,7 @@ export function PictureEditor({
     radius
 }: {
     /** What this picture is, in the sentence a screen reader reads out. */
-    label: string;
+    label: PictureKind;
     icon: LucideIcon;
     picture: Picture;
     /** Whether there is a picture of their own here, which is what decides
@@ -355,7 +366,8 @@ export function PictureEditor({
     radius: keyof typeof HANDLE_RADIUS;
 }) {
     const [open, setOpen] = useState(false);
-    const actions = actionsFor(label, picture, exists);
+    const t = useTranslations("account");
+    const actions = actionsFor(label, picture, exists, t);
 
     /** Chosen from the dialog: it goes, then the work starts. A dialog left
      *  standing over a file picker is one somebody has to dismiss before they
@@ -372,8 +384,8 @@ export function PictureEditor({
                 <ContextMenuTrigger asChild>
                     <button
                         type="button"
-                        aria-label={`Edit ${label}`}
-                        title={`Edit ${label}`}
+                        aria-label={t("pictures.edit", { kind: label })}
+                        title={t("pictures.edit", { kind: label })}
                         disabled={picture.sending}
                         // The sheet and the chip used to read the menu's own open
                         // state off this button. The dialog is not attached to
@@ -435,7 +447,7 @@ export function PictureEditor({
 
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="max-w-xs">
-                    <DialogTitle className="capitalize">{label}</DialogTitle>
+                    <DialogTitle>{t("pictures.title", { kind: label })}</DialogTitle>
                     <div className="flex flex-col gap-1">
                         {actions.map((action) => (
                             <button
@@ -492,17 +504,14 @@ export function ProfilePicturesCard({
     const photo = usePicture("/api/avatar", avatarUrl(userId), FACE_CROP);
     const banner = usePicture("/api/banner", bannerUrl(userId), BAND_CROP);
     const error = photo.error || banner.error;
+    const t = useTranslations("account");
 
     return (
         <Card>
             <CardBody className="flex flex-col gap-4">
                 <div>
-                    <h2 className="text-sm font-medium">Photo and banner</h2>
-                    <p className="text-xs text-muted-foreground">
-                        How your profile looks to everybody else. Without a photo, Polaris uses the
-                        picture your email address has on Gravatar and your initials if it has none;
-                        without a banner, a colour taken from your photo.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("pictures.cardTitle")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("pictures.personHint")}</p>
                 </div>
 
                 <div className="overflow-hidden rounded-lg border border-border">
@@ -582,17 +591,14 @@ export function OrgPicturesCard({
     const photo = usePicture(`/api/avatar/org/${orgId}`, orgAvatarUrl(orgId), TILE_CROP);
     const banner = usePicture(`/api/banner/org/${orgId}`, orgBannerUrl(orgId), BAND_CROP);
     const error = photo.error || banner.error;
+    const t = useTranslations("account");
 
     return (
         <Card>
             <CardBody className="flex flex-col gap-4">
                 <div>
-                    <h2 className="text-sm font-medium">Photo and banner</h2>
-                    <p className="text-xs text-muted-foreground">
-                        How this organization looks wherever it appears - the switcher, its
-                        people&apos;s rosters, and its own page. Without a photo, Polaris draws its
-                        initials; without a banner, a colour taken from the photo.
-                    </p>
+                    <h2 className="text-sm font-medium">{t("pictures.cardTitle")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("pictures.orgHint")}</p>
                 </div>
 
                 <div className="overflow-hidden rounded-lg border border-border">

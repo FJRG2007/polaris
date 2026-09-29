@@ -11,6 +11,7 @@
  * word it is named by.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NameEffectPicker, NameFontPicker } from "@/app/(app)/account/name-style-picker";
@@ -18,8 +19,8 @@ import { NAME_EFFECTS, NAME_FONTS } from "@polaris/core";
 
 /** With nothing chosen, which is what the picker looks like to somebody who has
  *  never opened it - and the state the colour controls stay out of. */
-const effects = renderToStaticMarkup(<NameEffectPicker value={null} onChange={() => {}} />);
-const fonts = renderToStaticMarkup(<NameFontPicker value={null} onChange={() => {}} />);
+const effects = renderToStaticMarkup(withMessages(<NameEffectPicker value={null} onChange={() => {}} />));
+const fonts = renderToStaticMarkup(withMessages(<NameFontPicker value={null} onChange={() => {}} />));
 
 function buttons(html: string): number {
     return (html.match(/<button\b/g) ?? []).length;
@@ -63,8 +64,8 @@ describe("the display name pickers", () => {
         // either has to come back marked on both - otherwise choosing a face
         // silently clears the effect the next time the card is opened.
         const saved = "gummy:comic:#ff5a5f:#ffcc66";
-        const row = renderToStaticMarkup(<NameEffectPicker value={saved} onChange={() => {}} />);
-        const face = renderToStaticMarkup(<NameFontPicker value={saved} onChange={() => {}} />);
+        const row = renderToStaticMarkup(withMessages(<NameEffectPicker value={saved} onChange={() => {}} />));
+        const face = renderToStaticMarkup(withMessages(<NameFontPicker value={saved} onChange={() => {}} />));
         expect(row).toContain('aria-pressed="true"');
         expect(row.match(/aria-pressed="true"/g)).toHaveLength(1);
         expect(face.match(/aria-pressed="true"/g)).toHaveLength(1);

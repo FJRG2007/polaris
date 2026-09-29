@@ -26,6 +26,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { saveCompaniesAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { OrgAvatar } from "@/components/avatar";
 import { MAX_COMPANY_LENGTH, MOST_COMPANIES } from "@polaris/core";
 import { BadgeCheck, ExternalLink, Plus, X } from "lucide-react";
@@ -50,6 +51,8 @@ export function CompaniesCard({
 }) {
     // Always one empty row at the end, so adding a second place is typing into
     // the field that is already there rather than finding a button first.
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
     const [typed, setTyped] = useState<string[]>([...companies, ""]);
     const [picked, setPicked] = useState<ReadonlySet<string>>(new Set(shown));
     const [busy, setBusy] = useState(false);
@@ -91,28 +94,24 @@ export function CompaniesCard({
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="text-sm font-medium">Where you work</h2>
+                        <h2 className="text-sm font-medium">{t("companies.title")}</h2>
                         {username ? (
                             <Link
                                 href={`/u/${username}`}
                                 className="text-primary flex items-center gap-1 text-xs hover:underline"
                             >
-                                See your page
+                                {t("companies.seePage")}
                                 <ExternalLink className="size-3 shrink-0" />
                             </Link>
                         ) : null}
                     </div>
-                    <p className="text-muted-foreground text-xs">
-                        Who sees any of this is one setting on your privacy screen. Nothing here is shown until
-                        you tick it.
-                    </p>
+                    <p className="text-muted-foreground text-xs">{t("companies.description")}</p>
                 </div>
 
                 {organizations.length > 0 ? (
                     <fieldset className="flex flex-col gap-2">
                         <legend className="text-muted-foreground mb-1 text-xs">
-                            Organizations here. These carry a tick on your page: Polaris holds the roster and
-                            you are on it.
+                            {t("companies.organizations")}
                         </legend>
                         {organizations.map((org) => (
                             <label key={org.id} className="flex items-center gap-2 text-sm">
@@ -131,7 +130,7 @@ export function CompaniesCard({
                 ) : null}
 
                 <div className="flex flex-col gap-2 text-sm">
-                    <span>Somewhere else</span>
+                    <span>{t("companies.elsewhere")}</span>
                     {typed.map((entry, index) => (
                         // Keyed by position, deliberately: these are the same few
                         // fields being edited, and keying by their contents would
@@ -140,10 +139,10 @@ export function CompaniesCard({
                         <div key={index} className="flex items-center gap-2">
                             <Input
                                 value={entry}
-                                placeholder={index === 0 ? "Optional" : "Add another"}
+                                placeholder={index === 0 ? t("access.groups.optional") : t("companies.addAnother")}
                                 maxLength={MAX_COMPANY_LENGTH}
                                 autoComplete="organization"
-                                aria-label={`Company ${index + 1}`}
+                                aria-label={t("companies.company", { number: index + 1 })}
                                 onChange={(event) => {
                                     const next = [...typed];
                                     next[index] = event.target.value;
@@ -155,8 +154,8 @@ export function CompaniesCard({
                                     type="button"
                                     size="icon"
                                     variant="ghost"
-                                    aria-label={`Remove ${entry.trim()}`}
-                                    title="Remove"
+                                    aria-label={t("companies.remove", { name: entry.trim() })}
+                                    title={t("emails.remove")}
                                     onClick={() => write(typed.filter((_, at) => at !== index))}
                                 >
                                     <X className="size-4 shrink-0" />
@@ -177,18 +176,17 @@ export function CompaniesCard({
                             onClick={() => write([...typed, ""])}
                         >
                             <Plus className="size-4 shrink-0" />
-                            Add another
+                            {t("companies.addAnother")}
                         </Button>
                     ) : null}
                     <span className="text-muted-foreground text-xs">
-                        Drawn without a tick, because Polaris knows nothing about these beyond that you typed
-                        them.
+                        {t("companies.typedHint")}
                     </span>
                 </div>
 
                 <div className="flex items-center justify-between gap-2">
                     {error ? <p className="text-danger text-sm">{error}</p> : null}
-                    {done && !error ? <p className="text-success text-sm">Saved.</p> : null}
+                    {done && !error ? <p className="text-success text-sm">{t("appearance.saved")}</p> : null}
                     <Button
                         type="button"
                         className="ml-auto"
@@ -213,7 +211,7 @@ export function CompaniesCard({
                             setDone(true);
                         }}
                     >
-                        {busy ? "Saving..." : "Save"}
+                        {busy ? tc("actions.saving") : tc("actions.save")}
                     </Button>
                 </div>
             </CardBody>
