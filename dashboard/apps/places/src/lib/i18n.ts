@@ -3,7 +3,7 @@
  * messages from the app's own catalogs. See dashboard/docs/i18n.md.
  */
 
-import type { Locale, Translator } from "@polaris/core";
+import { DEFAULT_LOCALE, type Locale, type Translator } from "@polaris/core";
 import { host } from "@polaris/app-host";
 import { placesCatalogs, type PlacesKey } from "../../messages";
 
@@ -14,9 +14,14 @@ export async function placesT(): Promise<PlacesTranslator> {
     return placesCatalogs.translator(await host.i18nRequest.getLocale(), "places");
 }
 
-/** The translator for one account, with no request around it - a notification. */
+/** The translator for one account, with no request around it - a notification.
+ *  A sweep or a job that cannot ask still says it, in the source language. */
 export async function placesTFor(userId: string): Promise<PlacesTranslator> {
-    return placesCatalogs.translator(await host.i18nLocaleService.getUserLocale(userId), "places");
+    try {
+        return placesCatalogs.translator(await host.i18nLocaleService.getUserLocale(userId), "places");
+    } catch {
+        return placesCatalogs.translator(DEFAULT_LOCALE, "places");
+    }
 }
 
 /** The translator for a locale already in hand. */

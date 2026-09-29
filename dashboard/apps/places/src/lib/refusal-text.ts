@@ -129,6 +129,22 @@ const SHAPED: readonly { readonly pattern: RegExp; readonly key: PlacesKey; read
     { pattern: /^The relay refused it \((\d+)\)\.$/, key: "refusals.relayStatus", params: ["status"] }
 ];
 
+/** The outage headlines `reachability` writes into an event's label. */
+const OUTAGES: readonly { readonly pattern: RegExp; readonly key: PlacesKey; readonly params: readonly string[] }[] = [
+    { pattern: /^Every camera(?: at (.+))? stopped answering$/s, key: "outage.every", params: ["place"] },
+    {
+        pattern: /^(.+) stopped answering - the only one of (\d+)(?: at (.+))?$/s,
+        key: "outage.only",
+        params: ["camera", "total", "place"]
+    },
+    {
+        pattern: /^(.+) stopped answering - (\d+) of (\d+)(?: at (.+))? have$/s,
+        key: "outage.some",
+        params: ["camera", "down", "total", "place"]
+    },
+    { pattern: /^(.+) stopped answering$/s, key: "outage.one", params: ["camera"] }
+];
+
 export function placesRefusalText(t: PlacesTranslator, message: string): string {
     const key = EXACT.get(message);
     if (key) return t(key);
@@ -136,6 +152,17 @@ export function placesRefusalText(t: PlacesTranslator, message: string): string 
     const kind = cannot ? KIND_BY_WORD.get(cannot[1] ?? "") : undefined;
     const action = cannot ? ACTION_BY_VERB.get(cannot[2] ?? "") : undefined;
     if (kind && action) return t("refusals.kindCannot", { kind, action });
+    for (const { pattern, key: shaped, params } of OUTAGES) {
+        const found = pattern.exec(message);
+        if (!found) continue;
+        const values: Record<string, string | number> = {};
+        params.forEach((name, index) => {
+            const value = found[index + 1];
+            values[name] = name === "place" ? (value ?? "") : /^\d+$/.test(value ?? "") ? Number(value) : (value ?? "");
+        });
+        values.hasPlace = values.place ? "yes" : "no";
+        return t(shaped, values);
+    }
     for (const { pattern, key: shaped, params } of SHAPED) {
         const found = pattern.exec(message);
         if (!found) continue;

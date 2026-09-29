@@ -26,6 +26,8 @@
 import { prisma } from "@polaris/db";
 import { isMuted } from "@polaris/core";
 import { raiseAlerts, type Said } from "./alerts";
+import { englishPlaces } from "../../messages";
+import { placesTFor, type PlacesTranslator } from "./i18n";
 import { POWER_SOURCES } from "./camera-models";
 
 /** The answers that mean "this camera is spending its own charge". Derived from
@@ -143,25 +145,24 @@ export function outageHeadline(
     cameraName: string,
     placeName: string,
     down: number,
-    total: number
+    total: number,
+    t: PlacesTranslator = englishPlaces
 ): string {
-    const where = placeName ? ` at ${placeName}` : "";
-    if (total > 1 && down >= total) return `Every camera${where} stopped answering`;
-    if (total > 1 && down === 1)
-        return `${cameraName} stopped answering - the only one of ${total}${where}`;
-    if (total > 1) return `${cameraName} stopped answering - ${down} of ${total}${where} have`;
-    return `${cameraName} stopped answering`;
+    const where = { place: placeName, hasPlace: placeName ? "yes" : "no" };
+    if (total > 1 && down >= total) return t("outage.every", where);
+    if (total > 1 && down === 1) return t("outage.only", { camera: cameraName, total, ...where });
+    if (total > 1) return t("outage.some", { camera: cameraName, down, total, ...where });
+    return t("outage.one", { camera: cameraName });
 }
 
 /** How long it was gone, in the words somebody would use. Read off the row
  *  rather than counted in passes, so a restart does not reset it. */
-export function outageLength(since: Date, until: Date): string {
+export function outageLength(since: Date, until: Date, t: PlacesTranslator = englishPlaces): string {
     const minutes = Math.max(1, Math.round((until.getTime() - since.getTime()) / 60_000));
-    if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+    if (minutes < 60) return t("outage.minutes", { count: minutes });
     const hours = Math.round(minutes / 60);
-    if (hours < 48) return `${hours} hour${hours === 1 ? "" : "s"}`;
-    const days = Math.round(hours / 24);
-    return `${days} day${days === 1 ? "" : "s"}`;
+    if (hours < 48) return t("outage.hours", { count: hours });
+    return t("outage.days", { count: Math.round(hours / 24) });
 }
 
 /**
@@ -229,7 +230,15 @@ async function reportOutage(
         said
     );
 
-    await tell(camera.installedAppId, headline, "A camera is not answering", event.id, said);
+    await tell(
+        camera.installedAppId,
+        (t) => ({
+            title: outageHeadline(camera.name, placeName, down, total, t),
+            body: t("outage.notAnswering")
+        }),
+        event.id,
+        said
+    );
 }
 
 /**
@@ -253,8 +262,10 @@ async function reportRecovery(camera: Watched, since: Date, now: Date, said: Sai
     await prisma.cameraEvent.update({ where: { id: open.id }, data: { endedAt: now } });
     await tell(
         camera.installedAppId,
-        `${camera.name} is answering again`,
-        `It was quiet for ${outageLength(since, now)}`,
+        (t) => ({
+            title: t("outage.back", { camera: camera.name }),
+            body: t("outage.wasQuiet", { length: outageLength(since, now, t) })
+        }),
         open.id,
         said
     );
@@ -265,15 +276,14 @@ async function reportRecovery(camera: Watched, since: Date, now: Date, said: Sai
  *  that still writes a delivery line is a history nobody can read. */
 async function tell(
     installedAppId: string,
-    title: string,
-    body: string,
+    words: (t: PlacesTranslator) => { title: string; body: string },
     eventId: string,
     said: Said
 ): Promise<void> {
     // One line per sentence per pass. The dispatcher does not deduplicate, so a
     // place that went dark all at once would otherwise leave one bell entry per
     // camera, every one of them reading "Every camera at Home stopped answering".
-    const line = `${installedAppId}:${title}`;
+    const line = `${installedAppId}:${words(englishPlaces).title}`;
     if (said.has(line)) return;
     said.add(line);
     const install = await prisma.installedApp.findFirst({
@@ -282,6 +292,8 @@ async function tell(
     });
     if (!install) return;
     if (isMuted(await ruleFor(install.ownerId, "places.offline"))) return;
+    // In the language of whoever the house belongs to, not of the sweep.
+    const { title, body } = words(await placesTFor(install.ownerId));
     await notify({
         userId: install.ownerId,
         event: "places.offline",

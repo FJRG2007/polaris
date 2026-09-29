@@ -27,20 +27,12 @@ import {
     Switch
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
+import { usePlacesT } from "../use-places-t";
 
 const { runAction } = hostUi.runAction;
 
-/** What an alert can fire on. The camera's own vocabulary, in words. */
-const KINDS = [
-    { value: "person", label: "Somebody is seen" },
-    { value: "face", label: "A known face is seen" },
-    { value: "vehicle", label: "A vehicle" },
-    { value: "animal", label: "An animal" },
-    { value: "package", label: "A box or bag is left" },
-    { value: "motion", label: "Anything moves" },
-    { value: "tamper", label: "A camera is tampered with" },
-    { value: "offline", label: "A camera stops answering" }
-];
+/** What an alert can fire on, each read as `alerts.kinds.<value>`. */
+const KINDS = ["person", "face", "vehicle", "animal", "package", "motion", "tamper", "offline"] as const;
 
 export function AlertDialog({
     rule,
@@ -63,6 +55,7 @@ export function AlertDialog({
     onClose: () => void;
     onSaved: (rule: AlertRuleView) => void;
 }) {
+    const t = usePlacesT();
     const [name, setName] = useState(rule?.name ?? "");
     const [kinds, setKinds] = useState<string[]>([...(rule?.kinds ?? ["person"])]);
     const [cameraId, setCameraId] = useState(rule?.cameraId ?? "");
@@ -112,46 +105,42 @@ export function AlertDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>{rule ? rule.name : "Add an alert"}</DialogTitle>
+                    <DialogTitle>{rule ? rule.name : t("alerts.addTitle")}</DialogTitle>
                     <DialogDescription>
-                        Everything the cameras see is in Events either way. An alert is what you
-                        want telling about: it arrives as a message in a conversation with the
-                        people you pick.
+                        {t("alerts.intro")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            Name<span className="text-danger"> *</span>
+                            {t("placeDialog.name")}<span className="text-danger"> *</span>
                         </span>
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder="Somebody at the door overnight"
+                            placeholder={t("alerts.namePlaceholder")}
                             autoFocus
                         />
                     </label>
 
                     <div className="flex flex-col gap-2">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            Tell me when
+                            {t("alerts.when")}
                         </span>
                         <div className="flex flex-wrap gap-3">
-                            {KINDS.map((item) => (
+                            {KINDS.map((value) => (
                                 <label
-                                    key={item.value}
+                                    key={value}
                                     className="flex items-center gap-2 text-[0.8125rem]"
                                 >
                                     <Checkbox
-                                        checked={kinds.includes(item.value)}
+                                        checked={kinds.includes(value)}
                                         onChange={(event) =>
-                                            setKinds(
-                                                toggle(kinds, item.value, event.target.checked)
-                                            )
+                                            setKinds(toggle(kinds, value, event.target.checked))
                                         }
                                     />
-                                    {item.label}
+                                    {t(`alerts.kinds.${value}`)}
                                 </label>
                             ))}
                         </div>
@@ -160,13 +149,13 @@ export function AlertDialog({
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1.5">
                             <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                On
+                                {t("alerts.on")}
                             </span>
                             <Select
                                 value={cameraId}
                                 onValueChange={setCameraId}
                                 options={[
-                                    { value: "", label: "Any camera here" },
+                                    { value: "", label: t("alerts.anyCamera") },
                                     ...cameras.map((camera) => ({
                                         value: camera.id,
                                         label: camera.name
@@ -177,13 +166,13 @@ export function AlertDialog({
                         {known.length > 0 ? (
                             <label className="flex flex-col gap-1.5">
                                 <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                    Only about
+                                    {t("alerts.onlyAbout")}
                                 </span>
                                 <Select
                                     value={label}
                                     onValueChange={setLabel}
                                     options={[
-                                        { value: "", label: "Anybody, strangers included" },
+                                        { value: "", label: t("alerts.anybody") },
                                         ...known.map((person) => ({
                                             value: person.name,
                                             label: person.name
@@ -197,7 +186,7 @@ export function AlertDialog({
                     {areas.length > 0 ? (
                         <div className="flex flex-col gap-2">
                             <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                Only in
+                                {t("alerts.onlyIn")}
                             </span>
                             <div className="flex flex-wrap gap-3">
                                 {areas.map((area) => (
@@ -217,8 +206,8 @@ export function AlertDialog({
                             </div>
                             <p className="text-[0.75rem] text-foreground-subtle">
                                 {zones.length === 0
-                                    ? "Anywhere the camera can see."
-                                    : "A camera nobody has drawn on will never match this."}
+                                    ? t("alerts.anywhere")
+                                    : t("alerts.undrawn")}
                             </p>
                         </div>
                     ) : null}
@@ -226,7 +215,7 @@ export function AlertDialog({
                     <div className="flex flex-col gap-2">
                         <label className="flex items-center justify-between gap-3">
                             <span className="text-[0.8125rem] text-foreground">
-                                Only at certain hours
+                                {t("dialog.hours")}
                             </span>
                             <Switch checked={hoursOn} onChange={setHoursOn} />
                         </label>
@@ -237,18 +226,18 @@ export function AlertDialog({
                                     onChange={(event) => setFrom(event.target.value)}
                                     className="w-20"
                                     inputMode="numeric"
-                                    aria-label="From hour"
+                                    aria-label={t("dialog.fromHour")}
                                 />
-                                <span className="text-[0.75rem] text-muted-foreground">to</span>
+                                <span className="text-[0.75rem] text-muted-foreground">{t("dialog.to")}</span>
                                 <Input
                                     value={to}
                                     onChange={(event) => setTo(event.target.value)}
                                     className="w-20"
                                     inputMode="numeric"
-                                    aria-label="To hour"
+                                    aria-label={t("dialog.toHour")}
                                 />
                                 <span className="text-[0.75rem] text-foreground-subtle">
-                                    24-hour clock. 22 to 7 is overnight.
+                                    {t("alerts.hoursHint")}
                                 </span>
                             </div>
                         ) : null}
@@ -256,7 +245,7 @@ export function AlertDialog({
 
                     <div className="flex flex-col gap-2">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            Tell<span className="text-danger"> *</span>
+                            {t("alerts.tell")}<span className="text-danger"> *</span>
                         </span>
                         <div className="flex max-h-40 flex-col gap-2 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
                             {people.map((person) => (
@@ -281,14 +270,14 @@ export function AlertDialog({
                     <div className="flex flex-col gap-1.5">
                         <label className="flex items-center justify-between gap-3">
                             <span className="text-[0.8125rem] text-foreground">
-                                Also send it to their notifications
+                                {t("alerts.notify")}
                             </span>
                             <Switch checked={notify} onChange={setNotify} />
                         </label>
                         <p className="text-[0.75rem] text-foreground-subtle">
                             {notify
-                                ? "It reaches the bell as well, and wherever each person sends their alerts. Everyone chooses that in their own notification settings."
-                                : "Only the conversation. Nothing lands on the bell."}
+                                ? t("alerts.notifyOn")
+                                : t("alerts.notifyOff")}
                         </p>
                     </div>
                 </div>
@@ -297,7 +286,7 @@ export function AlertDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={busy}>
-                        Cancel
+                        {t("common.cancel")}
                     </Button>
                     <Button
                         onClick={save}
@@ -306,7 +295,7 @@ export function AlertDialog({
                         }
                     >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                        {rule ? "Save" : "Add alert"}
+                        {rule ? t("common.save") : t("alerts.add")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

@@ -25,6 +25,7 @@ import type { EventView } from "../../lib/events";
 import { DetectionBox } from "../detection-box";
 import { kindLabel } from "../detection-label";
 import { usePlacesT } from "../use-places-t";
+import { placesRefusalText } from "../../lib/refusal-text";
 import type { CameraView } from "../../lib/cameras";
 import { Bell, Check, Loader2, Trash2 } from "lucide-react";
 import {
@@ -249,7 +250,9 @@ export function EventsView({ canControl }: { canControl: boolean }) {
      */
     const nameFor = (subject: string | null): string | null => {
         if (!subject) return null;
-        return people.find((person) => person.subjectId === subject)?.name ?? subject;
+        // A recognized subject is shown by name; an outage's label is a sentence
+        // Places wrote, and reads in the reader's words.
+        return people.find((person) => person.subjectId === subject)?.name ?? placesRefusalText(t, subject);
     };
 
     /** Puts the moment a link named where somebody can see it, once. */
@@ -533,7 +536,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
             {moment ? (
                 <MomentDialog
                     title={t("events.momentTitle", {
-                        what: moment.event.label ?? kindLabel(moment.event.kind, t),
+                        what: nameFor(moment.event.label) ?? kindLabel(moment.event.kind, t),
                         camera: moment.event.cameraName,
                         at: format.dateTime(moment.event.at)
                     })}

@@ -27,6 +27,12 @@ import { withinHours } from "./detection";
 import type { Detection } from "./events";
 import type { AlertRuleInput } from "./schemas";
 import { host } from "@polaris/app-host";
+import { placesTFor, type PlacesTranslator } from "./i18n";
+import { placesRefusalText } from "./refusal-text";
+import { englishPlaces, type PlacesKey } from "../../messages";
+
+/** The kinds an alert names in its own words, as `alertSay.<kind>`. */
+const SAYS = new Set(["person", "vehicle", "animal", "package", "tamper", "motion"]);
 
 const { publishChatChange } = host.chatLive;
 const { notify } = host.notificationsDispatch;
@@ -236,24 +242,19 @@ function matches(
 function headline(
     detection: Detection,
     cameraName: string,
-    placeName: string
+    placeName: string,
+    t: PlacesTranslator
 ): { who: string; where: string } {
     const who =
         detection.kind === "face" && detection.label
             ? detection.label
-            : detection.kind === "person"
-              ? "Somebody"
-              : detection.kind === "vehicle"
-                ? "A vehicle"
-                : detection.kind === "animal"
-                  ? "An animal"
-                  : detection.kind === "package"
-                    ? "Something was left"
-                    : detection.kind === "tamper"
-                      ? "Somebody may have tampered with a camera"
-                      : detection.kind === "offline"
-                        ? (detection.label ?? "A camera stopped answering")
-                        : "Movement";
+            : detection.kind === "offline"
+              ? detection.label
+                  ? placesRefusalText(t, detection.label)
+                  : t("alertSay.offline")
+              : SAYS.has(detection.kind)
+                ? t(`alertSay.${detection.kind}` as PlacesKey)
+                : t("alertSay.motion");
     // An outage already names its camera and its place, and how much of that
     // place went with it - that count is the whole point of the sentence. Adding
     // "at Front door, Home" to the end of it says the same thing twice.
@@ -319,17 +320,20 @@ export async function raiseAlerts(
         // Named after where it has just walked into rather than where it came
         // in: "somebody at the driveway" is only a useful sentence if the
         // driveway is what set it off.
-        const { who, where } = headline(
-            onlyZones
-                ? { ...detection, zones: [...onlyZones, ...(detection.zones ?? [])] }
-                : detection,
-            camera.name,
-            place?.name ?? ""
-        );
-        // With the way back to the moment on the end of it: an alert somebody
-        // cannot act on is a line of text.
-        const said = where ? `${who} at **${where}**` : `**${who}**`;
-        const text = `${said} - [see it](${eventHref(eventId)})`;
+        const seen = onlyZones
+            ? { ...detection, zones: [...onlyZones, ...(detection.zones ?? [])] }
+            : detection;
+        const sentence = (t: PlacesTranslator) => {
+            const { who, where } = headline(seen, camera.name, place?.name ?? "", t);
+            return {
+                // With the way back to the moment on the end of it: an alert
+                // somebody cannot act on is a line of text.
+                said: where ? t("alertSay.at", { who, where }) : t("alertSay.bare", { who }),
+                title: where ? t("alertSay.title", { who, where }) : who
+            };
+        };
+        // The line the batch remembers, in one language whoever reads it.
+        const said = sentence(englishPlaces).said;
 
         for (const rule of rules) {
             // Per rule rather than per batch: a rule that names one camera and a
@@ -340,6 +344,14 @@ export async function raiseAlerts(
             if (alreadySaid?.has(line)) continue;
             alreadySaid?.add(line);
             const channelId = await conversationFor(rule, rule.recipients[0] ?? null);
+            // Written once into a conversation several people read, so in the
+            // language of the first of them - the one it was opened for.
+            const first = rule.recipients[0];
+            const words = first ? await placesTFor(first) : englishPlaces;
+            const text = words("alertSay.message", {
+                said: sentence(words).said,
+                href: eventHref(eventId)
+            });
             await prisma.chatMessage.create({
                 data: { channelId, kind: "system", authorId: null, body: text }
             });
@@ -368,11 +380,11 @@ export async function raiseAlerts(
             // about either.
             if (rule.notify) {
                 await Promise.all(
-                    rule.recipients.map((userId) =>
+                    rule.recipients.map(async (userId) =>
                         notify({
                             userId,
                             event: "places.alert",
-                            title: where ? `${who} at ${where}` : who,
+                            title: sentence(await placesTFor(userId)).title,
                             body: rule.name,
                             href: eventHref(eventId),
                             metadata: { eventId, ruleId: rule.id }
