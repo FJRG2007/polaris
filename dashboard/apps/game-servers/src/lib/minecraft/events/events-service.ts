@@ -972,7 +972,7 @@ async function begin(
     }
     if (preset.kind === "blood-moon") {
         // Held still until dawn: the clock, or the night runs out before the
-        // event does or is slept through; the weather, or the storm clears.
+        // event does or is slept through; the weather, or the rain clears.
         // What each was is kept, and put back when it ends.
         const before: Record<string, string> = {};
         for (const names of commands.FROZEN_RULES) {

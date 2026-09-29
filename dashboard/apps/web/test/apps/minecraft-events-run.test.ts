@@ -121,7 +121,7 @@ interface World {
     scoreTitle: string;
     /** Players carrying each tag. */
     tags: Record<string, Set<string>>;
-    /** How long the storm lasts, in ticks, as the last `weather thunder` left it. */
+    /** How long the rain lasts, in ticks, as the last `weather rain` left it. */
     stormTicks: number;
 }
 
@@ -437,15 +437,15 @@ function answer(sent: string): string {
     if (line === "difficulty") return `The difficulty is ${world.difficulty}`;
     // Seconds as a whole number up to 1.19.3; a time from 1.19.4, where a bare
     // number is ticks and `s` makes it seconds.
-    const storm = /^weather thunder (\d+)(s?)$/.exec(line);
+    const storm = /^weather (?:rain|thunder) (\d+)(s?)$/.exec(line);
     if (storm) {
         const seconds = storm[2] === "s";
         if (!events.atLeast(world.version, [1, 19, 4])) {
             if (seconds)
-                return `Expected whitespace to end one argument, but found trailing data\n...r thunder ${storm[1]}<--[HERE]`;
+                return `Expected whitespace to end one argument, but found trailing data\n...r rain ${storm[1]}<--[HERE]`;
             world.stormTicks = Number(storm[1]) * 20;
         } else world.stormTicks = Number(storm[1]) * (seconds ? 20 : 1);
-        return "Changing to rain and thunder";
+        return line.includes("thunder") ? "Changing to rain and thunder" : "Changing to rain";
     }
     // `daytime` is gone from 26.1, read as a timeline that does not exist; the
     // day's own timeline answers instead.
@@ -2217,6 +2217,8 @@ describe("what the audit found", () => {
             await play(4_100);
             // What is left of the three minutes once it has started, in ticks.
             expect(world.stormTicks).toBeGreaterThanOrEqual(170 * 20);
+            // Rain, never thunder: its lightning burns houses and turns villagers.
+            expect(world.sent.some((line) => line.startsWith("weather thunder"))).toBe(false);
         }
     );
 

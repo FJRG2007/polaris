@@ -492,7 +492,7 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
     "blood-moon": {
         label: "Blood moon",
         summary:
-            "Night falls with a thunderstorm and waves of mobs rise around every player on the surface. Survive to dawn without dying; the podium goes to the most kills.",
+            "Night falls with rain and waves of mobs rise around every player on the surface. Survive to dawn without dying; the podium goes to the most kills.",
         unit: "kills",
         competitive: true
     },

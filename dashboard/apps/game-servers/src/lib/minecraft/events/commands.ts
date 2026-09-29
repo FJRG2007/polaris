@@ -977,15 +977,18 @@ export function roughly(value: number, step: number): number {
 // ------------------------------------------------------------------ blood moon
 
 /**
- * Night, and a storm for as long as it lasts. The storm's length is seconds up
- * to 1.19.3 and ticks from 1.19.4, where `s` asks for seconds - which the older
- * versions refuse. Both are sent, the bare number first: an older server takes
- * it as seconds and refuses the second; a newer one takes it as ticks and the
- * second puts it right.
+ * Night, and rain for as long as it lasts. Rain, not thunder: a thunderstorm's
+ * lightning sets wooden roofs on fire and turns a villager into a witch, a pig
+ * into a zombified piglin - in the chunks round every player, their homes
+ * included - and a real server lost a villager and part of a house to the one
+ * a blood moon brought on. The rain's length is seconds up to 1.19.3 and ticks
+ * from 1.19.4, where `s` asks for seconds - which the older versions refuse.
+ * Both are sent, the bare number first: an older server takes it as seconds and
+ * refuses the second; a newer one takes it as ticks and the second puts it right.
  */
 export function nightfall(seconds: number): string[] {
     const storm = Math.max(60, Math.round(seconds));
-    return ["time set 13000", `weather thunder ${storm}`, `weather thunder ${storm}s`];
+    return ["time set 13000", `weather rain ${storm}`, `weather rain ${storm}s`];
 }
 
 /**
