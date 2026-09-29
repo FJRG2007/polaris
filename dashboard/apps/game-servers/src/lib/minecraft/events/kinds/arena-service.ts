@@ -63,6 +63,10 @@ export interface KindContext {
 /** The event cannot go on, for the reason given. */
 export class EventStopped extends Error {}
 
+/** Not enough players joined for it to go ahead: called off, which is nobody's
+ *  failure - as a spleef with one player is. */
+export class TooFew extends EventStopped {}
+
 const NO_PLACE = "No dry ground was found for it near the players";
 const TOO_FEW = "Fewer than two players joined";
 /** How far from the players the ground under an arena is looked for. */
@@ -179,7 +183,7 @@ async function enrol(ctx: KindContext, lines: string[]): Promise<void> {
             )
         ]);
         lines.length = 0;
-        throw new EventStopped(TOO_FEW);
+        throw new TooFew(TOO_FEW);
     }
     ctx.run = { ...ctx.run, joined: taking, enrolled: true };
     await ctx.persist();
@@ -333,7 +337,7 @@ async function bringIn(ctx: KindContext): Promise<void> {
             });
         }
         if (run.entrants.length + fresh.length < catalog.joinersNeeded(run.preset)) {
-            throw new EventStopped(TOO_FEW);
+            throw new TooFew(TOO_FEW);
         }
         ctx.run = { ...ctx.run, entrants: [...run.entrants, ...fresh], marker, kit };
         await ctx.persist();

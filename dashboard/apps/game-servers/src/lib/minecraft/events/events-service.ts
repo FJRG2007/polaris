@@ -650,6 +650,8 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     try {
         done = await play(installedAppId, loop, server, now);
     } catch (error) {
+        if (error instanceof stageService.CalledOff || error instanceof arenaService.TooFew)
+            return finish(installedAppId, loop, server, "cancelled", error.message);
         if (error instanceof PlaceNotFound || error instanceof arenaService.EventStopped)
             return finish(installedAppId, loop, server, "failed", error.message);
         if (error instanceof stageService.CalledOff)

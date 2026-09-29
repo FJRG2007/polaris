@@ -3353,7 +3353,7 @@ describe("a team duel", () => {
         const after = state();
         expect(after.run).toBeNull();
         expect(after.history[0]).toMatchObject({
-            outcome: "failed",
+            outcome: "cancelled",
             note: "Fewer than two players joined"
         });
         expect(fills()).toEqual([]);
