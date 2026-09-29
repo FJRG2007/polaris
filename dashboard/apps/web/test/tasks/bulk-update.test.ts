@@ -50,7 +50,9 @@ vi.mock("@polaris/db", () => ({
             createMany: assigneeCreateMany
         },
         taskTagLink: { findMany: tagFindMany, deleteMany: vi.fn(), createMany: vi.fn() },
-        activity: { createMany: activityCreateMany, create: activityCreate, count: activityCount }
+        activity: { createMany: activityCreateMany, create: activityCreate, count: activityCount },
+        // The reader's language, for the words an assignment alert says itself.
+        user: { findUnique: vi.fn(async () => null) }
     }
 }));
 

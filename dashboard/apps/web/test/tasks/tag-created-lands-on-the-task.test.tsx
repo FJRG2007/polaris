@@ -17,6 +17,7 @@ import type { PersonRef } from "@/lib/tasks/facts";
 import type { StatusView } from "@/lib/tasks/space-service";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 // The task screen's comment box is the one from Chat, whose emoji picker reaches
 // Chat's own server actions - and that module reads Polaris' configuration as it
@@ -84,8 +85,7 @@ function dialog() {
                 onClose={() => {}}
                 onCreated={() => {}}
             />
-        </ToastProvider>
-    );
+        </ToastProvider>, { wrapper: MessagesWrapper });
 }
 
 /** Type a name no tag carries and take the offer to create it. */

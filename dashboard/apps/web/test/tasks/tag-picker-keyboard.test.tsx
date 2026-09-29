@@ -17,6 +17,7 @@ import { TagPicker } from "@/app/(app)/tasks/pickers";
 import type { TagView } from "@/lib/tasks/space-service";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 afterEach(cleanup);
 
@@ -50,7 +51,7 @@ async function open(user: ReturnType<typeof userEvent.setup>) {
 describe("the tag picker's keyboard", () => {
     it("steps into the list on tab instead of closing", async () => {
         const user = userEvent.setup();
-        render(<Harness />);
+        render(<Harness />, { wrapper: MessagesWrapper });
         const field = await open(user);
 
         await user.keyboard("back{Tab}");
@@ -61,7 +62,7 @@ describe("the tag picker's keyboard", () => {
     it("puts the tag on the task when enter lands on it", async () => {
         const user = userEvent.setup();
         const picked: string[][] = [];
-        render(<Harness onPicked={(ids) => picked.push(ids)} />);
+        render(<Harness onPicked={(ids) => picked.push(ids)} />, { wrapper: MessagesWrapper });
         await open(user);
 
         await user.keyboard("back{Tab}{Enter}");
@@ -70,7 +71,7 @@ describe("the tag picker's keyboard", () => {
 
     it("empties the field and takes the keyboard back, ready for the next tag", async () => {
         const user = userEvent.setup();
-        render(<Harness />);
+        render(<Harness />, { wrapper: MessagesWrapper });
         const field = await open(user);
 
         await user.keyboard("back{Tab}{Enter}");
@@ -81,7 +82,7 @@ describe("the tag picker's keyboard", () => {
     it("takes the second tag typed straight after the first", async () => {
         const user = userEvent.setup();
         const picked: string[][] = [];
-        render(<Harness onPicked={(ids) => picked.push(ids)} />);
+        render(<Harness onPicked={(ids) => picked.push(ids)} />, { wrapper: MessagesWrapper });
         await open(user);
 
         await user.keyboard("back{Tab}{Enter}");

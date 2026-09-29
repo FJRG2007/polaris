@@ -14,6 +14,7 @@ import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import type { ViewProps } from "@/app/(app)/tasks/views/shared";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { DISPLAY_DEFAULTS, type DisplayPreferences } from "@polaris/core";
+import { withMessages } from "../setup/i18n";
 
 // The events feed is a network call the view makes on mount; the calendar has to
 // draw its tasks whether or not anybody has linked a calendar.
@@ -101,11 +102,11 @@ function props(rows: TaskRow[]): ViewProps {
 }
 
 function render(rows: TaskRow[], preferences: DisplayPreferences): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <DisplayFormatProvider preferences={preferences}>
             <CalendarView {...props(rows)} />
         </DisplayFormatProvider>
-    );
+    ));
 }
 
 /** The weekday headings, in the order the grid drew them. */

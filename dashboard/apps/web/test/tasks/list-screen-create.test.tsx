@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
+import { withMessages } from "../setup/i18n";
 
 // The screen calls server actions and the router on interaction only; rendering
 // it needs them to exist, not to work.
@@ -41,7 +42,7 @@ function context(): SpaceContext {
 }
 
 function screen(props: { listId: string | null; defaultListId: string | null; lists: { id: string; name: string }[] }) {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <ListScreen
             listId={props.listId}
             defaultListId={props.defaultListId}
@@ -51,7 +52,7 @@ function screen(props: { listId: string | null; defaultListId: string | null; li
             context={context()}
             lists={props.lists}
         />
-    );
+    ));
 }
 
 describe("making a task from the list screen", () => {

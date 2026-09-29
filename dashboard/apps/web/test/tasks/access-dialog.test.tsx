@@ -18,6 +18,7 @@
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { MessagesWrapper } from "../setup/i18n";
 
 const listSpaceMembersAction = vi.fn();
 const listFolderMembersAction = vi.fn();
@@ -93,8 +94,7 @@ describe("a list, which has no access of its own", () => {
                     asked: { kind: "list", name: "Backlog" }
                 }}
                 onClose={() => {}}
-            />
-        );
+            />, { wrapper: MessagesWrapper });
 
         const said = await screen.findByText(/has no access of its own/);
         expect(said.textContent).toContain("Backlog");
@@ -114,8 +114,7 @@ describe("a list, which has no access of its own", () => {
                     asked: { kind: "list", name: "Inbox" }
                 }}
                 onClose={() => {}}
-            />
-        );
+            />, { wrapper: MessagesWrapper });
 
         const said = await screen.findByText(/has no access of its own/);
         expect(said.textContent).toContain("the space");
@@ -133,8 +132,7 @@ describe("a sprint", () => {
                     asked: { kind: "sprint", name: "Sprint 12" }
                 }}
                 onClose={() => {}}
-            />
-        );
+            />, { wrapper: MessagesWrapper });
 
         const said = await screen.findByText(/has no access of its own/);
         expect(said.textContent).toContain("Sprint 12");
@@ -144,14 +142,14 @@ describe("a sprint", () => {
 describe("who may change it", () => {
     it("offers the invite form when the server says this caller may", async () => {
         listSpaceMembersAction.mockResolvedValue(spaceAnswer(true));
-        render(<AccessDialog target={{ scope: { kind: "space", id: "s1" } }} onClose={() => {}} />);
+        render(<AccessDialog target={{ scope: { kind: "space", id: "s1" } }} onClose={() => {}} />, { wrapper: MessagesWrapper });
 
         await waitFor(() => expect(screen.getByRole("button", { name: /invite/i })).toBeTruthy());
     });
 
     it("draws it read-only when the server says they may not, whatever the screen thought", async () => {
         listSpaceMembersAction.mockResolvedValue(spaceAnswer(false));
-        render(<AccessDialog target={{ scope: { kind: "space", id: "s1" } }} onClose={() => {}} />);
+        render(<AccessDialog target={{ scope: { kind: "space", id: "s1" } }} onClose={() => {}} />, { wrapper: MessagesWrapper });
 
         await screen.findByText("Bo");
         expect(screen.queryByRole("button", { name: /invite/i })).toBeNull();
@@ -160,7 +158,7 @@ describe("who may change it", () => {
 
     it("never offers to take the space off its owner", async () => {
         listSpaceMembersAction.mockResolvedValue(spaceAnswer(true));
-        render(<AccessDialog target={{ scope: { kind: "space", id: "s1" } }} onClose={() => {}} />);
+        render(<AccessDialog target={{ scope: { kind: "space", id: "s1" } }} onClose={() => {}} />, { wrapper: MessagesWrapper });
 
         await screen.findByText("Ada");
         // Bo can be removed; the owner is not a grant and cannot be one - taking
@@ -185,8 +183,7 @@ describe("a grant made further up", () => {
             canManage: true
         });
         render(
-            <AccessDialog target={{ scope: { kind: "folder", id: "f2" } }} onClose={() => {}} />
-        );
+            <AccessDialog target={{ scope: { kind: "folder", id: "f2" } }} onClose={() => {}} />, { wrapper: MessagesWrapper });
 
         await screen.findByText("Bo");
         expect(screen.getByText("Through Acme")).toBeTruthy();
@@ -196,7 +193,7 @@ describe("a grant made further up", () => {
 
 describe("closing", () => {
     it("asks nothing until it is opened", async () => {
-        render(<AccessDialog target={null} onClose={() => {}} />);
+        render(<AccessDialog target={null} onClose={() => {}} />, { wrapper: MessagesWrapper });
         await Promise.resolve();
         expect(listSpaceMembersAction).not.toHaveBeenCalled();
         expect(listFolderMembersAction).not.toHaveBeenCalled();
@@ -206,7 +203,7 @@ describe("closing", () => {
         const user = userEvent.setup();
         const closed = vi.fn();
         listSpaceMembersAction.mockResolvedValue(spaceAnswer(true));
-        render(<AccessDialog target={{ scope: { kind: "space", id: "s1" } }} onClose={closed} />);
+        render(<AccessDialog target={{ scope: { kind: "space", id: "s1" } }} onClose={closed} />, { wrapper: MessagesWrapper });
 
         await screen.findByText("Ada");
         await user.keyboard("{Escape}");

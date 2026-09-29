@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { StatusView } from "@/lib/tasks/space-service";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
+import { withMessages } from "../setup/i18n";
 
 // The task screen's comment box is the one from Chat, whose emoji picker reaches
 // Chat's own server actions - and that module reads Polaris' configuration as it
@@ -53,7 +54,7 @@ function context(overrides: Partial<SpaceContext> = {}): SpaceContext {
 }
 
 function board(overrides: Partial<SpaceContext> = {}): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <ListScreen
             listId="l1"
             defaultListId="l1"
@@ -63,11 +64,11 @@ function board(overrides: Partial<SpaceContext> = {}): string {
             context={context(overrides)}
             lists={[{ id: "l1", name: "Inbox", spaceId: "s1" }]}
         />
-    );
+    ));
 }
 
 function spaceSettings(canManage: boolean): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <SpaceScreen
             spaceId="s1"
             name="Product"
@@ -87,7 +88,7 @@ function spaceSettings(canManage: boolean): string {
             baseUrl="https://polaris.test"
             initialTab="Statuses"
         />
-    );
+    ));
 }
 
 describe("managing a board's columns", () => {

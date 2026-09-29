@@ -21,6 +21,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { TagView } from "@/lib/tasks/space-service";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MessagesWrapper, withMessages } from "../setup/i18n";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh() {}, push() {} }),
@@ -45,13 +46,13 @@ const TAGS: TagView[] = [
 /** The picker as a task draws it, opened. Its menu is portalled and built only
  *  when it opens, so there is nothing to read until it has been. */
 async function openPicker(spaceId: string) {
-    render(<TagPicker tags={TAGS} spaceId={spaceId} selected={[]} onChange={() => undefined} />);
+    render(<TagPicker tags={TAGS} spaceId={spaceId} selected={[]} onChange={() => undefined} />, { wrapper: MessagesWrapper });
     await userEvent.setup().click(screen.getByRole("button", { name: "Tags" }));
     return screen.findByRole("menu");
 }
 
 function spaceSettings(canManage: boolean): string {
-    return renderToStaticMarkup(
+    return renderToStaticMarkup(withMessages(
         <SpaceScreen
             spaceId="s1"
             name="Product"
@@ -71,7 +72,7 @@ function spaceSettings(canManage: boolean): string {
             baseUrl="https://polaris.test"
             initialTab="Tags"
         />
-    );
+    ));
 }
 
 describe("the space's own tags tab", () => {

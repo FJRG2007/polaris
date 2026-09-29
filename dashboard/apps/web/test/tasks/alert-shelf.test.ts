@@ -27,6 +27,8 @@ vi.mock("@polaris/db", () => ({
         },
         teamMember: { findMany: async () => [] },
         user: {
+            // The reader's language, for the words a reminder says itself.
+            findUnique: async () => null,
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
                 where.id.in.map((id) => ({ id, isAdmin: false }))
         },
