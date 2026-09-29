@@ -41,11 +41,14 @@ const bodySchema = z.object({
 
 export async function POST(request: Request): Promise<Response> {
     const worker = await authorizeWorker(request);
+    // i18n-ignore: read by the vision worker, not by a person
     if (!worker) return Response.json({ error: "Not authorized." }, { status: 401 });
     const install = await homeInstall();
+    // i18n-ignore: read by the vision worker, not by a person
     if (!install) return Response.json({ error: "Home is not set up." }, { status: 404 });
 
     const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+    // i18n-ignore: read by the vision worker, not by a person
     if (!parsed.success) return Response.json({ error: "Malformed report." }, { status: 400 });
     if (parsed.data.cameras.length === 0) return Response.json({ ok: true });
 

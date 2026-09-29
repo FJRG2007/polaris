@@ -52,17 +52,21 @@ const bodySchema = z.object({
 
 export async function POST(request: Request): Promise<Response> {
     const worker = await authorizeWorker(request);
+    // i18n-ignore: read by the vision worker, not by a person
     if (!worker) return Response.json({ error: "Not authorized." }, { status: 401 });
     const install = await homeInstall();
+    // i18n-ignore: read by the vision worker, not by a person
     if (!install) return Response.json({ error: "Home is not set up." }, { status: 404 });
 
     const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+    // i18n-ignore: read by the vision worker, not by a person
     if (!parsed.success) return Response.json({ error: "Malformed report." }, { status: 400 });
 
     const camera = await prisma.camera.findFirst({
         where: { id: parsed.data.cameraId, installedAppId: install.id },
         select: { id: true, storageTarget: true }
     });
+    // i18n-ignore: read by the vision worker, not by a person
     if (!camera) return Response.json({ error: "No such camera." }, { status: 404 });
 
     // The end of something is only ever an update to the event its beginning
@@ -76,6 +80,7 @@ export async function POST(request: Request): Promise<Response> {
     if (parsed.data.still) {
         const bytes = Buffer.from(parsed.data.still, "base64");
         if (bytes.byteLength > MAX_STILL_BYTES) {
+            // i18n-ignore: read by the vision worker, not by a person
             return Response.json({ error: "That picture is too large." }, { status: 413 });
         }
         stillKey = await storeStill(camera, bytes).catch(() => null);

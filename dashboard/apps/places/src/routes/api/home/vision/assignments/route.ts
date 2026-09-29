@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
     const worker = await authorizeWorker(request);
+    // i18n-ignore: read by the vision worker, not by a person
     if (!worker) return Response.json({ error: "Not authorized." }, { status: 401 });
     const install = await homeInstall();
     if (!install) return Response.json({ assignments: [] });

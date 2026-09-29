@@ -29,6 +29,7 @@ import {
     Select
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
+import { usePlacesT } from "../use-places-t";
 
 const { runAction } = hostUi.runAction;
 
@@ -46,6 +47,7 @@ export function DiscoverDialog({
     onClose: () => void;
     onPick: (found: DiscoveredCamera) => void;
 }) {
+    const t = usePlacesT();
     const [subnet, setSubnet] = useState("");
     const [from, setFrom] = useState("");
     const [busy, setBusy] = useState(false);
@@ -72,10 +74,9 @@ export function DiscoverDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Look for cameras</DialogTitle>
+                    <DialogTitle>{t("cameras.discover")}</DialogTitle>
                     <DialogDescription>
-                        Polaris asks the network first. Give it an address range as well if your
-                        cameras sit behind a repeater or an access point that blocks that.
+                        {t("discover.intro")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -83,7 +84,7 @@ export function DiscoverDialog({
                     <div className="flex items-end gap-2">
                         <label className="flex flex-1 flex-col gap-1.5">
                             <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                Address range
+                                {t("discover.range")}
                             </span>
                             <Input
                                 value={subnet}
@@ -97,19 +98,19 @@ export function DiscoverDialog({
                             ) : (
                                 <Radar className="size-4 shrink-0" />
                             )}
-                            Look
+                            {t("discover.look")}
                         </Button>
                     </div>
                     {servers.length > 0 ? (
                         <label className="flex flex-col gap-1.5">
                             <span className="text-[0.75rem] font-medium text-muted-foreground">
-                                Look from
+                                {t("discover.from")}
                             </span>
                             <Select
                                 value={from}
                                 onValueChange={setFrom}
                                 options={[
-                                    { value: "", label: "Polaris itself" },
+                                    { value: "", label: t("dialog.direct") },
                                     ...servers.map((server) => ({
                                         value: server.id,
                                         label: server.label
@@ -117,9 +118,7 @@ export function DiscoverDialog({
                                 ]}
                             />
                             <span className="text-[0.6875rem] text-foreground-subtle">
-                                For a camera on a network Polaris cannot reach - another building, a
-                                guest network, the far side of a repeater. That machine does the
-                                looking.
+                                {t("discover.fromHint")}
                             </span>
                         </label>
                     ) : null}
@@ -130,8 +129,7 @@ export function DiscoverDialog({
                 {found !== null ? (
                     found.length === 0 ? (
                         <p className="mt-4 text-[0.8125rem] text-muted-foreground">
-                            Nothing answered. If the camera is on another network, add it by address
-                            and choose the server that can see it.
+                            {t("discover.nothing")}
                         </p>
                     ) : (
                         <ul className="mt-4 flex flex-col divide-y divide-border rounded-lg border border-border">
@@ -147,19 +145,19 @@ export function DiscoverDialog({
                                         <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                             {camera.name ? `${camera.address} - ` : ""}
                                             {camera.via === "probe"
-                                                ? "answered ONVIF"
-                                                : "has a stream port open"}
+                                                ? t("discover.onvif")
+                                                : t("discover.port")}
                                         </p>
                                     </div>
                                     {known.has(camera.address) ? (
-                                        <Badge variant="neutral">Added</Badge>
+                                        <Badge variant="neutral">{t("discover.added")}</Badge>
                                     ) : (
                                         <Button
                                             size="sm"
                                             variant="secondary"
                                             onClick={() => onPick(camera)}
                                         >
-                                            Add
+                                            {t("discover.add")}
                                         </Button>
                                     )}
                                 </li>
@@ -170,7 +168,7 @@ export function DiscoverDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Close
+                        {t("discover.close")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

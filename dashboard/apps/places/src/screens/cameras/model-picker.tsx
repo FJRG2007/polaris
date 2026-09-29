@@ -22,7 +22,9 @@ import { Camera, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
     CAMERA_MODELS,
+    brandName,
     cameraModel,
+    modelName,
     modelsOfBrand,
     searchBrands,
     searchModels,
@@ -37,6 +39,7 @@ import {
     MenuSearch
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
+import { usePlacesT } from "../use-places-t";
 
 const { TpLinkMark } = hostUi.brandIcons;
 
@@ -100,11 +103,13 @@ export function BrandMark({ brand, className }: { brand: string; className?: str
  *  the list on purpose - it is what somebody scanning for "Reolink" is looking
  *  for, and the model alone is a part number. */
 function ModelLabel({ model }: { model: CameraModel }) {
+    const t = usePlacesT();
     return (
         <span className="flex min-w-0 items-center gap-2">
             <BrandMark brand={model.brand} />
             <span className="truncate">
-                <span className="text-muted-foreground">{model.brand}</span> {model.name}
+                <span className="text-muted-foreground">{brandName(model.brand, t)}</span>{" "}
+                {modelName(model, t)}
             </span>
         </span>
     );
@@ -126,6 +131,7 @@ export function BrandPicker({
     value: string;
     onChange: (brand: string) => void;
 }) {
+    const t = usePlacesT();
     const [query, setQuery] = useState("");
     const matches = useMemo(() => searchBrands(query), [query]);
 
@@ -133,17 +139,17 @@ export function BrandPicker({
         <PickerMenu
             query={query}
             onQuery={setQuery}
-            label="Camera brand"
-            placeholder="Tapo, TP-Link, Reolink"
-            empty="No make by that name. Pick Other and Polaris asks the camera the rest."
+            label={t("modelPicker.brandLabel")}
+            placeholder={t("modelPicker.brandPlaceholder")}
+            empty={t("modelPicker.brandEmpty")}
             value={
                 value ? (
                     <span className="flex min-w-0 items-center gap-2">
                         <BrandMark brand={value} />
-                        <span className="truncate">{value}</span>
+                        <span className="truncate">{brandName(value, t)}</span>
                     </span>
                 ) : (
-                    <span className="truncate text-foreground-subtle">Who makes it</span>
+                    <span className="truncate text-foreground-subtle">{t("modelPicker.brandNone")}</span>
                 )
             }
         >
@@ -153,7 +159,7 @@ export function BrandPicker({
                       <DropdownMenuItem key={entry.brand} onSelect={() => onChange(entry.brand)}>
                           <span className="flex min-w-0 items-center gap-2">
                               <BrandMark brand={entry.brand} />
-                              <span className="truncate">{entry.brand}</span>
+                              <span className="truncate">{brandName(entry.brand, t)}</span>
                               <span className="ml-auto shrink-0 text-[0.6875rem] text-foreground-subtle">
                                   {entry.count}
                               </span>
@@ -170,7 +176,7 @@ export function ModelPicker({
     onChange,
     /** What to show when nothing is picked - which is every camera added before
      *  this list existed, and they must not read as broken. */
-    placeholder = "Choose the camera"
+    placeholder
 }: {
     value: string;
     /** The make already chosen, which is what this is listing. Empty lists every
@@ -179,6 +185,7 @@ export function ModelPicker({
     onChange: (modelId: string) => void;
     placeholder?: string;
 }) {
+    const t = usePlacesT();
     const [query, setQuery] = useState("");
     // Narrowed to the make first, because a list of every camera anybody makes
     // is a list nobody reads - and then searched inside it, because a make with
@@ -198,14 +205,16 @@ export function ModelPicker({
         <PickerMenu
             query={query}
             onQuery={setQuery}
-            label="Camera model"
-            placeholder="C410, tapo c200, tplink"
-            empty={'No camera by that name. Pick the closest one, or "Something else".'}
+            label={t("modelPicker.modelLabel")}
+            placeholder={t("modelPicker.modelPlaceholder")}
+            empty={t("modelPicker.modelEmpty")}
             value={
                 chosen ? (
                     <ModelLabel model={chosen} />
                 ) : (
-                    <span className="truncate text-foreground-subtle">{placeholder}</span>
+                    <span className="truncate text-foreground-subtle">
+                        {placeholder ?? t("modelPicker.modelNone")}
+                    </span>
                 )
             }
         >

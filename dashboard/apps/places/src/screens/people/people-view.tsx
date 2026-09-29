@@ -38,10 +38,12 @@ import {
     ConfirmDeleteDialog
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
+import { usePlacesT } from "../use-places-t";
 
 const { runAction } = hostUi.runAction;
 
 export function PeopleView({ canManage }: { canManage: boolean }) {
+    const t = usePlacesT();
     const [people, setPeople] = useState<PersonView[] | null>(null);
     const [ready, setReady] = useState(true);
     const [adding, setAdding] = useState(false);
@@ -175,10 +177,9 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
         <div className="flex flex-col gap-4">
             {!ready ? (
                 <p className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-[0.75rem] text-muted-foreground">
-                    Nothing is recognizing faces yet. Names written here start working the moment
-                    something is.
+                    {t("people.noRecognizer")}
                     <Button asChild variant="secondary" size="sm">
-                        <Link href="/places/settings">Set it up</Link>
+                        <Link href="/places/settings">{t("people.setUp")}</Link>
                     </Button>
                 </p>
             ) : null}
@@ -187,7 +188,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                 <div className="flex flex-wrap gap-2">
                     <Button onClick={() => setAdding(true)}>
                         <UserPlus className="size-4 shrink-0" />
-                        Add somebody
+                        {t("people.add")}
                     </Button>
                 </div>
             ) : null}
@@ -199,13 +200,13 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
             ) : people.length === 0 ? (
                 <EmptyState
                     icon={<ScanFace />}
-                    title="Nobody yet"
-                    description="Add the people who live here with a few photographs each, and the cameras stop reporting them as strangers."
+                    title={t("people.emptyTitle")}
+                    description={t("people.emptyBody")}
                     action={
                         canManage ? (
                             <Button size="sm" onClick={() => setAdding(true)}>
                                 <UserPlus className="size-4 shrink-0" />
-                                Add somebody
+                                {t("people.add")}
                             </Button>
                         ) : undefined
                     }
@@ -214,7 +215,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                 <ul
                     tabIndex={0}
                     onKeyDown={onKeyDown}
-                    aria-label="People"
+                    aria-label={t("pages.people.title")}
                     className="flex flex-col divide-y divide-border rounded-lg border border-border"
                 >
                     {people.map((person) => (
@@ -234,7 +235,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                             <Input
                                                 ref={nameField}
                                                 value={draft}
-                                                aria-label={`Name for ${person.name}`}
+                                                aria-label={t("people.nameFor", { name: person.name })}
                                                 className="h-7 text-[0.8125rem]"
                                                 onChange={(event) => setDraft(event.target.value)}
                                                 onBlur={() => commitRename(person)}
@@ -258,24 +259,24 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                         )}
                                         <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                             {person.faces === 0
-                                                ? "No photographs yet - they will still be reported as a stranger"
-                                                : `${person.faces} photograph${person.faces === 1 ? "" : "s"}`}
+                                                ? t("people.noPhotos")
+                                                : t("people.photoCount", { count: person.faces })}
                                         </p>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-2">
                                         {person.faces > 0 && person.faces < 3 ? (
                                             <Badge
                                                 variant="warning"
-                                                title="A few photographs recognize a person; one recognizes a photograph"
+                                                title={t("people.fewHint")}
                                             >
-                                                Add more
+                                                {t("people.addMore")}
                                             </Badge>
                                         ) : null}
                                         <label className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">
-                                            Tell me
+                                            {t("people.tellMe")}
                                             <Switch
                                                 checked={person.notify}
-                                                aria-label={`Report when ${person.name} is seen`}
+                                                aria-label={t("people.reportWhen", { name: person.name })}
                                                 onChange={(value) => {
                                                     setPeople((current) =>
                                                         (current ?? []).map((item) =>
@@ -296,8 +297,8 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label={`Add a photograph of ${person.name}`}
-                                                    title="Add a photograph"
+                                                    aria-label={t("people.addPhotoOf", { name: person.name })}
+                                                    title={t("people.addPhoto")}
                                                     disabled={!ready || uploading === person.id}
                                                     onClick={() => pickPhoto(person)}
                                                 >
@@ -310,8 +311,8 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label={`Forget ${person.name}`}
-                                                    title="Forget them"
+                                                    aria-label={t("people.forgetName", { name: person.name })}
+                                                    title={t("people.forget")}
                                                     onClick={() => setRemoving(person)}
                                                 >
                                                     <Trash2 className="size-4 shrink-0" />
@@ -327,14 +328,14 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                     <>
                                         <ContextMenuItem onSelect={() => startRename(person)}>
                                             <Pencil className="size-4 shrink-0" />
-                                            Rename
+                                            {t("people.rename")}
                                         </ContextMenuItem>
                                         <ContextMenuItem
                                             disabled={!ready}
                                             onSelect={() => pickPhoto(person)}
                                         >
                                             <ImagePlus className="size-4 shrink-0" />
-                                            Add a photograph
+                                            {t("people.addPhoto")}
                                         </ContextMenuItem>
                                         <ContextMenuSeparator />
                                         <ContextMenuItem
@@ -342,12 +343,12 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                             onSelect={() => setRemoving(person)}
                                         >
                                             <Trash2 className="size-4 shrink-0" />
-                                            Forget them
+                                            {t("people.forget")}
                                         </ContextMenuItem>
                                     </>
                                 ) : (
                                     <ContextMenuItem disabled>
-                                        Nothing to change here
+                                        {t("cameras.nothingToChange")}
                                     </ContextMenuItem>
                                 )}
                             </ContextMenuContent>
@@ -382,9 +383,14 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                     onOpenChange={(open) => !open && setRemoving(null)}
                     name={removing.name}
                     kind="person"
+                    title={t("people.forgetTitle")}
+                    question={t.rich("people.forgetQuestion", {
+                        name: removing.name,
+                        em: (chunks) => <span className="font-medium text-foreground">{chunks}</span>
+                    })}
                     requireTyping={false}
-                    description="Their photographs are deleted from the recognizer as well. The cameras will report them as a stranger from then on."
-                    confirmLabel="Forget them"
+                    description={t("people.forgetBody")}
+                    confirmLabel={t("people.forget")}
                     onConfirm={() => remove(removing)}
                 />
             ) : null}

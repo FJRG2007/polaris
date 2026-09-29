@@ -29,6 +29,7 @@ import {
     Input
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
+import { usePlacesT } from "../use-places-t";
 
 const { runAction } = hostUi.runAction;
 
@@ -51,6 +52,7 @@ export function PersonDialog({
     onClose: () => void;
     onSaved: (person: PersonView) => void;
 }) {
+    const t = usePlacesT();
     const [name, setName] = useState("");
     const [chosen, setChosen] = useState<Chosen[]>([]);
     const [busy, setBusy] = useState(false);
@@ -90,7 +92,7 @@ export function PersonDialog({
         // photographs that worked.
         const refused: string[] = [];
         for (const [index, item] of chosen.entries()) {
-            setProgress(`Sending ${index + 1} of ${chosen.length}`);
+            setProgress(t("people.sending", { at: index + 1, total: chosen.length }));
             const bytes = new Uint8Array(await item.file.arrayBuffer());
             const result = await runAction(
                 () => actions.addFaceAction(created.person!.id, bytes, item.file.type),
@@ -103,7 +105,7 @@ export function PersonDialog({
 
         if (refused.length > 0) {
             setError(
-                `${refused.length} of ${chosen.length} photographs were not accepted. ${refused[0]}`
+                t("people.refused", { count: refused.length, total: chosen.length, first: refused[0] ?? "" })
             );
             // The person exists either way, so the list is told about them.
             onSaved({ ...created.person, faces: chosen.length - refused.length });
@@ -116,29 +118,28 @@ export function PersonDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add somebody</DialogTitle>
+                    <DialogTitle>{t("people.add")}</DialogTitle>
                     <DialogDescription>
-                        Their name, and a few photographs of their face. Without photographs the
-                        cameras still see them - they are just reported as a stranger.
+                        {t("people.addIntro")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            Name<span className="text-danger"> *</span>
+                            {t("placeDialog.name")}<span className="text-danger"> *</span>
                         </span>
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder="Ana"
+                            placeholder={t("people.namePlaceholder")}
                             autoFocus
                         />
                     </label>
 
                     <div className="flex flex-col gap-2">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            Photographs
+                            {t("people.photos")}
                         </span>
                         {chosen.length > 0 ? (
                             <ul className="flex flex-wrap gap-2">
@@ -154,7 +155,7 @@ export function PersonDialog({
                                         <button
                                             type="button"
                                             onClick={() => drop(index)}
-                                            aria-label="Remove this photograph"
+                                            aria-label={t("people.removePhoto")}
                                             className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full border border-border bg-elevated text-foreground-subtle hover:text-foreground"
                                         >
                                             <X className="size-3 shrink-0" />
@@ -172,12 +173,12 @@ export function PersonDialog({
                             onClick={() => fileInput.current?.click()}
                         >
                             <ImagePlus className="size-4 shrink-0" />
-                            {chosen.length > 0 ? "Add more" : "Choose photographs"}
+                            {chosen.length > 0 ? t("people.addMore") : t("people.choose")}
                         </Button>
                         <span className="text-[0.6875rem] text-foreground-subtle">
                             {recognizerReady
-                                ? "Four or five, in different light, one face per photograph. One photograph recognizes that photograph; several recognize a person."
-                                : "Face recognition is off, so there is nowhere to send them. Turn it on under Settings - the name can be written down now and starts working then."}
+                                ? t("people.photosHint")
+                                : t("people.facesOff")}
                         </span>
                         <input
                             ref={fileInput}
@@ -197,11 +198,11 @@ export function PersonDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={busy}>
-                        Cancel
+                        {t("common.cancel")}
                     </Button>
                     <Button onClick={save} disabled={busy || !name.trim()}>
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                        {progress || "Add person"}
+                        {progress || t("people.addPerson")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

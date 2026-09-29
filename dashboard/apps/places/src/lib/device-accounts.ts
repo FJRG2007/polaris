@@ -363,6 +363,7 @@ async function adoptLegacyAccount(installedAppId: string): Promise<void> {
                 installedAppId,
                 brand: "Nuki",
                 connection: NUKI_WEB,
+                // i18n-ignore: the maker's own name
                 label: label?.value?.trim() || "Nuki",
                 secret: sealCredentials({ token }),
                 status: status?.value === "unauthorized" ? "unauthorized" : "ok"

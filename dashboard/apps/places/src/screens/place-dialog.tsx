@@ -14,7 +14,8 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { savePlaceAction } from "./actions";
-import { PLACE_KINDS, PLACE_KIND_LABELS, type PlaceKind, type PlaceView } from "../lib/place-kinds";
+import { PLACE_KINDS, type PlaceKind, type PlaceView } from "../lib/place-kinds";
+import { usePlacesT } from "./use-places-t";
 import {
     Button,
     Dialog,
@@ -39,6 +40,7 @@ export function PlaceDialog({
     onClose: () => void;
     onSaved: (place: PlaceView) => void;
 }) {
+    const t = usePlacesT();
     const [name, setName] = useState(place?.name ?? "");
     const [kind, setKind] = useState(place?.kind ?? "house");
     const [address, setAddress] = useState(place?.address ?? "");
@@ -64,45 +66,45 @@ export function PlaceDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{place ? place.name : "Add a place"}</DialogTitle>
+                    <DialogTitle>{place ? place.name : t("placeDialog.addTitle")}</DialogTitle>
                     <DialogDescription>
-                        A house, an office, a workshop - anywhere with cameras of its own.
+                        {t("placeDialog.description")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            Name<span className="text-danger"> *</span>
+                            {t("placeDialog.name")}<span className="text-danger"> *</span>
                         </span>
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder="The flat"
+                            placeholder={t("placeDialog.namePlaceholder")}
                             autoFocus
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            What it is
+                            {t("placeDialog.kind")}
                         </span>
                         <Select
                             value={kind}
                             onValueChange={setKind}
                             options={PLACE_KINDS.map((value) => ({
                                 value,
-                                label: PLACE_KIND_LABELS[value as PlaceKind]
+                                label: t(`placeKinds.${value as PlaceKind}`)
                             }))}
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            Where it is
+                            {t("placeDialog.address")}
                         </span>
                         <Input
                             value={address}
                             onChange={(event) => setAddress(event.target.value)}
-                            placeholder="Optional, and only ever written down"
+                            placeholder={t("placeDialog.addressPlaceholder")}
                         />
                     </label>
                 </div>
@@ -111,11 +113,11 @@ export function PlaceDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={busy}>
-                        Cancel
+                        {t("common.cancel")}
                     </Button>
                     <Button onClick={save} disabled={busy || !name.trim()}>
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                        {place ? "Save" : "Add place"}
+                        {place ? t("common.save") : t("placeDialog.add")}
                     </Button>
                 </DialogFooter>
             </DialogContent>
