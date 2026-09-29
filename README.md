@@ -128,7 +128,8 @@ with one thing does not get the rest.
   backups of it with restore.
 - **Marketplace** - one-press installs for the things people actually self-host,
   including **game servers** (Minecraft, ARK and FiveM, with worlds, mods,
-  resources, players, schedules and crash detection).
+  resources, players, schedules, crash detection and Minecraft challenges -
+  daily, weekly, a season pass, bingo and community goals).
 - **Runners** - GitHub Actions compatible CI on your own machines, with per-repo
   policy and budgets.
 - **Agents** - coding agents that work in a repository: headless runs that open
