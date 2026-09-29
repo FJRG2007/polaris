@@ -1,1 +1,73 @@
-{}
+{
+    "staged": {
+        "elsewhere": "{count, plural, one {# pending change} other {# pending changes}} in another environment",
+        "pending": "{count, plural, one {# pending change} other {# pending changes}}",
+        "switch": "Switch to that environment to review and deploy them.",
+        "review": "Nothing has been removed yet. Review the changeset, then deploy it.",
+        "details": "Details",
+        "deploy": "Deploy",
+        "deployCount": "Deploy {count}",
+        "title": "Pending changes",
+        "description": "These take effect when you deploy. Discard any you did not mean.",
+        "otherEnvironment": "Other environment",
+        "discardNamed": "Discard removing {name}",
+        "discard": "Discard",
+        "failed": "Some changes could not be applied",
+        "stillPending": "They are still pending. Deploying again retries only these.",
+        "discardAll": "Discard all here"
+    },
+    "glance": {
+        "up": "Answering",
+        "down": "Not answering",
+        "unchecked": "Not checked yet",
+        "summary": "Environment summary",
+        "switch": "Switch address",
+        "addresses": "Addresses in this environment",
+        "noAddress": "No address yet",
+        "open": "Open {name}",
+        "lastDeploy": "Last deploy",
+        "notDeployed": "Not deployed yet",
+        "needsLook": "{name} needs a look",
+        "needLook": "{count} services need a look"
+    },
+    "sections": {
+        "architecture": {
+            "label": "Architecture",
+            "hint": "Services and how they connect"
+        },
+        "elsewhere": {
+            "label": "Elsewhere",
+            "hint": "What this project runs on Vercel or Railway"
+        },
+        "observability": {
+            "label": "Observability",
+            "hint": "Metrics across the environment"
+        },
+        "logs": {
+            "label": "Logs",
+            "hint": "Every service's output in one stream"
+        },
+        "settings": {
+            "label": "Settings",
+            "hint": "Project configuration"
+        }
+    },
+    "shell": {
+        "newProject": "New project",
+        "project": "Project",
+        "environment": "Environment",
+        "attention": "{count, plural, one {# service needs a look} other {# services need a look}}",
+        "name": "Project name",
+        "cancel": "Cancel",
+        "create": "Create"
+    },
+    "detail": {
+        "localNotReady": "The local host is not ready to build and deploy. This needs the full edition with a running <code>{daemon}</code>.",
+        "firewall": "Firewall",
+        "canvasView": "Canvas view",
+        "listView": "List view",
+        "noEnvironments": "This project has no environments.",
+        "noServices": "No services",
+        "online": "{online}/{total} online"
+    }
+}

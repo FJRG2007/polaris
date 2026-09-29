@@ -78,7 +78,9 @@ export function DangerSection({
                 open={confirming}
                 onOpenChange={setConfirming}
                 name={settings.name}
-                kind={t("danger.kind")}
+                kind="project"
+                title={t("danger.delete")}
+                confirmLabel={t("danger.delete")}
                 description={t("danger.confirmDescription")}
                 error={error}
                 pending={pending}

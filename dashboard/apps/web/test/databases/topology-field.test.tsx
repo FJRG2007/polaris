@@ -3,6 +3,7 @@
  * one, and saying plainly what a sharded cluster does not get yet.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -12,7 +13,7 @@ import {
 } from "@/app/(app)/apps/deploy/database-topology-field";
 
 function render(engine: string, value = SINGLE_TOPOLOGY): string {
-    return renderToStaticMarkup(<DatabaseTopologyField engine={engine} value={value} onChange={() => undefined} />);
+    return renderToStaticMarkup(withMessages(<DatabaseTopologyField engine={engine} value={value} onChange={() => undefined} />));
 }
 
 describe("the layout field", () => {

@@ -18,6 +18,8 @@ import { useState } from "react";
 import { Button, cn } from "@polaris/ui";
 import { dbEngineLabel } from "@polaris/core";
 import { dbTone, StatusPill } from "./deploy-view";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { Activity, ChevronDown, Layers } from "lucide-react";
 import { CONSUMPTION_METRICS, MetricsHistory, percent, type MetricSpec } from "@/components/metrics-history";
@@ -54,10 +56,10 @@ interface HttpPoint {
     bytesPerSec: number;
 }
 
-const TRAFFIC: MetricSpec<HttpPoint>[] = [
+const traffic = (t: NamespaceTranslator<"deploy">): MetricSpec<HttpPoint>[] => [
     {
         key: "req",
-        label: "Requests",
+        label: t("observability.requests"),
         value: (point) => point.requests,
         format: (value) => String(Math.round(value)),
         tone: "primary",
@@ -65,7 +67,7 @@ const TRAFFIC: MetricSpec<HttpPoint>[] = [
     },
     {
         key: "err",
-        label: "Error rate",
+        label: t("observability.errorRate"),
         value: (point) => point.errorRate,
         format: percent,
         tone: "danger",
@@ -74,7 +76,7 @@ const TRAFFIC: MetricSpec<HttpPoint>[] = [
     },
     {
         key: "rt",
-        label: "Response time",
+        label: t("observability.responseTime"),
         value: (point) => point.avgResponseMs,
         format: (value) => `${Math.round(value)} ms`,
         tone: "warning",
@@ -82,7 +84,7 @@ const TRAFFIC: MetricSpec<HttpPoint>[] = [
     },
     {
         key: "net",
-        label: "Traffic",
+        label: t("observability.traffic"),
         value: (point) => point.bytesPerSec,
         format: formatRate,
         tone: "success",
@@ -101,20 +103,19 @@ export function ObservabilityView({
 }) {
     // The first running service starts open, because a screen of ten collapsed
     // rows answers nothing - and a stopped one has no chart to show.
+    const t = useTranslations("deploy");
     const [open, setOpen] = useState<string | null>(services.find((service) => service.running)?.id ?? null);
 
     return (
         <div className="flex w-full flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Observability</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Consumption and traffic across {environmentName}. Up to 30 days of history per service.
-                    </p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("observability.title")}</h1>
+                    <p className="text-sm text-muted-foreground">{t("observability.intro", { environment: environmentName })}</p>
                 </div>
                 <Button asChild variant="ghost" size="sm">
                     <Link href="/watch">
-                        <Activity className="size-4" /> Alarms in Watch
+                        <Activity className="size-4" /> {t("observability.alarms")}
                     </Link>
                 </Button>
             </div>
@@ -122,7 +123,7 @@ export function ObservabilityView({
             {services.length === 0 && databases.length === 0 ? (
                 <div className="rounded-lg border border-border/60 px-4 py-16 text-center">
                     <p className="text-sm text-muted-foreground">
-                        Nothing to observe yet. Add a service to this environment.
+                        {t("observability.empty")}
                     </p>
                 </div>
             ) : (
@@ -138,11 +139,8 @@ export function ObservabilityView({
 
                     {databases.length > 0 && (
                         <section className="rounded-lg border border-border/60 p-4">
-                            <h2 className="text-sm font-medium">Databases</h2>
-                            <p className="mb-2 text-xs text-muted-foreground">
-                                Managed databases report their state rather than a series - their containers are not
-                                sampled the way services are.
-                            </p>
+                            <h2 className="text-sm font-medium">{t("observability.databases")}</h2>
+                            <p className="mb-2 text-xs text-muted-foreground">{t("observability.databasesHint")}</p>
                             <div className="overflow-hidden rounded-md border border-border/60">
                                 {databases.map((database) => (
                                     <div
@@ -177,6 +175,7 @@ function ServicePanel({
     open: boolean;
     onToggle: () => void;
 }) {
+    const t = useTranslations("deploy");
     return (
         <section className="overflow-hidden rounded-lg border border-border/60">
             <button
@@ -189,7 +188,7 @@ function ServicePanel({
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{service.name}</span>
                 <span
                     className={cn("size-1.5 shrink-0 rounded-full", service.running ? "bg-success-solid" : "bg-muted-foreground")}
-                    title={service.running ? "Running" : "Not running"}
+                    title={service.running ? t("observability.running") : t("observability.notRunning")}
                 />
                 <ChevronDown className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} />
             </button>
@@ -198,7 +197,7 @@ function ServicePanel({
                 <div className="flex flex-col gap-4 border-t border-border/60 p-4">
                     <div>
                         <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            Consumption
+                            {t("observability.consumption")}
                         </h3>
                         <MetricsHistory
                             endpoint={`/api/deploy/apps/${service.id}/metrics/history`}
@@ -208,15 +207,14 @@ function ServicePanel({
                     </div>
                     <div>
                         <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            Traffic
+                            {t("observability.traffic")}
                         </h3>
                         <MetricsHistory<HttpPoint>
                             endpoint={`/api/deploy/apps/${service.id}/http-metrics`}
-                            metrics={TRAFFIC}
+                            metrics={traffic(t)}
                         />
                         <p className="mt-1 text-xs text-muted-foreground">
-                            Derived from the container&apos;s own access logs, so a service that does not log requests
-                            shows nothing here.
+                            {t("observability.trafficHint")}
                         </p>
                     </div>
                 </div>

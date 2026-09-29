@@ -1021,7 +1021,8 @@ function BucketsSection({ storeId, manage, ask }: { storeId: string; manage: boo
                     open
                     onOpenChange={(open) => !open && setRemoving(null)}
                     name={removing.name}
-                    kind={t("database.buckets.kind")}
+                    kind="bucket"
+                    title={t("database.buckets.deleteTitle")}
                     description={t("database.buckets.removeDescription")}
                     confirmLabel={t("database.buckets.remove")}
                     onConfirm={() => {

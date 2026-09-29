@@ -14,6 +14,7 @@ import Link from "next/link";
 import { rankedDomains } from "./domain-rank";
 import { useEffect, useMemo, useState } from "react";
 import { CopyButton } from "@/components/copy-button";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { projectGlanceAction } from "./glance-actions";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { RelativeTime } from "@/components/relative-time";
@@ -78,11 +79,12 @@ const HEALTH_DOT: Record<string, string> = {
 };
 
 function HealthDot({ address }: { address: GlanceAddress }) {
+    const t = useTranslations("deployProject");
     const status = address.healthStatus ?? "unknown";
     return (
         <span
             role="img"
-            aria-label={status === "up" ? "Answering" : status === "down" ? "Not answering" : "Not checked yet"}
+            aria-label={status === "up" ? t("glance.up") : status === "down" ? t("glance.down") : t("glance.unchecked")}
             className={cn("size-1.5 shrink-0 rounded-full", HEALTH_DOT[status] ?? "bg-foreground-subtle")}
         />
     );
@@ -114,6 +116,7 @@ export function ProjectGlanceBar({
     /** Where opening one of its services goes. */
     serviceHref: (applicationId: string) => string;
 }) {
+    const t = useTranslations("deployProject");
     const addresses = useMemo(() => rankedDomains(glance?.addresses ?? []), [glance]);
     const storageKey = `polaris.deploy.glance.${environmentId}`;
     const [picked, setPicked] = useState<string | null>(null);
@@ -132,7 +135,7 @@ export function ProjectGlanceBar({
 
     return (
         <section
-            aria-label="Environment summary"
+            aria-label={t("glance.summary")}
             className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-border bg-card px-4 py-2.5"
         >
             <div className="flex min-w-0 max-w-full flex-1 basis-64 items-center gap-2">
@@ -148,6 +151,7 @@ export function ProjectGlanceBar({
                             <span className="truncate" title={shown.hostname}>{shown.hostname}</span>
                             <ArrowUpRight className="size-3.5 text-muted-foreground" />
                         </a>
+                        {/* i18n-ignore: the shared copy button says "Copy" in English around it */}
                         <CopyButton value={`https://${shown.hostname}`} label="the address" />
                         {addresses.length > 1 && (
                             <DropdownMenu>
@@ -155,7 +159,7 @@ export function ProjectGlanceBar({
                                     <button
                                         type="button"
                                         className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                        aria-label="Switch address"
+                                        aria-label={t("glance.switch")}
                                     >
                                         {shown.service}
                                         <span className="tabular-nums text-foreground-subtle">+{addresses.length - 1}</span>
@@ -163,7 +167,7 @@ export function ProjectGlanceBar({
                                     </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="start" className="max-h-72 max-w-[min(24rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain">
-                                    <DropdownMenuLabel>Addresses in this environment</DropdownMenuLabel>
+                                    <DropdownMenuLabel>{t("glance.addresses")}</DropdownMenuLabel>
                                     {addresses.map((address) => (
                                         <DropdownMenuItem key={address.id} onSelect={() => pick(address.hostname)}>
                                             <HealthDot address={address} />
@@ -180,7 +184,7 @@ export function ProjectGlanceBar({
                     </>
                 ) : (
                     <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                        <Globe className="size-4" /> No address yet
+                        <Globe className="size-4" /> {t("glance.noAddress")}
                     </span>
                 )}
             </div>
@@ -190,9 +194,9 @@ export function ProjectGlanceBar({
                     <Link
                         href={serviceHref(last.applicationId)}
                         className="inline-flex min-w-0 items-center gap-2 rounded-md text-xs text-muted-foreground hover:text-foreground"
-                        title={`Open ${last.service}`}
+                        title={t("glance.open", { name: last.service })}
                     >
-                        <span className="shrink-0">Last deploy</span>
+                        <span className="shrink-0">{t("glance.lastDeploy")}</span>
                         <Badge variant={deployVariant(last.status)} className="shrink-0 capitalize">
                             {last.status.replace(/_/g, " ")}
                         </Badge>
@@ -200,7 +204,7 @@ export function ProjectGlanceBar({
                         <span className="truncate" title={last.service}>{last.service}</span>
                     </Link>
                 ) : (
-                    <span className="text-xs text-muted-foreground">Not deployed yet</span>
+                    <span className="text-xs text-muted-foreground">{t("glance.notDeployed")}</span>
                 )}
                 {firstAttention && (
                     <Link
@@ -210,8 +214,8 @@ export function ProjectGlanceBar({
                     >
                         <CircleAlert className="size-3" />
                         {attention.length === 1
-                            ? `${firstAttention.service} needs a look`
-                            : `${attention.length} services need a look`}
+                            ? t("glance.needsLook", { name: firstAttention.service })
+                            : t("glance.needLook", { count: attention.length })}
                     </Link>
                 )}
             </div>

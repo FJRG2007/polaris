@@ -19,7 +19,6 @@
         "edit": "Edit",
         "remove": "Remove",
         "give": "Give access",
-        "entryKind": "entry",
         "removeAccess": "Remove access",
         "removeDescription": "They lose access to this project. Nothing they deployed is affected.",
         "change": "Change access",
@@ -40,7 +39,8 @@
         "keepDate": "Keep the current date",
         "whenEnds": "When this access ends",
         "cancel": "Cancel",
-        "save": "Save"
+        "save": "Save",
+        "deleteTitle": "Delete entry"
     },
     "tokens": {
         "lifetimes": {
@@ -65,7 +65,6 @@
         "deleteNamed": "Delete {name}",
         "delete": "Delete",
         "new": "New token",
-        "kind": "token",
         "deleteDescription": "Anything using it stops working immediately, and the record of what it did goes with it. Revoke instead if you want to keep the trail.",
         "createFailed": "Could not create the token",
         "createTitle": "New project token",
@@ -81,7 +80,8 @@
         "issuedDescription": "This is the only time it is shown. Polaris stores a hash, so it cannot be recovered later.",
         "copyToken": "Copy token",
         "copy": "Copy",
-        "done": "Done"
+        "done": "Done",
+        "deleteTitle": "Delete token"
     },
     "usage": {
         "loadFailed": "Could not load the usage",
@@ -134,9 +134,9 @@
         "promoteFirst": "Promote another environment first",
         "delete": "Delete environment",
         "new": "New environment",
-        "kind": "environment",
         "deleteWithServices": "Every service in it goes too - {count} of them, with their containers, domains and variables.",
-        "deleteEmpty": "The environment and its variables are removed."
+        "deleteEmpty": "The environment and its variables are removed.",
+        "deleteTitle": "Delete environment"
     },
     "sections": {
         "title": "Project settings",
@@ -245,7 +245,6 @@
         "delete": "Delete project",
         "ownerOnly": "Only {owner}, who owns this project, can delete it.",
         "singleService": "Removing a single service is done from the service itself, and is staged so it can be reviewed before it takes effect.",
-        "kind": "project",
         "confirmDescription": "This is immediate. Unlike removing a service, it is not staged and there is nothing to review afterwards."
     },
     "flags": {

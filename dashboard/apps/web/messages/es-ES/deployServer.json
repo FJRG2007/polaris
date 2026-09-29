@@ -8,7 +8,7 @@
         "checkDetails": "Revisa los datos del entorno",
         "notFound": "No se encontró el entorno",
         "createFailed": "No se pudo crear el entorno",
-        "layoutFailed": "No se pudo guardar la disposición",
+        "layoutFailed": "No se guardó la disposición",
         "deleteFailed": "No se pudo eliminar el entorno",
         "cannotDeploy": "Puedes crear este entorno, pero no desplegarlo. Desmarca «Desplegarlo en cuanto se cree» y vuelve a intentarlo.",
         "renameFailed": "No se pudo cambiar el nombre del entorno",
@@ -25,12 +25,12 @@
         "imageRequired": "Falta la referencia de la imagen (p. ej. nginx:latest)",
         "serverNotFound": "No se encontró el servidor elegido",
         "createFailed": "No se pudo crear la aplicación",
-        "settingsFailed": "No se pudieron guardar los ajustes",
+        "settingsFailed": "No se guardaron los ajustes",
         "gone": "Ese servicio ya no existe",
-        "setupFailed": "No se pudo ejecutar la configuración",
+        "setupFailed": "Falló la configuración",
         "changeFailed": "No se pudo cambiar",
         "portFailed": "No se pudo actualizar el puerto",
-        "runtimeCheck": "Revisa la versión del entorno de ejecución",
+        "runtimeCheck": "Revisa la versión del runtime",
         "pathsFailed": "No se pudieron actualizar las rutas del código",
         "serverFailed": "No se pudo cambiar el servidor",
         "deleteFailed": "No se pudo eliminar el servicio",
@@ -41,9 +41,9 @@
         "revealFailed": "No se pudo mostrar la variable",
         "check": "Revisa las variables",
         "oneGone": "Una de esas variables ya no existe: recarga y vuelve a intentarlo",
-        "saveFailed": "No se pudieron guardar las variables",
-        "nothingToRedeploy": "No hay nada que volver a desplegar",
-        "redeployFailed": "No se pudo iniciar el nuevo despliegue"
+        "saveFailed": "No se guardaron las variables",
+        "nothingToRedeploy": "Nada que redesplegar",
+        "redeployFailed": "No se pudo volver a desplegar"
     },
     "notes": {
         "invalid": "No se puede publicar esa nota",
@@ -80,20 +80,20 @@
     "common": {
         "invalidRequest": "Solicitud no válida",
         "unknownChoice": "Opción desconocida",
-        "checkForm": "Revisa el formulario",
+        "checkForm": "Revisa los datos",
         "pickOption": "Elige una de las opciones disponibles",
-        "serviceNotFound": "No se encontró el servicio",
-        "databaseNotFound": "No se encontró la base de datos",
+        "serviceNotFound": "Servicio no encontrado",
+        "databaseNotFound": "Base no encontrada",
         "invalidRequestShort": "Esa solicitud no es válida",
         "didNotWork": "No ha funcionado",
         "checkDetails": "Revisa los datos y vuelve a intentarlo",
-        "projectNotFound": "No se encontró el proyecto",
-        "unknownService": "Servicio desconocido"
+        "projectNotFound": "Proyecto no encontrado",
+        "unknownService": "Servicio no válido"
     },
     "edge": {
-        "readFailed": "No se pudieron leer los ajustes del borde",
+        "readFailed": "No se leyeron los ajustes del borde",
         "invalid": "Esos ajustes no son válidos",
-        "saveFailed": "No se pudieron guardar los ajustes del borde"
+        "saveFailed": "No se guardaron los ajustes del borde"
     },
     "databases": {
         "invalid": "Esa configuración de base de datos no es válida",
@@ -103,11 +103,11 @@
         "readFailed": "No se pudo leer esta base de datos",
         "membersFailed": "No se pudieron leer los miembros",
         "copySourcesFailed": "No se pudieron listar las bases de datos de origen",
-        "upgradeFailed": "No se pudo iniciar la actualización",
-        "upgradeCancelFailed": "No se pudo cancelar la actualización",
+        "upgradeFailed": "No se pudo iniciar la mejora",
+        "upgradeCancelFailed": "No se pudo cancelar la mejora",
         "revertFailed": "No se pudo volver a la versión anterior",
         "persistenceFailed": "No se pudo cambiar cómo guarda Redis sus datos",
-        "replicaSetFailed": "No se pudo cambiar el conjunto de réplicas",
+        "replicaSetFailed": "No se cambió el conjunto de réplicas",
         "limitsFailed": "No se pudieron cambiar los límites",
         "pitrFailed": "No se pudo cambiar la recuperación a un momento dado",
         "recoveryFailed": "No se pudo iniciar la recuperación",
@@ -117,11 +117,11 @@
         "saveFailed": "No se pudo guardar el acceso al registro"
     },
     "volumes": {
-        "foldersFailed": "No se pudieron listar las carpetas",
+        "foldersFailed": "No se listaron las carpetas",
         "addFailed": "No se pudo añadir el volumen",
         "updateFailed": "No se pudo actualizar el volumen",
         "removeFailed": "No se pudo quitar el volumen",
-        "notFound": "No se encontró el volumen",
+        "notFound": "No existe el volumen",
         "loadFailed": "No se pudo cargar el volumen",
         "measureFailed": "No se pudo medir el volumen",
         "wipeFailed": "No se pudo vaciar el volumen",
@@ -134,15 +134,15 @@
         "loadFailed": "No se pudieron cargar los ajustes del proyecto",
         "saveFailed": "No se pudo guardar el proyecto",
         "visibilityFailed": "No se pudo cambiar la visibilidad",
-        "flagsFailed": "No se pudieron guardar las opciones",
+        "flagsFailed": "No se guardaron las opciones",
         "templateFailed": "No se pudo generar la plantilla",
         "visibilityUnknown": "Elige una de las visibilidades disponibles",
         "unreadable": "No se pudieron leer esos ajustes"
     },
     "members": {
-        "loadFailed": "No se pudieron cargar los miembros",
+        "loadFailed": "No se cargaron los miembros",
         "saveFailed": "No se pudo guardar el acceso",
-        "teamsFailed": "No se pudieron cargar los equipos",
+        "teamsFailed": "No se cargaron los equipos",
         "removeFailed": "No se pudo quitar al miembro"
     },
     "tokens": {
@@ -157,7 +157,7 @@
         "addFailed": "No se pudo añadir el webhook",
         "updateFailed": "No se pudo actualizar el webhook",
         "removeFailed": "No se pudo quitar el webhook",
-        "unreachable": "No se pudo contactar con el endpoint"
+        "unreachable": "No se contactó con el endpoint"
     },
     "usage": {
         "loadFailed": "No se pudo cargar el consumo",
@@ -169,7 +169,7 @@
         "removeDatabaseFailed": "No se pudo quitar la base de datos",
         "discardFailed": "No se pudo descartar el cambio",
         "discardAllFailed": "No se pudieron descartar los cambios",
-        "deployFailed": "No se pudieron desplegar los cambios",
+        "deployFailed": "No se desplegaron los cambios",
         "gone": "Ese cambio ya no está pendiente"
     },
     "crons": {
@@ -177,7 +177,7 @@
         "saveFailed": "No se pudo guardar la tarea programada",
         "removeFailed": "No se pudo quitar la tarea programada",
         "runFailed": "No se pudo iniciar la tarea",
-        "runsFailed": "No se pudieron leer las ejecuciones de la tarea",
+        "runsFailed": "No se leyeron las ejecuciones",
         "checkDetails": "Revisa los datos de la tarea"
     },
     "source": {
@@ -192,8 +192,8 @@
         "check": "Revisa los ajustes de escalado"
     },
     "fix": {
-        "check": "Revisa la corrección",
-        "failed": "No se pudo aplicar la corrección"
+        "check": "Revisa el arreglo",
+        "failed": "No se aplicó la corrección"
     },
     "buckets": {
         "listFailed": "No se pudieron listar los buckets",
@@ -201,7 +201,7 @@
         "removeFailed": "No se pudo quitar el bucket",
         "keyCreateFailed": "No se pudo crear la clave",
         "keyRevokeFailed": "No se pudo revocar la clave",
-        "expirySetFailed": "No se pudo fijar la regla de caducidad",
+        "expirySetFailed": "No se fijó la regla de caducidad",
         "expiryRemoveFailed": "No se pudo quitar la regla de caducidad",
         "signFailed": "No se pudo firmar la URL",
         "replicaTargetsFailed": "No se pudieron listar los buckets de destino de la réplica",

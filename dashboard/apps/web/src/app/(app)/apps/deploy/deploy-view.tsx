@@ -635,7 +635,8 @@ function DatabaseCard({
                 open={confirming}
                 onOpenChange={setConfirming}
                 name={database.name}
-                kind={t("view.databaseKind")}
+                kind="database"
+                title={t("view.deleteDatabase")}
                 confirmLabel={t("view.stageRemoval")}
                 description={
                     database.hostedOnInstance

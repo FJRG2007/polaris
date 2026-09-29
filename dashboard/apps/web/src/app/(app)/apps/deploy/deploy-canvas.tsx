@@ -995,7 +995,8 @@ export function DeployCanvas({
                     }
                 }}
                 name={deleteTarget?.name ?? ""}
-                kind={deleteTarget?.kind === "database" ? t("view.databaseKind") : t("canvas.serviceKind")}
+                kind={deleteTarget?.kind ?? "service"}
+                title={deleteTarget?.kind === "database" ? t("view.deleteDatabase") : t("canvas.deleteServiceTitle")}
                 description={
                     deleteTarget?.kind === "database"
                         ? deleteTarget.hostedCount

@@ -153,10 +153,10 @@
     },
     "cancel": {
         "label": "Stop this deploy",
-        "name": "this deploy",
-        "kind": "deploy",
         "confirm": "Stop it",
-        "description": "The build stops where it is and the release is never published. Whatever is serving now keeps serving."
+        "description": "The build stops where it is and the release is never published. Whatever is serving now keeps serving.",
+        "title": "Delete deploy",
+        "question": "Delete <strong>this deploy</strong>?"
     },
     "details": {
         "status": "Status",
@@ -360,9 +360,9 @@
         "queued": "Already queued. Deploy the pending changes to carry it out, or discard it from the banner.",
         "hint": "Removes the container, its domains, variables and deploy history.",
         "delete": "Delete",
-        "kind": "service",
         "confirm": "Stage removal",
-        "description": "The container, its domains, variables and deploy history go. Nothing happens until you deploy the pending changes."
+        "description": "The container, its domains, variables and deploy history go. Nothing happens until you deploy the pending changes.",
+        "deleteTitle": "Delete service"
     },
     "server": {
         "title": "Server",
@@ -402,5 +402,79 @@
         "healthPathHint": "Asked of every copy every 10 seconds. One that stops answering is left out until it answers again. Blank = no check.",
         "emailShield": "With more than one copy the edge balances between them itself, so email addresses in its pages are not hidden from scrapers.",
         "save": "Save scaling"
+    },
+    "cdn": {
+        "emptiedPath": "Emptied {path}.",
+        "emptied": "Emptied the cache for {hostname}.",
+        "served": "Served through Cloudflare",
+        "serve": "Serve through Cloudflare",
+        "notServed": "Not served through Cloudflare",
+        "description": "Serves {hostname} through Cloudflare's proxy, which caches static assets at its edge. Needs the domain's DNS on the Cloudflare account connected under Domains.",
+        "cacheHint": "The cache is emptied after every successful deploy. Empty it now, for the whole domain or under one path.",
+        "pathPlaceholder": "Path, e.g. assets/ (blank for everything)",
+        "close": "Close",
+        "empty": "Empty cache"
+    },
+    "fix": {
+        "startCommand": "Start command",
+        "buildCommand": "Build command (blank for none)",
+        "rootDirectory": "Root directory",
+        "valueFor": "Value for {name}",
+        "usePort": "Use port {port} and redeploy",
+        "buildOn": "Build on {version} and redeploy",
+        "generate": "Generate {name} and redeploy",
+        "set": "Set {name} and redeploy",
+        "detected": "Build without the Dockerfile",
+        "save": "Save and redeploy",
+        "checkValue": "Check the value",
+        "likely": "Likely cause: {title}"
+    },
+    "files": {
+        "listFailed": "Could not list files",
+        "uploadFailed": "Upload failed",
+        "up": "Up",
+        "openInDrive": "Open this container in Drive",
+        "viewInDrive": "View in Drive",
+        "upload": "Upload",
+        "empty": "Empty.",
+        "download": "Download"
+    },
+    "callouts": {
+        "failed": "Action required - the last deploy failed",
+        "previousLive": "The release before it is still live.",
+        "viewLog": "View log",
+        "redeploy": "Redeploy",
+        "behind": "{count, plural, one {# commit} other {# commits}} behind {branch}",
+        "liveIs": "Live is <mono>{sha}</mono>.",
+        "compare": "Compare",
+        "deployLatest": "Deploy latest",
+        "newerImage": "A newer image is published"
+    },
+    "buildMachine": {
+        "title": "Build on",
+        "hint": "Another machine builds the image and sends it here, so a small server can run what it could not build."
+    },
+    "steps": {
+        "state": {
+            "done": "done",
+            "current": "in progress",
+            "failed": "failed",
+            "warning": "done with a warning",
+            "skipped": "not needed",
+            "pending": "not started"
+        },
+        "labels": {
+            "queued": "Queued",
+            "keptImage": "Kept image",
+            "clone": "Clone",
+            "pull": "Pull",
+            "source": "Source",
+            "build": "Build",
+            "keep": "Keep",
+            "start": "Start",
+            "live": "Live"
+        },
+        "progress": "Deploy progress",
+        "aria": "{step}: {state}"
     }
 }

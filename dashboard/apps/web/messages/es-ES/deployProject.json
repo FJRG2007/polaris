@@ -1,1 +1,73 @@
-{}
+{
+    "staged": {
+        "elsewhere": "{count, plural, one {# cambio pendiente} other {# cambios pendientes}} en otro entorno",
+        "pending": "{count, plural, one {# cambio pendiente} other {# cambios pendientes}}",
+        "switch": "Cambia a ese entorno para revisarlos y desplegarlos.",
+        "review": "Aún no se ha eliminado nada. Revisa los cambios y luego despliégalos.",
+        "details": "Detalles",
+        "deploy": "Desplegar",
+        "deployCount": "Desplegar {count}",
+        "title": "Cambios pendientes",
+        "description": "Se aplican al desplegar. Descarta los que no querías.",
+        "otherEnvironment": "Otro entorno",
+        "discardNamed": "No eliminar {name}",
+        "discard": "Descartar",
+        "failed": "Algunos cambios fallaron",
+        "stillPending": "Siguen pendientes. Al desplegar de nuevo solo se reintentan estos.",
+        "discardAll": "Descartar todos"
+    },
+    "glance": {
+        "up": "Responde",
+        "down": "No responde",
+        "unchecked": "Sin comprobar",
+        "summary": "Resumen del entorno",
+        "switch": "Otra dirección",
+        "addresses": "Direcciones del entorno",
+        "noAddress": "Aún sin dirección",
+        "open": "Abrir {name}",
+        "lastDeploy": "Última versión",
+        "notDeployed": "Sin desplegar aún",
+        "needsLook": "{name} requiere atención",
+        "needLook": "{count} servicios requieren atención"
+    },
+    "sections": {
+        "architecture": {
+            "label": "Arquitectura",
+            "hint": "Servicios y cómo se conectan"
+        },
+        "elsewhere": {
+            "label": "Externos",
+            "hint": "Lo que el proyecto ejecuta en Vercel o Railway"
+        },
+        "observability": {
+            "label": "Observabilidad",
+            "hint": "Métricas de todo el entorno"
+        },
+        "logs": {
+            "label": "Logs",
+            "hint": "La salida de cada servicio en un flujo"
+        },
+        "settings": {
+            "label": "Ajustes",
+            "hint": "Configuración del proyecto"
+        }
+    },
+    "shell": {
+        "newProject": "Nuevo proyecto",
+        "project": "Proyecto",
+        "environment": "Entorno",
+        "attention": "{count, plural, one {# servicio requiere atención} other {# servicios requieren atención}}",
+        "name": "Nombre",
+        "cancel": "Cancelar",
+        "create": "Crear"
+    },
+    "detail": {
+        "localNotReady": "El equipo local no está listo para compilar y desplegar. Necesita la edición completa con <code>{daemon}</code> en marcha.",
+        "firewall": "Cortafuegos",
+        "canvasView": "Lienzo",
+        "listView": "Lista",
+        "noEnvironments": "Este proyecto no tiene entornos.",
+        "noServices": "Sin servicios",
+        "online": "{online}/{total} en línea"
+    }
+}

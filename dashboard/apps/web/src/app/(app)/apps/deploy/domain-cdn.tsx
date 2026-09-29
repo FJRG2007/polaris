@@ -10,6 +10,7 @@
 import { Cloud, Loader2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { cachePurgeSchema } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { purgeDomainCacheAction, setDomainCdnAction } from "./database-actions";
 import {
     Button,
@@ -35,6 +36,7 @@ export function DomainCdnButton({
     enabled: boolean;
     onChanged: () => void;
 }) {
+    const t = useTranslations("deployService");
     const [open, setOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState<string | null>(null);
@@ -58,7 +60,12 @@ export function DomainCdnButton({
         startTransition(async () => {
             const result = await purgeDomainCacheAction({ domainId, ...(prefix.trim() ? { prefix: prefix.trim() } : {}) });
             if (result.error) setError(result.error);
-            else setDone(prefix.trim() ? `Emptied ${hostname}/${prefix.trim().replace(/^\/+/, "")}.` : `Emptied the cache for ${hostname}.`);
+            else
+                setDone(
+                    prefix.trim()
+                        ? t("cdn.emptiedPath", { path: `${hostname}/${prefix.trim().replace(/^\/+/, "")}` })
+                        : t("cdn.emptied", { hostname })
+                );
         });
     }
 
@@ -66,7 +73,8 @@ export function DomainCdnButton({
         <>
             <button
                 type="button"
-                title={enabled ? "Served through Cloudflare" : "Serve through Cloudflare"}
+                title={enabled ? t("cdn.served") : t("cdn.serve")}
+                // i18n-ignore: a product name
                 aria-label="Cloudflare CDN"
                 onClick={() => setOpen(true)}
                 className={cn(
@@ -79,27 +87,26 @@ export function DomainCdnButton({
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
+                        {/* i18n-ignore: a product name */}
                         <DialogTitle>Cloudflare CDN</DialogTitle>
                         <DialogDescription>
-                            Serves {hostname} through Cloudflare&apos;s proxy, which caches static assets at its edge. Needs the
-                            domain&apos;s DNS on the Cloudflare account connected under Domains.
+                            {t("cdn.description", { hostname })}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col gap-4">
                         <label className="flex items-center gap-2 text-sm">
-                            <Switch checked={enabled} disabled={pending} onChange={toggle} aria-label="Serve through Cloudflare" />
-                            {enabled ? "Served through Cloudflare" : "Not served through Cloudflare"}
+                            <Switch checked={enabled} disabled={pending} onChange={toggle} aria-label={t("cdn.serve")} />
+                            {enabled ? t("cdn.served") : t("cdn.notServed")}
                         </label>
                         {enabled ? (
                             <div className="flex flex-col gap-2">
                                 <p className="text-xs text-muted-foreground">
-                                    The cache is emptied after every successful deploy. Empty it now, for the whole domain or
-                                    under one path.
+                                    {t("cdn.cacheHint")}
                                 </p>
                                 <Input
                                     value={prefix}
                                     onChange={(event) => setPrefix(event.target.value)}
-                                    placeholder="Path, e.g. assets/ (blank for everything)"
+                                    placeholder={t("cdn.pathPlaceholder")}
                                 />
                                 {prefix.trim() && !valid.success ? (
                                     <p className="text-xs text-warning">{valid.error.issues[0]?.message}</p>
@@ -111,11 +118,11 @@ export function DomainCdnButton({
                     </div>
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setOpen(false)}>
-                            Close
+                            {t("cdn.close")}
                         </Button>
                         {enabled ? (
                             <Button disabled={pending || !valid.success} onClick={purge}>
-                                {pending ? <Loader2 className="size-4 animate-spin" /> : null} Empty cache
+                                {pending ? <Loader2 className="size-4 animate-spin" /> : null} {t("cdn.empty")}
                             </Button>
                         ) : null}
                     </DialogFooter>

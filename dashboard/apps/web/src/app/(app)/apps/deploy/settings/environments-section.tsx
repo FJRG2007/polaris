@@ -238,7 +238,9 @@ export function EnvironmentsSection({
                 open={deleting !== null}
                 onOpenChange={(open) => !open && setDeleting(null)}
                 name={deleting?.name ?? ""}
-                kind={t("environments.kind")}
+                kind="environment"
+                title={t("environments.deleteTitle")}
+                confirmLabel={t("environments.deleteTitle")}
                 description={
                     deleting && deleting.serviceCount > 0
                         ? t("environments.deleteWithServices", { count: deleting.serviceCount })

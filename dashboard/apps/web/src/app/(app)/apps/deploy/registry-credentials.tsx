@@ -8,6 +8,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { KeyRound, Loader2, Plus, Trash2 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import {
     deleteRegistryCredentialAction,
@@ -23,16 +24,17 @@ interface Credential {
 }
 
 export function RegistryCredentialsButton() {
+    const t = useTranslations("deployConfig");
     const [open, setOpen] = useState(false);
     return (
         <>
             <Button variant="outline" onClick={() => setOpen(true)}>
-                <KeyRound className="size-4" /> Registries
+                <KeyRound className="size-4" /> {t("registry.button")}
             </Button>
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>Private registry credentials</DialogTitle>
+                        <DialogTitle>{t("registry.title")}</DialogTitle>
                     </DialogHeader>
                     {open && <RegistryManager />}
                 </DialogContent>
@@ -42,6 +44,7 @@ export function RegistryCredentialsButton() {
 }
 
 function RegistryManager() {
+    const t = useTranslations("deployConfig");
     const [items, setItems] = useState<Credential[] | null>(null);
     const [registry, setRegistry] = useState("");
     const [username, setUsername] = useState("");
@@ -83,10 +86,10 @@ function RegistryManager() {
         <div className="flex flex-col gap-4">
             {items === null ? (
                 <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                    <Loader2 className="size-4 animate-spin" /> Loading...
+                    <Loader2 className="size-4 animate-spin" /> {t("registry.loading")}
                 </div>
             ) : items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No registry logins yet.</p>
+                <p className="text-sm text-muted-foreground">{t("registry.empty")}</p>
             ) : (
                 <ul className="flex flex-col gap-1">
                     {items.map((item) => (
@@ -97,7 +100,7 @@ function RegistryManager() {
                                 variant="ghost"
                                 size="icon"
                                 className="ml-auto"
-                                title="Remove"
+                                title={t("registry.remove")}
                                 disabled={pending}
                                 onClick={() => remove(item.id)}
                             >
@@ -109,20 +112,20 @@ function RegistryManager() {
             )}
 
             <div className="flex flex-col gap-2 border-t border-border/60 pt-3">
-                <span className="text-xs font-medium text-muted-foreground">Add a login</span>
-                <Input value={registry} onChange={(event) => setRegistry(event.target.value)} placeholder="ghcr.io (or docker.io)" />
-                <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="username" />
+                <span className="text-xs font-medium text-muted-foreground">{t("registry.add")}</span>
+                <Input value={registry} onChange={(event) => setRegistry(event.target.value)} placeholder={t("registry.hostPlaceholder")} />
+                <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder={t("registry.userPlaceholder")} />
                 <Input
                     type="password"
                     autoComplete="off"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="password or token"
+                    placeholder={t("registry.passwordPlaceholder")}
                 />
                 {error && <p className="text-sm text-danger">{error}</p>}
                 <div className="flex justify-end">
                     <Button onClick={add} disabled={pending || !registry.trim() || !username.trim() || !password}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Save login
+                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} {t("registry.save")}
                     </Button>
                 </div>
             </div>

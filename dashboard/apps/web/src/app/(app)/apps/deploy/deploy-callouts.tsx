@@ -9,6 +9,7 @@
 
 import { Button, cn } from "@polaris/ui";
 import { LikelyCause } from "./likely-cause";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { deployFreshnessAction, imageUpdateAction } from "./glance-actions";
 import { useEffect, useState, type ReactNode } from "react";
@@ -140,6 +141,7 @@ export function DeployCallouts({
     /** A fix was applied and a new deploy started. */
     onFixed?: () => void;
 }) {
+    const t = useTranslations("deployService");
     const latest = items[0] ?? null;
     const active = items.find((item) => item.isCurrent) ?? null;
     const moving = items.some((item) => isInFlightStatus(item.status));
@@ -168,7 +170,7 @@ export function DeployCallouts({
                 <Callout
                     tone="danger"
                     icon={<CircleAlert className="size-4" />}
-                    title="Action required - the last deploy failed"
+                    title={t("callouts.failed")}
                     detail={
                         <>
                             {errorLine && (
@@ -176,14 +178,14 @@ export function DeployCallouts({
                                     {errorLine}
                                 </span>
                             )}
-                            {active && active.id !== failed.id && <span>The release before it is still live.</span>}
+                            {active && active.id !== failed.id && <span>{t("callouts.previousLive")}</span>}
                         </>
                     }
                 >
                     <Button size="sm" variant="ghost" onClick={() => onViewLog(failed.id)}>
-                        View log
+                        {t("callouts.viewLog")}
                     </Button>
-                    {deployButton("Redeploy")}
+                    {deployButton(t("callouts.redeploy"))}
                 </Callout>
             )}
             {failed && (
@@ -198,11 +200,18 @@ export function DeployCallouts({
                 <Callout
                     tone="neutral"
                     icon={<GitCommitHorizontal className="size-4" />}
-                    title={`${behind.behindBy} ${behind.behindBy === 1 ? "commit" : "commits"} behind ${behind.branch}`}
+                    title={t("callouts.behind", { count: behind.behindBy, branch: behind.branch })}
                     detail={
                         active?.commitSha ? (
                             <span>
-                                Live is <span className="font-mono">{active.commitSha.slice(0, 7)}</span>.
+                                {t.rich("callouts.liveIs", {
+                                    sha: active.commitSha.slice(0, 7),
+                                    mono: (chunks) => (
+                                        <span key="sha" className="font-mono">
+                                            {chunks}
+                                        </span>
+                                    )
+                                })}
                             </span>
                         ) : undefined
                     }
@@ -214,20 +223,20 @@ export function DeployCallouts({
                             rel="noreferrer"
                             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
-                            Compare <ArrowUpRight className="size-3" />
+                            {t("callouts.compare")} <ArrowUpRight className="size-3" />
                         </a>
                     )}
-                    {deployButton("Deploy latest")}
+                    {deployButton(t("callouts.deployLatest"))}
                 </Callout>
             )}
             {newerImage && (
                 <Callout
                     tone="neutral"
                     icon={<PackageCheck className="size-4" />}
-                    title="A newer image is published"
+                    title={t("callouts.newerImage")}
                     detail={<span className="font-mono">{newerImage.image}</span>}
                 >
-                    {deployButton("Deploy latest")}
+                    {deployButton(t("callouts.deployLatest"))}
                 </Callout>
             )}
         </div>

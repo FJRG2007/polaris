@@ -12,6 +12,8 @@ import { useRouter } from "next/navigation";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
 import { RegistryCredentialsButton } from "./registry-credentials";
 import { createProjectAction, deleteProjectAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     forwardRef,
     useEffect,
@@ -73,6 +75,7 @@ export function ProjectsGrid({
     localReady: boolean;
 }) {
     const router = useRouter();
+    const t = useTranslations("deploy");
     const [layout, setLayout] = useState<"grid" | "list">("grid");
     const [search, setSearch] = useState("");
     // Projects whose delete is in flight. Deleting one now takes its services off
@@ -121,7 +124,7 @@ export function ProjectsGrid({
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Projects</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("projects.title")}</h1>
                 {canManage && (
                     <div className="flex flex-wrap items-center gap-2">
                         <RegistryCredentialsButton />
@@ -132,20 +135,23 @@ export function ProjectsGrid({
 
             {failure && (
                 <div className="flex items-start justify-between gap-3 rounded-lg border border-danger-edge bg-danger-soft px-4 py-3 text-sm text-danger-ink">
-                    <p>
-                        {failure.name} was not deleted. {failure.message}
-                    </p>
+                    <p>{t("projects.notDeleted", { name: failure.name, reason: failure.message })}</p>
                     <Button size="sm" variant="ghost" onClick={() => setFailure(null)}>
-                        Dismiss
+                        {t("projects.dismiss")}
                     </Button>
                 </div>
             )}
 
             {!localReady && canManage && (
                 <div className="rounded-lg border border-warning-edge bg-warning-soft px-4 py-3 text-sm text-muted-foreground">
-                    The local host is not ready to build and deploy. This needs the full edition with a running{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">polaris-hostd</code>. Remote
-                    servers added in the Servers view work regardless.
+                    {t.rich("projects.localNotReady", {
+                        daemon: "polaris-hostd",
+                        code: (chunks) => (
+                            <code key="hostd" className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">
+                                {chunks}
+                            </code>
+                        )
+                    })}
                 </div>
             )}
 
@@ -155,7 +161,7 @@ export function ProjectsGrid({
                     <Input
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
-                        placeholder={`Search ${count} project${count === 1 ? "" : "s"}`}
+                        placeholder={t("projects.search", { count })}
                         className="h-8 pl-8"
                     />
                 </div>
@@ -163,7 +169,7 @@ export function ProjectsGrid({
                     <button
                         type="button"
                         onClick={() => setLayout("grid")}
-                        aria-label="Grid view"
+                        aria-label={t("projects.gridView")}
                         className={`rounded p-1.5 transition-colors ${layout === "grid" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                     >
                         <LayoutGrid className="size-4" />
@@ -171,7 +177,7 @@ export function ProjectsGrid({
                     <button
                         type="button"
                         onClick={() => setLayout("list")}
-                        aria-label="List view"
+                        aria-label={t("projects.listView")}
                         className={`rounded p-1.5 transition-colors ${layout === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                     >
                         <List className="size-4" />
@@ -192,14 +198,12 @@ export function ProjectsGrid({
                         <Rocket className="size-5" />
                     </span>
                     <div className="relative">
-                        <h2 className="text-sm font-medium">Deploy your first app</h2>
-                        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-                            Create a project to group environments, applications, and databases.
-                        </p>
+                        <h2 className="text-sm font-medium">{t("projects.emptyTitle")}</h2>
+                        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{t("projects.emptyHint")}</p>
                     </div>
                 </div>
             ) : filtered.length === 0 ? (
-                <p className="py-16 text-center text-sm text-muted-foreground">No projects match &ldquo;{search}&rdquo;.</p>
+                <p className="py-16 text-center text-sm text-muted-foreground">{t("projects.noMatch", { search })}</p>
             ) : layout === "grid" ? (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {filtered.map((project) => (
@@ -254,6 +258,7 @@ function ProjectMenu({
     children: ReactNode;
 }) {
     const router = useRouter();
+    const t = useTranslations("deploy");
     const [confirming, setConfirming] = useState(false);
 
     const href = `/apps/deploy/${project.id}`;
@@ -270,22 +275,22 @@ function ProjectMenu({
                 <ContextMenuContent>
                     <ContextMenuLabel>{project.name}</ContextMenuLabel>
                     <ContextMenuItem onSelect={() => router.push(href)}>
-                        <ExternalLink className="size-4" /> Open
+                        <ExternalLink className="size-4" /> {t("projects.open")}
                     </ContextMenuItem>
                     <ContextMenuItem onSelect={() => window.open(href, "_blank", "noopener,noreferrer")}>
-                        <SquareArrowOutUpRight className="size-4" /> Open in new tab
+                        <SquareArrowOutUpRight className="size-4" /> {t("projects.openNewTab")}
                     </ContextMenuItem>
                     <ContextMenuItem onSelect={() => router.push(`${href}/settings`)}>
-                        <Settings className="size-4" /> Settings
+                        <Settings className="size-4" /> {t("projects.settings")}
                     </ContextMenuItem>
                     <ContextMenuItem onSelect={() => void navigator.clipboard?.writeText(project.id)}>
-                        <Copy className="size-4" /> Copy project ID
+                        <Copy className="size-4" /> {t("projects.copyId")}
                     </ContextMenuItem>
                     {canManage && (
                         <>
                             <ContextMenuSeparator />
                             <ContextMenuItem variant="danger" onSelect={() => setConfirming(true)}>
-                                <Trash2 className="size-4" /> Delete
+                                <Trash2 className="size-4" /> {t("projects.delete")}
                             </ContextMenuItem>
                         </>
                     )}
@@ -297,10 +302,12 @@ function ProjectMenu({
                 onOpenChange={setConfirming}
                 name={project.name}
                 kind="project"
+                title={t("projects.deleteTitle")}
+                confirmLabel={t("projects.deleteTitle")}
                 description={
                     project.total > 0
-                        ? `Every environment in this project goes with it, along with its ${project.total} ${project.total === 1 ? "service" : "services"} and their deploy history. Whatever they are running is stopped and removed from its server.`
-                        : "The project and its environments are removed."
+                        ? t("projects.deleteWithServices", { count: project.total })
+                        : t("projects.deleteEmpty")
                 }
                 onConfirm={remove}
             />
@@ -311,16 +318,19 @@ function ProjectMenu({
 /** How a project reads on its card. A build in progress is what the project is doing,
  *  so it is what the card says: a count of what is up says nothing at all while the
  *  first service is still being made. */
-function statusTone(project: ProjectCardData): { dot: string; text: string; chip: string; label: string; busy: boolean } {
+function statusTone(
+    project: ProjectCardData,
+    t: NamespaceTranslator<"deploy">
+): { dot: string; text: string; chip: string; label: string; busy: boolean } {
     const { online, total, deploying } = project;
     const busy = deploying > 0;
     const label = busy
         ? deploying === 1
-            ? "Deploying"
-            : `Deploying ${deploying}`
+            ? t("projects.deploying")
+            : t("projects.deployingCount", { count: deploying })
         : total === 0
-          ? "No services"
-          : `${online}/${total} online`;
+          ? t("projects.noServices")
+          : t("projects.online", { online, total });
     if (total === 0) {
         return {
             dot: "bg-muted-foreground",
@@ -378,7 +388,8 @@ const DOT_CANVAS: React.CSSProperties = {
  */
 const ProjectCard = forwardRef<HTMLAnchorElement, { project: ProjectCardData } & ComponentPropsWithoutRef<"a">>(
     function ProjectCard({ project, className, ...rest }, ref) {
-        const status = statusTone(project);
+        const t = useTranslations("deploy");
+        const status = statusTone(project, t);
         const partial = status.busy || (project.total > 0 && project.online < project.total);
         return (
             <Link
@@ -395,12 +406,12 @@ const ProjectCard = forwardRef<HTMLAnchorElement, { project: ProjectCardData } &
                     {project.name}
                 </h3>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                    {project.total} {project.total === 1 ? "service" : "services"}
+                    {t("projects.services", { count: project.total })}
                 </span>
             </div>
             <div className="mx-4 flex min-h-44 flex-1 items-center justify-center rounded-lg border border-border/60" style={DOT_CANVAS}>
                 {project.total === 0 ? (
-                    <span className="text-xs text-muted-foreground">Empty project</span>
+                    <span className="text-xs text-muted-foreground">{t("projects.emptyProject")}</span>
                 ) : (
                     <ServiceTiles services={project.services} />
                 )}
@@ -423,7 +434,8 @@ const ProjectCard = forwardRef<HTMLAnchorElement, { project: ProjectCardData } &
 
 const ProjectRow = forwardRef<HTMLAnchorElement, { project: ProjectCardData } & ComponentPropsWithoutRef<"a">>(
     function ProjectRow({ project, className, ...rest }, ref) {
-        const status = statusTone(project);
+        const t = useTranslations("deploy");
+        const status = statusTone(project, t);
         return (
             <Link
                 ref={ref}
@@ -454,6 +466,7 @@ const ProjectRow = forwardRef<HTMLAnchorElement, { project: ProjectCardData } & 
 
 function CreateProjectButton() {
     const router = useRouter();
+    const t = useTranslations("deploy");
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -478,20 +491,21 @@ function CreateProjectButton() {
     return (
         <>
             <Button onClick={() => setOpen(true)}>
-                <Plus className="size-4" /> New
+                <Plus className="size-4" /> {t("projects.new")}
             </Button>
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>New project</DialogTitle>
+                        <DialogTitle>{t("projects.newTitle")}</DialogTitle>
                     </DialogHeader>
                     <div className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">Project name</span>
+                            <span className="text-xs font-medium text-muted-foreground">{t("projects.name")}</span>
                             <Input
                                 autoFocus
                                 value={name}
                                 onChange={(event) => setName(event.target.value)}
+                                // i18n-ignore: an example project name
                                 placeholder="my-project"
                                 onKeyDown={(event) => event.key === "Enter" && submit()}
                             />
@@ -499,10 +513,10 @@ function CreateProjectButton() {
                         {error && <p className="text-sm text-danger">{error}</p>}
                         <div className="flex justify-end gap-2">
                             <Button variant="ghost" onClick={() => setOpen(false)}>
-                                Cancel
+                                {t("projects.cancel")}
                             </Button>
                             <Button onClick={submit} disabled={pending || !name.trim()}>
-                                {pending && <Loader2 className="size-4 animate-spin" />} Create
+                                {pending && <Loader2 className="size-4 animate-spin" />} {t("projects.create")}
                             </Button>
                         </div>
                     </div>

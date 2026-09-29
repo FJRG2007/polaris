@@ -16,6 +16,7 @@ import { Select } from "@polaris/ui";
 import { useMemo, useState } from "react";
 import { ScrollText } from "lucide-react";
 import { RuntimeLogs } from "@/components/runtime-logs";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const ALL = "__all__";
 
@@ -41,6 +42,7 @@ export function LogsView({
     /** The service to open on, from the link - one not in this environment is ignored. */
     initialService?: string | null;
 }) {
+    const t = useTranslations("deploy");
     const [selected, setSelected] = useState<string>(() =>
         initialService && services.some((service) => service.id === initialService) ? initialService : ALL
     );
@@ -68,27 +70,25 @@ export function LogsView({
         <div className="flex w-full flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Logs</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Runtime output across {environmentName}. Build logs live on each deployment.
-                    </p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("logs.title")}</h1>
+                    <p className="text-sm text-muted-foreground">{t("logs.intro", { environment: environmentName })}</p>
                 </div>
                 <Select
                     value={selected}
                     onValueChange={setSelected}
                     options={[
-                        { value: ALL, label: `All services (${services.length})` },
+                        { value: ALL, label: t("logs.all", { count: services.length }) },
                         ...services.map((service) => ({ value: service.id, label: service.name }))
                     ]}
                     className="h-9 w-52"
-                    aria-label="Service"
+                    aria-label={t("logs.service")}
                 />
             </div>
 
             {services.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 rounded-lg border border-border/60 px-4 py-16 text-center">
                     <ScrollText className="size-5 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">No services in this environment to log.</p>
+                    <p className="text-sm text-muted-foreground">{t("logs.empty")}</p>
                 </div>
             ) : (
                 <RuntimeLogs
@@ -98,7 +98,7 @@ export function LogsView({
                     className="h-[calc(100vh-21rem)] min-h-[24rem]"
                     followNote={
                         watched.length > followed.length
-                            ? `Showing the first ${MAX_FOLLOWED} services. Pick one to see the rest.`
+                            ? t("logs.capped", { count: MAX_FOLLOWED })
                             : undefined
                     }
                 />

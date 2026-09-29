@@ -16,6 +16,10 @@ import { Lightbulb, Loader2 } from "lucide-react";
 import type { DeployFix, Diagnosis } from "@polaris/deploy";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { applyDeployFixAction, deploymentDiagnosisAction } from "./fix-actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+
+type ServiceT = NamespaceTranslator<"deployService">;
 
 /** One answer per failed deploy for the life of the page: its log does not change. */
 const answers = new Map<string, Diagnosis | null>();
@@ -35,34 +39,36 @@ function inputFor(fix: DeployFix, typed: string): unknown {
 }
 
 /** Whether the fix needs something typed before it can be applied. */
-function asks(fix: DeployFix): { label: string; placeholder: string } | null {
+function asks(fix: DeployFix, t: ServiceT): { label: string; placeholder: string } | null {
     switch (fix.kind) {
         case "set-start-command":
-            return { label: "Start command", placeholder: "npm run serve" };
+            // i18n-ignore: an example command
+            return { label: t("fix.startCommand"), placeholder: "npm run serve" };
         case "set-build-command":
-            return { label: "Build command (blank for none)", placeholder: "npm run build" };
+            // i18n-ignore: an example command
+            return { label: t("fix.buildCommand"), placeholder: "npm run build" };
         case "set-root-directory":
-            return { label: "Root directory", placeholder: "apps/web" };
+            return { label: t("fix.rootDirectory"), placeholder: "apps/web" };
         case "add-variable":
-            return fix.generate || fix.value !== null ? null : { label: `Value for ${fix.name}`, placeholder: "" };
+            return fix.generate || fix.value !== null ? null : { label: t("fix.valueFor", { name: fix.name }), placeholder: "" };
         default:
             return null;
     }
 }
 
 /** The button's words for a fix that needs nothing typed. */
-function pressLabel(fix: DeployFix): string {
+function pressLabel(fix: DeployFix, t: ServiceT): string {
     switch (fix.kind) {
         case "set-port":
-            return `Use port ${fix.port} and redeploy`;
+            return t("fix.usePort", { port: fix.port });
         case "set-runtime-version":
-            return `Build on ${fix.version} and redeploy`;
+            return t("fix.buildOn", { version: fix.version });
         case "add-variable":
-            return fix.generate ? `Generate ${fix.name} and redeploy` : `Set ${fix.name} and redeploy`;
+            return fix.generate ? t("fix.generate", { name: fix.name }) : t("fix.set", { name: fix.name });
         case "use-detected-build":
-            return "Build without the Dockerfile";
+            return t("fix.detected");
         default:
-            return "Save and redeploy";
+            return t("fix.save");
     }
 }
 
@@ -79,6 +85,7 @@ export function LikelyCause({
     canSetVariables: boolean;
     onFixed: () => void;
 }) {
+    const t = useTranslations("deployService");
     const [diagnosis, setDiagnosis] = useState<Diagnosis | null | undefined>(() => answers.get(deploymentId));
     const [typed, setTyped] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -102,7 +109,7 @@ export function LikelyCause({
     }, [deploymentId]);
 
     const fix = diagnosis?.fix ?? null;
-    const prompt = fix ? asks(fix) : null;
+    const prompt = fix ? asks(fix, t) : null;
     const allowed = fix ? (fix.kind === "add-variable" ? canSetVariables : canConfigure) : false;
     const problem = useMemo(() => {
         if (!fix || !prompt) return null;
@@ -110,8 +117,8 @@ export function LikelyCause({
         // empty is itself the answer.
         if (!typed.trim() && fix.kind !== "set-build-command") return null;
         const parsed = core.deployFixInputSchema.safeParse(inputFor(fix, typed));
-        return parsed.success ? null : (parsed.error.issues[0]?.message ?? "Check the value");
-    }, [fix, prompt, typed]);
+        return parsed.success ? null : (parsed.error.issues[0]?.message ?? t("fix.checkValue"));
+    }, [fix, prompt, typed, t]);
     const ready = !prompt || fix?.kind === "set-build-command" || typed.trim().length > 0;
 
     if (!diagnosis) return null;
@@ -131,7 +138,7 @@ export function LikelyCause({
             <div className="flex items-start gap-2">
                 <Lightbulb className="mt-0.5 size-4 text-primary" />
                 <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground">Likely cause: {diagnosis.title}</p>
+                    <p className="text-sm font-medium text-foreground">{t("fix.likely", { title: diagnosis.title })}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{diagnosis.detail}</p>
                     <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={diagnosis.evidence}>
                         {diagnosis.evidence}
@@ -156,7 +163,7 @@ export function LikelyCause({
                         </label>
                     )}
                     <Button size="sm" disabled={pending || !ready || problem !== null} onClick={apply}>
-                        {pending && <Loader2 className="size-4 animate-spin" />} {prompt ? "Save and redeploy" : pressLabel(fix)}
+                        {pending && <Loader2 className="size-4 animate-spin" />} {prompt ? t("fix.save") : pressLabel(fix, t)}
                     </Button>
                 </div>
             )}

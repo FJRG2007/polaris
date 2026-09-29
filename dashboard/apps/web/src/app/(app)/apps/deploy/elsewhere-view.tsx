@@ -361,7 +361,16 @@ export function ElsewhereView({
                 open={removing !== null}
                 onOpenChange={(open) => (open ? undefined : setRemoving(null))}
                 name={removing?.name ?? ""}
-                kind={t("elsewhere.serviceKind")}
+                kind="service"
+                title={t("elsewhere.deleteTitle")}
+                question={t.rich("elsewhere.deleteQuestion", {
+                    name: removing?.name ?? "",
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
+                })}
                 requireTyping={false}
                 description={t("elsewhere.removeDescription")}
                 confirmLabel={t("elsewhere.remove")}

@@ -8,17 +8,18 @@
 
 import { Switch } from "@polaris/ui";
 import type { ImportedConfig, PickedSetting } from "@polaris/deploy";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
-const LABELS: Record<PickedSetting["setting"], string> = {
-    installCommand: "Install",
-    buildCommand: "Build",
-    startCommand: "Start",
-    outputDirectory: "Output directory",
-    rootDirectory: "Root directory",
-    dockerfilePath: "Dockerfile",
-    healthPath: "Health check",
-    replicas: "Copies"
-};
+const LABELS = {
+    installCommand: "repoConfig.labels.install",
+    buildCommand: "repoConfig.labels.build",
+    startCommand: "repoConfig.labels.start",
+    outputDirectory: "repoConfig.labels.output",
+    rootDirectory: "repoConfig.labels.root",
+    dockerfilePath: "repoConfig.labels.dockerfile",
+    healthPath: "repoConfig.labels.health",
+    replicas: "repoConfig.labels.copies"
+} as const satisfies Record<PickedSetting["setting"], string>;
 
 export function RepoConfigPreview({
     imported,
@@ -29,31 +30,30 @@ export function RepoConfigPreview({
     use: boolean;
     onUse: (value: boolean) => void;
 }) {
+    const t = useTranslations("deploy");
     const variables = Object.keys(imported.variables);
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
             <div className="flex items-start justify-between gap-3">
                 <span>
-                    <span className="font-medium">Settings from the repository</span>
-                    <span className="block text-xs text-muted-foreground">
-                        Read from its own deploy files. Anything typed above still wins.
-                    </span>
+                    <span className="font-medium">{t("repoConfig.title")}</span>
+                    <span className="block text-xs text-muted-foreground">{t("repoConfig.hint")}</span>
                 </span>
-                <Switch checked={use} onChange={onUse} aria-label="Use the repository's settings" />
+                <Switch checked={use} onChange={onUse} aria-label={t("repoConfig.use")} />
             </div>
             {use && (
                 <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
                     {imported.settings.map((entry) => (
                         <div key={entry.setting} className="contents">
-                            <dt className="text-muted-foreground">{LABELS[entry.setting]}</dt>
-                            <dd className="min-w-0 truncate font-mono" title={`${entry.value} - from ${entry.from}`}>
+                            <dt className="text-muted-foreground">{t(LABELS[entry.setting])}</dt>
+                            <dd className="min-w-0 truncate font-mono" title={t("repoConfig.from", { value: entry.value, file: entry.from })}>
                                 {entry.value} <span className="font-sans text-muted-foreground">({entry.from})</span>
                             </dd>
                         </div>
                     ))}
                     {variables.length > 0 && (
                         <div className="contents">
-                            <dt className="text-muted-foreground">Variables</dt>
+                            <dt className="text-muted-foreground">{t("repoConfig.variables")}</dt>
                             <dd className="min-w-0 truncate font-mono" title={variables.join(", ")}>
                                 {variables.join(", ")}
                             </dd>
@@ -61,7 +61,7 @@ export function RepoConfigPreview({
                     )}
                     {imported.generate.length > 0 && (
                         <div className="contents">
-                            <dt className="text-muted-foreground">Generated</dt>
+                            <dt className="text-muted-foreground">{t("repoConfig.generated")}</dt>
                             <dd className="min-w-0 truncate font-mono" title={imported.generate.join(", ")}>
                                 {imported.generate.join(", ")}
                             </dd>
@@ -69,10 +69,16 @@ export function RepoConfigPreview({
                     )}
                     {imported.needs.length > 0 && (
                         <div className="contents">
-                            <dt className="text-warning-ink">Needs a value</dt>
+                            <dt className="text-warning-ink">{t("repoConfig.needs")}</dt>
                             <dd className="min-w-0 text-warning-ink">
-                                <span className="font-mono">{imported.needs.join(", ")}</span> - add under Variables
-                                once it is created.
+                                {t.rich("repoConfig.needsHint", {
+                                    names: imported.needs.join(", "),
+                                    mono: (chunks) => (
+                                        <span key="names" className="font-mono">
+                                            {chunks}
+                                        </span>
+                                    )
+                                })}
                             </dd>
                         </div>
                     )}

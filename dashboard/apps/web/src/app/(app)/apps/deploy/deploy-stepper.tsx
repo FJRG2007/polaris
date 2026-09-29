@@ -14,6 +14,8 @@ import { cn } from "@polaris/ui";
 import { useEffect, useState } from "react";
 import { Check, Loader2, Minus, TriangleAlert, X } from "lucide-react";
 import type { DeployStep, DeployStepState } from "@/lib/deploy/deploy-steps";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
 const CIRCLE: Record<DeployStepState, string> = {
     done: "border-transparent bg-primary text-primary-foreground",
@@ -33,14 +35,33 @@ const SEGMENT: Record<DeployStepState, string> = {
     pending: "bg-muted"
 };
 
-const STATE_WORD: Record<DeployStepState, string> = {
-    done: "done",
-    current: "in progress",
-    failed: "failed",
-    warning: "done with a warning",
-    skipped: "not needed",
-    pending: "not started"
+const STATE_WORD = {
+    done: "steps.state.done",
+    current: "steps.state.current",
+    failed: "steps.state.failed",
+    warning: "steps.state.warning",
+    skipped: "steps.state.skipped",
+    pending: "steps.state.pending"
+} as const satisfies Record<DeployStepState, string>;
+
+/** The step names the server writes, in the reader's language. The server names a
+ *  step in English (`lib/deploy/deploy-steps.ts`); one it adds later still shows. */
+const STEP_LABEL: Readonly<Record<string, NamespaceKey<"deployService">>> = {
+    Queued: "steps.labels.queued",
+    "Kept image": "steps.labels.keptImage",
+    Clone: "steps.labels.clone",
+    Pull: "steps.labels.pull",
+    Source: "steps.labels.source",
+    Build: "steps.labels.build",
+    Keep: "steps.labels.keep",
+    Start: "steps.labels.start",
+    Live: "steps.labels.live"
 };
+
+function stepLabel(label: string, t: NamespaceTranslator<"deployService">): string {
+    const key = STEP_LABEL[label];
+    return key ? t(key) : label;
+}
 
 function Glyph({ state }: { state: DeployStepState }) {
     if (state === "done") return <Check className="size-3.5" aria-hidden />;
@@ -53,10 +74,11 @@ function Glyph({ state }: { state: DeployStepState }) {
 
 /** The full stepper, for the top of a build log. */
 export function DeployStepper({ steps }: { steps: readonly DeployStep[] }) {
+    const t = useTranslations("deployService");
     const last = steps.reduce((furthest, step, index) => (step.state !== "pending" ? index : furthest), 0);
     const progress = steps.length > 1 ? (last / (steps.length - 1)) * 100 : 0;
     return (
-        <ol className="relative flex items-start justify-between gap-1 px-1 pb-1 pt-1" aria-label="Deploy progress">
+        <ol className="relative flex items-start justify-between gap-1 px-1 pb-1 pt-1" aria-label={t("steps.progress")}>
             {/* The track, behind the circles; each circle carries a ring the colour
                 of the card so the line stops cleanly at its edge. */}
             <span className="absolute left-4 right-4 top-[0.9rem] h-0.5 rounded-full bg-border" aria-hidden />
@@ -69,7 +91,7 @@ export function DeployStepper({ steps }: { steps: readonly DeployStep[] }) {
                 <li
                     key={step.id}
                     className="relative flex min-w-0 flex-1 flex-col items-center gap-1 text-center"
-                    aria-label={`${step.label}: ${STATE_WORD[step.state]}`}
+                    aria-label={t("steps.aria", { step: stepLabel(step.label, t), state: t(STATE_WORD[step.state]) })}
                 >
                     <span
                         className={cn(
@@ -89,9 +111,10 @@ export function DeployStepper({ steps }: { steps: readonly DeployStep[] }) {
                                   : "text-foreground"
                         )}
                     >
-                        {step.label}
+                        {stepLabel(step.label, t)}
                     </span>
                     <span className="h-3.5 text-[0.625rem] tabular-nums text-foreground-subtle">
+                        {/* i18n-ignore: a duration in seconds */}
                         {step.seconds !== undefined ? `${step.seconds < 10 ? step.seconds.toFixed(1) : Math.round(step.seconds)}s` : ""}
                     </span>
                 </li>
@@ -102,6 +125,7 @@ export function DeployStepper({ steps }: { steps: readonly DeployStep[] }) {
 
 /** A thin row of segments, one per step, for a deployment in a list. */
 export function DeployStepSegments({ steps }: { steps: readonly DeployStep[] }) {
+    const t = useTranslations("deployService");
     const current = steps.find((step) => step.state === "current" || step.state === "failed");
     return (
         <span className="inline-flex min-w-0 items-center gap-2">
@@ -112,7 +136,7 @@ export function DeployStepSegments({ steps }: { steps: readonly DeployStep[] }) 
             </span>
             {current && (
                 <span className={cn("truncate text-xs", current.state === "failed" ? "text-danger-ink" : "text-muted-foreground")}>
-                    {current.label}
+                    {stepLabel(current.label, t)}
                 </span>
             )}
         </span>

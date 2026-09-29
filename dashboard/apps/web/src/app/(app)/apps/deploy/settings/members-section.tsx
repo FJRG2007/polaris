@@ -406,7 +406,8 @@ export function MembersSection({ projectId }: { projectId: string }) {
                 open={removing !== null}
                 onOpenChange={(open) => !open && setRemoving(null)}
                 name={removing?.name ?? ""}
-                kind={t("members.entryKind")}
+                kind="entry"
+                title={t("members.deleteTitle")}
                 confirmLabel={t("members.removeAccess")}
                 description={t("members.removeDescription")}
                 pending={pending}

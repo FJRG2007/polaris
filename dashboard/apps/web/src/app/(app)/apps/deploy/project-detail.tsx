@@ -14,6 +14,7 @@ import { useStagedChanges } from "./staged-changes";
 import type { ProjectCapability } from "@polaris/core";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { ProjectAccessProvider } from "./access-context";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, type ReactNode } from "react";
 import { List, ShieldCheck, Waypoints } from "lucide-react";
 import {
@@ -74,6 +75,7 @@ export function ProjectDetail({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [settling]);
 
+    const t = useTranslations("deployProject");
     const [view, setView] = useState<"canvas" | "list">("canvas");
     const [detailAppId, setDetailAppId] = useState<string | null>(openService ?? null);
     // A link that names a service while the board is already open - the project
@@ -113,12 +115,14 @@ export function ProjectDetail({
             <div className="flex w-full flex-col gap-4">
                 {!localReady && canManage && (
                     <div className="rounded-lg border border-warning-edge bg-warning-soft px-4 py-3 text-sm text-muted-foreground">
-                        The local host is not ready to build and deploy. This needs the full edition
-                        with a running{" "}
-                        <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">
-                            polaris-hostd
-                        </code>
-                        .
+                        {t.rich("detail.localNotReady", {
+                            daemon: "polaris-hostd",
+                            code: (chunks) => (
+                                <code key="hostd" className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">
+                                    {chunks}
+                                </code>
+                            )
+                        })}
                     </div>
                 )}
 
@@ -133,8 +137,8 @@ export function ProjectDetail({
                         {canManage && (
                             <Link
                                 href={`/apps/firewall?scope=project&id=${project.id}`}
-                                aria-label="Firewall"
-                                title="Firewall"
+                                aria-label={t("detail.firewall")}
+                                title={t("detail.firewall")}
                                 className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <ShieldCheck className="size-4" />
@@ -143,13 +147,13 @@ export function ProjectDetail({
                         <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                             <ViewToggle
                                 active={view === "canvas"}
-                                label="Canvas view"
+                                label={t("detail.canvasView")}
                                 onSelect={() => setView("canvas")}
                                 icon={<Waypoints className="size-4" />}
                             />
                             <ViewToggle
                                 active={view === "list"}
-                                label="List view"
+                                label={t("detail.listView")}
                                 onSelect={() => setView("list")}
                                 icon={<List className="size-4" />}
                             />
@@ -176,7 +180,7 @@ export function ProjectDetail({
                     )
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        This project has no environments.
+                        {t("detail.noEnvironments")}
                     </p>
                 )}
 
@@ -221,6 +225,7 @@ function ViewToggle({
 
 /** A tinted chip summarizing how many of the environment's services are online. */
 function EnvSummary({ environment }: { environment: ProjectSummary["environments"][number] }) {
+    const t = useTranslations("deployProject");
     const online =
         environment.applications.filter((app) => app.currentDeploymentId).length +
         environment.databases.filter((db) =>
@@ -240,7 +245,7 @@ function EnvSummary({ environment }: { environment: ProjectSummary["environments
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${chip}`}
         >
             <span className={`size-1.5 rounded-full ${dot} ${partial ? "animate-pulse" : ""}`} />
-            {total === 0 ? "No services" : `${online}/${total} online`}
+            {total === 0 ? t("detail.noServices") : t("detail.online", { online, total })}
         </span>
     );
 }

@@ -17,6 +17,7 @@ import { sendFile } from "@/components/transfers/move-file";
 import Link from "next/link";
 import { Button } from "@polaris/ui";
 import { asDirectory, parentDirectory } from "./files-path";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Download, File as FileIcon, Folder, HardDrive, Upload } from "lucide-react";
 
@@ -33,6 +34,7 @@ export function FilesPanel({
     root?: string;
 }) {
     const base = asDirectory(root);
+    const t = useTranslations("deployService");
     const [path, setPath] = useState(base);
     const [entries, setEntries] = useState<Entry[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export function FilesPanel({
                 }
             );
             const data = (await res.json()) as { entries?: Entry[]; error?: string };
-            if (!res.ok) setError(data.error ?? "Could not list files");
+            if (!res.ok) setError(data.error ?? t("files.listFailed"));
             else {
                 setEntries(data.entries ?? []);
                 setPath(next);
@@ -83,7 +85,7 @@ export function FilesPanel({
         );
         if (!sent.ok) {
             const data = JSON.parse(sent.body || "{}") as { error?: string };
-            setError(data.error ?? "Upload failed");
+            setError(data.error ?? t("files.uploadFailed"));
         } else {
             await load(path);
         }
@@ -97,18 +99,18 @@ export function FilesPanel({
                     variant="ghost"
                     onClick={goUp}
                     disabled={busy || path === base}
-                    title="Up"
-                    aria-label="Up"
+                    title={t("files.up")}
+                    aria-label={t("files.up")}
                 >
                     <ArrowUp className="size-4" />
                 </Button>
                 <span className="truncate text-xs text-muted-foreground">{path}</span>
                 <div className="ml-auto flex items-center gap-2">
-                    <Button asChild variant="ghost" title="Open this container in Drive">
+                    <Button asChild variant="ghost" title={t("files.openInDrive")}>
                         <Link
                             href={`/drive?c=container:${applicationId}&p=${encodeURIComponent(path.replace(/^\/+|\/+$/g, ""))}`}
                         >
-                            <HardDrive className="size-4" /> View in Drive
+                            <HardDrive className="size-4" /> {t("files.viewInDrive")}
                         </Link>
                     </Button>
                     <Button
@@ -116,7 +118,7 @@ export function FilesPanel({
                         onClick={() => fileInput.current?.click()}
                         disabled={busy}
                     >
-                        <Upload className="size-4" /> Upload
+                        <Upload className="size-4" /> {t("files.upload")}
                     </Button>
                     <input
                         ref={fileInput}
@@ -133,7 +135,7 @@ export function FilesPanel({
             {error && <p className="text-xs text-danger">{error}</p>}
             <div className="max-h-80 overflow-auto overscroll-contain rounded-md border border-border/60">
                 {entries.length === 0 && !busy && (
-                    <p className="p-3 text-xs text-muted-foreground">Empty.</p>
+                    <p className="p-3 text-xs text-muted-foreground">{t("files.empty")}</p>
                 )}
                 {entries.map((entry) => (
                     <div
@@ -163,7 +165,7 @@ export function FilesPanel({
                                     );
                                 }}
                                 className="text-muted-foreground hover:text-foreground"
-                                title="Download"
+                                title={t("files.download")}
                             >
                                 <Download className="size-4" />
                             </a>

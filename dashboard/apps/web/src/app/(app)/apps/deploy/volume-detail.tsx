@@ -587,7 +587,8 @@ function SettingsTab({
                 open={wiping}
                 onOpenChange={setWiping}
                 name={volume.name}
-                kind={t("volume.settings.contentsKind")}
+                kind="volume contents"
+                title={t("volume.settings.wipeTitle")}
                 confirmLabel={t("volume.settings.wipe")}
                 description={t("volume.settings.wipeDescription")}
                 error={error}
@@ -599,7 +600,8 @@ function SettingsTab({
                 open={deleting}
                 onOpenChange={setDeleting}
                 name={volume.name}
-                kind={t("volume.settings.kind")}
+                kind="volume"
+                title={t("volume.settings.delete")}
                 confirmLabel={t("volume.settings.stageRemoval")}
                 description={t("volume.settings.deleteDescription")}
                 blockedReason={blockedReason}

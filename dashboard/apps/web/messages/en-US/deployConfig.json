@@ -177,7 +177,6 @@
         "edit": "Edit",
         "deleteNamed": "Delete {name}",
         "delete": "Delete",
-        "kind": "scheduled job",
         "deleteQuestion": "Delete the scheduled job <strong>{name}</strong>?",
         "deleteDescription": "It stops running, and the record of its past runs goes with it.",
         "next": " - next {when}",
@@ -201,6 +200,19 @@
         "onSchedule": "on schedule",
         "took": "- {seconds}s",
         "exit": "- exit {code}",
-        "noOutput": "It printed nothing."
+        "noOutput": "It printed nothing.",
+        "deleteTitle": "Delete scheduled job"
+    },
+    "registry": {
+        "button": "Registries",
+        "title": "Private registry credentials",
+        "loading": "Loading...",
+        "empty": "No registry logins yet.",
+        "remove": "Remove",
+        "add": "Add a login",
+        "hostPlaceholder": "ghcr.io (or docker.io)",
+        "userPlaceholder": "username",
+        "passwordPlaceholder": "password or token",
+        "save": "Save login"
     }
 }

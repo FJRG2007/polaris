@@ -181,7 +181,6 @@
             "add": "Bucket",
             "empty": "No buckets yet.",
             "unmanaged": "Also in the store, made outside Polaris: {names}.",
-            "kind": "bucket",
             "removeDescription": "Every object in it and every key for it goes. This cannot be undone.",
             "remove": "Remove bucket",
             "removeNamed": "Remove {name}",
@@ -220,7 +219,8 @@
             "candidatesUnreadable": "Could not list the buckets to replicate into",
             "replicate": "Replicate...",
             "noCandidates": "No bucket in another store on this server. Create a second object store here first.",
-            "replicateInto": "Replicate into..."
+            "replicateInto": "Replicate into...",
+            "deleteTitle": "Delete bucket"
         }
     },
     "volume": {
@@ -285,13 +285,12 @@
             "delete": "Delete volume",
             "deleteHint": "Detaches the mount from the service. The next deploy starts without it.",
             "deleteButton": "Delete",
-            "contentsKind": "volume contents",
             "wipeDescription": "Everything in this volume is destroyed. The volume itself stays, so the service keeps its mount.",
-            "kind": "volume",
             "stageRemoval": "Stage removal",
             "deleteDescription": "The mount is detached from the service. Whether the data goes with it is up to you.",
             "destroyData": "Also destroy the data",
-            "destroyDataHint": "Off by default. Detaching a volume and destroying what is in it are two different intentions, and only one of them can be taken back."
+            "destroyDataHint": "Off by default. Detaching a volume and destroying what is in it are two different intentions, and only one of them can be taken back.",
+            "wipeTitle": "Delete volume contents"
         }
     },
     "volumeForm": {
@@ -333,5 +332,39 @@
         "add": "Add volume",
         "newTitle": "New volume",
         "noServices": "Add a service first - a volume mounts into a service's container."
+    },
+    "topology": {
+        "readReplicas": "Read replicas",
+        "readReplicasHint": "They follow the primary by GTID replication and refuse writes. The connection details gain a URI for reading from them.",
+        "primaryOnly": "Just the primary.",
+        "none": "None",
+        "layout": "Layout",
+        "replicaSetHint": "{count} members on this server, finding each other by name. Connection strings list them all.",
+        "shardedHint": "A config server set of {setSize}, {shards} shards of {setSize} members and a router: {containers} containers. Each collection stays on one shard until your application shards it with a shard key (shardCollection). Backups and version changes are not offered for it yet.",
+        "singleHint": "One container.",
+        "single": "Single",
+        "replicaSet": "Replica set",
+        "sharded": "Sharded",
+        "members": "Members",
+        "memberCount": "{count} members",
+        "shardCount": "{count} shards"
+    },
+    "volumes": {
+        "count": "{count, plural, one {# volume} other {# volumes}}",
+        "new": "New Volume",
+        "editing": "Editing {name}",
+        "empty": "No volumes attached.",
+        "options": "Volume options",
+        "optionsNamed": "Options for {name}",
+        "viewInDrive": "View in Drive",
+        "remove": "Remove",
+        "removeNamed": "Remove {name}"
+    },
+    "folderPicker": {
+        "title": "Choose a folder",
+        "up": "Up",
+        "empty": "No sub-folders here.",
+        "cancel": "Cancel",
+        "use": "Use this folder"
     }
 }

@@ -15,6 +15,7 @@
  */
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { STAGED_CHANGE_LABELS } from "@polaris/core";
 import type { ShellEnvironment } from "./project-shell";
 import type { StagedChangeView } from "@/lib/deploy-staged-changes";
@@ -118,6 +119,7 @@ export function StagedChangesBanner({
 }) {
     const { changes, refresh: refreshChanges } = useStagedChanges();
     const router = useRouter();
+    const t = useTranslations("deployProject");
     const [open, setOpen] = useState(false);
     const [failures, setFailures] = useState<{ targetName: string; error: string }[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -171,8 +173,8 @@ export function StagedChangesBanner({
     const count = here.length;
     const summary =
         count === 0
-            ? `${elsewhere} pending ${elsewhere === 1 ? "change" : "changes"} in another environment`
-            : `${count} pending ${count === 1 ? "change" : "changes"}`;
+            ? t("staged.elsewhere", { count: elsewhere })
+            : t("staged.pending", { count });
 
     return (
         <>
@@ -186,14 +188,14 @@ export function StagedChangesBanner({
                         <p className="text-sm font-medium">{summary}</p>
                         <p className="truncate text-xs text-muted-foreground">
                             {count === 0
-                                ? "Switch to that environment to review and deploy them."
-                                : "Nothing has been removed yet. Review the changeset, then deploy it."}
+                                ? t("staged.switch")
+                                : t("staged.review")}
                         </p>
                     </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                     <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
-                        Details
+                        {t("staged.details")}
                     </Button>
                     <Button size="sm" disabled={pending || count === 0} onClick={apply}>
                         {pending ? (
@@ -201,7 +203,7 @@ export function StagedChangesBanner({
                         ) : (
                             <Rocket className="size-4" />
                         )}
-                        Deploy
+                        {t("staged.deploy")}
                     </Button>
                 </div>
             </div>
@@ -209,10 +211,8 @@ export function StagedChangesBanner({
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>Pending changes</DialogTitle>
-                        <DialogDescription>
-                            These take effect when you deploy. Discard any you did not mean.
-                        </DialogDescription>
+                        <DialogTitle>{t("staged.title")}</DialogTitle>
+                        <DialogDescription>{t("staged.description")}</DialogDescription>
                     </DialogHeader>
 
                     <div className="flex flex-col gap-3">
@@ -249,15 +249,15 @@ export function StagedChangesBanner({
                                         <div className="flex shrink-0 items-center gap-2">
                                             {foreign && (
                                                 <span className="rounded-full border border-border/60 px-2 py-0.5 text-xs text-muted-foreground">
-                                                    Other environment
+                                                    {t("staged.otherEnvironment")}
                                                 </span>
                                             )}
                                             <button
                                                 type="button"
                                                 onClick={() => discard(change.id)}
                                                 disabled={pending}
-                                                aria-label={`Discard removing ${change.targetName}`}
-                                                title="Discard"
+                                                aria-label={t("staged.discardNamed", { name: change.targetName })}
+                                                title={t("staged.discard")}
                                                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                             >
                                                 <X className="size-4" />
@@ -272,7 +272,7 @@ export function StagedChangesBanner({
                             <div className="rounded-md border border-danger-edge bg-danger-soft px-3 py-2">
                                 <p className="flex items-center gap-1.5 text-sm font-medium text-danger">
                                     <TriangleAlert className="size-4" />
-                                    Some changes could not be applied
+                                    {t("staged.failed")}
                                 </p>
                                 <ul className="mt-1 flex flex-col gap-0.5">
                                     {failures.map((failure) => (
@@ -288,7 +288,7 @@ export function StagedChangesBanner({
                                     ))}
                                 </ul>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    They are still pending. Deploying again retries only these.
+                                    {t("staged.stillPending")}
                                 </p>
                             </div>
                         )}
@@ -302,7 +302,7 @@ export function StagedChangesBanner({
                                 disabled={pending || here.length === 0}
                                 onClick={discardAll}
                             >
-                                <Trash2 className="size-4" /> Discard all here
+                                <Trash2 className="size-4" /> {t("staged.discardAll")}
                             </Button>
                             <Button
                                 size="sm"
@@ -314,7 +314,7 @@ export function StagedChangesBanner({
                                 ) : (
                                     <Rocket className="size-4" />
                                 )}
-                                Deploy {here.length > 0 ? here.length : ""}
+                                {here.length > 0 ? t("staged.deployCount", { count: here.length }) : t("staged.deploy")}
                             </Button>
                         </div>
                     </div>

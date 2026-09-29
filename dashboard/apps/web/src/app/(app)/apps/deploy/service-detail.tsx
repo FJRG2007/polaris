@@ -1310,8 +1310,17 @@ function CancelDeployButton({
             <ConfirmDeleteDialog
                 open={open}
                 onOpenChange={setOpen}
-                name={t("cancel.name")}
-                kind={t("cancel.kind")}
+                // i18n-ignore: the component asks with the question below instead
+                name="this deploy"
+                kind="deploy"
+                title={t("cancel.title")}
+                question={t.rich("cancel.question", {
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
+                })}
                 requireTyping={false}
                 confirmLabel={t("cancel.confirm")}
                 description={t("cancel.description")}
@@ -3671,7 +3680,8 @@ function DangerSection({
                 open={confirming}
                 onOpenChange={setConfirming}
                 name={app.name}
-                kind={t("danger.kind")}
+                kind="service"
+                title={t("danger.deleteTitle")}
                 confirmLabel={t("danger.confirm")}
                 description={t("danger.description")}
                 error={error}

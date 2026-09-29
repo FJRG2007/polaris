@@ -189,7 +189,9 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
                 open={deleting !== null}
                 onOpenChange={(open) => !open && setDeleting(null)}
                 name={deleting?.name ?? ""}
-                kind={t("tokens.kind")}
+                kind="token"
+                title={t("tokens.deleteTitle")}
+                confirmLabel={t("tokens.deleteTitle")}
                 description={t("tokens.deleteDescription")}
                 pending={pending}
                 onConfirm={remove}

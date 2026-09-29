@@ -14,6 +14,7 @@
 import * as core from "@polaris/core";
 import type { ReactNode } from "react";
 import { SegmentedControl, Select } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export type TopologyValue = Pick<core.DatabaseCreateInput, "topology" | "members" | "shards" | "readReplicas">;
 
@@ -33,27 +34,24 @@ export function DatabaseTopologyField({
     value: TopologyValue;
     onChange: (value: TopologyValue) => void;
 }) {
+    const t = useTranslations("deployData");
     const topology = core.topologyOf(value);
 
     if (engine === "mysql") {
         const replicas = topology.kind === "replicas" ? topology.replicas : 0;
         return (
             <Group
-                label="Read replicas"
-                hint={
-                    replicas > 0
-                        ? "They follow the primary by GTID replication and refuse writes. The connection details gain a URI for reading from them."
-                        : "Just the primary."
-                }
+                label={t("topology.readReplicas")}
+                hint={replicas > 0 ? t("topology.readReplicasHint") : t("topology.primaryOnly")}
             >
                 <SegmentedControl
-                    aria-label="Read replicas"
+                    aria-label={t("topology.readReplicas")}
                     value={String(replicas)}
                     onValueChange={(next) =>
                         onChange(next === "0" ? SINGLE_TOPOLOGY : { topology: "replicas", readReplicas: Number(next) })
                     }
                     options={[
-                        { value: "0", label: "None" },
+                        { value: "0", label: t("topology.none") },
                         ...core.MYSQL_REPLICA_COUNTS.map((count) => ({ value: String(count), label: String(count) }))
                     ]}
                 />
@@ -70,17 +68,21 @@ export function DatabaseTopologyField({
               : 1;
     return (
         <Group
-            label="Layout"
+            label={t("topology.layout")}
             hint={
                 topology.kind === "replicaSet"
-                    ? `${containers} members on this server, finding each other by name. Connection strings list them all.`
+                    ? t("topology.replicaSetHint", { count: containers })
                     : topology.kind === "sharded"
-                      ? `A config server set of ${core.MONGO_CLUSTER_SET_SIZE}, ${topology.shards} shards of ${core.MONGO_CLUSTER_SET_SIZE} members and a router: ${containers} containers. Each collection stays on one shard until your application shards it with a shard key (shardCollection). Backups and version changes are not offered for it yet.`
-                      : "One container."
+                      ? t("topology.shardedHint", {
+                            setSize: core.MONGO_CLUSTER_SET_SIZE,
+                            shards: topology.shards,
+                            containers
+                        })
+                      : t("topology.singleHint")
             }
         >
             <SegmentedControl
-                aria-label="Layout"
+                aria-label={t("topology.layout")}
                 value={topology.kind === "replicas" ? "single" : topology.kind}
                 onValueChange={(next) =>
                     onChange(
@@ -92,18 +94,18 @@ export function DatabaseTopologyField({
                     )
                 }
                 options={[
-                    { value: "single", label: "Single" },
-                    { value: "replicaSet", label: "Replica set" },
-                    { value: "sharded", label: "Sharded" }
+                    { value: "single", label: t("topology.single") },
+                    { value: "replicaSet", label: t("topology.replicaSet") },
+                    { value: "sharded", label: t("topology.sharded") }
                 ]}
             />
             {topology.kind === "replicaSet" ? (
                 <SegmentedControl
-                    aria-label="Members"
+                    aria-label={t("topology.members")}
                     size="sm"
                     value={String(topology.members)}
                     onValueChange={(next) => onChange({ topology: "replicaSet", members: Number(next) })}
-                    options={core.MONGO_SET_SIZES.map((count) => ({ value: String(count), label: `${count} members` }))}
+                    options={core.MONGO_SET_SIZES.map((count) => ({ value: String(count), label: t("topology.memberCount", { count }) }))}
                 />
             ) : null}
             {topology.kind === "sharded" ? (
@@ -111,7 +113,7 @@ export function DatabaseTopologyField({
                     <Select
                         value={String(topology.shards)}
                         onValueChange={(next) => onChange({ topology: "sharded", shards: Number(next) })}
-                        options={core.MONGO_SHARD_COUNTS.map((count) => ({ value: String(count), label: `${count} shards` }))}
+                        options={core.MONGO_SHARD_COUNTS.map((count) => ({ value: String(count), label: t("topology.shardCount", { count }) }))}
                     />
                 </div>
             ) : null}

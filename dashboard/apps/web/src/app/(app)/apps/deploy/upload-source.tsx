@@ -19,6 +19,7 @@ import { formatBytes } from "@polaris/core";
 import { Button, Input, cn } from "@polaris/ui";
 import { FolderUp, Loader2 } from "lucide-react";
 import { uploadedSourceAction } from "./source-actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDesktopBridge } from "@/components/desktop-app";
 import type { UploadedSource } from "@/lib/deploy/source-upload";
 import { useEffect, useRef, useState, useTransition, type DragEvent, type ReactNode } from "react";
@@ -59,9 +60,10 @@ async function walk(entry: FileSystemEntry, prefix: string, into: PickedFile[]):
 }
 
 /** Zip the picked files in the browser, refusing a folder too big to send. */
-async function zipped(files: readonly PickedFile[], name: string): Promise<PickedSource> {
+/** `empty` is what to say, in the reader's language, when there is nothing to send. */
+async function zipped(files: readonly PickedFile[], name: string, empty: string): Promise<PickedSource> {
     const total = files.reduce((sum, item) => sum + item.file.size, 0);
-    if (files.length === 0) throw new Error("There are no files in that folder.");
+    if (files.length === 0) throw new Error(empty);
     if (total > MAX_FOLDER) throw new Error(`That folder holds more than ${formatBytes(MAX_FOLDER)}.`);
     const { default: JSZip } = await import("jszip");
     const zip = new JSZip();
@@ -81,20 +83,22 @@ function asZip(file: File): PickedSource {
 export async function sendSource(
     applicationId: string,
     picked: PickedSource,
-    deploy: boolean
+    deploy: boolean,
+    /** What to say when the request does not get through, in the reader's language. */
+    words: { unreachable: string; failed: string }
 ): Promise<{ error?: string; deployError?: string; upload?: UploadedSource }> {
     const response = await fetch(`/api/deploy/apps/${applicationId}/source${deploy ? "?deploy=1" : ""}`, {
         method: "POST",
         headers: { "content-type": "application/zip", "x-polaris-name": encodeURIComponent(picked.name) },
         body: picked.blob
     }).catch(() => null);
-    if (!response) return { error: "Could not reach Polaris. Check the connection and try again." };
+    if (!response) return { error: words.unreachable };
     const body = (await response.json().catch(() => ({}))) as {
         error?: string;
         deployError?: string;
         upload?: UploadedSource;
     };
-    if (!response.ok) return { error: body.error ?? "Could not upload the folder" };
+    if (!response.ok) return { error: body.error ?? words.failed };
     return body;
 }
 
@@ -108,6 +112,7 @@ export function SourceDropZone({
     onPicked: (picked: PickedSource | null, error?: string) => void;
     disabled?: boolean;
 }) {
+    const t = useTranslations("deploy");
     const folderInput = useRef<HTMLInputElement>(null);
     const zipInput = useRef<HTMLInputElement>(null);
     const [over, setOver] = useState(false);
@@ -125,7 +130,7 @@ export function SourceDropZone({
             const next = await work();
             if (next) onPicked(next);
         } catch (caught) {
-            onPicked(null, caught instanceof Error ? caught.message : "Could not read that");
+            onPicked(null, caught instanceof Error ? caught.message : t("upload.unreadable"));
         } finally {
             setReading(false);
         }
@@ -149,10 +154,10 @@ export function SourceDropZone({
                 // Under the folder's own name, the shape any zipped folder has; the
                 // server takes a single folder holding everything as the root.
                 await walk(single, "", files);
-                return zipped(files, single.name);
+                return zipped(files, single.name, t("upload.noFiles"));
             }
             for (const entry of entries) await walk(entry, "", files);
-            return zipped(files, "upload");
+            return zipped(files, "upload", t("upload.noFiles"));
         });
     }
 
@@ -179,7 +184,7 @@ export function SourceDropZone({
                 const path = file.webkitRelativePath || file.name;
                 return skipped(path) ? [] : [{ path, file }];
             });
-            return zipped(files, list[0]?.webkitRelativePath.split("/")[0] || "upload");
+            return zipped(files, list[0]?.webkitRelativePath.split("/")[0] || "upload", t("upload.noFiles"));
         });
     }
 
@@ -205,12 +210,13 @@ export function SourceDropZone({
                 <span className="font-medium">
                     {picked.name}
                     <span className="block text-xs font-normal text-muted-foreground">
-                        {picked.files > 0 ? `${picked.files} files, ` : ""}
-                        {formatBytes(picked.blob.size)} to send
+                        {picked.files > 0
+                            ? t("upload.toSendFiles", { count: picked.files, size: formatBytes(picked.blob.size) })
+                            : t("upload.toSend", { size: formatBytes(picked.blob.size) })}
                     </span>
                 </span>
             ) : (
-                <span className="text-muted-foreground">Drop a folder or a .zip here</span>
+                <span className="text-muted-foreground">{t("upload.drop")}</span>
             )}
             <div className="flex flex-wrap justify-center gap-2">
                 <Button
@@ -220,7 +226,7 @@ export function SourceDropZone({
                     disabled={disabled || reading}
                     onClick={chooseFolder}
                 >
-                    Choose folder
+                    {t("upload.chooseFolder")}
                 </Button>
                 <Button
                     type="button"
@@ -229,7 +235,7 @@ export function SourceDropZone({
                     disabled={disabled || reading}
                     onClick={() => zipInput.current?.click()}
                 >
-                    Choose zip
+                    {t("upload.chooseZip")}
                 </Button>
             </div>
             <input
@@ -253,7 +259,7 @@ export function SourceDropZone({
                     event.target.value = "";
                 }}
             />
-            <span className="text-xs text-muted-foreground">node_modules and .git are left out.</span>
+            <span className="text-xs text-muted-foreground">{t("upload.leftOut")}</span>
         </div>
     );
 }
@@ -282,6 +288,7 @@ export function NewFolderForm({
     serverId: string;
     onDone: () => void;
 }) {
+    const t = useTranslations("deploy");
     const [name, setName] = useState("");
     const [picked, setPicked] = useState<PickedSource | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -298,11 +305,14 @@ export function NewFolderForm({
                 serverId
             });
             if (created.error || !created.applicationId) {
-                setError(created.error ?? "Could not create the service");
+                setError(created.error ?? t("upload.createFailed"));
                 return;
             }
-            const sent = await sendSource(created.applicationId, picked, true);
-            if (sent.error) setError(`The service was created, but the folder did not arrive: ${sent.error}`);
+            const sent = await sendSource(created.applicationId, picked, true, {
+                unreachable: t("upload.unreachable"),
+                failed: t("upload.failed")
+            });
+            if (sent.error) setError(t("upload.createdNoFolder", { reason: sent.error }));
             else if (sent.deployError) setError(sent.deployError);
             else onDone();
         });
@@ -311,7 +321,7 @@ export function NewFolderForm({
     return (
         <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Name</span>
+                <span className="text-xs font-medium text-muted-foreground">{t("upload.name")}</span>
                 <Input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
@@ -332,7 +342,7 @@ export function NewFolderForm({
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !picked}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} Deploy
+                    {pending && <Loader2 className="size-4 animate-spin" />} {t("upload.deploy")}
                 </Button>
             </div>
         </div>
@@ -342,6 +352,7 @@ export function NewFolderForm({
 /** On a service built from an upload: what it was last built from, and a place
  *  to send a newer folder. Nothing for a service built any other way. */
 export function UploadedSourceSection({ applicationId, onChanged }: { applicationId: string; onChanged: () => void }) {
+    const t = useTranslations("deploy");
     const [state, setState] = useState<{ upload: UploadedSource | null; uploadable: boolean } | null>(null);
     const [picked, setPicked] = useState<PickedSource | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -363,7 +374,10 @@ export function UploadedSourceSection({ applicationId, onChanged }: { applicatio
         if (!picked) return;
         setError(null);
         startTransition(async () => {
-            const sent = await sendSource(applicationId, picked, true);
+            const sent = await sendSource(applicationId, picked, true, {
+                unreachable: t("upload.unreachable"),
+                failed: t("upload.failed")
+            });
             if (sent.error) {
                 setError(sent.error);
                 return;
@@ -377,15 +391,23 @@ export function UploadedSourceSection({ applicationId, onChanged }: { applicatio
 
     return (
         <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">Uploaded source</h3>
+            <h3 className="text-sm font-medium">{t("upload.title")}</h3>
             <div className="flex flex-col gap-3 rounded-md border border-border p-3 text-sm">
                 {state.upload ? (
                     <p className="text-xs text-muted-foreground">
-                        Built from <span className="font-medium text-foreground">{state.upload.name}</span>:{" "}
-                        {state.upload.files} files, {formatBytes(state.upload.bytes)}.
+                        {t.rich("upload.builtFrom", {
+                            name: state.upload.name,
+                            count: state.upload.files,
+                            size: formatBytes(state.upload.bytes),
+                            strong: (chunks) => (
+                                <span key="name" className="font-medium text-foreground">
+                                    {chunks}
+                                </span>
+                            )
+                        })}
                     </p>
                 ) : (
-                    <p className="text-xs text-muted-foreground">Nothing uploaded yet.</p>
+                    <p className="text-xs text-muted-foreground">{t("upload.nothing")}</p>
                 )}
                 <SourceDropZone
                     picked={picked}
@@ -398,7 +420,7 @@ export function UploadedSourceSection({ applicationId, onChanged }: { applicatio
                 {error && <p className="text-sm text-danger">{error}</p>}
                 <div className="flex justify-end">
                     <Button onClick={send} disabled={pending || !picked}>
-                        {pending && <Loader2 className="size-4 animate-spin" />} Upload and deploy
+                        {pending && <Loader2 className="size-4 animate-spin" />} {t("upload.send")}
                     </Button>
                 </div>
             </div>

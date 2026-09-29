@@ -14,6 +14,7 @@ import { Button } from "@polaris/ui";
 import { deleteVolumeAction, listVolumesAction } from "./actions";
 import { VolumeForm, type EditVolume } from "./volume-form";
 import { useProjectCan } from "./access-context";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ProjectApp } from "./deploy-view";
 
 type Volume = Awaited<ReturnType<typeof listVolumesAction>>[number];
@@ -28,6 +29,7 @@ function volumeDriveHref(appId: string, volume: Volume): string {
 }
 
 export function VolumesTab({ app }: { app: ProjectApp }) {
+    const t = useTranslations("deployData");
     const can = useProjectCan();
     const [items, setItems] = useState<Volume[] | null>(null);
     const [showAdd, setShowAdd] = useState(false);
@@ -53,7 +55,7 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
         <div className="flex flex-col gap-4 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-medium">
-                    {items ? items.length : 0} volume{items && items.length === 1 ? "" : "s"}
+                    {t("volumes.count", { count: items ? items.length : 0 })}
                 </span>
                 {can("volumes.manage") && (
                     <Button
@@ -63,7 +65,7 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                             setShowAdd((open) => !open);
                         }}
                     >
-                        <Plus className="size-4" /> New Volume
+                        <Plus className="size-4" /> {t("volumes.new")}
                     </Button>
                 )}
             </div>
@@ -84,7 +86,7 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
             {editVolume && (
                 <div className="rounded-md border border-border/60 p-3">
                     <p className="mb-2 text-xs font-medium text-muted-foreground">
-                        Editing {editVolume.name}
+                        {t("volumes.editing", { name: editVolume.name })}
                     </p>
                     <VolumeForm
                         applicationId={app.id}
@@ -102,7 +104,7 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
 
             <div className="overflow-hidden rounded-md border border-border/60">
                 {items && items.length === 0 && (
-                    <p className="p-3 text-xs text-muted-foreground">No volumes attached.</p>
+                    <p className="p-3 text-xs text-muted-foreground">{t("volumes.empty")}</p>
                 )}
                 {items?.map((volume) => (
                     <div
@@ -135,13 +137,13 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                                         setShowAdd(false);
                                         setEditVolume(volume);
                                     }}
-                                    title="Volume options"
-                                    aria-label={`Options for ${volume.name}`}
+                                    title={t("volumes.options")}
+                                    aria-label={t("volumes.optionsNamed", { name: volume.name })}
                                 >
                                     <Settings2 className="size-4" />
                                 </Button>
                             )}
-                            <Button asChild variant="ghost" size="sm" title="View in Drive">
+                            <Button asChild variant="ghost" size="sm" title={t("volumes.viewInDrive")}>
                                 <Link href={volumeDriveHref(app.id, volume)}>
                                     <HardDrive className="size-4" />
                                 </Link>
@@ -152,8 +154,8 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                                     size="sm"
                                     onClick={() => remove(volume)}
                                     disabled={pending}
-                                    title="Remove"
-                                    aria-label={`Remove ${volume.name}`}
+                                    title={t("volumes.remove")}
+                                    aria-label={t("volumes.removeNamed", { name: volume.name })}
                                 >
                                     <Trash2 className="size-4" />
                                 </Button>

@@ -18,6 +18,7 @@ import {
     DialogTitle
 } from "@polaris/ui";
 import { listNasFoldersAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function FolderPicker({
     connectionId,
@@ -30,6 +31,7 @@ export function FolderPicker({
     onOpenChange: (open: boolean) => void;
     onPick: (path: string) => void;
 }) {
+    const t = useTranslations("deployData");
     const [path, setPath] = useState("");
     const [folders, setFolders] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export function FolderPicker({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Choose a folder</DialogTitle>
+                    <DialogTitle>{t("folderPicker.title")}</DialogTitle>
                 </DialogHeader>
                 <div className="flex items-center gap-2">
                     <Button
@@ -70,7 +72,7 @@ export function FolderPicker({
                         size="sm"
                         onClick={up}
                         disabled={busy || !path}
-                        title="Up"
+                        title={t("folderPicker.up")}
                     >
                         <ArrowUp className="size-4" />
                     </Button>
@@ -82,7 +84,7 @@ export function FolderPicker({
                 {error && <p className="text-xs text-danger">{error}</p>}
                 <div className="max-h-72 overflow-auto overscroll-contain rounded-md border border-border/60">
                     {folders.length === 0 && !busy && (
-                        <p className="p-3 text-xs text-muted-foreground">No sub-folders here.</p>
+                        <p className="p-3 text-xs text-muted-foreground">{t("folderPicker.empty")}</p>
                     )}
                     {folders.map((name) => (
                         <button
@@ -97,7 +99,7 @@ export function FolderPicker({
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-                        Cancel
+                        {t("folderPicker.cancel")}
                     </Button>
                     <Button
                         size="sm"
@@ -106,7 +108,7 @@ export function FolderPicker({
                             onOpenChange(false);
                         }}
                     >
-                        Use this folder
+                        {t("folderPicker.use")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

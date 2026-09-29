@@ -306,7 +306,9 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
                 onOpenChange={(open) => !open && setDeleting(null)}
                 name={deleting?.name ?? ""}
                 requireTyping={false}
-                kind={t("cron.kind")}
+                kind="scheduled job"
+                title={t("cron.deleteTitle")}
+                confirmLabel={t("cron.deleteTitle")}
                 question={t.rich("cron.deleteQuestion", {
                     name: deleting?.name ?? "",
                     strong: (chunks) => <strong key="name">{chunks}</strong>

@@ -17,6 +17,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { SECTIONS } from "./project-sections";
 import { createProjectAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { TabAttentionDot } from "./attention-dot";
 import { HeaderPortal } from "@/components/header-portal";
 import { useState, useTransition, type ReactNode } from "react";
@@ -63,6 +64,8 @@ export function ProjectShell({
     const router = useRouter();
     const pathname = usePathname();
     const search = useSearchParams();
+    const t = useTranslations("deployProject");
+    const td = useTranslations("deploy");
 
     const base = `/apps/deploy/${project.id}`;
     const defaultEnv = project.environments.find((environment) => environment.isDefault) ?? project.environments[0];
@@ -103,9 +106,9 @@ export function ProjectShell({
     }
 
     const newProjectOption = canManage
-        ? [{ value: NEW_PROJECT, label: "New project", icon: <Plus className="size-3.5 text-muted-foreground" /> }]
+        ? [{ value: NEW_PROJECT, label: t("shell.newProject"), icon: <Plus className="size-3.5 text-muted-foreground" /> }]
         : [];
-    const newEnvOption = newEnvironmentOption(canManage);
+    const newEnvOption = newEnvironmentOption(canManage, td("newEnvironment.option"));
 
     const projectSelect = (
         <Select
@@ -113,7 +116,7 @@ export function ProjectShell({
             onValueChange={(id) => (id === NEW_PROJECT ? setShowNewProject(true) : router.push(`/apps/deploy/${id}`))}
             options={[...projects.map((item) => ({ value: item.id, label: item.name })), ...newProjectOption]}
             className="h-8 min-w-0 flex-1 font-medium md:w-44 md:min-w-[11rem] md:flex-none"
-            aria-label="Project"
+            aria-label={t("shell.project")}
         />
     );
     const environmentSelect = (
@@ -125,7 +128,7 @@ export function ProjectShell({
                 ...newEnvOption
             ]}
             className="h-8 min-w-0 flex-1 md:w-52 md:min-w-[13rem] md:flex-none"
-            aria-label="Environment"
+            aria-label={t("shell.environment")}
         />
     );
 
@@ -199,6 +202,8 @@ function ProjectNav({
     /** Services in this environment that need a look - a dot on Architecture, where they are. */
     attention: number;
 }) {
+    const t = useTranslations("deployProject");
+
     function isActive(path: string): boolean {
         const target = `${base}${path}`;
         // The root is the only one that must match exactly, or it would stay lit
@@ -216,7 +221,7 @@ function ProjectNav({
                         <li key={section.label} className="shrink-0 lg:shrink">
                             <Link
                                 href={sectionHref(section.path)}
-                                title={section.hint}
+                                title={t(section.hint)}
                                 aria-current={active ? "page" : undefined}
                                 className={cn(
                                     "flex items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-muted",
@@ -224,10 +229,10 @@ function ProjectNav({
                                 )}
                             >
                                 <Icon className="size-4 shrink-0" />
-                                {section.label}
+                                {t(section.label)}
                                 {section.path === "" && attention > 0 && (
                                     <TabAttentionDot
-                                        label={`${attention} ${attention === 1 ? "service needs" : "services need"} a look`}
+                                        label={t("shell.attention", { count: attention })}
                                         className="ml-auto"
                                     />
                                 )}
@@ -242,6 +247,7 @@ function ProjectNav({
 
 function NewProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
     const router = useRouter();
+    const t = useTranslations("deployProject");
     const [name, setName] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -266,15 +272,16 @@ function NewProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>New project</DialogTitle>
+                    <DialogTitle>{t("shell.newProject")}</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">Project name</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("shell.name")}</span>
                         <Input
                             autoFocus
                             value={name}
                             onChange={(event) => setName(event.target.value)}
+                            // i18n-ignore: an example project name
                             placeholder="my-project"
                             onKeyDown={(event) => event.key === "Enter" && submit()}
                         />
@@ -282,10 +289,10 @@ function NewProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {t("shell.cancel")}
                         </Button>
                         <Button onClick={submit} disabled={pending || !name.trim()}>
-                            Create
+                            {t("shell.create")}
                         </Button>
                     </div>
                 </div>

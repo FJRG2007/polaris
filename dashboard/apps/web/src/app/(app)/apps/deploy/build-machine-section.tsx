@@ -9,8 +9,10 @@ import { Select } from "@polaris/ui";
 import { useEffect, useState } from "react";
 import type { BuildMachineView } from "@/lib/deploy/build-machine";
 import { buildMachineAction, setBuildMachineAction } from "./source-actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function BuildMachineSection({ applicationId }: { applicationId: string }) {
+    const t = useTranslations("deployService");
     const [view, setView] = useState<BuildMachineView | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -41,17 +43,16 @@ export function BuildMachineSection({ applicationId }: { applicationId: string }
 
     return (
         <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">Build on</h3>
+            <h3 className="text-sm font-medium">{t("buildMachine.title")}</h3>
             <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
                 <Select
                     value={view.value}
                     onValueChange={(value) => void choose(value)}
                     options={view.options.map((option) => ({ value: option.value, label: option.label }))}
-                    aria-label="Build on"
+                    aria-label={t("buildMachine.title")}
                 />
                 <span className="text-xs text-muted-foreground">
-                    Another machine builds the image and sends it here, so a small server can run what it could
-                    not build.
+                    {t("buildMachine.hint")}
                 </span>
                 {error && <p className="text-sm text-danger">{error}</p>}
             </div>

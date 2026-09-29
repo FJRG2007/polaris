@@ -12,23 +12,26 @@
  * on the one screen a project is configured from.
  */
 
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { Activity, Cloud, LayoutGrid, ScrollText, Settings, type LucideIcon } from "lucide-react";
 
 export interface Section {
-    label: string;
+    /** Catalog key of the tab's name, in the deployProject namespace. */
+    label: NamespaceKey<"deployProject">;
     /** Appended to the project's own path; "" is the project root. So a value
      *  that reads like a route of its own is not one here - it becomes a segment
      *  underneath, which is exactly how `/admin/settings` produced
      *  `/apps/deploy/<id>/admin/settings` and landed nowhere. */
     path: string;
     icon: LucideIcon;
-    hint: string;
+    /** Catalog key of the tab's tooltip, in the deployProject namespace. */
+    hint: NamespaceKey<"deployProject">;
 }
 
 export const SECTIONS: Section[] = [
-    { label: "Architecture", path: "", icon: LayoutGrid, hint: "Services and how they connect" },
-    { label: "Elsewhere", path: "/elsewhere", icon: Cloud, hint: "What this project runs on Vercel or Railway" },
-    { label: "Observability", path: "/observability", icon: Activity, hint: "Metrics across the environment" },
-    { label: "Logs", path: "/logs", icon: ScrollText, hint: "Every service's output in one stream" },
-    { label: "Settings", path: "/settings", icon: Settings, hint: "Project configuration" }
+    { label: "sections.architecture.label", path: "", icon: LayoutGrid, hint: "sections.architecture.hint" },
+    { label: "sections.elsewhere.label", path: "/elsewhere", icon: Cloud, hint: "sections.elsewhere.hint" },
+    { label: "sections.observability.label", path: "/observability", icon: Activity, hint: "sections.observability.hint" },
+    { label: "sections.logs.label", path: "/logs", icon: ScrollText, hint: "sections.logs.hint" },
+    { label: "sections.settings.label", path: "/settings", icon: Settings, hint: "sections.settings.hint" }
 ];
