@@ -12,6 +12,8 @@
  * those fail loudly, they just sit in the vault not working.
  */
 
+import { ENGLISH, type Words } from "@/lib/words";
+
 /** A login on its way into the vault, normalized. */
 export interface IntendedLogin {
     readonly name: string;
@@ -39,13 +41,13 @@ export type Intent =
  * The errors are what somebody should do about it rather than which rule failed,
  * because this is the text the popup puts under the button.
  */
-export function readIntendedLogin(typed: TypedLogin): Intent {
+export function readIntendedLogin(typed: TypedLogin, t: Words = ENGLISH): Intent {
     const name = typed.name.trim();
-    if (name === "") return { ok: false, error: "Give it a name so you can find it again." };
+    if (name === "") return { ok: false, error: t("save.nameIt") };
 
     const uri = typed.uri.trim();
     if (uri !== "" && !/^https?:\/\//i.test(uri)) {
-        return { ok: false, error: "The address has to be a web page." };
+        return { ok: false, error: t("save.webPage") };
     }
 
     const username = typed.username.trim();
@@ -56,7 +58,7 @@ export function readIntendedLogin(typed: TypedLogin): Intent {
     const password = typed.password;
 
     if (username === "" && password === "") {
-        return { ok: false, error: "Add a username or a password: there is nothing to save yet." };
+        return { ok: false, error: t("save.nothingYet") };
     }
 
     return {

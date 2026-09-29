@@ -4,6 +4,7 @@
         "jsx": "react-jsx",
         "strict": true,
         "noUncheckedIndexedAccess": true,
-        "verbatimModuleSyntax": true
+        "verbatimModuleSyntax": true,
+        "resolveJsonModule": true
     }
 }

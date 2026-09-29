@@ -154,8 +154,22 @@ describe("asking whether the connection still stands", () => {
             account: { id: "u1", name: "Ada", email: "ada@example.com" },
             connectionName: "Chrome on Windows",
             vault: true,
-            organizations: []
+            organizations: [],
+            // A server too old to say, where the browser's own language is spoken.
+            locale: null
         });
+    });
+
+    it("reads the account's language when the server says it", async () => {
+        answering(200, {
+            connection: { id: "c1", name: "Chrome on Windows" },
+            account: { id: "u1", name: "Ada", email: "ada@example.com", locale: "es-ES" },
+            can: { vault: true }
+        });
+
+        const state = await checkLink(ORIGIN, "connection-token");
+
+        expect(state !== null && state !== "ended" ? state.locale : null).toBe("es-ES");
     });
 
     it("reads the organizations the account can switch to, with their vaults", async () => {

@@ -13,6 +13,8 @@
  * see once it is spread across a worker, an alarm and a dropdown.
  */
 
+import { ENGLISH, type Words } from "@/lib/words";
+
 const MINUTE = 60_000;
 
 /**
@@ -39,15 +41,20 @@ export interface TimeoutChoice {
  * because the alternative is keeping the key somewhere a restart cannot take it,
  * and key material at rest is the one thing this extension is built to avoid.
  */
-export const TIMEOUT_CHOICES: readonly TimeoutChoice[] = [
-    { label: "1 minute", ms: MINUTE },
-    { label: "5 minutes", ms: 5 * MINUTE },
-    { label: "15 minutes", ms: 15 * MINUTE },
-    { label: "30 minutes", ms: 30 * MINUTE },
-    { label: "1 hour", ms: 60 * MINUTE },
-    { label: "4 hours", ms: 240 * MINUTE },
-    { label: "When the browser closes", ms: UNTIL_BROWSER_CLOSES }
-];
+export function timeoutChoices(t: Words = ENGLISH): readonly TimeoutChoice[] {
+    return [
+        { label: t("lock.minutes", { count: 1 }), ms: MINUTE },
+        { label: t("lock.minutes", { count: 5 }), ms: 5 * MINUTE },
+        { label: t("lock.minutes", { count: 15 }), ms: 15 * MINUTE },
+        { label: t("lock.minutes", { count: 30 }), ms: 30 * MINUTE },
+        { label: t("lock.hours", { count: 1 }), ms: 60 * MINUTE },
+        { label: t("lock.hours", { count: 4 }), ms: 240 * MINUTE },
+        { label: t("lock.browserCloses"), ms: UNTIL_BROWSER_CLOSES }
+    ];
+}
+
+/** The choices in English, for whatever reads them without a reader. */
+export const TIMEOUT_CHOICES: readonly TimeoutChoice[] = timeoutChoices();
 
 /**
  * The deadline somebody gets without choosing one.

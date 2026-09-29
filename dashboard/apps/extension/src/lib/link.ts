@@ -47,6 +47,8 @@ export interface LinkedAccount {
     readonly id: string;
     readonly name: string;
     readonly email: string;
+    /** The account's language, when the server said it. */
+    readonly locale?: string;
 }
 
 /** Where a request stands, and what it carried if it was approved. */
@@ -72,6 +74,9 @@ export interface LinkState {
     /** Empty from a server too old to list them, which is also an account that
      *  belongs to none. */
     readonly organizations: readonly LinkOrganization[];
+    /** The account's language, as its Polaris names it. Null from a server too
+     *  old to say, where the browser's own language is spoken instead. */
+    readonly locale: string | null;
 }
 
 function url(origin: string, path: string): string {
@@ -104,7 +109,8 @@ function readAccount(value: unknown): LinkedAccount | null {
     return {
         id: row["id"],
         name: typeof row["name"] === "string" ? row["name"] : "",
-        email: row["email"]
+        email: row["email"],
+        ...(typeof row["locale"] === "string" ? { locale: row["locale"] } : {})
     };
 }
 
@@ -263,7 +269,8 @@ export async function checkLink(
         account,
         connectionName: typeof connection?.["name"] === "string" ? connection["name"] : "",
         vault: can?.["vault"] === true,
-        organizations: readOrganizations(body["organizations"])
+        organizations: readOrganizations(body["organizations"]),
+        locale: typeof account.locale === "string" ? account.locale : null
     };
 }
 

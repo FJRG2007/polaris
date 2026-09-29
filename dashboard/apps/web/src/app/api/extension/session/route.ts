@@ -17,6 +17,7 @@ import { userHasPermission } from "@polaris/auth";
 import { clientHost, clientIp, clientUserAgent } from "@/lib/request-context";
 import { scopeChoices } from "@/lib/workspace-scope";
 import { bearerToken, readExtensionToken, revokeExtensionToken } from "@/lib/extension/sessions";
+import { storedLocale } from "@/lib/i18n/locale-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +40,12 @@ export async function GET(request: Request): Promise<Response> {
 
     // What this account may do, so the extension offers a vault only where there
     // is one to offer rather than leading somebody to a refusal.
-    const vault = await userHasPermission(principal.userId, "vault.use");
+    // And the language it chose for Polaris, which the extension speaks too -
+    // none when it never chose one, so the extension goes by the browser.
+    const [vault, locale] = await Promise.all([
+        userHasPermission(principal.userId, "vault.use"),
+        storedLocale(principal.userId).catch(() => null)
+    ]);
 
     // The organizations it may switch between, as the header switcher in the
     // dashboard offers them - with the vault each one holds, so the extension can
@@ -54,7 +60,7 @@ export async function GET(request: Request): Promise<Response> {
         : [];
     return Response.json({
         connection: { id: principal.id, name: principal.name },
-        account: { id: account.id, name: account.name ?? "", email: account.email },
+        account: { id: account.id, name: account.name ?? "", email: account.email, ...(locale ? { locale } : {}) },
         organizations: organizations.map((org) => ({
             id: org.id,
             name: org.name,

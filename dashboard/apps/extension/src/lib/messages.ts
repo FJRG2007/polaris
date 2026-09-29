@@ -13,6 +13,7 @@
  */
 
 import type { UpdateNotice } from "@/lib/update";
+import { ENGLISH, type Words } from "@/lib/words";
 
 /** One decrypted login, reduced to what a list needs to draw it. */
 export interface ItemSummary {
@@ -464,8 +465,17 @@ export const FROM_PAGE: ReadonlySet<Request["kind"]> = new Set([
  * every caller already handles. Re-opening the popup starts it again, which is
  * what the sentence asks for.
  */
+let unreachableWords: Words = ENGLISH;
+
+/** The words the "did not answer" refusal is said in, set by whichever screen
+ *  asks: the popup and the page script each know their reader's language, and
+ *  this is the one sentence that is written here rather than by the worker. */
+export function speakRepliesIn(t: Words): void {
+    unreachableWords = t;
+}
+
 export async function askBackground(request: Request): Promise<Reply> {
-    const unreachable = { ok: false, error: "Polaris did not answer. Open this again." } as const;
+    const unreachable = { ok: false, error: unreachableWords("errors.silentWorker") } as const;
     try {
         const reply = (await browser.runtime.sendMessage(request)) as Reply | undefined;
         // A worker torn down mid-question can also answer with nothing at all,

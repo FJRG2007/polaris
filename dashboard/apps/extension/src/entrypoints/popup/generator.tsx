@@ -16,6 +16,7 @@
 
 import { useEffect, useState } from "react";
 import { AgainMark, CheckMark, CopyMark, EyeMark, FoldMark } from "./marks";
+import { useWords } from "./words";
 import {
     PASSWORD_MAX_LENGTH,
     PASSWORD_MIN_LENGTH,
@@ -31,12 +32,13 @@ import {
     type GeneratorOptions
 } from "@/lib/generator";
 
-/** What each set is called on its chip, and what it is called out loud. */
-const SET_LABELS: Record<CharacterSet, { chip: string; name: string }> = {
-    uppercase: { chip: "A-Z", name: "Uppercase letters" },
-    lowercase: { chip: "a-z", name: "Lowercase letters" },
-    digits: { chip: "0-9", name: "Digits" },
-    symbols: { chip: "!#$", name: "Symbols" }
+/** What each set is called on its chip; what it is called out loud is
+ *  `generator.sets.<set>` in the catalog. */
+const SET_CHIPS: Record<CharacterSet, string> = {
+    uppercase: "A-Z",
+    lowercase: "a-z",
+    digits: "0-9",
+    symbols: "!#$"
 };
 
 export interface GeneratorPanelProps {
@@ -73,6 +75,7 @@ export function GeneratorPanel({
     // The box's own text, so a half-typed "1" on the way to "16" is not snapped
     // to eight under somebody's cursor. Put back to the real length when they
     // leave it, and whenever the slider moves the length from outside.
+    const t = useWords();
     const [typed, setTyped] = useState(String(options.length));
     useEffect(() => setTyped(String(options.length)), [options.length]);
     const typedLength = Number(typed);
@@ -93,9 +96,9 @@ export function GeneratorPanel({
     return (
         <div className="row generator">
             <div className="generated">
-                <code className="value" aria-label="Generated password">
+                <code className="value" aria-label={t("generator.generated")}>
                     {value === null
-                        ? "Nothing can be made of that."
+                        ? t("generator.nothing")
                         : shown
                           ? value
                           : "•".repeat(value.length)}
@@ -103,8 +106,8 @@ export function GeneratorPanel({
                 <div className="acts">
                     <button
                         className="icon"
-                        aria-label={shown ? "Hide the password" : "Show the password"}
-                        title={shown ? "Hide" : "Show"}
+                        aria-label={shown ? t("generator.hidePassword") : t("generator.showPassword")}
+                        title={shown ? t("generator.hide") : t("generator.show")}
                         disabled={value === null}
                         onClick={() => onShown(!shown)}
                     >
@@ -112,16 +115,16 @@ export function GeneratorPanel({
                     </button>
                     <button
                         className="icon"
-                        aria-label="Make another password"
-                        title="Make another"
+                        aria-label={t("generator.anotherPassword")}
+                        title={t("generator.another")}
                         onClick={onAgain}
                     >
                         <AgainMark />
                     </button>
                     <button
                         className={copied ? "icon copied" : "icon"}
-                        aria-label={copied ? "Copied" : "Copy the password"}
-                        title={copied ? "Copied" : "Copy"}
+                        aria-label={copied ? t("generator.copied") : t("generator.copyPassword")}
+                        title={copied ? t("generator.copied") : t("generator.copy")}
                         disabled={value === null}
                         onClick={onCopy}
                     >
@@ -135,15 +138,13 @@ export function GeneratorPanel({
                     <span className="meter" aria-hidden="true">
                         <span style={{ width: `${Math.min(100, (bits / 128) * 100)}%` }} />
                     </span>
-                    <span>
-                        {bits} bits, {strengthWord(bits)}
-                    </span>
+                    <span>{t("generator.strength", { bits, strength: strengthWord(bits) })}</span>
                 </p>
             ) : null}
 
             <div className="length">
                 <label htmlFor="generator-length" className="muted small">
-                    Length
+                    {t("generator.length")}
                 </label>
                 <input
                     id="generator-length"
@@ -156,7 +157,7 @@ export function GeneratorPanel({
                 <input
                     className="tiny"
                     type="number"
-                    aria-label="Length in characters"
+                    aria-label={t("generator.lengthLabel")}
                     min={PASSWORD_MIN_LENGTH}
                     max={PASSWORD_MAX_LENGTH}
                     value={typed}
@@ -186,11 +187,11 @@ export function GeneratorPanel({
             </div>
             {typedValid ? null : (
                 <p id="generator-length-hint" className="muted small">
-                    {PASSWORD_MIN_LENGTH} to {PASSWORD_MAX_LENGTH} characters.
+                    {t("generator.lengthRange", { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH })}
                 </p>
             )}
 
-            <div className="chips" role="group" aria-label="Characters to use">
+            <div className="chips" role="group" aria-label={t("generator.characters")}>
                 {CHARACTER_SETS.map((set) => {
                     const on = options[set];
                     const locked = on && !canTurnOff(options, set);
@@ -199,8 +200,8 @@ export function GeneratorPanel({
                             key={set}
                             className="chip"
                             aria-pressed={on}
-                            aria-label={SET_LABELS[set].name}
-                            title={locked ? "At least one kind has to stay on" : SET_LABELS[set].name}
+                            aria-label={t(`generator.sets.${set}`)}
+                            title={locked ? t("generator.oneStaysOn") : t(`generator.sets.${set}`)}
                             // Not `disabled`: a disabled button cannot show its
                             // tooltip, and the tooltip is the answer to "why won't
                             // this switch off".
@@ -209,20 +210,20 @@ export function GeneratorPanel({
                                 if (!locked) onOptions(withSet(options, set, !on));
                             }}
                         >
-                            {SET_LABELS[set].chip}
+                            {SET_CHIPS[set]}
                         </button>
                     );
                 })}
                 <button
                     className="chip"
                     aria-pressed={options.avoidAmbiguous}
-                    aria-label="Avoid look-alike characters"
-                    title="Leave out 0 and O, 1, l and I"
+                    aria-label={t("generator.avoidLabel")}
+                    title={t("generator.avoidHint")}
                     onClick={() =>
                         onOptions({ ...options, avoidAmbiguous: !options.avoidAmbiguous })
                     }
                 >
-                    No look-alikes
+                    {t("generator.avoid")}
                 </button>
             </div>
 
@@ -230,17 +231,17 @@ export function GeneratorPanel({
                 {onUse ? (
                     <button
                         className="ghost"
-                        title="Put it straight into a new login"
+                        title={t("generator.useHint")}
                         disabled={value === null}
                         onClick={onUse}
                     >
-                        Use it
+                        {t("generator.use")}
                     </button>
                 ) : null}
                 <button
                     className="icon fold"
-                    aria-label="Close the generator"
-                    title="Close"
+                    aria-label={t("generator.closeLabel")}
+                    title={t("generator.close")}
                     onClick={onClose}
                 >
                     <FoldMark />

@@ -14,6 +14,8 @@
  * types the wrong thing somewhere.
  */
 
+import { ENGLISH, type Words } from "@/lib/words";
+
 /** The ids the entries are created and answered under. */
 export const MENU = {
     root: "polaris",
@@ -31,12 +33,18 @@ export interface MenuEntry {
     readonly title: string;
 }
 
-export const MENU_ENTRIES: readonly MenuEntry[] = [
-    { id: MENU.fill, title: "Fill the login for this site" },
-    { id: MENU.generate, title: "Generate a password" },
-    { id: MENU.code, title: "Fill the one-time code" },
-    { id: MENU.email, title: "Fill my email" }
-];
+/** The entries, titled in the reader's words. */
+export function menuEntries(t: Words = ENGLISH): readonly MenuEntry[] {
+    return [
+        { id: MENU.fill, title: t("menu.fill") },
+        { id: MENU.generate, title: t("menu.generate") },
+        { id: MENU.code, title: t("menu.code") },
+        { id: MENU.email, title: t("menu.email") }
+    ];
+}
+
+/** The entries in English, for whatever reads them without a reader. */
+export const MENU_ENTRIES: readonly MenuEntry[] = menuEntries();
 
 /** The kind of box the pointer is over, as the page's script reads it. */
 export type MenuTarget = "password" | "text";

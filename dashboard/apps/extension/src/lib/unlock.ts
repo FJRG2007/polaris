@@ -26,6 +26,7 @@ import {
     symmetricKeyFromBytes,
     type SymmetricKey
 } from "@polaris/vault-crypto";
+import { ENGLISH, type Words } from "@/lib/words";
 
 /** The record the worker holds and `accounts` parks, named again here because it
  *  is what this takes. Described in one place: a second copy of the shape is a
@@ -97,12 +98,8 @@ export async function openVault(
 
 /** What each refusal reads as in the popup. One sentence, and the two that are
  *  not the reader's doing say what will mend them. */
-export function unlockRefusal(reason: UnlockFailure): string {
-    if (reason === "nothing") {
-        return "This browser is no longer holding your vault keys. Ask Polaris to let it in again.";
-    }
-    if (reason === "unavailable") {
-        return "This copy of the extension could not run your vault's key derivation. Updating it is what fixes that.";
-    }
-    return "That password did not open the vault.";
+export function unlockRefusal(reason: UnlockFailure, t: Words = ENGLISH): string {
+    if (reason === "nothing") return t("unlock.noKeys");
+    if (reason === "unavailable") return t("unlock.noDerivation");
+    return t("unlock.wrongPassword");
 }

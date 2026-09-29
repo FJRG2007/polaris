@@ -21,7 +21,9 @@ import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
 import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
-import { MENU, MENU_ENTRIES, visibleEntries, type MenuTarget } from "@/lib/context-menu";
+import { ACCOUNT_LOCALE, words } from "@/lib/locale-store";
+import type { WordKey } from "@/lib/words";
+import { MENU, MENU_ENTRIES, menuEntries, visibleEntries, type MenuTarget } from "@/lib/context-menu";
 import { SECOND_STEP_FOR_MS, sameSite, stepFor, type SecondStep } from "@/lib/second-step";
 import {
     decrypt,
@@ -101,6 +103,12 @@ interface OpenVault {
 let open: OpenVault | null = null;
 
 /** What came down last sync, still encrypted, so a recycled worker keeps it. */
+/** One sentence in the reader's words, looked up when it is said: the language
+ *  can change between two answers, when the account's does. */
+async function say(key: WordKey, params?: Record<string, string | number>): Promise<string> {
+    return (await words())(key, params);
+}
+
 const CIPHERS = storage.defineItem<protocol.SyncResponse | null>("session:vault.ciphers", {
     fallback: null
 });
@@ -921,8 +929,11 @@ async function forgetLink(): Promise<void> {
         LINK_WAITING.setValue(null),
         LINK_ORGS.setValue([]),
         LINK_FACES.setValue({ self: null, orgs: {} }),
-        LINK_SHELF.setValue(null)
+        LINK_SHELF.setValue(null),
+        // No account, so the browser's own language until another connects.
+        ACCOUNT_LOCALE.setValue(null)
     ]);
+    await retitleMenus();
 }
 
 /** Throw away everything this browser holds for the connection in front.
@@ -967,7 +978,11 @@ async function refreshLink(force = false): Promise<void> {
         await dropLink();
         return;
     }
-    const [held, shelf] = await Promise.all([LINK_FACES.getValue(), LINK_SHELF.getValue()]);
+    const [held, shelf, spoken] = await Promise.all([
+        LINK_FACES.getValue(),
+        LINK_SHELF.getValue(),
+        ACCOUNT_LOCALE.getValue()
+    ]);
     // Every face at once, and each one kept as it was when its answer is "could
     // not find out" - a slow server should not turn a photo back into initials.
     const [self, ...orgFaces] = await Promise.all([
@@ -992,8 +1007,11 @@ async function refreshLink(force = false): Promise<void> {
         shelf !== null && !state.organizations.some((org) => org.id === shelf)
             ? LINK_SHELF.setValue(null)
             : Promise.resolve(),
-        LINK_CHECKED.setValue(Date.now())
+        LINK_CHECKED.setValue(Date.now()),
+        // The account's language, which every screen of the extension speaks.
+        ACCOUNT_LOCALE.setValue(state.locale)
     ]);
+    if (state.locale !== spoken) await retitleMenus();
 }
 
 /** The collection running right now, so one request is never polled twice over. */
@@ -1096,7 +1114,7 @@ async function requestVault(
         device: await device(),
         extensionToken: connection
     });
-    if (!opened) return { ok: false, error: "That server did not answer." };
+    if (!opened) return { ok: false, error: await say("errors.serverSilent") };
 
     // Whatever pair this replaces is unreachable the moment it is overwritten, so
     // its private half is zeroed first rather than left in memory with nothing
@@ -1404,7 +1422,7 @@ async function heldFor(page: PageContext): Promise<HeldCapture | null> {
 async function saveCaptured(page: PageContext): Promise<messages.Reply> {
     const held = await heldFor(page);
     if (!held || held.offer.kind === "none") {
-        return { ok: false, error: "There is nothing waiting to be saved." };
+        return { ok: false, error: await say("errors.nothingToSave") };
     }
     const { offer } = held;
     await CAPTURE.setValue(null);
@@ -2087,7 +2105,7 @@ function typeIntoPage(
  */
 async function fill(id: string, page: PageContext | null = null): Promise<messages.Reply> {
     const target = page ?? (await activeTab());
-    if (!target) return { ok: false, error: "There is no page to fill." };
+    if (!target) return { ok: false, error: await say("errors.noPageToFill") };
     const running = fillTab(id, target);
     filling.set(target.tabId, running);
     try {
@@ -2104,7 +2122,7 @@ const filling = new Map<number, Promise<messages.Reply>>();
 async function fillTab(id: string, target: PageContext): Promise<messages.Reply> {
     const tab = { id: target.tabId, url: target.url };
     const login = (await logins()).find((one) => one.id === id);
-    if (!login) return { ok: false, error: "That item is not open." };
+    if (!login) return { ok: false, error: await say("errors.itemNotOpen") };
 
     // Re-checked here, against the tab as it is now: between the popup drawing a
     // list and somebody pressing it, a page can navigate, and a fill must never
@@ -2112,10 +2130,10 @@ async function fillTab(id: string, target: PageContext): Promise<messages.Reply>
     // list was built from, so the two cannot disagree about what belongs where -
     // and it is the one the tests cover.
     if (isBlockedHost(await BLOCKED.getValue(), tab.url)) {
-        return { ok: false, error: "This extension is switched off for this site." };
+        return { ok: false, error: await say("errors.offForSite") };
     }
     if (!matchesPage(login.uris, tab.url)) {
-        return { ok: false, error: "That item is not saved for this site." };
+        return { ok: false, error: await say("errors.notForSite") };
     }
 
     try {
@@ -2139,7 +2157,7 @@ async function fillTab(id: string, target: PageContext): Promise<messages.Reply>
             | { user?: boolean; pass?: boolean; code?: boolean }
             | undefined;
         if (!filled?.user && !filled?.pass && !filled?.code) {
-            return { ok: false, error: "No login form was found on this page." };
+            return { ok: false, error: await say("errors.noLoginForm") };
         }
         // A password went in and the code did not, so the site will ask for it
         // next - on the page the sign-in lands on, or on this one a moment later.
@@ -2168,7 +2186,7 @@ async function fillTab(id: string, target: PageContext): Promise<messages.Reply>
         }
         return { ok: true };
     } catch {
-        return { ok: false, error: "This page cannot be filled." };
+        return { ok: false, error: await say("errors.cannotFill") };
     }
 }
 
@@ -2216,16 +2234,16 @@ async function save(item: {
     readonly uri: string;
 }): Promise<messages.Reply> {
     const opened = await vault();
-    if (!opened) return { ok: false, error: "The vault is locked." };
+    if (!opened) return { ok: false, error: await say("errors.vaultLocked") };
 
-    const intent = readIntendedLogin(item);
+    const intent = readIntendedLogin(item, await words());
     if (!intent.ok) return { ok: false, error: intent.error };
 
     const origin = await currentOrigin();
-    if (!origin) return { ok: false, error: "Say which Polaris this is first." };
+    if (!origin) return { ok: false, error: await say("errors.whichPolaris") };
     const base = vaultBase(origin);
     const access = await token(base);
-    if (!access) return { ok: false, error: "That server did not answer. Sign in again." };
+    if (!access) return { ok: false, error: await say("errors.serverSilentSignIn") };
 
     const { login } = intent;
     const key = opened.key;
@@ -2245,14 +2263,14 @@ async function save(item: {
 
     if (!outcome.ok) {
         if (outcome.status === null)
-            return { ok: false, error: "That server could not be reached." };
+            return { ok: false, error: await say("errors.unreachable") };
         if (outcome.status === 401)
-            return { ok: false, error: "That session has ended. Sign in again." };
+            return { ok: false, error: await say("errors.sessionEnded") };
         // A 400 here is this client having built the item wrong, which is a defect
         // rather than something the reader can act on - so it is logged with the
         // status and they are told the one useful thing: nothing was saved.
         console.error("polaris: the vault refused a new item, status", outcome.status);
-        return { ok: false, error: "That could not be saved." };
+        return { ok: false, error: await say("errors.notSaved") };
     }
 
     // Straight away rather than on the next poll: the item somebody just saved has
@@ -2277,20 +2295,20 @@ async function save(item: {
  */
 async function changePassword(id: string, password: string): Promise<messages.Reply> {
     const opened = await vault();
-    if (!opened) return { ok: false, error: "The vault is locked." };
-    if (password === "") return { ok: false, error: "Type the new password first." };
+    if (!opened) return { ok: false, error: await say("errors.vaultLocked") };
+    if (password === "") return { ok: false, error: await say("errors.typePassword") };
 
     const held = await CIPHERS.getValue();
     const item = held?.ciphers.find((one) => one["id"] === id);
-    if (!item) return { ok: false, error: "That item is not here. Sync and try again." };
+    if (!item) return { ok: false, error: await say("errors.itemMissing") };
     const key = keyFor(item);
-    if (!key) return { ok: false, error: "This vault does not hold the key for that item." };
+    if (!key) return { ok: false, error: await say("errors.noItemKey") };
 
     const origin = await currentOrigin();
-    if (!origin) return { ok: false, error: "Say which Polaris this is first." };
+    if (!origin) return { ok: false, error: await say("errors.whichPolaris") };
     const base = vaultBase(origin);
     const access = await token(base);
-    if (!access) return { ok: false, error: "That server did not answer. Sign in again." };
+    if (!access) return { ok: false, error: await say("errors.serverSilentSignIn") };
 
     // What goes out is built by `lib/item.ts`: the item as it arrived, with the
     // password replaced, the old one moved into its history and the revision this
@@ -2302,9 +2320,9 @@ async function changePassword(id: string, password: string): Promise<messages.Re
 
     if (!outcome.ok) {
         if (outcome.status === null)
-            return { ok: false, error: "That server could not be reached." };
+            return { ok: false, error: await say("errors.unreachable") };
         if (outcome.status === 401)
-            return { ok: false, error: "That session has ended. Sign in again." };
+            return { ok: false, error: await say("errors.sessionEnded") };
         if (outcome.status === 409) {
             // Somebody else saved it first. Bring their version down before saying
             // so, because the next thing anybody does is look at the item - and it
@@ -2312,11 +2330,11 @@ async function changePassword(id: string, password: string): Promise<messages.Re
             await sync(true);
             return {
                 ok: false,
-                error: "Somebody changed this item elsewhere. It has been refreshed; try again."
+                error: await say("errors.changedElsewhere")
             };
         }
         console.error("polaris: the vault refused an item update, status", outcome.status);
-        return { ok: false, error: "That could not be saved." };
+        return { ok: false, error: await say("errors.notSaved") };
     }
 
     await sync(true);
@@ -2416,7 +2434,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "connect": {
                 const origin = readOrigin(request.typed);
-                if (!origin) return { ok: false, error: "That does not look like an address." };
+                if (!origin) return { ok: false, error: await say("errors.notAnAddress") };
                 // Checked, never requested: asking is the popup's job because only
                 // a user gesture may ask, and this worker has none. What is left
                 // here is the decision - a caller saying it was granted is not
@@ -2424,7 +2442,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 if (!(await holdsOrigin(origin))) {
                     return {
                         ok: false,
-                        error: "Without permission for that address, nothing can be read from it."
+                        error: await say("errors.noPermission")
                     };
                 }
                 await rememberOrigin(origin);
@@ -2433,7 +2451,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "link": {
                 const origin = await currentOrigin();
-                if (!origin) return { ok: false, error: "Say which Polaris this is first." };
+                if (!origin) return { ok: false, error: await say("errors.whichPolaris") };
                 // The same id the vault's clients are known by, so a browser that
                 // was signed in to a vault before connections existed is adopted
                 // by the connection rather than turning up twice.
@@ -2445,7 +2463,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 if (!opened) {
                     return {
                         ok: false,
-                        error: "That server did not answer. It may be older than this extension."
+                        error: await say("errors.serverTooOld")
                     };
                 }
                 await LINK_WAITING.setValue({
@@ -2513,14 +2531,14 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "authorize": {
                 const origin = await currentOrigin();
-                if (!origin) return { ok: false, error: "Say which Polaris this is first." };
+                if (!origin) return { ok: false, error: await say("errors.whichPolaris") };
                 // The connection comes first. A vault is something a connected
                 // extension is let into, so being let into one without a
                 // connection would be the old way round - and the server binds
                 // the two, so a token it does not recognise is refused there too.
                 const connection = await LINK_TOKEN.getValue();
                 if (!connection) {
-                    return { ok: false, error: "Connect this browser to Polaris first." };
+                    return { ok: false, error: await say("errors.connectFirst") };
                 }
                 return requestVault(origin, connection);
             }
@@ -2551,10 +2569,10 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // end: what follows is asking again, not waiting longer.
                 await WAITING.setValue(null);
                 if (state === "lost") {
-                    return { ok: false, error: "This browser lost the request. Ask again." };
+                    return { ok: false, error: await say("errors.lostRequest") };
                 }
                 if (state === "unreadable") {
-                    return { ok: false, error: "What came back could not be opened. Ask again." };
+                    return { ok: false, error: await say("errors.cannotOpenReply") };
                 }
                 if (state === "accountless") {
                     // What came back cannot say why the account half was missing,
@@ -2563,7 +2581,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     // same refusal forever, updating something already current.
                     return {
                         ok: false,
-                        error: "That approval carried the vault but not your account. Update Polaris from Settings, and if it refuses again, check your account is still allowed to use the vault."
+                        error: await say("errors.vaultWithoutAccount")
                     };
                 }
                 return { ok: true, waiting: state, userCode, pollMs };
@@ -2578,7 +2596,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "unlock": {
                 const opened = await inTurn(() => unlock(request.password));
-                if (!opened.ok) return { ok: false, error: unlockRefusal(opened.reason) };
+                if (!opened.ok) return { ok: false, error: unlockRefusal(opened.reason, await words()) };
                 // Deliberately not waited on - an unlock should not sit on the
                 // network - but still in a turn, or the items it brings down could
                 // land after a switch and be read as the incoming account's.
@@ -2650,7 +2668,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     await badge();
                     return true;
                 });
-                if (!moved) return { ok: false, error: "That account is not signed in here." };
+                if (!moved) return { ok: false, error: await say("errors.notSignedInHere") };
                 return { ok: true, status: await status() };
             }
 
@@ -2680,7 +2698,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // Refused while somebody is signed in, because the session would be
                 // left with no address to reach its own server at.
                 if (await REFRESH.getValue()) {
-                    return { ok: false, error: "Sign out of this account first." };
+                    return { ok: false, error: await say("errors.signOutFirst") };
                 }
                 await forgetOrigin();
                 return { ok: true, status: await status() };
@@ -2691,7 +2709,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 const orgs = await LINK_ORGS.getValue();
                 const orgId = request.orgId;
                 if (orgId !== null && !orgs.some((org) => org.id === orgId)) {
-                    return { ok: false, error: "You are not part of that organization." };
+                    return { ok: false, error: await say("errors.notInOrg") };
                 }
                 await LINK_SHELF.setValue(orgId);
                 return { ok: true, status: await status() };
@@ -2700,14 +2718,14 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             case "sync":
                 return (await inTurn(() => sync(true)))
                     ? { ok: true, status: await status() }
-                    : { ok: false, error: "Nothing came back from that server." };
+                    : { ok: false, error: await say("errors.nothingBack") };
 
             case "itemsFor": {
                 // Said, rather than answered with an empty list: a locked vault
                 // under the box read as "nothing saved for this site", which is
                 // wrong and sends somebody off to save a login they already have.
                 if (!(await vault())) {
-                    return { ok: false, error: "Your vault is locked.", locked: true };
+                    return { ok: false, error: await say("errors.yourVaultLocked"), locked: true };
                 }
                 // Anything saved elsewhere since the last look - a login added in
                 // Polaris a moment ago - is in this list rather than the next one.
@@ -2751,35 +2769,35 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // so the item has to be one saved for it - the same rule a fill
                 // is held to, and for the same reason.
                 if (page && (!login || !matchesPage(login.uris, page.url))) {
-                    return { ok: false, error: "That item is not saved for this site." };
+                    return { ok: false, error: await say("errors.notForSite") };
                 }
-                if (!login?.totp) return { ok: false, error: "That item has no one-time code." };
+                if (!login?.totp) return { ok: false, error: await say("errors.noCode") };
                 const code = await totpCode(login.totp);
-                if (!code) return { ok: false, error: "That authenticator value cannot be read." };
+                if (!code) return { ok: false, error: await say("errors.badAuthenticator") };
                 return { ok: true, code, remaining: totpRemaining(login.totp) };
             }
 
             case "secondStepCode": {
-                if (!page) return { ok: false, error: "There is no page here." };
+                if (!page) return { ok: false, error: await say("errors.noPage") };
                 const held = stepFor(await SECOND_STEP.getValue(), page, Date.now(), "code");
-                if (!held) return { ok: false, error: "There is no code waiting for this page." };
+                if (!held) return { ok: false, error: await say("errors.noCodeWaiting") };
                 // Once: the box that asked gets it, and a second code box on the
                 // same page is somebody's own to fill.
                 await SECOND_STEP.setValue(null);
                 const login = (await logins()).find((one) => one.id === held.itemId);
                 if (!login?.totp || !matchesPage(login.uris, page.url)) {
-                    return { ok: false, error: "That item is not saved for this site." };
+                    return { ok: false, error: await say("errors.notForSite") };
                 }
                 const code = await totpCode(login.totp);
-                if (!code) return { ok: false, error: "That authenticator value cannot be read." };
+                if (!code) return { ok: false, error: await say("errors.badAuthenticator") };
                 return { ok: true, code, remaining: totpRemaining(login.totp) };
             }
 
             case "continueSignIn": {
-                if (!page) return { ok: false, error: "There is no page here." };
+                if (!page) return { ok: false, error: await say("errors.noPage") };
                 await filling.get(page.tabId);
                 const held = stepFor(await SECOND_STEP.getValue(), page, Date.now(), "password");
-                if (!held) return { ok: false, error: "There is nothing waiting for this page." };
+                if (!held) return { ok: false, error: await say("errors.nothingWaiting") };
                 // Once, like the code: a second password box on the same page is
                 // somebody's own. The fill itself is held to every rule any fill
                 // is - the site switched off, the item saved for this page - and
@@ -2795,9 +2813,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 return { ok: true };
 
             case "myDetails": {
-                if (!(await vault())) return { ok: false, error: "Unlock Polaris first." };
+                if (!(await vault())) return { ok: false, error: await say("errors.unlockFirst") };
                 if (page && (await blockedHere(page.url)).blocked) {
-                    return { ok: false, error: "This extension is switched off for this site." };
+                    return { ok: false, error: await say("errors.offForSite") };
                 }
                 const account = await readAccount();
                 const email = account?.email ?? (await EMAIL.getValue());
@@ -2823,10 +2841,10 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             case "captured":
                 return page
                     ? capture(page, request)
-                    : { ok: false, error: "There is no page here." };
+                    : { ok: false, error: await say("errors.noPage") };
 
             case "pendingCapture": {
-                if (!page) return { ok: false, error: "There is no page here." };
+                if (!page) return { ok: false, error: await say("errors.noPage") };
                 const held = await heldFor(page);
                 return {
                     ok: true,
@@ -2839,7 +2857,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             case "saveCaptured":
                 return page
                     ? inTurn(() => saveCaptured(page))
-                    : { ok: false, error: "There is no page here." };
+                    : { ok: false, error: await say("errors.noPage") };
 
             case "dismissCapture": {
                 await CAPTURE.setValue(null);
@@ -2873,7 +2891,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "setBlocked": {
                 const { host } = await blockedHere();
-                if (!host) return { ok: false, error: "There is no site here to switch off." };
+                if (!host) return { ok: false, error: await say("errors.noSiteToSwitch") };
                 const held = await BLOCKED.getValue();
                 const without = held.filter((entry) => entry !== host);
                 await BLOCKED.setValue(request.blocked ? [...without, host] : without);
@@ -2886,7 +2904,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // this is a feature the browser does not have rather than one that
                 // failed - and the sentence says which.
                 if (!browser.scripting?.registerContentScripts) {
-                    return { ok: false, error: "This browser cannot show Polaris inside a page." };
+                    return { ok: false, error: await say("errors.noInline") };
                 }
                 await syncAutofill();
                 const target = await activeTab();
@@ -2915,7 +2933,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "copy": {
                 const login = (await logins()).find((one) => one.id === request.id);
-                if (!login) return { ok: false, error: "That item is not open." };
+                if (!login) return { ok: false, error: await say("errors.itemNotOpen") };
                 // The popup writes to the clipboard itself, from the gesture that
                 // asked for it: a worker has no document to copy from, and the
                 // value crosses to a page of ours rather than to a web page.
@@ -2933,7 +2951,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                             : null;
                 return value
                     ? { ok: true, value }
-                    : { ok: false, error: "There is nothing to copy." };
+                    : { ok: false, error: await say("errors.nothingToCopy") };
             }
         }
     };
@@ -2955,9 +2973,9 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
     };
 
     void answerAndTouch()
-        .catch((error: unknown): messages.Reply => {
+        .catch(async (error: unknown): Promise<messages.Reply> => {
             console.error("polaris: the vault worker could not answer:", error);
-            return { ok: false, error: "Something went wrong." };
+            return { ok: false, error: await say("errors.wentWrong") };
         })
         .then(sendResponse);
     return true;
@@ -3171,8 +3189,9 @@ async function setupMenus(): Promise<void> {
     if (!menus) return;
     await menus.removeAll();
     fitted = null;
+    // i18n-ignore the product's name
     menus.create({ id: MENU.root, title: "Polaris", contexts: ["editable"] });
-    for (const entry of MENU_ENTRIES) {
+    for (const entry of menuEntries(await words())) {
         menus.create({
             id: entry.id,
             parentId: MENU.root,
@@ -3180,6 +3199,18 @@ async function setupMenus(): Promise<void> {
             contexts: ["editable"]
         });
     }
+}
+
+/** Title the entries again in the reader's words, after the account's language
+ *  changed. Only the titles: which of them show is `fitMenu`'s. */
+async function retitleMenus(): Promise<void> {
+    const menus = browser.contextMenus;
+    if (!menus) return;
+    await Promise.all(
+        menuEntries(await words()).map((entry) =>
+            Promise.resolve(menus.update(entry.id, { title: entry.title })).catch(() => undefined)
+        )
+    );
 }
 
 /** What the entries were last fitted to, so a hover over a box of the same kind costs nothing. */
