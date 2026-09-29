@@ -30,6 +30,7 @@ import { runAction } from "@/lib/run-action";
 import { useEffect, useMemo, useState } from "react";
 import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { RelativeTime } from "@/components/relative-time";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { RichText } from "@/components/rich-text/rich-text";
 import { cn, Input, Button, SegmentedControl } from "@polaris/ui";
 import { Composer } from "@/app/(app)/chat/composer";
@@ -50,6 +51,9 @@ import { describeActivity, mergeConversation, type ConversationFilter } from "./
  * put one, with a different limit, is how two lists of the same attachments come
  * to disagree.
  */
+/** What stands in for a face on a comment an automation wrote. */
+const AUTOMATION_INITIALS = "AUT"; // i18n-ignore
+
 const COMMENT_RULES: core.ChatRules = {
     ...core.DEFAULT_CHAT_RULES,
     maxMessageLength: core.COMMENT_BODY_MAX,
@@ -76,6 +80,8 @@ export function ActivityStream({
     onChanged: () => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("tasksDetail");
+    const tc = useTranslations("common");
     const [busy, setBusy] = useState(false);
     const [filter, setFilter] = useState<ConversationFilter>("all");
     const [replyTo, setReplyTo] = useState<string | null>(null);
@@ -131,9 +137,9 @@ export function ActivityStream({
                         body: file
                     }
                 );
-                if (!response.ok) onError((await response.text()) || "Could not send that file");
+                if (!response.ok) onError((await response.text()) || t("conversation.fileFailed"));
             } catch {
-                onError("Could not send that file");
+                onError(t("conversation.fileFailed"));
             }
         }
 
@@ -150,20 +156,20 @@ export function ActivityStream({
                 <Avatar person={comment.author} size={28} />
             ) : (
                 <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[0.625rem] text-muted-foreground ring-1 ring-border">
-                    AUT
+                    {AUTOMATION_INITIALS}
                 </span>
             )}
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">
-                        {comment.author?.name ?? "Automation"}
+                        {comment.author?.name ?? t("conversation.automation")}
                     </span>
                     <span className="text-xs text-muted-foreground">
                         <RelativeTime iso={comment.createdAt} />
                     </span>
                     {comment.resolvedAt && (
                         <span className="inline-flex items-center gap-1 text-[0.6875rem] text-success">
-                            <CheckCircle2 className="size-3" /> Resolved
+                            <CheckCircle2 className="size-3" /> {t("conversation.resolved")}
                         </span>
                     )}
                 </div>
@@ -216,7 +222,7 @@ export function ActivityStream({
                             onClick={() => setReplyTo(comment.id)}
                             className="hover:text-foreground"
                         >
-                            Reply
+                            {t("conversation.reply")}
                         </button>
                     )}
                     <button
@@ -235,7 +241,7 @@ export function ActivityStream({
                         }}
                         className="hover:text-foreground"
                     >
-                        {comment.resolvedAt ? "Reopen" : "Resolve"}
+                        {comment.resolvedAt ? t("conversation.reopen") : t("conversation.resolve")}
                     </button>
                     {(canModerate || comment.author?.id === currentUserId) && (
                         <button
@@ -249,7 +255,7 @@ export function ActivityStream({
                             }}
                             className="hover:text-danger"
                         >
-                            Delete
+                            {t("conversation.delete")}
                         </button>
                     )}
                 </div>
@@ -260,7 +266,7 @@ export function ActivityStream({
                             channelId={null}
                             rules={COMMENT_RULES}
                             disabled={busy}
-                            placeholder="Write a reply"
+                            placeholder={t("conversation.replyPlaceholder")}
                             onSend={(body, files) => post(body, comment.id, files)}
                         />
                         <button
@@ -268,7 +274,7 @@ export function ActivityStream({
                             onClick={() => setReplyTo(null)}
                             className="self-start text-[0.6875rem] text-muted-foreground hover:text-foreground"
                         >
-                            Cancel
+                            {tc("actions.cancel")}
                         </button>
                     </div>
                 )}
@@ -283,15 +289,15 @@ export function ActivityStream({
         // whole thread to the height of one line.
         <div className="flex flex-col md:min-h-0 md:flex-1">
             <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-                <h2 className="text-sm font-semibold">Activity</h2>
+                <h2 className="text-sm font-semibold">{t("conversation.title")}</h2>
                 <SegmentedControl
-                    aria-label="What to show"
+                    aria-label={t("conversation.show")}
                     size="sm"
                     value={filter}
                     onValueChange={setFilter}
                     options={[
-                        { value: "all", label: "Everything" },
-                        { value: "comments", label: "Comments" }
+                        { value: "all", label: t("conversation.everything") },
+                        { value: "comments", label: t("conversation.comments") }
                     ]}
                 />
             </header>
@@ -302,7 +308,7 @@ export function ActivityStream({
                 className="flex flex-col gap-4 p-4 md:min-h-0 md:flex-1 md:overflow-y-auto overscroll-contain"
             >
                 {stream.length === 0 && (
-                    <p className="text-xs text-muted-foreground">Nothing has happened here yet.</p>
+                    <p className="text-xs text-muted-foreground">{t("conversation.empty")}</p>
                 )}
                 {stream.map((item) =>
                     item.kind === "comment" ? (
@@ -319,7 +325,7 @@ export function ActivityStream({
                                 aria-hidden
                                 className="mt-1.5 size-1.5 shrink-0 rounded-full bg-border"
                             />
-                            <span className="flex-1">{describeActivity(item.line)}</span>
+                            <span className="flex-1">{describeActivity(t, item.line)}</span>
                             <RelativeTime iso={item.line.createdAt} />
                         </div>
                     )
@@ -336,7 +342,7 @@ export function ActivityStream({
                     channelId={null}
                     rules={COMMENT_RULES}
                     disabled={busy}
-                    placeholder="Write a comment"
+                    placeholder={t("conversation.commentPlaceholder")}
                     onSend={(body, files) => post(body, null, files)}
                 />
             </div>
@@ -363,6 +369,7 @@ export function TimerControl({
     onChanged: () => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("tasksDetail");
     return (
         <div className="flex items-center gap-2">
             <Button
@@ -379,11 +386,11 @@ export function TimerControl({
                 }}
             >
                 {running ? <Square className="size-3.5" /> : <Play className="size-3.5" />}
-                {running ? "Stop" : "Start"}
+                {running ? t("time.stop") : t("time.start")}
             </Button>
             {trackedSeconds > 0 && (
                 <span className="text-xs text-muted-foreground">
-                    {core.formatTrackedSeconds(trackedSeconds)} logged
+                    {t("time.logged", { time: core.formatTrackedSeconds(trackedSeconds) })}
                 </span>
             )}
         </div>
@@ -408,6 +415,7 @@ export function TimeSection({
     onChanged: () => void;
     onError: (message: string) => void;
 }) {
+    const t = useTranslations("tasksDetail");
     const [manual, setManual] = useState("");
     const [note, setNote] = useState("");
     const [billable, setBillable] = useState(false);
@@ -418,10 +426,10 @@ export function TimeSection({
     return (
         <section className="flex flex-col gap-3">
             <header className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-medium">Time</h3>
+                <h3 className="text-sm font-medium">{t("time.title")}</h3>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{core.formatTrackedSeconds(tracked)} tracked</span>
-                    {estimate ? <span>of {core.formatDurationMinutes(estimate)}</span> : null}
+                    <span>{t("time.tracked", { time: core.formatTrackedSeconds(tracked) })}</span>
+                    {estimate ? <span>{t("time.ofEstimate", { time: core.formatDurationMinutes(estimate) })}</span> : null}
                     {used !== null && (
                         <span className={cn(used > 100 && "text-warning")}>({used}%)</span>
                     )}
@@ -431,15 +439,15 @@ export function TimeSection({
             <div className="flex flex-wrap items-center gap-2">
                 <Input
                     value={manual}
-                    placeholder="1h 30m"
-                    aria-label="Time to log"
+                    placeholder="1h 30m" // i18n-ignore - the format the box reads, not a sentence
+                    aria-label={t("time.toLog")}
                     onChange={(event) => setManual(event.target.value)}
                     className="h-8 w-24 text-xs"
                 />
                 <Input
                     value={note}
-                    placeholder="What was it for?"
-                    aria-label="Note"
+                    placeholder={t("time.notePlaceholder")}
+                    aria-label={t("time.note")}
                     onChange={(event) => setNote(event.target.value)}
                     className="h-8 w-44 text-xs"
                 />
@@ -449,7 +457,7 @@ export function TimeSection({
                         checked={billable}
                         onChange={(event) => setBillable(event.target.checked)}
                     />
-                    Billable
+                    {t("time.billable")}
                 </label>
                 <Button
                     size="sm"
@@ -469,7 +477,7 @@ export function TimeSection({
                         onChanged();
                     }}
                 >
-                    Log
+                    {t("time.log")}
                 </Button>
             </div>
 
@@ -479,7 +487,7 @@ export function TimeSection({
                         <li key={entry.id} className="flex items-center gap-2 px-3 py-2">
                             <span className="w-16 font-mono text-xs">
                                 {entry.running
-                                    ? "running"
+                                    ? t("time.running")
                                     : core.formatTrackedSeconds(entry.seconds)}
                             </span>
                             <span className="flex-1 truncate text-xs text-muted-foreground">
@@ -487,13 +495,13 @@ export function TimeSection({
                                 {entry.note ? ` - ${entry.note}` : ""}
                             </span>
                             {entry.billable && (
-                                <span className="text-[0.6875rem] text-success">billable</span>
+                                <span className="text-[0.6875rem] text-success">{t("time.billableTag")}</span>
                             )}
                             {(canModerate || entry.userId === currentUserId) && !entry.running && (
                                 <button
                                     type="button"
-                                    aria-label="Remove entry"
-                                    title="Remove entry"
+                                    aria-label={t("time.remove")}
+                                    title={t("time.remove")}
                                     onClick={async () => {
                                         await runAction(
                                             () => actions.deleteTimeEntryAction(taskId, entry.id),

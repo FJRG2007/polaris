@@ -21,6 +21,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import * as activity from "@/lib/activity/activity";
 import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
+import { TaskRefusal } from "./refusal";
 
 export interface AutomationEventInput {
     readonly trigger: core.AutomationTrigger;
@@ -475,7 +476,7 @@ export async function createAutomation(
  * would let an admin of one space rewrite every other space's rules.
  */
 function ruleNotInSpace(): Error {
-    return new Error("That rule is not in this space");
+    return new TaskRefusal("refusals.ruleNotInSpace");
 }
 
 export async function updateAutomation(

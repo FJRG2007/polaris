@@ -170,7 +170,8 @@ async function refusedCredentials(client: GoogleOAuthClient, redirectUri: string
     const body = await response.json().catch(() => null);
     const said = z.object({ error: z.string() }).safeParse(body);
     if (said.success && said.data.error === "invalid_client") {
-        return "Google does not recognize this client ID and secret together. Check both on the client you created - a secret belongs to one client only.";
+        // Read by whoever is setting the integration up, in the request that checks it.
+        return (await getTranslations("tasks"))("google.invalidClient");
     }
     return null;
 }
@@ -183,7 +184,7 @@ async function refusedRedirectUri(client: GoogleOAuthClient, redirectUri: string
     // 4xx is Google declining to show a consent screen at all, which is what
     // everybody pressing Connect would get. Anything else means it would.
     if (!probe || probe.status < 400 || probe.status >= 500) return null;
-    return `Google refuses to authorize anybody with this redirect URI. Add ${redirectUri} to the client's authorized redirect URIs, and give this deployment a domain - Google rejects an IP address outright.`;
+    return (await getTranslations("tasks"))("google.redirectRefused", { redirectUri });
 }
 
 const tokenSchema = z.object({
@@ -235,9 +236,7 @@ export async function exchangeGoogleCode(
         // the request did not force the consent screen. Nothing here can use an
         // access token that dies in an hour, so it is refused with the one
         // instruction that fixes it.
-        throw new Error(
-            "Google did not return a refresh token. Remove Polaris from your Google account's third-party access and link again."
-        );
+        throw new Error((await getTranslations("tasks"))("google.noRefreshToken"));
     }
 
     const who = await fetchJson(USERINFO, userinfoSchema, { Authorization: `Bearer ${token.access_token}` });

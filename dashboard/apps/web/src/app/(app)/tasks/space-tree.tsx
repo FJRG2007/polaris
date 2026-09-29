@@ -24,6 +24,7 @@ import Link from "next/link";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { avatarUrl } from "@/lib/avatar-url";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { usePathname } from "next/navigation";
@@ -127,15 +128,19 @@ interface RowAction {
  * A list and a folder are named in a row that appears the moment the menu closes,
  * so the menu has to leave focus in that row rather than take it back.
  */
+/** The key that renames a row, drawn beside the menu item. A key, not a word. */
+const RENAME_SHORTCUT = "F2"; // i18n-ignore
+
 function CreateButton({ at, onPick }: { at: CreateAt; onPick: (kind: CreateKind) => void }) {
-    const options = createOptionsFor(at);
+    const t = useTranslations("tasks");
+    const options = createOptionsFor(at, t);
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    aria-label={`Create in ${at.name}`}
-                    title="Create"
+                    aria-label={t("tree.createIn", { name: at.name })}
+                    title={t("tree.create")}
                     onClick={(event) => event.preventDefault()}
                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                 >
@@ -159,14 +164,15 @@ function CreateButton({ at, onPick }: { at: CreateAt; onPick: (kind: CreateKind)
 }
 
 function CreateSubmenu({ at, onPick }: { at: CreateAt; onPick: (kind: CreateKind) => void }) {
+    const t = useTranslations("tasks");
     return (
         <ContextMenuSub>
             <ContextMenuSubTrigger>
                 <Plus className="size-3.5" />
-                Create new
+                {t("tree.createNew")}
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="w-44">
-                {createOptionsFor(at).map((option) => (
+                {createOptionsFor(at, t).map((option) => (
                     <ContextMenuItem
                         key={option.kind}
                         onSelect={() => onPick(option.kind)}
@@ -252,6 +258,7 @@ function TreeRow({
     create,
     createMenu
 }: RowProps) {
+    const t = useTranslations("tasks");
     const [over, setOver] = useState<"into" | DropEdge | null>(null);
     // Renaming is reached from the right-click menu, which is still trapping
     // focus when the field appears; it claims focus once the menu has gone.
@@ -263,7 +270,7 @@ function TreeRow({
                 <Input
                     ref={field}
                     defaultValue={label}
-                    aria-label={`Rename ${label}`}
+                    aria-label={t("tree.rename", { name: label })}
                     onFocus={(event) => event.target.select()}
                     onBlur={(event) => {
                         const next = event.target.value.trim();
@@ -488,6 +495,8 @@ export function SpaceTree({
     canManage: boolean;
 }) {
     const pathname = usePathname();
+    const t = useTranslations("tasks");
+    const tc = useTranslations("common");
     const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
     const [draft, setDraft] = useState<Draft | null>(null);
     const [renaming, setRenaming] = useState<string | null>(null);
@@ -590,16 +599,16 @@ export function SpaceTree({
     };
 
     return (
-        <nav aria-label="Spaces" className="flex w-full flex-col gap-3 md:w-60 md:shrink-0">
+        <nav aria-label={t("tree.spaces")} className="flex w-full flex-col gap-3 md:w-60 md:shrink-0">
             <div className="flex items-center justify-between">
                 <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Spaces
+                    {t("tree.spaces")}
                 </h2>
                 {canManage && canCreate && (
                     <button
                         type="button"
-                        aria-label="Create a space"
-                        title="Create a space"
+                        aria-label={t("tree.createSpace")}
+                        title={t("tree.createSpace")}
                         onClick={() => {
                             const opening = !newSpace;
                             setNewSpace(opening);
@@ -631,14 +640,14 @@ export function SpaceTree({
                     <Input
                         autoFocus
                         value={spaceName}
-                        placeholder="Space name"
+                        placeholder={t("tree.spaceName")}
                         onChange={(event) => setSpaceName(event.target.value)}
                         className="h-8 text-sm"
                     />
                     {spaceOrgs.length > 0 && (
                         <Select
                             value={spaceOwner}
-                            aria-label="Who this space belongs to"
+                            aria-label={t("tree.owner")}
                             className="h-8 text-sm"
                             // Faces, not words. Which shelf a space lands on is
                             // the one thing on this form that cannot be undone
@@ -657,11 +666,11 @@ export function SpaceTree({
                                                 status={false}
                                                 person={{
                                                     id: me?.id ?? "",
-                                                    name: me?.name ?? "You",
+                                                    name: me?.name ?? t("tree.you"),
                                                     image: me ? avatarUrl(me.id) : null
                                                 }}
                                             />
-                                            <span className="truncate">{me?.name ?? "You"}</span>
+                                            <span className="truncate">{me?.name ?? t("tree.you")}</span>
                                         </span>
                                     )
                                 },
@@ -693,10 +702,10 @@ export function SpaceTree({
                                 setNewSpace(false);
                             }}
                         >
-                            Create
+                            {t("tree.create")}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setNewSpace(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                     </div>
                 </div>
@@ -710,7 +719,7 @@ export function SpaceTree({
 
             {spaces.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                    No spaces yet. A space holds the lists one team works out of.
+                    {t("tree.empty")}
                 </p>
             )}
 
@@ -751,14 +760,19 @@ export function SpaceTree({
                 name={confirm?.name ?? ""}
                 kind={confirm?.kind ?? "folder"}
                 requireTyping={!confirm?.empty}
+                title={confirm?.kind === "list" ? t("tree.deleteList") : t("tree.deleteFolder")}
+                question={t.rich("deleteTask.question", {
+                    name: confirm?.name ?? "",
+                    strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                })}
                 description={
                     confirm?.empty
-                        ? "It is empty, so nothing goes with it."
+                        ? t("tree.deleteEmpty")
                         : confirm?.kind === "folder"
-                          ? "What is inside moves up one level rather than being deleted with it."
-                          : "The tasks in this list, and their comments and tracked time, go with it."
+                          ? t("tree.deleteFolderDescription")
+                          : t("tree.deleteListDescription")
                 }
-                confirmLabel={confirm?.kind === "folder" ? "Delete folder" : "Delete list"}
+                confirmLabel={confirm?.kind === "folder" ? t("tree.deleteFolder") : t("tree.deleteList")}
                 onConfirm={async () => {
                     if (!confirm) return;
                     await run(() =>
@@ -820,6 +834,7 @@ function SpaceSection({
     run
 }: SectionProps) {
     const open = !collapsed.has(space.id);
+    const t = useTranslations("tasks");
     const editable = canManage && canWrite(space.role);
     const tree = useMemo(() => core.buildFolderTree(space.folders), [space.folders]);
     // Renaming a space is reached from its right-click menu; the field waits for
@@ -911,7 +926,7 @@ function SpaceSection({
                           ...(canAdmin(listGovernedBy(list).role)
                               ? [
                                     {
-                                        label: "Who can reach this",
+                                        label: t("tree.access"),
                                         Icon: Users,
                                         onSelect: () =>
                                             onAccess({
@@ -922,8 +937,8 @@ function SpaceSection({
                                 ]
                               : []),
                           {
-                              label: "Rename",
-                              shortcut: "F2",
+                              label: t("tree.renameAction"),
+                              shortcut: RENAME_SHORTCUT,
                               Icon: Pencil,
                               quick: true,
                               onSelect: () => onRenaming(`list:${list.id}`)
@@ -931,7 +946,7 @@ function SpaceSection({
                           ...(canAdmin(space.role)
                               ? [
                                     {
-                                        label: "Delete list",
+                                        label: t("tree.deleteList"),
                                         shortcut: "Del",
                                         Icon: Trash2,
                                         danger: true,
@@ -969,7 +984,7 @@ function SpaceSection({
             ...(canAdmin(folder.role)
                 ? [
                       {
-                          label: "Who can reach this",
+                          label: t("tree.access"),
                           Icon: Users,
                           quick: true,
                           onSelect: () => onAccess({ scope: { kind: "folder", id: folder.id } })
@@ -977,8 +992,8 @@ function SpaceSection({
                   ]
                 : []),
             {
-                label: "Rename",
-                shortcut: "F2",
+                label: t("tree.renameAction"),
+                shortcut: RENAME_SHORTCUT,
                 Icon: Pencil,
                 quick: true,
                 onSelect: () => onRenaming(`folder:${folder.id}`)
@@ -986,7 +1001,7 @@ function SpaceSection({
             ...(canAdmin(folder.role)
                 ? [
                       {
-                          label: "Delete folder",
+                          label: t("tree.deleteFolder"),
                           shortcut: "Del",
                           Icon: Trash2,
                           danger: true,
@@ -1044,7 +1059,9 @@ function SpaceSection({
                         <button
                             type="button"
                             aria-label={
-                                folderOpen ? `Collapse ${folder.name}` : `Expand ${folder.name}`
+                                folderOpen
+                                    ? t("tree.collapse", { name: folder.name })
+                                    : t("tree.expand", { name: folder.name })
                             }
                             onClick={(event) => {
                                 event.preventDefault();
@@ -1139,7 +1156,9 @@ function SpaceSection({
                         <button
                             type="button"
                             onClick={() => onToggle(space.id)}
-                            aria-label={open ? `Collapse ${space.name}` : `Expand ${space.name}`}
+                            aria-label={
+                                open ? t("tree.collapse", { name: space.name }) : t("tree.expand", { name: space.name })
+                            }
                             className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             {open ? (
@@ -1157,7 +1176,7 @@ function SpaceSection({
                             <Input
                                 ref={nameField}
                                 defaultValue={space.name}
-                                aria-label={`Rename ${space.name}`}
+                                aria-label={t("tree.rename", { name: space.name })}
                                 onFocus={(event) => event.target.select()}
                                 onBlur={async (event) => {
                                     const next = event.target.value.trim();
@@ -1189,8 +1208,8 @@ function SpaceSection({
                         {spaceManageable && (
                             <Link
                                 href={`/tasks/s/${space.id}`}
-                                aria-label={`${space.name} settings`}
-                                title="Space settings"
+                                aria-label={t("tree.settingsOf", { name: space.name })}
+                                title={t("tree.settings")}
                                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <Settings2 className="size-3.5" />
@@ -1210,17 +1229,17 @@ function SpaceSection({
                                     }
                                 >
                                     <Users className="size-3.5" />
-                                    Who can reach this
+                                    {t("tree.access")}
                                 </ContextMenuItem>
                                 <ContextMenuItem onSelect={() => onRenaming(`space:${space.id}`)}>
                                     <Pencil className="size-3.5" />
-                                    Rename
-                                    <MenuShortcut>F2</MenuShortcut>
+                                    {t("tree.renameAction")}
+                                    <MenuShortcut>{RENAME_SHORTCUT}</MenuShortcut>
                                 </ContextMenuItem>
                                 <ContextMenuItem asChild>
                                     <Link href={`/tasks/s/${space.id}`}>
                                         <Settings2 className="size-3.5" />
-                                        Space settings
+                                        {t("tree.settings")}
                                     </Link>
                                 </ContextMenuItem>
                             </>
@@ -1260,12 +1279,12 @@ function SpaceSection({
                                 onClick={() => onCreate("list", spaceAt)}
                                 className="flex flex-1 items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
-                                <Plus className="size-3.5" /> List
+                                <Plus className="size-3.5" /> {t("create.kind.list")}
                             </button>
                             <button
                                 type="button"
-                                aria-label={`Add a folder to ${space.name}`}
-                                title="Add a folder"
+                                aria-label={t("tree.addFolderTo", { name: space.name })}
+                                title={t("tree.addFolder")}
                                 onClick={() => onCreate("folder", spaceAt)}
                                 className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
@@ -1276,7 +1295,7 @@ function SpaceSection({
 
                     {space.partial && (
                         <p className="px-2 py-1 text-[0.6875rem] text-muted-foreground">
-                            You have been given part of this space.
+                            {t("tree.partial")}
                         </p>
                     )}
                 </div>
@@ -1301,6 +1320,7 @@ function DraftRow({
     onCancel: () => void;
     run: (call: () => Promise<{ error?: string }>) => Promise<void>;
 }) {
+    const t = useTranslations("tasks");
     const [value, setValue] = useState("");
     // The create menu is still trapping focus when this row appears, so the
     // field takes focus a tick after it, once the menu is gone.
@@ -1330,10 +1350,8 @@ function DraftRow({
             <Input
                 ref={field}
                 value={value}
-                aria-label={draft.kind === "folder" ? "Folder name" : "List name"}
-                placeholder={
-                    draft.kind === "folder" ? "Folder name, then enter" : "List name, then enter"
-                }
+                aria-label={draft.kind === "folder" ? t("tree.folderName") : t("tree.listName")}
+                placeholder={draft.kind === "folder" ? t("tree.folderNameHint") : t("tree.listNameHint")}
                 onChange={(event) => setValue(event.target.value)}
                 onBlur={() => void commit()}
                 onKeyDown={(event) => {

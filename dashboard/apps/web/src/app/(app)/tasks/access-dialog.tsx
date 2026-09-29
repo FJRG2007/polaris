@@ -26,6 +26,9 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { useCallback, useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { optionLabel } from "./option-label";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { GrantView } from "@/lib/access/grants";
 import { Loader2, Trash2, UserPlus } from "lucide-react";
 import { PersonName, PersonRow } from "@/components/person-name";
@@ -42,10 +45,9 @@ import {
     Select
 } from "@polaris/ui";
 
-const ROLE_OPTIONS = core.SPACE_ROLES.map((role) => ({
-    value: role,
-    label: core.SPACE_ROLE_LABELS[role]
-}));
+function roleOptions(t: NamespaceTranslator<"tasks">) {
+    return core.SPACE_ROLES.map((role) => ({ value: role, label: optionLabel(t, "spaceRole", role) }));
+}
 
 /** Where the grants being edited actually live. */
 export type AccessScope = { kind: "space"; id: string } | { kind: "folder"; id: string };
@@ -80,6 +82,8 @@ export function AccessDialog({
     target: AccessTarget | null;
     onClose: () => void;
 }) {
+    const t = useTranslations("tasks");
+    const ROLE_OPTIONS = roleOptions(t);
     const [name, setName] = useState("");
     const [path, setPath] = useState("");
     const [members, setMembers] = useState<AccessMember[]>([]);
@@ -197,16 +201,18 @@ export function AccessDialog({
     };
 
     const whole = scopeKind === "space";
-    const reach = whole
-        ? "People added here reach everything in this space."
-        : "People added here reach this folder and everything inside it, and nothing else in the space.";
+    const reach = whole ? t("access.reachSpace") : t("access.reachFolder");
 
     return (
         <Dialog open={target !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
-                        Access to {name || (whole ? "this space" : "this folder")}
+                        {name
+                            ? t("access.title", { name })
+                            : whole
+                              ? t("access.titleSpace")
+                              : t("access.titleFolder")}
                     </DialogTitle>
                     <DialogDescription>
                         {path && <span className="font-mono text-xs">{path}</span>}
@@ -218,10 +224,16 @@ export function AccessDialog({
                         {target?.asked && (
                             <>
                                 <span>
-                                    {target.asked.kind === "sprint" ? "Sprint" : "List"}{" "}
-                                    <strong className="font-medium">{target.asked.name}</strong> has
-                                    no access of its own: it is reached through{" "}
-                                    {whole ? "the space" : "the folder"} around it.
+                                    {t.rich("access.inherited", {
+                                        kind: target.asked.kind,
+                                        scope: whole ? "space" : "folder",
+                                        name: target.asked.name,
+                                        strong: (chunks) => (
+                                            <strong key="name" className="font-medium">
+                                                {chunks}
+                                            </strong>
+                                        )
+                                    })}
                                 </span>
                                 <br />
                             </>
@@ -249,9 +261,7 @@ export function AccessDialog({
                     <ul className="flex flex-col gap-1">
                         {members.length === 0 && (
                             <li className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-                                {whole
-                                    ? "Nobody else is on this space yet."
-                                    : "Nobody has been given this folder on its own yet."}
+                                {whole ? t("access.nobodySpace") : t("access.nobodyFolder")}
                             </li>
                         )}
                         {members.map((member) => {
@@ -271,22 +281,22 @@ export function AccessDialog({
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {member.through
-                                                ? `Through ${member.through}`
+                                                ? t("access.through", { name: member.through })
                                                 : member.contact}
                                         </p>
                                     </div>
                                     {fixed ? (
                                         <span className="text-xs text-muted-foreground">
                                             {member.role === "owner"
-                                                ? "Owner"
-                                                : core.SPACE_ROLE_LABELS[member.role]}
+                                                ? t("access.owner")
+                                                : optionLabel(t, "spaceRole", member.role)}
                                         </span>
                                     ) : (
                                         <>
                                             <Select
                                                 value={member.role}
                                                 options={ROLE_OPTIONS}
-                                                aria-label={`Role for ${member.name}`}
+                                                aria-label={t("access.roleFor", { name: member.name })}
                                                 className="h-8 w-28 text-xs"
                                                 onValueChange={async (next) => {
                                                     await runAction(
@@ -309,8 +319,8 @@ export function AccessDialog({
                                             />
                                             <button
                                                 type="button"
-                                                aria-label={`Remove ${member.name}`}
-                                                title="Remove"
+                                                aria-label={t("pickers.remove", { name: member.name })}
+                                                title={t("access.remove")}
                                                 onClick={async () => {
                                                     await runAction(
                                                         () =>
@@ -370,7 +380,7 @@ export function AccessDialog({
                         }}
                     >
                         <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-muted-foreground">
-                            Email or username
+                            {t("access.identifier")}
                             <Input
                                 value={identifier}
                                 placeholder="client@example.com"
@@ -381,27 +391,27 @@ export function AccessDialog({
                         <Select
                             value={role}
                             options={ROLE_OPTIONS}
-                            aria-label="Role"
+                            aria-label={t("access.role")}
                             className="h-9 w-32"
                             onValueChange={(next) => setRole(next as core.SpaceRole)}
                         />
                         <Button type="submit" size="sm" disabled={!identifier.trim()}>
-                            <UserPlus className="size-4 shrink-0" /> Invite
+                            <UserPlus className="size-4 shrink-0" /> {t("access.invite")}
                         </Button>
                         <p className="w-full text-xs text-muted-foreground">
-                            {core.SPACE_ROLE_HINTS[role]}
+                            {optionLabel(t, "spaceRoleHint", role)}
                         </p>
                     </form>
                 )}
 
                 {!loading && (granted.length > 0 || available.length > 0) && (
                     <div className="flex flex-col gap-2 border-t border-border pt-3">
-                        <p className="text-xs font-medium">Teams</p>
+                        <p className="text-xs font-medium">{t("access.teams")}</p>
                         {granted.length === 0 ? (
                             <p className="text-xs text-muted-foreground">
                                 {whole
-                                    ? "No team has this space yet."
-                                    : "No team has this folder on its own yet."}
+                                    ? t("access.noTeamSpace")
+                                    : t("access.noTeamFolder")}
                             </p>
                         ) : (
                             <ul className="flex flex-col gap-1">
@@ -421,7 +431,7 @@ export function AccessDialog({
                                                 <Select
                                                     value={grant.role}
                                                     options={ROLE_OPTIONS}
-                                                    aria-label={`Role for ${grant.teamName}`}
+                                                    aria-label={t("access.roleFor", { name: grant.teamName })}
                                                     className="h-8 w-28 text-xs"
                                                     onValueChange={async (next) => {
                                                         if (!scopeId) return;
@@ -445,8 +455,8 @@ export function AccessDialog({
                                                 />
                                                 <button
                                                     type="button"
-                                                    aria-label={`Remove ${grant.teamName}`}
-                                                    title="Remove"
+                                                    aria-label={t("pickers.remove", { name: grant.teamName })}
+                                                    title={t("access.remove")}
                                                     onClick={async () => {
                                                         if (!scopeId) return;
                                                         await runAction(
@@ -471,7 +481,7 @@ export function AccessDialog({
                                             </>
                                         ) : (
                                             <span className="text-xs text-muted-foreground">
-                                                {core.SPACE_ROLE_LABELS[grant.role]}
+                                                {optionLabel(t, "spaceRole", grant.role)}
                                             </span>
                                         )}
                                     </li>
@@ -486,8 +496,8 @@ export function AccessDialog({
                                 <div className="flex flex-wrap items-end gap-2">
                                     <Select
                                         value={teamPick}
-                                        placeholder="Choose a team"
-                                        aria-label="Team to add"
+                                        placeholder={t("access.chooseTeam")}
+                                        aria-label={t("access.teamToAdd")}
                                         className="h-9 min-w-48 flex-1"
                                         options={available
                                             .filter(
@@ -502,7 +512,7 @@ export function AccessDialog({
                                     <Select
                                         value={teamRole}
                                         options={ROLE_OPTIONS}
-                                        aria-label="Role for the team"
+                                        aria-label={t("access.teamRole")}
                                         className="h-9 w-32"
                                         onValueChange={(next) =>
                                             setTeamRole(next as core.SpaceRole)
@@ -537,7 +547,7 @@ export function AccessDialog({
                                             await reloadTeams();
                                         }}
                                     >
-                                        <UserPlus className="size-4 shrink-0" /> Give access
+                                        <UserPlus className="size-4 shrink-0" /> {t("access.give")}
                                     </Button>
                                 </div>
                             )}
@@ -581,6 +591,7 @@ function RoleGrants({
     canManage: boolean;
     whole: boolean;
 }) {
+    const t = useTranslations("tasks");
     const [grants, setGrants] = useState<GrantView[]>([]);
     const [roles, setRoles] = useState<GrantCandidate[]>([]);
     const [pick, setPick] = useState("");
@@ -604,12 +615,12 @@ function RoleGrants({
 
     return (
         <div className="flex flex-col gap-2 border-t border-border pt-3">
-            <p className="text-xs font-medium">Roles</p>
+            <p className="text-xs font-medium">{t("access.roles")}</p>
             {grants.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                     {whole
-                        ? "No role has this space yet."
-                        : "No role has this folder on its own yet."}
+                        ? t("access.noRoleSpace")
+                        : t("access.noRoleFolder")}
                 </p>
             ) : (
                 <ul className="flex flex-col gap-1">
@@ -631,16 +642,17 @@ function RoleGrants({
                                 ) : null}
                             </p>
                             <span className="shrink-0 text-xs text-muted-foreground">
-                                {core.SPACE_ROLE_LABELS[grant.capability as core.SpaceRole] ??
-                                    grant.capability}
+                                {(core.SPACE_ROLES as readonly string[]).includes(grant.capability)
+                                    ? optionLabel(t, "spaceRole", grant.capability)
+                                    : grant.capability}
                             </span>
                             {canManage ? (
                                 <Button
                                     variant="ghost"
                                     size="icon"
                                     disabled={busy}
-                                    aria-label={`Take ${grant.principalName} off this`}
-                                    title="Take this role off"
+                                    aria-label={t("access.takeOff", { name: grant.principalName })}
+                                    title={t("access.takeRoleOff")}
                                     onClick={async () => {
                                         setBusy(true);
                                         const answer = await revokeShareAction(
@@ -667,23 +679,23 @@ function RoleGrants({
             {canManage && offered.length > 0 ? (
                 <div className="flex flex-wrap items-center gap-2">
                     <Select
-                        aria-label="Which role"
+                        aria-label={t("access.whichRole")}
                         className="min-w-40 flex-1"
                         value={pick}
                         onValueChange={setPick}
-                        placeholder="Pick a role"
+                        placeholder={t("access.pickRole")}
                         options={offered.map((one) => ({
                             value: one.id,
                             label: one.orgName ? `${one.orgName} - ${one.name}` : one.name
                         }))}
                     />
                     <Select
-                        aria-label="What that role can do here"
+                        aria-label={t("access.roleCapability")}
                         value={role}
                         onValueChange={(next) => setRole(next as core.SpaceRole)}
                         options={core.SPACE_ROLES.map((one) => ({
                             value: one,
-                            label: core.SPACE_ROLE_LABELS[one]
+                            label: optionLabel(t, "spaceRole", one)
                         }))}
                     />
                     <Button
@@ -706,7 +718,7 @@ function RoleGrants({
                             await load();
                         }}
                     >
-                        <UserPlus className="size-4 shrink-0" /> Give access
+                        <UserPlus className="size-4 shrink-0" /> {t("access.give")}
                     </Button>
                 </div>
             ) : null}

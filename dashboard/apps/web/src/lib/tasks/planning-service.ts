@@ -107,7 +107,7 @@ export async function createSprint(input: core.SprintInput): Promise<string> {
 /** A sprint id names no space, so every write keeps to the one the caller was
  *  cleared for - an id alone would reach every other space's sprints. */
 function sprintNotInSpace(): Error {
-    return new Error("That sprint is not in this space");
+    return new TaskRefusal("refusals.sprintNotInSpace");
 }
 
 /** Edits a sprint's own details. It deliberately cannot change which folder the

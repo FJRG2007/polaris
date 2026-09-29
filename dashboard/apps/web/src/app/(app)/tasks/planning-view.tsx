@@ -16,6 +16,8 @@ import * as core from "@polaris/core";
 import { ProgressBar } from "./pickers";
 import { runAction } from "@/lib/run-action";
 import { useDisplayFormat } from "@/components/display-format";
+import { optionLabel } from "./option-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CalendarRange, Plus, Target, Trash2, Users } from "lucide-react";
 import { Button, Card, CardBody, EmptyState, Input, Select, cn } from "@polaris/ui";
 import type { GoalView, SprintView } from "@/lib/tasks/planning-service";
@@ -41,6 +43,8 @@ export function SprintsView({
     canEdit: boolean;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("tasks");
+    const tc = useTranslations("common");
     const [creating, setCreating] = useState(false);
     const [spaceId, setSpaceId] = useState(spaces[0]?.id ?? "");
     const [name, setName] = useState("");
@@ -54,13 +58,13 @@ export function SprintsView({
             <AccessDialog target={access} onClose={() => setAccess(null)} />
             <header className="flex flex-wrap items-center gap-3">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Sprints</h1>
-                    <p className="text-sm text-muted-foreground">Time-boxed runs of work, with what is left each day.</p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("sprints.title")}</h1>
+                    <p className="text-sm text-muted-foreground">{t("sprints.subtitle")}</p>
                 </div>
                 <span className="flex-1" />
                 {canEdit && spaces.length > 0 && !creating && (
                     <Button size="sm" onClick={() => setCreating(true)}>
-                        <Plus className="size-4" /> New sprint
+                        <Plus className="size-4" /> {t("create.sprint.title")}
                     </Button>
                 )}
             </header>
@@ -75,26 +79,26 @@ export function SprintsView({
                 <Card>
                     <CardBody className="flex flex-wrap items-end gap-2 p-4">
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Space
+                            {t("trackers.space")}
                             <Select
                                 value={spaceId}
                                 onValueChange={setSpaceId}
                                 options={spaces.map((space) => ({ value: space.id, label: space.name }))}
-                                aria-label="Space"
+                                aria-label={t("trackers.space")}
                                 className="h-8 w-40 text-xs"
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Name
+                            {t("sprints.name")}
                             <Input
                                 value={name}
                                 onChange={(event) => setName(event.target.value)}
-                                placeholder="Sprint 14"
+                                placeholder={t("create.sprint.placeholder")}
                                 className="h-8 w-40 text-sm"
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Starts
+                            {t("create.sprint.starts")}
                             <input
                                 type="date"
                                 value={start}
@@ -103,7 +107,7 @@ export function SprintsView({
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Ends
+                            {t("create.sprint.ends")}
                             <input
                                 type="date"
                                 value={end}
@@ -133,17 +137,17 @@ export function SprintsView({
                                 }
                             }}
                         >
-                            Create
+                            {t("tree.create")}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setCreating(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                     </CardBody>
                 </Card>
             )}
 
             {sprints.length === 0 && !creating && (
-                <EmptyState title="No sprints yet." description="A sprint groups work into a window without moving it out of its list." />
+                <EmptyState title={t("sprints.emptyTitle")} description={t("sprints.emptyDescription")} />
             )}
 
             <ul className="flex flex-col gap-3">
@@ -168,9 +172,15 @@ export function SprintsView({
                                                 </span>
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                {format.date(sprint.startDate)} to {format.date(sprint.endDate)} -{" "}
-                                                {sprint.doneCount} of {sprint.taskCount} done
-                                                {sprint.points > 0 ? `, ${sprint.donePoints}/${sprint.points} points` : ""}
+                                                {t("sprints.summary", {
+                                                    start: format.date(sprint.startDate),
+                                                    end: format.date(sprint.endDate),
+                                                    done: sprint.doneCount,
+                                                    total: sprint.taskCount
+                                                })}
+                                                {sprint.points > 0
+                                                    ? t("sprints.points", { done: sprint.donePoints, total: sprint.points })
+                                                    : ""}
                                             </p>
                                         </div>
                                         <Select
@@ -189,18 +199,18 @@ export function SprintsView({
                                                 if (result?.error) setError(result.error);
                                             }}
                                             options={[
-                                                { value: "planned", label: "Planned" },
-                                                { value: "active", label: "Active" },
-                                                { value: "completed", label: "Completed" }
+                                                { value: "planned", label: t("sprints.status.planned") },
+                                                { value: "active", label: t("sprints.status.active") },
+                                                { value: "completed", label: t("sprints.status.completed") }
                                             ]}
-                                            aria-label={`Status of ${sprint.name}`}
+                                            aria-label={t("sprints.statusOf", { name: sprint.name })}
                                             className="h-8 w-32 text-xs"
                                         />
                                         {canEdit && (
                                             <button
                                                 type="button"
-                                                aria-label={`Who can reach ${sprint.name}`}
-                                                title="Who can reach this"
+                                                aria-label={t("sprints.accessOf", { name: sprint.name })}
+                                                title={t("tree.access")}
                                                 onClick={() =>
                                                     setAccess({
                                                         scope: sprint.folderId
@@ -216,8 +226,8 @@ export function SprintsView({
                                         )}
                                         {canEdit && <button
                                             type="button"
-                                            aria-label={`Delete ${sprint.name}`}
-                                            title="Delete sprint"
+                                            aria-label={t("automations.deleteNamed", { name: sprint.name })}
+                                            title={t("sprints.delete")}
                                             onClick={async () => {
                                                 const result = await runAction(
                                                     () => actions.deleteSprintAction(sprint.spaceId, sprint.id),
@@ -246,6 +256,7 @@ export function SprintsView({
 
 /** A burndown drawn as two inline paths: what should be left, and what is. */
 function Burndown({ points }: { points: readonly core.BurndownPoint[] }) {
+    const t = useTranslations("tasks");
     const max = Math.max(1, ...points.map((point) => point.ideal));
     const width = 100;
     const height = 40;
@@ -259,7 +270,7 @@ function Burndown({ points }: { points: readonly core.BurndownPoint[] }) {
         .join(" ");
 
     return (
-        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-16 w-full" role="img" aria-label="Burndown">
+        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-16 w-full" role="img" aria-label={t("sprints.burndown")}>
             <polyline points={ideal} fill="none" stroke="currentColor" strokeWidth="0.5" className="text-muted-foreground/40" />
             <polyline points={actual} fill="none" stroke="currentColor" strokeWidth="1" className="text-primary" />
         </svg>
@@ -283,6 +294,8 @@ export function GoalsView({
     canEdit: boolean;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("tasks");
+    const tc = useTranslations("common");
     const [creating, setCreating] = useState(false);
     const [name, setName] = useState("");
     const [spaceId, setSpaceId] = useState("");
@@ -293,15 +306,13 @@ export function GoalsView({
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <header className="flex flex-wrap items-center gap-3">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Goals</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Objectives measured by targets. A target that watches a list keeps itself current.
-                    </p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("goals.title")}</h1>
+                    <p className="text-sm text-muted-foreground">{t("goals.subtitle")}</p>
                 </div>
                 <span className="flex-1" />
                 {canEdit && !creating && (
                     <Button size="sm" onClick={() => setCreating(true)}>
-                        <Plus className="size-4" /> New goal
+                        <Plus className="size-4" /> {t("create.goal.title")}
                     </Button>
                 )}
             </header>
@@ -317,8 +328,8 @@ export function GoalsView({
                     <CardBody className="flex flex-wrap items-end gap-2 p-4">
                         <Input
                             value={name}
-                            placeholder="Ship the new billing flow"
-                            aria-label="Goal name"
+                            placeholder={t("goals.placeholder")}
+                            aria-label={t("create.goal.name")}
                             onChange={(event) => setName(event.target.value)}
                             className="h-8 w-64 text-sm"
                         />
@@ -326,10 +337,10 @@ export function GoalsView({
                             value={spaceId}
                             onValueChange={setSpaceId}
                             options={[
-                                { value: "", label: "Not tied to a space" },
+                                { value: "", label: t("goals.noSpace") },
                                 ...spaces.map((space) => ({ value: space.id, label: space.name }))
                             ]}
-                            aria-label="Space"
+                            aria-label={t("trackers.space")}
                             className="h-8 w-44 text-xs"
                         />
                         <Button
@@ -348,17 +359,17 @@ export function GoalsView({
                                 }
                             }}
                         >
-                            Create
+                            {t("tree.create")}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setCreating(false)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                     </CardBody>
                 </Card>
             )}
 
             {goals.length === 0 && !creating && (
-                <EmptyState title="No goals yet." description="A goal is the outcome; the tasks are how you get there." />
+                <EmptyState title={t("goals.emptyTitle")} description={t("goals.emptyDescription")} />
             )}
 
             <ul className="grid gap-3 md:grid-cols-2">
@@ -374,14 +385,14 @@ export function GoalsView({
                                         </p>
                                         <p className="text-xs text-muted-foreground">
                                             {goal.ownerName}
-                                            {goal.dueDate ? ` - due ${format.date(goal.dueDate)}` : ""}
+                                            {goal.dueDate ? t("goals.due", { date: format.date(goal.dueDate) }) : ""}
                                         </p>
                                     </div>
                                     <span className="text-sm font-semibold">{goal.percent}%</span>
                                     {canEdit && <button
                                         type="button"
-                                        aria-label={`Delete ${goal.name}`}
-                                        title="Delete goal"
+                                        aria-label={t("automations.deleteNamed", { name: goal.name })}
+                                        title={t("goals.delete")}
                                         onClick={async () => {
                                             const result = await runAction(() => actions.deleteGoalAction(goal.id), setError);
                                             if (result?.error) setError(result.error);
@@ -400,14 +411,17 @@ export function GoalsView({
                                             <span className="min-w-0 flex-1 truncate">{target.name}</span>
                                             {target.type === "tasks" ? (
                                                 <span className="text-muted-foreground">
-                                                    {target.currentValue}/{target.targetValue} tasks
+                                                    {t("goals.taskProgress", {
+                                                        current: target.currentValue,
+                                                        target: target.targetValue
+                                                    })}
                                                 </span>
                                             ) : (
                                                 <input
                                                     type="number"
                                                     disabled={!canEdit}
                                                     defaultValue={target.currentValue}
-                                                    aria-label={`Value for ${target.name}`}
+                                                    aria-label={t("goals.valueFor", { name: target.name })}
                                                     onBlur={async (event) => {
                                                         const value = Number(event.target.value);
                                                         if (value === target.currentValue) return;
@@ -423,8 +437,8 @@ export function GoalsView({
                                             <span className="w-10 text-right text-muted-foreground">{target.percent}%</span>
                                             {canEdit && <button
                                                 type="button"
-                                                aria-label={`Remove ${target.name}`}
-                                                title="Remove target"
+                                                aria-label={t("pickers.remove", { name: target.name })}
+                                                title={t("goals.removeTarget")}
                                                 onClick={async () => {
                                                     const result = await runAction(
                                                         () => actions.deleteGoalTargetAction(target.id),
@@ -440,7 +454,7 @@ export function GoalsView({
                                     ))}
                                     {goal.targets.length === 0 && (
                                         <li className="text-xs text-muted-foreground">
-                                            No targets yet, so there is nothing to measure.
+                                            {t("goals.noTargets")}
                                         </li>
                                     )}
                                 </ul>
@@ -460,7 +474,7 @@ export function GoalsView({
                                     />
                                 ) : (
                                     <Button size="sm" variant="ghost" onClick={() => setTargetFor(goal.id)}>
-                                        <Plus className="size-3.5" /> Target
+                                        <Plus className="size-3.5" /> {t("goals.target")}
                                     </Button>
                                 )}
                             </CardBody>
@@ -481,6 +495,8 @@ function TargetForm({
     onAdd: (input: Record<string, unknown>) => Promise<void>;
     onCancel: () => void;
 }) {
+    const t = useTranslations("tasks");
+    const tc = useTranslations("common");
     const [name, setName] = useState("");
     const [type, setType] = useState<core.GoalTargetType>("number");
     const [targetValue, setTargetValue] = useState("100");
@@ -490,8 +506,8 @@ function TargetForm({
         <div className="flex flex-wrap items-end gap-2 rounded-md border border-border p-2">
             <Input
                 value={name}
-                placeholder="Target name"
-                aria-label="Target name"
+                placeholder={t("goals.targetName")}
+                aria-label={t("goals.targetName")}
                 onChange={(event) => setName(event.target.value)}
                 className="h-8 w-40 text-sm"
             />
@@ -500,9 +516,9 @@ function TargetForm({
                 onValueChange={(value) => setType(value as core.GoalTargetType)}
                 options={core.GOAL_TARGET_TYPES.map((entry) => ({
                     value: entry,
-                    label: core.GOAL_TARGET_LABELS[entry]
+                    label: optionLabel(t, "goalTarget", entry)
                 }))}
-                aria-label="Target type"
+                aria-label={t("goals.targetType")}
                 className="h-8 w-36 text-xs"
             />
             {type === "tasks" ? (
@@ -510,15 +526,15 @@ function TargetForm({
                     value={listId}
                     onValueChange={setListId}
                     options={lists.map((list) => ({ value: list.id, label: list.name }))}
-                    placeholder="Which list"
-                    aria-label="List to count"
+                    placeholder={t("goals.whichList")}
+                    aria-label={t("goals.listToCount")}
                     className="h-8 w-40 text-xs"
                 />
             ) : (
                 <Input
                     type="number"
                     value={targetValue}
-                    aria-label="Target value"
+                    aria-label={t("goals.targetValue")}
                     onChange={(event) => setTargetValue(event.target.value)}
                     className="h-8 w-24 text-sm"
                 />
@@ -535,10 +551,10 @@ function TargetForm({
                     })
                 }
             >
-                Add
+                {t("goals.add")}
             </Button>
             <Button size="sm" variant="ghost" onClick={onCancel}>
-                Cancel
+                {tc("actions.cancel")}
             </Button>
         </div>
     );

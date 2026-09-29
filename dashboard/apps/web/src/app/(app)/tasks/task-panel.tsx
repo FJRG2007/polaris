@@ -30,6 +30,7 @@ import { HandToAgent } from "./hand-to-agent";
 import type { TaskDetail } from "@/lib/tasks/task-service";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AttachmentSection, CommitSection } from "./task-files";
 import { FieldsSection, PropertyRows } from "./task-properties";
 import { ActivityStream, TimeSection } from "./task-conversation";
@@ -87,6 +88,8 @@ export function TaskPanel({
     onChanged: () => void;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("tasksDetail");
+    const tt = useTranslations("tasks");
     const auto = useAutosave();
     const [detail, setDetail] = useState<TaskDetail | null>(null);
     const [error, setError] = useState("");
@@ -384,11 +387,11 @@ export function TaskPanel({
                         {/* The dialog is announced before its content arrives, so
                             it needs a name while it is still loading - otherwise a
                             screen reader opens an unnamed window. */}
-                        <DialogTitle className="sr-only">Task</DialogTitle>
+                        <DialogTitle className="sr-only">{t("panel.task")}</DialogTitle>
                         {loading ? (
                             <Loader2 className="size-5 animate-spin" />
                         ) : (
-                            error || "Loading the task"
+                            error || t("panel.loading")
                         )}
                     </div>
                 )}
@@ -402,14 +405,14 @@ export function TaskPanel({
                             {/* The same copy control the rest of Polaris uses,
                                 acknowledgement included - a reference people
                                 quote in chat is a reference they copy. */}
-                            <CopyButton value={task.reference} label="the task reference" />
+                            <CopyButton value={task.reference} label={t("panel.referenceLabel")} />
                             {detail?.parent && (
                                 <button
                                     type="button"
                                     onClick={() => void openTask(detail.parent!.id)}
                                     className="min-w-0 truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
                                 >
-                                    in {detail.parent.name}
+                                    {t("panel.inParent", { name: detail.parent.name })}
                                 </button>
                             )}
                             {/* The actions are a group of their own rather than a
@@ -429,20 +432,20 @@ export function TaskPanel({
                                             className="size-3.5 shrink-0 animate-spin"
                                             aria-hidden="true"
                                         />
-                                        Saving
+                                        {t("panel.saving")}
                                     </span>
                                 )}
                                 <span className="hidden text-[0.6875rem] text-muted-foreground sm:inline">
-                                    Created {format.date(task.createdAt)}
+                                    {t("panel.created", { date: format.date(task.createdAt) })}
                                 </span>
                                 {task.recurring && (
                                     <span
                                         className="inline-flex items-center gap-1 text-[0.6875rem] text-muted-foreground"
-                                        title="This task repeats"
-                                        aria-label="This task repeats"
+                                        title={t("panel.repeatsTitle")}
+                                        aria-label={t("panel.repeatsTitle")}
                                     >
                                         <Repeat className="size-3.5" />
-                                        <span className="hidden sm:inline">Repeats</span>
+                                        <span className="hidden sm:inline">{t("panel.repeats")}</span>
                                     </span>
                                 )}
                                 {/* Icon-only on a phone, the way every other toolbar
@@ -461,17 +464,17 @@ export function TaskPanel({
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    title="Share"
-                                    aria-label="Share"
+                                    title={t("panel.share")}
+                                    aria-label={t("panel.share")}
                                     onClick={() => setSharing(true)}
                                 >
                                     <Share2 className="size-4" />
-                                    <span className="hidden sm:inline">Share</span>
+                                    <span className="hidden sm:inline">{t("panel.share")}</span>
                                 </Button>
                                 <button
                                     type="button"
-                                    aria-label={watching ? "Stop watching" : "Watch this task"}
-                                    title={watching ? "Stop watching" : "Watch this task"}
+                                    aria-label={watching ? t("panel.stopWatching") : t("panel.watch")}
+                                    title={watching ? t("panel.stopWatching") : t("panel.watch")}
                                     onClick={async () => {
                                         await runAction(
                                             () => actions.setWatchingAction(task.id, !watching),
@@ -492,8 +495,8 @@ export function TaskPanel({
                                         <DropdownMenuTrigger asChild>
                                             <button
                                                 type="button"
-                                                aria-label="More actions"
-                                                title="More actions"
+                                                aria-label={t("panel.more")}
+                                                title={t("panel.more")}
                                                 className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                             >
                                                 <MoreHorizontal className="size-4" />
@@ -514,30 +517,28 @@ export function TaskPanel({
                                                     if (result?.id) void openTask(result.id);
                                                 }}
                                             >
-                                                Duplicate
+                                                {t("panel.duplicate")}
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onSelect={() =>
                                                     void patch({ milestone: !task.milestone })
                                                 }
                                             >
-                                                {task.milestone
-                                                    ? "Not a milestone"
-                                                    : "Mark as a milestone"}
+                                                {task.milestone ? t("panel.notMilestone") : t("panel.milestone")}
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onSelect={() =>
                                                     void patch({ archived: !task.archived })
                                                 }
                                             >
-                                                {task.archived ? "Unarchive" : "Archive"}
+                                                {task.archived ? t("panel.unarchive") : t("panel.archive")}
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem
                                                 variant="danger"
                                                 onSelect={() => setConfirmDelete(true)}
                                             >
-                                                Delete
+                                                {t("panel.delete")}
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -554,7 +555,7 @@ export function TaskPanel({
                                         defaultValue={task.name}
                                         key={task.id}
                                         disabled={!context.canEdit}
-                                        aria-label="Task name"
+                                        aria-label={t("create.name")}
                                         // Held while it is being typed and written
                                         // once typing stops, so a name only ever
                                         // exists on the screen for a moment.
@@ -604,12 +605,12 @@ export function TaskPanel({
                                 />
 
                                 <section className="flex flex-col gap-1 border-t border-border pt-4">
-                                    <h3 className="text-sm font-medium">Description</h3>
+                                    <h3 className="text-sm font-medium">{t("create.description")}</h3>
                                     <RichTextEditor
                                         key={task.id}
                                         value={task.description}
                                         disabled={!context.canEdit}
-                                        placeholder="What needs doing, and what does done look like? Type / for a block, @ for somebody, # for a task."
+                                        placeholder={t("panel.descriptionPlaceholder")}
                                         // Held while it is being written and saved
                                         // once writing stops, the way every other
                                         // free-text field here is. This is the one
@@ -625,7 +626,7 @@ export function TaskPanel({
                                         listAction={
                                             context.canEdit
                                                 ? {
-                                                      label: "Move to subtasks",
+                                                      label: t("panel.moveToSubtasks"),
                                                       run: (items) =>
                                                           toSubtasks(task.id, task.listId, items)
                                                   }
@@ -739,10 +740,10 @@ export function TaskPanel({
                             name={task.name}
                             kind="change"
                             requireTyping={false}
-                            title="Leave the change behind?"
-                            description={error || "The last change could not be saved."}
-                            question="Everything else stays as it was saved. What is still in the boxes goes."
-                            confirmLabel="Leave it behind"
+                            title={t("panel.leaveTitle")}
+                            description={error || t("panel.leaveDescription")}
+                            question={t("panel.leaveQuestion")}
+                            confirmLabel={t("panel.leaveConfirm")}
                             onConfirm={() => {
                                 const next = discarding?.next ?? null;
                                 auto.discard();
@@ -764,8 +765,13 @@ export function TaskPanel({
                             // case, not a safeguard; that belongs on the things
                             // that hold other people's work.
                             requireTyping={false}
-                            description="Comments, checklists and tracked time go with it. Archiving keeps all of that and takes it off the board."
-                            confirmLabel="Delete task"
+                            title={tt("deleteTask.title")}
+                            question={tt.rich("deleteTask.question", {
+                                name: task.name,
+                                strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                            })}
+                            description={tt("deleteTask.description")}
+                            confirmLabel={tt("deleteTask.title")}
                             onConfirm={async () => {
                                 await runAction(() => actions.deleteTaskAction(task.id), setError);
                                 setConfirmDelete(false);

@@ -12,6 +12,9 @@
 
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
+import { trackerSentence } from "./tracker-sentence";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, useTransition } from "react";
 import type { TrackerView } from "@/lib/tasks/trackers/service";
 import { Check, Link2, Loader2, RefreshCw, Trash2, TriangleAlert } from "lucide-react";
@@ -47,6 +50,7 @@ interface Space {
 }
 
 export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
+    const t = useTranslations("tasks");
     const [editing, setEditing] = useState<TrackerView | "new" | null>(null);
     const [removing, setRemoving] = useState<TrackerView | null>(null);
     const [note, setNote] = useState<string | null>(null);
@@ -66,7 +70,7 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
             void runAction(() => syncTrackerAction(tracker.id), setError).then((result) => {
                 if (!result) return;
                 if (result.error) setError(result.error);
-                else setNote(`Brought in ${result.added ?? 0} and updated ${result.updated ?? 0}.`);
+                else setNote(t("trackers.pulled", { added: result.added ?? 0, updated: result.updated ?? 0 }));
             });
         });
     };
@@ -85,15 +89,15 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
             <div className="flex justify-end">
                 <Button size="sm" onClick={() => setEditing("new")}>
                     <Link2 className="size-4 shrink-0" />
-                    Connect a tracker
+                    {t("trackers.connect")}
                 </Button>
             </div>
 
             {trackers.length === 0 ? (
                 <EmptyState
                     icon={<Link2 />}
-                    title="Nothing connected"
-                    description="Connect Linear or Jira and their issues appear as tasks here, keeping their reference. Move one on this board and it moves there too."
+                    title={t("trackers.emptyTitle")}
+                    description={t("trackers.emptyDescription")}
                 />
             ) : (
                 <div className="space-y-2">
@@ -108,21 +112,30 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
                                         {tracker.label}
                                     </p>
                                     <p className="truncate text-xs text-muted-foreground">
-                                        {core.ISSUE_TRACKER_LABELS[tracker.provider]} into{" "}
-                                        {tracker.spaceName} / {tracker.listName} - {tracker.linked}{" "}
-                                        linked
-                                        {tracker.syncedAt ? "" : ", never pulled"}
+                                        {tracker.syncedAt
+                                            ? t("trackers.summary", {
+                                                  provider: core.ISSUE_TRACKER_LABELS[tracker.provider],
+                                                  space: tracker.spaceName,
+                                                  list: tracker.listName,
+                                                  linked: tracker.linked
+                                              })
+                                            : t("trackers.summaryNeverPulled", {
+                                                  provider: core.ISSUE_TRACKER_LABELS[tracker.provider],
+                                                  space: tracker.spaceName,
+                                                  list: tracker.listName,
+                                                  linked: tracker.linked
+                                              })}
                                     </p>
                                     {tracker.error ? (
                                         <p className="mt-1 flex items-start gap-1 text-xs text-danger">
                                             <TriangleAlert className="mt-0.5 size-3 shrink-0" />
-                                            {tracker.error}
+                                            {trackerSentence(t, tracker.error)}
                                         </p>
                                     ) : null}
                                 </div>
                                 {tracker.pushStatus ? (
                                     <Badge variant="neutral" className="shrink-0">
-                                        Two-way
+                                        {t("trackers.twoWay")}
                                     </Badge>
                                 ) : null}
                                 <Switch
@@ -136,7 +149,7 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
                                     disabled={busy}
                                 >
                                     <Check className="size-4 shrink-0" />
-                                    Test
+                                    {t("trackers.test")}
                                 </Button>
                                 <Button
                                     size="sm"
@@ -145,19 +158,21 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
                                     disabled={busy}
                                 >
                                     <RefreshCw className="size-4 shrink-0" />
-                                    Pull now
+                                    {t("trackers.pullNow")}
                                 </Button>
                                 <Button
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => setEditing(tracker)}
                                 >
-                                    Edit
+                                    {t("trackers.edit")}
                                 </Button>
                                 <Button
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => setRemoving(tracker)}
+                                    aria-label={t("trackers.disconnectNamed", { name: tracker.label })}
+                                    title={t("trackers.disconnect")}
                                 >
                                     <Trash2 className="size-4 shrink-0" />
                                 </Button>
@@ -183,10 +198,10 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
                     // Nothing is destroyed, so nothing has to be typed out: the
                     // tasks stay and the tracker is untouched.
                     requireTyping={false}
-                    title={`Disconnect ${removing.label}?`}
-                    question={`Disconnect ${removing.label}?`}
-                    description="The tasks it brought in stay where they are and stop being kept in step. Nothing is deleted in the tracker."
-                    confirmLabel="Disconnect"
+                    title={t("trackers.disconnectQuestion", { name: removing.label })}
+                    question={t("trackers.disconnectQuestion", { name: removing.label })}
+                    description={t("trackers.disconnectDescription")}
+                    confirmLabel={t("trackers.disconnect")}
                     onConfirm={async () => {
                         await runAction(() => deleteTrackerAction(removing.id), setError);
                         setRemoving(null);
@@ -198,6 +213,8 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
 }
 
 function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onClose: () => void }) {
+    const t = useTranslations("tasks");
+    const tc = useTranslations("common");
     const [spaces, setSpaces] = useState<Space[] | null>(null);
     const [provider, setProvider] = useState<core.IssueTracker>(tracker?.provider ?? "linear");
     const [label, setLabel] = useState(tracker?.label ?? "");
@@ -250,13 +267,13 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {tracker ? `Edit ${tracker.label}` : "Connect a tracker"}
+                        {tracker ? t("trackers.editNamed", { name: tracker.label }) : t("trackers.connect")}
                     </DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-3">
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">Tracker</span>
+                        <span className="text-xs text-muted-foreground">{t("trackers.tracker")}</span>
                         <Select
                             value={provider}
                             onValueChange={(value) => setProvider(value as core.IssueTracker)}
@@ -269,23 +286,26 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
                     </label>
 
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">Name it</span>
+                        <span className="text-xs text-muted-foreground">{t("trackers.nameIt")}</span>
                         <Input
                             value={label}
                             onChange={(event) => setLabel(event.target.value)}
-                            placeholder="Product board"
+                            placeholder={t("trackers.namePlaceholder")}
                         />
                     </label>
 
                     {core.ISSUE_TRACKER_FIELDS[provider].map((field) => (
                         <label key={field.key} className="block space-y-1">
                             <span className="text-xs text-muted-foreground">
-                                {field.label}. {field.hint}
+                                {t("trackers.fieldLine", {
+                                    label: t(`trackers.fields.${field.key}.label` as NamespaceKey<"tasks">),
+                                    hint: t(`trackers.fields.${field.key}.hint` as NamespaceKey<"tasks">)
+                                })}
                             </span>
                             <Input
                                 type={field.secret ? "password" : "text"}
                                 value={field.secret ? secret : (config[field.key] ?? "")}
-                                placeholder={field.secret && tracker ? "Kept as it is" : ""}
+                                placeholder={field.secret && tracker ? t("trackers.keptAsIs") : ""}
                                 onChange={(event) =>
                                     field.secret
                                         ? setSecret(event.target.value)
@@ -300,23 +320,21 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
 
                     <label className="block space-y-1">
                         <span className="text-xs text-muted-foreground">
-                            {provider === "linear"
-                                ? "Team key, such as ENG. Leave it empty for every issue the key can see."
-                                : "JQL. Leave it empty for everything, newest first."}
+                            {provider === "linear" ? t("trackers.linearQuery") : t("trackers.jiraQuery")}
                         </span>
                         <Input
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={
                                 provider === "linear"
-                                    ? "ENG"
-                                    : "project = ENG AND statusCategory != Done"
+                                    ? "ENG" // i18n-ignore
+                                    : "project = ENG AND statusCategory != Done" // i18n-ignore
                             }
                         />
                     </label>
 
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">Space</span>
+                        <span className="text-xs text-muted-foreground">{t("trackers.space")}</span>
                         <Select
                             value={spaceId}
                             onValueChange={setSpaceId}
@@ -324,28 +342,24 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
                                 value: space.id,
                                 label: space.name
                             }))}
-                            placeholder="Pick a space"
+                            placeholder={t("trackers.pickSpace")}
                         />
                     </label>
 
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">List</span>
+                        <span className="text-xs text-muted-foreground">{t("trackers.list")}</span>
                         <Select
                             value={listId}
                             onValueChange={setListId}
                             options={lists.map((list) => ({ value: list.id, label: list.name }))}
-                            placeholder="Pick a list"
+                            placeholder={t("trackers.pickList")}
                         />
                     </label>
 
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
                         <div className="min-w-0">
-                            <p className="text-sm">Send status changes back</p>
-                            <p className="text-xs text-muted-foreground">
-                                Moving a task here moves the issue there. Off by default: writing
-                                into somebody else&apos;s tracker is a decision, not a side effect
-                                of connecting one.
-                            </p>
+                            <p className="text-sm">{t("trackers.push")}</p>
+                            <p className="text-xs text-muted-foreground">{t("trackers.pushHint")}</p>
                         </div>
                         <Switch checked={pushStatus} onChange={setPushStatus} />
                     </div>
@@ -355,11 +369,11 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button onClick={submit} disabled={busy || !label || !spaceId || !listId}>
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                        Save
+                        {tc("actions.save")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

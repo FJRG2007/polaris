@@ -6,6 +6,7 @@
  * in @polaris/core rather than inside a view.
  */
 
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import type { ActivityView, CommentView } from "@/lib/tasks/task-service";
 
 /** What the stream is showing: everything, or only what people said. */
@@ -17,40 +18,43 @@ export type StreamItem =
 
 /** One history line in plain language. The stored values are already resolved to
  *  names, so this is a sentence rather than a second lookup. */
-export function describeActivity(line: ActivityView): string {
-    const who = line.authorName ?? "A rule";
+export function describeActivity(t: NamespaceTranslator<"tasksDetail">, line: ActivityView): string {
+    const who = line.authorName ?? t("activity.aRule");
+    const another = t("activity.anotherStatus");
     switch (line.action) {
         case "created":
-            return `${who} created this task`;
+            return t("activity.created", { who });
         case "status":
             return line.fromValue
-                ? `${who} moved it from ${line.fromValue} to ${line.toValue ?? "another status"}`
-                : `${who} set the status to ${line.toValue ?? "another status"}`;
+                ? t("activity.statusMoved", { who, from: line.fromValue, to: line.toValue ?? another })
+                : t("activity.statusSet", { who, to: line.toValue ?? another });
         case "priority":
-            return `${who} changed the priority from ${line.fromValue} to ${line.toValue}`;
+            return t("activity.priority", { who, from: line.fromValue ?? "", to: line.toValue ?? "" });
         case "due":
-            return line.toValue ? `${who} set a due date` : `${who} cleared the due date`;
+            return line.toValue ? t("activity.dueSet", { who }) : t("activity.dueCleared", { who });
         case "assignee":
-            return `${who} changed who is on it`;
+            return t("activity.assignee", { who });
         case "moved":
-            return `${who} moved it to another list`;
+            return t("activity.moved", { who });
         case "blocked":
             // The reason is worth repeating here: the block itself may be gone by
             // the time anybody reads back, and why it was there is the part that
             // explains the week this task did not move.
-            return line.toValue ? `${who} marked it blocked: ${line.toValue}` : `${who} marked it blocked`;
+            return line.toValue
+                ? t("activity.blockedWhy", { who, reason: line.toValue })
+                : t("activity.blocked", { who });
         case "unblocked":
-            return `${who} cleared the block`;
+            return t("activity.unblocked", { who });
         case "archived":
-            return `${who} archived it`;
+            return t("activity.archived", { who });
         case "recurred":
-            return "It recurred and was rescheduled";
+            return t("activity.recurred");
         case "automation":
-            return `The rule "${line.toValue}" ran`;
+            return t("activity.automation", { rule: line.toValue ?? "" });
         case "bulk":
-            return `${who} changed it along with others`;
+            return t("activity.bulk", { who });
         default:
-            return `${who} changed it`;
+            return t("activity.changed", { who });
     }
 }
 
