@@ -22,11 +22,14 @@ import {
     createDisplayFormat,
     type DisplayFormat,
     type DisplayPreferences,
+    type Locale,
     type ThemeId,
     type UserDisplayPreferences
 } from "@polaris/core";
 import { getSetting, setSetting } from "./setting-store";
 import { resolveSession } from "./session";
+import { getLocale } from "./i18n/request";
+import { getUserLocale } from "./i18n/locale-service";
 
 /** The Setting key holding the deployment-wide defaults. */
 const PLATFORM_KEY = "display.defaults";
@@ -75,7 +78,12 @@ export async function getReportedTimeZone(userId: string): Promise<string | null
 }
 
 /**
- * The effective set for a user: built-in defaults, then platform, then their own.
+ * The effective set for a user: built-in defaults, then what their language
+ * implies, then platform, then their own.
+ *
+ * `locale` is the language the result is for - the reader's, when the caller is
+ * drawing a page (an administrator viewing as somebody still reads in their own
+ * language). Left out, it is the account's own.
  *
  * With one substitution the layering cannot express: a zone left on "automatic"
  * is resolved to what this account's browser reported. Automatic means the
@@ -84,13 +92,15 @@ export async function getReportedTimeZone(userId: string): Promise<string | null
  * deciding whether somebody is hidden both quietly used the deployment's clock.
  */
 export async function resolveDisplayPreferencesFor(
-    userId: string | null
+    userId: string | null,
+    locale?: Locale
 ): Promise<DisplayPreferences> {
-    const [platform, account] = await Promise.all([
+    const [platform, account, language] = await Promise.all([
         getPlatformDisplayPreferences(),
-        userId ? readAccountDisplay(userId) : Promise.resolve(NOTHING_HELD)
+        userId ? readAccountDisplay(userId) : Promise.resolve(NOTHING_HELD),
+        locale ?? (userId ? getUserLocale(userId) : undefined)
     ]);
-    const resolved = resolveDisplayPreferences(platform, account.preferences);
+    const resolved = resolveDisplayPreferences(platform, account.preferences, language);
     return {
         ...resolved,
         timeZone: effectiveTimeZone(resolved.timeZone, account.deviceTimeZone)
@@ -131,8 +141,8 @@ export async function recordDeviceTimeZone(userId: string, zone: string): Promis
  * is the closest thing to a house style a visitor can be shown.
  */
 export async function getDisplayFormat(): Promise<DisplayFormat> {
-    const session = await resolveSession();
-    return createDisplayFormat(await resolveDisplayPreferencesFor(session?.id ?? null));
+    const [session, locale] = await Promise.all([resolveSession(), getLocale()]);
+    return createDisplayFormat(await resolveDisplayPreferencesFor(session?.id ?? null, locale));
 }
 
 export async function saveUserDisplayPreferences(

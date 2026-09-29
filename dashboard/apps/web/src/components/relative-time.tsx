@@ -6,6 +6,9 @@
  * on hover. The element is registered lazily in the browser (it extends
  * HTMLElement, which does not exist during SSR), and until it upgrades the
  * absolute date is shown as the fallback, so there is never a blank cell.
+ *
+ * The phrase is the element's own, from Intl, in the language it is given: the
+ * reader's, so "3 hours ago" is "hace 3 horas" for somebody reading in Spanish.
  */
 
 import { useDisplayFormat } from "./display-format";
@@ -51,6 +54,7 @@ export function RelativeTime({
         "relative-time",
         {
             datetime: iso,
+            lang: format.preferences.language,
             tense,
             // Only when asked for: an attribute set to undefined is not written,
             // so everything already using this keeps the element's own defaults.

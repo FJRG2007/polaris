@@ -163,6 +163,9 @@ const EAGER_UI = [
     "confirmDialog.useConfirm",
     "copyButton.CopyButton",
     "gameLogo.GameLogo",
+    // The language a page is drawn in: a hook over a context the root layout
+    // already provides.
+    "i18nProvider.useLocale",
     // The kept-reading hooks and the merge under them: hooks cannot be drawn
     // later, and the shell's own screens load the module anyway.
     "liveRead.useKeptSnapshot",

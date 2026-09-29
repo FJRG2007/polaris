@@ -7,6 +7,9 @@ import localFont from "next/font/local";
 import { DropGuard } from "@/components/drop-guard";
 import { themeClass } from "@polaris/core";
 import { resolveSession } from "@/lib/session";
+import { getLocale, getTranslations } from "@/lib/i18n/request";
+import { pickMessages } from "@/lib/i18n/translate";
+import { I18nProvider, LocaleSync } from "@/components/i18n/i18n-provider";
 import { resolveTextSize, resolveTheme } from "@/lib/display-prefs-service";
 
 /**
@@ -151,31 +154,41 @@ const NAME_FACES = [
     .map((face) => face.variable)
     .join(" ");
 
-export const metadata: Metadata = {
-    title: "Polaris",
-    description: "Home-lab control plane - drive, connections, and more."
-};
+/** The document's title and description, the description in the reader's
+ *  language. The title is the product's name, which is not translated. */
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("common");
+    return {
+        title: "Polaris", // i18n-ignore
+        description: t("meta.description")
+    };
+}
 
 /**
- * The theme and the text size are resolved here, on the server, and written onto
- * the document it is served as.
+ * The theme, the text size and the language are resolved here, on the server,
+ * and written onto the document it is served as.
  *
  * Which means there is no flash: the first paint is already in the right palette
  * and at the right size, with no script to run and nothing to correct
  * afterwards. It costs one cached settings read per request - and it answers
  * "dark" at 16px for anything with no session and no database, which is what
  * keeps a build that prerenders a page from needing one.
+ *
+ * The language is the reader's (see `getLocale`), and the `common` namespace is
+ * handed to every client component from here; a screen that needs more asks for
+ * it with `<Messages>`.
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
     const session = await resolveSession().catch(() => null);
-    const [theme, textSize] = await Promise.all([
+    const [theme, textSize, locale] = await Promise.all([
         resolveTheme(session?.id ?? null),
-        resolveTextSize(session?.id ?? null)
+        resolveTextSize(session?.id ?? null),
+        getLocale()
     ]);
 
     return (
         <html
-            lang="en"
+            lang={locale}
             className={`${sans.variable} ${mono.variable} ${NAME_FACES} ${themeClass(theme)}`.trim()}
             // Everything Polaris draws is sized in rem, so this is what the whole
             // interface is laid out against - see globals.css.
@@ -183,8 +196,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             suppressHydrationWarning
         >
             <body>
-                <DropGuard />
-                {children}
+                <I18nProvider locale={locale} messages={pickMessages(locale, ["common"])}>
+                    <LocaleSync locale={locale} signedIn={session !== null} />
+                    <DropGuard />
+                    {children}
+                </I18nProvider>
             </body>
         </html>
     );

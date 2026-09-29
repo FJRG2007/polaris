@@ -34,6 +34,9 @@ import { readRecentPlaces } from "@/lib/overview/recent-places";
 import { useInstalledNav } from "@/components/use-installed-nav";
 import { anythingWaiting, useAppUnread } from "@/components/app-unread";
 import { saveFavoriteAppsAction } from "@/app/(app)/app-launcher-actions";
+import { useNavLabel } from "@/components/i18n/use-nav-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 export function AppNav({
     appIds,
@@ -47,6 +50,15 @@ export function AppNav({
 }) {
     const pathname = usePathname();
     const toast = useToast();
+    const t = useTranslations("nav");
+    const label = useNavLabel();
+    // The description an app is listed with, by its id. Every app in the
+    // catalogue has one in the `nav` namespace - the catalog test says so - and
+    // the catalogue's own English is the answer for one that does not yet.
+    const describe = (id: string, key: "description" | "guestDescription", english: string) => {
+        const path = `apps.${id}.${key}`;
+        return t.has(path) ? t(path as NamespaceKey<"nav">) : english;
+    };
     const allowed = new Set(appIds);
     const asGuest = new Set(guestAppIds);
     const waiting = useAppUnread();
@@ -76,14 +88,19 @@ export function AppNav({
             asGuest.has(app.id) && app.guest
                 ? {
                       ...app,
-                      label: app.guest.label,
-                      description: app.guest.description,
+                      label: label(app.guest.label),
+                      description: describe(app.id, "guestDescription", app.guest.description),
                       href: app.guest.href
                   }
                 : // A guest reaches the app through a subject rather than through
                   // the app, so their entry leads to that subject and never to a
                   // remembered screen behind it.
-                  { ...app, href: places[app.id] ?? app.href };
+                  {
+                      ...app,
+                      label: label(app.label),
+                      description: describe(app.id, "description", app.description),
+                      href: places[app.id] ?? app.href
+                  };
         // Whatever that app has waiting, whichever app it is. Naming them
         // here is what left Mail with a number and no dot beside it.
         const badge = badgeLabel(waiting[app.id] ?? 0);
@@ -91,9 +108,10 @@ export function AppNav({
     });
     const layout = launcherLayout({ available: apps.map((app) => app.id), favorites, recent });
     const isGameServer = installedId !== null && installed !== null && installed.tabs.length > 0;
-    const current = isGameServer
+    const active = isGameServer
         ? (nav.POLARIS_APPS.find((app) => app.id === "games") ?? nav.resolveActiveApp(pathname))
         : nav.resolveActiveApp(pathname);
+    const current = { ...active, label: label(active.label) };
 
     // Optimistic: the star fills at once and comes back off, with a note, if the
     // save is refused. Sent whole, so two quick clicks cannot interleave into a
@@ -118,7 +136,7 @@ export function AppNav({
             })
             .catch(() => {
                 undo();
-                toast.show({ title: "Your favorites could not be saved. Try again in a moment." });
+                toast.show({ title: t("switcher.saveFailed") });
             });
     }
 
@@ -128,7 +146,19 @@ export function AppNav({
             currentAppId={current.id}
             currentApp={current.hidden ? current : undefined}
             featured={layout.featured}
-            featuredLabel={layout.pinned ? "Favorites" : layout.visited ? "Recent" : "Suggested"}
+            featuredLabel={
+                layout.pinned
+                    ? t("switcher.favorites")
+                    : layout.visited
+                      ? t("switcher.recent")
+                      : t("switcher.suggested")
+            }
+            strings={{
+                moreApps: t("switcher.moreApps"),
+                allApps: t("switcher.allApps"),
+                pin: (app) => t("switcher.pin", { app }),
+                unpin: (app) => t("switcher.unpin", { app })
+            }}
             pinned={favorites}
             onTogglePin={togglePin}
             // Moving between apps keeps the page. An anchor here reloaded the

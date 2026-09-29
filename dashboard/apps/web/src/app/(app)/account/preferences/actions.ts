@@ -6,6 +6,8 @@
  * how to render.
  */
 
+import { z } from "zod";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import * as core from "@polaris/core";
@@ -24,12 +26,17 @@ import {
     recordDeviceTimeZone,
     saveUserDisplayPreferences
 } from "@/lib/display-prefs-service";
-import { PRESENCE_CHOICES, type PresenceChoice } from "@polaris/core";
+import { LOCALES, PRESENCE_CHOICES, type PresenceChoice } from "@polaris/core";
+import { setUserLocale } from "@/lib/i18n/locale-service";
+import { getTranslations } from "@/lib/i18n/request";
+import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from "@/lib/i18n/cookie";
 
 export async function saveDisplayPreferencesAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = userDisplayPreferencesSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Unsupported choice." };
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("account"))("errors.unsupportedChoice") };
+    }
     // A replace rather than a merge, because a field left on "Platform default"
     // has to be able to go back to being absent - which a merge cannot say. The
     // text size is the one field this form does not own, so whatever is stored
@@ -41,6 +48,31 @@ export async function saveDisplayPreferencesAction(input: unknown): Promise<{ er
         textSize: parsed.data.textSize ?? held.textSize
     });
     // Formatting is resolved in the app layout, so every screen re-renders.
+    revalidatePath("/", "layout");
+    return {};
+}
+
+const localeSchema = z.enum(LOCALES);
+
+/**
+ * The language this account reads Polaris in.
+ *
+ * The reader's own, even while an administrator is viewing as somebody else:
+ * it is the administrator who is reading. Every tab the account has open is told
+ * (see `setUserLocale`), and the cookie follows so the sign-in screen after
+ * signing out is in the same language. The frame is resolved in the layouts, so
+ * the whole tree is drawn again.
+ */
+export async function setLocaleAction(locale: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = localeSchema.safeParse(locale);
+    if (!parsed.success) return { error: (await getTranslations("account"))("language.unsupported") };
+    await setUserLocale(user.viewingAs?.actorId ?? user.id, parsed.data);
+    (await cookies()).set(LOCALE_COOKIE, parsed.data, {
+        sameSite: "lax",
+        path: "/",
+        maxAge: LOCALE_COOKIE_MAX_AGE
+    });
     revalidatePath("/", "layout");
     return {};
 }
@@ -62,7 +94,9 @@ export async function saveTextSizeAction(size: unknown): Promise<{ error?: strin
         .pick({ textSize: true })
         .required()
         .safeParse({ textSize: size });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Not a size Polaris offers" };
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("account"))("errors.unsupportedSize") };
+    }
     await patchUserDisplayPreferences(user.id, { textSize: parsed.data.textSize });
     revalidatePath("/", "layout");
     return {};
@@ -138,10 +172,10 @@ export async function setPresenceAction(
     const wanted = (PRESENCE_CHOICES as readonly string[]).includes(String(choice))
         ? (String(choice) as PresenceChoice)
         : null;
-    if (!wanted) return { error: "That is not a status" };
+    if (!wanted) return { error: (await getTranslations("account"))("errors.notAPresence") };
     const parsed = core.presenceWindowSchema.safeParse(window ?? {});
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "That is not a window" };
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("account"))("errors.notAWindow") };
     }
 
     await setPresenceChoice(user.id, wanted, parsed.data);
@@ -165,7 +199,9 @@ export async function setStatusAction(
     const user = await requireUser();
     const parsed = core.userStatusSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? "That status could not be saved" };
+        return {
+            error: parsed.error.issues[0]?.message ?? (await getTranslations("account"))("errors.statusNotSaved")
+        };
     }
 
     await setStatus(user.id, parsed.data.text, parsed.data);

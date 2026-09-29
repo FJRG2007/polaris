@@ -102,6 +102,12 @@ model User {
     // Not a preference: the choice stays in `displayPrefs` and stays "auto".
     // Null until a browser has said, which is until the account signs in once.
     deviceTimeZone String?
+    // The language this account reads Polaris in, as a locale tag ("en-US",
+    // "es-ES"). Null until one has been worked out: the first request of an
+    // account detects it from the browser (or the address's country) and writes
+    // it here, and the account can change it at any time. Code reads it through
+    // `getUserLocale`, which answers the default for a null.
+    locale         String?
     // Which events this account wants told about and how, as stringified JSON
     // keyed by event id. Events absent here (and a null column) follow the
     // catalogue default, so a newly added event never arrives muted.

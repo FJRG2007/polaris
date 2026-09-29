@@ -43,7 +43,8 @@ describe("the menu behind your own face", () => {
     it("carries the way to the apps", async () => {
         const source = await menu;
         expect(source).toContain('<Link href="/account/downloads">');
-        expect(source).toContain("Get the apps");
+        expect(source).toContain('t("account.getApps")');
+        expect(await readFile(`${SRC}../messages/en-US/nav.json`, "utf8")).toContain('"getApps": "Get the apps"');
     });
 });
 

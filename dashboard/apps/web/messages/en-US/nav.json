@@ -1,0 +1,277 @@
+{
+    "shell": {
+        "overview": "Polaris overview"
+    },
+    "switcher": {
+        "favorites": "Favorites",
+        "recent": "Recent",
+        "suggested": "Suggested",
+        "moreApps": "More apps",
+        "allApps": "Polaris apps",
+        "pin": "Add {app} to favorites",
+        "unpin": "Remove {app} from favorites",
+        "saveFailed": "Your favorites could not be saved. Try again in a moment."
+    },
+    "waiting": {
+        "unread": "{count, plural, one {# unread message} other {# unread messages}}",
+        "byApp": {
+            "admin": "{count, plural, one {# thing needs an administrator} other {# things need an administrator}}"
+        }
+    },
+    "account": {
+        "trigger": "Your account",
+        "triggerHint": "Your account. Press twice to open it.",
+        "presence": {
+            "auto": "Online",
+            "busy": "Do not disturb",
+            "away": "Away",
+            "invisible": "Invisible"
+        },
+        "onSchedule": "On your weekly schedule",
+        "until": "until {time}",
+        "presenceFor": {
+            "m15": "For 15 minutes",
+            "m60": "For 1 hour",
+            "m480": "For 8 hours",
+            "m1440": "For 24 hours",
+            "m4320": "For 3 days",
+            "untilChanged": "Until I change it"
+        },
+        "untilMoment": "Until a date and time...",
+        "everyWeek": "Every week...",
+        "setStatus": "Set a status",
+        "myAccount": "My account",
+        "notifications": "Notifications",
+        "getApps": "Get the apps",
+        "sharedLinks": "Shared links",
+        "signOut": "Sign out",
+        "timing": {
+            "title": "{state} until a date and time",
+            "description": "You go back to being shown as online after this.",
+            "moment": "When it goes back to normal"
+        },
+        "status": {
+            "description": "Shown beside your name while you are online.",
+            "placeholder": "What are you up to?",
+            "clear": "Clear",
+            "clearsWhen": "When the status clears",
+            "clearsIn": {
+                "m30": "In 30 minutes",
+                "m60": "In 1 hour",
+                "m240": "In 4 hours",
+                "m1440": "In 24 hours",
+                "never": "Don't clear"
+            },
+            "atMoment": "At a date and time...",
+            "clearsAt": "The date and time the status clears",
+            "clearIt": "Clear it"
+        },
+        "moment": {
+            "missing": "Pick a date and time.",
+            "invalid": "That is not a date and time.",
+            "past": "Pick a moment that has not passed.",
+            "tooFar": "Pick a moment inside the next year."
+        }
+    },
+    "apps": {
+        "overview": {
+            "description": "Your services, usage and shortcuts at a glance"
+        },
+        "drive": {
+            "description": "Files across every NAS"
+        },
+        "vault": {
+            "description": "Passwords, keys and secrets, encrypted in your browser"
+        },
+        "apps": {
+            "description": "Install & run apps: deploys, servers, assistants"
+        },
+        "home": {
+            "description": "Your places, the cameras in them and the doors of them - what they saw, and what to do about it"
+        },
+        "tools": {
+            "description": "Convert, resize, optimize, trim and translate - the small jobs, on your own machine"
+        },
+        "games": {
+            "description": "Minecraft, ARK and FiveM servers on your own machines"
+        },
+        "tasks": {
+            "description": "Plan and track work: spaces, lists, boards & goals"
+        },
+        "chat": {
+            "description": "Channels, direct messages and calls with the people here"
+        },
+        "mail": {
+            "description": "Your mailboxes, read and answered here"
+        },
+        "notes": {
+            "description": "Write things down, nested the way a notebook is"
+        },
+        "office": {
+            "description": "Documents, spreadsheets, slides and diagrams, written together"
+        },
+        "watch": {
+            "description": "Alarms on app health, spikes and outages"
+        },
+        "admin": {
+            "description": "Users, access, domains & updates",
+            "guestDescription": "Customer conversations across every channel"
+        },
+        "account": {
+            "description": "Profile, security & API keys"
+        }
+    },
+    "labels": {
+        "AI provider keys": "AI provider keys",
+        "AI providers": "AI providers",
+        "API keys": "API keys",
+        "Access": "Access",
+        "Access rules": "Access rules",
+        "Account": "Account",
+        "Account standing": "Account standing",
+        "Activity": "Activity",
+        "Agent defaults": "Agent defaults",
+        "Agents": "Agents",
+        "Alarms": "Alarms",
+        "Alerts": "Alerts",
+        "Analytics": "Analytics",
+        "Announce": "Announce",
+        "Anti-cheat": "Anti-cheat",
+        "Apps": "Apps",
+        "Archive": "Archive",
+        "Automations": "Automations",
+        "Away message": "Away message",
+        "Backups": "Backups",
+        "Billing": "Billing",
+        "Cameras": "Cameras",
+        "Channels": "Channels",
+        "Chat": "Chat",
+        "Clips": "Clips",
+        "Code": "Code",
+        "Communication": "Communication",
+        "Comparisons": "Comparisons",
+        "Connect an app": "Connect an app",
+        "Connected accounts": "Connected accounts",
+        "Connected trackers": "Connected trackers",
+        "Console": "Console",
+        "Consumption": "Consumption",
+        "Contacts": "Contacts",
+        "Containers": "Containers",
+        "Conversations": "Conversations",
+        "Databases": "Databases",
+        "Deploy": "Deploy",
+        "Devices": "Devices",
+        "Diagrams": "Diagrams",
+        "Display defaults": "Display defaults",
+        "Docs": "Docs",
+        "Documents": "Documents",
+        "Domains": "Domains",
+        "Downloads": "Downloads",
+        "Drafts": "Drafts",
+        "Drive": "Drive",
+        "Drop points": "Drop points",
+        "Email": "Email",
+        "Events": "Events",
+        "Everything": "Everything",
+        "Evidence": "Evidence",
+        "Favorites": "Favorites",
+        "Filed": "Filed",
+        "Files": "Files",
+        "Filters": "Filters",
+        "Firewall": "Firewall",
+        "Friends": "Friends",
+        "Game servers": "Game servers",
+        "Goals": "Goals",
+        "Groups": "Groups",
+        "How it works": "How it works",
+        "Inbox": "Inbox",
+        "Integrations": "Integrations",
+        "Items": "Items",
+        "Keeping records": "Keeping records",
+        "Kinds": "Kinds",
+        "Labels": "Labels",
+        "Linked chat": "Linked chat",
+        "Live": "Live",
+        "Logs": "Logs",
+        "Machines": "Machines",
+        "Mail": "Mail",
+        "Mail server": "Mail server",
+        "Mailboxes": "Mailboxes",
+        "Management": "Management",
+        "Marketplace": "Marketplace",
+        "Mods": "Mods",
+        "My account": "My account",
+        "My work": "My work",
+        "Notes": "Notes",
+        "Notifications": "Notifications",
+        "Office": "Office",
+        "Operations": "Operations",
+        "Organizations": "Organizations",
+        "Overview": "Overview",
+        "Password & 2FA": "Password & 2FA",
+        "People": "People",
+        "Places": "Places",
+        "Platform": "Platform",
+        "Players": "Players",
+        "Policies": "Policies",
+        "Pools": "Pools",
+        "Preferences": "Preferences",
+        "Presentations": "Presentations",
+        "Privacy": "Privacy",
+        "Profile": "Profile",
+        "Recent": "Recent",
+        "Reporting": "Reporting",
+        "Repositories": "Repositories",
+        "Resources": "Resources",
+        "Roles": "Roles",
+        "Rules": "Rules",
+        "Runners": "Runners",
+        "Running it": "Running it",
+        "Runs": "Runs",
+        "Safety": "Safety",
+        "Scan a code": "Scan a code",
+        "Schedule": "Schedule",
+        "Secrets": "Secrets",
+        "Security": "Security",
+        "Send-as addresses": "Send-as addresses",
+        "Sends": "Sends",
+        "Sent": "Sent",
+        "Servers": "Servers",
+        "Services": "Services",
+        "Sessions": "Sessions",
+        "Set up": "Set up",
+        "Settings": "Settings",
+        "Shared": "Shared",
+        "Shared links": "Shared links",
+        "Shared with me": "Shared with me",
+        "Side panel": "Side panel",
+        "Signature": "Signature",
+        "Snippets": "Snippets",
+        "Spaces": "Spaces",
+        "Spam": "Spam",
+        "Spreadsheets": "Spreadsheets",
+        "Sprints": "Sprints",
+        "Starred": "Starred",
+        "Status schedule": "Status schedule",
+        "Talking to players": "Talking to players",
+        "Tasks": "Tasks",
+        "Teams": "Teams",
+        "Telemetry": "Telemetry",
+        "Timesheet": "Timesheet",
+        "Tools": "Tools",
+        "Trash": "Trash",
+        "Updates & settings": "Updates & settings",
+        "Uploads": "Uploads",
+        "Usage": "Usage",
+        "Users": "Users",
+        "Vault": "Vault",
+        "Vaults": "Vaults",
+        "Voice & Video": "Voice & Video",
+        "Watch": "Watch",
+        "Webhooks": "Webhooks",
+        "What is on it": "What is on it",
+        "Where the room went": "Where the room went",
+        "Who gets in": "Who gets in",
+        "World": "World"
+    }
+}

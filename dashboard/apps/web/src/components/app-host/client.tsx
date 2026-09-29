@@ -12,6 +12,11 @@
  * carries a graph of its own is therefore loaded when it is first drawn
  * rather than imported here; the small ones, drawn on most screens, are not
  * worth a chunk of their own.
+ *
+ * `i18nProvider.useLocale` is the language the page is drawn in. An app ships
+ * its own catalogs and formats them with it -
+ * `catalogs.translator(hostUi.i18nProvider.useLocale(), "games")` - see
+ * docs/i18n.md.
  */
 
 import dynamic from "next/dynamic";
@@ -35,6 +40,7 @@ import { subscribeSharedStream } from "@/lib/shared-stream";
 import { ToolbarSwitch } from "@/components/toolbar-switch";
 import { useSessionScope } from "@/components/session-scope";
 import { useDisplayFormat } from "@/components/display-format";
+import { useLocale } from "@/components/i18n/i18n-provider";
 import { useRuntimeLog } from "@/app/(app)/apps/installed/[id]/use-runtime-log";
 import { CONSUMPTION_METRICS, PLAYER_METRICS } from "@/components/metrics-specs";
 import { dropSnapshots, readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
@@ -104,6 +110,7 @@ export const clientHost = {
     copyButton: { CopyButton },
     displayFormat: { useDisplayFormat },
     gameLogo: { GameLogo },
+    i18nProvider: { useLocale },
     logViewer: { LogViewer },
     logos: { IntegrationLogo },
     mediaPlayer: { MediaPlayer },

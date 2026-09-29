@@ -13,15 +13,18 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DISPLAY_DEFAULTS, resolveDisplayPreferences } from "@polaris/core";
 import { DisplayPreferencesForm } from "@/components/display-preferences-form";
+import { withMessages } from "../setup/i18n";
 
 function render(options: { allowInherit: boolean; mine?: Record<string, string> }): string {
     return renderToStaticMarkup(
-        <DisplayPreferencesForm
-            initial={options.mine ?? {}}
-            fallback={resolveDisplayPreferences({ weekStart: "sun" })}
-            allowInherit={options.allowInherit}
-            save={async () => ({})}
-        />
+        withMessages(
+            <DisplayPreferencesForm
+                initial={options.mine ?? {}}
+                fallback={resolveDisplayPreferences({ weekStart: "sun" })}
+                allowInherit={options.allowInherit}
+                save={async () => ({})}
+            />
+        )
     );
 }
 

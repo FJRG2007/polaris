@@ -8,22 +8,31 @@
  *
  * The sample line under the form is formatted with exactly what is selected, so
  * the effect of a choice is visible before it is saved.
+ *
+ * The language is not here: it has its own card and is saved on its own, since
+ * changing it redraws the whole page (see `LanguageCard`). Its words come from
+ * the `account` namespace, which both pages hand down with `<Messages>`.
  */
 
 import { useMemo, useState, type FormEvent } from "react";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { Button, Card, CardBody, Select, type SelectOption } from "@polaris/ui";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import {
     CURRENCIES,
     THEMES,
     weekdayOrder,
+    weekdayNames,
     createDisplayFormat,
     AUTOMATIC_TIME_ZONE,
-    WEEKDAY_SHORT_NAMES,
     resolveDisplayPreferences,
+    type Locale,
     type WeekStart,
     type DisplayPreferences,
     type UserDisplayPreferences
 } from "@polaris/core";
+
+type Translate = NamespaceTranslator<"account">;
 
 /** The "leave it to the layer below" choice. Radix forbids an empty value. */
 const INHERIT = "inherit";
@@ -41,7 +50,7 @@ const SAMPLE = new Date(2026, 6, 31, 14, 5, 9);
  * list of zones is still better than a field that cannot be used. Automatic sits
  * at the top and is what almost everybody keeps.
  */
-function timeZoneOptions(): FieldOption[] {
+function timeZoneOptions(automatic: string): FieldOption[] {
     // Reached this way rather than called directly: it is a recent addition to
     // Intl, and a runtime without it must fall back rather than fail to render
     // the whole form.
@@ -56,7 +65,7 @@ function timeZoneOptions(): FieldOption[] {
         zones = ["UTC", "Europe/London", "Europe/Madrid", "Europe/Berlin", "America/New_York", "America/Los_Angeles"];
     }
     return [
-        { value: AUTOMATIC_TIME_ZONE, label: "Automatic", short: "Automatic" },
+        { value: AUTOMATIC_TIME_ZONE, label: automatic, short: automatic },
         ...zones.map((zone) => ({ value: zone, label: zone.replace(/_/g, " "), short: zone }))
     ];
 }
@@ -74,86 +83,114 @@ interface FieldSpec {
     label: string;
     hint?: string;
     options: FieldOption[];
-    /** Only English exists so far; the control still records the choice. */
-    disabled?: boolean;
 }
 
-const FIELDS: FieldSpec[] = [
-    {
-        key: "theme",
-        label: "Theme",
-        hint: "Applied the moment it is saved, on every screen.",
-        options: THEMES.map((theme) => ({
-            value: theme.id,
-            label: `${theme.label} - ${theme.description}`,
-            short: theme.label
-        }))
-    },
-    {
-        key: "dateOrder",
-        label: "Date order",
-        options: [
-            { value: "dmy", label: "Day first (31/07/2026)", short: "Day first" },
-            { value: "mdy", label: "Month first (07/31/2026)", short: "Month first" }
-        ]
-    },
-    {
-        key: "yearFormat",
-        label: "Year",
-        options: [
-            { value: "yyyy", label: "Four digits (2026)", short: "Four digits" },
-            { value: "yy", label: "Two digits (26)", short: "Two digits" }
-        ]
-    },
-    {
-        key: "clock",
-        label: "Clock",
-        options: [
-            { value: "24h", label: "24-hour (14:05)", short: "24-hour" },
-            { value: "12h", label: "12-hour (2:05 PM)", short: "12-hour" }
-        ]
-    },
-    {
-        key: "weekStart",
-        label: "Week starts on",
-        hint: "Where every calendar and week view begins.",
-        options: [
-            { value: "sun", label: "Sunday", short: "Sunday" },
-            { value: "mon", label: "Monday", short: "Monday" },
-            { value: "sat", label: "Saturday", short: "Saturday" }
-        ]
-    },
-    {
-        key: "timeZone",
-        label: "Time zone",
-        hint: "Every time on screen is written in it. Automatic follows the device you are on.",
-        options: timeZoneOptions()
-    },
-    {
-        key: "temperature",
-        label: "Temperature",
-        options: [
-            { value: "c", label: "Celsius (C)", short: "Celsius" },
-            { value: "f", label: "Fahrenheit (F)", short: "Fahrenheit" }
-        ]
-    },
-    {
-        key: "currency",
-        label: "Currency",
-        options: CURRENCIES.map((entry) => ({
-            value: entry.code,
-            label: `${entry.label} (${entry.code})`,
-            short: entry.code
-        }))
-    },
-    {
-        key: "language",
-        label: "Language",
-        hint: "English is the only language available so far.",
-        options: [{ value: "en", label: "English", short: "English" }],
-        disabled: true
-    }
-];
+/** The keys this form owns, in the order it draws them. What decides whether a
+ *  save is offered, so it is fixed rather than read off the translated fields. */
+const FIELD_KEYS = [
+    "theme",
+    "dateOrder",
+    "yearFormat",
+    "clock",
+    "weekStart",
+    "timeZone",
+    "temperature",
+    "currency"
+] as const satisfies readonly (keyof UserDisplayPreferences)[];
+
+/** An option whose label shows an example, and whose short name is the label
+ *  without it - "Day first (31/07/2026)" and "Day first". */
+function sampled(value: string, short: string, sample: string, t: Translate): FieldOption {
+    return { value, label: t("display.withSample", { label: short, sample }), short };
+}
+
+/**
+ * The fields, in the reader's language. Built per render rather than once for the
+ * module, because the words depend on the locale the page is drawn in - a
+ * module-level list would be frozen in whichever language loaded it first.
+ */
+function buildFields(t: Translate, locale: Locale): FieldSpec[] {
+    const days = weekdayNames(locale, "long");
+    return [
+        {
+            key: "theme",
+            label: t("display.theme.label"),
+            hint: t("display.theme.hint"),
+            options: THEMES.map((theme) => {
+                const label = t(`display.theme.names.${theme.id}`);
+                return {
+                    value: theme.id,
+                    label: t("display.theme.option", {
+                        label,
+                        description: t(`display.theme.descriptions.${theme.id}`)
+                    }),
+                    short: label
+                };
+            })
+        },
+        {
+            key: "dateOrder",
+            label: t("display.dateOrder.label"),
+            options: [
+                sampled("dmy", t("display.dateOrder.dmy"), "31/07/2026", t),
+                sampled("mdy", t("display.dateOrder.mdy"), "07/31/2026", t)
+            ]
+        },
+        {
+            key: "yearFormat",
+            label: t("display.yearFormat.label"),
+            options: [
+                sampled("yyyy", t("display.yearFormat.yyyy"), "2026", t),
+                sampled("yy", t("display.yearFormat.yy"), "26", t)
+            ]
+        },
+        {
+            key: "clock",
+            label: t("display.clock.label"),
+            options: [
+                sampled("24h", t("display.clock.24h"), "14:05", t),
+                sampled("12h", t("display.clock.12h"), "2:05 PM", t)
+            ]
+        },
+        {
+            key: "weekStart",
+            label: t("display.weekStart.label"),
+            hint: t("display.weekStart.hint"),
+            options: (["sun", "mon", "sat"] as const).map((day) => {
+                // Standing alone in a list, so capitalised as a label is.
+                const first = days[weekdayOrder(day)[0] as number] as string;
+                const name = first.charAt(0).toLocaleUpperCase(locale) + first.slice(1);
+                return { value: day, label: name, short: name };
+            })
+        },
+        {
+            key: "timeZone",
+            label: t("display.timeZone.label"),
+            hint: t("display.timeZone.hint"),
+            options: timeZoneOptions(t("display.timeZone.automatic"))
+        },
+        {
+            key: "temperature",
+            label: t("display.temperature.label"),
+            options: [
+                sampled("c", t("display.temperature.c"), "C", t),
+                sampled("f", t("display.temperature.f"), "F", t)
+            ]
+        },
+        {
+            key: "currency",
+            label: t("display.currency.label"),
+            options: CURRENCIES.map((entry) => ({
+                value: entry.code,
+                label: t("display.withSample", {
+                    label: t(`display.currency.names.${entry.code}`),
+                    sample: entry.code
+                }),
+                short: entry.code
+            }))
+        }
+    ];
+}
 
 function toSelectOptions(options: FieldOption[]): SelectOption[] {
     return options.map((option) => ({ value: option.value, label: option.label }));
@@ -161,7 +198,7 @@ function toSelectOptions(options: FieldOption[]): SelectOption[] {
 
 /** Same keys, same values - a save is only offered when something differs. */
 function same(left: UserDisplayPreferences, right: UserDisplayPreferences): boolean {
-    return FIELDS.every((field) => (left[field.key] ?? null) === (right[field.key] ?? null));
+    return FIELD_KEYS.every((key) => (left[key] ?? null) === (right[key] ?? null));
 }
 
 export function DisplayPreferencesForm({
@@ -182,16 +219,19 @@ export function DisplayPreferencesForm({
     allowTheme?: boolean;
     save: (values: UserDisplayPreferences) => Promise<{ error?: string }>;
 }) {
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
+    const locale = useLocale();
     const [values, setValues] = useState<UserDisplayPreferences>(initial);
     const [saved, setSaved] = useState<UserDisplayPreferences>(initial);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState(false);
 
-    const fields = useMemo(
-        () => (allowTheme ? FIELDS : FIELDS.filter((field) => field.key !== "theme")),
-        [allowTheme]
-    );
+    const fields = useMemo(() => {
+        const all = buildFields(t, locale);
+        return allowTheme ? all : all.filter((field) => field.key !== "theme");
+    }, [t, locale, allowTheme]);
     const effective = useMemo(() => resolveDisplayPreferences(fallback, values), [fallback, values]);
     const format = useMemo(() => createDisplayFormat(effective), [effective]);
     const changed = !same(values, saved);
@@ -234,7 +274,9 @@ export function DisplayPreferencesForm({
                                 ? [
                                       {
                                           value: INHERIT,
-                                          label: `Platform default (${shortFor(field, fallback[field.key])})`
+                                          label: t("display.platformDefault", {
+                                              value: shortFor(field, fallback[field.key])
+                                          })
                                       },
                                       ...toSelectOptions(field.options)
                                   ]
@@ -246,7 +288,6 @@ export function DisplayPreferencesForm({
                                         value={inherited ? INHERIT : String(values[field.key])}
                                         onValueChange={(value) => pick(field.key, value)}
                                         options={options}
-                                        disabled={field.disabled}
                                         aria-label={field.label}
                                     />
                                     {field.hint ? (
@@ -258,26 +299,29 @@ export function DisplayPreferencesForm({
                     </div>
 
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border border-border bg-muted/30 p-3 text-sm sm:grid-cols-4">
-                        <Sample label="Date" value={format.date(SAMPLE)} />
-                        <Sample label="Time" value={format.time(SAMPLE)} />
-                        <Sample label="Week" value={weekSample(effective.weekStart)} />
+                        <Sample label={t("display.sample.date")} value={format.date(SAMPLE)} />
+                        <Sample label={t("display.sample.time")} value={format.time(SAMPLE)} />
                         <Sample
-                            label="Time zone"
+                            label={t("display.sample.week")}
+                            value={weekSample(effective.weekStart, locale, t)}
+                        />
+                        <Sample
+                            label={t("display.sample.timeZone")}
                             value={
                                 effective.timeZone === AUTOMATIC_TIME_ZONE
-                                    ? "This device"
+                                    ? t("display.sample.thisDevice")
                                     : effective.timeZone.replace(/_/g, " ")
                             }
                         />
-                        <Sample label="Temperature" value={format.temperature(21.4)} />
-                        <Sample label="Amount" value={format.currency(1234.5)} />
+                        <Sample label={t("display.sample.temperature")} value={format.temperature(21.4)} />
+                        <Sample label={t("display.sample.amount")} value={format.currency(1234.5)} />
                     </dl>
 
                     <div className="flex items-center justify-between gap-2">
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        {done && !error ? <p className="text-sm text-success">Preferences saved.</p> : null}
+                        {done && !error ? <p className="text-sm text-success">{t("display.saved")}</p> : null}
                         <Button type="submit" disabled={busy || !changed} className="ml-auto">
-                            {busy ? "Saving..." : "Save"}
+                            {busy ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
                 </form>
@@ -287,9 +331,13 @@ export function DisplayPreferencesForm({
 }
 
 /** The week as the chosen start draws it: the first day, then the last. */
-function weekSample(weekStart: WeekStart): string {
+function weekSample(weekStart: WeekStart, locale: Locale, t: Translate): string {
     const order = weekdayOrder(weekStart);
-    return `${WEEKDAY_SHORT_NAMES[order[0] as number]} to ${WEEKDAY_SHORT_NAMES[order[6] as number]}`;
+    const days = weekdayNames(locale, "short");
+    return t("display.sample.weekRange", {
+        first: days[order[0] as number] as string,
+        last: days[order[6] as number] as string
+    });
 }
 
 /** The short name of a value, so "Platform default" can say what it resolves to.

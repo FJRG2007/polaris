@@ -13,6 +13,9 @@
  *
  * Locked apps stay visible but badged so the platform's scope is legible even in
  * the limited edition; clicking one routes to its unlock explainer.
+ *
+ * The words it adds of its own come in through `strings`, in English unless the
+ * caller translates them: this package draws, the app decides the language.
  */
 
 import { cn } from "../lib/cn";
@@ -40,6 +43,24 @@ export interface PolarisApp {
     readonly badge?: string;
 }
 
+/** The switcher's own words. Everything else it draws is the caller's data. */
+export interface AppSwitcherStrings {
+    /** The heading over the apps after the top row. */
+    readonly moreApps: string;
+    /** The heading over every app, when there is no top row. */
+    readonly allApps: string;
+    /** The star's name for an app not yet pinned, and for one that is. */
+    readonly pin: (appLabel: string) => string;
+    readonly unpin: (appLabel: string) => string;
+}
+
+const ENGLISH: AppSwitcherStrings = {
+    moreApps: "More apps",
+    allApps: "Polaris apps",
+    pin: (appLabel) => `Add ${appLabel} to favorites`,
+    unpin: (appLabel) => `Remove ${appLabel} from favorites`
+};
+
 export function AppSwitcher({
     apps,
     currentAppId,
@@ -49,7 +70,8 @@ export function AppSwitcher({
     featured,
     featuredLabel = "Favorites",
     pinned = [],
-    onTogglePin
+    onTogglePin,
+    strings = ENGLISH
 }: {
     apps: readonly PolarisApp[];
     currentAppId: string;
@@ -87,6 +109,8 @@ export function AppSwitcher({
     pinned?: readonly string[];
     /** Pin or unpin one app. Absent, no star is drawn. */
     onTogglePin?: (appId: string) => void;
+    /** The switcher's own words, in the reader's language. English by default. */
+    strings?: AppSwitcherStrings;
 }) {
     const current = currentApp ?? apps.find((app) => app.id === currentAppId) ?? apps[0];
     if (!current) return null;
@@ -110,7 +134,7 @@ export function AppSwitcher({
     const rest = apps.filter((app) => !top.includes(app));
     const sections = [
         { label: featuredLabel, apps: top },
-        { label: top.length > 0 ? "More apps" : "Polaris apps", apps: rest }
+        { label: top.length > 0 ? strings.moreApps : strings.allApps, apps: rest }
     ].filter((section) => section.apps.length > 0);
     return (
         <DropdownMenu>
@@ -151,6 +175,7 @@ export function AppSwitcher({
                                     pinned={pinnedIds.has(app.id)}
                                     onTogglePin={onTogglePin}
                                     Anchor={Anchor}
+                                    strings={strings}
                                 />
                             ))}
                         </div>
@@ -175,18 +200,18 @@ function AppTile({
     active,
     pinned,
     onTogglePin,
-    Anchor
+    Anchor,
+    strings
 }: {
     app: PolarisApp;
     active: boolean;
     pinned: boolean;
     onTogglePin?: (appId: string) => void;
     Anchor: ElementType;
+    strings: AppSwitcherStrings;
 }) {
     const Icon = app.icon;
-    const pinLabel = pinned
-        ? `Remove ${app.label} from favorites`
-        : `Add ${app.label} to favorites`;
+    const pinLabel = pinned ? strings.unpin(app.label) : strings.pin(app.label);
     return (
         <div className="group/tile relative">
             <DropdownMenuItem asChild disabled={app.locked}>

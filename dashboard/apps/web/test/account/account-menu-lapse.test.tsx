@@ -23,6 +23,7 @@
 
 import userEvent from "@testing-library/user-event";
 import { AccountMenu } from "@/components/account-menu";
+import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 
@@ -99,7 +100,8 @@ describe("the picker left open across the window it set", () => {
                 presenceNextChange={WINDOW_END.toISOString()}
                 status=""
                 statusUntil={null}
-            />
+            />,
+            { wrapper: MessagesWrapper }
         );
 
         await user.click(screen.getByRole("button", { name: "Your account" }));
@@ -142,7 +144,8 @@ describe("choosing a status", () => {
                 presenceNextChange={null}
                 status=""
                 statusUntil={null}
-            />
+            />,
+            { wrapper: MessagesWrapper }
         );
         await user.click(screen.getByRole("button", { name: "Your account" }));
         await screen.findByRole("menu");

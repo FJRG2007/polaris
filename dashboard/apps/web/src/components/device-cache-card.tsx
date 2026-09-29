@@ -17,6 +17,7 @@
 
 import { useState } from "react";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Everything Polaris writes into a browser is under this. Deliberately not all
  *  of local storage: this origin is the sign-in surface too, and clearing what
@@ -24,6 +25,7 @@ import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 const OURS = "polaris.";
 
 export function DeviceCacheCard() {
+    const t = useTranslations("account");
     const [clearing, setClearing] = useState(false);
 
     const clear = async (): Promise<void> => {
@@ -55,18 +57,13 @@ export function DeviceCacheCard() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>This device</CardTitle>
+                <CardTitle>{t("deviceCache.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm text-muted-foreground">
-                    Polaris keeps a few things in this browser so screens open faster - pictures,
-                    how loud each person is in a call, playback speed. Clear them if something looks
-                    out of date and a reload has not fixed it. Your other devices are not affected,
-                    and you stay signed in.
-                </p>
+                <p className="text-sm text-muted-foreground">{t("deviceCache.body")}</p>
                 <div>
                     <Button variant="secondary" disabled={clearing} onClick={() => void clear()}>
-                        {clearing ? "Clearing" : "Clear cached data"}
+                        {clearing ? t("deviceCache.clearing") : t("deviceCache.clear")}
                     </Button>
                 </div>
             </CardBody>

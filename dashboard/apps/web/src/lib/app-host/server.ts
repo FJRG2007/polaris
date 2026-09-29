@@ -108,6 +108,8 @@ const load = {
     envVarService: once(() => import("@/lib/env-var-service")),
     footageStorage: once(() => import("@/lib/footage-storage")),
     hostService: once(() => import("@/lib/host-service")),
+    i18nLocaleService: once(() => import("@/lib/i18n/locale-service")),
+    i18nRequest: once(() => import("@/lib/i18n/request")),
     integrationService: once(() => import("@/lib/integration-service")),
     minecraftRouter: once(() => import("@/lib/minecraft-router")),
     integrationsCloudflareAccountService: once(
@@ -293,6 +295,16 @@ export const serverHost = {
     hostService: {
         getHostConnection: later(load.hostService, "getHostConnection"),
         listHosts: later(load.hostService, "listHosts")
+    },
+    // Which language to write in. An app ships its own catalogs and formats
+    // them with `defineCatalogs` from @polaris/core; what it needs from here is
+    // who is reading - the request's reader, or any account by id (a linked
+    // player, the recipient of a notification). See docs/i18n.md.
+    i18nLocaleService: {
+        getUserLocale: later(load.i18nLocaleService, "getUserLocale")
+    },
+    i18nRequest: {
+        getLocale: later(load.i18nRequest, "getLocale")
     },
     integrationService: {
         getIntegrationSecret: later(load.integrationService, "getIntegrationSecret")

@@ -1,0 +1,10 @@
+{
+    "actions": {
+        "save": "Save",
+        "saving": "Saving...",
+        "cancel": "Cancel"
+    },
+    "meta": {
+        "description": "Home-lab control plane - drive, connections, and more."
+    }
+}

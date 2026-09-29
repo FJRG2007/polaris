@@ -8,6 +8,8 @@ import { Avatar } from "@/components/avatar";
 import { useNow } from "@/components/presence";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { usePresenceRefresh } from "@/components/presence-store";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
 import { noteSignOutAction } from "@/app/(app)/account/sessions/actions";
@@ -31,7 +33,6 @@ import {
     MAX_STATUS,
     PRESENCE_CHOICES,
     PRESENCE_DURATIONS,
-    PRESENCE_LABELS,
     STATUS_DURATIONS,
     MAX_WINDOW_MS,
     windowEndsAt,
@@ -72,6 +73,27 @@ import {
  */
 const DOUBLE_PRESS_MS = 600;
 
+type Translate = NamespaceTranslator<"nav">;
+
+/**
+ * The words for one of the offered lengths, by its minutes. The lengths are
+ * core's (`PRESENCE_DURATIONS`, `STATUS_DURATIONS`); the words are the catalog's,
+ * one key per length - the navigation catalog test fails for a length added to
+ * core without one.
+ */
+function presenceForKey(minutes: number | null): NamespaceKey<"nav"> {
+    return (minutes === null ? "account.presenceFor.untilChanged" : `account.presenceFor.m${minutes}`) as NamespaceKey<"nav">;
+}
+
+function clearsInKey(minutes: number | null): NamespaceKey<"nav"> {
+    return (minutes === null ? "account.status.clearsIn.never" : `account.status.clearsIn.m${minutes}`) as NamespaceKey<"nav">;
+}
+
+/** What a chosen state is called, in the reader's language. */
+function presenceLabel(choice: PresenceChoice, t: Translate): string {
+    return t(`account.presence.${choice}`);
+}
+
 /**
  * The personal account dropdown. Only per-user items live here; administration
  * (users, policies, domains, integrations, updates, ...) moved to the dedicated
@@ -111,6 +133,8 @@ export function AccountMenu({
     statusUntil: string | null;
 }) {
     const router = useRouter();
+    const t = useTranslations("nav");
+    const tc = useTranslations("common");
     const format = useDisplayFormat();
     const refreshPresence = usePresenceRefresh();
     const [open, setOpen] = useState(false);
@@ -279,8 +303,8 @@ export function AccountMenu({
     /** What is wrong with the moment being typed, empty when nothing is - and
      *  the one answer the two fields add up to, which is only ever built from a
      *  moment that is a moment. */
-    const badMoment = clearsAt === null ? "" : momentProblem(clearsAt);
-    const badTiming = timing === null ? "" : momentProblem(moment);
+    const badMoment = clearsAt === null ? "" : momentProblem(clearsAt, t);
+    const badTiming = timing === null ? "" : momentProblem(moment, t);
     const statusWindow: WindowChoice =
         clearsAt !== null && !badMoment
             ? { until: new Date(clearsAt).toISOString() }
@@ -356,8 +380,8 @@ export function AccountMenu({
             face it was aimed at. */}
             <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
                 <DropdownMenuTrigger
-                    aria-label="Your account"
-                    title="Your account. Press twice to open it."
+                    aria-label={t("account.trigger")}
+                    title={t("account.triggerHint")}
                     // Straight there. Your own face is the way to your own account
                     // in every application that has one, and going through a menu to
                     // press the item named after the thing you just pressed is a step
@@ -420,7 +444,7 @@ export function AccountMenu({
                                     )}
                                 />
                                 <span className="min-w-0 flex-1 truncate">
-                                    {PRESENCE_LABELS[choice]}
+                                    {presenceLabel(choice, t)}
                                 </span>
                                 {shownChoice === choice && shownUntil && (
                                     // The word rather than the sentence: "until"
@@ -430,9 +454,9 @@ export function AccountMenu({
                                     // a press away under Every week.
                                     <span
                                         className="shrink-0 truncate text-[0.6875rem] text-muted-foreground"
-                                        title={shownByRule ? "On your weekly schedule" : undefined}
+                                        title={shownByRule ? t("account.onSchedule") : undefined}
                                     >
-                                        until {endLabel(shownUntil, format)}
+                                        {t("account.until", { time: endLabel(shownUntil, format) })}
                                     </span>
                                 )}
                                 {shownChoice === choice && (
@@ -488,7 +512,7 @@ export function AccountMenu({
                                                 void choose(choice, { minutes: duration.minutes })
                                             }
                                         >
-                                            {duration.label}
+                                            {t(presenceForKey(duration.minutes))}
                                         </DropdownMenuItem>
                                     ))}
                                     <DropdownMenuSeparator />
@@ -504,12 +528,12 @@ export function AccountMenu({
                                             setTiming(choice);
                                         }}
                                     >
-                                        Until a date and time...
+                                        {t("account.untilMoment")}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem asChild>
                                         <Link href="/account/privacy/schedule">
                                             <CalendarClock className="size-4" />
-                                            Every week...
+                                            {t("account.everyWeek")}
                                         </Link>
                                     </DropdownMenuItem>
                                 </DropdownMenuSubContent>
@@ -536,19 +560,19 @@ export function AccountMenu({
                         }}
                     >
                         <MessageSquareText className="size-4" />
-                        <span className="min-w-0 truncate">{shownStatus || "Set a status"}</span>
+                        <span className="min-w-0 truncate">{shownStatus || t("account.setStatus")}</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                         <Link href="/account">
                             <UserCog className="size-4" />
-                            My account
+                            {t("account.myAccount")}
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                         <Link href="/account/notifications">
                             <Bell className="size-4" />
-                            Notifications
+                            {t("account.notifications")}
                         </Link>
                     </DropdownMenuItem>
                     {/* Where the apps are. It existed and was reachable from
@@ -558,18 +582,18 @@ export function AccountMenu({
                     <DropdownMenuItem asChild>
                         <Link href="/account/downloads">
                             <Download className="size-4" />
-                            Get the apps
+                            {t("account.getApps")}
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                         <Link href="/drive/shared-links">
                             <Link2 className="size-4" />
-                            Shared links
+                            {t("account.sharedLinks")}
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={onSignOut}>
                         <LogOut className="size-4" />
-                        Sign out
+                        {t("account.signOut")}
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
@@ -581,24 +605,22 @@ export function AccountMenu({
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
                         <DialogTitle>
-                            {timing ? PRESENCE_LABELS[timing] : ""} until a date and time
+                            {t("account.timing.title", { state: timing ? presenceLabel(timing, t) : "" })}
                         </DialogTitle>
-                        <DialogDescription>
-                            You go back to being shown as online after this.
-                        </DialogDescription>
+                        <DialogDescription>{t("account.timing.description")}</DialogDescription>
                     </DialogHeader>
                     <Input
                         autoFocus
                         type="datetime-local"
                         value={moment}
                         min={localInput(new Date())}
-                        aria-label="When it goes back to normal"
+                        aria-label={t("account.timing.moment")}
                         onChange={(event) => setMoment(event.target.value)}
                     />
                     {badTiming ? <p className="text-xs text-danger">{badTiming}</p> : null}
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setTiming(null)}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button
                             aria-disabled={Boolean(badTiming)}
@@ -607,7 +629,7 @@ export function AccountMenu({
                                 void choose(timing, { until: new Date(moment).toISOString() });
                             }}
                         >
-                            Save
+                            {tc("actions.save")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -618,17 +640,15 @@ export function AccountMenu({
             <Dialog open={writing} onOpenChange={setWriting}>
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>Set a status</DialogTitle>
-                        <DialogDescription>
-                            Shown beside your name while you are online.
-                        </DialogDescription>
+                        <DialogTitle>{t("account.setStatus")}</DialogTitle>
+                        <DialogDescription>{t("account.status.description")}</DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col gap-3">
                         <Input
                             autoFocus
                             value={line}
                             maxLength={MAX_STATUS}
-                            placeholder="What are you up to?"
+                            placeholder={t("account.status.placeholder")}
                             onChange={(event) => setLine(event.target.value)}
                             onKeyDown={(event) => {
                                 if (event.key === "Enter" && !badMoment) {
@@ -637,16 +657,16 @@ export function AccountMenu({
                             }}
                         />
                         <label className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">Clear</span>
+                            <span className="text-xs text-muted-foreground">{t("account.status.clear")}</span>
                             <Select
                                 value={clearsAt === null ? String(clears) : AT_A_TIME}
-                                aria-label="When the status clears"
+                                aria-label={t("account.status.clearsWhen")}
                                 options={[
                                     ...STATUS_DURATIONS.map((duration) => ({
                                         value: String(duration.minutes),
-                                        label: duration.label
+                                        label: t(clearsInKey(duration.minutes))
                                     })),
-                                    { value: AT_A_TIME, label: "At a date and time..." }
+                                    { value: AT_A_TIME, label: t("account.status.atMoment") }
                                 ]}
                                 onValueChange={(value) => {
                                     if (value === AT_A_TIME) {
@@ -665,7 +685,7 @@ export function AccountMenu({
                                 type="datetime-local"
                                 value={clearsAt}
                                 min={localInput(new Date())}
-                                aria-label="The date and time the status clears"
+                                aria-label={t("account.status.clearsAt")}
                                 onChange={(event) => setClearsAt(event.target.value)}
                             />
                         ) : null}
@@ -680,7 +700,7 @@ export function AccountMenu({
                                 disabled={saving}
                                 onClick={() => void saveStatus("", {})}
                             >
-                                Clear it
+                                {t("account.status.clearIt")}
                             </Button>
                         )}
                         <Button
@@ -688,7 +708,7 @@ export function AccountMenu({
                             aria-disabled={Boolean(badMoment)}
                             onClick={() => !badMoment && void saveStatus(line, statusWindow)}
                         >
-                            Save
+                            {tc("actions.save")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -721,12 +741,12 @@ function localInput(at: Date): string {
 
 /** What is wrong with a picked moment, empty when nothing is. The same two
  *  limits the server checks, said before the trip rather than after it. */
-function momentProblem(value: string): string {
-    if (!value) return "Pick a date and time.";
+function momentProblem(value: string, t: Translate): string {
+    if (!value) return t("account.moment.missing");
     const at = new Date(value).getTime();
-    if (!Number.isFinite(at)) return "That is not a date and time.";
-    if (at <= Date.now()) return "Pick a moment that has not passed.";
-    if (at - Date.now() > MAX_WINDOW_MS) return "Pick a moment inside the next year.";
+    if (!Number.isFinite(at)) return t("account.moment.invalid");
+    if (at <= Date.now()) return t("account.moment.past");
+    if (at - Date.now() > MAX_WINDOW_MS) return t("account.moment.tooFar");
     return "";
 }
 

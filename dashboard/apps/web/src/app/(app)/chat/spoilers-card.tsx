@@ -14,23 +14,22 @@
  */
 
 import { Card, CardBody, Switch } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setSpoilersShown, useSpoilersShown } from "./spoilers-shown";
 
 export function SpoilersCard() {
+    const t = useTranslations("account");
     const shown = useSpoilersShown();
     return (
         <Card>
             <CardBody className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <p className="text-sm font-medium">Show spoilers without asking</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                        Pictures and messages somebody sent covered are drawn straight away instead
-                        of waiting for a press. This browser only.
-                    </p>
+                    <p className="text-sm font-medium">{t("spoilers.title")}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{t("spoilers.body")}</p>
                 </div>
                 <Switch
                     checked={shown}
-                    aria-label="Show spoilers without asking"
+                    aria-label={t("spoilers.title")}
                     onChange={(next) => setSpoilersShown(next)}
                 />
             </CardBody>

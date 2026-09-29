@@ -13,6 +13,7 @@ import { passwordIsBreached } from "@/lib/pwned-passwords";
 import { hashToken, tokenMatchesHash } from "@polaris/core/tokens";
 import { BREACHED_PASSWORD_MESSAGE, setupSchema } from "@polaris/core";
 import { assignRole, hasAnyUser, provisionUser, seedDefaultRoles, setUserAdmin } from "@polaris/auth";
+import { adoptRequestLocale } from "@/lib/i18n/request";
 
 export async function completeSetupAction(input: unknown): Promise<{ error?: string }> {
     const parsed = setupSchema.safeParse(input);
@@ -41,6 +42,8 @@ export async function completeSetupAction(input: unknown): Promise<{ error?: str
         await setUserAdmin(user.id);
         await seedDefaultRoles();
         await assignRole(user.id, "admin");
+        // The language this browser asks for, so the dashboard opens in it.
+        await adoptRequestLocale(user.id);
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Setup failed" };

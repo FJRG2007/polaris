@@ -486,6 +486,11 @@ export async function claimInvite(input: ClaimInput): Promise<{ email?: string; 
         if (role) await assignRole(user.id, role.name);
     }
 
+    // The language the invite page was read in, or the one this browser asks
+    // for - so the first screen after accepting is already in it.
+    const { adoptRequestLocale } = await import("@/lib/i18n/request");
+    await adoptRequestLocale(user.id);
+
     // An address that belongs to a service Polaris can sign them in with is
     // worth one sentence, once, on the account it has just made.
     await suggestConnectionLink(user.id, invite.email);

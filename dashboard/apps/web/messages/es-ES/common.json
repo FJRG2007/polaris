@@ -1,0 +1,10 @@
+{
+    "actions": {
+        "save": "Guardar",
+        "saving": "Guardando...",
+        "cancel": "Cancelar"
+    },
+    "meta": {
+        "description": "Panel de control para tu home lab: archivos, conexiones y más."
+    }
+}

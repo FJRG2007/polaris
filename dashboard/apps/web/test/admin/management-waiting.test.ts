@@ -21,7 +21,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { updateIsWaiting } from "@/lib/admin-waiting";
-import { waitingSays } from "@/lib/notification-badge";
+import { translate } from "@/lib/i18n/translate";
 
 const SRC = new URL("../../src/", import.meta.url);
 
@@ -51,15 +51,15 @@ describe("an update that is waiting for somebody", () => {
 });
 
 describe("what a badge says it is counting", () => {
+    // The words live in the `nav` catalog, where the rail reads them.
     it("is messages for an app that does not say otherwise", () => {
-        expect(waitingSays(1)).toBe("1 unread message");
-        expect(waitingSays(4)).toBe("4 unread messages");
+        expect(translate("en-US", "nav.waiting.unread", { count: 1 })).toBe("1 unread message");
+        expect(translate("en-US", "nav.waiting.unread", { count: 4 })).toBe("4 unread messages");
     });
 
     it("is whatever the app says, for one that does", () => {
-        const words = { one: "thing needs an administrator", many: "things need an administrator" };
-        expect(waitingSays(1, words)).toBe("1 thing needs an administrator");
-        expect(waitingSays(3, words)).toBe("3 things need an administrator");
+        expect(translate("en-US", "nav.waiting.byApp.admin", { count: 1 })).toBe("1 thing needs an administrator");
+        expect(translate("en-US", "nav.waiting.byApp.admin", { count: 3 })).toBe("3 things need an administrator");
     });
 });
 

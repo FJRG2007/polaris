@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { TEXT_SIZES, type TextSize } from "@polaris/core";
 import { Button, Card, CardBody, CardHeader, CardTitle, cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** The custom property the whole interface is laid out against - see globals.css. */
 const PROPERTY = "--app-text-size";
@@ -45,6 +46,8 @@ export function AccessibilityForm({
     standard: TextSize;
     save: (size: number) => Promise<{ error?: string }>;
 }) {
+    const t = useTranslations("account");
+    const tc = useTranslations("common");
     const [size, setSize] = useState<TextSize>(initial);
     const [saved, setSaved] = useState<TextSize>(initial);
     const [busy, setBusy] = useState(false);
@@ -71,18 +74,18 @@ export function AccessibilityForm({
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Accessibility</CardTitle>
+                <CardTitle>{t("accessibility.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
                     <div className="flex items-baseline justify-between gap-2">
                         <label htmlFor="text-size" className="text-sm font-medium">
-                            Text size
+                            {t("accessibility.textSize")}
                         </label>
                         <span className="text-sm tabular-nums text-muted-foreground">
-                            {size}px
+                            {t("accessibility.pixelsShort", { size })}
                             {size === standard ? (
-                                <span className="pl-1.5 text-xs">Default</span>
+                                <span className="pl-1.5 text-xs">{t("accessibility.default")}</span>
                             ) : null}
                         </span>
                     </div>
@@ -101,7 +104,7 @@ export function AccessibilityForm({
                             const next = TEXT_SIZES[Number(event.target.value)];
                             if (next !== undefined) setSize(next);
                         }}
-                        aria-valuetext={`${size} pixels`}
+                        aria-valuetext={t("accessibility.pixels", { size })}
                         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                     />
                     <div className="flex justify-between text-[0.6875rem] tabular-nums text-muted-foreground">
@@ -109,7 +112,7 @@ export function AccessibilityForm({
                             <button
                                 key={step}
                                 type="button"
-                                aria-label={`${step} pixels`}
+                                aria-label={t("accessibility.pixels", { size: step })}
                                 aria-pressed={step === size}
                                 onClick={() => {
                                     setDone(false);
@@ -118,7 +121,11 @@ export function AccessibilityForm({
                                 // The one to come back to is marked on the scale
                                 // itself, so it is visible while the slider is
                                 // being moved rather than only after it lands.
-                                title={step === standard ? `${step} - the default here` : undefined}
+                                title={
+                                    step === standard
+                                        ? t("accessibility.stepIsDefault", { size: step })
+                                        : undefined
+                                }
                                 className={cn(
                                     step === size
                                         ? "font-medium text-foreground"
@@ -133,35 +140,35 @@ export function AccessibilityForm({
                         ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                        Polaris is laid out in this size, so the rows and panels around the text grow with it.
-                        The page changes as you move the slider; it stays that way once you save.{" "}
-                        {size === standard ? (
-                            <>This is the default here.</>
-                        ) : (
-                            <>
-                                The default here is {standard}px.{" "}
-                                {/* A way back rather than a number to remember.
-                                    Sets the slider like any other step, so it is
-                                    still a change somebody saves rather than one
-                                    that happens to them. */}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setDone(false);
-                                        setSize(standard);
-                                    }}
-                                    className="underline underline-offset-2 hover:text-foreground"
-                                >
-                                    Go back to it
-                                </button>
-                            </>
-                        )}
+                        {t("accessibility.body")}{" "}
+                        {size === standard
+                            ? t("accessibility.isDefault")
+                            : t.rich("accessibility.defaultIs", {
+                                  size: standard,
+                                  // A way back rather than a number to remember.
+                                  // Sets the slider like any other step, so it is
+                                  // still a change somebody saves rather than one
+                                  // that happens to them.
+                                  back: (chunks) => (
+                                      <button
+                                          key="back"
+                                          type="button"
+                                          onClick={() => {
+                                              setDone(false);
+                                              setSize(standard);
+                                          }}
+                                          className="underline underline-offset-2 hover:text-foreground"
+                                      >
+                                          {chunks}
+                                      </button>
+                                  )
+                              })}
                     </p>
                 </div>
 
                 <div className="flex items-center justify-between gap-2">
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
-                    {done && !error ? <p className="text-sm text-success">Text size saved.</p> : null}
+                    {done && !error ? <p className="text-sm text-success">{t("accessibility.saved")}</p> : null}
                     <Button
                         type="button"
                         className="ml-auto"
@@ -183,7 +190,7 @@ export function AccessibilityForm({
                             setDone(true);
                         }}
                     >
-                        {busy ? "Saving..." : "Save"}
+                        {busy ? tc("actions.saving") : tc("actions.save")}
                     </Button>
                 </div>
             </CardBody>

@@ -12,10 +12,16 @@
  * a role, a policy or an app - which is everybody's business, and still tells
  * the tab nothing it could not already see.
  *
+ * The account's own language rides here too: a change of it is a frame naming
+ * the new locale, delivered only to that account, so every tab it has open
+ * redraws in it (see `LocaleWatcher`). Never coalesced - it is one write, and
+ * the tabs should follow it as fast as the tab that made it.
+ *
  * Node runtime for Prisma, and never cached.
  */
 
 import { resolveSession } from "@/lib/session";
+import { subscribeLocale } from "@/lib/i18n/locale-live";
 import { concerns, subscribeAccess } from "@/lib/access-live";
 
 export const runtime = "nodejs";
@@ -40,6 +46,7 @@ export async function GET(request: Request): Promise<Response> {
     const readerId = session.id;
     const encoder = new TextEncoder();
     let unsubscribe: (() => void) | null = null;
+    let unsubscribeLocale: (() => void) | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
     let pending: ReturnType<typeof setTimeout> | null = null;
     let closed = false;
@@ -53,6 +60,8 @@ export async function GET(request: Request): Promise<Response> {
         pending = null;
         unsubscribe?.();
         unsubscribe = null;
+        unsubscribeLocale?.();
+        unsubscribeLocale = null;
     }
 
     const stream = new ReadableStream<Uint8Array>({
@@ -80,6 +89,12 @@ export async function GET(request: Request): Promise<Response> {
             unsubscribe = subscribeAccess((change) => {
                 if (closed || !concerns(change, readerId)) return;
                 wake();
+            });
+
+            unsubscribeLocale = subscribeLocale((change) => {
+                if (closed || change.userId !== readerId) return;
+                sequence += 1;
+                write(`data: ${JSON.stringify({ kind: "locale", locale: change.locale, seq: sequence })}\n\n`);
             });
 
             request.signal.addEventListener("abort", () => {

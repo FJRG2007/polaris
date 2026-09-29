@@ -9,6 +9,7 @@ import { savePlatformDisplayAction } from "./actions";
 import { resolveDisplayPreferences } from "@polaris/core";
 import { ThemePolicyCard } from "./theme-policy";
 import { getPlatformDisplayPreferences, usersMayChooseTheme } from "@/lib/display-prefs-service";
+import { Messages } from "@/components/i18n/messages";
 import { DisplayPreferencesForm } from "@/components/display-preferences-form";
 
 export const dynamic = "force-dynamic";
@@ -28,12 +29,15 @@ export default async function DisplayAdminPage() {
                 title="Display defaults"
                 description="The theme, units and formats for the whole deployment. Each account can override them under Account > Preferences."
             />
-            <DisplayPreferencesForm
-                initial={resolveDisplayPreferences(platform)}
-                fallback={resolveDisplayPreferences(platform)}
-                allowInherit={false}
-                save={savePlatformDisplayAction}
-            />
+            {/* The form is the account page's too, and its words are there. */}
+            <Messages namespaces={["account"]}>
+                <DisplayPreferencesForm
+                    initial={resolveDisplayPreferences(platform)}
+                    fallback={resolveDisplayPreferences(platform)}
+                    allowInherit={false}
+                    save={savePlatformDisplayAction}
+                />
+            </Messages>
             <ThemePolicyCard allowed={mayChooseTheme} />
         </div>
     );

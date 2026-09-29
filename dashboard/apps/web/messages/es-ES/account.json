@@ -1,0 +1,131 @@
+{
+    "preferences": {
+        "title": "Preferencias",
+        "intro": "Cómo se ve Polaris en tu cuenta y en qué unidades y formatos escribe."
+    },
+    "language": {
+        "title": "Idioma",
+        "hint": "Se aplica al momento, en todas las pestañas abiertas.",
+        "unsupported": "Ese idioma no está disponible."
+    },
+    "display": {
+        "withSample": "{label} ({sample})",
+        "platformDefault": "Predeterminado de la plataforma ({value})",
+        "theme": {
+            "label": "Tema",
+            "hint": "Se aplica en cuanto lo guardas, en todas las pantallas.",
+            "option": "{label} - {description}",
+            "names": {
+                "dark": "Oscuro",
+                "light": "Claro",
+                "system": "Según el sistema",
+                "midnight": "Medianoche",
+                "graphite": "Grafito"
+            },
+            "descriptions": {
+                "dark": "El predeterminado. Superficies tranquilas con un toque de azul.",
+                "light": "Superficies blancas, para una habitación luminosa.",
+                "system": "Oscuro o claro, según esté configurado este equipo.",
+                "midnight": "Casi negro, con los paneles más separados. Para una habitación oscura.",
+                "graphite": "Gris sin tono de color, para quien le moleste el azul."
+            }
+        },
+        "dateOrder": {
+            "label": "Orden de la fecha",
+            "dmy": "Día primero",
+            "mdy": "Mes primero"
+        },
+        "yearFormat": {
+            "label": "Año",
+            "yyyy": "Cuatro cifras",
+            "yy": "Dos cifras"
+        },
+        "clock": {
+            "label": "Reloj",
+            "24h": "24 horas",
+            "12h": "12 horas"
+        },
+        "weekStart": {
+            "label": "La semana empieza el",
+            "hint": "Donde empieza cada calendario y vista semanal."
+        },
+        "timeZone": {
+            "label": "Zona horaria",
+            "hint": "Todas las horas en pantalla se escriben en ella. Automática sigue al dispositivo que usas.",
+            "automatic": "Automática"
+        },
+        "temperature": {
+            "label": "Temperatura",
+            "c": "Celsius",
+            "f": "Fahrenheit"
+        },
+        "currency": {
+            "label": "Moneda",
+            "names": {
+                "EUR": "Euro",
+                "USD": "Dólar estadounidense",
+                "GBP": "Libra esterlina",
+                "CHF": "Franco suizo",
+                "SEK": "Corona sueca",
+                "NOK": "Corona noruega",
+                "DKK": "Corona danesa",
+                "PLN": "Esloti polaco",
+                "CAD": "Dólar canadiense",
+                "AUD": "Dólar australiano",
+                "MXN": "Peso mexicano",
+                "BRL": "Real brasileño",
+                "ARS": "Peso argentino",
+                "COP": "Peso colombiano",
+                "CLP": "Peso chileno",
+                "JPY": "Yen japonés",
+                "CNY": "Yuan chino",
+                "INR": "Rupia india"
+            }
+        },
+        "sample": {
+            "date": "Fecha",
+            "time": "Hora",
+            "week": "Semana",
+            "weekRange": "De {first} a {last}",
+            "timeZone": "Zona horaria",
+            "thisDevice": "Este dispositivo",
+            "temperature": "Temperatura",
+            "amount": "Importe"
+        },
+        "saved": "Preferencias guardadas."
+    },
+    "accessibility": {
+        "title": "Accesibilidad",
+        "textSize": "Tamaño del texto",
+        "pixelsShort": "{size}px",
+        "pixels": "{size} píxeles",
+        "default": "Predeterminado",
+        "stepIsDefault": "{size} - el predeterminado aquí",
+        "body": "Polaris se dibuja a este tamaño, así que las filas y los paneles alrededor del texto crecen con él. La página cambia al mover el control y se queda así al guardar.",
+        "isDefault": "Este es el predeterminado aquí.",
+        "defaultIs": "El predeterminado aquí es {size}px. <back>Volver a él</back>",
+        "saved": "Tamaño del texto guardado."
+    },
+    "spoilers": {
+        "title": "Mostrar spoilers sin preguntar",
+        "body": "Las imágenes y los mensajes que alguien envió tapados se muestran directamente, sin esperar a que pulses. Solo en este navegador."
+    },
+    "deviceCache": {
+        "title": "Este dispositivo",
+        "body": "Polaris guarda algunas cosas en este navegador para que las pantallas abran más rápido: imágenes, el volumen de cada persona en una llamada, la velocidad de reproducción. Bórralas si algo parece desactualizado y recargar no lo ha arreglado. Tus otros dispositivos no se ven afectados y sigues con la sesión iniciada.",
+        "clear": "Borrar datos en caché",
+        "clearing": "Borrando"
+    },
+    "apps": {
+        "title": "Polaris como app",
+        "body": "Abre Polaris en su propia ventana, instala la app de escritorio o añade la extensión del navegador.",
+        "downloads": "Descargas"
+    },
+    "errors": {
+        "unsupportedChoice": "Opción no admitida.",
+        "unsupportedSize": "Ese tamaño no está disponible en Polaris",
+        "notAPresence": "Ese no es un estado válido",
+        "notAWindow": "Ese no es un periodo válido",
+        "statusNotSaved": "No se ha podido guardar el estado"
+    }
+}

@@ -1,0 +1,277 @@
+{
+    "shell": {
+        "overview": "Resumen de Polaris"
+    },
+    "switcher": {
+        "favorites": "Favoritos",
+        "recent": "Recientes",
+        "suggested": "Sugeridas",
+        "moreApps": "Más aplicaciones",
+        "allApps": "Aplicaciones de Polaris",
+        "pin": "Añadir {app} a favoritos",
+        "unpin": "Quitar {app} de favoritos",
+        "saveFailed": "No se han podido guardar tus favoritos. Inténtalo de nuevo en un momento."
+    },
+    "waiting": {
+        "unread": "{count, plural, one {# mensaje sin leer} other {# mensajes sin leer}}",
+        "byApp": {
+            "admin": "{count, plural, one {# asunto necesita a un administrador} other {# asuntos necesitan a un administrador}}"
+        }
+    },
+    "account": {
+        "trigger": "Tu cuenta",
+        "triggerHint": "Tu cuenta. Pulsa dos veces para abrirla.",
+        "presence": {
+            "auto": "En línea",
+            "busy": "No molestar",
+            "away": "Ausente",
+            "invisible": "Invisible"
+        },
+        "onSchedule": "Según tu horario semanal",
+        "until": "hasta {time}",
+        "presenceFor": {
+            "m15": "Durante 15 minutos",
+            "m60": "Durante 1 hora",
+            "m480": "Durante 8 horas",
+            "m1440": "Durante 24 horas",
+            "m4320": "Durante 3 días",
+            "untilChanged": "Hasta que lo cambie"
+        },
+        "untilMoment": "Hasta una fecha y hora...",
+        "everyWeek": "Cada semana...",
+        "setStatus": "Poner un estado",
+        "myAccount": "Mi cuenta",
+        "notifications": "Notificaciones",
+        "getApps": "Descargar las apps",
+        "sharedLinks": "Enlaces compartidos",
+        "signOut": "Cerrar sesión",
+        "timing": {
+            "title": "{state} hasta una fecha y hora",
+            "description": "Después volverás a aparecer en línea.",
+            "moment": "Cuándo vuelve a la normalidad"
+        },
+        "status": {
+            "description": "Se muestra junto a tu nombre mientras estás en línea.",
+            "placeholder": "¿Qué estás haciendo?",
+            "clear": "Borrar",
+            "clearsWhen": "Cuándo se borra el estado",
+            "clearsIn": {
+                "m30": "En 30 minutos",
+                "m60": "En 1 hora",
+                "m240": "En 4 horas",
+                "m1440": "En 24 horas",
+                "never": "No borrar"
+            },
+            "atMoment": "En una fecha y hora...",
+            "clearsAt": "Fecha y hora en que se borra el estado",
+            "clearIt": "Quitarlo"
+        },
+        "moment": {
+            "missing": "Elige una fecha y hora.",
+            "invalid": "Esa fecha y hora no es válida.",
+            "past": "Elige un momento que no haya pasado.",
+            "tooFar": "Elige un momento dentro del próximo año."
+        }
+    },
+    "apps": {
+        "overview": {
+            "description": "Tus servicios, el uso y los accesos directos de un vistazo"
+        },
+        "drive": {
+            "description": "Archivos de todos tus NAS"
+        },
+        "vault": {
+            "description": "Contraseñas, claves y secretos, cifrados en tu navegador"
+        },
+        "apps": {
+            "description": "Instala y ejecuta apps: despliegues, servidores, asistentes"
+        },
+        "home": {
+            "description": "Tus lugares, sus cámaras y sus puertas: lo que han visto y qué hacer al respecto"
+        },
+        "tools": {
+            "description": "Convierte, redimensiona, optimiza, recorta y traduce: los trabajos pequeños, en tu propia máquina"
+        },
+        "games": {
+            "description": "Servidores de Minecraft, ARK y FiveM en tus propias máquinas"
+        },
+        "tasks": {
+            "description": "Planifica y sigue el trabajo: espacios, listas, tableros y objetivos"
+        },
+        "chat": {
+            "description": "Canales, mensajes directos y llamadas con la gente de aquí"
+        },
+        "mail": {
+            "description": "Tus buzones, leídos y respondidos aquí"
+        },
+        "notes": {
+            "description": "Apunta cosas, anidadas como en un cuaderno"
+        },
+        "office": {
+            "description": "Documentos, hojas de cálculo, presentaciones y diagramas, escritos en equipo"
+        },
+        "watch": {
+            "description": "Alarmas sobre la salud de las apps, picos y caídas"
+        },
+        "admin": {
+            "description": "Usuarios, acceso, dominios y actualizaciones",
+            "guestDescription": "Conversaciones con clientes de todos los canales"
+        },
+        "account": {
+            "description": "Perfil, seguridad y claves de API"
+        }
+    },
+    "labels": {
+        "AI provider keys": "Claves de proveedores de IA",
+        "AI providers": "Proveedores de IA",
+        "API keys": "Claves de API",
+        "Access": "Acceso",
+        "Access rules": "Reglas de acceso",
+        "Account": "Cuenta",
+        "Account standing": "Estado de la cuenta",
+        "Activity": "Actividad",
+        "Agent defaults": "Ajustes de agentes",
+        "Agents": "Agentes",
+        "Alarms": "Alarmas",
+        "Alerts": "Alertas",
+        "Analytics": "Analítica",
+        "Announce": "Anuncios",
+        "Anti-cheat": "Antitrampas",
+        "Apps": "Aplicaciones",
+        "Archive": "Archivo",
+        "Automations": "Automatizaciones",
+        "Away message": "Respuesta automática",
+        "Backups": "Copias de seguridad",
+        "Billing": "Facturación",
+        "Cameras": "Cámaras",
+        "Channels": "Canales",
+        "Chat": "Chat",
+        "Clips": "Clips",
+        "Code": "Código",
+        "Communication": "Comunicación",
+        "Comparisons": "Comparativas",
+        "Connect an app": "Conectar una app",
+        "Connected accounts": "Cuentas conectadas",
+        "Connected trackers": "Gestores conectados",
+        "Console": "Consola",
+        "Consumption": "Consumo",
+        "Contacts": "Contactos",
+        "Containers": "Contenedores",
+        "Conversations": "Conversaciones",
+        "Databases": "Bases de datos",
+        "Deploy": "Despliegues",
+        "Devices": "Dispositivos",
+        "Diagrams": "Diagramas",
+        "Display defaults": "Formatos por defecto",
+        "Docs": "Documentos",
+        "Documents": "Documentos",
+        "Domains": "Dominios",
+        "Downloads": "Descargas",
+        "Drafts": "Borradores",
+        "Drive": "Drive",
+        "Drop points": "Puntos de entrega",
+        "Email": "Correo electrónico",
+        "Events": "Eventos",
+        "Everything": "Todo",
+        "Evidence": "Pruebas",
+        "Favorites": "Favoritos",
+        "Filed": "Archivado",
+        "Files": "Archivos",
+        "Filters": "Filtros",
+        "Firewall": "Cortafuegos",
+        "Friends": "Amigos",
+        "Game servers": "Servidores de juegos",
+        "Goals": "Objetivos",
+        "Groups": "Grupos",
+        "How it works": "Cómo funciona",
+        "Inbox": "Bandeja de entrada",
+        "Integrations": "Integraciones",
+        "Items": "Elementos",
+        "Keeping records": "Conservación de datos",
+        "Kinds": "Tipos",
+        "Labels": "Etiquetas",
+        "Linked chat": "Chat vinculado",
+        "Live": "En directo",
+        "Logs": "Registros",
+        "Machines": "Máquinas",
+        "Mail": "Correo",
+        "Mail server": "Servidor de correo",
+        "Mailboxes": "Buzones",
+        "Management": "Administración",
+        "Marketplace": "Catálogo",
+        "Mods": "Mods",
+        "My account": "Mi cuenta",
+        "My work": "Mi trabajo",
+        "Notes": "Notas",
+        "Notifications": "Notificaciones",
+        "Office": "Office",
+        "Operations": "Operaciones",
+        "Organizations": "Organizaciones",
+        "Overview": "Resumen",
+        "Password & 2FA": "Contraseña y 2FA",
+        "People": "Personas",
+        "Places": "Lugares",
+        "Platform": "Plataforma",
+        "Players": "Jugadores",
+        "Policies": "Políticas",
+        "Pools": "Pools",
+        "Preferences": "Preferencias",
+        "Presentations": "Presentaciones",
+        "Privacy": "Privacidad",
+        "Profile": "Perfil",
+        "Recent": "Recientes",
+        "Reporting": "Informes",
+        "Repositories": "Repositorios",
+        "Resources": "Recursos",
+        "Roles": "Roles",
+        "Rules": "Reglas",
+        "Runners": "Runners",
+        "Running it": "Funcionamiento",
+        "Runs": "Ejecuciones",
+        "Safety": "Protección",
+        "Scan a code": "Escanear un código",
+        "Schedule": "Programación",
+        "Secrets": "Secretos",
+        "Security": "Seguridad",
+        "Send-as addresses": "Direcciones de envío",
+        "Sends": "Envíos",
+        "Sent": "Enviados",
+        "Servers": "Servidores",
+        "Services": "Servicios",
+        "Sessions": "Sesiones",
+        "Set up": "Configuración",
+        "Settings": "Ajustes",
+        "Shared": "Compartido",
+        "Shared links": "Enlaces compartidos",
+        "Shared with me": "Compartido conmigo",
+        "Side panel": "Panel lateral",
+        "Signature": "Firma",
+        "Snippets": "Fragmentos",
+        "Spaces": "Espacios",
+        "Spam": "Spam",
+        "Spreadsheets": "Hojas de cálculo",
+        "Sprints": "Sprints",
+        "Starred": "Destacados",
+        "Status schedule": "Horario de estado",
+        "Talking to players": "Hablar con los jugadores",
+        "Tasks": "Tareas",
+        "Teams": "Equipos",
+        "Telemetry": "Telemetría",
+        "Timesheet": "Registro de horas",
+        "Tools": "Herramientas",
+        "Trash": "Papelera",
+        "Updates & settings": "Actualizaciones y ajustes",
+        "Uploads": "Subidas",
+        "Usage": "Uso",
+        "Users": "Usuarios",
+        "Vault": "Vault",
+        "Vaults": "Bóvedas",
+        "Voice & Video": "Voz y vídeo",
+        "Watch": "Monitorización",
+        "Webhooks": "Webhooks",
+        "What is on it": "Contenido",
+        "Where the room went": "Qué ocupa espacio",
+        "Who gets in": "Quién entra",
+        "World": "Mundo"
+    }
+}

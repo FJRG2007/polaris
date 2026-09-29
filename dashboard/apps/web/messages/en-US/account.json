@@ -1,0 +1,131 @@
+{
+    "preferences": {
+        "title": "Preferences",
+        "intro": "How Polaris looks for your account, and the units and formats it writes in."
+    },
+    "language": {
+        "title": "Language",
+        "hint": "Applies right away, in every open tab.",
+        "unsupported": "That language is not available."
+    },
+    "display": {
+        "withSample": "{label} ({sample})",
+        "platformDefault": "Platform default ({value})",
+        "theme": {
+            "label": "Theme",
+            "hint": "Applied the moment it is saved, on every screen.",
+            "option": "{label} - {description}",
+            "names": {
+                "dark": "Dark",
+                "light": "Light",
+                "system": "Follow the system",
+                "midnight": "Midnight",
+                "graphite": "Graphite"
+            },
+            "descriptions": {
+                "dark": "The default. Quiet surfaces with a trace of blue in them.",
+                "light": "White surfaces, for a bright room.",
+                "system": "Dark or light, whichever this machine is set to.",
+                "midnight": "Nearly black, with the panels further apart. For a dark room.",
+                "graphite": "Grey with no colour cast, for anyone the blue tint bothers."
+            }
+        },
+        "dateOrder": {
+            "label": "Date order",
+            "dmy": "Day first",
+            "mdy": "Month first"
+        },
+        "yearFormat": {
+            "label": "Year",
+            "yyyy": "Four digits",
+            "yy": "Two digits"
+        },
+        "clock": {
+            "label": "Clock",
+            "24h": "24-hour",
+            "12h": "12-hour"
+        },
+        "weekStart": {
+            "label": "Week starts on",
+            "hint": "Where every calendar and week view begins."
+        },
+        "timeZone": {
+            "label": "Time zone",
+            "hint": "Every time on screen is written in it. Automatic follows the device you are on.",
+            "automatic": "Automatic"
+        },
+        "temperature": {
+            "label": "Temperature",
+            "c": "Celsius",
+            "f": "Fahrenheit"
+        },
+        "currency": {
+            "label": "Currency",
+            "names": {
+                "EUR": "Euro",
+                "USD": "US dollar",
+                "GBP": "Pound sterling",
+                "CHF": "Swiss franc",
+                "SEK": "Swedish krona",
+                "NOK": "Norwegian krone",
+                "DKK": "Danish krone",
+                "PLN": "Polish zloty",
+                "CAD": "Canadian dollar",
+                "AUD": "Australian dollar",
+                "MXN": "Mexican peso",
+                "BRL": "Brazilian real",
+                "ARS": "Argentine peso",
+                "COP": "Colombian peso",
+                "CLP": "Chilean peso",
+                "JPY": "Japanese yen",
+                "CNY": "Chinese yuan",
+                "INR": "Indian rupee"
+            }
+        },
+        "sample": {
+            "date": "Date",
+            "time": "Time",
+            "week": "Week",
+            "weekRange": "{first} to {last}",
+            "timeZone": "Time zone",
+            "thisDevice": "This device",
+            "temperature": "Temperature",
+            "amount": "Amount"
+        },
+        "saved": "Preferences saved."
+    },
+    "accessibility": {
+        "title": "Accessibility",
+        "textSize": "Text size",
+        "pixelsShort": "{size}px",
+        "pixels": "{size} pixels",
+        "default": "Default",
+        "stepIsDefault": "{size} - the default here",
+        "body": "Polaris is laid out in this size, so the rows and panels around the text grow with it. The page changes as you move the slider; it stays that way once you save.",
+        "isDefault": "This is the default here.",
+        "defaultIs": "The default here is {size}px. <back>Go back to it</back>",
+        "saved": "Text size saved."
+    },
+    "spoilers": {
+        "title": "Show spoilers without asking",
+        "body": "Pictures and messages somebody sent covered are drawn straight away instead of waiting for a press. This browser only."
+    },
+    "deviceCache": {
+        "title": "This device",
+        "body": "Polaris keeps a few things in this browser so screens open faster - pictures, how loud each person is in a call, playback speed. Clear them if something looks out of date and a reload has not fixed it. Your other devices are not affected, and you stay signed in.",
+        "clear": "Clear cached data",
+        "clearing": "Clearing"
+    },
+    "apps": {
+        "title": "Polaris as an app",
+        "body": "Open Polaris in its own window, install the desktop app, or add the browser extension.",
+        "downloads": "Downloads"
+    },
+    "errors": {
+        "unsupportedChoice": "Unsupported choice.",
+        "unsupportedSize": "Not a size Polaris offers",
+        "notAPresence": "That is not a status",
+        "notAWindow": "That is not a window",
+        "statusNotSaved": "That status could not be saved"
+    }
+}

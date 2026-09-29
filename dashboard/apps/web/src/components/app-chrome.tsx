@@ -28,6 +28,9 @@ import { accessFor, type SessionUser } from "@/lib/session";
 import { AccountMenu } from "@/components/account-menu";
 import { DeniedNotice } from "@/components/denied-notice";
 import { AccessWatcher } from "@/components/access-watcher";
+import { Messages } from "@/components/i18n/messages";
+import { LocaleWatcher } from "@/components/i18n/locale-watcher";
+import { getLocale, getTranslations } from "@/lib/i18n/request";
 import { ownStatus, presenceChoiceOf } from "@/lib/presence-service";
 import { ViewAsBanner } from "@/components/view-as-banner";
 import { AppNavDrawer } from "@/components/app-nav-drawer";
@@ -116,6 +119,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
     const adminCount = user.isAdmin
         ? countAdminWaiting().catch(() => NO_ADMIN_WAITING)
         : NO_ADMIN_WAITING;
+    // The reader's language, which is not necessarily the account being shown:
+    // an administrator viewing as somebody reads the frame in their own.
+    const [locale, t] = await Promise.all([getLocale(), getTranslations("nav")]);
     const [
         notifications,
         display,
@@ -136,7 +142,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
     ] = await Promise.all([
         // The open shelf's, as the bell shows them - see `lib/shelf`.
         openShelfFor(user.id).then((shelf) => listNotifications(user.id, shelf)),
-        resolveDisplayPreferencesFor(user.id),
+        resolveDisplayPreferencesFor(user.id, locale),
         // What this account's browser last said. Read beside the preferences
         // it resolves - the same memoized row - so the reporter below stays
         // quiet on every load after the first.
@@ -159,7 +165,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
     ]);
     const build = buildStamp();
 
-    return (
+    const frame = (
         <CapabilityProvider capabilities={capabilities}>
             {/* First in the tree on purpose: it tells the kept-reads store which
                 build this document is, and the screens below ask that store while
@@ -215,6 +221,10 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                     again, and nobody reloads a page they were
                                     never told had changed. */}
                                                             <AccessWatcher />
+                                                            {/* And the account's language, on the same
+                                    stream: changed in one tab, every tab redraws
+                                    in it. */}
+                                                            <LocaleWatcher />
                                                             <PresenceReporter />
                                                             <DesktopGameReporter />
                                                             <TimeZoneReporter
@@ -267,7 +277,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                 mark={
                                                                     <Link
                                                                         href="/home"
-                                                                        aria-label="Polaris overview"
+                                                                        aria-label={t("shell.overview")}
                                                                         className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                                                     >
                                                                         <PolarisMark nameClassName="hidden sm:inline" />
@@ -373,4 +383,8 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
             </AppUrlProvider>
         </CapabilityProvider>
     );
+
+    // The frame's own words - the rail, the switcher, the account menu - for
+    // every client component in it.
+    return <Messages namespaces={["nav"]}>{frame}</Messages>;
 }
