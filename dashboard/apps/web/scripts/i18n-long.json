@@ -327,6 +327,8 @@
     "web/tasksViews:paste.tags (es-ES)",
     "web/telemetry:grid.off (es-ES)",
     "web/telemetry:rules.policies.anywhere.label (es-ES)",
+    "web/tools:page.coming (es-ES)",
+    "web/tools:page.title (es-ES)",
     "web/vault:app.lock (es-ES)",
     "web/vault:unlock.unlock (es-ES)",
     "web/watch:alarms.above (es-ES)",

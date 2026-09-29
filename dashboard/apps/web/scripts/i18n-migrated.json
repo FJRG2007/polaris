@@ -1207,6 +1207,10 @@
         "web/src/app/(app)/watch/watch-subject-detail.tsx",
         "web/src/app/(app)/watch/actions.ts",
         "web/src/lib/watch/alarm-evaluator.ts",
-        "web/src/lib/watch/words.ts"
+        "web/src/lib/watch/words.ts",
+        "web/src/app/(app)/tools/page.tsx",
+        "web/src/app/(app)/tools/images/page.tsx",
+        "web/src/app/(app)/tools/images/images-view.tsx",
+        "web/src/app/api/tools/image/route.ts"
     ]
 }

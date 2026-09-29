@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, ImageUp, Loader2, MapPin } from "lucide-react";
 import { Button, Input, Select, Switch, cn, useToast } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** What the file says about itself, as the server read it. */
 interface Facts {
@@ -37,11 +38,12 @@ interface Made {
     height: number;
 }
 
+/** Format names, the same in every language. */
 const FORMATS = [
-    { value: "webp", label: "WebP" },
-    { value: "jpeg", label: "JPEG" },
-    { value: "png", label: "PNG" },
-    { value: "avif", label: "AVIF" }
+    { value: "webp", label: "WebP" }, // i18n-ignore
+    { value: "jpeg", label: "JPEG" }, // i18n-ignore
+    { value: "png", label: "PNG" }, // i18n-ignore
+    { value: "avif", label: "AVIF" } // i18n-ignore
 ];
 
 /** Bytes as somebody would say them. */
@@ -53,6 +55,7 @@ function weigh(bytes: number): string {
 
 export function ImagesView() {
     const toast = useToast();
+    const t = useTranslations("tools");
     const [file, setFile] = useState<File | null>(null);
     const [facts, setFacts] = useState<Facts | null>(null);
     const [made, setMade] = useState<Made | null>(null);
@@ -78,14 +81,19 @@ export function ImagesView() {
                     method: "POST",
                     body: chosen
                 });
-                if (!answer.ok) throw new Error("not a picture");
+                if (!answer.ok) {
+                    // The server says which: too large, or not a picture at all.
+                    const said = (await answer.json().catch(() => null)) as { error?: unknown } | null;
+                    throw new Error(typeof said?.error === "string" ? said.error : "");
+                }
                 setFacts((await answer.json()) as Facts);
-            } catch {
+            } catch (caught) {
                 setFile(null);
-                toast.show({ title: "That file is not a picture." });
+                const message = caught instanceof Error ? caught.message : "";
+                toast.show({ title: message || t("images.notAPicture") });
             }
         },
-        [toast]
+        [toast, t]
     );
 
     // Re-encoded as the controls move, after a beat. Every move is a real
@@ -126,7 +134,7 @@ export function ImagesView() {
                         height: Number(answer.headers.get("X-Image-Height")) || 0
                     });
                 } catch {
-                    if (alive) toast.show({ title: "That picture could not be converted." });
+                    if (alive) toast.show({ title: t("images.convertFailed") });
                 } finally {
                     if (alive) setWorking(false);
                 }
@@ -136,7 +144,7 @@ export function ImagesView() {
             alive = false;
             clearTimeout(timer);
         };
-    }, [file, facts, format, quality, longest, keepMetadata, toast]);
+    }, [file, facts, format, quality, longest, keepMetadata, toast, t]);
 
     useEffect(
         () => () => {
@@ -174,7 +182,7 @@ export function ImagesView() {
                     className="flex min-h-56 w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border text-sm text-foreground-subtle transition-colors hover:border-primary hover:text-foreground"
                 >
                     <ImageUp className="size-6 shrink-0" aria-hidden />
-                    Drop a picture here, or choose one
+                    {t("images.drop")}
                 </button>
             ) : (
                 <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
@@ -184,7 +192,7 @@ export function ImagesView() {
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                     src={made.url}
-                                    alt="The converted picture"
+                                    alt={t("images.converted")}
                                     className="max-h-[55vh] max-w-full object-contain"
                                 />
                             ) : (
@@ -195,22 +203,26 @@ export function ImagesView() {
                             )}
                             {working && made ? (
                                 <span className="absolute right-2 top-2 rounded bg-background/80 px-2 py-1 text-xs text-foreground-subtle">
-                                    Working
+                                    {t("images.working")}
                                 </span>
                             ) : null}
                         </div>
 
                         {facts ? (
                             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
-                                <Fact label="Was">
-                                    {facts.width} x {facts.height}, {weigh(facts.bytes)}
+                                <Fact label={t("images.was")}>
+                                    {t("images.size", {
+                                        width: facts.width,
+                                        height: facts.height,
+                                        weight: weigh(facts.bytes)
+                                    })}
                                 </Fact>
-                                <Fact label="Now">
+                                <Fact label={t("images.now")}>
                                     {made
-                                        ? `${made.width} x ${made.height}, ${weigh(made.bytes)}`
+                                        ? t("images.size", { width: made.width, height: made.height, weight: weigh(made.bytes) })
                                         : "-"}
                                 </Fact>
-                                <Fact label="Saved">
+                                <Fact label={t("images.saved")}>
                                     <span
                                         className={cn(
                                             "tabular-nums",
@@ -220,24 +232,23 @@ export function ImagesView() {
                                         {made ? `${Math.round(saved * 100)}%` : "-"}
                                     </span>
                                 </Fact>
-                                <Fact label="Taken">{facts.taken ?? "Not recorded"}</Fact>
+                                <Fact label={t("images.taken")}>{facts.taken ?? t("images.notRecorded")}</Fact>
                             </dl>
                         ) : null}
 
                         {facts?.hasLocation && keepMetadata ? (
                             <p className="flex items-start gap-2 rounded-lg border border-warning-edge bg-warning-soft p-3 text-sm">
                                 <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
-                                This picture records where it was taken, and keeping its information
-                                keeps that too.
+                                {t("images.locationWarning")}
                             </p>
                         ) : null}
                     </div>
 
                     <div className="flex flex-col gap-4">
                         <label className="flex flex-col gap-1.5 text-sm">
-                            Format
+                            {t("images.format")}
                             <Select
-                                aria-label="Format"
+                                aria-label={t("images.format")}
                                 value={format}
                                 onValueChange={setFormat}
                                 options={FORMATS}
@@ -247,7 +258,7 @@ export function ImagesView() {
                         {format !== "png" ? (
                             <label className="flex flex-col gap-1.5 text-sm">
                                 <span className="flex items-center justify-between gap-2">
-                                    Quality
+                                    {t("images.quality")}
                                     <span className="tabular-nums text-foreground-subtle">
                                         {quality}
                                     </span>
@@ -258,24 +269,24 @@ export function ImagesView() {
                                     max={100}
                                     step={1}
                                     value={quality}
-                                    aria-label="Quality"
+                                    aria-label={t("images.quality")}
                                     onChange={(event) => setQuality(Number(event.target.value))}
                                     className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                                 />
                             </label>
                         ) : (
                             <p className="text-sm text-foreground-subtle">
-                                PNG keeps every pixel exactly, so it has no quality to set.
+                                {t("images.pngNoQuality")}
                             </p>
                         )}
 
                         <label className="flex flex-col gap-1.5 text-sm">
-                            Longest side
+                            {t("images.longest")}
                             <Input
                                 inputMode="numeric"
-                                placeholder="Leave empty to keep its size"
+                                placeholder={t("images.longestPlaceholder")}
                                 value={longest}
-                                aria-label="Longest side in pixels"
+                                aria-label={t("images.longestLabel")}
                                 onChange={(event) =>
                                     setLongest(event.target.value.replace(/\D/g, ""))
                                 }
@@ -284,15 +295,13 @@ export function ImagesView() {
 
                         <label className="flex items-start justify-between gap-3 text-sm">
                             <span className="flex flex-col">
-                                Keep its information
-                                <span className="text-xs text-foreground-subtle">
-                                    The date, the camera and, on a phone photo, the place.
-                                </span>
+                                {t("images.keepInfo")}
+                                <span className="text-xs text-foreground-subtle">{t("images.keepInfoHint")}</span>
                             </span>
                             <Switch
                                 checked={keepMetadata}
                                 onChange={setKeepMetadata}
-                                aria-label="Keep the picture's information"
+                                aria-label={t("images.keepInfoLabel")}
                             />
                         </label>
 
@@ -304,11 +313,11 @@ export function ImagesView() {
                                     aria-disabled={!made}
                                 >
                                     <Download className="size-4 shrink-0" aria-hidden />
-                                    Download
+                                    {t("images.download")}
                                 </a>
                             </Button>
                             <Button variant="ghost" onClick={() => setFile(null)}>
-                                Use another picture
+                                {t("images.another")}
                             </Button>
                         </div>
                     </div>

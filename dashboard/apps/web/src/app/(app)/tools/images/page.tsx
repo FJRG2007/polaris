@@ -10,17 +10,19 @@
 import { PageHeader } from "@polaris/ui";
 import { ImagesView } from "./images-view";
 import { requireToolsReach } from "@/lib/tools/access";
+import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
 export default async function ToolsImagesPage() {
     await requireToolsReach();
+    const t = await getTranslations("tools");
 
     return (
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
             <PageHeader
-                title="Images"
-                description="Convert, resize and make a picture smaller - and see what each choice costs."
+                title={t("groups.images.name")}
+                description={t("images.description")}
             />
             <ImagesView />
         </div>

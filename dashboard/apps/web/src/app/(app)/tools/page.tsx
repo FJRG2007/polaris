@@ -12,17 +12,22 @@ import Link from "next/link";
 import { PageHeader } from "@polaris/ui";
 import { TOOL_GROUPS } from "@/lib/tools/catalog";
 import { requireToolsReach } from "@/lib/tools/access";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function ToolsPage() {
     await requireToolsReach();
+    const t = await getTranslations("tools");
+    // The catalog's English, by the group's id and the line's place in it.
+    const word = (key: string) => t(key as NamespaceKey<"tools">);
 
     return (
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
             <PageHeader
-                title="Tools"
-                description="The small jobs, done here instead of on somebody else's server."
+                title={t("page.title")}
+                description={t("page.description")}
             />
 
             <ul className="grid gap-3 sm:grid-cols-2">
@@ -42,16 +47,16 @@ export default async function ToolsPage() {
                                     className="size-5 shrink-0 text-foreground-subtle"
                                     aria-hidden
                                 />
-                                <span className="font-medium">{group.name}</span>
+                                <span className="font-medium">{word(`groups.${group.id}.name`)}</span>
                                 {group.soon ? (
                                     <span className="ml-auto rounded border border-border px-1.5 py-0.5 text-xs text-foreground-subtle">
-                                        Coming
+                                        {t("page.coming")}
                                     </span>
                                 ) : null}
                             </div>
                             <ul className="flex flex-col gap-1 text-sm text-foreground-subtle">
-                                {group.does.map((one) => (
-                                    <li key={one}>{one}</li>
+                                {group.does.map((one, index) => (
+                                    <li key={one}>{word(`groups.${group.id}.does.${index}`)}</li>
                                 ))}
                             </ul>
                         </Link>

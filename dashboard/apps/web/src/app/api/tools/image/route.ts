@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { sessionCan } from "@/lib/session";
 import { apiUser } from "@/lib/api-session";
 import { toolsInstall } from "@/lib/tools/access";
+import { readerWords } from "@/lib/i18n/reader-words";
 import {
     IMAGE_TYPES,
     MOST_IMAGE_BYTES,
@@ -30,32 +31,33 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
+    const t = await readerWords("tools");
     if (!(await sessionCan(user, "tools.use")))
-        return NextResponse.json({ error: "Not allowed." }, { status: 403 });
+        return NextResponse.json({ error: t("errors.notAllowed") }, { status: 403 });
     // The app can be removed, and removing it has to actually turn its routes
     // off - otherwise "uninstalled" means "hidden", which is not the promise the
     // marketplace makes.
     if (!(await toolsInstall()))
-        return NextResponse.json({ error: "Tools is not installed." }, { status: 404 });
+        return NextResponse.json({ error: t("errors.notInstalled") }, { status: 404 });
 
     const url = new URL(request.url);
     const bytes = await readUpload(request);
     if (bytes === "too-large")
-        return NextResponse.json({ error: "This picture is too large." }, { status: 413 });
+        return NextResponse.json({ error: t("errors.tooLarge") }, { status: 413 });
     if (bytes.byteLength === 0)
-        return NextResponse.json({ error: "No picture was sent." }, { status: 400 });
+        return NextResponse.json({ error: t("errors.noPicture") }, { status: 400 });
 
     if (url.searchParams.get("op") === "facts") {
         try {
             return NextResponse.json(await readImageFacts(bytes));
         } catch {
-            return NextResponse.json({ error: "That file is not a picture." }, { status: 422 });
+            return NextResponse.json({ error: t("images.notAPicture") }, { status: 422 });
         }
     }
 
     const format = url.searchParams.get("format") ?? "";
     if (!isImageFormat(format))
-        return NextResponse.json({ error: "Unknown format." }, { status: 400 });
+        return NextResponse.json({ error: t("errors.unknownFormat") }, { status: 400 });
 
     const longest = Number(url.searchParams.get("max"));
     try {
@@ -77,7 +79,7 @@ export async function POST(request: Request): Promise<Response> {
             }
         });
     } catch {
-        return NextResponse.json({ error: "That picture could not be read." }, { status: 422 });
+        return NextResponse.json({ error: t("errors.unreadable") }, { status: 422 });
     }
 }
 

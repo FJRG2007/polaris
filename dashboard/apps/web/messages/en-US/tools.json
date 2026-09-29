@@ -1,1 +1,78 @@
-{}
+{
+    "page": {
+        "title": "Tools",
+        "description": "The small jobs, done here instead of on somebody else's server.",
+        "coming": "Coming"
+    },
+    "groups": {
+        "images": {
+            "name": "Images",
+            "does": {
+                "0": "Convert between JPEG, PNG, WebP and AVIF",
+                "1": "Resize, by size or by how much of it you want",
+                "2": "Make it smaller without it looking worse",
+                "3": "Read what the file says about itself"
+            }
+        },
+        "documents": {
+            "name": "Documents",
+            "does": {
+                "0": "Turn a PDF into an editable Word document",
+                "1": "Pull the text out of almost anything",
+                "2": "Turn a spreadsheet into CSV, and back",
+                "3": "Read what the file says about itself"
+            }
+        },
+        "video": {
+            "name": "Video",
+            "does": {
+                "0": "Trim the start, the end, or a piece out of the middle",
+                "1": "Silence it, or take one clip out of it",
+                "2": "Blur a face, a plate or a screen",
+                "3": "Crop to what matters"
+            }
+        },
+        "links": {
+            "name": "Links & text",
+            "does": {
+                "0": "Shorten a link to one this Polaris answers",
+                "1": "See how many people followed it",
+                "2": "Translate a passage using the providers this Polaris has"
+            }
+        }
+    },
+    "images": {
+        "description": "Convert, resize and make a picture smaller - and see what each choice costs.",
+        "notAPicture": "That file is not a picture.",
+        "convertFailed": "That picture could not be converted.",
+        "drop": "Drop a picture here, or choose one",
+        "converted": "The converted picture",
+        "working": "Working",
+        "was": "Was",
+        "now": "Now",
+        "size": "{width} x {height}, {weight}",
+        "saved": "Saved",
+        "taken": "Taken",
+        "notRecorded": "Not recorded",
+        "locationWarning": "This picture records where it was taken, and keeping its information keeps that too.",
+        "format": "Format",
+        "quality": "Quality",
+        "pngNoQuality": "PNG keeps every pixel exactly, so it has no quality to set.",
+        "longest": "Longest side",
+        "longestPlaceholder": "Leave empty to keep its size",
+        "longestLabel": "Longest side in pixels",
+        "keepInfo": "Keep its information",
+        "keepInfoHint": "The date, the camera and, on a phone photo, the place.",
+        "keepInfoLabel": "Keep the picture's information",
+        "download": "Download",
+        "another": "Use another picture"
+    },
+    "errors": {
+        "notAllowed": "Not allowed.",
+        "notInstalled": "Tools is not installed.",
+        "tooLarge": "This picture is too large.",
+        "noPicture": "No picture was sent.",
+        "unknownFormat": "Unknown format.",
+        "unreadable": "That picture could not be read."
+    }
+}

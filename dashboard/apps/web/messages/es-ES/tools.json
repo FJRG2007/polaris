@@ -1,1 +1,78 @@
-{}
+{
+    "page": {
+        "title": "Herramientas",
+        "description": "Las tareas pequeñas, hechas aquí en vez de en el servidor de otro.",
+        "coming": "Próximamente"
+    },
+    "groups": {
+        "images": {
+            "name": "Imágenes",
+            "does": {
+                "0": "Convertir entre JPEG, PNG, WebP y AVIF",
+                "1": "Cambiar el tamaño, por medidas o por cuánto quieres conservar",
+                "2": "Hacerla más ligera sin que se vea peor",
+                "3": "Leer lo que el archivo dice de sí mismo"
+            }
+        },
+        "documents": {
+            "name": "Documentos",
+            "does": {
+                "0": "Convertir un PDF en un documento de Word editable",
+                "1": "Sacar el texto de casi cualquier cosa",
+                "2": "Convertir una hoja de cálculo en CSV, y al revés",
+                "3": "Leer lo que el archivo dice de sí mismo"
+            }
+        },
+        "video": {
+            "name": "Vídeo",
+            "does": {
+                "0": "Recortar el principio, el final o un trozo del medio",
+                "1": "Quitarle el sonido o sacar un fragmento",
+                "2": "Difuminar una cara, matrícula o pantalla",
+                "3": "Encuadrar lo que importa"
+            }
+        },
+        "links": {
+            "name": "Enlaces y texto",
+            "does": {
+                "0": "Acortar un enlace a uno que responde este Polaris",
+                "1": "Ver cuántas personas lo siguieron",
+                "2": "Traducir un texto con los proveedores que tiene este Polaris"
+            }
+        }
+    },
+    "images": {
+        "description": "Convierte, redimensiona y aligera una imagen, y ve lo que cuesta cada opción.",
+        "notAPicture": "Ese archivo no es una imagen.",
+        "convertFailed": "No se pudo convertir esa imagen.",
+        "drop": "Suelta una imagen aquí o elige una",
+        "converted": "La imagen convertida",
+        "working": "Procesando",
+        "was": "Antes",
+        "now": "Ahora",
+        "size": "{width} x {height}, {weight}",
+        "saved": "Ahorro",
+        "taken": "Tomada",
+        "notRecorded": "Sin registrar",
+        "locationWarning": "Esta imagen guarda dónde se tomó, y conservar su información también conserva eso.",
+        "format": "Formato",
+        "quality": "Calidad",
+        "pngNoQuality": "PNG conserva cada píxel exactamente, así que no tiene calidad que ajustar.",
+        "longest": "Lado más largo",
+        "longestPlaceholder": "Vacío para mantener su tamaño",
+        "longestLabel": "Lado más largo en píxeles",
+        "keepInfo": "Conservar su información",
+        "keepInfoHint": "La fecha, la cámara y, en una foto de móvil, el lugar.",
+        "keepInfoLabel": "Conservar la información de la imagen",
+        "download": "Descargar",
+        "another": "Usar otra imagen"
+    },
+    "errors": {
+        "notAllowed": "No permitido.",
+        "notInstalled": "Herramientas no está instalada.",
+        "tooLarge": "Esta imagen es demasiado grande.",
+        "noPicture": "No se envió ninguna imagen.",
+        "unknownFormat": "Formato desconocido.",
+        "unreadable": "No se pudo leer esa imagen."
+    }
+}
