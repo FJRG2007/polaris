@@ -746,8 +746,16 @@ describe("where an event may go", () => {
         const random = () => (turn += 0.37) % 1;
         const point = commands.clearPoint({ x: 0, z: 0 }, 24, home, random);
         expect(point).not.toBeNull();
-        expect(Math.hypot(point!.x, point!.z)).toBeGreaterThanOrEqual(commands.HOME_CLEARANCE);
+        // Clear by what the marker can drift too, so where it comes down is clear.
+        expect(Math.hypot(point!.x, point!.z)).toBeGreaterThanOrEqual(
+            commands.HOME_CLEARANCE + commands.MARK_DRIFT
+        );
         expect(commands.clearPoint({ x: 0, z: 0 }, 24, [], random)).not.toBeNull();
+        // A column just past the line is not enough: the marker may come down a step nearer.
+        const edge = commands.clearPoint({ x: 0, z: 0 }, commands.HOME_CLEARANCE + 1, home, random);
+        expect(Math.hypot(edge!.x, edge!.z)).toBeGreaterThanOrEqual(
+            commands.HOME_CLEARANCE + commands.MARK_DRIFT
+        );
     });
 
     it("asks about the ground under a point by the names the server knows", () => {

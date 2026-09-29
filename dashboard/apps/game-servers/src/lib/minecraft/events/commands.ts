@@ -728,6 +728,13 @@ export function readHomes(
 export const HOME_CLEARANCE = 48;
 
 /**
+ * How far the marker can come down from the column it was dropped on: before
+ * 1.19.4 `spreadplayers` puts it on the nearest ground it likes, a block or two
+ * off. A 1.16.5 meteor landed 47 blocks from a bed its column had cleared by 48.
+ */
+export const MARK_DRIFT = 2;
+
+/**
  * A point about `distance` from the centre that is clear of every home. The
  * bearing is tried all the way round first, then further out, so somebody
  * standing at their own door still gets an event - just past their land.
@@ -739,8 +746,11 @@ export function clearPoint(
     random: () => number,
     clearance = HOME_CLEARANCE
 ): { x: number; z: number } | null {
+    // Kept further off by what the marker can drift, so where it lands is clear too.
     const clear = (point: { x: number; z: number }) =>
-        homes.every((home) => Math.hypot(point.x - home.x, point.z - home.z) >= clearance);
+        homes.every(
+            (home) => Math.hypot(point.x - home.x, point.z - home.z) >= clearance + MARK_DRIFT
+        );
     for (let ring = 0; ring < 4; ring += 1) {
         const reach = distance + ring * (clearance / 2);
         for (let turn = 0; turn < 12; turn += 1) {
