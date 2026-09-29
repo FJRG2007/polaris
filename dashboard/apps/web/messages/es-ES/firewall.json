@@ -349,7 +349,7 @@
         "text": "Esta regla no forma parte de esta versión de Polaris.",
         "back": "Volver a las reglas"
     },
-    "loading": "Cargando las reglas del firewall",
+    "loading": "Cargando reglas del cortafuegos",
     "predefined": {
         "open": "Abrir",
         "openNamed": "Abrir {name}"
@@ -408,7 +408,7 @@
     "page": {
         "backToList": "Volver a la lista de reglas",
         "back": "Volver",
-        "title": "Firewall",
+        "title": "Cortafuegos",
         "nothing": "Aún no existe nada de ese tipo, así que no hay nada que proteger. Crea uno y sus reglas aparecerán aquí."
     },
     "principals": {
@@ -491,11 +491,11 @@
         "application": "Se aplica solo a {label}."
     },
     "errors": {
-        "load": "No se pudo cargar la regla del firewall",
-        "save": "No se pudo guardar la regla del firewall",
+        "load": "No se cargó la regla del cortafuegos",
+        "save": "No se guardó la regla del cortafuegos",
         "traffic": "No se pudo leer el tráfico reciente",
         "directory": "No se pudo cargar el directorio",
-        "overview": "No se pudo cargar el resumen del firewall",
+        "overview": "No se pudo cargar el resumen del cortafuegos",
         "address": "Esa dirección no es válida",
         "window": "Ese periodo no es válido",
         "activity": "No se pudo leer la actividad de esa dirección",
@@ -573,8 +573,8 @@
         "body": "Bloquea direcciones ya conocidas por escanear o atacar. Conecta <link>Dymo API o Criminal IP</link> para activarlos. Se les pregunta en segundo plano por las direcciones vistas en tu tráfico, nunca mientras una petición espera."
     },
     "ban": {
-        "blocked": "Bloqueada por el firewall",
-        "wasBlocked": "Estuvo bloqueada por el firewall",
+        "blocked": "Bloqueada por el cortafuegos",
+        "wasBlocked": "Bloqueada antes por el cortafuegos",
         "noReason": "No se registró ningún motivo.",
         "stands": "Se mantiene hasta que alguien lo levante.",
         "lifts": "Se levanta {when}.",

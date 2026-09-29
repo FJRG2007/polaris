@@ -15,11 +15,13 @@ import { Loader2, Mails } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button, EmptyState } from "@polaris/ui";
 import { installMailServerAppAction } from "./actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** Where the app sits in the marketplace; the marketplace opens on it. */
 const MAIL_SERVER_LISTING = "/apps/marketplace?app=mail-server";
 
 export function MailServerInstallState({ canInstall }: { canInstall: boolean }) {
+    const t = useTranslations("mailServer");
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
 
@@ -41,21 +43,17 @@ export function MailServerInstallState({ canInstall }: { canInstall: boolean }) 
         <div className="flex flex-col gap-3">
             <EmptyState
                 icon={<Mails />}
-                title="Install Mail server from the Marketplace"
-                description={
-                    canInstall
-                        ? "Mail at your own domains: SPF, DKIM and DMARC written and checked, mailboxes and aliases. Installing downloads nothing - a server is set up only when you choose a machine for it."
-                        : "Mail at your own domains: SPF, DKIM and DMARC written and checked, mailboxes and aliases. Ask somebody who can install apps to add it."
-                }
+                title={t("install.title")}
+                description={canInstall ? t("install.body") : t("install.bodyAsk")}
                 action={
                     canInstall ? (
                         <>
                             <Button size="sm" onClick={install} disabled={pending}>
                                 {pending ? <Loader2 className="animate-spin" /> : null}
-                                {pending ? "Installing" : "Install"}
+                                {pending ? t("install.pending") : t("install.install")}
                             </Button>
                             <Button asChild size="sm" variant="ghost">
-                                <Link href={MAIL_SERVER_LISTING}>View in Marketplace</Link>
+                                <Link href={MAIL_SERVER_LISTING}>{t("install.view")}</Link>
                             </Button>
                         </>
                     ) : null

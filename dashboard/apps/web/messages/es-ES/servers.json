@@ -278,7 +278,7 @@
     "groups": {
         "title": "Grupos de servidores",
         "new": "Nuevo grupo",
-        "intro": "Escribe una regla de firewall una sola vez para un conjunto de máquinas. Al añadir un servidor a un grupo, pasa a regirse por sus reglas al momento.",
+        "intro": "Escribe una regla de cortafuegos una sola vez para un conjunto de máquinas. Al añadir un servidor a un grupo, pasa a regirse por sus reglas al momento.",
         "placeholder": "Ej.: Centro de datos",
         "create": "Crear",
         "loading": "Cargando grupos...",
@@ -286,7 +286,7 @@
         "renameNamed": "Renombrar {name}",
         "enrollFirst": "Registra un servidor para poder añadirlo aquí.",
         "kind": "grupo de servidores",
-        "deleteBody": "Los servidores se quedan. Las reglas de firewall escritas para este grupo se eliminan con él."
+        "deleteBody": "Los servidores se quedan. Las reglas de cortafuegos escritas para este grupo se eliminan con él."
     },
     "usage": {
         "offMaybe": "Puede que esté apagado o inaccesible.",
@@ -309,10 +309,10 @@
         "askFailed": "Polaris no ha podido preguntarle: {reason}",
         "traefikYes": "Responde él mismo en 80 y 443, así que un dominio que apunte aquí sigue funcionando aunque Polaris esté apagado.",
         "traefikNo": "Aquí no responde nada en 80 y 443, así que un dominio que apunte a este servidor no llega a nada.",
-        "guardYes": "El componente que decide del firewall está en marcha a su lado.",
-        "guardNo": "Sin el componente que decide del firewall: una lista de direcciones permitidas sigue aplicándose, pero una lista de bloqueo, un paquete de reglas o una regla de inicio de sesión no.",
-        "pushYes": "Recibe de Polaris las rutas y los cambios del firewall al momento.",
-        "pushNo": "Solo lee lo que le dice un contenedor desplegado, así que un dominio nuevo o una regla de firewall editada esperan a que ese servicio se vuelva a compilar, y un despliegue sustituye la versión en marcha con un breve corte.",
+        "guardYes": "El componente que decide del cortafuegos está en marcha a su lado.",
+        "guardNo": "Sin el componente que decide del cortafuegos: una lista de direcciones permitidas sigue aplicándose, pero una lista de bloqueo, un paquete de reglas o una regla de inicio de sesión no.",
+        "pushYes": "Recibe de Polaris las rutas y los cambios del cortafuegos al momento.",
+        "pushNo": "Solo lee lo que le dice un contenedor desplegado, así que un dominio nuevo o una regla de cortafuegos editada esperan a que ese servicio se vuelva a compilar, y un despliegue sustituye la versión en marcha con un breve corte.",
         "settingUp": "Preparándolo",
         "again": "Volver a prepararlo",
         "setUp": "Preparar este servidor",

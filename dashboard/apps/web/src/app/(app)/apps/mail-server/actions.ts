@@ -31,14 +31,18 @@ import * as appInstall from "@/lib/mail-server/app-install";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import { MailServerUnreachable } from "@/lib/mail-server/transport";
 import { requirePermission, sessionCan, type SessionUser } from "@/lib/session";
-import { reached, SETUP_STEP_LABELS, SETUP_STEPS, type SetupStep } from "@/lib/mail-server/steps";
+import { reached, SETUP_STEPS, type SetupStep } from "@/lib/mail-server/steps";
 import { listServers, MailServerAccessError, requireServer, type MailServerActor } from "@/lib/mail-server/access";
+import { getTranslations } from "@/lib/i18n/request";
+import { mailSchemaText } from "@/lib/mail-server/words";
+import { mailServerRefusalText } from "@/lib/mail-server/refusal-text";
 
 type Result<T = object> = { error: string } | ({ error?: undefined } & T);
 
 /** The sentence a failure is shown as. Only failures written for a reader are
  *  passed on; anything else is logged and said generically. */
-function failed(error: unknown): { error: string } {
+async function failed(error: unknown): Promise<{ error: string }> {
+    const t = await getTranslations("mailServer");
     if (
         error instanceof MailServerAccessError ||
         error instanceof setup.MailSetupRefusal ||
@@ -47,14 +51,20 @@ function failed(error: unknown): { error: string } {
         error instanceof dmarc.DmarcUploadError ||
         error instanceof core.DmarcReportError
     ) {
-        return { error: error.message };
+        return { error: mailServerRefusalText(t, error.message) };
     }
     console.error("polaris: mail server action failed:", error);
-    return { error: "That did not work. Try again in a moment." };
+    return { error: t("errors.generic") };
 }
 
-function invalid(error: z.ZodError): { error: string } {
-    return { error: error.issues[0]?.message ?? "Those details are not valid" };
+async function invalid(error: z.ZodError): Promise<{ error: string }> {
+    const t = await getTranslations("mailServer");
+    return { error: mailSchemaText(t, error.issues[0]?.message) ?? t("errors.invalid") };
+}
+
+/** A reply in the reader's language. */
+async function say(key: "errors.notInCatalog" | "errors.installFailed" | "errors.uninstallFailed" | "errors.setupRunning"): Promise<string> {
+    return (await getTranslations("mailServer"))(key);
 }
 
 /** Said by every action below once the app has been uninstalled under an open
@@ -102,7 +112,7 @@ export async function installMailServerAppAction(): Promise<Result> {
     const user = await requirePermission("deploy.manage");
     try {
         const manifest = findApp(appInstall.MAIL_SERVER_APP);
-        if (!manifest) return { error: "Mail server is not in the catalog." };
+        if (!manifest) return { error: await say("errors.notInCatalog") };
         const installedAppId =
             (await appInstall.adoptMailServerApp()) ??
             (await installApp(user.id, user.id, defaultInstallInput(manifest))).installedAppId;
@@ -117,7 +127,7 @@ export async function installMailServerAppAction(): Promise<Result> {
             return {};
         }
         console.error("polaris: installing Mail server failed:", error);
-        return { error: "Mail server could not be installed. Try again in a moment." };
+        return { error: await say("errors.installFailed") };
     }
 }
 
@@ -135,7 +145,7 @@ export async function uninstallMailServerAppAction(): Promise<Result> {
     } catch (error) {
         if (error instanceof appInstall.MailServerAppRefusal) return { error: error.message };
         console.error("polaris: uninstalling Mail server failed:", error);
-        return { error: "Mail server could not be uninstalled. Try again in a moment." };
+        return { error: await say("errors.uninstallFailed") };
     }
 }
 
@@ -159,7 +169,8 @@ export interface MailServerSummary {
 async function placementNames(placements: readonly string[]): Promise<Map<string, string>> {
     const ids = placements.filter((placement) => serverIdSchema.safeParse(placement).success);
     const hosts = ids.length > 0 ? await prisma.host.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }) : [];
-    return new Map([["local", "This machine"], ...hosts.map((host) => [host.id, host.name] as [string, string])]);
+    const t = await getTranslations("mailServer");
+    return new Map([["local", t("common.thisMachine")], ...hosts.map((host) => [host.id, host.name] as [string, string])]);
 }
 
 export async function listServersAction(): Promise<Result<{ servers: MailServerSummary[] }>> {
@@ -167,6 +178,7 @@ export async function listServersAction(): Promise<Result<{ servers: MailServerS
         const who = await actor();
         const rows = await listServers(who, await scopeOrgIdFor(who.id));
         const names = await placementNames(rows.map((row) => row.placement));
+        const t = await getTranslations("mailServer");
         return {
             servers: rows.map((row) => ({
                 id: row.id,
@@ -176,7 +188,7 @@ export async function listServersAction(): Promise<Result<{ servers: MailServerS
                 step: row.step,
                 error: row.error,
                 placement: row.placement,
-                placementName: names.get(row.placement) ?? "A server that is no longer connected",
+                placementName: names.get(row.placement) ?? t("common.placementGone"),
                 createdAt: row.createdAt.toISOString()
             }))
         };
@@ -189,7 +201,8 @@ export async function listServersAction(): Promise<Result<{ servers: MailServerS
 export async function listPlacementsAction(): Promise<{ id: string; name: string }[]> {
     const who = await actor();
     const hosts = await prisma.host.findMany({ where: { ownerId: who.id }, select: { id: true, name: true }, orderBy: { name: "asc" } });
-    return [{ id: "local", name: "This machine" }, ...hosts];
+    const t = await getTranslations("mailServer");
+    return [{ id: "local", name: t("common.thisMachine") }, ...hosts];
 }
 
 export async function startSetupAction(input: unknown): Promise<Result<{ id: string }>> {
@@ -217,6 +230,7 @@ export async function serverDetailAction(serverId: string): Promise<Result<{ ser
     try {
         const { row } = await server(serverId);
         const names = await placementNames([row.placement]);
+        const t = await getTranslations("mailServer");
         const app = row.applicationId
             ? await prisma.application.findUnique({
                   where: { id: row.applicationId },
@@ -232,7 +246,7 @@ export async function serverDetailAction(serverId: string): Promise<Result<{ ser
                 step: row.step,
                 error: row.error,
                 placement: row.placement,
-                placementName: names.get(row.placement) ?? "A server that is no longer connected",
+                placementName: names.get(row.placement) ?? t("common.placementGone"),
                 createdAt: row.createdAt.toISOString(),
                 log: row.log,
                 running: setup.isRunning(row.id),
@@ -240,7 +254,7 @@ export async function serverDetailAction(serverId: string): Promise<Result<{ ser
                 projectId: app?.environment.projectId ?? null,
                 steps: SETUP_STEPS.filter((step) => step !== "done").map((step) => ({
                     step,
-                    label: SETUP_STEP_LABELS[step],
+                    label: t(`steps.${step === "recovery-off" ? "recoveryOff" : step}`),
                     done: reached(row.step, step)
                 }))
             }
@@ -274,7 +288,7 @@ export async function resumeSetupAction(input: unknown): Promise<Result> {
 export async function removeServerAction(serverId: string): Promise<Result> {
     try {
         const { who, row } = await server(serverId);
-        if (setup.isRunning(row.id)) return { error: "Setup is still running. Wait for it to stop first." };
+        if (setup.isRunning(row.id)) return { error: await say("errors.setupRunning") };
         await prisma.mailServer.delete({ where: { id: row.id } });
         await recordAudit({
             actorId: who.id,
@@ -431,10 +445,11 @@ export async function createMailboxAction(input: unknown): Promise<Result<{ id: 
     try {
         const { who, row } = await server(parsed.data.serverId);
         const created = await ops.createMailbox(who.id, row, parsed.data);
+        const t = await getTranslations("mailServer");
         let warning: string | null = null;
         if (parsed.data.addToMyMail) {
             if (!(await sessionCan(who.user, "mail.use"))) {
-                warning = "The mailbox was created. Your account cannot use Mail, so it was not added there.";
+                warning = t("boxes.warnNoMail");
             } else {
                 const setupInput = core.mailAccountSetupSchema.safeParse({
                     address: created.address,
@@ -444,12 +459,13 @@ export async function createMailboxAction(input: unknown): Promise<Result<{ id: 
                     smtp: { host: row.hostname, port: 465, security: "tls" }
                 });
                 if (!setupInput.success) {
-                    warning = "The mailbox was created, but it could not be added to Mail.";
+                    warning = t("boxes.warnNotAdded");
                 } else {
                     await addAccount(who.id, setupInput.data, row.orgId).catch((error: unknown) => {
-                        warning = `The mailbox was created. Mail could not connect to it yet${
-                            error instanceof Error && error.message ? ` (${error.message})` : ""
-                        }; add it from Mail once the server's DNS and certificate are in place.`;
+                        warning =
+                            error instanceof Error && error.message
+                                ? t("boxes.warnNoConnectWhy", { reason: error.message })
+                                : t("boxes.warnNoConnect");
                     });
                 }
             }

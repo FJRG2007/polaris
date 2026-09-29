@@ -9,6 +9,7 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withMessages } from "../setup/i18n";
 
 let installed: string | null;
 let canInstall: boolean;
@@ -17,6 +18,10 @@ vi.mock("@/lib/session", () => ({
     requirePermission: async () => ({ id: "user-1", isAdmin: false }),
     sessionCan: async () => canInstall
 }));
+vi.mock("@/lib/i18n/request", async () => {
+    const { translatorFor } = await import("@/lib/i18n/translate");
+    return { getTranslations: async (namespace: "mailServer") => translatorFor("en-US", namespace) };
+});
 vi.mock("@/lib/mail-server/app-install", () => ({ adoptMailServerApp: async () => installed }));
 vi.mock("@/lib/mail-server/access", () => ({
     requireServer: async (_actor: unknown, id: string) => ({ id, hostname: "mail.example.com" })
@@ -45,7 +50,7 @@ const { default: DetailPage } = await import("@/app/(app)/apps/mail-server/[id]/
 const SERVER_ID = "0190a0b0-0000-7000-8000-000000000001";
 
 async function render(page: Promise<JSX.Element>): Promise<string> {
-    return renderToStaticMarkup(await page);
+    return renderToStaticMarkup(withMessages(await page));
 }
 
 beforeEach(() => {

@@ -13,6 +13,8 @@ import { relayAction, setRelayAction } from "../actions";
 import { Field, PanelError, usePanelData } from "../ui-bits";
 import { Button, Input, Select, Skeleton } from "@polaris/ui";
 import { mailRelaySchema, RELAY_PROVIDERS, relayProvider } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { mailSchemaText } from "@/lib/mail-server/words";
 
 const DIRECT = "direct";
 
@@ -32,6 +34,8 @@ function RelayForm({
     current: Extract<Awaited<ReturnType<typeof relayAction>>, { relay: unknown }>["relay"];
     onSaved: () => void;
 }) {
+    const t = useTranslations("mailServer");
+    const tcommon = useTranslations("common");
     const [provider, setProvider] = useState<string>(current?.provider ?? DIRECT);
     const [host, setHost] = useState(current?.provider === "custom" ? current.host : "");
     const [region, setRegion] = useState(current?.region ?? "");
@@ -53,7 +57,9 @@ function RelayForm({
     };
     const parsed = mailRelaySchema.safeParse(input);
     const issue = (path: string, typed: string): string | null =>
-        parsed.success || !typed.trim() ? null : (parsed.error.issues.find((entry) => entry.path[0] === path)?.message ?? null);
+        parsed.success || !typed.trim()
+            ? null
+            : mailSchemaText(t, parsed.error.issues.find((entry) => entry.path[0] === path)?.message);
     const needsSecret = spec !== null && !secret && !(current && current.provider === provider && current.hasSecret);
     const unchanged =
         (provider === DIRECT && current === null) ||
@@ -76,7 +82,7 @@ function RelayForm({
             return;
         }
         setSecret("");
-        setMessage({ tone: "ok", text: provider === DIRECT ? "Mail now goes straight to each recipient." : "Mail now goes out through the relay." });
+        setMessage({ tone: "ok", text: provider === DIRECT ? t("sending.nowDirect") : t("sending.nowRelay") });
         onSaved();
     }
 
@@ -88,7 +94,10 @@ function RelayForm({
                 void save();
             }}
         >
-            <Field label="Send through" hint={spec?.spfInclude ? `Adds ${spec.spfInclude} to each domain's SPF in the DNS plan.` : undefined}>
+            <Field
+                label={t("sending.through")}
+                hint={spec?.spfInclude ? t("sending.spfHint", { include: spec.spfInclude }) : undefined}
+            >
                 {(id) => (
                     <Select
                         id={id}
@@ -99,38 +108,44 @@ function RelayForm({
                             if (next) setPort(String(next.defaultPort));
                         }}
                         options={[
-                            { value: DIRECT, label: "Directly, to each recipient's server" },
-                            ...RELAY_PROVIDERS.map((entry) => ({ value: entry.id, label: entry.label }))
+                            { value: DIRECT, label: t("sending.direct") },
+                            ...RELAY_PROVIDERS.map((entry) => ({
+                                value: entry.id,
+                                label: entry.id === "custom" ? t("sending.custom") : entry.label
+                            }))
                         ]}
                     />
                 )}
             </Field>
             {spec?.regional ? (
-                <Field label="Region" required error={issue("region", region)}>
+                <Field label={t("sending.region")} required error={issue("region", region)}>
                     {(id) => <Input id={id} value={region} onChange={(event) => setRegion(event.target.value)} placeholder="eu-west-1" />}
                 </Field>
             ) : null}
             {provider === "custom" ? (
-                <Field label="SMTP host" required error={issue("host", host)}>
+                <Field label={t("sending.host")} required error={issue("host", host)}>
                     {(id) => <Input id={id} value={host} onChange={(event) => setHost(event.target.value)} placeholder="smtp.example.net" />}
                 </Field>
             ) : null}
             {spec ? (
                 <>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Field label="Port" error={issue("port", port)} hint="587 for STARTTLS, 465 for TLS.">
+                        <Field label={t("health.columns.port")} error={issue("port", port)} hint={t("sending.portHint")}>
                             {(id) => (
                                 <Input id={id} inputMode="numeric" value={port} onChange={(event) => setPort(event.target.value.replace(/[^\d]/g, ""))} />
                             )}
                         </Field>
-                        <Field label="Username" hint={spec.username ? `Leave empty for "${spec.username}".` : undefined}>
+                        <Field
+                            label={t("sending.username")}
+                            hint={spec.username ? t("sending.usernameHint", { username: spec.username }) : undefined}
+                        >
                             {(id) => <Input id={id} value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="off" />}
                         </Field>
                     </div>
                     <Field
-                        label="Password or API key"
+                        label={t("sending.secret")}
                         required={needsSecret}
-                        hint={current?.hasSecret && current.provider === provider ? "Leave empty to keep the one saved." : undefined}
+                        hint={current?.hasSecret && current.provider === provider ? t("sending.secretHint") : undefined}
                     >
                         {(id) => (
                             <Input id={id} type="password" value={secret} onChange={(event) => setSecret(event.target.value)} autoComplete="off" />
@@ -141,14 +156,16 @@ function RelayForm({
             {message ? <p className={message.tone === "error" ? "text-xs text-danger" : "text-xs text-success"}>{message.text}</p> : null}
             <div className="flex flex-wrap items-center gap-3">
                 <Button type="submit" disabled={!parsed.success || pending || needsSecret || unchanged}>
-                    {pending ? "Saving..." : "Save"}
+                    {pending ? tcommon("actions.saving") : tcommon("actions.save")}
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                    Polaris sends its own mail through this server as an email channel, under{" "}
-                    <Link href="/admin/email" className="underline">
-                        Management, Email
-                    </Link>
-                    .
+                    {t.rich("sending.channel", {
+                        link: (chunks) => (
+                            <Link key="link" href="/admin/email" className="underline">
+                                {chunks}
+                            </Link>
+                        )
+                    })}
                 </p>
             </div>
         </form>

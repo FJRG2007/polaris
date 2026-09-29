@@ -17,16 +17,18 @@ import { ForwardsTab } from "./forwards-tab";
 import { MailboxesTab } from "./mailboxes-tab";
 import { Card, CardBody, cn, ScrollRow } from "@polaris/ui";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
+/** The tabs, in order; each one's name is `tabs.<id>` in the catalog. */
 const TABS = [
-    { id: "overview", label: "Overview" },
-    { id: "domains", label: "Domains and DNS" },
-    { id: "mailboxes", label: "Mailboxes" },
-    { id: "forwards", label: "Forwards" },
-    { id: "sending", label: "Sending" },
-    { id: "rules", label: "Rules" },
-    { id: "reports", label: "DMARC reports" },
-    { id: "backups", label: "Backups" }
+    { id: "overview" },
+    { id: "domains" },
+    { id: "mailboxes" },
+    { id: "forwards" },
+    { id: "sending" },
+    { id: "rules" },
+    { id: "reports" },
+    { id: "backups" }
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -42,6 +44,7 @@ export function ServerView({
      *  drawn at once. */
     seed: OverviewSeed;
 }) {
+    const t = useTranslations("mailServer");
     const router = useRouter();
     const params = useSearchParams();
     const asked = params.get("tab");
@@ -63,8 +66,8 @@ export function ServerView({
                 <Link
                     href="/apps/mail-server"
                     className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label="All mail servers"
-                    title="All mail servers"
+                    aria-label={t("view.back")}
+                    title={t("view.back")}
                 >
                     <ArrowLeft className="size-4" />
                 </Link>
@@ -91,7 +94,7 @@ export function ServerView({
                                     : "text-muted-foreground"
                             )}
                         >
-                            {entry.label}
+                            {t(`tabs.${entry.id}`)}
                         </button>
                     ))}
                 </ScrollRow>

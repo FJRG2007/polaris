@@ -10,6 +10,8 @@ import { mailForwardSchema } from "@polaris/core";
 import { Forward, Plus, Trash2 } from "lucide-react";
 import { Field, PanelError, usePanelData } from "../ui-bits";
 import { createForwardAction, deleteForwardAction, listForwardsAction } from "../actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { mailSchemaText } from "@/lib/mail-server/words";
 import {
     Button,
     ConfirmDeleteDialog,
@@ -29,6 +31,7 @@ import {
 type Loaded = Extract<Awaited<ReturnType<typeof listForwardsAction>>, { forwards: unknown }>;
 
 export function ForwardsTab({ serverId }: { serverId: string }) {
+    const t = useTranslations("mailServer");
     const panel = usePanelData(`forwards:${serverId}`, () => listForwardsAction(serverId));
     const [creating, setCreating] = useState(false);
     const [deleting, setDeleting] = useState<Loaded["forwards"][number] | null>(null);
@@ -54,7 +57,7 @@ export function ForwardsTab({ serverId }: { serverId: string }) {
             <div className="flex justify-end">
                 <Button size="sm" onClick={() => setCreating(true)} disabled={domains.length === 0}>
                     <Plus />
-                    New forward
+                    {t("forwards.new")}
                 </Button>
             </div>
             {!panel.data ? (
@@ -64,7 +67,7 @@ export function ForwardsTab({ serverId }: { serverId: string }) {
                     <Skeleton className="h-40 w-full" />
                 )
             ) : forwards.length === 0 ? (
-                <EmptyState icon={<Forward />} title="No forwards" description="Send an address's mail on to other people without giving it a mailbox." />
+                <EmptyState icon={<Forward />} title={t("forwards.none")} description={t("forwards.noneBody")} />
             ) : (
                 <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                     {forwards.map((forward) => (
@@ -74,14 +77,14 @@ export function ForwardsTab({ serverId }: { serverId: string }) {
                                     {forward.address}
                                 </span>
                                 <span className="truncate text-xs text-muted-foreground" title={forward.recipients.join(", ")}>
-                                    To {forward.recipients.join(", ")}
+                                    {t("forwards.to", { recipients: forward.recipients.join(", ") })}
                                 </span>
                             </div>
                             <Button
                                 size="icon"
                                 variant="ghost"
-                                aria-label={`Delete ${forward.address}`}
-                                title={`Delete ${forward.address}`}
+                                aria-label={t("boxes.deleteNamed", { address: forward.address })}
+                                title={t("boxes.deleteNamed", { address: forward.address })}
                                 onClick={() => setDeleting(forward)}
                             >
                                 <Trash2 />
@@ -95,9 +98,9 @@ export function ForwardsTab({ serverId }: { serverId: string }) {
                 open={deleting !== null}
                 onOpenChange={(open) => (open ? undefined : setDeleting(null))}
                 name={deleting?.address ?? ""}
-                kind="forward"
+                kind={t("forwards.kind")}
                 requireTyping={false}
-                description="Mail to the address starts bouncing. Nothing already delivered is touched."
+                description={t("forwards.deleteBody")}
                 error={deleteError}
                 onConfirm={() => void remove()}
             />
@@ -118,6 +121,8 @@ function CreateForward({
     onOpenChange: (open: boolean) => void;
     onCreated: () => void;
 }) {
+    const t = useTranslations("mailServer");
+    const tcommon = useTranslations("common");
     const [domainId, setDomainId] = useState("");
     const [localPart, setLocalPart] = useState("");
     const [recipients, setRecipients] = useState("");
@@ -131,7 +136,9 @@ function CreateForward({
         .filter(Boolean);
     const parsed = mailForwardSchema.safeParse({ serverId, domainId: chosenDomain, localPart, recipients: list });
     const issue = (path: string, typed: string): string | null =>
-        parsed.success || !typed.trim() ? null : (parsed.error.issues.find((entry) => entry.path[0] === path)?.message ?? null);
+        parsed.success || !typed.trim()
+            ? null
+            : mailSchemaText(t, parsed.error.issues.find((entry) => entry.path[0] === path)?.message);
 
     async function submit(): Promise<void> {
         if (!parsed.success || pending) return;
@@ -153,8 +160,8 @@ function CreateForward({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="w-[min(32rem,95vw)] max-w-[min(32rem,95vw)]">
                 <DialogHeader>
-                    <DialogTitle>New forward</DialogTitle>
-                    <DialogDescription>Receivers may treat forwarded mail as suspicious when the sender's domain enforces DMARC.</DialogDescription>
+                    <DialogTitle>{t("forwards.new")}</DialogTitle>
+                    <DialogDescription>{t("forwards.intro")}</DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-4"
@@ -164,10 +171,10 @@ function CreateForward({
                     }}
                 >
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <Field label="Address" required error={issue("localPart", localPart)}>
+                        <Field label={t("boxes.columns.address")} required error={issue("localPart", localPart)}>
                             {(id) => <Input id={id} value={localPart} onChange={(event) => setLocalPart(event.target.value)} placeholder="team" />}
                         </Field>
-                        <Field label="Domain" required>
+                        <Field label={t("dns.domain")} required>
                             {(id) => (
                                 <Select
                                     id={id}
@@ -178,16 +185,21 @@ function CreateForward({
                             )}
                         </Field>
                     </div>
-                    <Field label="Send to" required error={issue("recipients", recipients)} hint="One address per line, or separated by commas.">
+                    <Field
+                        label={t("forwards.sendTo")}
+                        required
+                        error={issue("recipients", recipients)}
+                        hint={t("forwards.sendToHint")}
+                    >
                         {(id) => <Textarea id={id} rows={3} value={recipients} onChange={(event) => setRecipients(event.target.value)} />}
                     </Field>
                     {error ? <p className="text-xs text-danger">{error}</p> : null}
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {tcommon("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={!parsed.success || pending}>
-                            {pending ? "Creating..." : "Create"}
+                            {pending ? t("boxes.creating") : t("boxes.create")}
                         </Button>
                     </DialogFooter>
                 </form>

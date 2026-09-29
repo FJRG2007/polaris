@@ -20,6 +20,8 @@ import { connect as tlsConnect } from "node:tls";
 import { call, engineAnswers } from "./stalwart";
 import { prisma, type MailServer } from "@polaris/db";
 import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
+import { mailNoteText } from "./words";
 import { detectPublicIp } from "@/lib/network-service";
 import { endpointFor, MailServerUnreachable } from "./transport";
 import { probeTcpOutcome, publicProbeHost } from "@/lib/net/port-probe";
@@ -280,12 +282,15 @@ export async function sweepMailServers(): Promise<{ checked: number; changed: nu
         if (status === server.status) continue;
         changed += 1;
         await prisma.mailServer.update({ where: { id: server.id }, data: { status } });
+        const t = await wordsFor(server.ownerId, "mailServer");
         await notify({
             userId: server.ownerId,
             event: "mailserver.attention",
             level: up ? "success" : "warning",
-            title: up ? `${server.hostname} is answering again` : `${server.hostname} stopped answering`,
-            body: up ? null : (engine.note ?? "The mail server is not answering."),
+            title: up
+                ? t("notices.answeringAgain", { host: server.hostname })
+                : t("notices.stopped", { host: server.hostname }),
+            body: up ? null : (mailNoteText(t, engine.note) ?? t("notices.notAnswering")),
             href: `/apps/mail-server/${server.id}`,
             shelf: { orgId: server.orgId }
         });

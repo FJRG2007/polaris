@@ -971,6 +971,27 @@
         "web/src/lib/vault/sync.ts",
         "web/src/lib/vault/tokens.ts",
         "web/src/lib/vault/totp-browser.ts",
-        "web/src/lib/vault/would-open.ts"
+        "web/src/lib/vault/would-open.ts",
+        "web/src/app/(app)/apps/mail-server/[id]/backups-tab.tsx",
+        "web/src/app/(app)/apps/mail-server/[id]/dns-tab.tsx",
+        "web/src/app/(app)/apps/mail-server/[id]/forwards-tab.tsx",
+        "web/src/app/(app)/apps/mail-server/[id]/mailboxes-tab.tsx",
+        "web/src/app/(app)/apps/mail-server/[id]/overview-tab.tsx",
+        "web/src/app/(app)/apps/mail-server/[id]/page.tsx",
+        "web/src/app/(app)/apps/mail-server/[id]/reports-tab.tsx",
+        "web/src/app/(app)/apps/mail-server/[id]/rules-tab.tsx",
+        "web/src/app/(app)/apps/mail-server/[id]/sending-tab.tsx",
+        "web/src/app/(app)/apps/mail-server/[id]/server-view.tsx",
+        "web/src/app/(app)/apps/mail-server/actions.ts",
+        "web/src/app/(app)/apps/mail-server/install-state.tsx",
+        "web/src/app/(app)/apps/mail-server/mail-servers-view.tsx",
+        "web/src/app/(app)/apps/mail-server/page.tsx",
+        "web/src/app/(app)/apps/mail-server/ui-bits.tsx",
+        "web/src/lib/mail-server/dmarc-report.ts",
+        "web/src/lib/mail-server/health.ts",
+        "web/src/lib/mail-server/inbound.ts",
+        "web/src/lib/mail-server/setup.ts",
+        "web/src/lib/mail-server/refusal-text.ts",
+        "web/src/lib/mail-server/words.ts"
     ]
 }

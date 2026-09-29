@@ -12,8 +12,10 @@ import { PanelError, usePanelData } from "../ui-bits";
 import { RelativeTime } from "@/components/relative-time";
 import { backupsAction, protectAction } from "../actions";
 import { Badge, Button, EmptyState, Skeleton } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function BackupsTab({ serverId }: { serverId: string }) {
+    const t = useTranslations("mailServer");
     const panel = usePanelData(`backups:${serverId}`, () => backupsAction(serverId));
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -32,9 +34,7 @@ export function BackupsTab({ serverId }: { serverId: string }) {
     return (
         <div className="flex flex-col gap-4">
             <p className="text-xs text-muted-foreground">
-                Each copy is the engine&apos;s own export, taken with the server paused for as long as it runs, so every
-                mailbox is caught at the same moment. Mail sent meanwhile is retried by the sender. Restoring pauses it
-                again and puts the whole server back.
+                {t("backups.intro")}
             </p>
             {error ? <PanelError message={error} /> : null}
             {!backups ? (
@@ -44,37 +44,38 @@ export function BackupsTab({ serverId }: { serverId: string }) {
                     <Skeleton className="h-20 w-full" />
                 )
             ) : !backups.ready ? (
-                <EmptyState icon={<Archive />} title="Not running yet" description="It can be protected once setup has finished." />
+                <EmptyState icon={<Archive />} title={t("backups.notRunning")} description={t("backups.notRunningBody")} />
             ) : (
                 <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border px-3 py-2">
-                    <span className="min-w-0 flex-1 text-[0.8125rem] text-foreground">Whole server</span>
+                    <span className="min-w-0 flex-1 text-[0.8125rem] text-foreground">{t("backups.whole")}</span>
                     {backups.resourceId ? (
                         <>
                             <span className="text-xs text-muted-foreground">
                                 {backups.lastBackupAt ? (
-                                    <>
-                                        Last copy <RelativeTime iso={backups.lastBackupAt} />, {backups.copyCount} kept
-                                    </>
+                                    t.rich("backups.lastCopy", {
+                                        count: backups.copyCount,
+                                        when: () => <RelativeTime key="when" iso={backups.lastBackupAt!} />
+                                    })
                                 ) : (
-                                    "No copy yet"
+                                    t("backups.noCopy")
                                 )}
                             </span>
                             {backups.lastStatus === "failed" ? (
                                 <Badge variant="danger" title={backups.lastError ?? undefined}>
-                                    Last copy failed
+                                    {t("backups.lastFailed")}
                                 </Badge>
                             ) : (
-                                <Badge variant="success">Protected</Badge>
+                                <Badge variant="success">{t("backups.protected")}</Badge>
                             )}
                             <Button asChild size="sm" variant="outline">
-                                <Link href={`/apps/backups/${backups.resourceId}`}>Copies and restore</Link>
+                                <Link href={`/apps/backups/${backups.resourceId}`}>{t("backups.copies")}</Link>
                             </Button>
                         </>
                     ) : (
                         <>
-                            <Badge>Not protected</Badge>
+                            <Badge>{t("backups.unprotected")}</Badge>
                             <Button size="sm" onClick={() => void protect()} disabled={pending}>
-                                {pending ? "Protecting..." : "Protect with Backups"}
+                                {pending ? t("backups.protecting") : t("backups.protect")}
                             </Button>
                         </>
                     )}
@@ -82,7 +83,7 @@ export function BackupsTab({ serverId }: { serverId: string }) {
             )}
             {backups && backups.volumeResources.length > 0 ? (
                 <p className="text-xs text-muted-foreground">
-                    Its volumes are also still copied as files, from before:{" "}
+                    {t("backups.volumes")}{" "}
                     {backups.volumeResources.map((resource, index) => (
                         <span key={resource.id}>
                             {index > 0 ? ", " : ""}

@@ -507,7 +507,7 @@
         },
         "cloud": {
             "label": "Nube (VM)",
-            "summary": "AWS, GCP, Azure o similar: IP pública detrás de un firewall que configuras tú.",
+            "summary": "AWS, GCP, Azure o similar: IP pública detrás de un cortafuegos que configuras tú.",
             "routing": "Apunta el registro A a la instancia y permite 80/443 en su grupo de seguridad. Usa una IP reservada para que el registro siga funcionando."
         },
         "unknown": {

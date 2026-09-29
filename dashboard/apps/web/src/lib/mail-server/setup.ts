@@ -403,6 +403,7 @@ const admin: StepRunner = async (server) => {
                     password: adminPassword(server),
                     quotaBytes: null,
                     admin: true,
+                    // i18n-ignore stored on the engine; the screen says it through the catalog
                     description: "Polaris manages this mail server with this account."
                 })
             ]),
@@ -491,6 +492,7 @@ const sender: StepRunner = async (server) => {
                     domainId,
                     password,
                     quotaBytes: 256 * 1024 * 1024,
+                    // i18n-ignore stored on the engine; the screen says it through the catalog
                     description: "Polaris sends its own mail from this mailbox."
                 })
             ]),

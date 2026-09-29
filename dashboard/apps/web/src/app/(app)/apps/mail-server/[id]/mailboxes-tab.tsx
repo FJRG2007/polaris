@@ -10,6 +10,9 @@ import { Inbox, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { passwordIsBreached } from "@/lib/pwned-passwords";
 import { Field, forgetPanelData, PanelError, usePanelData } from "../ui-bits";
+import { mailNoteText, mailSchemaText } from "@/lib/mail-server/words";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     BREACHED_PASSWORD_MESSAGE,
     MAILBOX_IDENTITY_PASSWORD_MESSAGE,
@@ -81,12 +84,13 @@ function usePasswordRefusal(password: string, address: string): string | null {
     return identity ?? breached;
 }
 
-function quotaLabel(quotaMb: number): string {
-    if (quotaMb <= 0) return "No limit";
+function quotaLabel(quotaMb: number, t: NamespaceTranslator<"mailServer">): string {
+    if (quotaMb <= 0) return t("boxes.noLimit");
     return quotaMb >= 1024 ? `${Math.round((quotaMb / 1024) * 10) / 10} GB` : `${quotaMb} MB`;
 }
 
 export function MailboxesTab({ serverId }: { serverId: string }) {
+    const t = useTranslations("mailServer");
     const panel = usePanelData(`mailboxes:${serverId}`, () => listMailboxesAction(serverId));
     const [creating, setCreating] = useState(false);
     const [editing, setEditing] = useState<Mailbox | null>(null);
@@ -114,7 +118,7 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
             <div className="flex justify-end">
                 <Button size="sm" onClick={() => setCreating(true)} disabled={domains.length === 0}>
                     <Plus />
-                    New mailbox
+                    {t("boxes.new")}
                 </Button>
             </div>
             {!panel.data ? (
@@ -124,15 +128,15 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
                     <Skeleton className="h-40 w-full" />
                 )
             ) : mailboxes.length === 0 ? (
-                <EmptyState icon={<Inbox />} title="No mailboxes yet" description="Create one for each person or address that receives mail." />
+                <EmptyState icon={<Inbox />} title={t("boxes.none")} description={t("boxes.noneBody")} />
             ) : (
                 <div className="overflow-x-auto">
                     <table className="w-full text-[0.8125rem]">
                         <thead>
                             <tr className="text-left">
-                                <th className="w-full max-w-0 py-1.5 pr-3">Address</th>
-                                <th className="py-1.5 pr-3">Quota</th>
-                                <th className="py-1.5 pr-3">Also receives</th>
+                                <th className="w-full max-w-0 py-1.5 pr-3">{t("boxes.columns.address")}</th>
+                                <th className="py-1.5 pr-3">{t("boxes.columns.quota")}</th>
+                                <th className="py-1.5 pr-3">{t("boxes.columns.aliases")}</th>
                                 <th className="py-1.5" />
                             </tr>
                         </thead>
@@ -144,13 +148,15 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
                                             <span className="truncate text-foreground" title={mailbox.address}>
                                                 {mailbox.address}
                                             </span>
-                                            {mailbox.polaris ? <Badge>Polaris sends from this</Badge> : null}
+                                            {mailbox.polaris ? <Badge>{t("boxes.polaris")}</Badge> : null}
                                         </div>
                                         {mailbox.description ? (
-                                            <p className="truncate text-xs text-muted-foreground" title={mailbox.description}>{mailbox.description}</p>
+                                            <p className="truncate text-xs text-muted-foreground" title={mailNoteText(t, mailbox.description) ?? undefined}>
+                                                {mailNoteText(t, mailbox.description)}
+                                            </p>
                                         ) : null}
                                     </td>
-                                    <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">{quotaLabel(mailbox.quotaMb)}</td>
+                                    <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">{quotaLabel(mailbox.quotaMb, t)}</td>
                                     <td className="py-2 pr-3 text-xs text-muted-foreground">
                                         {mailbox.aliases.length === 0
                                             ? "-"
@@ -160,8 +166,8 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
                                         <Button
                                             size="icon"
                                             variant="ghost"
-                                            aria-label={`Edit ${mailbox.address}`}
-                                            title={`Edit ${mailbox.address}`}
+                                            aria-label={t("boxes.editNamed", { address: mailbox.address })}
+                                            title={t("boxes.editNamed", { address: mailbox.address })}
                                             onClick={() => setEditing(mailbox)}
                                         >
                                             <Pencil />
@@ -170,8 +176,8 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                aria-label={`Delete ${mailbox.address}`}
-                                                title={`Delete ${mailbox.address}`}
+                                                aria-label={t("boxes.deleteNamed", { address: mailbox.address })}
+                                                title={t("boxes.deleteNamed", { address: mailbox.address })}
                                                 onClick={() => setDeleting(mailbox)}
                                             >
                                                 <Trash2 />
@@ -199,8 +205,8 @@ export function MailboxesTab({ serverId }: { serverId: string }) {
                 open={deleting !== null}
                 onOpenChange={(open) => (open ? undefined : setDeleting(null))}
                 name={deleting?.address ?? ""}
-                kind="mailbox"
-                description="Every message in it is deleted with it, and mail to the address starts bouncing."
+                kind={t("boxes.kind")}
+                description={t("boxes.deleteBody")}
                 error={deleteError}
                 onConfirm={() => void remove()}
             />
@@ -221,6 +227,8 @@ function CreateDialog({
     onOpenChange: (open: boolean) => void;
     onCreated: () => void;
 }) {
+    const t = useTranslations("mailServer");
+    const tcommon = useTranslations("common");
     const [domainId, setDomainId] = useState("");
     const [localPart, setLocalPart] = useState("");
     const [password, setPassword] = useState("");
@@ -237,7 +245,9 @@ function CreateDialog({
     const address = `${localPart.trim().toLowerCase()}@${domains.find((domain) => domain.id === chosenDomain)?.name ?? ""}`;
     const refusal = usePasswordRefusal(password, address);
     const issue = (path: string, value: string): string | null =>
-        parsed.success || !value.trim() ? null : (parsed.error.issues.find((entry) => entry.path[0] === path)?.message ?? null);
+        parsed.success || !value.trim()
+            ? null
+            : mailSchemaText(t, parsed.error.issues.find((entry) => entry.path[0] === path)?.message);
 
     function close(): void {
         setLocalPart("");
@@ -266,21 +276,19 @@ function CreateDialog({
         <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
             <DialogContent className="w-[min(32rem,95vw)] max-w-[min(32rem,95vw)]">
                 <DialogHeader>
-                    <DialogTitle>{done ? "Mailbox created" : "New mailbox"}</DialogTitle>
-                    <DialogDescription>
-                        {done ? done.address : "Mail apps sign in with the address and this password over IMAP 993 and SMTP 465."}
-                    </DialogDescription>
+                    <DialogTitle>{done ? t("boxes.created") : t("boxes.new")}</DialogTitle>
+                    <DialogDescription>{done ? done.address : t("boxes.createIntro")}</DialogDescription>
                 </DialogHeader>
                 {done ? (
                     <div className="flex flex-col gap-3 text-[0.8125rem]">
                         {done.warning ? (
                             <p className="text-warning">{done.warning}</p>
                         ) : addToMyMail ? (
-                            <p className="text-muted-foreground">It is in your Mail as well.</p>
+                            <p className="text-muted-foreground">{t("boxes.inMyMail")}</p>
                         ) : null}
                         <DialogFooter>
                             <Button type="button" onClick={close}>
-                                Done
+                                {t("dns.done")}
                             </Button>
                         </DialogFooter>
                     </div>
@@ -293,10 +301,10 @@ function CreateDialog({
                         }}
                     >
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <Field label="Name" required error={issue("localPart", localPart)}>
+                            <Field label={t("boxes.name")} required error={issue("localPart", localPart)}>
                                 {(id) => <Input id={id} value={localPart} onChange={(event) => setLocalPart(event.target.value)} placeholder="alice" />}
                             </Field>
-                            <Field label="Domain" required>
+                            <Field label={t("dns.domain")} required>
                                 {(id) => (
                                     <Select
                                         id={id}
@@ -307,7 +315,12 @@ function CreateDialog({
                                 )}
                             </Field>
                         </div>
-                        <Field label="Password" required error={issue("password", password) ?? refusal} hint="At least 12 characters.">
+                        <Field
+                            label={t("boxes.password")}
+                            required
+                            error={issue("password", password) ?? mailSchemaText(t, refusal ?? undefined)}
+                            hint={t("boxes.passwordHint")}
+                        >
                             {(id) => (
                                 <div className="flex gap-2">
                                     <Input
@@ -318,32 +331,39 @@ function CreateDialog({
                                         autoComplete="new-password"
                                     />
                                     <Button type="button" variant="outline" onClick={() => setPassword(generatedPassword())}>
-                                        Generate
+                                        {t("boxes.generate")}
                                     </Button>
                                 </div>
                             )}
                         </Field>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <Field label="Quota in MB" error={issue("quotaMb", quotaMb)} hint="0 for no limit.">
+                            <Field label={t("boxes.quota")} error={issue("quotaMb", quotaMb)} hint={t("boxes.quotaHint")}>
                                 {(id) => (
                                     <Input id={id} inputMode="numeric" value={quotaMb} onChange={(event) => setQuotaMb(event.target.value.replace(/[^\d]/g, ""))} />
                                 )}
                             </Field>
-                            <Field label="Description">
-                                {(id) => <Input id={id} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Optional" />}
+                            <Field label={t("boxes.description")}>
+                                {(id) => (
+                                    <Input
+                                        id={id}
+                                        value={description}
+                                        onChange={(event) => setDescription(event.target.value)}
+                                        placeholder={t("boxes.optional")}
+                                    />
+                                )}
                             </Field>
                         </div>
                         <label className="flex items-center gap-2 text-[0.8125rem] text-foreground">
                             <Checkbox checked={addToMyMail} onChange={(event) => setAddToMyMail(event.target.checked)} />
-                            Add it to my Mail
+                            {t("boxes.addToMyMail")}
                         </label>
                         {error ? <p className="text-xs text-danger">{error}</p> : null}
                         <DialogFooter>
                             <Button type="button" variant="ghost" onClick={close}>
-                                Cancel
+                                {tcommon("actions.cancel")}
                             </Button>
                             <Button type="submit" disabled={!parsed.success || Boolean(refusal) || pending}>
-                                {pending ? "Creating..." : "Create"}
+                                {pending ? t("boxes.creating") : t("boxes.create")}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -366,6 +386,8 @@ function EditDialog({
     onClose: () => void;
     onSaved: () => void;
 }) {
+    const t = useTranslations("mailServer");
+    const tcommon = useTranslations("common");
     const [password, setPassword] = useState("");
     const [quotaMb, setQuotaMb] = useState("");
     const [aliases, setAliases] = useState<{ localPart: string; domainId: string }[]>([]);
@@ -411,50 +433,62 @@ function EditDialog({
             <DialogContent className="w-[min(34rem,95vw)] max-w-[min(34rem,95vw)]">
                 <DialogHeader>
                     <DialogTitle>{mailbox.address}</DialogTitle>
-                    <DialogDescription>Each part saves on its own.</DialogDescription>
+                    <DialogDescription>{t("boxes.editIntro")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-5">
                     {!mailbox.polaris ? (
-                        <Field label="New password" error={refusal} hint="Mail apps signed in with the old one are asked for this one.">
+                        <Field
+                            label={t("boxes.newPassword")}
+                            error={mailSchemaText(t, refusal ?? undefined)}
+                            hint={t("boxes.newPasswordHint")}
+                        >
                             {(id) => (
                                 <div className="flex gap-2">
                                     <Input id={id} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" />
                                     <Button type="button" variant="outline" onClick={() => setPassword(generatedPassword())}>
-                                        Generate
+                                        {t("boxes.generate")}
                                     </Button>
                                     <Button
                                         type="button"
                                         disabled={pending || password.length < 12 || Boolean(refusal)}
                                         onClick={() =>
-                                            void run(() => setMailboxPasswordAction({ serverId, accountId: mailbox.id, password }), "Password changed.")
+                                            void run(
+                                                () => setMailboxPasswordAction({ serverId, accountId: mailbox.id, password }),
+                                                t("boxes.passwordChanged")
+                                            )
                                         }
                                     >
-                                        Save
+                                        {tcommon("actions.save")}
                                     </Button>
                                 </div>
                             )}
                         </Field>
                     ) : null}
-                    <Field label="Quota in MB" hint="0 for no limit.">
+                    <Field label={t("boxes.quota")} hint={t("boxes.quotaHint")}>
                         {(id) => (
                             <div className="flex gap-2">
                                 <Input id={id} inputMode="numeric" value={quotaMb} onChange={(event) => setQuotaMb(event.target.value.replace(/[^\d]/g, ""))} />
                                 <Button
                                     type="button"
                                     disabled={pending || !quotaChanged}
-                                    onClick={() => void run(() => setMailboxQuotaAction({ serverId, accountId: mailbox.id, quotaMb }), "Quota saved.")}
+                                    onClick={() =>
+                                        void run(
+                                            () => setMailboxQuotaAction({ serverId, accountId: mailbox.id, quotaMb }),
+                                            t("boxes.quotaSaved")
+                                        )
+                                    }
                                 >
-                                    Save
+                                    {tcommon("actions.save")}
                                 </Button>
                             </div>
                         )}
                     </Field>
                     <div className="flex flex-col gap-2">
-                        <span className="text-[0.8125rem] font-medium text-foreground">Other addresses that deliver here</span>
+                        <span className="text-[0.8125rem] font-medium text-foreground">{t("boxes.aliases")}</span>
                         {aliases.map((alias, index) => (
                             <div key={index} className="flex items-center gap-2">
                                 <Input
-                                    aria-label="Alias name"
+                                    aria-label={t("boxes.aliasName")}
                                     value={alias.localPart}
                                     onChange={(event) =>
                                         setAliases(aliases.map((entry, at) => (at === index ? { ...entry, localPart: event.target.value } : entry)))
@@ -462,7 +496,7 @@ function EditDialog({
                                 />
                                 <div className="w-48 shrink-0">
                                     <Select
-                                        aria-label="Alias domain"
+                                        aria-label={t("boxes.aliasDomain")}
                                         value={alias.domainId}
                                         onValueChange={(value) =>
                                             setAliases(aliases.map((entry, at) => (at === index ? { ...entry, domainId: value } : entry)))
@@ -474,8 +508,8 @@ function EditDialog({
                                     type="button"
                                     size="icon"
                                     variant="ghost"
-                                    aria-label="Remove this alias"
-                                    title="Remove this alias"
+                                    aria-label={t("boxes.removeAlias")}
+                                    title={t("boxes.removeAlias")}
                                     onClick={() => setAliases(aliases.filter((_, at) => at !== index))}
                                 >
                                     <Trash2 />
@@ -490,7 +524,7 @@ function EditDialog({
                                 onClick={() => setAliases([...aliases, { localPart: "", domainId: mailbox.domainId }])}
                             >
                                 <Plus />
-                                Add an address
+                                {t("boxes.addAlias")}
                             </Button>
                             <Button
                                 type="button"
@@ -504,11 +538,11 @@ function EditDialog({
                                                 accountId: mailbox.id,
                                                 aliases: aliases.map((alias) => ({ localPart: alias.localPart.trim(), domainId: alias.domainId }))
                                             }),
-                                        "Addresses saved."
+                                        t("boxes.aliasesSaved")
                                     )
                                 }
                             >
-                                Save addresses
+                                {t("boxes.saveAliases")}
                             </Button>
                         </div>
                     </div>

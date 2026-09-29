@@ -349,6 +349,7 @@ export async function ensureReportsMailbox(server: MailServer, without?: string)
                     domainId: primary.id,
                     password,
                     quotaBytes: REPORTS_QUOTA_BYTES,
+                    // i18n-ignore stored on the engine; the screen says it through the catalog
                     description: "DMARC reports about this server's domains arrive here; Polaris reads and files them."
                 })
             ]),

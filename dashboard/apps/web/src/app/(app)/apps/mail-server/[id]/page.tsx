@@ -15,6 +15,7 @@ import { requireServer } from "@/lib/mail-server/access";
 import { MailServerInstallState } from "../install-state";
 import { requirePermission, sessionCan } from "@/lib/session";
 import { adoptMailServerApp } from "@/lib/mail-server/app-install";
+import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
@@ -26,11 +27,12 @@ export default async function MailServerDetailPage({
     const user = await requirePermission("mailserver.manage");
     const { id } = await params;
     if (!(await adoptMailServerApp())) {
+        const t = await getTranslations("mailServer");
         return (
             <div className="mx-auto flex w-full max-w-5xl flex-col">
                 <PageHeader
-                    title="Mail server"
-                    description="Send and receive mail at your own domains, with the DNS it needs published and checked from here."
+                    title={t("page.title")}
+                    description={t("page.description")}
                 />
                 <MailServerInstallState canInstall={await sessionCan(user, "deploy.manage")} />
             </div>

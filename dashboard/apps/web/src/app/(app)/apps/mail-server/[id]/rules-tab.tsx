@@ -13,6 +13,7 @@ import { RelativeTime } from "@/components/relative-time";
 import { Field, PanelError, usePanelData } from "../ui-bits";
 import { BellRing, Pencil, Plus, Trash2 } from "lucide-react";
 import { createRuleAction, deleteRuleAction, listRulesAction, updateRuleAction } from "../actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     Checkbox,
@@ -32,6 +33,7 @@ import {
 type Rule = Extract<Awaited<ReturnType<typeof listRulesAction>>, { rules: unknown }>["rules"][number];
 
 export function RulesTab({ serverId }: { serverId: string }) {
+    const t = useTranslations("mailServer");
     const panel = usePanelData(`rules:${serverId}`, () => listRulesAction(serverId));
     const [editing, setEditing] = useState<Rule | "new" | null>(null);
     const [deleting, setDeleting] = useState<Rule | null>(null);
@@ -62,7 +64,7 @@ export function RulesTab({ serverId }: { serverId: string }) {
             <div className="flex justify-end">
                 <Button size="sm" onClick={() => setEditing("new")}>
                     <Plus />
-                    New rule
+                    {t("rules.new")}
                 </Button>
             </div>
             {error ? <PanelError message={error} /> : null}
@@ -75,34 +77,43 @@ export function RulesTab({ serverId }: { serverId: string }) {
             ) : rules.length === 0 ? (
                 <EmptyState
                     icon={<BellRing />}
-                    title="No rules"
-                    description="Get a notification when mail you care about arrives: an invoice address, a monitoring sender."
+                    title={t("rules.none")}
+                    description={t("rules.noneBody")}
                 />
             ) : (
                 <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                     {rules.map((rule) => (
                         <li key={rule.id} className="flex items-center gap-3 px-3 py-2">
-                            <Switch checked={rule.enabled} onChange={(value) => void toggle(rule, value)} aria-label={`Rule ${rule.name} on`} />
+                            <Switch checked={rule.enabled} onChange={(value) => void toggle(rule, value)} aria-label={t("rules.onLabel", { name: rule.name })} />
                             <div className="flex min-w-0 flex-1 flex-col">
                                 <span className="truncate text-[0.8125rem] text-foreground">{rule.name}</span>
                                 <span className="truncate text-xs text-muted-foreground">
-                                    To {rule.recipient || "any address"}, from {rule.sender || "anybody"}
-                                    {rule.includeSpam ? ", spam included" : ""}
+                                    {t("rules.summary", {
+                                        to: rule.recipient || t("rules.anyAddress"),
+                                        from: rule.sender || t("rules.anybody"),
+                                        spam: rule.includeSpam ? "yes" : "no"
+                                    })}
                                 </span>
                             </div>
                             {rule.lastFiredAt ? (
                                 <span className="hidden text-xs text-foreground-subtle sm:inline">
-                                    Last notified <RelativeTime iso={rule.lastFiredAt} />
+                                    {t("rules.lastNotified")} <RelativeTime iso={rule.lastFiredAt} />
                                 </span>
                             ) : null}
-                            <Button size="icon" variant="ghost" aria-label={`Edit ${rule.name}`} title={`Edit ${rule.name}`} onClick={() => setEditing(rule)}>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label={t("boxes.editNamed", { address: rule.name })}
+                                title={t("boxes.editNamed", { address: rule.name })}
+                                onClick={() => setEditing(rule)}
+                            >
                                 <Pencil />
                             </Button>
                             <Button
                                 size="icon"
                                 variant="ghost"
-                                aria-label={`Delete ${rule.name}`}
-                                title={`Delete ${rule.name}`}
+                                aria-label={t("boxes.deleteNamed", { address: rule.name })}
+                                title={t("boxes.deleteNamed", { address: rule.name })}
                                 onClick={() => setDeleting(rule)}
                             >
                                 <Trash2 />
@@ -123,7 +134,7 @@ export function RulesTab({ serverId }: { serverId: string }) {
                 open={deleting !== null}
                 onOpenChange={(open) => (open ? undefined : setDeleting(null))}
                 name={deleting?.name ?? ""}
-                kind="rule"
+                kind={t("rules.kind")}
                 requireTyping={false}
                 onConfirm={() => void remove()}
             />
@@ -142,6 +153,8 @@ function RuleDialog({
     onClose: () => void;
     onSaved: () => void;
 }) {
+    const t = useTranslations("mailServer");
+    const tcommon = useTranslations("common");
     const [name, setName] = useState(rule?.name ?? "");
     const [recipient, setRecipient] = useState(rule?.recipient ?? "");
     const [sender, setSender] = useState(rule?.sender ?? "");
@@ -175,8 +188,8 @@ function RuleDialog({
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="w-[min(30rem,95vw)] max-w-[min(30rem,95vw)]">
                 <DialogHeader>
-                    <DialogTitle>{rule ? "Edit rule" : "New rule"}</DialogTitle>
-                    <DialogDescription>Use * for any run of characters, like *@bank.example. Empty matches everything.</DialogDescription>
+                    <DialogTitle>{rule ? t("rules.edit") : t("rules.new")}</DialogTitle>
+                    <DialogDescription>{t("rules.intro")}</DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-4"
@@ -185,26 +198,33 @@ function RuleDialog({
                         void submit();
                     }}
                 >
-                    <Field label="Name" required>
-                        {(id) => <Input id={id} value={name} onChange={(event) => setName(event.target.value)} placeholder="Invoices" />}
+                    <Field label={t("boxes.name")} required>
+                        {(id) => (
+                            <Input
+                                id={id}
+                                value={name}
+                                onChange={(event) => setName(event.target.value)}
+                                placeholder={t("rules.namePlaceholder")}
+                            />
+                        )}
                     </Field>
-                    <Field label="Sent to">
+                    <Field label={t("rules.sentTo")}>
                         {(id) => <Input id={id} value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="billing@*" />}
                     </Field>
-                    <Field label="Sent from">
+                    <Field label={t("rules.sentFrom")}>
                         {(id) => <Input id={id} value={sender} onChange={(event) => setSender(event.target.value)} placeholder="*@bank.example" />}
                     </Field>
                     <label className="flex items-center gap-2 text-[0.8125rem] text-foreground">
                         <Checkbox checked={includeSpam} onChange={(event) => setIncludeSpam(event.target.checked)} />
-                        Also for mail the spam filter caught
+                        {t("rules.includeSpam")}
                     </label>
                     {error ? <p className="text-xs text-danger">{error}</p> : null}
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tcommon("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={!parsed.success || pending || unchanged}>
-                            {pending ? "Saving..." : "Save"}
+                            {pending ? tcommon("actions.saving") : tcommon("actions.save")}
                         </Button>
                     </DialogFooter>
                 </form>

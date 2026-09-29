@@ -17,6 +17,7 @@ import { MailServerAccessError, unseal } from "./access";
 import * as core from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma, type MailInboundRule, type MailServer } from "@polaris/db";
 
@@ -88,17 +89,18 @@ async function fire(server: MailServer, rule: MailInboundRule, event: core.Inbou
     });
     if (!ceiling.allowed) return;
     const to = event.to.length > 0 ? event.to.join(", ") : server.hostname;
+    const t = await wordsFor(server.ownerId, "mailServer");
     const body = [
-        event.from ? `From ${event.from} to ${to}.` : `To ${to}.`,
-        event.spam ? "The spam filter marked it as spam." : null,
-        ceiling.last ? "This rule has matched often in the last ten minutes; further matches are not notified until the window ends." : null
+        event.from ? t("notices.fromTo", { from: event.from, to }) : t("notices.to", { to }),
+        event.spam ? t("notices.spam") : null,
+        ceiling.last ? t("notices.ceiling") : null
     ]
         .filter(Boolean)
         .join(" ");
     await notify({
         userId: server.ownerId,
         event: "mailserver.inbound",
-        title: `${rule.name}: mail arrived at ${server.hostname}`,
+        title: t("notices.arrived", { rule: rule.name, host: server.hostname }),
         body,
         href: `/apps/mail-server/${server.id}?tab=rules`,
         shelf: { orgId: server.orgId },

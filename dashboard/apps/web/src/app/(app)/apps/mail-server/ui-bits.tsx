@@ -9,6 +9,7 @@
 
 import { Badge, cn } from "@polaris/ui";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 type Answer<T> = { error: string } | ({ error?: undefined } & T);
 
@@ -52,6 +53,7 @@ export function usePanelData<T extends object>(
     key: string,
     load: () => Promise<Answer<T>>
 ): { data: T | null; error: string | null; loading: boolean; reload: () => Promise<void> } {
+    const t = useTranslations("mailServer");
     const [data, setData] = useState<T | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -60,7 +62,7 @@ export function usePanelData<T extends object>(
 
     const fetchNow = useCallback(async () => {
         setLoading(true);
-        const answer = await loader.current().catch(() => ({ error: "Polaris could not be reached." }) as Answer<T>);
+        const answer = await loader.current().catch(() => ({ error: t("common.unreachable") }) as Answer<T>);
         if ("error" in answer && answer.error) {
             setError(answer.error);
         } else {
@@ -69,7 +71,7 @@ export function usePanelData<T extends object>(
             writeCache(key, answer);
         }
         setLoading(false);
-    }, [key]);
+    }, [key, t]);
 
     useEffect(() => {
         const cached = readCache<T>(key);
@@ -116,34 +118,30 @@ export function Field({
 
 export type Verdict = "pass" | "warn" | "fail" | "unverified";
 
-const VERDICT_LABEL: Record<Verdict, string> = {
-    pass: "Pass",
-    warn: "Check",
-    fail: "Fail",
-    unverified: "Unverified"
-};
-
 export function VerdictBadge({ verdict, label }: { verdict: Verdict; label?: string }) {
+    const t = useTranslations("mailServer");
     const variant = verdict === "pass" ? "success" : verdict === "warn" ? "warning" : verdict === "fail" ? "danger" : "neutral";
-    return <Badge variant={variant}>{label ?? VERDICT_LABEL[verdict]}</Badge>;
+    return <Badge variant={variant}>{label ?? t(`verdicts.${verdict}`)}</Badge>;
 }
 
 /** The server's state, as one badge. */
 export function StatusBadge({ status }: { status: string }) {
-    if (status === "ready") return <Badge variant="success">Running</Badge>;
-    if (status === "down") return <Badge variant="danger">Not answering</Badge>;
-    if (status === "failed") return <Badge variant="danger">Setup stopped</Badge>;
-    return <Badge variant="primary">Setting up</Badge>;
+    const t = useTranslations("mailServer");
+    if (status === "ready") return <Badge variant="success">{t("status.ready")}</Badge>;
+    if (status === "down") return <Badge variant="danger">{t("status.down")}</Badge>;
+    if (status === "failed") return <Badge variant="danger">{t("status.failed")}</Badge>;
+    return <Badge variant="primary">{t("status.settingUp")}</Badge>;
 }
 
 /** A sentence a panel could not load past. */
 export function PanelError({ message, onRetry }: { message: string; onRetry?: () => void }) {
+    const tcommon = useTranslations("common");
     return (
         <div className="flex items-center justify-between gap-3 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-[0.8125rem] text-danger-ink">
             <span>{message}</span>
             {onRetry ? (
                 <button type="button" className="shrink-0 text-xs font-medium underline" onClick={onRetry}>
-                    Try again
+                    {tcommon("pages.error.tryAgain")}
                 </button>
             ) : null}
         </div>

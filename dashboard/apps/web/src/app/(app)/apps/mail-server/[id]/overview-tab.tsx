@@ -32,6 +32,8 @@ import {
     storedHealthAction,
     type MailServerDetail
 } from "../actions";
+import { mailNoteText, portNote, portWords } from "@/lib/mail-server/words";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 type Health = Extract<Awaited<ReturnType<typeof healthAction>>, { health: unknown }>["health"];
 
@@ -44,6 +46,7 @@ export interface OverviewSeed {
 }
 
 export function OverviewTab({ serverId, seed }: { serverId: string; seed: OverviewSeed }) {
+    const t = useTranslations("mailServer");
     const router = useRouter();
     const [detail, setDetail] = useState<MailServerDetail | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -58,7 +61,7 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
         let timer: ReturnType<typeof setTimeout> | null = null;
         const tick = async () => {
             const answer = await serverDetailAction(serverId).catch(() => ({
-                error: "Polaris could not be reached."
+                error: t("common.unreachable")
             }));
             if (stopped) return;
             if ("server" in answer && answer.server) {
@@ -67,7 +70,7 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
                 if (answer.server.running || answer.server.status === "setting-up")
                     timer = setTimeout(tick, 3000);
             } else {
-                setError(answer.error ?? "That mail server was not found.");
+                setError(answer.error ?? t("refusals.notFound"));
             }
         };
         void tick();
@@ -75,7 +78,7 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
             stopped = true;
             if (timer) clearTimeout(timer);
         };
-    }, [serverId, busy]);
+    }, [serverId, busy, t]);
 
     async function resume(from: string | null): Promise<void> {
         setBusy(true);
@@ -111,15 +114,22 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
                 <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge status={status} />
                     <span className="flex items-center gap-1 text-[0.8125rem] text-muted-foreground">
-                        {detail?.primaryDomain ?? seed.primaryDomain} on{" "}
-                        {detail ? detail.placementName : <Skeleton className="h-3.5 w-24" />}
+                        {t.rich("overview.on", {
+                            domain: detail?.primaryDomain ?? seed.primaryDomain,
+                            place: () =>
+                                detail ? (
+                                    <span key="place">{detail.placementName}</span>
+                                ) : (
+                                    <Skeleton key="place" className="h-3.5 w-24" />
+                                )
+                        })}
                     </span>
                     <div className="ml-auto flex items-center gap-2">
                         {detail?.projectId ? (
                             <Button asChild size="sm" variant="outline">
                                 <Link href={`/apps/deploy/${detail.projectId}`}>
                                     <ExternalLink />
-                                    Service in Deploy
+                                    {t("overview.inDeploy")}
                                 </Link>
                             </Button>
                         ) : null}
@@ -131,7 +141,7 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger-edge bg-danger-soft px-3 py-2">
                         <span className="text-[0.8125rem] text-danger">{detail.error}</span>
                         <Button size="sm" onClick={() => void resume(null)} disabled={busy}>
-                            Run setup again from here
+                            {t("overview.runAgain")}
                         </Button>
                     </div>
                 ) : null}
@@ -174,14 +184,14 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
                 {detail && !settingUp ? (
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs text-muted-foreground">
-                            Repair by running setup again from
+                            {t("overview.repairFrom")}
                         </span>
                         <div className="w-64">
                             <Select
-                                aria-label="Step to repair from"
+                                aria-label={t("overview.repairStep")}
                                 value={repairFrom}
                                 onValueChange={setRepairFrom}
-                                placeholder="Choose a step"
+                                placeholder={t("overview.chooseStep")}
                                 options={detail.steps.map((entry) => ({
                                     value: entry.step,
                                     label: entry.label
@@ -194,7 +204,7 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
                             disabled={!repairFrom || busy}
                             onClick={() => void resume(repairFrom)}
                         >
-                            Repair
+                            {t("overview.repair")}
                         </Button>
                     </div>
                 ) : null}
@@ -204,8 +214,7 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
 
             <section className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                 <p className="max-w-xl text-xs text-muted-foreground">
-                    Removing it here stops Polaris managing it. The service, its volumes and the
-                    mail in them stay in Deploy until you delete them there.
+                    {t("overview.removeHint")}
                 </p>
                 <Button
                     size="sm"
@@ -213,17 +222,17 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
                     onClick={() => setRemoving(true)}
                     disabled={!detail || detail.running}
                 >
-                    Remove from Polaris
+                    {t("overview.remove")}
                 </Button>
             </section>
             <ConfirmDeleteDialog
                 open={removing}
                 onOpenChange={setRemoving}
                 name={detail?.hostname ?? seed.hostname}
-                kind="mail server"
-                title="Stop managing this mail server?"
-                confirmLabel="Remove"
-                description="Its service and mail stay in Deploy. Rules on incoming mail and filed DMARC reports are deleted."
+                kind={t("overview.kind")}
+                title={t("overview.removeTitle")}
+                confirmLabel={t("overview.removeConfirm")}
+                description={t("overview.removeBody")}
                 error={removeError}
                 onConfirm={() => void remove()}
             />
@@ -232,6 +241,7 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
 }
 
 function HealthSection({ serverId }: { serverId: string }) {
+    const t = useTranslations("mailServer");
     const format = useDisplayFormat();
     const stored = usePanelData(`stored-health:${serverId}`, () => storedHealthAction(serverId));
     const [health, setHealth] = useState<Health | null>(null);
@@ -254,7 +264,7 @@ function HealthSection({ serverId }: { serverId: string }) {
     return (
         <section className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-foreground">Health</h2>
+                <h2 className="text-sm font-semibold text-foreground">{t("health.title")}</h2>
                 <Button
                     size="sm"
                     variant="outline"
@@ -262,14 +272,14 @@ function HealthSection({ serverId }: { serverId: string }) {
                     disabled={checking}
                 >
                     <RefreshCw className={checking ? "animate-spin" : undefined} />
-                    {checking ? "Checking..." : "Check now"}
+                    {checking ? t("dns.checking") : t("health.check")}
                 </Button>
             </div>
             {error ? <PanelError message={error} /> : null}
             {health ? (
                 <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="rounded-md border border-border p-3">
-                        <dt className="text-xs text-muted-foreground">Engine</dt>
+                        <dt className="text-xs text-muted-foreground">{t("health.engine")}</dt>
                         <dd className="mt-1 flex items-center gap-2 text-[0.8125rem]">
                             <VerdictBadge
                                 verdict={
@@ -278,28 +288,28 @@ function HealthSection({ serverId }: { serverId: string }) {
                                 label={
                                     health.engine.answers
                                         ? health.engine.managed
-                                            ? "Answering"
-                                            : "Not managed"
-                                        : "Not answering"
+                                            ? t("health.answering")
+                                            : t("health.notManaged")
+                                        : t("status.down")
                                 }
                             />
                         </dd>
                         {health.engine.note ? (
                             <p className="mt-1 text-xs text-muted-foreground">
-                                {health.engine.note}
+                                {mailNoteText(t, health.engine.note)}
                             </p>
                         ) : null}
                     </div>
                     <div className="rounded-md border border-border p-3">
-                        <dt className="text-xs text-muted-foreground">Waiting to go out</dt>
+                        <dt className="text-xs text-muted-foreground">{t("health.queued")}</dt>
                         <dd className="mt-1 text-[0.8125rem] text-foreground">
                             {health.engine.queued === null
-                                ? "Unknown"
-                                : `${health.engine.queued} message${health.engine.queued === 1 ? "" : "s"}`}
+                                ? t("health.unknown")
+                                : t("health.messages", { count: health.engine.queued })}
                         </dd>
                     </div>
                     <div className="rounded-md border border-border p-3">
-                        <dt className="text-xs text-muted-foreground">Certificate on 465</dt>
+                        <dt className="text-xs text-muted-foreground">{t("health.certificate")}</dt>
                         <dd className="mt-1 flex flex-wrap items-center gap-2 text-[0.8125rem]">
                             <VerdictBadge verdict={health.certificate.verdict} />
                             {health.certificate.issuer ? (
@@ -310,12 +320,12 @@ function HealthSection({ serverId }: { serverId: string }) {
                         </dd>
                         {health.certificate.expiresAt ? (
                             <p className="mt-1 text-xs text-muted-foreground">
-                                Expires {format.date(health.certificate.expiresAt)}
+                                {t("health.expires", { when: format.date(health.certificate.expiresAt) })}
                             </p>
                         ) : null}
                         {health.certificate.note ? (
                             <p className="mt-1 text-xs text-muted-foreground">
-                                {health.certificate.note}
+                                {mailNoteText(t, health.certificate.note)}
                             </p>
                         ) : null}
                     </div>
@@ -330,7 +340,7 @@ function HealthSection({ serverId }: { serverId: string }) {
                 <div className="flex flex-col gap-2 rounded-md border border-border p-3">
                     <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-xs text-muted-foreground">
-                            The address mail leaves from
+                            {t("health.leavesFrom")}
                         </h3>
                         <VerdictBadge verdict={health.reverse.verdict} />
                         {health.reverse.address ? <Mono>{health.reverse.address}</Mono> : null}
@@ -340,12 +350,12 @@ function HealthSection({ serverId }: { serverId: string }) {
                             <p className="flex items-center gap-2 text-[0.8125rem]">
                                 <VerdictBadge verdict={check.verdict} />
                                 <span className="text-muted-foreground">
-                                    {at === 0 ? "Reverse name" : "Greeting name"}
+                                    {at === 0 ? t("health.reverse") : t("health.greeting")}
                                 </span>
                             </p>
-                            <p className="text-xs text-muted-foreground">{check.note}</p>
+                            <p className="text-xs text-muted-foreground">{mailNoteText(t, check.note)}</p>
                             {check.instruction ? (
-                                <p className="text-xs text-foreground">{check.instruction}</p>
+                                <p className="text-xs text-foreground">{mailNoteText(t, check.instruction)}</p>
                             ) : null}
                         </div>
                     ))}
@@ -355,13 +365,13 @@ function HealthSection({ serverId }: { serverId: string }) {
                 <div className="flex flex-col gap-2">
                     <p className="text-xs text-muted-foreground">
                         {ports.address ? (
-                            <>
-                                Ports knocked on at <Mono>{ports.address}</Mono>, from where Polaris
-                                runs
-                                {ports.at ? `, ${format.dateTime(ports.at)}` : ""}.
-                            </>
+                            t.rich(ports.at ? "health.knockedAt" : "health.knocked", {
+                                address: ports.address,
+                                when: ports.at ? format.dateTime(ports.at) : "",
+                                mono: (chunks) => <Mono key="address">{chunks}</Mono>
+                            })
                         ) : (
-                            ports.note
+                            mailNoteText(t, ports.note)
                         )}
                     </p>
                     {ports.results.length > 0 ? (
@@ -369,9 +379,9 @@ function HealthSection({ serverId }: { serverId: string }) {
                             <table className="w-full text-[0.8125rem]">
                                 <thead>
                                     <tr className="text-left">
-                                        <th className="py-1.5 pr-3">Port</th>
-                                        <th className="py-1.5 pr-3">Used for</th>
-                                        <th className="py-1.5 pr-3">Result</th>
+                                        <th className="py-1.5 pr-3">{t("health.columns.port")}</th>
+                                        <th className="py-1.5 pr-3">{t("health.columns.usedFor")}</th>
+                                        <th className="py-1.5 pr-3">{t("health.columns.result")}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
@@ -380,18 +390,18 @@ function HealthSection({ serverId }: { serverId: string }) {
                                             <td className="py-2 pr-3 font-mono text-xs">
                                                 {result.port}{" "}
                                                 <span className="text-muted-foreground">
-                                                    {result.label}
+                                                    {portWords(t, result).label}
                                                 </span>
                                             </td>
                                             <td className="py-2 pr-3 text-muted-foreground">
-                                                {result.purpose}
+                                                {portWords(t, result).purpose}
                                             </td>
                                             <td className="py-2 pr-3">
                                                 <div className="flex flex-col gap-1">
                                                     <VerdictBadge verdict={result.verdict} />
                                                     {result.note ? (
                                                         <span className="text-xs text-muted-foreground">
-                                                            {result.note}
+                                                            {portNote(t, result.note)}
                                                         </span>
                                                     ) : null}
                                                 </div>
@@ -404,7 +414,7 @@ function HealthSection({ serverId }: { serverId: string }) {
                     ) : null}
                 </div>
             ) : !health && !stored.loading ? (
-                <p className="text-xs text-muted-foreground">Not checked yet.</p>
+                <p className="text-xs text-muted-foreground">{t("dns.notChecked")}</p>
             ) : null}
         </section>
     );
