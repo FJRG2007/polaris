@@ -27,6 +27,7 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/ark-actions", () => ({}
 // first render is what a first visit gets.
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
+        i18nProvider: { useLocale: () => "en-US" },
         liveRead: { useKeptSnapshot: () => undefined },
         relativeTime: { RelativeTime: () => null },
         snapshotCache: {

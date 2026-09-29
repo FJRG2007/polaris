@@ -20,6 +20,7 @@
  */
 
 import { GAME_RULES } from "../../lib/minecraft/rules";
+import { useGameText } from "../game-text";
 import { applyCompletion, completeConsole, type ConsoleGame } from "../../lib/console-complete";
 import { recentItemsAction, sendConsoleCommandAction } from "./minecraft-actions";
 import {
@@ -152,6 +153,7 @@ export function GameConsole({
      *  to - the two do not share a single command. */
     hint?: string;
 }) {
+    const t = useGameText("games");
     const { log, refresh } = useRuntimeLog(applicationId, true, 400);
     const [line, setLine] = useState("");
     const [replies, setReplies] = useState<Reply[]>([]);
@@ -345,7 +347,7 @@ export function GameConsole({
                 remember(step.line);
                 const result = await sendConsoleCommandAction(installedAppId, step.line).catch(
                     () =>
-                        ({ error: "The server did not answer" }) as {
+                        ({ error: t("console.theServerDidNotAnswer") }) as {
                             output?: string;
                             error?: string;
                         }
@@ -488,13 +490,13 @@ export function GameConsole({
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium">Console</p>
+                    <p className="text-sm font-medium">{t("console.console")}</p>
                     <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => void refresh()}
-                        aria-label="Refresh the console"
-                        title="Refresh the console"
+                        aria-label={t("console.refreshTheConsole")}
+                        title={t("console.refreshTheConsole")}
                     >
                         <RefreshCw className="size-4" />
                     </Button>
@@ -564,16 +566,16 @@ export function GameConsole({
                                             });
                                         }}
                                     >
-                                        Edit
+                                        {t("console.edit")}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onSelect={() => load(entry.command)}>
-                                        Put it in the box
+                                        {t("console.putItInTheBox")}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
                                         className="text-danger"
                                         onSelect={() => forget(entry.id)}
                                     >
-                                        <Trash2 className="size-4" /> Forget it
+                                        <Trash2 className="size-4" /> {t("console.forgetIt")}
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -588,7 +590,7 @@ export function GameConsole({
                             setKeeping({ label: "", command: line.trim() });
                         }}
                     >
-                        <Plus className="size-3.5" /> Keep a command
+                        <Plus className="size-3.5" /> {t("console.keepACommand")}
                     </Button>
                 </div>
 
@@ -640,9 +642,9 @@ export function GameConsole({
                         onSelect={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
                         onBlur={() => setChoice(null)}
                         onKeyDown={onKeyDown}
-                        placeholder={running ? hint : "Start the server to send commands"}
+                        placeholder={running ? hint : t("console.startTheServerToSend")}
                         disabled={!running || pending || queue !== null}
-                        aria-label="Server command"
+                        aria-label={t("console.serverCommand")}
                         className="font-mono"
                     />
                     {/* What was typed here before, including before the last
@@ -653,8 +655,8 @@ export function GameConsole({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label="Commands you have run"
-                                title="Commands you have run"
+                                aria-label={t("console.commandsYouHaveRun")}
+                                title={t("console.commandsYouHaveRun")}
                             >
                                 <History className="size-4" />
                             </Button>
@@ -663,10 +665,12 @@ export function GameConsole({
                             align="end"
                             className="max-h-80 overflow-y-auto overscroll-contain"
                         >
-                            <DropdownMenuLabel>Commands you have run</DropdownMenuLabel>
+                            <DropdownMenuLabel>{t("console.commandsYouHaveRun")}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             {past.length === 0 ? (
-                                <DropdownMenuItem disabled>Nothing yet</DropdownMenuItem>
+                                <DropdownMenuItem disabled>
+                                    {t("console.nothingYet")}
+                                </DropdownMenuItem>
                             ) : (
                                 [...past].reverse().map((command, index) => (
                                     <DropdownMenuItem
@@ -687,7 +691,7 @@ export function GameConsole({
                                         className="text-danger"
                                         onSelect={clearHistory}
                                     >
-                                        <Trash2 className="size-4" /> Clear the history
+                                        <Trash2 className="size-4" /> {t("console.clearTheHistory")}
                                     </DropdownMenuItem>
                                 </>
                             )}
@@ -696,8 +700,8 @@ export function GameConsole({
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Run several commands"
-                        title="Run several commands, one after another"
+                        aria-label={t("console.runSeveralCommands")}
+                        title={t("console.runSeveralCommandsOneAfter")}
                         disabled={!running || queue !== null}
                         onClick={() => setBatch(line.trim())}
                     >
@@ -707,7 +711,7 @@ export function GameConsole({
                         onClick={() => submit(line)}
                         disabled={!running || pending || queue !== null || line.trim().length === 0}
                     >
-                        <CornerDownLeft className="size-4" /> Send
+                        <CornerDownLeft className="size-4" /> {t("console.send")}
                     </Button>
                 </div>
 
@@ -728,7 +732,7 @@ export function GameConsole({
                                 stopQueue.current = true;
                             }}
                         >
-                            <Square className="size-3.5" /> Stop
+                            <Square className="size-3.5" /> {t("console.stop")}
                         </Button>
                     </div>
                 )}
@@ -737,7 +741,7 @@ export function GameConsole({
                     <Dialog open onOpenChange={(open: boolean) => !open && setBatch(null)}>
                         <DialogContent className="sm:max-w-2xl">
                             <DialogHeader>
-                                <DialogTitle>Run several commands</DialogTitle>
+                                <DialogTitle>{t("console.runSeveralCommands")}</DialogTitle>
                                 <DialogDescription>
                                     One per line, sent in order, each after the last is answered.
                                     Put <code>wait 10</code> on a line of its own to pause for ten
@@ -752,7 +756,7 @@ export function GameConsole({
                                 className="font-mono text-xs"
                                 placeholder={`title @a title {"text":"Reloading..."}\neffect give @a minecraft:slowness 10 255 true\nwait 10\ntitle @a title {"text":"Done!"}`}
                                 onChange={(event) => setBatch(event.target.value)}
-                                aria-label="Commands, one per line"
+                                aria-label={t("console.commandsOnePerLine")}
                             />
                             {parsedBatch?.problem && batch.trim().length > 0 ? (
                                 <p role="alert" className="text-sm text-danger">
@@ -765,7 +769,7 @@ export function GameConsole({
                             ) : null}
                             <DialogFooter>
                                 <Button variant="ghost" onClick={() => setBatch(null)}>
-                                    Cancel
+                                    {t("console.cancel")}
                                 </Button>
                                 <Button
                                     disabled={
@@ -782,7 +786,7 @@ export function GameConsole({
                                     <ListOrdered className="size-4" />
                                     {parsedBatch && !parsedBatch.problem
                                         ? `Run ${commandCount(parsedBatch.steps)} ${commandCount(parsedBatch.steps) === 1 ? "command" : "commands"}`
-                                        : "Run"}
+                                        : t("console.run")}
                                 </Button>
                             </DialogFooter>
                         </DialogContent>
@@ -794,7 +798,9 @@ export function GameConsole({
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>
-                                    {keeping.id ? "Edit the command" : "Keep a command"}
+                                    {keeping.id
+                                        ? t("console.editTheCommand")
+                                        : t("console.keepACommand")}
                                 </DialogTitle>
                                 <DialogDescription>
                                     It sits above the console for everybody who runs this server.
@@ -805,7 +811,9 @@ export function GameConsole({
                             </DialogHeader>
                             <div className="flex flex-col gap-3">
                                 <label className="flex flex-col gap-1">
-                                    <span className="text-sm font-medium">Command</span>
+                                    <span className="text-sm font-medium">
+                                        {t("console.command")}
+                                    </span>
                                     <Input
                                         autoFocus
                                         value={keeping.command}
@@ -818,11 +826,11 @@ export function GameConsole({
                                     />
                                 </label>
                                 <label className="flex flex-col gap-1">
-                                    <span className="text-sm font-medium">Name</span>
+                                    <span className="text-sm font-medium">{t("console.name")}</span>
                                     <Input
                                         value={keeping.label}
                                         maxLength={MAX_SAVED_LABEL}
-                                        placeholder="The command itself, if you leave this empty"
+                                        placeholder={t("console.theCommandItselfIfYou")}
                                         onChange={(event) =>
                                             setKeeping({ ...keeping, label: event.target.value })
                                         }
@@ -836,13 +844,13 @@ export function GameConsole({
                             </div>
                             <DialogFooter>
                                 <Button variant="ghost" onClick={() => setKeeping(null)}>
-                                    Cancel
+                                    {t("console.cancel")}
                                 </Button>
                                 <Button
                                     onClick={keep}
                                     disabled={pending || keeping.command.trim().length === 0}
                                 >
-                                    Keep it
+                                    {t("console.keepIt")}
                                 </Button>
                             </DialogFooter>
                         </DialogContent>

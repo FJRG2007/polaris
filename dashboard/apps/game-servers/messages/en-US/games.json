@@ -276,5 +276,31 @@
             "removeTitle": "Remove {name} from the player list?",
             "removeBody": "The running server is told at once. While the server only lets in players on the list, they cannot join again until they are added back."
         }
+    },
+    "console": {
+        "theServerDidNotAnswer": "The server did not answer",
+        "console": "Console",
+        "refreshTheConsole": "Refresh the console",
+        "edit": "Edit",
+        "putItInTheBox": "Put it in the box",
+        "forgetIt": "Forget it",
+        "keepACommand": "Keep a command",
+        "startTheServerToSend": "Start the server to send commands",
+        "serverCommand": "Server command",
+        "commandsYouHaveRun": "Commands you have run",
+        "nothingYet": "Nothing yet",
+        "clearTheHistory": "Clear the history",
+        "runSeveralCommands": "Run several commands",
+        "runSeveralCommandsOneAfter": "Run several commands, one after another",
+        "send": "Send",
+        "stop": "Stop",
+        "commandsOnePerLine": "Commands, one per line",
+        "cancel": "Cancel",
+        "run": "Run",
+        "editTheCommand": "Edit the command",
+        "command": "Command",
+        "name": "Name",
+        "theCommandItselfIfYou": "The command itself, if you leave this empty",
+        "keepIt": "Keep it"
     }
 }

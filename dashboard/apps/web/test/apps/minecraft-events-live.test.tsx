@@ -11,6 +11,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
+        i18nProvider: { useLocale: () => "en-US" },
         confirmDialog: { useConfirm: () => [async () => true, null] },
         displayFormat: {
             useDisplayFormat: () => ({ dateTime: (at: number) => new Date(at).toISOString() })

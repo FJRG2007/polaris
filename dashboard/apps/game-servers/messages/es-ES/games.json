@@ -276,5 +276,31 @@
             "removeTitle": "¿Quitar a {name} de la lista de jugadores?",
             "removeBody": "Se avisa al servidor en marcha al momento. Mientras el servidor solo deje entrar a los de la lista, no podrá volver hasta que se le añada de nuevo."
         }
+    },
+    "console": {
+        "theServerDidNotAnswer": "El servidor no respondió",
+        "console": "Consola",
+        "refreshTheConsole": "Actualizar la consola",
+        "edit": "Editar",
+        "putItInTheBox": "Ponerlo en la caja",
+        "forgetIt": "Olvidarlo",
+        "keepACommand": "Guardar un comando",
+        "startTheServerToSend": "Arranca el servidor para enviar comandos",
+        "serverCommand": "Comando",
+        "commandsYouHaveRun": "Comandos que has ejecutado",
+        "nothingYet": "Nada aún",
+        "clearTheHistory": "Borrar el historial",
+        "runSeveralCommands": "Varios comandos",
+        "runSeveralCommandsOneAfter": "Ejecutar varios comandos, uno tras otro",
+        "send": "Enviar",
+        "stop": "Parar",
+        "commandsOnePerLine": "Comandos, uno por línea",
+        "cancel": "Cancelar",
+        "run": "Lanzar",
+        "editTheCommand": "Editar el comando",
+        "command": "Comando",
+        "name": "Nombre",
+        "theCommandItselfIfYou": "El propio comando, si lo dejas vacío",
+        "keepIt": "Guardarlo"
     }
 }

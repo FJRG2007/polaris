@@ -543,7 +543,7 @@ function ConnectCard({
                             <JoinAddress
                                 title={t("panel.orConnectStraightToIt")}
                                 value={`open ${withPort(address, status?.gamePort ?? ports.game)}`}
-                                detail={t("panel.consoleHint")}
+                                detail={t("panel.joinConsoleHint")}
                             />
                         </>
                     )}
@@ -1474,7 +1474,7 @@ function PlayersTab({
                                     minutes,
                                     reason
                                 }),
-                            t("panel.timedOut", { name: target.name })
+                            t("panel.outForAWhile", { name: target.name })
                         )
                     }
                 />

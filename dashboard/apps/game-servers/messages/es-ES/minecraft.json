@@ -739,5 +739,36 @@
             "hotbar": "Barra {number}",
             "slot": "Casilla {number}"
         }
+    },
+    "sidebar": {
+        "sidePanel": "Panel lateral",
+        "aBoxOnTheRight": "Un recuadro a la derecha de la pantalla de cada jugador. Polaris mantiene sus valores al día mientras el servidor funciona.",
+        "showTheSidePanel": "Mostrar el panel lateral",
+        "title": "Título",
+        "lines": "Líneas",
+        "dragToMoveOrUse": "Arrastra para mover, o usa las flechas",
+        "leaveEmptyForAGap": "Vacío para un hueco",
+        "addALine": "Añadir línea",
+        "addALeaderboard": "Añadir clasificación",
+        "severalTakingTurns": "Varias por turnos...",
+        "changeItInLinkedChat": "Cámbialo en Chat vinculado",
+        "linkOneInLinkedChat": "Vincula uno en Chat vinculado",
+        "onlySomebodyWhoManagesThis": "Solo quien gestiona este servidor puede cambiarlo.",
+        "save": "Guardar",
+        "leaderboardsTakingTurns": "Clasificaciones por turnos",
+        "twoLinesThatShowEach": "Dos líneas que muestran cada una por turnos: su encabezado y la lista debajo. Mayús-clic toma un tramo entero, Ctrl+A todas.",
+        "chooseAll": "Elegir todas",
+        "clear": "Borrar",
+        "leaderboards": "Clasificaciones",
+        "itsTurn": "Su turno",
+        "eachFor": "Cada una",
+        "secondsEachLeaderboardShows": "Segundos por clasificación",
+        "chooseAtLeastTwo": "Elige al menos dos.",
+        "thePanelHasNoRoom": "El panel no tiene sitio para dos líneas más. Quita una primero.",
+        "cancel": "Cancelar",
+        "add": "Añadir",
+        "preview": "Vista",
+        "previewOfTheSidePanel": "Vista previa del panel lateral",
+        "offNobodySeesItUntil": "Desactivado: nadie lo ve hasta que se active."
     }
 }

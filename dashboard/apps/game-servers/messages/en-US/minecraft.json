@@ -739,5 +739,36 @@
             "hotbar": "Hotbar {number}",
             "slot": "Slot {number}"
         }
+    },
+    "sidebar": {
+        "sidePanel": "Side panel",
+        "aBoxOnTheRight": "A box on the right of every player's screen. Polaris keeps its values current while the server runs.",
+        "showTheSidePanel": "Show the side panel",
+        "title": "Title",
+        "lines": "Lines",
+        "dragToMoveOrUse": "Drag to move, or use the arrow keys",
+        "leaveEmptyForAGap": "Leave empty for a gap",
+        "addALine": "Add a line",
+        "addALeaderboard": "Add a leaderboard",
+        "severalTakingTurns": "Several, taking turns...",
+        "changeItInLinkedChat": "Change it in Linked chat",
+        "linkOneInLinkedChat": "Link one in Linked chat",
+        "onlySomebodyWhoManagesThis": "Only somebody who manages this server can change it.",
+        "save": "Save",
+        "leaderboardsTakingTurns": "Leaderboards taking turns",
+        "twoLinesThatShowEach": "Two lines that show each of these in turn: its heading, and the list under it. Shift-click takes a whole stretch, Ctrl+A all of them.",
+        "chooseAll": "Choose all",
+        "clear": "Clear",
+        "leaderboards": "Leaderboards",
+        "itsTurn": "Its turn",
+        "eachFor": "Each for",
+        "secondsEachLeaderboardShows": "Seconds each leaderboard shows",
+        "chooseAtLeastTwo": "Choose at least two.",
+        "thePanelHasNoRoom": "The panel has no room for two more lines. Remove one first.",
+        "cancel": "Cancel",
+        "add": "Add",
+        "preview": "Preview",
+        "previewOfTheSidePanel": "Preview of the side panel",
+        "offNobodySeesItUntil": "Off: nobody sees it until it is switched on."
     }
 }

@@ -21,6 +21,7 @@
  */
 
 import Image from "next/image";
+import { useGameText } from "../game-text";
 import * as actions from "./ark-actions";
 import { hostUi } from "@polaris/app-host/client";
 import { RestartPlanner } from "./restart-planner";
@@ -73,6 +74,7 @@ export function ArkMods({
      *  container, and the restart is only offered against one. */
     running: boolean;
 }) {
+    const t = useGameText("ark");
     // What this tab last read paints first, so a revisit is not a skeleton while
     // the server and Steam are asked again; the read replaces what moved.
     const modsKey = `ark-mods:${installedAppId}`;
@@ -150,15 +152,14 @@ export function ArkMods({
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm text-muted-foreground">
-                    Mods are downloaded when the server starts. Players who join a modded server get
-                    them from Steam by themselves - nobody has to subscribe to anything first.
+                    {t("mods.modsAreDownloadedWhenThe")}
                 </p>
                 <Button
                     size="icon"
                     variant="ghost"
                     className="ml-auto"
-                    aria-label="Read the mods again"
-                    title="Read the mods again"
+                    aria-label={t("mods.readTheModsAgain")}
+                    title={t("mods.readTheModsAgain")}
                     disabled={loading}
                     onClick={() => {
                         setLoading(true);
@@ -217,7 +218,7 @@ export function ArkMods({
                 for the server's files. */}
             <div className="flex flex-col gap-1">
                 <p className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Map
+                    {t("mods.map")}
                 </p>
                 <Card>
                     <CardBody className="py-0">
@@ -237,9 +238,7 @@ export function ArkMods({
                             />
                         ) : (
                             <p className="py-4 text-sm text-muted-foreground">
-                                This server runs one of the maps that come with the game. A Workshop
-                                map replaces it, and its world is kept separately from the one you
-                                have now.
+                                {t("mods.thisServerRunsOneOf")}
                             </p>
                         )}
                     </CardBody>
@@ -256,7 +255,7 @@ export function ArkMods({
                             <ListPending loading={loading} rows={2} />
                         ) : ids.length === 0 ? (
                             <p className="py-4 text-sm text-muted-foreground">
-                                No mods. Paste a Workshop link above to add one.
+                                {t("mods.noModsPasteAWorkshop")}
                             </p>
                         ) : (
                             ids.map((id, index) => (
@@ -289,11 +288,7 @@ export function ArkMods({
                 </Card>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-                Mods load in the order above and a later one wins over an earlier one, which is what
-                decides the outcome when two of them change the same thing. Removing a mod stops the
-                server loading it; anything it added to the world goes with it.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("mods.modsLoadInTheOrder")}</p>
         </div>
     );
 }
@@ -302,8 +297,9 @@ export function ArkMods({
  *  failed - the error above says why, and "no mods" would be a claim nothing
  *  checked. */
 function ListPending({ loading, rows }: { loading: boolean; rows: number }) {
+    const t = useGameText("ark");
     if (!loading) {
-        return <p className="py-4 text-sm text-muted-foreground">Could not be read.</p>;
+        return <p className="py-4 text-sm text-muted-foreground">{t("mods.couldNotBeRead")}</p>;
     }
     return (
         <div className="flex flex-col gap-2 py-3" aria-busy="true">
@@ -338,6 +334,7 @@ function ModShelves({
     onAdd: (id: string) => void;
     onSetMap: (id: string) => void;
 }) {
+    const t = useGameText("ark");
     const shelvesKey = `ark-mod-shelves:${installedAppId}`;
     const [shelves, setShelves] = useState<ModShelves>([]);
     useKeptSnapshot<ModShelves>(shelvesKey, KEPT_MODS_MS, (kept) =>
@@ -365,14 +362,13 @@ function ModShelves({
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">Worth a look</p>
+                        <p className="text-sm font-medium">{t("mods.worthALook")}</p>
                         <p className="text-xs text-muted-foreground">
-                            The ones most private servers end up running. Anything else on the
-                            Workshop goes in above, by its link.
+                            {t("mods.theOnesMostPrivateServers")}
                         </p>
                     </div>
                     <Button size="sm" variant="ghost" onClick={() => setOpen(!open)}>
-                        {open ? "Hide" : "Show"}
+                        {open ? t("mods.hide") : t("mods.show")}
                     </Button>
                 </div>
 
@@ -417,7 +413,7 @@ function ModShelves({
                                         href={workshopUrl(suggestion.id)}
                                         target="_blank"
                                         rel="noreferrer noopener"
-                                        title="Open it on Steam"
+                                        title={t("mods.openItOnSteam")}
                                         aria-label={`Open ${item?.title ?? suggestion.name} on Steam`}
                                         className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
@@ -430,7 +426,7 @@ function ModShelves({
                                             disabled={busy}
                                             onClick={() => onSetMap(suggestion.id)}
                                         >
-                                            Use as the map
+                                            {t("mods.useAsTheMap")}
                                         </Button>
                                     ) : (
                                         <Button
@@ -438,7 +434,7 @@ function ModShelves({
                                             disabled={busy}
                                             onClick={() => onAdd(suggestion.id)}
                                         >
-                                            <Plus className="size-4" /> Add
+                                            <Plus className="size-4" /> {t("mods.add")}
                                         </Button>
                                     )}
                                 </div>
@@ -462,6 +458,7 @@ function AddMod({
     onAdd: (id: string) => void;
     onSetMap: (id: string) => void;
 }) {
+    const t = useGameText("ark");
     const [query, setQuery] = useState("");
     const [looking, setLooking] = useState(false);
     const [found, setFound] = useState<WorkshopItem | null>(null);
@@ -502,8 +499,8 @@ function AddMod({
                         <Input
                             className="pl-9"
                             value={query}
-                            aria-label="A Workshop link, an id, or something to search for"
-                            placeholder="Paste a Workshop link, or search by name"
+                            aria-label={t("mods.aWorkshopLinkAnId")}
+                            placeholder={t("mods.pasteAWorkshopLinkOr")}
                             onChange={(event) => setQuery(event.target.value)}
                             onKeyDown={(event) => {
                                 if (event.key !== "Enter") return;
@@ -521,7 +518,7 @@ function AddMod({
                         ) : (
                             <Search className="size-4" />
                         )}
-                        Look it up
+                        {t("mods.lookItUp")}
                     </Button>
                 </div>
 
@@ -533,9 +530,7 @@ function AddMod({
 
                 {needsKey && (
                     <p className="text-xs text-muted-foreground">
-                        Searching the Workshop needs a Steam Web API key, which Polaris asks for
-                        under Integrations. Without one, paste a mod&apos;s link here and it is
-                        added the same way.
+                        {t("mods.searchingTheWorkshopNeedsA")}
                     </p>
                 )}
 
@@ -559,7 +554,7 @@ function AddMod({
 
                 {results !== null && results.length === 0 && !needsKey && (
                     <p className="text-sm text-muted-foreground">
-                        Nothing on the Workshop matches that.
+                        {t("mods.nothingOnTheWorkshopMatches")}
                     </p>
                 )}
 
@@ -604,6 +599,7 @@ function Candidate({
     onAdd: () => void;
     onSetMap: () => void;
 }) {
+    const t = useGameText("ark");
     return (
         <div className="flex flex-wrap items-center gap-3 rounded-md border border-border p-2">
             <Preview installedAppId={installedAppId} item={item} />
@@ -633,12 +629,12 @@ function Candidate({
                 variant="secondary"
                 disabled={busy}
                 onClick={onSetMap}
-                title="Run this as the map"
+                title={t("mods.runThisAsTheMap")}
             >
-                Use as the map
+                {t("mods.useAsTheMap")}
             </Button>
             <Button size="sm" disabled={busy} onClick={onAdd}>
-                <Plus className="size-4" /> Add
+                <Plus className="size-4" /> {t("mods.add")}
             </Button>
         </div>
     );
@@ -692,6 +688,7 @@ function ModRow({
     onDown?: () => void;
     onRemove: () => void;
 }) {
+    const t = useGameText("ark");
     return (
         <div
             className={cn(
@@ -722,22 +719,20 @@ function ModRow({
                 </p>
             </div>
             <div className="flex items-center gap-1">
-                {item?.gone && <Badge variant="danger">taken down</Badge>}
-                {item && !item.forArk && <Badge variant="warning">not an ARK mod</Badge>}
+                {item?.gone && <Badge variant="danger">{t("mods.takenDown")}</Badge>}
+                {item && !item.forArk && <Badge variant="warning">{t("mods.notAnArkMod")}</Badge>}
                 {!knowsDisk ? (
-                    <Badge title="The server is not running, so what it has downloaded cannot be read.">
-                        unknown
-                    </Badge>
+                    <Badge title={t("mods.theServerIsNotRunning")}>unknown</Badge>
                 ) : installed ? (
                     <Badge variant="success">installed</Badge>
                 ) : (
-                    <Badge variant="warning">installs at the next start</Badge>
+                    <Badge variant="warning">{t("mods.installsAtTheNextStart")}</Badge>
                 )}
                 <a
                     href={workshopUrl(id)}
                     target="_blank"
                     rel="noreferrer noopener"
-                    title="Open it on Steam"
+                    title={t("mods.openItOnSteam")}
                     aria-label={`Open ${item?.title ?? id} on Steam`}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
@@ -749,7 +744,7 @@ function ModRow({
                         variant="ghost"
                         disabled={busy}
                         aria-label={`Load ${item?.title ?? id} earlier`}
-                        title="Load it earlier"
+                        title={t("mods.loadItEarlier")}
                         onClick={onUp}
                     >
                         <ArrowUp className="size-4" />
@@ -761,7 +756,7 @@ function ModRow({
                         variant="ghost"
                         disabled={busy}
                         aria-label={`Load ${item?.title ?? id} later`}
-                        title="Load it later"
+                        title={t("mods.loadItLater")}
                         onClick={onDown}
                     >
                         <ArrowDown className="size-4" />
@@ -774,7 +769,7 @@ function ModRow({
                         disabled={busy}
                         className="text-danger hover:text-danger"
                         aria-label={`Remove ${item?.title ?? id}`}
-                        title="Remove it"
+                        title={t("mods.removeIt")}
                         onClick={onRemove}
                     >
                         <Trash2 className="size-4" />
