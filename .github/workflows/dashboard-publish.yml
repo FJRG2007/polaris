@@ -58,14 +58,16 @@ permissions:
   # Read by `changes`, to find the last run that published.
   actions: read
 
-# One publish at a time. An image is now pushed untagged and named minutes later by
-# the `tag` job, so two overlapping runs interleave: the older one's `tag` can land
-# after the newer one's and move `latest` back to the commit before it. Cancellation
-# stays off - a run stopped between the push and the tag leaves images in the
-# registry that nothing will ever name.
+# One publish at a time, and only the newest: a push to main cancels the run still
+# building an older commit, since every commit carries the ones before it and the
+# older image would only be replaced minutes later. Runs still never overlap, so an
+# older `tag` can never land after a newer one and move `latest` back. A run stopped
+# between the push and the tag leaves an untagged digest behind, which ghcr-prune.yml
+# removes; the next successful run measures its changes from the last one that
+# succeeded, so nothing the cancelled run carried is skipped.
 concurrency:
   group: dashboard-publish
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   # Decide which images need rebuilding from the paths that changed in this push.
