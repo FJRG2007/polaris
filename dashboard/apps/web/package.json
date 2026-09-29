@@ -11,7 +11,8 @@
         "build": "next build",
         "start": "next start",
         "test": "vitest run --passWithNoTests",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "i18n:scan": "node scripts/i18n-scan.mjs"
     },
     "dependencies": {
         "@better-auth/passkey": "1.6.25",
