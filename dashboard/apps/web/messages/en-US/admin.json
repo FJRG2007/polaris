@@ -630,6 +630,65 @@
             "checkAgain": "Save, then run the DNS check again - it reports the moment the ports reach Polaris.",
             "remote": "Only if the router still answers after that: it is keeping the ports for its own admin page. Go to <b>{path}</b> and turn off management from the internet (WAN), or move it to a port such as 8443.",
             "remoteGeneric": "Only if the router still answers after that: it is keeping the ports for its own admin page. Go to the remote-management settings and turn off management from the internet (WAN), or move it to a port such as 8443."
+        },
+        "brands": {
+            "zte": {
+                "signIn": "The user and password printed on the label underneath the router. On an ISP box the user is usually `admin` and the password is the one on the label, not the WiFi key.",
+                "forwardEnable": "The rule is created switched off. Set it to on in the list of rules once it is saved, or the ports stay closed behind a rule that looks right.",
+                "remotePath": "Management & Diagnosis > Remote management (some builds keep it under Internet > Security > Access control)",
+                "caution": "ZTE firmware supplied by an ISP reserves 80, 443, 21 and 7547 for its own management and refuses to forward them. If the form rejects the rule, the ports cannot be opened on this router - publish Polaris through a tunnel instead, under Advanced below."
+            },
+            "huawei": {
+                "signIn": "The user and password on the label. ISP units keep port forwarding behind an installer account the label does not carry - ask your provider for it if the menu is missing.",
+                "forwardPath": "Forward Rules > Port Mapping Configuration, with Type set to Custom",
+                "remotePath": "Security > ACL Rules, which is what usually publishes the admin page on the WAN side"
+            },
+            "tplink": {
+                "signIn": "The account you created on first setup. A router never set up asks for `admin` / `admin`."
+            },
+            "asus": {
+                "signIn": "The account you created on first setup, or `admin` / `admin` on one never set up.",
+                "reserve": {
+                    "path": "LAN > DHCP Server, with Enable Manual Assignment set to Yes",
+                    "add": "the + button under Manually Assigned IP around the DHCP list"
+                },
+                "forwardPath": "WAN > Virtual Server / Port Forwarding, with Enable Port Forwarding set to Yes"
+            },
+            "fritzbox": {
+                "signIn": "The FRITZ!Box password on the label or on the card that came with it. There is no user name.",
+                "reserve": {
+                    "action": "open this server with the pencil button and tick \"Always assign this network device the same IPv4 address\""
+                },
+                "caution": "It shares ports per device: pick this server, then add one sharing for 80 and one for 443. Turn on the advanced view if the menu is not there."
+            },
+            "netgear": {
+                "signIn": "`admin` with the password you set. A router never set up uses `admin` / `password`."
+            },
+            "mikrotik": {
+                "signIn": "`admin`, with no password on a router still at defaults.",
+                "reserve": {
+                    "action": "select the lease showing this server and press \"Make Static\""
+                },
+                "forwardPath": "IP > Firewall > NAT > Add, chain dstnat",
+                "remotePath": "IP > Services, where the www and www-ssl services hold 80 and 443",
+                "caution": "The form is not a port-forward form: set chain=dstnat, protocol=tcp, dst-port=80,443, in-interface to the WAN interface, then action=dst-nat with to-addresses set to this server."
+            },
+            "other": {
+                "label": "Another brand",
+                "signIn": "The user and password on the label underneath the router - on most boxes this is not the WiFi password. If it was changed and is lost, a factory reset is the only way back in.",
+                "reserve": {
+                    "path": "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
+                    "add": "the button that adds an entry",
+                    "fields": {
+                        "0": "MAC address",
+                        "1": "IP address"
+                    },
+                    "save": "Save"
+                },
+                "forwardPath": "Look for Port forwarding, Virtual server, NAT/PAT or Applications & Gaming - the same form under four different names.",
+                "forwardEnable": "If the rule has an Enable or Status switch, turn it on - some firmware saves a new rule switched off.",
+                "remotePath": "Look for Remote management, Web access from WAN or Remote administration."
+            }
         }
     },
     "domainsSetup": {

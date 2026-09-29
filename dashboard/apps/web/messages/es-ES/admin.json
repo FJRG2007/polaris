@@ -630,6 +630,65 @@
             "checkAgain": "Guarda y vuelve a hacer la comprobación de DNS: avisa en cuanto los puertos lleguen a Polaris.",
             "remote": "Solo si el router sigue respondiendo después: está reservando los puertos para su propia página de administración. Ve a <b>{path}</b> y desactiva la administración desde internet (WAN), o muévela a un puerto como el 8443.",
             "remoteGeneric": "Solo si el router sigue respondiendo después: está reservando los puertos para su propia página de administración. Ve a los ajustes de administración remota y desactiva la administración desde internet (WAN), o muévela a un puerto como el 8443."
+        },
+        "brands": {
+            "zte": {
+                "signIn": "El usuario y la contraseña impresos en la etiqueta de debajo del router. En un equipo de operador el usuario suele ser `admin` y la contraseña es la de la etiqueta, no la clave del WiFi.",
+                "forwardEnable": "La regla se crea desactivada. Actívala en la lista de reglas una vez guardada, o los puertos seguirán cerrados tras una regla que parece correcta.",
+                "remotePath": "Management & Diagnosis > Remote management (algunas versiones lo tienen en Internet > Security > Access control)",
+                "caution": "El firmware de ZTE que entregan los operadores reserva el 80, el 443, el 21 y el 7547 para su propia gestión y se niega a reenviarlos. Si el formulario rechaza la regla, los puertos no se pueden abrir en este router: publica Polaris mediante un túnel, en Avanzado más abajo."
+            },
+            "huawei": {
+                "signIn": "El usuario y la contraseña de la etiqueta. Los equipos de operador guardan el reenvío de puertos tras una cuenta de instalador que no viene en la etiqueta: pídesela a tu proveedor si no aparece el menú.",
+                "forwardPath": "Forward Rules > Port Mapping Configuration, con Type en Custom",
+                "remotePath": "Security > ACL Rules, que es lo que suele publicar la página de administración hacia la WAN"
+            },
+            "tplink": {
+                "signIn": "La cuenta que creaste en la primera configuración. Un router sin configurar pide `admin` / `admin`."
+            },
+            "asus": {
+                "signIn": "La cuenta que creaste en la primera configuración, o `admin` / `admin` en uno sin configurar.",
+                "reserve": {
+                    "path": "LAN > DHCP Server, con Enable Manual Assignment en Yes",
+                    "add": "el botón + de Manually Assigned IP, junto a la lista de DHCP"
+                },
+                "forwardPath": "WAN > Virtual Server / Port Forwarding, con Enable Port Forwarding en Yes"
+            },
+            "fritzbox": {
+                "signIn": "La contraseña de la FRITZ!Box que viene en la etiqueta o en la tarjeta que la acompaña. No hay nombre de usuario.",
+                "reserve": {
+                    "action": "abre este servidor con el botón del lápiz y marca \"Always assign this network device the same IPv4 address\""
+                },
+                "caution": "Comparte los puertos por dispositivo: elige este servidor y añade una compartición para el 80 y otra para el 443. Activa la vista avanzada si no aparece el menú."
+            },
+            "netgear": {
+                "signIn": "`admin` con la contraseña que pusiste. Un router sin configurar usa `admin` / `password`."
+            },
+            "mikrotik": {
+                "signIn": "`admin`, sin contraseña en un router que sigue con los valores de fábrica.",
+                "reserve": {
+                    "action": "selecciona la concesión de este servidor y pulsa \"Make Static\""
+                },
+                "forwardPath": "IP > Firewall > NAT > Add, con chain dstnat",
+                "remotePath": "IP > Services, donde los servicios www y www-ssl ocupan el 80 y el 443",
+                "caution": "El formulario no es de reenvío de puertos: pon chain=dstnat, protocol=tcp, dst-port=80,443, in-interface en la interfaz WAN, y luego action=dst-nat con to-addresses apuntando a este servidor."
+            },
+            "other": {
+                "label": "Otra marca",
+                "signIn": "El usuario y la contraseña de la etiqueta de debajo del router: en la mayoría de equipos no es la contraseña del WiFi. Si se cambió y se ha perdido, la única forma de volver a entrar es restablecerlo de fábrica.",
+                "reserve": {
+                    "path": "los ajustes de DHCP o de LAN, con un nombre como Address Reservation, DHCP Binding o Static Lease",
+                    "add": "el botón que añade una entrada",
+                    "fields": {
+                        "0": "Dirección MAC",
+                        "1": "Dirección IP"
+                    },
+                    "save": "Guardar"
+                },
+                "forwardPath": "Busca Port forwarding, Virtual server, NAT/PAT o Applications & Gaming: es el mismo formulario con cuatro nombres distintos.",
+                "forwardEnable": "Si la regla tiene un interruptor Enable o Status, actívalo: algunos firmwares guardan una regla nueva desactivada.",
+                "remotePath": "Busca Remote management, Web access from WAN o Remote administration."
+            }
         }
     },
     "domainsSetup": {

@@ -35,6 +35,7 @@ import {
     type RouterForwardRule,
     type RouterFormField
 } from "@/lib/router-guide";
+import { routerGuideIn } from "./router-words";
 
 /** A value to type elsewhere: shown verbatim, copied in one click. */
 function Value({ text }: { text: string }) {
@@ -118,7 +119,7 @@ export function RouterSteps({
         if (!picked.current && detected !== "other") setBrand(detected);
     }, [detected]);
 
-    const guide = routerGuide(brand);
+    const guide = routerGuideIn(t, routerGuide(brand));
     const gateway = likelyGateway(lanIp);
     const adminUrl = guide.admin ?? (gateway ? `http://${gateway}` : null);
     // Named for the form in front of the operator rather than for Polaris: a brand
@@ -142,7 +143,7 @@ export function RouterSteps({
                             picked.current = true;
                             setBrand(value as RouterBrand);
                         }}
-                        options={ROUTER_BRANDS.map((entry) => ({ value: entry.id, label: entry.label }))}
+                        options={ROUTER_BRANDS.map((entry) => ({ value: entry.id, label: routerGuideIn(t, entry).label }))}
                     />
                 </label>
                 {adminUrl && (

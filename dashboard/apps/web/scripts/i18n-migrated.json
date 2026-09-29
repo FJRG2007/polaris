@@ -1462,6 +1462,8 @@
         "web/src/lib/compliance/evidence-sections.ts",
         "web/src/lib/compliance/evidence.ts",
         "web/src/lib/compliance/evidence-export.ts",
-        "web/src/lib/compliance/evidence-readings.ts"
+        "web/src/lib/compliance/evidence-readings.ts",
+        "web/src/lib/router-guide.ts",
+        "web/src/app/(app)/admin/domains/router-words.ts"
     ]
 }

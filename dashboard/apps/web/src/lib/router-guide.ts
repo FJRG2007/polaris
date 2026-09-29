@@ -127,6 +127,7 @@ export interface RouterFormField {
 export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
     {
         id: "zte",
+        // i18n-ignore a brand's name
         label: "ZTE",
         admin: null,
         signIn: "The user and password printed on the label underneath the router. On an ISP box the user is usually `admin` and the password is the one on the label, not the WiFi key.",
@@ -137,8 +138,11 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             path: "Local Network > LAN > DHCP Binding",
             add: "New Item",
             fields: [
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "Name", value: "name" },
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "MAC Address", value: "mac" },
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "IP Address", value: "ip" }
             ],
             save: "Create New Item"
@@ -148,11 +152,17 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         // generic ones: the destination is "LAN Host", both port fields are ranges,
         // and there is a WAN source range that has to be left wide open.
         forwardFields: [
+            // i18n-ignore the router's own label, quoted as its page shows it
             { label: "Name", value: "name" },
+            // i18n-ignore the router's own label, quoted as its page shows it
             { label: "Protocol", value: "protocol" },
+            // i18n-ignore the router's own label, quoted as its page shows it
             { label: "WAN Host IP Address", value: "anySource" },
+            // i18n-ignore the router's own label, quoted as its page shows it
             { label: "LAN Host", value: "ip" },
+            // i18n-ignore the router's own label, quoted as its page shows it
             { label: "WAN Port", value: "portRange" },
+            // i18n-ignore the router's own label, quoted as its page shows it
             { label: "LAN Host Port", value: "portRange" }
         ],
         forwardSave: "Create New Item",
@@ -171,6 +181,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
     },
     {
         id: "huawei",
+        // i18n-ignore a brand's name
         label: "Huawei",
         admin: "http://192.168.100.1",
         signIn: "The user and password on the label. ISP units keep port forwarding behind an installer account the label does not carry - ask your provider for it if the menu is missing.",
@@ -179,7 +190,9 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             path: "LAN > DHCP Static IP Configuration",
             add: "New",
             fields: [
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "MAC Address", value: "mac" },
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "IP Address", value: "ip" }
             ],
             save: "Apply"
@@ -195,6 +208,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
     },
     {
         id: "tplink",
+        // i18n-ignore a brand's name
         label: "TP-Link",
         admin: "http://tplinkwifi.net",
         signIn: "The account you created on first setup. A router never set up asks for `admin` / `admin`.",
@@ -203,8 +217,11 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             path: "Advanced > Network > DHCP Server > Address Reservation",
             add: "Add",
             fields: [
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "MAC Address", value: "mac" },
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "IP Address", value: "ip" },
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "Description", value: "name" }
             ],
             save: "Save"
@@ -220,6 +237,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
     },
     {
         id: "asus",
+        // i18n-ignore a brand's name
         label: "ASUS",
         admin: "http://router.asus.com",
         signIn: "The account you created on first setup, or `admin` / `admin` on one never set up.",
@@ -228,8 +246,11 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             path: "LAN > DHCP Server, with Enable Manual Assignment set to Yes",
             add: "the + button under Manually Assigned IP around the DHCP list",
             fields: [
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "MAC Address", value: "mac" },
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "IP Address", value: "ip" },
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "Name (optional)", value: "name" }
             ],
             save: "Apply"
@@ -245,6 +266,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
     },
     {
         id: "fritzbox",
+        // i18n-ignore a brand's name
         label: "FRITZ!Box",
         admin: "http://fritz.box",
         signIn: "The FRITZ!Box password on the label or on the card that came with it. There is no user name.",
@@ -265,6 +287,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
     },
     {
         id: "netgear",
+        // i18n-ignore a brand's name
         label: "NETGEAR",
         admin: "http://routerlogin.net",
         signIn: "`admin` with the password you set. A router never set up uses `admin` / `password`.",
@@ -273,8 +296,11 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             path: "ADVANCED > Setup > LAN Setup > Address Reservation",
             add: "Add",
             fields: [
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "IP Address", value: "ip" },
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "MAC Address", value: "mac" },
+                // i18n-ignore the router's own label, quoted as its page shows it
                 { label: "Device Name", value: "name" }
             ],
             save: "Add"
@@ -290,6 +316,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
     },
     {
         id: "mikrotik",
+        // i18n-ignore a brand's name
         label: "MikroTik",
         admin: "http://192.168.88.1",
         signIn: "`admin`, with no password on a router still at defaults.",
@@ -310,6 +337,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
     },
     {
         id: "other",
+        // i18n-ignore said in the reader's words by admin/domains/router-words.ts
         label: "Another brand",
         admin: null,
         signIn: "The user and password on the label underneath the router - on most boxes this is not the WiFi password. If it was changed and is lost, a factory reset is the only way back in.",
@@ -318,7 +346,9 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             path: "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
             add: "the button that adds an entry",
             fields: [
+                // i18n-ignore said in the reader's words by admin/domains/router-words.ts
                 { label: "MAC address", value: "mac" },
+                // i18n-ignore said in the reader's words by admin/domains/router-words.ts
                 { label: "IP address", value: "ip" }
             ],
             save: "Save"
