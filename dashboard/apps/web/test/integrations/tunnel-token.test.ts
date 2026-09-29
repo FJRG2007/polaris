@@ -8,6 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { isTunnelToken, tunnelTokenHint } from "../../src/lib/integrations/tunnel-token";
+import { translatorFor } from "@/lib/i18n/translate";
 
 /** Shaped like a current ngrok authtoken: two base62 halves joined by an underscore. */
 const NGROK = "2NtQ8vJ7t9RY6Xk3fQz5eXyzABC_5aB1cD2eF3gH4iJ5kL6mN";
@@ -65,5 +66,9 @@ describe("what a refused token is told", () => {
     it("names the provider it was expecting, since the dialog serves both", () => {
         expect(tunnelTokenHint("ngrok")).toContain("ngrok");
         expect(tunnelTokenHint("cloudflare")).toContain("Cloudflare");
+        // The integrations screen says them through the catalog, word for word.
+        const english = translatorFor("en-US", "admin");
+        expect(english("integrations.tunnelHint.ngrok")).toBe(tunnelTokenHint("ngrok"));
+        expect(english("integrations.tunnelHint.cloudflare")).toBe(tunnelTokenHint("cloudflare"));
     });
 });

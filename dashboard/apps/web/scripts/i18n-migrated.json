@@ -1431,6 +1431,11 @@
         "web/src/lib/mcp/tools/tasks.ts",
         "web/src/lib/access-explain-service.ts",
         "web/src/lib/browser-guide.ts",
-        "web/src/lib/install-command.ts"
+        "web/src/lib/install-command.ts",
+        "web/src/lib/chat/call-ports.ts",
+        "web/src/lib/deploy/build-machine.ts",
+        "web/src/lib/integrations/criminalip.ts",
+        "web/src/lib/integrations/tunnel-token.ts",
+        "web/src/lib/messaging/discord-invite.ts"
     ]
 }

@@ -11,6 +11,7 @@ import {
     discordInviteUrl,
     discordPortalUrl
 } from "../../src/lib/messaging/discord-invite";
+import { translatorFor } from "@/lib/i18n/translate";
 
 /** Shaped like a Discord snowflake: 18 digits. */
 const APP_ID = "123456789012345678";
@@ -31,6 +32,10 @@ describe("the invite link", () => {
         expect(discordInviteUrl(APP_ID)).toContain("permissions=117760");
         expect(DISCORD_BOT_PERMISSIONS).toContain("Send messages");
         expect(DISCORD_BOT_PERMISSIONS).not.toContain("Administrator");
+        // The setup panel names them through the catalog, in the same order.
+        expect(translatorFor("en-US", "admin")("inbox.discordSetup.botPermissions")).toBe(
+            DISCORD_BOT_PERMISSIONS.join(", ").toLowerCase()
+        );
     });
 
     it("refuses anything that is not a snowflake, so nothing else reaches the URL", () => {

@@ -14,11 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@polaris/ui";
 import type { ChannelSetup } from "@polaris/messaging";
-import {
-    DISCORD_BOT_PERMISSIONS,
-    discordInviteUrl,
-    discordPortalUrl
-} from "@/lib/messaging/discord-invite";
+import { discordInviteUrl, discordPortalUrl } from "@/lib/messaging/discord-invite";
 import { channelStateAction } from "./actions";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -114,9 +110,7 @@ export function DiscordSetupPanel({ channelId }: { channelId: string }) {
                         <ExternalLink className="size-3.5" />
                     </a>
                     <span className="text-xs text-muted-foreground">
-                        {t("inbox.discordSetup.addBotHint", {
-                            permissions: DISCORD_BOT_PERMISSIONS.join(", ").toLowerCase()
-                        })}
+                        {t("inbox.discordSetup.addBotHint", { permissions: t("inbox.discordSetup.botPermissions") })}
                     </span>
                 </div>
             ) : (

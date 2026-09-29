@@ -588,6 +588,10 @@
                 "range": "Dos reglas cubren todos los servidores, ahora y después. No se abre nada fuera de estos rangos.",
                 "perPort": "Exacto, pero cada servidor nuevo necesita otra regla en el router."
             }
+        },
+        "callLabel": {
+            "udp": "Llamadas",
+            "tcp": "Llamadas por TCP"
         }
     },
     "domainsRouter": {
@@ -1004,7 +1008,8 @@
                 "messageContent": "Sin él, los mensajes que recibe el bot en canales del servidor llegan vacíos."
             },
             "switchOn": "Actívalos en Bot > Privileged Gateway Intents",
-            "reconnectAfter": "Después vuelve a conectar el canal: los intents se eligen cuando el bot inicia sesión."
+            "reconnectAfter": "Después vuelve a conectar el canal: los intents se eligen cuando el bot inicia sesión.",
+            "botPermissions": "ver canales, enviar mensajes, insertar enlaces, adjuntar archivos, leer el historial de mensajes"
         },
         "errors": {
             "checkForm": "Revisa los datos",
@@ -1225,7 +1230,15 @@
         },
         "criminalIp": {
             "block": "Bloquear direcciones marcadas como",
-            "hint": "Hosting y VPN abarcan mucho tráfico normal. Las consultas se hacen en segundo plano y la respuesta se guarda como un bloqueo normal, así que nada de esto ralentiza una petición."
+            "hint": "Hosting y VPN abarcan mucho tráfico normal. Las consultas se hacen en segundo plano y la respuesta se guarda como un bloqueo normal, así que nada de esto ralentiza una petición.",
+            "rules": {
+                "is_vpn": "VPN",
+                "is_proxy": "Proxy",
+                "is_tor": "Tor",
+                "is_hosting": "Hosting o centro de datos",
+                "is_scanner": "Escáner conocido",
+                "is_malicious": "Malicioso conocido"
+            }
         },
         "filter": {
             "moduleUrl": "Desde dónde se sirve el filtro",
@@ -1352,6 +1365,10 @@
             "configureFirst": "Configura la integración antes de activarla",
             "githubNotConnected": "No se ha podido conectar la GitHub App",
             "installationsNotRefreshed": "No se actualizaron las instalaciones"
+        },
+        "tunnelHint": {
+            "ngrok": "Eso no es un authtoken de ngrok. Copia el valor completo del panel de ngrok.",
+            "cloudflare": "Eso no es un token de túnel de Cloudflare. Copia el token del comando de instalación del conector."
         }
     },
     "integrationsModels": {

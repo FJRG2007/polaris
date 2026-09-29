@@ -19,7 +19,7 @@ import { verifyKey } from "@/lib/integrations/virustotal";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
 import type { CfAccount } from "@/lib/integrations/cloudflare-api";
 import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
-import { isTunnelToken, tunnelTokenHint } from "@/lib/integrations/tunnel-token";
+import { isTunnelToken } from "@/lib/integrations/tunnel-token";
 import type { CloudflareTokenScope } from "@/lib/integrations/cloudflare-token-link";
 import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
 import { connectGithubApp, disconnectGithub, refreshInstallations } from "@/lib/github-service";
@@ -395,7 +395,7 @@ export async function saveTunnelAction(input: {
     if (provider !== "cloudflare" && provider !== "ngrok")
         return { error: t("integrations.errors.unknownTunnel") };
     const newToken = input.token && input.token.trim() ? input.token.trim() : undefined;
-    if (newToken && !isTunnelToken(provider, newToken)) return { error: tunnelTokenHint(provider) };
+    if (newToken && !isTunnelToken(provider, newToken)) return { error: t(`integrations.tunnelHint.${provider}`) };
 
     try {
         const existing = await getIntegrationState(provider);

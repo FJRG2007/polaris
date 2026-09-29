@@ -15,10 +15,15 @@
 
 /** Each permission the bot is asked for, with the bit Discord names it by. */
 const BOT_PERMISSIONS: { label: string; bit: number }[] = [
+    // i18n-ignore Discord's own names; the setup panel says them in the reader's words
     { label: "View channels", bit: 1 << 10 },
+    // i18n-ignore Discord's own names; the setup panel says them in the reader's words
     { label: "Send messages", bit: 1 << 11 },
+    // i18n-ignore Discord's own names; the setup panel says them in the reader's words
     { label: "Embed links", bit: 1 << 14 },
+    // i18n-ignore Discord's own names; the setup panel says them in the reader's words
     { label: "Attach files", bit: 1 << 15 },
+    // i18n-ignore Discord's own names; the setup panel says them in the reader's words
     { label: "Read message history", bit: 1 << 16 }
 ];
 

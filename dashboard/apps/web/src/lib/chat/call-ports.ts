@@ -35,7 +35,9 @@ export interface CallPort {
  * everything that talks about them.
  */
 export const CALL_PORTS: readonly CallPort[] = [
+    // i18n-ignore the ports card says it by protocol
     { port: 7882, protocol: "udp", label: "Call media", probeable: false },
+    // i18n-ignore the ports card says it by protocol
     { port: 7881, protocol: "tcp", label: "Call media over TCP", probeable: true }
 ];
 

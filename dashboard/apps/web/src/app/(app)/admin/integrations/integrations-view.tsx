@@ -31,7 +31,6 @@ import {
 import type { ConnectionFailure } from "@/lib/connections/attention";
 import {
     isTunnelToken,
-    tunnelTokenHint,
     type TunnelProviderSlug
 } from "@/lib/integrations/tunnel-token";
 import {
@@ -872,7 +871,7 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                                             : "border-border text-muted-foreground hover:bg-muted"
                                     )}
                                 >
-                                    {rule.label}
+                                    {t(`integrations.criminalIp.rules.${rule.value}`)}
                                 </button>
                             ))}
                         </div>
@@ -1466,7 +1465,7 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                             autoComplete="off"
                         />
                         {entered && !valid ? (
-                            <span className="text-xs text-danger">{tunnelTokenHint(provider)}</span>
+                            <span className="text-xs text-danger">{t(`integrations.tunnelHint.${provider}`)}</span>
                         ) : card.apiKeyHelp ? (
                             <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
                         ) : null}

@@ -452,7 +452,9 @@
     },
     "buildMachine": {
         "title": "Compilar en",
-        "hint": "Otra máquina compila la imagen y la envía aquí, para que un servidor pequeño pueda ejecutar lo que no podría compilar."
+        "hint": "Otra máquina compila la imagen y la envía aquí, para que un servidor pequeño pueda ejecutar lo que no podría compilar.",
+        "itsServer": "Su propio servidor",
+        "polarisHost": "El host de Polaris"
     },
     "steps": {
         "state": {

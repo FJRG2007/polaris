@@ -13,12 +13,14 @@ const RULES: Record<TunnelProviderSlug, { pattern: RegExp; hint: string }> = {
     // ones are a single run of base62 with no separator at all.
     ngrok: {
         pattern: /^[A-Za-z0-9_]{20,}$/,
+        // i18n-ignore the integrations screen says it by provider
         hint: "That is not an ngrok authtoken. Copy the whole value from the ngrok dashboard."
     },
     // A connector token is base64 (either alphabet) and never short - it carries
     // the account, the tunnel id, and its secret.
     cloudflare: {
         pattern: /^[A-Za-z0-9+/=_-]{40,}$/,
+        // i18n-ignore the integrations screen says it by provider
         hint: "That is not a Cloudflare tunnel token. Copy the token from the connector install command."
     }
 };

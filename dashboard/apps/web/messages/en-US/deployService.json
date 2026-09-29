@@ -452,7 +452,9 @@
     },
     "buildMachine": {
         "title": "Build on",
-        "hint": "Another machine builds the image and sends it here, so a small server can run what it could not build."
+        "hint": "Another machine builds the image and sends it here, so a small server can run what it could not build.",
+        "itsServer": "The server it runs on",
+        "polarisHost": "The Polaris host"
     },
     "steps": {
         "state": {

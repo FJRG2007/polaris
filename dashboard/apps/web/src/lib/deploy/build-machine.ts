@@ -15,6 +15,7 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import type { TargetRow } from "./runtime";
+import { readerWords } from "@/lib/i18n/reader-words";
 
 /** The choice as it is sent and stored: nothing, the Polaris host, or a server. */
 export const buildOnSchema = z.union([z.literal(""), z.literal("local"), z.string().uuid()]);
@@ -106,8 +107,9 @@ export async function buildMachineOptions(applicationId: string, ownerId: string
         orderBy: { name: "asc" }
     });
     const local = runsLocally(app.target);
-    const options: { value: BuildOn; label: string }[] = [{ value: "", label: "The server it runs on" }];
-    if (!local) options.push({ value: "local", label: "The Polaris host" });
+    const t = await readerWords("deployService");
+    const options: { value: BuildOn; label: string }[] = [{ value: "", label: t("buildMachine.itsServer") }];
+    if (!local) options.push({ value: "local", label: t("buildMachine.polarisHost") });
     for (const host of hosts) {
         if (!local && host.id === app.target.hostId) continue;
         options.push({ value: host.id, label: host.name });

@@ -588,6 +588,10 @@
                 "range": "Two rules cover every server here, now and later. Nothing outside these ranges is opened.",
                 "perPort": "Exact, but every new server needs another rule in the router."
             }
+        },
+        "callLabel": {
+            "udp": "Call media",
+            "tcp": "Call media over TCP"
         }
     },
     "domainsRouter": {
@@ -1004,7 +1008,8 @@
                 "messageContent": "Without it, messages the bot receives in server channels arrive empty."
             },
             "switchOn": "Switch them on under Bot > Privileged Gateway Intents",
-            "reconnectAfter": "Reconnect the channel afterwards - the intents are chosen when the bot logs in."
+            "reconnectAfter": "Reconnect the channel afterwards - the intents are chosen when the bot logs in.",
+            "botPermissions": "view channels, send messages, embed links, attach files, read message history"
         },
         "errors": {
             "checkForm": "Check the form",
@@ -1225,7 +1230,15 @@
         },
         "criminalIp": {
             "block": "Block addresses reported as",
-            "hint": "Hosting and VPN cover a lot of ordinary traffic. Lookups happen in the background and the answer is cached as an ordinary ban, so nothing here slows a request down."
+            "hint": "Hosting and VPN cover a lot of ordinary traffic. Lookups happen in the background and the answer is cached as an ordinary ban, so nothing here slows a request down.",
+            "rules": {
+                "is_vpn": "VPN",
+                "is_proxy": "Proxy",
+                "is_tor": "Tor",
+                "is_hosting": "Hosting or datacenter",
+                "is_scanner": "Known scanner",
+                "is_malicious": "Known malicious"
+            }
         },
         "filter": {
             "moduleUrl": "Where the filter is served from",
@@ -1352,6 +1365,10 @@
             "configureFirst": "Configure the integration before enabling it",
             "githubNotConnected": "Could not connect the GitHub App",
             "installationsNotRefreshed": "Could not refresh installations"
+        },
+        "tunnelHint": {
+            "ngrok": "That is not an ngrok authtoken. Copy the whole value from the ngrok dashboard.",
+            "cloudflare": "That is not a Cloudflare tunnel token. Copy the token from the connector install command."
         }
     },
     "integrationsModels": {

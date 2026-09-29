@@ -83,7 +83,9 @@ export function CallPortsCard() {
                 {reading.ports.map((entry) => (
                     <li key={`${entry.protocol}-${entry.port}`} className="flex items-center gap-2 py-2">
                         <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm" title={entry.label}>{entry.label}</p>
+                            <p className="truncate text-sm" title={t(`domainsPorts.callLabel.${entry.protocol}`)}>
+                                {t(`domainsPorts.callLabel.${entry.protocol}`)}
+                            </p>
                             <p className="font-mono text-xs text-muted-foreground">
                                 {entry.port}/{entry.protocol}
                             </p>

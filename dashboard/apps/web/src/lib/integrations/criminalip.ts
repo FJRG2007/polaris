@@ -15,11 +15,17 @@ const ENDPOINT = "https://api.criminalip.io/v1/asset/ip/report/summary";
 /** What Criminal IP reports that Polaris will act on. Each maps to a boolean their
  *  summary returns; an operator picks which ones count as a block. */
 export const CRIMINALIP_RULES = [
+    // i18n-ignore the integrations screen says it by value
     { value: "is_vpn", label: "VPN" },
+    // i18n-ignore the integrations screen says it by value
     { value: "is_proxy", label: "Proxy" },
+    // i18n-ignore the integrations screen says it by value
     { value: "is_tor", label: "Tor" },
+    // i18n-ignore the integrations screen says it by value
     { value: "is_hosting", label: "Hosting or datacenter" },
+    // i18n-ignore the integrations screen says it by value
     { value: "is_scanner", label: "Known scanner" },
+    // i18n-ignore the integrations screen says it by value
     { value: "is_malicious", label: "Known malicious" }
 ] as const;
 
