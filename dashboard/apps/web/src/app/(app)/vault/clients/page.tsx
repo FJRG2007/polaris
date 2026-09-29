@@ -17,6 +17,7 @@ import { CopyButton } from "@/components/copy-button";
 import { listVaultClients } from "@/lib/vault/devices";
 import { BitwardenMark } from "@/components/brand-icons";
 import { RelativeTime } from "@/components/relative-time";
+import { getTranslations } from "@/lib/i18n/request";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { ExternalLink, KeyRound, Terminal, TriangleAlert } from "lucide-react";
 
@@ -24,6 +25,7 @@ export const dynamic = "force-dynamic";
 
 export default async function VaultClientsPage() {
     const user = await requirePermission("vault.use");
+    const t = await getTranslations("vault");
     const vault = await getVault(user.id);
     // The configured sharing origin, not the tab's host: an address that only
     // works from inside the house is not one to paste into a phone.
@@ -36,20 +38,16 @@ export default async function VaultClientsPage() {
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Connect an app</h1>
-                <p className="text-sm text-muted-foreground">
-                    This vault speaks the Bitwarden protocol, so their apps work with it.
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("clients.title")}</h1>
+                <p className="text-sm text-muted-foreground">{t("clients.intro")}</p>
             </div>
 
             {!vault ? (
                 <Card>
                     <CardBody className="flex flex-col items-start gap-3 p-6">
-                        <p className="text-sm text-muted-foreground">
-                            Set your vault up first. There is nothing for an app to sign in to yet.
-                        </p>
+                        <p className="text-sm text-muted-foreground">{t("clients.setUpFirst")}</p>
                         <Button asChild size="sm">
-                            <Link href="/vault">Set up my vault</Link>
+                            <Link href="/vault">{t("clients.setUp")}</Link>
                         </Button>
                     </CardBody>
                 </Card>
@@ -59,7 +57,7 @@ export default async function VaultClientsPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <BitwardenMark className="size-4" />
-                        Your server address
+                        {t("clients.serverAddress")}
                     </CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3">
@@ -67,20 +65,13 @@ export default async function VaultClientsPage() {
                         <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm">
                             {serverUrl}
                         </code>
-                        <CopyButton value={serverUrl} label="the server address" />
+                        <CopyButton value={serverUrl} label={t("clients.serverAddressCopy")} />
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                        On the app&apos;s sign-in screen, choose self-hosted and paste this in. Sign
-                        in with the address on your Polaris account and your master password.
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("clients.signInHint")}</p>
                     {insecure ? (
                         <div className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm">
                             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
-                            <span>
-                                This address is not HTTPS. Most clients refuse to sign in over a
-                                plain connection, and they are right to - set up a certificate under
-                                Management &gt; Domains first.
-                            </span>
+                            <span>{t("clients.insecure")}</span>
                         </div>
                     ) : null}
                 </CardBody>
@@ -88,35 +79,27 @@ export default async function VaultClientsPage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Where to put it</CardTitle>
+                    <CardTitle>{t("clients.whereTitle")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-4 text-sm">
                     <div>
-                        <p className="font-medium">Browser extension</p>
-                        <p className="text-muted-foreground">
-                            Open it, press the settings cog on the sign-in screen, pick
-                            &quot;Self-hosted&quot; and paste the address into Server URL.
-                        </p>
+                        <p className="font-medium">{t("clients.extension")}</p>
+                        <p className="text-muted-foreground">{t("clients.extensionHint")}</p>
                     </div>
                     <div>
-                        <p className="font-medium">Desktop and mobile</p>
-                        <p className="text-muted-foreground">
-                            Tap the region selector above the email field, choose
-                            &quot;Self-hosted&quot;, and paste the address into Server URL.
-                        </p>
+                        <p className="font-medium">{t("clients.desktop")}</p>
+                        <p className="text-muted-foreground">{t("clients.desktopHint")}</p>
                     </div>
                     <div>
-                        <p className="font-medium">Command line</p>
-                        <p className="text-muted-foreground">
-                            Point the CLI at this server, then sign in as usual.
-                        </p>
+                        <p className="font-medium">{t("clients.cli")}</p>
+                        <p className="text-muted-foreground">{t("clients.cliHint")}</p>
                         <div className="mt-2 flex items-center gap-2">
                             <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs">
                                 bw config server {serverUrl}
                             </code>
                             <CopyButton
                                 value={`bw config server ${serverUrl}`}
-                                label="the CLI command"
+                                label={t("clients.cliCopy")}
                             />
                         </div>
                     </div>
@@ -127,55 +110,38 @@ export default async function VaultClientsPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <KeyRound className="size-4" />
-                        Let a client in
+                        {t("clients.letInTitle")}
                     </CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col items-start gap-3 text-sm">
-                    <p className="text-muted-foreground">
-                        Polaris&apos; own extension does not ask for your master password. It shows a
-                        code, you approve it here in a browser that already has this vault open, and
-                        it is handed a copy of the vault key sealed so that only it can open it.
-                    </p>
-                    <p className="text-muted-foreground">
-                        It opens this screen for you. Open it yourself if the extension could not,
-                        and type the code it is showing.
-                    </p>
+                    <p className="text-muted-foreground">{t("clients.letInOne")}</p>
+                    <p className="text-muted-foreground">{t("clients.letInTwo")}</p>
                     <Button asChild size="sm" variant="secondary">
-                        <Link href="/vault/authorize">Approve a request</Link>
+                        <Link href="/vault/authorize">{t("clients.approve")}</Link>
                     </Button>
                 </CardBody>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Polaris&apos; own extension</CardTitle>
+                    <CardTitle>{t("clients.ownTitle")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col items-start gap-3 text-sm">
-                    <p className="text-muted-foreground">
-                        Built for this vault rather than adapted to it: it asks the browser for
-                        permission to talk to this address and no other, fills a login without
-                        holding any standing access to the pages you open, and locks itself again
-                        when you stop using it.
-                    </p>
-                    <p className="text-muted-foreground">
-                        The package for your browser is under Downloads, with the desktop app and
-                        everything else installable.
-                    </p>
+                    <p className="text-muted-foreground">{t("clients.ownOne")}</p>
+                    <p className="text-muted-foreground">{t("clients.ownTwo")}</p>
                     <Button asChild size="sm" variant="secondary">
-                        <Link href="/account/downloads">Downloads</Link>
+                        <Link href="/account/downloads">{t("clients.downloads")}</Link>
                     </Button>
                 </CardBody>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Apps signed in to this vault</CardTitle>
+                    <CardTitle>{t("clients.signedInTitle")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3 text-sm">
                     {clients.length === 0 ? (
-                        <p className="text-muted-foreground">
-                            Nothing has signed in yet. An app appears here the first time it does.
-                        </p>
+                        <p className="text-muted-foreground">{t("clients.noneSignedIn")}</p>
                     ) : (
                         <ul className="flex flex-col divide-y divide-border">
                             {clients.map((client) => (
@@ -188,24 +154,24 @@ export default async function VaultClientsPage() {
                                             {client.name}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {client.label} - last used{" "}
-                                            <RelativeTime iso={client.lastSeenAt} />
+                                            {t.rich("clients.lastUsed", {
+                                                label: client.label,
+                                                time: () => (
+                                                    <RelativeTime key="time" iso={client.lastSeenAt} />
+                                                )
+                                            })}
                                         </p>
                                     </div>
                                     {client.kind === "extension" ? (
                                         <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
-                                            Extension
+                                            {t("clients.extensionBadge")}
                                         </span>
                                     ) : null}
                                 </li>
                             ))}
                         </ul>
                     )}
-                    <p className="text-xs text-muted-foreground">
-                        The name and the kind are what each app said about itself, not something
-                        Polaris checked. If you do not recognise one, change your master password:
-                        removing a row cannot shut out something that already holds the vault key.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("clients.claimNote")}</p>
                 </CardBody>
             </Card>
 
@@ -213,35 +179,32 @@ export default async function VaultClientsPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Terminal className="size-4" />
-                        If an app asks for each address separately
+                        {t("clients.separateTitle")}
                     </CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-2 text-sm">
-                    <p className="text-muted-foreground">
-                        Some versions offer a custom environment with a field per service. These are
-                        the values.
-                    </p>
+                    <p className="text-muted-foreground">{t("clients.separateHint")}</p>
                     <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 font-mono text-xs">
-                        <dt className="text-muted-foreground">Web vault</dt>
+                        <dt className="text-muted-foreground">{t("clients.webVault")}</dt>
                         <dd className="truncate" title={serverUrl}>
                             {serverUrl}
                         </dd>
-                        <dt className="text-muted-foreground">API</dt>
+                        <dt className="text-muted-foreground">{t("clients.api")}</dt>
                         <dd
                             className="truncate"
                             title={`${serverUrl}/api`}
                         >{`${serverUrl}/api`}</dd>
-                        <dt className="text-muted-foreground">Identity</dt>
+                        <dt className="text-muted-foreground">{t("clients.identity")}</dt>
                         <dd
                             className="truncate"
                             title={`${serverUrl}/identity`}
                         >{`${serverUrl}/identity`}</dd>
-                        <dt className="text-muted-foreground">Icons</dt>
+                        <dt className="text-muted-foreground">{t("clients.icons")}</dt>
                         <dd
                             className="truncate"
                             title={`${serverUrl}/icons`}
                         >{`${serverUrl}/icons`}</dd>
-                        <dt className="text-muted-foreground">Notifications</dt>
+                        <dt className="text-muted-foreground">{t("clients.notifications")}</dt>
                         <dd
                             className="truncate"
                             title={`${serverUrl}/notifications`}
@@ -252,26 +215,15 @@ export default async function VaultClientsPage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>What is different here</CardTitle>
+                    <CardTitle>{t("clients.differentTitle")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-2 text-sm text-muted-foreground">
-                    <p>
-                        Accounts are made in Polaris, not from a client - an app&apos;s &quot;create
-                        account&quot; will be refused, and your master password is separate from the
-                        one you sign in to Polaris with.
-                    </p>
-                    <p>
-                        Two-step login uses the authenticator on your Polaris account, so a code
-                        from it is what an app will ask for.
-                    </p>
-                    <p>
-                        Icons for saved sites are fetched by this server rather than by Bitwarden,
-                        so the list of sites you have accounts on stays here.
-                    </p>
+                    <p>{t("clients.differentOne")}</p>
+                    <p>{t("clients.differentTwo")}</p>
+                    <p>{t("clients.differentThree")}</p>
                     <p className="flex items-center gap-1">
                         <ExternalLink className="size-3" />
-                        Bitwarden is a trademark of Bitwarden, Inc. Polaris is not affiliated with
-                        them; it implements their published client protocol.
+                        {t("clients.trademark")}
                     </p>
                 </CardBody>
             </Card>

@@ -10,6 +10,7 @@ import home from "./home.json";
 import mail from "./mail.json";
 import admin from "./admin.json";
 import tasks from "./tasks.json";
+import vault from "./vault.json";
 import common from "./common.json";
 import deploy from "./deploy.json";
 import account from "./account.json";
@@ -56,5 +57,6 @@ export default {
     tasks,
     tasksDetail,
     tasksViews,
-    validation
+    validation,
+    vault
 };

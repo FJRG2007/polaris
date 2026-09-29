@@ -26,12 +26,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, Loader2, ShieldAlert } from "lucide-react";
 import {
     defaultParts,
-    PART_LABELS,
-    PART_WARNINGS,
     shareableParts,
     shareText,
-    type SharedPart
+    WARNED_PARTS,
+    type SharedPart,
+    type ShareTextLabels
 } from "./share-item";
+import { identityLabelKey, type IdentityField } from "./identity-fields";
+import { IDENTITY_FIELDS } from "./vault-model";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     Checkbox,
@@ -45,13 +48,9 @@ import {
     Select
 } from "@polaris/ui";
 
-/** How long the link lasts unless somebody says otherwise. A week: long enough
- *  to be read, short enough that a forgotten share expires on its own. */
-const LIFETIMES = [
-    { value: "1", label: "1 day" },
-    { value: "7", label: "7 days" },
-    { value: "30", label: "30 days" }
-];
+/** How long the link can last, in days. A week unless somebody says otherwise:
+ *  long enough to be read, short enough that a forgotten share expires on its own. */
+const LIFETIMES = ["1", "7", "30"] as const;
 
 export function ShareItemDialog({
     item,
@@ -63,6 +62,8 @@ export function ShareItemDialog({
     onShared?: (item: VaultItem) => void;
     onClose: () => void;
 }) {
+    const t = useTranslations("vault");
+    const tc = useTranslations("common");
     const { key } = useVaultSession();
     const [parts, setParts] = useState<Set<SharedPart>>(new Set());
     const [days, setDays] = useState("7");
@@ -88,12 +89,30 @@ export function ShareItemDialog({
         setError(null);
     }, [item]);
 
-    const body = item ? shareText(item, parts) : "";
+    const labels: ShareTextLabels = {
+        username: t("share.text.username"),
+        password: t("share.text.password"),
+        totp: t("share.text.totp"),
+        recovery: t("share.text.recovery"),
+        website: t("share.text.website"),
+        cardholder: t("share.text.cardholder"),
+        cardNumber: t("share.text.cardNumber"),
+        expires: t("share.text.expires"),
+        securityCode: t("share.text.securityCode"),
+        publicKey: t("share.text.publicKey"),
+        privateKey: t("share.text.privateKey"),
+        notes: t("share.text.notes"),
+        identityField: (field) =>
+            (IDENTITY_FIELDS as readonly string[]).includes(field)
+                ? t(identityLabelKey(field as IdentityField))
+                : field
+    };
+    const body = item ? shareText(item, parts, labels) : "";
 
     async function onShare(): Promise<void> {
         if (!item || !key) return;
         if (!body.trim()) {
-            setError("Pick at least one thing to send.");
+            setError(t("share.pickSomething"));
             return;
         }
         setBusy(true);
@@ -106,7 +125,7 @@ export function ShareItemDialog({
             const views = Number(maxViews);
             const result = await createSendAction({
                 type: 0,
-                name: await crypto.encrypt(item.name || "Shared credential", sendKey),
+                name: await crypto.encrypt(item.name || t("share.sharedName"), sendKey),
                 notes: null,
                 // Wrapped under the vault key as well, so this account's other
                 // devices can list the share without being told the link.
@@ -121,7 +140,7 @@ export function ShareItemDialog({
                 hideEmail: true
             });
             if (result.error || !result.url) {
-                setError(result.error ?? "That link could not be made.");
+                setError(result.error ?? t("share.failed"));
                 return;
             }
             setLink(
@@ -150,18 +169,18 @@ export function ShareItemDialog({
         <Dialog open={item !== null} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Share {item?.name || "this item"}</DialogTitle>
+                    <DialogTitle>
+                        {item?.name ? t("share.title", { name: item.name }) : t("share.titleUnnamed")}
+                    </DialogTitle>
                     <DialogDescription>
-                        Anybody with the link can read what you pick. Polaris cannot - the key is
-                        in the link itself, and it is shown once.
+                        {t("share.description")}
                     </DialogDescription>
                 </DialogHeader>
 
                 {link ? (
                     <div className="flex flex-col gap-2">
                         <p className="text-sm">
-                            Copy it now. This is the only time it is shown, and the part after the
-                            # is what opens it.
+                            {t("share.copyNow")}
                         </p>
                         <div className="flex items-center gap-2">
                             <Input readOnly value={link} className="font-mono text-xs" />
@@ -169,8 +188,8 @@ export function ShareItemDialog({
                                 type="button"
                                 size="icon"
                                 variant="secondary"
-                                title="Copy the link"
-                                aria-label="Copy the link"
+                                title={t("share.copyLink")}
+                                aria-label={t("share.copyLink")}
                                 onClick={async () => {
                                     await navigator.clipboard.writeText(link);
                                     setCopied(true);
@@ -184,14 +203,14 @@ export function ShareItemDialog({
                             </Button>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            It is listed under Sends, where you can end it early.
+                            {t("share.listed")}
                         </p>
                     </div>
                 ) : (
                     <div className="flex flex-col gap-4">
                         <fieldset className="flex flex-col gap-2">
                             <legend className="text-xs font-medium text-muted-foreground">
-                                What to send
+                                {t("share.whatToSend")}
                             </legend>
                             {available.map((part) => (
                                 <label key={part} className="flex items-start gap-2 text-sm">
@@ -201,11 +220,11 @@ export function ShareItemDialog({
                                         className="mt-0.5"
                                     />
                                     <span className="min-w-0">
-                                        {PART_LABELS[part]}
-                                        {PART_WARNINGS[part] ? (
+                                        {t(`share.parts.${part}`)}
+                                        {WARNED_PARTS.has(part) ? (
                                             <span className="flex items-start gap-1 text-xs text-warning">
                                                 <ShieldAlert className="mt-0.5 size-3 shrink-0" />
-                                                {PART_WARNINGS[part]}
+                                                {t(`share.warnings.${part as "totp" | "recovery" | "sshKey"}`)}
                                             </span>
                                         ) : null}
                                     </span>
@@ -216,32 +235,35 @@ export function ShareItemDialog({
                         <div className="grid gap-3 sm:grid-cols-2">
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="text-xs text-muted-foreground">
-                                    Stops working after
+                                    {t("share.stopsAfter")}
                                 </span>
                                 <Select
                                     value={days}
                                     onValueChange={setDays}
-                                    aria-label="How long the link lasts"
-                                    options={LIFETIMES}
+                                    aria-label={t("share.lifetime")}
+                                    options={LIFETIMES.map((value) => ({
+                                        value,
+                                        label: t(`share.lifetimes.d${value}`)
+                                    }))}
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="text-xs text-muted-foreground">
-                                    Times it can be opened
+                                    {t("share.times")}
                                 </span>
                                 <Input
                                     type="number"
                                     min={1}
                                     value={maxViews}
                                     onChange={(event) => setMaxViews(event.target.value)}
-                                    placeholder="Any number of times"
+                                    placeholder={t("share.anyNumber")}
                                 />
                             </label>
                         </div>
 
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="text-xs text-muted-foreground">
-                                Password to open it (optional)
+                                {t("share.password")}
                             </span>
                             {/* enigma:allow-no-breach-check enigma:allow-identity-password -
                                 this is not an account password and there is no
@@ -255,14 +277,14 @@ export function ShareItemDialog({
                                 type="password"
                                 value={password}
                                 onChange={(event) => setPassword(event.target.value)}
-                                placeholder="Told to them another way"
+                                placeholder={t("share.passwordPlaceholder")}
                                 autoComplete="new-password"
                             />
                             {/* The point of a second channel, said once: a
                                 password sent in the same message as the link is
                                 not a password. */}
                             <span className="text-xs text-muted-foreground">
-                                Send this by a different route than the link.
+                                {t("share.passwordHint")}
                             </span>
                         </label>
 
@@ -272,12 +294,12 @@ export function ShareItemDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
-                        {link ? "Done" : "Cancel"}
+                        {link ? t("share.done") : tc("actions.cancel")}
                     </Button>
                     {link ? null : (
                         <Button onClick={() => void onShare()} disabled={busy || !key}>
                             {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                            Make the link
+                            {t("share.make")}
                         </Button>
                     )}
                 </DialogFooter>

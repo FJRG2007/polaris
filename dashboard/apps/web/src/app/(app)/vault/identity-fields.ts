@@ -13,15 +13,17 @@
  */
 
 import { IDENTITY_FIELDS } from "./vault-model";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 export type IdentityField = (typeof IDENTITY_FIELDS)[number];
 
+/** The four questions, by id; each is headed `vault.identity.groups.<id>`. */
 export const IDENTITY_GROUPS: readonly {
-    title: string;
+    id: "name" | "contact" | "address" | "numbers";
     fields: readonly { field: IdentityField; span?: "full" }[];
 }[] = [
     {
-        title: "Name",
+        id: "name",
         fields: [
             { field: "title" },
             { field: "firstName" },
@@ -31,11 +33,11 @@ export const IDENTITY_GROUPS: readonly {
         ]
     },
     {
-        title: "Getting hold of them",
+        id: "contact",
         fields: [{ field: "email" }, { field: "phone" }, { field: "username" }]
     },
     {
-        title: "Address",
+        id: "address",
         fields: [
             { field: "address1", span: "full" },
             { field: "address2", span: "full" },
@@ -46,41 +48,26 @@ export const IDENTITY_GROUPS: readonly {
         ]
     },
     {
-        title: "Numbers they were given",
+        id: "numbers",
         fields: [{ field: "ssn" }, { field: "passportNumber" }, { field: "licenseNumber" }]
     }
 ];
 
-/** Where the derived label reads badly. `Address 1` is what the field is called
- *  and not what anybody would write on an envelope. */
-export const IDENTITY_LABELS: Partial<Record<IdentityField, string>> = {
-    address1: "Street",
-    address2: "Flat, suite, building",
-    state: "County or state",
-    postalCode: "Postcode",
-    ssn: "National insurance or social security number",
-    licenseNumber: "Driving licence number",
-    username: "Username on file"
-};
-
-/** A hint only where the field's own name does not say what goes in it. */
-export const IDENTITY_HINTS: Partial<Record<IdentityField, string>> = {
-    title: "Mr, Ms, Dr",
-    address2: "Optional"
-};
-
-/** Turn a field key like `postalCode` into "Postal code". */
-export function humanize(field: string): string {
-    const spaced = field
-        .replace(/([A-Z])/g, " $1")
-        .toLowerCase()
-        .trim();
-    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+/** What a field is called on screen: `vault.identity.fields.<field>`. `Address 1`
+ *  is what the field is called and not what anybody would write on an envelope,
+ *  so the catalog names each one rather than deriving it from the key. */
+export function identityLabelKey(field: IdentityField): NamespaceKey<"vault"> {
+    return `identity.fields.${field}`;
 }
 
-/** What a field is called on screen. */
-export function identityLabel(field: IdentityField): string {
-    return IDENTITY_LABELS[field] ?? humanize(field);
+/** A hint only where the field's own name does not say what goes in it. */
+const HINTED: Partial<Record<IdentityField, NamespaceKey<"vault">>> = {
+    title: "identity.hints.title",
+    address2: "identity.hints.address2"
+};
+
+export function identityHintKey(field: IdentityField): NamespaceKey<"vault"> | undefined {
+    return HINTED[field];
 }
 
 /**

@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 import { requirePermission } from "@/lib/session";
 import { vaultStateAction } from "./vault-actions";
 import { VaultSessionProvider } from "./vault-session";
+import { Messages } from "@/components/i18n/messages";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +19,10 @@ export default async function VaultLayout({ children }: { children: ReactNode })
     const user = await requirePermission("vault.use");
     const state = await vaultStateAction();
     return (
-        <VaultSessionProvider state={state} name={user.name}>
-            {children}
-        </VaultSessionProvider>
+        <Messages namespaces={["vault"]}>
+            <VaultSessionProvider state={state} name={user.name}>
+                {children}
+            </VaultSessionProvider>
+        </Messages>
     );
 }

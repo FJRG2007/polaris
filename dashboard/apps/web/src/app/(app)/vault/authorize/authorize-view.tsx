@@ -17,6 +17,7 @@
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as vaultCrypto from "@/lib/vault/crypto";
 import { useVaultSession } from "../vault-session";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
@@ -24,6 +25,7 @@ import { answerAuthorizationAction, describeAuthorizationAction } from "./action
 import { formatUserCode, type PendingAuthorization } from "@/lib/vault/authorization-code";
 
 export function AuthorizeView() {
+    const t = useTranslations("vault");
     const { key } = useVaultSession();
     const asked = useSearchParams().get("code") ?? "";
     const [typed, setTyped] = useState(asked);
@@ -65,7 +67,7 @@ export function AuthorizeView() {
         if (approve) {
             if (!key) {
                 setBusy(false);
-                setError("Unlock your vault before letting a client in.");
+                setError(t("authorize.errors.unlockFirst"));
                 return;
             }
             // The public half is whatever the asking client sent, so sealing to it
@@ -80,7 +82,7 @@ export function AuthorizeView() {
                 );
             } catch {
                 setBusy(false);
-                setError("That request did not come with a usable key. Ask the app for a new one.");
+                setError(t("authorize.errors.unusableKey"));
                 return;
             }
         }
@@ -102,12 +104,10 @@ export function AuthorizeView() {
             <Card>
                 <CardBody className="flex flex-col gap-2">
                     <p className="text-sm font-medium">
-                        {answered === "in" ? "It is in." : "Turned away."}
+                        {answered === "in" ? t("authorize.letIn") : t("authorize.turnedAway")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                        {answered === "in"
-                            ? "The app has what it needs. You can close this page."
-                            : "Nothing was handed over."}
+                        {answered === "in" ? t("authorize.letInHint") : t("authorize.turnedAwayHint")}
                     </p>
                 </CardBody>
             </Card>
@@ -122,33 +122,29 @@ export function AuthorizeView() {
                         <div className="flex flex-col gap-1">
                             <p className="text-sm font-medium">{pending.device}</p>
                             <p className="text-xs text-muted-foreground">
-                                Code {formatUserCode(pending.userCode)}
+                                {t("authorize.code", { code: formatUserCode(pending.userCode) })}
                             </p>
                         </div>
                         <dl className="flex flex-col gap-1 text-xs">
                             <div className="flex justify-between gap-3">
-                                <dt className="text-muted-foreground">Asked from</dt>
+                                <dt className="text-muted-foreground">{t("authorize.askedFrom")}</dt>
                                 {/* The whole address, because this is half the
                                     decision and an IPv6 one does not fit the row. */}
-                                <dd className="truncate" title={pending.requestIp ?? "Unknown"}>
-                                    {pending.requestIp ?? "Unknown"}
+                                <dd className="truncate" title={pending.requestIp ?? t("authorize.unknown")}>
+                                    {pending.requestIp ?? t("authorize.unknown")}
                                 </dd>
                             </div>
                             <div className="flex justify-between gap-3">
-                                <dt className="text-muted-foreground">On</dt>
+                                <dt className="text-muted-foreground">{t("authorize.on")}</dt>
                                 {/* And the whole name it was asked on: which of a
                                     deployment's addresses saw the request is the
                                     other half, and the tail is where they differ. */}
-                                <dd className="truncate" title={pending.host ?? "Unknown"}>
-                                    {pending.host ?? "Unknown"}
+                                <dd className="truncate" title={pending.host ?? t("authorize.unknown")}>
+                                    {pending.host ?? t("authorize.unknown")}
                                 </dd>
                             </div>
                         </dl>
-                        <p className="text-xs text-muted-foreground">
-                            Saying yes hands this app a copy of your vault key, sealed so that only
-                            it can open it. It can then read and change your items until you end it
-                            from Sessions.
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("authorize.warning")}</p>
                         {error ? (
                             <p role="alert" className="text-sm text-danger">
                                 {error}
@@ -156,7 +152,7 @@ export function AuthorizeView() {
                         ) : null}
                         <div className="flex items-center gap-2">
                             <Button size="sm" disabled={busy} onClick={() => void answer(true)}>
-                                {busy ? "Working" : "Let it in"}
+                                {busy ? t("authorize.working") : t("authorize.letItIn")}
                             </Button>
                             <Button
                                 size="sm"
@@ -164,7 +160,7 @@ export function AuthorizeView() {
                                 disabled={busy}
                                 onClick={() => void answer(false)}
                             >
-                                Turn it away
+                                {t("authorize.turnItAway")}
                             </Button>
                         </div>
                     </>
@@ -174,7 +170,8 @@ export function AuthorizeView() {
                             autoFocus
                             value={typed}
                             maxLength={16}
-                            aria-label="The code the app is showing"
+                            aria-label={t("authorize.codeLabel")}
+                            // i18n-ignore: the shape of the code, not words
                             placeholder="XXXX-XXXX"
                             onChange={(event) => setTyped(event.target.value)}
                             onKeyDown={(event) => event.key === "Enter" && void look(typed)}
@@ -189,7 +186,7 @@ export function AuthorizeView() {
                             disabled={busy || typed.trim() === ""}
                             onClick={() => void look(typed)}
                         >
-                            {busy ? "Looking" : "Find it"}
+                            {busy ? t("authorize.looking") : t("authorize.findIt")}
                         </Button>
                     </>
                 )}

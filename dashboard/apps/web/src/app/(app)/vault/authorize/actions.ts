@@ -13,6 +13,7 @@
 import { z } from "zod";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { getTranslations } from "@/lib/i18n/request";
 import { readUserCode, type PendingAuthorization } from "@/lib/vault/authorization-code";
 import { answerVaultAuthorization, describeVaultAuthorization } from "@/lib/vault/authorization";
 
@@ -39,11 +40,12 @@ export async function describeAuthorizationAction(
     typed: unknown
 ): Promise<{ pending?: PendingAuthorization; error?: string }> {
     await requirePermission("vault.use");
+    const t = await getTranslations("vault");
     const code = typeof typed === "string" ? readUserCode(typed) : null;
-    if (!code) return { error: "That is not a code from a Polaris app." };
+    if (!code) return { error: t("authorize.errors.notACode") };
     const pending = await describeVaultAuthorization(code);
     if (!pending) {
-        return { error: "Nothing is waiting on that code. Ask the app for a new one." };
+        return { error: t("authorize.errors.nothingWaiting") };
     }
     return { pending };
 }
@@ -53,17 +55,18 @@ export async function answerAuthorizationAction(
     input: unknown
 ): Promise<{ ok?: true; error?: string }> {
     const user = await requirePermission("vault.use");
+    const t = await getTranslations("vault");
     const parsed = answerSchema.safeParse(input);
-    if (!parsed.success) return { error: "That request cannot be answered." };
+    if (!parsed.success) return { error: t("authorize.errors.cannotAnswer") };
 
     const code = readUserCode(parsed.data.userCode);
-    if (!code) return { error: "That is not a code from a Polaris app." };
+    if (!code) return { error: t("authorize.errors.notACode") };
 
     // Read before answering, so what the log records is what the person saw rather
     // than what a row said after it was spent.
     const pending = await describeVaultAuthorization(code);
     if (!pending) {
-        return { error: "Nothing is waiting on that code. Ask the app for a new one." };
+        return { error: t("authorize.errors.nothingWaiting") };
     }
 
     const answered = await answerVaultAuthorization({
@@ -72,7 +75,7 @@ export async function answerAuthorizationAction(
         approve: parsed.data.approve,
         wrappedKey: parsed.data.wrappedKey
     });
-    if (answered.error) return { error: answered.error };
+    if (answered.error) return { error: t(`authorize.errors.${answered.error}`) };
 
     await recordAudit({
         actorId: user.id,

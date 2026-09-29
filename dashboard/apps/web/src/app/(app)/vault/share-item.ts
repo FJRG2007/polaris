@@ -36,25 +36,43 @@ export type SharedPart =
     | "fields"
     | "notes";
 
-/** How each part is named on the form, and what it is worth saying about it. */
-export const PART_LABELS: Record<SharedPart, string> = {
-    username: "Username or email",
+/** The parts where the consequence is not obvious from the name, and a warning is
+ *  said beside them on the form (`vault.share.warnings.<part>`). Each part's name
+ *  is `vault.share.parts.<part>`. */
+export const WARNED_PARTS: ReadonlySet<SharedPart> = new Set<SharedPart>(["totp", "recovery", "sshKey"]);
+
+/** The labels the shared text is written with. The form hands in the sender's
+ *  language; the English ones are the default for anything with no reader. */
+export interface ShareTextLabels {
+    username: string;
+    password: string;
+    totp: string;
+    recovery: string;
+    website: string;
+    cardholder: string;
+    cardNumber: string;
+    expires: string;
+    securityCode: string;
+    publicKey: string;
+    privateKey: string;
+    notes: string;
+    identityField: (field: string) => string;
+}
+
+const ENGLISH_LABELS: ShareTextLabels = {
+    username: "Username",
     password: "Password",
     totp: "Authenticator key",
     recovery: "Recovery codes",
-    uris: "Websites",
-    card: "Card details",
-    identity: "Identity",
-    sshKey: "Private key",
-    fields: "Custom fields",
-    notes: "Notes"
-};
-
-/** Said beside the parts where the consequence is not obvious from the name. */
-export const PART_WARNINGS: Partial<Record<SharedPart, string>> = {
-    totp: "This is not a code - it is what makes every future code. Sending it hands over the second factor.",
-    recovery: "Each of these gets past the second factor once.",
-    sshKey: "The private half. Whoever has it can sign as this key."
+    website: "Website",
+    cardholder: "Cardholder",
+    cardNumber: "Card number",
+    expires: "Expires",
+    securityCode: "Security code",
+    publicKey: "Public key",
+    privateKey: "Private key",
+    notes: "Notes",
+    identityField: humanField
 };
 
 /** The parts turned on unless somebody says otherwise: the smallest set that is
@@ -99,15 +117,19 @@ export function defaultParts(item: VaultItem): SharedPart[] {
  * a phone and paste into a form. Nothing is included that was not asked for, and
  * a part with nothing in it prints nothing rather than an empty heading.
  */
-export function shareText(item: VaultItem, parts: ReadonlySet<SharedPart>): string {
+export function shareText(
+    item: VaultItem,
+    parts: ReadonlySet<SharedPart>,
+    labels: ShareTextLabels = ENGLISH_LABELS
+): string {
     const lines: string[] = [];
     const add = (label: string, value: string) => {
         if (value.trim()) lines.push(`${label}: ${value.trim()}`);
     };
 
-    if (parts.has("username")) add("Username", item.login.username);
-    if (parts.has("password")) add("Password", item.login.password);
-    if (parts.has("totp")) add("Authenticator key", item.login.totp);
+    if (parts.has("username")) add(labels.username, item.login.username);
+    if (parts.has("password")) add(labels.password, item.login.password);
+    if (parts.has("totp")) add(labels.totp, item.login.totp);
     if (parts.has("recovery")) {
         // The mark that says which are spent is a Polaris convention, so it comes
         // off on the way out - the person receiving these has no vault to read it
@@ -115,28 +137,28 @@ export function shareText(item: VaultItem, parts: ReadonlySet<SharedPart>): stri
         const codes = core
             .readRecoveryCodes(core.fieldValue(item.fields, core.RECOVERY_CODES_FIELD))
             .map((code) => (code.startsWith("-") ? code.slice(1) : code));
-        if (codes.length > 0) lines.push(`Recovery codes:\n${codes.join("\n")}`);
+        if (codes.length > 0) lines.push(`${labels.recovery}:\n${codes.join("\n")}`);
     }
     if (parts.has("uris")) {
-        for (const entry of item.login.uris) add("Website", core.withoutWildcard(entry.uri));
+        for (const entry of item.login.uris) add(labels.website, core.withoutWildcard(entry.uri));
     }
     if (parts.has("card")) {
-        add("Cardholder", item.card.cardholderName);
-        add("Card number", item.card.number);
+        add(labels.cardholder, item.card.cardholderName);
+        add(labels.cardNumber, item.card.number);
         add(
-            "Expires",
+            labels.expires,
             core.writeCardExpiry({ month: item.card.expMonth, year: item.card.expYear })
         );
-        add("Security code", item.card.code);
+        add(labels.securityCode, item.card.code);
     }
     if (parts.has("identity")) {
         for (const [field, value] of Object.entries(item.identity)) {
-            add(humanField(field), value);
+            add(labels.identityField(field), value);
         }
     }
     if (parts.has("sshKey")) {
-        add("Public key", item.sshKey.publicKey);
-        if (item.sshKey.privateKey) lines.push(`Private key:\n${item.sshKey.privateKey.trim()}`);
+        add(labels.publicKey, item.sshKey.publicKey);
+        if (item.sshKey.privateKey) lines.push(`${labels.privateKey}:\n${item.sshKey.privateKey.trim()}`);
     }
     if (parts.has("fields")) {
         for (const field of item.fields) {
@@ -145,7 +167,7 @@ export function shareText(item: VaultItem, parts: ReadonlySet<SharedPart>): stri
             add(field.name, field.value);
         }
     }
-    if (parts.has("notes") && item.notes.trim()) lines.push(`Notes:\n${item.notes.trim()}`);
+    if (parts.has("notes") && item.notes.trim()) lines.push(`${labels.notes}:\n${item.notes.trim()}`);
 
     return lines.join("\n");
 }

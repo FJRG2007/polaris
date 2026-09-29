@@ -40,7 +40,10 @@ import {
     X
 } from "lucide-react";
 import { emptyItem, type VaultFolder, type VaultItem } from "./vault-model";
-import { humanize, IDENTITY_GROUPS, IDENTITY_HINTS, IDENTITY_LABELS } from "./identity-fields";
+import { IDENTITY_GROUPS, identityHintKey, identityLabelKey } from "./identity-fields";
+import { cipherTypeLabel, uriMatchLabel } from "./vault-labels";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     Dialog,
@@ -69,10 +72,18 @@ function replaceUri(
     return next;
 }
 
-const TYPE_OPTIONS = core.CIPHER_TYPES.map((type) => ({
-    value: String(type),
-    label: core.CIPHER_TYPE_LABEL[type]
-}));
+/**
+ * What core says is wrong with a website or a card number, in the reader's
+ * language. Core words its answers in English for every caller; keyed by those
+ * words so a new one core learns to say still reaches the screen, in English,
+ * rather than nothing.
+ */
+const PROBLEM_KEYS: Record<string, NamespaceKey<"vault">> = {
+    "That pattern will not compile, so it would never match anything.": "item.problems.pattern",
+    "That does not look like a web address.": "item.problems.notAddress",
+    "That is more digits than a card number has.": "item.problems.tooLong",
+    "Those digits do not add up - one of them is probably wrong.": "item.problems.luhn"
+};
 
 /** The custom fields this form draws with an editor of its own. They are stored
  *  as custom fields for compatibility with every other Bitwarden client, not
@@ -103,6 +114,13 @@ export function ItemDialog({
     /** Makes a folder and answers with its id, or null if it could not. */
     onCreateFolder: (name: string) => Promise<string | null>;
 }) {
+    const t = useTranslations("vault");
+    const tc = useTranslations("common");
+    const problem = (said: string | null): string | null => {
+        if (!said) return null;
+        const key = PROBLEM_KEYS[said];
+        return key ? t(key) : said;
+    };
     const { vaults, vaultKeys } = useVaultSession();
     const [draft, setDraft] = useState<VaultItem>(emptyItem(core.CIPHER_LOGIN));
     const [generator, setGenerator] = useState(false);
@@ -167,16 +185,16 @@ export function ItemDialog({
     const expiryNote = (() => {
         if (!draft.card.expMonth || !draft.card.expYear) {
             return expiry.trim() && !core.readCardExpiry(expiry)
-                ? { tone: "danger" as const, text: "That is not a month and a year." }
+                ? { tone: "danger" as const, text: t("item.expiry.notAMonth") }
                 : null;
         }
         const stored = { month: draft.card.expMonth, year: draft.card.expYear };
         const now = new Date();
         if (core.cardExpired(stored, now)) {
-            return { tone: "danger" as const, text: "This card has expired." };
+            return { tone: "danger" as const, text: t("item.expiry.expired") };
         }
         if (core.cardExpiringSoon(stored, now)) {
-            return { tone: "warning" as const, text: "This card expires soon." };
+            return { tone: "warning" as const, text: t("item.expiry.soon") };
         }
         return null;
     })();
@@ -218,7 +236,7 @@ export function ItemDialog({
         const id = await onCreateFolder(name);
         setPending(false);
         if (!id) {
-            setError("That folder could not be created.");
+            setError(t("item.folderFailed"));
             return;
         }
         patch({ folderId: id });
@@ -232,7 +250,7 @@ export function ItemDialog({
     async function onSubmit(): Promise<void> {
         const intoVault = !draft.id && draft.organizationId !== null;
         if (intoVault && !collectionId) {
-            setError("Pick a collection to put it in.");
+            setError(t("item.pickCollection"));
             return;
         }
         setPending(true);
@@ -269,26 +287,29 @@ export function ItemDialog({
         <Dialog open={item !== null} onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{draft.id ? "Edit item" : "New item"}</DialogTitle>
+                    <DialogTitle>{draft.id ? t("item.editTitle") : t("item.newTitle")}</DialogTitle>
                     <DialogDescription>
-                        Everything here is encrypted in this browser before it is saved.
+                        {t("item.description")}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex max-h-[65vh] flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
                     <div className="grid grid-cols-2 gap-3">
                         <label className="flex flex-col gap-1 text-sm">
-                            Kind
+                            {t("item.kind")}
                             <Select
                                 value={String(draft.type)}
                                 onValueChange={(value) => patch({ type: Number(value) })}
-                                options={TYPE_OPTIONS}
-                                aria-label="Kind"
+                                options={core.CIPHER_TYPES.map((type) => ({
+                                    value: String(type),
+                                    label: cipherTypeLabel(t, type)
+                                }))}
+                                aria-label={t("item.kind")}
                                 disabled={Boolean(draft.id)}
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Folder
+                            {t("item.folder")}
                             <Select
                                 value={draft.folderId ?? ""}
                                 onValueChange={(value) => {
@@ -300,14 +321,14 @@ export function ItemDialog({
                                     patch({ folderId: value || null });
                                 }}
                                 options={[
-                                    { value: "", label: "No folder" },
+                                    { value: "", label: t("item.noFolder") },
                                     ...folders.map((folder) => ({
                                         value: folder.id,
-                                        label: folder.name || "Untitled"
+                                        label: folder.name || t("labels.untitled")
                                     })),
-                                    { value: NEW_FOLDER, label: "New folder..." }
+                                    { value: NEW_FOLDER, label: t("item.newFolder") }
                                 ]}
-                                aria-label="Folder"
+                                aria-label={t("item.folder")}
                             />
                         </label>
                     </div>
@@ -318,15 +339,15 @@ export function ItemDialog({
                     {choosable.length > 0 ? (
                         <div className="grid grid-cols-2 gap-3">
                             <label className="flex flex-col gap-1 text-sm">
-                                Vault
+                                {t("item.vault")}
                                 <Select
                                     value={draft.organizationId ?? ""}
                                     onValueChange={(value) =>
                                         patch({ organizationId: value || null })
                                     }
-                                    aria-label="Vault"
+                                    aria-label={t("item.vault")}
                                     options={[
-                                        { value: "", label: "My own vault" },
+                                        { value: "", label: t("item.myVault") },
                                         ...choosable.map((vault) => ({
                                             value: vault.vaultId ?? "",
                                             label: vault.name
@@ -336,12 +357,12 @@ export function ItemDialog({
                             </label>
                             {draft.organizationId ? (
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Collection
+                                    {t("item.collection")}
                                     <Select
                                         value={collectionId}
                                         onValueChange={setCollectionId}
-                                        aria-label="Collection"
-                                        placeholder="No collections here yet"
+                                        aria-label={t("item.collection")}
+                                        placeholder={t("item.noCollections")}
                                         options={collections.map((collection) => ({
                                             value: collection.id,
                                             label: collection.name
@@ -368,8 +389,8 @@ export function ItemDialog({
                                     }
                                     if (event.key === "Escape") setNewFolder(null);
                                 }}
-                                placeholder="Name the folder"
-                                aria-label="New folder name"
+                                placeholder={t("item.folderName")}
+                                aria-label={t("item.folderNameLabel")}
                             />
                             <Button
                                 type="button"
@@ -378,14 +399,14 @@ export function ItemDialog({
                                 onClick={() => void createFolder()}
                             >
                                 <FolderPlus className="size-4" />
-                                Create
+                                {t("item.create")}
                             </Button>
                             <Button
                                 type="button"
                                 size="icon"
                                 variant="ghost"
-                                title="Cancel"
-                                aria-label="Do not create a folder"
+                                title={tc("actions.cancel")}
+                                aria-label={t("item.cancelFolder")}
                                 onClick={() => setNewFolder(null)}
                             >
                                 <X className="size-4" />
@@ -394,11 +415,11 @@ export function ItemDialog({
                     ) : null}
 
                     <label className="flex flex-col gap-1 text-sm">
-                        Name
+                        {t("item.name")}
                         <Input
                             value={draft.name}
                             onChange={(event) => patch({ name: event.target.value })}
-                            placeholder="What this is"
+                            placeholder={t("item.namePlaceholder")}
                             autoFocus
                         />
                     </label>
@@ -406,7 +427,7 @@ export function ItemDialog({
                     {draft.type === core.CIPHER_LOGIN ? (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
-                                Username
+                                {t("item.username")}
                                 <Input
                                     value={draft.login.username}
                                     onChange={(event) =>
@@ -418,7 +439,7 @@ export function ItemDialog({
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                Password
+                                {t("item.password")}
                                 <div className="flex items-center gap-2">
                                     {/* The Input carries its own show/hide eye. */}
                                     <div className="flex-1">
@@ -441,8 +462,8 @@ export function ItemDialog({
                                         type="button"
                                         size="icon"
                                         variant="secondary"
-                                        title="Generate one"
-                                        aria-label="Generate a password"
+                                        title={t("item.generateOne")}
+                                        aria-label={t("item.generatePassword")}
                                         onClick={() => {
                                             patch({
                                                 login: {
@@ -467,7 +488,7 @@ export function ItemDialog({
                                     className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
                                     onClick={() => setGenerator((prev) => !prev)}
                                 >
-                                    {generator ? "Hide the generator" : "Open the generator"}
+                                    {generator ? t("item.hideGenerator") : t("item.openGenerator")}
                                 </button>
                             </label>
                             {/* What is true about it, while it is being chosen.
@@ -486,7 +507,7 @@ export function ItemDialog({
                                 </div>
                             ) : null}
                             <div className="flex flex-col gap-1 text-sm">
-                                <span>Authenticator key (optional)</span>
+                                <span>{t("item.totp")}</span>
                                 <div className="flex items-center gap-2">
                                     <Input
                                         className="flex-1 font-mono text-xs"
@@ -496,7 +517,7 @@ export function ItemDialog({
                                                 login: { ...draft.login, totp: event.target.value }
                                             })
                                         }
-                                        placeholder="The secret, or the whole otpauth:// link"
+                                        placeholder={t("item.totpPlaceholder")}
                                         autoComplete="off"
                                     />
                                     {/* The square a site shows is an otpauth://
@@ -512,7 +533,7 @@ export function ItemDialog({
                                         onClick={() => setScanning(true)}
                                     >
                                         <QrCode className="size-4 shrink-0" />
-                                        Scan
+                                        {t("item.scan")}
                                     </Button>
                                 </div>
                                 {draft.login.totp.trim() && !parseTotp(draft.login.totp) ? (
@@ -521,17 +542,14 @@ export function ItemDialog({
                                     // that cannot be read is a two-factor login
                                     // somebody thinks they have saved.
                                     <span className="text-xs text-danger">
-                                        That is not a key this can read. It should be an otpauth://
-                                        link, or the base32 secret on its own.
+                                        {t("item.totpUnreadable")}
                                     </span>
                                 ) : null}
                             </div>
                             <div className="flex flex-col gap-1 text-sm">
-                                <span>Recovery codes (optional)</span>
+                                <span>{t("item.recoveryCodes")}</span>
                                 <span className="text-xs text-muted-foreground">
-                                    The ones a site gives you for the day the authenticator is gone.
-                                    Paste them however they were printed, or hand over the file the
-                                    site offered.
+                                    {t("item.recoveryHint")}
                                 </span>
                                 {/* Encrypted exactly like the password and the
                                     authenticator key: it is a hidden field, which
@@ -545,7 +563,7 @@ export function ItemDialog({
                                 held one is a vault where the same credential
                                 gets saved three times. */}
                             <div className="flex flex-col gap-1 text-sm">
-                                <span>Websites</span>
+                                <span>{t("item.websites")}</span>
                                 <div className="flex flex-col gap-2">
                                     {(draft.login.uris.length > 0
                                         ? draft.login.uris
@@ -578,8 +596,8 @@ export function ItemDialog({
                                                     type="button"
                                                     size="icon-sm"
                                                     variant="ghost"
-                                                    aria-label="Remove this website"
-                                                    title="Remove this website"
+                                                    aria-label={t("item.removeWebsite")}
+                                                    title={t("item.removeWebsite")}
                                                     disabled={draft.login.uris.length === 0}
                                                     onClick={() =>
                                                         patch({
@@ -604,7 +622,7 @@ export function ItemDialog({
                                                 moment. */}
                                             {core.uriProblem(entry.uri, entry.match) ? (
                                                 <span className="text-xs text-danger">
-                                                    {core.uriProblem(entry.uri, entry.match)}
+                                                    {problem(core.uriProblem(entry.uri, entry.match))}
                                                 </span>
                                             ) : null}
                                             {/* The rule is only worth a line once
@@ -613,7 +631,7 @@ export function ItemDialog({
                                             {entry.uri.trim() ? (
                                                 <Select
                                                     className="h-7 text-xs"
-                                                    aria-label="When this login is offered here"
+                                                    aria-label={t("item.whenOffered")}
                                                     value={String(
                                                         entry.match ?? core.DEFAULT_URI_MATCH
                                                     )}
@@ -636,7 +654,7 @@ export function ItemDialog({
                                                     }
                                                     options={core.URI_MATCHES.map((match) => ({
                                                         value: String(match),
-                                                        label: core.URI_MATCH_LABELS[match]
+                                                        label: uriMatchLabel(t, match)
                                                     }))}
                                                 />
                                             ) : null}
@@ -661,7 +679,7 @@ export function ItemDialog({
                                     }
                                 >
                                     <Plus className="size-4 shrink-0" />
-                                    Another website
+                                    {t("item.anotherWebsite")}
                                 </Button>
                             </div>
                         </>
@@ -670,7 +688,7 @@ export function ItemDialog({
                     {draft.type === core.CIPHER_CARD ? (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
-                                Name on the card
+                                {t("item.cardName")}
                                 <Input
                                     value={draft.card.cardholderName}
                                     onChange={(event) =>
@@ -684,7 +702,7 @@ export function ItemDialog({
                                 />
                             </label>
                             <div className="flex flex-col gap-1 text-sm">
-                                <span>Number</span>
+                                <span>{t("item.number")}</span>
                                 <div className="relative">
                                     <Input
                                         value={draft.card.number}
@@ -719,7 +737,7 @@ export function ItemDialog({
                                     // number is wrong for most of the time it is
                                     // being typed.
                                     <span className="text-xs text-danger">
-                                        {core.cardNumberProblem(draft.card.number)}
+                                        {problem(core.cardNumberProblem(draft.card.number))}
                                     </span>
                                 ) : draft.card.brand ? (
                                     <span className="text-xs text-muted-foreground">
@@ -732,7 +750,7 @@ export function ItemDialog({
                                     {/* One box, because a card prints one. People
                                         type 0830, 08/30 or 08 / 2030 and all of
                                         them mean the same August. */}
-                                    <span>Expires</span>
+                                    <span>{t("item.expires")}</span>
                                     <Input
                                         value={expiry}
                                         onChange={(event) => {
@@ -746,7 +764,7 @@ export function ItemDialog({
                                                 }
                                             });
                                         }}
-                                        placeholder="MM/YY"
+                                        placeholder={t("item.expiryPlaceholder")}
                                         inputMode="numeric"
                                         autoComplete="off"
                                     />
@@ -763,7 +781,7 @@ export function ItemDialog({
                                     ) : null}
                                 </div>
                                 <label className="flex flex-col gap-1 text-sm">
-                                    Security code
+                                    {t("item.securityCode")}
                                     <Input
                                         type="password"
                                         value={draft.card.code}
@@ -780,11 +798,11 @@ export function ItemDialog({
                                 {/* Optional, and worth having: two cards from the
                                     same network look identical in a list, and
                                     the bank is what tells them apart. */}
-                                Bank (optional)
+                                {t("item.bank")}
                                 <Input
                                     value={bank}
                                     onChange={(event) => setBank(event.target.value)}
-                                    placeholder="Who issued it"
+                                    placeholder={t("item.bankPlaceholder")}
                                     autoComplete="off"
                                 />
                             </label>
@@ -802,9 +820,9 @@ export function ItemDialog({
                         // the town, county and postcode on one row.
                         <div className="flex flex-col gap-4">
                             {IDENTITY_GROUPS.map((group) => (
-                                <fieldset key={group.title} className="flex flex-col gap-2">
+                                <fieldset key={group.id} className="flex flex-col gap-2">
                                     <legend className="text-xs font-medium text-muted-foreground">
-                                        {group.title}
+                                        {t(`identity.groups.${group.id}`)}
                                     </legend>
                                     <div className="grid grid-cols-2 gap-3">
                                         {group.fields.map(({ field, span }) => (
@@ -815,7 +833,7 @@ export function ItemDialog({
                                                     span === "full" && "col-span-2"
                                                 )}
                                             >
-                                                {IDENTITY_LABELS[field] ?? humanize(field)}
+                                                {t(identityLabelKey(field))}
                                                 <Input
                                                     value={draft.identity[field] ?? ""}
                                                     onChange={(event) =>
@@ -826,7 +844,10 @@ export function ItemDialog({
                                                             }
                                                         })
                                                     }
-                                                    placeholder={IDENTITY_HINTS[field]}
+                                                    placeholder={(() => {
+                                                        const hint = identityHintKey(field);
+                                                        return hint ? t(hint) : undefined;
+                                                    })()}
                                                     autoComplete="off"
                                                 />
                                             </label>
@@ -840,7 +861,7 @@ export function ItemDialog({
                     {draft.type === core.CIPHER_SSH_KEY ? (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
-                                Private key
+                                {t("item.privateKey")}
                                 <Textarea
                                     rows={6}
                                     value={draft.sshKey.privateKey}
@@ -857,7 +878,7 @@ export function ItemDialog({
                                 />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                Public key
+                                {t("item.publicKey")}
                                 <Textarea
                                     rows={3}
                                     value={draft.sshKey.publicKey}
@@ -877,7 +898,7 @@ export function ItemDialog({
                     ) : null}
 
                     <label className="flex flex-col gap-1 text-sm">
-                        Notes
+                        {t("item.notes")}
                         <Textarea
                             rows={draft.type === core.CIPHER_SECURE_NOTE ? 10 : 3}
                             value={draft.notes}
@@ -887,7 +908,7 @@ export function ItemDialog({
 
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                            <span className="text-sm">Custom fields</span>
+                            <span className="text-sm">{t("item.customFields")}</span>
                             <Button
                                 type="button"
                                 size="sm"
@@ -902,7 +923,7 @@ export function ItemDialog({
                                 }
                             >
                                 <Plus className="size-4" />
-                                Add
+                                {t("item.add")}
                             </Button>
                         </div>
                         {/* Everything except the fields this form already has a
@@ -920,7 +941,7 @@ export function ItemDialog({
                                 <div key={index} className="flex items-center gap-2">
                                     <Input
                                         value={field.name}
-                                        placeholder="Name"
+                                        placeholder={t("item.fieldName")}
                                         onChange={(event) =>
                                             patch({
                                                 fields: draft.fields.map((entry, at) =>
@@ -937,7 +958,7 @@ export function ItemDialog({
                                     <div className="flex-1">
                                         <Input
                                             value={field.value}
-                                            placeholder="Value"
+                                            placeholder={t("item.fieldValue")}
                                             type={
                                                 field.type === core.FIELD_HIDDEN
                                                     ? "password"
@@ -963,10 +984,10 @@ export function ItemDialog({
                                         variant="ghost"
                                         title={
                                             field.type === core.FIELD_HIDDEN
-                                                ? "Keep as plain text"
-                                                : "Keep hidden"
+                                                ? t("item.keepPlain")
+                                                : t("item.keepHidden")
                                         }
-                                        aria-label="Toggle whether this field is stored hidden"
+                                        aria-label={t("item.toggleHidden")}
                                         onClick={() =>
                                             patch({
                                                 fields: draft.fields.map((entry, at) =>
@@ -993,8 +1014,8 @@ export function ItemDialog({
                                         type="button"
                                         size="icon"
                                         variant="ghost"
-                                        title="Remove this field"
-                                        aria-label="Remove this field"
+                                        title={t("item.removeField")}
+                                        aria-label={t("item.removeField")}
                                         onClick={() =>
                                             patch({
                                                 fields: draft.fields.filter((_, at) => at !== index)
@@ -1011,11 +1032,11 @@ export function ItemDialog({
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                 <DialogFooter>
                     <Button type="button" variant="secondary" onClick={onClose}>
-                        Cancel
+                        {tc("actions.cancel")}
                     </Button>
                     <Button type="button" onClick={onSubmit} disabled={pending}>
                         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                        Save
+                        {tc("actions.save")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

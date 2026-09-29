@@ -25,7 +25,9 @@ import { MoveDialog } from "./move-dialog";
 import { ShareItemDialog } from "./share-item-dialog";
 import { FolderDialog } from "./folder-dialog";
 import { useVaultSession } from "./vault-session";
-import { addressLines, IDENTITY_GROUPS, identityLabel } from "./identity-fields";
+import { addressLines, IDENTITY_GROUPS, identityLabelKey } from "./identity-fields";
+import { cipherTypeLabel, uriMatchLabel } from "./vault-labels";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as vaultCrypto from "@/lib/vault/crypto";
 import {
     AmexMark,
@@ -37,7 +39,7 @@ import {
 } from "@/components/brand-icons";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useDisplayFormat } from "@/components/display-format";
-import { ITEM_USE_LABELS, type ItemUseEntry } from "@/lib/vault/item-uses";
+import type { ItemUseEntry } from "@/lib/vault/item-uses";
 import type { SymmetricKey } from "@/lib/vault/crypto";
 import { useConfirm } from "@/components/confirm-dialog";
 import {
@@ -168,6 +170,7 @@ type Filter =
     | `vault:${string}`;
 
 export function VaultApp() {
+    const t = useTranslations("vault");
     const { key, lock, keyFor, vaultKeys, vaults } = useVaultSession();
     const [items, setItems] = useState<VaultItem[]>([]);
     const [folders, setFolders] = useState<VaultFolder[]>([]);
@@ -307,7 +310,7 @@ export function VaultApp() {
 
     /** Which vault an item belongs to, by the id the item carries. */
     function ownerName(vaultId: string): string {
-        return vaults.find((vault) => vault.vaultId === vaultId)?.name ?? "Another vault";
+        return vaults.find((vault) => vault.vaultId === vaultId)?.name ?? t("app.anotherVault");
     }
 
     /** The vaults this account can actually read, for the filter and the badge. */
@@ -355,12 +358,12 @@ export function VaultApp() {
     }
 
     async function onSave(item: VaultItem, collectionIds: string[]): Promise<string | null> {
-        if (!key) return "Your vault is locked.";
+        if (!key) return t("labels.lockedVault");
         // An item in another vault is written back under THAT vault's key, never
         // this account's - saving it under the wrong key would leave the other
         // members with an item none of them can open.
         const itemKey = keyFor(item.organizationId);
-        if (!itemKey) return "You do not hold the key for that vault.";
+        if (!itemKey) return t("labels.noKeyForVault");
         const body = await encryptItem(item, itemKey);
         const result = await saveItemAction(item.id || null, body, collectionIds);
         if (result.error) return result.error;
@@ -386,12 +389,12 @@ export function VaultApp() {
         const permanent = item.deleted;
         const confirmed = await confirm({
             title: permanent
-                ? `Delete "${item.name}" for good?`
-                : `Move "${item.name}" to the trash?`,
+                ? t("app.confirmDelete.title", { name: item.name })
+                : t("app.confirmTrash.title", { name: item.name }),
             description: permanent
-                ? "This cannot be undone."
-                : "You can put it back from the trash.",
-            confirmLabel: permanent ? "Delete" : "Move to trash",
+                ? t("app.confirmDelete.description")
+                : t("app.confirmTrash.description"),
+            confirmLabel: permanent ? t("app.confirmDelete.confirm") : t("app.confirmTrash.confirm"),
             danger: true
         });
         if (!confirmed || !key) return;
@@ -401,7 +404,7 @@ export function VaultApp() {
         const result = await deleteItemAction(item.id, !permanent);
         if (result.error) {
             await confirm({
-                title: permanent ? "Could not delete it" : "Could not move it to the trash",
+                title: permanent ? t("app.deleteFailed") : t("app.trashFailed"),
                 description: result.error,
                 alert: true
             });
@@ -444,7 +447,7 @@ export function VaultApp() {
         const result = await restoreItemAction(item.id);
         if (result.error) {
             await confirm({
-                title: "Could not put it back",
+                title: t("app.restoreFailed"),
                 description: result.error,
                 alert: true
             });
@@ -457,14 +460,14 @@ export function VaultApp() {
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Vault</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("app.title")}</h1>
                     <p className="text-sm text-muted-foreground">
-                        {items.filter((item) => !item.deleted).length} items, open in this tab only.
+                        {t("app.count", { count: items.filter((item) => !item.deleted).length })}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button asChild size="sm" variant="ghost">
-                        <Link href="/vault/clients">Connect an app</Link>
+                        <Link href="/vault/clients">{t("app.connectApp")}</Link>
                     </Button>
                     <Button
                         size="sm"
@@ -476,11 +479,11 @@ export function VaultApp() {
                         }}
                     >
                         <Lock className="size-4" />
-                        Lock
+                        {t("app.lock")}
                     </Button>
                     <Button size="sm" onClick={() => setEditing(emptyItem(core.CIPHER_LOGIN))}>
                         <Plus className="size-4" />
-                        New item
+                        {t("app.newItem")}
                     </Button>
                 </div>
             </div>
@@ -498,7 +501,7 @@ export function VaultApp() {
                             <Input
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
-                                placeholder="Search your vault"
+                                placeholder={t("app.search")}
                                 className="pl-9"
                             />
                         </div>
@@ -506,16 +509,16 @@ export function VaultApp() {
                             <Select
                                 value={filter}
                                 onValueChange={(value) => setFilter(value as Filter)}
-                                aria-label="Show"
+                                aria-label={t("app.show")}
                                 className="min-w-0 flex-1"
                                 options={[
-                                    { value: "all", label: "Everything" },
-                                    { value: "favorites", label: "Favorites" },
+                                    { value: "all", label: t("app.filters.all") },
+                                    { value: "favorites", label: t("app.filters.favorites") },
                                     // Only worth offering once there is more than
                                     // one vault to tell apart.
                                     ...(readable.length > 0
                                         ? [
-                                              { value: "vault:mine", label: "My own vault" },
+                                              { value: "vault:mine", label: t("app.filters.mine") },
                                               ...readable.map((vault) => ({
                                                   value: `vault:${vault.vaultId}`,
                                                   label: vault.name
@@ -524,20 +527,20 @@ export function VaultApp() {
                                         : []),
                                     ...core.CIPHER_TYPES.map((type) => ({
                                         value: `type:${type}`,
-                                        label: core.CIPHER_TYPE_LABEL[type]
+                                        label: cipherTypeLabel(t, type)
                                     })),
                                     ...folders.map((folder) => ({
                                         value: `folder:${folder.id}`,
-                                        label: folder.name || "Untitled folder"
+                                        label: folder.name || t("app.filters.untitledFolder")
                                     })),
-                                    { value: "trash", label: "Trash" }
+                                    { value: "trash", label: t("app.filters.trash") }
                                 ]}
                             />
                             <Button
                                 size="icon"
                                 variant="secondary"
-                                title="Folders"
-                                aria-label="Manage folders"
+                                title={t("app.folders")}
+                                aria-label={t("app.manageFolders")}
                                 onClick={() => setManagingFolders(true)}
                             >
                                 <FolderCog className="size-4" />
@@ -547,13 +550,11 @@ export function VaultApp() {
                         {loading ? (
                             <div className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
                                 <Loader2 className="size-4 animate-spin" />
-                                Opening your vault...
+                                {t("app.opening")}
                             </div>
                         ) : visible.length === 0 ? (
                             <p className="p-8 text-center text-sm text-muted-foreground">
-                                {items.length === 0
-                                    ? "Nothing in here yet. Add a login, a note, a card or a key."
-                                    : "Nothing matches that."}
+                                {items.length === 0 ? t("app.empty") : t("app.noMatch")}
                             </p>
                         ) : (
                             <ul className="-mr-1 flex max-h-[calc(100vh-16rem)] flex-col gap-0.5 overflow-y-auto overscroll-contain pr-1">
@@ -596,13 +597,11 @@ export function VaultApp() {
                                                         )}
                                                         <div className="min-w-0 flex-1">
                                                             <p className="truncate text-sm font-medium">
-                                                                {item.name || "Untitled"}
+                                                                {item.name || t("labels.untitled")}
                                                             </p>
                                                             <p className="truncate text-xs text-muted-foreground">
                                                                 {item.login.username ||
-                                                                    core.CIPHER_TYPE_LABEL[
-                                                                        item.type as core.CipherType
-                                                                    ]}
+                                                                    cipherTypeLabel(t, item.type)}
                                                             </p>
                                                         </div>
                                                         {item.favorite ? (
@@ -612,9 +611,9 @@ export function VaultApp() {
                                                 </ContextMenuTrigger>
                                                 <ContextMenuContent>
                                                     <ContextMenuLabel
-                                                        title={item.name || "Untitled"}
+                                                        title={item.name || t("labels.untitled")}
                                                     >
-                                                        {item.name || "Untitled"}
+                                                        {item.name || t("labels.untitled")}
                                                     </ContextMenuLabel>
                                                     {item.type === core.CIPHER_LOGIN ? (
                                                         <>
@@ -628,12 +627,9 @@ export function VaultApp() {
                                                                 }
                                                             >
                                                                 <Copy className="size-4" />
-                                                                Copy{" "}
-                                                                {core.looksLikeEmail(
-                                                                    item.login.username
-                                                                )
-                                                                    ? "email"
-                                                                    : "username"}
+                                                                {core.looksLikeEmail(item.login.username)
+                                                                    ? t("app.menu.copyEmail")
+                                                                    : t("app.menu.copyUsername")}
                                                                 <MenuShortcut keys="Mod+Shift+C" />
                                                             </ContextMenuItem>
                                                             <ContextMenuItem
@@ -647,7 +643,7 @@ export function VaultApp() {
                                                                 }}
                                                             >
                                                                 <Copy className="size-4" />
-                                                                Copy password
+                                                                {t("app.menu.copyPassword")}
                                                                 <MenuShortcut keys="Mod+C" />
                                                             </ContextMenuItem>
                                                             {item.login.totp ? (
@@ -657,7 +653,7 @@ export function VaultApp() {
                                                                     }
                                                                 >
                                                                     <Copy className="size-4" />
-                                                                    Copy the six digits
+                                                                    {t("app.menu.copyTotp")}
                                                                 </ContextMenuItem>
                                                             ) : null}
                                                             {openableUri(
@@ -675,7 +671,7 @@ export function VaultApp() {
                                                                         rel="noreferrer noopener"
                                                                     >
                                                                         <ExternalLink className="size-4" />
-                                                                        Open the website
+                                                                        {t("app.menu.openWebsite")}
                                                                     </a>
                                                                 </ContextMenuItem>
                                                             ) : null}
@@ -686,7 +682,7 @@ export function VaultApp() {
                                                         onSelect={() => setEditing(item)}
                                                     >
                                                         <Pencil className="size-4" />
-                                                        Edit
+                                                        {t("app.menu.edit")}
                                                         <MenuShortcut keys="F2" />
                                                     </ContextMenuItem>
                                                     <ContextMenuItem
@@ -702,20 +698,20 @@ export function VaultApp() {
                                                     >
                                                         <Star className="size-4" />
                                                         {item.favorite
-                                                            ? "Remove from favourites"
-                                                            : "Favourite"}
+                                                            ? t("app.menu.unfavourite")
+                                                            : t("app.menu.favourite")}
                                                     </ContextMenuItem>
                                                     <ContextMenuItem
                                                         onSelect={() => setMoving(item)}
                                                     >
                                                         <FolderInput className="size-4" />
-                                                        Move
+                                                        {t("app.menu.move")}
                                                     </ContextMenuItem>
                                                     <ContextMenuItem
                                                         onSelect={() => setSharing(item)}
                                                     >
                                                         <Share2 className="size-4" />
-                                                        Share by link
+                                                        {t("app.menu.share")}
                                                     </ContextMenuItem>
                                                     <ContextMenuSeparator />
                                                     <ContextMenuItem
@@ -724,8 +720,8 @@ export function VaultApp() {
                                                     >
                                                         <Trash2 className="size-4" />
                                                         {item.deleted
-                                                            ? "Delete for good"
-                                                            : "Move to trash"}
+                                                            ? t("app.menu.deleteForGood")
+                                                            : t("app.menu.trash")}
                                                         <MenuShortcut keys="Delete" />
                                                     </ContextMenuItem>
                                                 </ContextMenuContent>
@@ -761,19 +757,17 @@ export function VaultApp() {
                                     )}
                                     <div className="min-w-0">
                                         <h2 className="truncate text-base font-medium">
-                                            {current.name || "Untitled"}
+                                            {current.name || t("labels.untitled")}
                                         </h2>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {current.login.username ||
-                                                core.CIPHER_TYPE_LABEL[
-                                                    current.type as core.CipherType
-                                                ]}
+                                                cipherTypeLabel(t, current.type)}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     {current.deleted ? (
-                                        <Badge variant="neutral">In the trash</Badge>
+                                        <Badge variant="neutral">{t("app.inTrash")}</Badge>
                                     ) : null}
                                     {current.organizationId ? (
                                         <Badge variant="neutral">
@@ -784,11 +778,11 @@ export function VaultApp() {
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        title={current.favorite ? "Unstar" : "Star"}
+                                        title={current.favorite ? t("app.unstar") : t("app.star")}
                                         aria-label={
                                             current.favorite
-                                                ? `Unstar ${current.name}`
-                                                : `Star ${current.name}`
+                                                ? t("app.unstarNamed", { name: current.name })
+                                                : t("app.starNamed", { name: current.name })
                                         }
                                         onClick={async () => {
                                             await setItemFavoriteAction(
@@ -814,8 +808,8 @@ export function VaultApp() {
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            title="Move to another vault"
-                                            aria-label={`Move ${current.name}`}
+                                            title={t("app.moveElsewhere")}
+                                            aria-label={t("app.moveNamed", { name: current.name })}
                                             onClick={() => setMoving(current)}
                                         >
                                             <MoveRight className="size-4" />
@@ -829,8 +823,8 @@ export function VaultApp() {
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            title="Share by link"
-                                            aria-label={`Share ${current.name} by link`}
+                                            title={t("app.shareByLink")}
+                                            aria-label={t("app.shareNamed", { name: current.name })}
                                             onClick={() => setSharing(current)}
                                         >
                                             <Share2 className="size-4" />
@@ -840,8 +834,8 @@ export function VaultApp() {
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            title="Put it back"
-                                            aria-label={`Restore ${current.name}`}
+                                            title={t("app.restore")}
+                                            aria-label={t("app.restoreNamed", { name: current.name })}
                                             onClick={() => onRestore(current)}
                                         >
                                             <RotateCcw className="size-4" />
@@ -852,14 +846,14 @@ export function VaultApp() {
                                             variant="ghost"
                                             onClick={() => setEditing(current)}
                                         >
-                                            Edit
+                                            {t("app.edit")}
                                         </Button>
                                     )}
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        title="Delete"
-                                        aria-label={`Delete ${current.name}`}
+                                        title={t("app.delete")}
+                                        aria-label={t("app.deleteNamed", { name: current.name })}
                                         onClick={() => onDelete(current)}
                                     >
                                         <Trash2 className="size-4" />
@@ -870,7 +864,7 @@ export function VaultApp() {
                             {current.type === core.CIPHER_LOGIN ? (
                                 <>
                                     <Section
-                                        title="Sign in"
+                                        title={t("app.sections.signIn")}
                                         when={Boolean(
                                             current.login.username || current.login.password
                                         )}
@@ -878,15 +872,15 @@ export function VaultApp() {
                                         <Row
                                             label={
                                                 core.looksLikeEmail(current.login.username)
-                                                    ? "Email"
-                                                    : "Username"
+                                                    ? t("app.fields.email")
+                                                    : t("app.fields.username")
                                             }
                                             value={current.login.username}
                                             copied={copied === "username"}
                                             onCopy={() => copy("username", current.login.username)}
                                         />
                                         <Row
-                                            label="Password"
+                                            label={t("app.fields.password")}
                                             value={current.login.password}
                                             secret={!revealed}
                                             copied={copied === "password"}
@@ -922,7 +916,7 @@ export function VaultApp() {
                                     </Section>
 
                                     <Section
-                                        title="Two-factor"
+                                        title={t("app.sections.twoFactor")}
                                         when={Boolean(current.login.totp || recoveryCodes)}
                                     >
                                         {current.login.totp ? (
@@ -933,7 +927,7 @@ export function VaultApp() {
                                         {recoveryCodes ? (
                                             <div className="flex flex-col gap-2 px-3 py-2">
                                                 <span className="text-xs text-muted-foreground">
-                                                    Recovery codes
+                                                    {t("app.fields.recoveryCodes")}
                                                 </span>
                                                 <RecoveryCodes
                                                     value={recoveryCodes}
@@ -956,15 +950,14 @@ export function VaultApp() {
                                         ) : null}
                                     </Section>
 
-                                    <Section title="Websites" when={current.login.uris.length > 0}>
+                                    <Section title={t("app.sections.websites")} when={current.login.uris.length > 0}>
                                         {current.login.uris.map((entry) => (
                                             <Row
                                                 key={entry.uri}
-                                                label={
-                                                    core.URI_MATCH_LABELS[
-                                                        entry.match ?? core.DEFAULT_URI_MATCH
-                                                    ]
-                                                }
+                                                label={uriMatchLabel(
+                                                    t,
+                                                    entry.match ?? core.DEFAULT_URI_MATCH
+                                                )}
                                                 value={entry.uri}
                                                 link
                                             />
@@ -974,7 +967,7 @@ export function VaultApp() {
                             ) : null}
 
                             {current.type === core.CIPHER_CARD ? (
-                                <Section title="Card" when>
+                                <Section title={t("app.sections.card")} when>
                                     {/* The network's own mark, read from the
                                         number, beside who issued it. Two cards
                                         from one network look identical in a list
@@ -993,9 +986,9 @@ export function VaultApp() {
                                             </span>
                                         </div>
                                     ) : null}
-                                    <Row label="Name" value={current.card.cardholderName} />
+                                    <Row label={t("app.fields.name")} value={current.card.cardholderName} />
                                     <Row
-                                        label="Number"
+                                        label={t("app.fields.number")}
                                         // Grouped the way the card prints it, so
                                         // it can be read back against the card in
                                         // hand.
@@ -1007,7 +1000,7 @@ export function VaultApp() {
                                         onReveal={() => setRevealed((prev) => !prev)}
                                     />
                                     <Row
-                                        label="Expires"
+                                        label={t("app.fields.expires")}
                                         value={core.writeCardExpiry({
                                             month: current.card.expMonth,
                                             year: current.card.expYear
@@ -1025,7 +1018,7 @@ export function VaultApp() {
                                                 new Date()
                                             ) ? (
                                                 <span className="text-xs text-danger">
-                                                    This card expired.
+                                                    {t("app.cardExpired")}
                                                 </span>
                                             ) : core.cardExpiringSoon(
                                                   {
@@ -1035,13 +1028,13 @@ export function VaultApp() {
                                                   new Date()
                                               ) ? (
                                                 <span className="text-xs text-warning">
-                                                    This card expires soon.
+                                                    {t("app.cardExpiring")}
                                                 </span>
                                             ) : null
                                         }
                                     />
                                     <Row
-                                        label="Security code"
+                                        label={t("app.fields.securityCode")}
                                         value={current.card.code}
                                         secret={!revealed}
                                         revealed={revealed}
@@ -1055,7 +1048,7 @@ export function VaultApp() {
                                       // The address is one thing, read the way an
                                       // address is read; the rest are rows.
                                       const lines =
-                                          group.title === "Address"
+                                          group.id === "address"
                                               ? addressLines(current.identity)
                                               : [];
                                       const rows = group.fields.filter(
@@ -1063,15 +1056,15 @@ export function VaultApp() {
                                       );
                                       return (
                                           <Section
-                                              key={group.title}
-                                              title={group.title}
+                                              key={group.id}
+                                              title={t(`identity.groups.${group.id}`)}
                                               when={
-                                                  group.title === "Address"
+                                                  group.id === "address"
                                                       ? lines.length > 0
                                                       : rows.length > 0
                                               }
                                           >
-                                              {group.title === "Address" ? (
+                                              {group.id === "address" ? (
                                                   <div className="flex items-center gap-2 px-3 py-2">
                                                       <p className="min-w-0 flex-1 whitespace-pre-line text-sm">
                                                           {lines.join("\n")}
@@ -1079,8 +1072,8 @@ export function VaultApp() {
                                                       <Button
                                                           size="icon"
                                                           variant="ghost"
-                                                          title="Copy"
-                                                          aria-label="Copy the address"
+                                                          title={t("app.copy")}
+                                                          aria-label={t("app.copyAddress")}
                                                           onClick={() =>
                                                               copy("address", lines.join("\n"))
                                                           }
@@ -1096,7 +1089,7 @@ export function VaultApp() {
                                                   rows.map(({ field }) => (
                                                       <Row
                                                           key={field}
-                                                          label={identityLabel(field)}
+                                                          label={t(identityLabelKey(field))}
                                                           value={current.identity[field] ?? ""}
                                                           copied={copied === `id-${field}`}
                                                           onCopy={() =>
@@ -1114,15 +1107,15 @@ export function VaultApp() {
                                 : null}
 
                             {current.type === core.CIPHER_SSH_KEY ? (
-                                <Section title="Key" when>
+                                <Section title={t("app.sections.key")} when>
                                     <Row
-                                        label="Public key"
+                                        label={t("app.fields.publicKey")}
                                         value={current.sshKey.publicKey}
                                         copied={copied === "public"}
                                         onCopy={() => copy("public", current.sshKey.publicKey)}
                                     />
                                     <Row
-                                        label="Private key"
+                                        label={t("app.fields.privateKey")}
                                         value={current.sshKey.privateKey}
                                         secret={!revealed}
                                         revealed={revealed}
@@ -1139,7 +1132,7 @@ export function VaultApp() {
                                 other clients can read them, and listing them
                                 again here printed the codes twice - the second
                                 time as an unreadable row of dots. */}
-                            <Section title="More" when={extraFields.length > 0}>
+                            <Section title={t("app.sections.more")} when={extraFields.length > 0}>
                                 {extraFields.map(({ field, index }) => (
                                     <Row
                                         key={index}
@@ -1158,7 +1151,7 @@ export function VaultApp() {
                                 ))}
                             </Section>
 
-                            <Section title="Notes" when={Boolean(current.notes)}>
+                            <Section title={t("app.sections.notes")} when={Boolean(current.notes)}>
                                 <p className="whitespace-pre-wrap px-3 py-2 text-sm">
                                     {current.notes}
                                 </p>
@@ -1171,19 +1164,28 @@ export function VaultApp() {
                                 under the list is the short version, and it is
                                 there so nobody reads an empty history as proof
                                 of anything. */}
-                            <Section title="Who has used this" when={uses.length > 0}>
+                            <Section title={t("app.sections.uses")} when={uses.length > 0}>
                                 {uses.map((entry) => (
                                     <div
                                         key={entry.id}
                                         className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
                                     >
                                         <span className="min-w-0 truncate">
-                                            <span className="font-medium">
-                                                {entry.isSelf ? "You" : entry.actor}
-                                            </span>{" "}
-                                            <span className="text-muted-foreground">
-                                                {ITEM_USE_LABELS[entry.use].toLowerCase()}
-                                            </span>
+                                            {t.rich<ReactNode>("app.use", {
+                                                self: entry.isSelf ? "yes" : "no",
+                                                actor: entry.actor,
+                                                use: entry.use,
+                                                who: (chunks) => (
+                                                    <span key="who" className="font-medium">
+                                                        {chunks}
+                                                    </span>
+                                                ),
+                                                what: (chunks) => (
+                                                    <span key="what" className="text-muted-foreground">
+                                                        {chunks}
+                                                    </span>
+                                                )
+                                            })}
                                         </span>
                                         <span className="shrink-0 text-xs text-muted-foreground">
                                             {format.dateTime(entry.at)}
@@ -1191,8 +1193,7 @@ export function VaultApp() {
                                     </div>
                                 ))}
                                 <p className="px-3 py-2 text-xs text-muted-foreground">
-                                    Recorded by the app that opened it. Polaris never holds your
-                                    key, so it cannot see a password being read on its own.
+                                    {t("app.usesNote")}
                                 </p>
                             </Section>
                         </CardBody>
@@ -1200,7 +1201,7 @@ export function VaultApp() {
                 ) : (
                     <Card>
                         <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                            Pick something on the left to see it.
+                            {t("app.pickOne")}
                         </CardBody>
                     </Card>
                 )}
@@ -1317,6 +1318,7 @@ function Row({
     onCopy?: () => void;
     onReveal?: () => void;
 }) {
+    const t = useTranslations("vault");
     if (!value) return null;
     const href = link ? webLink(value) : null;
     return (
@@ -1347,8 +1349,10 @@ function Row({
                 <Button
                     size="icon"
                     variant="ghost"
-                    title={revealed ? "Hide" : "Show"}
-                    aria-label={revealed ? `Hide the ${label}` : `Show the ${label}`}
+                    title={revealed ? t("app.hide") : t("app.show")}
+                    aria-label={
+                        revealed ? t("app.hideNamed", { label }) : t("app.showNamed", { label })
+                    }
                     onClick={onReveal}
                 >
                     {revealed ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -1358,8 +1362,8 @@ function Row({
                 <Button
                     size="icon"
                     variant="ghost"
-                    title="Copy"
-                    aria-label={`Copy the ${label}`}
+                    title={t("app.copy")}
+                    aria-label={t("app.copyNamed", { label })}
                     onClick={onCopy}
                 >
                     {copied ? (

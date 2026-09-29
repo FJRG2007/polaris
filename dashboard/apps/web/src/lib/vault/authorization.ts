@@ -197,6 +197,10 @@ export async function describeVaultAuthorization(
     };
 }
 
+/** Why an answer was refused, as a key the screen that asked translates
+ *  (`vault.authorize.errors.<refusal>`). */
+export type AuthorizationRefusal = "unlockFirst" | "connectionEnded" | "otherAccount" | "noLongerWaiting";
+
 /**
  * Answer a request.
  *
@@ -215,9 +219,9 @@ export async function answerVaultAuthorization(
         readonly wrappedKey?: string;
     },
     now = new Date()
-): Promise<{ error?: string }> {
+): Promise<{ error?: AuthorizationRefusal }> {
     if (input.approve && !input.wrappedKey) {
-        return { error: "Unlock your vault before letting a client in." };
+        return { error: "unlockFirst" };
     }
 
     // A request that came from a connected extension belongs to the account that
@@ -233,14 +237,10 @@ export async function answerVaultAuthorization(
             select: { userId: true, revokedAt: true }
         });
         if (!connection || connection.revokedAt) {
-            return { error: "That extension's connection to Polaris has ended. Connect it again." };
+            return { error: "connectionEnded" };
         }
         if (connection.userId !== input.userId) {
-            return {
-                error:
-                    "That request came from an extension connected to another account. " +
-                    "Disconnect it in the extension, then connect it again from here."
-            };
+            return { error: "otherAccount" };
         }
     }
     // Only a pending, unexpired row is answerable, and the update says so in its
@@ -254,7 +254,7 @@ export async function answerVaultAuthorization(
         }
     });
     if (answered.count === 0) {
-        return { error: "That code is no longer waiting. Ask the extension for a new one." };
+        return { error: "noLongerWaiting" };
     }
     return {};
 }
