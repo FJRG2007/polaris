@@ -12,6 +12,7 @@
  */
 
 import { Select } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import type { SharePerson } from "@/lib/drive-sharing";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
@@ -25,6 +26,7 @@ export function PrincipalPicker({
     value: string;
     onChange: (value: string) => void;
 }) {
+    const t = useTranslations("drive");
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [groups, setGroups] = useState<SharePerson[]>([]);
 
@@ -47,7 +49,7 @@ export function PrincipalPicker({
                     onChange(last ? `user:${last.id}` : "");
                 }}
                 max={1}
-                label="Find a person"
+                label={t("picker.findAPerson")}
                 search={findSharePeopleAction}
             />
             {groups.length > 0 && (
@@ -57,7 +59,7 @@ export function PrincipalPicker({
                         setPicked([]);
                         onChange(next ? `group:${next}` : "");
                     }}
-                    placeholder="Or a group..."
+                    placeholder={t("picker.orAGroup")}
                     options={groups.map((group) => ({ value: group.id, label: group.name }))}
                 />
             )}

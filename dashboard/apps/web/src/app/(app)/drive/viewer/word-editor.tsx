@@ -47,20 +47,27 @@
 // the routes that can open a document and nothing anywhere else, because this
 // module is only loaded when somebody presses Edit.
 import "@polaris/genoffice-docs/styles.css";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import type { RefObject } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-const Editor = dynamic(async () => (await import("@polaris/genoffice-docs")).App, {
-    ssr: false,
-    loading: () => (
+/** What shows while the editor code arrives. */
+function EditorLoading({ label }: { label: "markdown" | "document" }) {
+    const t = useTranslations("driveViewer");
+    return (
         <div className="flex min-h-[50vh] items-center justify-center">
             <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground" aria-hidden />
-            <span className="sr-only">Opening the document</span>
+            <span className="sr-only">{label === "markdown" ? t("loading.editor") : t("loading.document")}</span>
         </div>
-    )
+    );
+}
+
+const Editor = dynamic(async () => (await import("@polaris/genoffice-docs")).App, {
+    ssr: false,
+    loading: () => <EditorLoading label="document" />
 });
 
 /** A subscription that will never fire. Returned so the editor's own unsubscribe
@@ -98,6 +105,7 @@ export function WordEditor({
      *  up Save. */
     onDirty: (dirty: boolean) => void;
 }) {
+    const t = useTranslations("driveViewer");
     const told = useRef(onDirty);
     told.current = onDirty;
     const [failed, setFailed] = useState(false);
@@ -153,15 +161,15 @@ export function WordEditor({
             discardDocPasswordIntents: async () => ({ ok: true }),
             consumeNewBlankDoc: async () => false,
             consumeAiDocContent: async () => null,
-            createDocument: async () => ({ ok: false, error: "Make a document in Drive." }),
+            createDocument: async () => ({ ok: false, error: t("word.makeADocumentInDrive") }),
             onOpenDocx: never,
             onRenamedDocx: never,
             saveDocx: async (_path: string, data: ArrayBuffer) => {
                 written.current = new Uint8Array(data);
                 return { ok: true };
             },
-            saveDocxAs: async () => ({ ok: false, error: "Use Save a copy beside Save." }),
-            saveDocxNew: async () => ({ ok: false, error: "Use Save a copy beside Save." }),
+            saveDocxAs: async () => ({ ok: false, error: t("word.useSaveACopyBeside") }),
+            saveDocxNew: async () => ({ ok: false, error: t("word.useSaveACopyBeside") }),
             writeRecoveryCopy: async () => ({ ok: true }),
             onTeardown: never,
             getRecentFiles: async () => [],
@@ -201,8 +209,8 @@ export function WordEditor({
                 window.print();
                 return { ok: true, canceled: true };
             },
-            printPdfBuffer: async () => ({ ok: false, error: "Use Print." }),
-            saveMergedPdf: async () => ({ ok: false, error: "Use Print." }),
+            printPdfBuffer: async () => ({ ok: false, error: t("word.usePrint") }),
+            saveMergedPdf: async () => ({ ok: false, error: t("word.usePrint") }),
             // Measured by the browser, which has the fonts. The editor falls
             // back to its own defaults when this answers nothing, which is what
             // it did on a machine without the font anyway.
@@ -214,23 +222,23 @@ export function WordEditor({
             addAttachmentPaths: async () => ({ added: [], errors: [] }),
             addPastedImage: async () => ({ added: [], errors: [] }),
             copyImageToClipboard: async () => false,
-            readAttachment: async () => ({ ok: false, error: "Not available here." }),
-            readAttachmentImage: async () => ({ ok: false, error: "Not available here." }),
+            readAttachment: async () => ({ ok: false, error: t("word.notAvailableHere") }),
+            readAttachmentImage: async () => ({ ok: false, error: t("word.notAvailableHere") }),
             getPathForFile: () => "",
 
             // ------------------------------------------------------------- AI
             getAiSettings: async () => ({ providers: [], activeProvider: null, enabled: false }),
             setAiSettings: async () => undefined,
-            aiChat: async () => ({ ok: false, error: "Not connected in Polaris." }),
+            aiChat: async () => ({ ok: false, error: t("word.notConnectedInPolaris") }),
             aiStream: async () => undefined,
             aiStreamCancel: async () => undefined,
             aiGskStatus: async () => ({ loggedIn: false }),
             aiGskLogin: async () => undefined,
             onAiStream: never,
-            webSearch: async () => ({ results: [], method: "error", error: "Not connected." }),
-            imageSearch: async () => ({ images: [], method: "error", error: "Not connected." }),
+            webSearch: async () => ({ results: [], method: "error", error: t("word.notConnected") }),
+            imageSearch: async () => ({ images: [], method: "error", error: t("word.notConnected") }),
             fetchImage: async () => null,
-            aiGenerateImage: async () => ({ error: "Not connected." })
+            aiGenerateImage: async () => ({ error: t("word.notConnected") })
         };
     }, [src, name, theme]);
 
@@ -311,7 +319,7 @@ export function WordEditor({
     if (failed) {
         return (
             <p role="alert" className="p-6 text-center text-[13px] text-danger">
-                This document could not be opened.
+                {t("word.thisDocumentCouldNotBe")}
             </p>
         );
     }

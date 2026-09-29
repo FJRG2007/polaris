@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Pencil } from "lucide-react";
 import { Button } from "@polaris/ui";
 import { WordEditor } from "./word-editor";
@@ -40,6 +41,7 @@ export function DocView({
     readOnly?: boolean;
     onSaved?: (name: string) => void;
 }) {
+    const t = useTranslations("driveViewer");
     const [html, setHtml] = useState<string | null>(null);
     const [error, setError] = useState(false);
     const [editing, setEditing] = useState(false);
@@ -86,7 +88,7 @@ export function DocView({
         };
     }, [src, revision]);
 
-    if (error) return <ViewerError>This document could not be rendered.</ViewerError>;
+    if (error) return <ViewerError>{t("doc.thisDocumentCouldNotBe")}</ViewerError>;
     if (html === null) return <Loading />;
 
     const editable = !readOnly && Boolean(target);
@@ -96,7 +98,7 @@ export function DocView({
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                 {editing && target ? (
                     <>
-                        <span className="text-xs font-medium text-muted-foreground">Editing</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("doc.editing")}</span>
                         <div className="ml-auto flex items-center gap-2">
                             <Button
                                 size="sm"
@@ -106,7 +108,7 @@ export function DocView({
                                     setDirty(false);
                                 }}
                             >
-                                Cancel
+                                {t("doc.cancel")}
                             </Button>
                             {/* The same toolbar every other editor in Drive
                                 saves through. A second save path would be a
@@ -135,7 +137,7 @@ export function DocView({
                     </>
                 ) : (
                     <>
-                        <span className="text-xs text-muted-foreground">Word document</span>
+                        <span className="text-xs text-muted-foreground">{t("doc.wordDocument")}</span>
                         {editable ? (
                             <Button
                                 size="sm"
@@ -144,7 +146,7 @@ export function DocView({
                                 onClick={() => setEditing(true)}
                             >
                                 <Pencil className="size-4" />
-                                Edit
+                                {t("doc.edit")}
                             </Button>
                         ) : null}
                     </>
@@ -168,6 +170,7 @@ export function DocView({
                 // dead to the wheel.
                 <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
                     <div className="mx-auto max-w-3xl p-6">
+                        {/* i18n-ignore: a stylesheet, not words */}
                         <style>{`
                 .doc-preview { line-height: 1.6; }
                 .doc-preview h1 { font-size: 1.5rem; font-weight: 600; margin: 1rem 0 0.5rem; }

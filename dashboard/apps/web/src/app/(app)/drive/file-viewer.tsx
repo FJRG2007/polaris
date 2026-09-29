@@ -17,6 +17,7 @@
  */
 
 import { viewerKind } from "./viewer/kind";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { formatBytes } from "@polaris/core";
 import { DocView } from "./viewer/doc-view";
 import { PdfView } from "./viewer/pdf-view";
@@ -163,6 +164,7 @@ export function FileViewer({
     /** Several files opened together - see `ViewerSteps`. Nothing is drawn for one. */
     steps?: ViewerSteps;
 }) {
+    const t = useTranslations("driveViewer");
     const format = useDisplayFormat();
     const byteUrl = urlFor ?? driveByteUrl;
     // Whether the server has answered the last request for bytes yet, so a file
@@ -197,8 +199,8 @@ export function FileViewer({
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        aria-label="Previous file"
-                                        title="Previous file"
+                                        aria-label={t("viewer.previousFile")}
+                                        title={t("viewer.previousFile")}
                                         disabled={!canBack}
                                         onClick={() => stepping.onStep(-1)}
                                     >
@@ -213,8 +215,8 @@ export function FileViewer({
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        aria-label="Next file"
-                                        title="Next file"
+                                        aria-label={t("viewer.nextFile")}
+                                        title={t("viewer.nextFile")}
                                         disabled={!canForward}
                                         onClick={() => stepping.onStep(1)}
                                     >
@@ -225,7 +227,7 @@ export function FileViewer({
                             {onShare ? (
                                 <Button size="sm" variant="ghost" onClick={() => onShare(target)}>
                                     <Share2 className="size-4" />
-                                    Share
+                                    {t("viewer.share")}
                                 </Button>
                             ) : null}
                             <Button
@@ -239,7 +241,7 @@ export function FileViewer({
                                 ) : (
                                     <Download className="size-4" />
                                 )}
-                                {preparing > 0 ? "Fetching" : "Download"}
+                                {preparing > 0 ? t("viewer.fetching") : t("viewer.download")}
                             </Button>
                         </div>
                     ) : null}
@@ -271,8 +273,8 @@ export function FileViewer({
                                 // screen reader reach; these are for the pointer.
                                 tabIndex={-1}
                                 aria-hidden
-                                aria-label="Previous file"
-                                title="Previous file"
+                                aria-label={t("viewer.previousFile")}
+                                title={t("viewer.previousFile")}
                                 className="absolute left-3 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-elevated/90 text-foreground shadow-modal hover:bg-elevated"
                                 onClick={() => stepping?.onStep(-1)}
                             >
@@ -286,8 +288,8 @@ export function FileViewer({
                                 // screen reader reach; these are for the pointer.
                                 tabIndex={-1}
                                 aria-hidden
-                                aria-label="Next file"
-                                title="Next file"
+                                aria-label={t("viewer.nextFile")}
+                                title={t("viewer.nextFile")}
                                 className="absolute right-3 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-elevated/90 text-foreground shadow-modal hover:bg-elevated"
                                 onClick={() => stepping?.onStep(1)}
                             >
@@ -298,28 +300,28 @@ export function FileViewer({
                     {target ? (
                         <aside className="hidden w-56 shrink-0 flex-col gap-2 border-l border-border p-4 text-sm md:flex">
                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                Properties
+                                {t("viewer.properties")}
                             </p>
                             <div className="flex justify-between gap-2">
-                                <span className="text-muted-foreground">Type</span>
+                                <span className="text-muted-foreground">{t("viewer.type")}</span>
                                 <span>
-                                    {extension ? `${extension.toUpperCase()} file` : "File"}
+                                    {extension ? t("viewer.kindFile", { kind: extension.toUpperCase() }) : t("viewer.file")}
                                 </span>
                             </div>
                             {target.size !== undefined ? (
                                 <div className="flex justify-between gap-2">
-                                    <span className="text-muted-foreground">Size</span>
+                                    <span className="text-muted-foreground">{t("viewer.size")}</span>
                                     <span>{formatBytes(BigInt(target.size))}</span>
                                 </div>
                             ) : null}
                             {target.modifiedAt ? (
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="text-muted-foreground">Modified</span>
+                                    <span className="text-muted-foreground">{t("viewer.modified")}</span>
                                     <span>{format.dateTime(target.modifiedAt)}</span>
                                 </div>
                             ) : null}
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-muted-foreground">Location</span>
+                                <span className="text-muted-foreground">{t("viewer.location")}</span>
                                 <span className="break-all">
                                     {target.locationLabel ??
                                         `/${target.path.split("/").slice(0, -1).join("/")}`}

@@ -46,7 +46,7 @@ const sendSchema = z.object({
 
 /** The one sentence a caller is meant to read. Anything else is logged and
  *  replaced, because the rest name paths and storages nobody asked to publish. */
-function refusal(caught: unknown): { error: string } {
+async function refusal(caught: unknown): Promise<{ error: string }> {
     if (caught instanceof transfers.TransferRefused) return { error: caught.message };
     console.error(caught);
     return { error: (await getTranslations("drive"))("errors.sendFailed") };
@@ -115,7 +115,7 @@ export async function sendTransferAction(
         revalidatePath("/drive");
         return { sent: made.length };
     } catch (caught) {
-        return refusal(caught);
+        return await refusal(caught);
     }
 }
 
@@ -154,7 +154,7 @@ export async function acceptTransferAction(
         revalidatePath("/drive");
         return { path: landed.path };
     } catch (caught) {
-        return refusal(caught);
+        return await refusal(caught);
     }
 }
 
@@ -166,7 +166,7 @@ export async function declineTransferAction(transferId: string): Promise<{ error
         revalidatePath("/drive");
         return {};
     } catch (caught) {
-        return refusal(caught);
+        return await refusal(caught);
     }
 }
 
@@ -178,7 +178,7 @@ export async function cancelTransferAction(transferId: string): Promise<{ error?
         revalidatePath("/drive");
         return {};
     } catch (caught) {
-        return refusal(caught);
+        return await refusal(caught);
     }
 }
 
@@ -192,6 +192,6 @@ export async function dismissTransferNoticeAction(transferId: string): Promise<{
         revalidatePath("/drive");
         return {};
     } catch (caught) {
-        return refusal(caught);
+        return await refusal(caught);
     }
 }

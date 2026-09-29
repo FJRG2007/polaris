@@ -29,6 +29,7 @@
 // `scripts/scope-editor-styles`. Statically: a stylesheet imported inside an
 // effect is one the bundler never sees.
 import "@polaris/genoffice-markdown/styles.css";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
@@ -36,16 +37,22 @@ import { useEffect, useMemo, useRef } from "react";
 
 /** The editor's own root. Never rendered on the server: it measures its own
  *  container and reaches for `window` as it starts. */
+/** What shows while the editor code arrives. */
+function EditorLoading({ label }: { label: "markdown" | "document" }) {
+    const t = useTranslations("driveViewer");
+    return (
+        <div className="flex min-h-[50vh] items-center justify-center">
+            <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground" aria-hidden />
+            <span className="sr-only">{label === "markdown" ? t("loading.editor") : t("loading.document")}</span>
+        </div>
+    );
+}
+
 const Editor = dynamic(
     async () => (await import("@polaris/genoffice-markdown")).default,
     {
         ssr: false,
-        loading: () => (
-            <div className="flex min-h-[50vh] items-center justify-center">
-                <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground" aria-hidden />
-                <span className="sr-only">Opening the editor</span>
-            </div>
-        )
+        loading: () => <EditorLoading label="markdown" />
     }
 );
 
@@ -69,6 +76,7 @@ export function RichMarkdownEditor({
      *  when a file may be overwritten. */
     onChange: (next: string) => void;
 }) {
+    const t = useTranslations("driveViewer");
     const latest = useRef(onChange);
     latest.current = onChange;
 
@@ -94,7 +102,7 @@ export function RichMarkdownEditor({
             pickImage: async () => null,
             saveImage: async () => null,
             readImage: async () => null,
-            exportDocx: async () => ({ ok: false as const, error: "Use Download beside Save." }),
+            exportDocx: async () => ({ ok: false as const, error: t("richMarkdown.useDownloadBesideSave") }),
             exportPdf: async () => {
                 window.print();
                 return { ok: true as const, canceled: true as const };
@@ -107,10 +115,10 @@ export function RichMarkdownEditor({
             aiStream: async () => undefined,
             aiStreamCancel: async () => undefined,
             onAiStream: never,
-            webSearch: async () => ({ results: [], method: "error", error: "Not connected." }),
-            imageSearch: async () => ({ images: [], method: "error", error: "Not connected." }),
+            webSearch: async () => ({ results: [], method: "error", error: t("richMarkdown.notConnected") }),
+            imageSearch: async () => ({ images: [], method: "error", error: t("richMarkdown.notConnected") }),
             fetchImage: async () => null,
-            aiGenerateImage: async () => ({ error: "Not connected." })
+            aiGenerateImage: async () => ({ error: t("richMarkdown.notConnected") })
         }),
         [name, text, theme]
     );

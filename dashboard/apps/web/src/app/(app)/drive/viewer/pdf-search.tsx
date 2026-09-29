@@ -7,6 +7,7 @@
  */
 
 import { Button, Input, cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PDFSlick } from "@pdfslick/react";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
@@ -27,6 +28,7 @@ export function PdfSearch({
     pdfSlick: PDFSlick | null;
     onClose: () => void;
 }) {
+    const t = useTranslations("driveViewer");
     const inputRef = useRef<HTMLInputElement>(null);
     const [query, setQuery] = useState("");
     const [status, setStatus] = useState<FindStatus>("idle");
@@ -111,7 +113,7 @@ export function PdfSearch({
     // the document, so the bar would read "No matches" over a box nobody has
     // typed in yet. Nothing has been asked, so nothing is being reported.
     const reported: FindStatus = query ? status : "idle";
-    const summary = matchSummary(reported, matches.current, matches.total);
+    const summary = matchSummary(t, reported, matches.current, matches.total);
     const stepping = reported !== "idle" && matches.total > 0;
 
     return (
@@ -129,10 +131,10 @@ export function PdfSearch({
                 onKeyDown={(event) => {
                     if (event.key === "Escape") onClose();
                 }}
-                placeholder="Find in document"
+                placeholder={t("pdfSearch.findInDocument")}
                 spellCheck={false}
                 className="h-8 w-56"
-                aria-label="Find in document"
+                aria-label={t("pdfSearch.findInDocument")}
             />
             <span
                 aria-live="polite"
@@ -146,8 +148,8 @@ export function PdfSearch({
                 variant="ghost"
                 disabled={!stepping}
                 onClick={() => find("again", true)}
-                aria-label="Previous match"
-                title="Previous match"
+                aria-label={t("pdfSearch.previousMatch")}
+                title={t("pdfSearch.previousMatch")}
             >
                 <ChevronUp className="size-4" />
             </Button>
@@ -156,8 +158,8 @@ export function PdfSearch({
                 size="icon-sm"
                 variant="ghost"
                 disabled={!stepping}
-                aria-label="Next match"
-                title="Next match"
+                aria-label={t("pdfSearch.nextMatch")}
+                title={t("pdfSearch.nextMatch")}
             >
                 <ChevronDown className="size-4" />
             </Button>
@@ -165,18 +167,20 @@ export function PdfSearch({
                 <Toggle
                     pressed={highlightAll}
                     onPressedChange={setHighlightAll}
-                    label="Highlight all"
+                    label={t("pdfSearch.highlightAll")}
                 >
-                    All
+                    {t("pdfSearch.all")}
                 </Toggle>
                 <Toggle
                     pressed={caseSensitive}
                     onPressedChange={setCaseSensitive}
-                    label="Match case"
+                    label={t("pdfSearch.matchCase")}
                 >
+                    {/* i18n-ignore: a glyph showing what the toggle does, not a word */}
                     Aa
                 </Toggle>
-                <Toggle pressed={entireWord} onPressedChange={setEntireWord} label="Whole words">
+                <Toggle pressed={entireWord} onPressedChange={setEntireWord} label={t("pdfSearch.wholeWords")}>
+                    {/* i18n-ignore: a glyph showing what the toggle does, not a word */}
                     Ab|
                 </Toggle>
                 <Button
@@ -184,8 +188,8 @@ export function PdfSearch({
                     size="icon-sm"
                     variant="ghost"
                     onClick={onClose}
-                    aria-label="Close search"
-                    title="Close search"
+                    aria-label={t("pdfSearch.closeSearch")}
+                    title={t("pdfSearch.closeSearch")}
                 >
                     <X className="size-4" />
                 </Button>

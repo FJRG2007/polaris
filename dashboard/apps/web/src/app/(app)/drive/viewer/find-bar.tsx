@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Input } from "@polaris/ui";
 import { MOST_MATCHES } from "./find-in-file";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
@@ -35,6 +36,7 @@ export function FindBar({
     onStep: (by: 1 | -1) => void;
     onClose: () => void;
 }) {
+    const t = useTranslations("driveViewer");
     const box = useRef<HTMLInputElement>(null);
     // Opened with the caret in it: a find bar somebody has to click into is one
     // press longer than the editor they are used to.
@@ -57,8 +59,8 @@ export function FindBar({
                         onClose();
                     }
                 }}
-                placeholder="Find in this file"
-                aria-label="Find in this file"
+                placeholder={t("find.findInThisFile")}
+                aria-label={t("find.findInThisFile")}
                 className="h-8 max-w-64"
             />
             <span
@@ -68,8 +70,8 @@ export function FindBar({
                 {query === ""
                     ? ""
                     : total === 0
-                      ? "No matches"
-                      : `${current + 1} of ${total}${total === MOST_MATCHES ? "+" : ""}`}
+                      ? t("find.noMatches")
+                      : t("find.matchOf", { current: current + 1, total: `${total}${total === MOST_MATCHES ? "+" : ""}` })}
             </span>
             <div className="ml-auto flex items-center gap-1">
                 <Button
@@ -77,8 +79,8 @@ export function FindBar({
                     variant="ghost"
                     disabled={total === 0}
                     onClick={() => onStep(-1)}
-                    aria-label="Previous match"
-                    title="Previous match (Shift+Enter)"
+                    aria-label={t("find.previousMatch")}
+                    title={t("find.previousMatchShiftEnter")}
                 >
                     <ChevronUp className="size-4" />
                 </Button>
@@ -87,12 +89,12 @@ export function FindBar({
                     variant="ghost"
                     disabled={total === 0}
                     onClick={() => onStep(1)}
-                    aria-label="Next match"
-                    title="Next match (Enter)"
+                    aria-label={t("find.nextMatch")}
+                    title={t("find.nextMatchEnter")}
                 >
                     <ChevronDown className="size-4" />
                 </Button>
-                <Button size="sm" variant="ghost" onClick={onClose} aria-label="Close find" title="Close (Esc)">
+                <Button size="sm" variant="ghost" onClick={onClose} aria-label={t("find.closeFind")} title={t("find.closeEsc")}>
                     <X className="size-4" />
                 </Button>
             </div>

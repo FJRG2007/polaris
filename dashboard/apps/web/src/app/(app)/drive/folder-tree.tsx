@@ -13,6 +13,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DriveEntry } from "./types";
 import { readListing, writeListing } from "./listing-cache";
 import { mergeUnchanged } from "@/lib/structural-merge";
@@ -62,6 +63,7 @@ export function FolderTree({
     rootLabel?: string;
     className?: string;
 }) {
+    const t = useTranslations("drive");
     const [children, setChildren] = useState<Record<string, FolderNode[]>>({});
     const [expanded, setExpanded] = useState<Set<string>>(new Set([""]));
     const [loading, setLoading] = useState<Set<string>>(new Set());
@@ -179,7 +181,7 @@ export function FolderTree({
                     style={{ paddingLeft: `${depth * 1.1 + 1.5}rem` }}
                 >
                     <Loader2 className="size-3 animate-spin" />
-                    Loading...
+                    {t("tree.loading")}
                 </p>
             ) : null;
         }
@@ -197,7 +199,7 @@ export function FolderTree({
                         type="button"
                         onClick={() => toggle(node.path)}
                         disabled={node.locked}
-                        aria-label={expanded.has(node.path) ? "Collapse" : "Expand"}
+                        aria-label={expanded.has(node.path) ? t("tree.collapse") : t("tree.expand")}
                         className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
                     >
                         <ChevronRight
@@ -245,7 +247,7 @@ export function FolderTree({
                 <button
                     type="button"
                     onClick={() => toggle(root)}
-                    aria-label={expanded.has(root) ? "Collapse" : "Expand"}
+                    aria-label={expanded.has(root) ? t("tree.collapse") : t("tree.expand")}
                     className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
                 >
                     <ChevronRight
@@ -262,7 +264,7 @@ export function FolderTree({
                 >
                     <FolderOpen className="size-4 shrink-0 text-primary" />
                     <span className="truncate">
-                        {rootLabel ?? (root === "" ? "Home" : (root.split("/").pop() ?? "Home"))}
+                        {rootLabel ?? (root === "" ? t("tree.home") : (root.split("/").pop() ?? t("tree.home")))}
                     </span>
                 </button>
             </div>

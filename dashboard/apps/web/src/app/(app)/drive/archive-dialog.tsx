@@ -153,22 +153,21 @@ export function ArchiveDialog({
                 <DialogHeader>
                     <DialogTitle className="truncate">{target?.name}</DialogTitle>
                     <DialogDescription>
-                        Browse the contents without extracting, or extract into a folder.
+                        {t("archiveDialog.description")}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     {loading && entries === null && !previewError ? (
                         <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
                             <Loader2 className="size-4 animate-spin" />
-                            Reading archive...
+                            {t("archiveDialog.reading")}
                         </div>
                     ) : null}
 
                     {previewError && entries === null ? (
                         <div className="flex flex-col gap-2 rounded-md border border-border p-3">
                             <p className="text-sm">
-                                Couldn&apos;t read this archive. If it&apos;s password-protected,
-                                enter the password to view its contents.
+                                {t("archiveDialog.unreadable")}
                             </p>
                             <div className="flex gap-2">
                                 <Input
@@ -256,8 +255,7 @@ export function ArchiveDialog({
                                 )}
                                 {hiddenFiles > 0 ? (
                                     <p className="p-2 text-xs text-muted-foreground">
-                                        And {hiddenFiles} more file{hiddenFiles === 1 ? "" : "s"} in
-                                        this folder.
+                                        {t("archiveDialog.moreFiles", { count: hiddenFiles })}
                                     </p>
                                 ) : null}
                             </div>

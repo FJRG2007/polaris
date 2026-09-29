@@ -6,28 +6,26 @@
  */
 
 import { Button, Select, cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import type { EditorTool, ToolParams } from "./pdf-annotate";
 import { DRAW_COLORS, HIGHLIGHT_COLORS, TOOLS } from "./pdf-annotate";
 
-const TEXT_SIZES = [
-    { value: "10", label: "10 pt" },
-    { value: "12", label: "12 pt" },
-    { value: "14", label: "14 pt" },
-    { value: "18", label: "18 pt" },
-    { value: "24", label: "24 pt" }
+/** Point sizes: a unit, the same in every language. */
+// i18n-ignore: a point size, the same in every language
+const TEXT_SIZES = ["10", "12", "14", "18", "24"].map((value) => ({ value, label: `${value} pt` }));
+
+const DRAW_THICKNESS: { value: string; label: NamespaceKey<"driveViewer"> }[] = [
+    { value: "1", label: "pdfTools.widths.thin" },
+    { value: "3", label: "pdfTools.widths.medium" },
+    { value: "6", label: "pdfTools.widths.thick" },
+    { value: "10", label: "pdfTools.widths.heavy" }
 ];
 
-const DRAW_THICKNESS = [
-    { value: "1", label: "Thin" },
-    { value: "3", label: "Medium" },
-    { value: "6", label: "Thick" },
-    { value: "10", label: "Heavy" }
-];
-
-const HIGHLIGHT_THICKNESS = [
-    { value: "8", label: "Thin" },
-    { value: "12", label: "Medium" },
-    { value: "20", label: "Thick" }
+const HIGHLIGHT_THICKNESS: { value: string; label: NamespaceKey<"driveViewer"> }[] = [
+    { value: "8", label: "pdfTools.widths.thin" },
+    { value: "12", label: "pdfTools.widths.medium" },
+    { value: "20", label: "pdfTools.widths.thick" }
 ];
 
 export function PdfTools({
@@ -43,6 +41,7 @@ export function PdfTools({
     onParams: (patch: Partial<ToolParams>) => void;
     disabled: boolean;
 }) {
+    const t = useTranslations("driveViewer");
     return (
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-2 py-1.5">
             <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
@@ -50,7 +49,7 @@ export function PdfTools({
                     <button
                         key={id}
                         type="button"
-                        title={label}
+                        title={t(label)}
                         disabled={disabled}
                         aria-pressed={tool === id}
                         onClick={() => onSelect(id)}
@@ -62,7 +61,7 @@ export function PdfTools({
                         )}
                     >
                         <Icon className="size-4 shrink-0" />
-                        {label}
+                        {t(label)}
                     </button>
                 ))}
             </div>
@@ -78,7 +77,7 @@ export function PdfTools({
                         value={String(params.textSize)}
                         onValueChange={(value) => onParams({ textSize: Number(value) })}
                         options={TEXT_SIZES}
-                        aria-label="Text size"
+                        aria-label={t("pdfTools.textSize")}
                         className="h-7 w-[92px]"
                     />
                 </>
@@ -94,8 +93,8 @@ export function PdfTools({
                     <Select
                         value={String(params.drawThickness)}
                         onValueChange={(value) => onParams({ drawThickness: Number(value) })}
-                        options={DRAW_THICKNESS}
-                        aria-label="Pen width"
+                        options={DRAW_THICKNESS.map((one) => ({ value: one.value, label: t(one.label) }))}
+                        aria-label={t("pdfTools.penWidth")}
                         className="h-7 w-[104px]"
                     />
                 </>
@@ -111,8 +110,8 @@ export function PdfTools({
                     <Select
                         value={String(params.highlightThickness)}
                         onValueChange={(value) => onParams({ highlightThickness: Number(value) })}
-                        options={HIGHLIGHT_THICKNESS}
-                        aria-label="Highlighter width"
+                        options={HIGHLIGHT_THICKNESS.map((one) => ({ value: one.value, label: t(one.label) }))}
+                        aria-label={t("pdfTools.highlighterWidth")}
                         className="h-7 w-[104px]"
                     />
                 </>
@@ -120,7 +119,7 @@ export function PdfTools({
 
             {tool === "image" ? (
                 <span className="text-xs text-muted-foreground">
-                    Click a page to place a picture.
+                    {t("pdfTools.clickAPageToPlace")}
                 </span>
             ) : null}
 
@@ -131,7 +130,7 @@ export function PdfTools({
                     className="ml-auto"
                     onClick={() => onSelect("none")}
                 >
-                    Done
+                    {t("pdfTools.done")}
                 </Button>
             ) : null}
         </div>
@@ -143,18 +142,19 @@ function Swatches({
     value,
     onChange
 }: {
-    colors: { value: string; label: string }[];
+    colors: { value: string; label: NamespaceKey<"driveViewer"> }[];
     value: string;
     onChange: (color: string) => void;
 }) {
+    const t = useTranslations("driveViewer");
     return (
         <div className="flex items-center gap-1">
             {colors.map((color) => (
                 <button
                     key={color.value}
                     type="button"
-                    title={color.label}
-                    aria-label={color.label}
+                    title={t(color.label)}
+                    aria-label={t(color.label)}
                     aria-pressed={color.value === value}
                     onClick={() => onChange(color.value)}
                     style={{ background: color.value }}

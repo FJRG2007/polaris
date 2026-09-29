@@ -8,6 +8,7 @@
  */
 
 import { Cloud, ExternalLink, Router } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,
     DropdownMenu,
@@ -21,6 +22,7 @@ import {
 const UNIFI_CLOUD_URL = "https://unifi.ui.com";
 
 export function UnifiConsoleButton({ webUrl }: { webUrl?: string }) {
+    const t = useTranslations("drive");
     function open(url: string) {
         window.open(url, "_blank", "noopener,noreferrer");
     }
@@ -30,21 +32,21 @@ export function UnifiConsoleButton({ webUrl }: { webUrl?: string }) {
             <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="secondary">
                     <ExternalLink className="size-4" />
-                    Open console
+                    {t("unifi.openConsole")}
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Open the UniFi console</DropdownMenuLabel>
+                <DropdownMenuLabel>{t("unifi.openTheUnifiConsole")}</DropdownMenuLabel>
                 <DropdownMenuItem onSelect={() => open(UNIFI_CLOUD_URL)}>
                     <Cloud className="size-4 text-muted-foreground" />
-                    UniFi Cloud (unifi.ui.com)
+                    {t("unifi.unifiCloudUnifiUiCom")}
                 </DropdownMenuItem>
                 {webUrl ? (
                     <>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onSelect={() => open(webUrl)}>
                             <Router className="size-4 text-muted-foreground" />
-                            This device ({webUrl.replace(/^https?:\/\//, "")})
+                            {t("unifi.thisDevice", { address: webUrl.replace(/^https?:\/\//, "") })}
                         </DropdownMenuItem>
                     </>
                 ) : null}

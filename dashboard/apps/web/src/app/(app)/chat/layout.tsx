@@ -16,6 +16,7 @@
 import { can } from "@polaris/auth";
 import type { ReactNode } from "react";
 import { ChatShell } from "./chat-shell";
+import { Messages } from "@/components/i18n/messages";
 import { requirePermission } from "@/lib/session";
 import { resolveScope } from "@/lib/workspace-scope";
 
@@ -39,15 +40,18 @@ export default async function ChatLayout({ children }: { children: ReactNode }) 
         can(user.id, "chat.meetings")
     ]);
 
+    // The file viewer an attachment opens in is Drive's, and says Drive's words.
     return (
-        <ChatShell
-            viewerId={user.id}
-            viewerName={user.name}
-            may={{ spaces, groups, attach, call, meetings }}
-            orgId={scope.org?.id ?? null}
-            orgName={scope.org?.name ?? null}
-        >
-            {children}
-        </ChatShell>
+        <Messages namespaces={["driveViewer"]}>
+            <ChatShell
+                viewerId={user.id}
+                viewerName={user.name}
+                may={{ spaces, groups, attach, call, meetings }}
+                orgId={scope.org?.id ?? null}
+                orgName={scope.org?.name ?? null}
+            >
+                {children}
+            </ChatShell>
+        </Messages>
     );
 }

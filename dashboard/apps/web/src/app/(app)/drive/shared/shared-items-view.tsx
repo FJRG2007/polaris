@@ -11,6 +11,8 @@
  */
 
 import Link from "next/link";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { stopSharingAction } from "../sharing-actions";
@@ -20,23 +22,24 @@ import { useDisplayFormat } from "@/components/display-format";
 import { FolderOpen, Share2, Trash2, Users } from "lucide-react";
 import type { DriveShareRole, SharedItem } from "@/lib/drive-sharing";
 
-const ROLE_LABELS: Record<DriveShareRole | "custom", string> = {
-    viewer: "Can view",
-    editor: "Can edit",
-    custom: "Custom access"
-};
+const ROLE_LABELS = {
+    viewer: "roles.viewer",
+    editor: "roles.editor",
+    custom: "roles.custom"
+} as const satisfies Record<DriveShareRole | "custom", NamespaceKey<"drive">>;
 
 export function SharedItemsView({ withMe, byMe }: { withMe: SharedItem[]; byMe: SharedItem[] }) {
+    const t = useTranslations("drive");
     const [given, setGiven] = useState(byMe);
     const [busy, setBusy] = useState<string | null>(null);
     const [confirm, confirmDialog] = useConfirm();
 
     async function stop(item: SharedItem) {
-        const who = item.recipient?.name ?? "them";
+        const who = item.recipient?.name ?? null;
         const ok = await confirm({
-            title: `Stop sharing ${item.name}?`,
-            description: `${who} will no longer be able to open it.`,
-            confirmLabel: "Stop sharing",
+            title: t("sharedItems.stopTitle", { name: item.name }),
+            description: who ? t("sharedItems.stopBody", { name: who }) : t("sharedItems.stopBodyThem"),
+            confirmLabel: t("sharedItems.stopSharing"),
             danger: true
         });
         if (!ok) return;
@@ -50,7 +53,7 @@ export function SharedItemsView({ withMe, byMe }: { withMe: SharedItem[]; byMe: 
         <div className="flex flex-col gap-6">
             {confirmDialog}
             <section className="flex flex-col gap-2">
-                <h2 className="text-sm font-medium">Shared with me</h2>
+                <h2 className="text-sm font-medium">{t("sharedItems.sharedWithMe")}</h2>
                 {withMe.length === 0 ? (
                     <Empty
                         icon={<Share2 className="size-4" />}
@@ -59,14 +62,14 @@ export function SharedItemsView({ withMe, byMe }: { withMe: SharedItem[]; byMe: 
                 ) : (
                     <ul className="flex flex-col gap-2">
                         {withMe.map((item) => (
-                            <ItemRow key={item.id} item={item} person={item.owner} label="From" />
+                            <ItemRow key={item.id} item={item} person={item.owner} label={t("sharedItems.from")} />
                         ))}
                     </ul>
                 )}
             </section>
 
             <section className="flex flex-col gap-2">
-                <h2 className="text-sm font-medium">Shared by me</h2>
+                <h2 className="text-sm font-medium">{t("sharedItems.sharedByMe")}</h2>
                 {given.length === 0 ? (
                     <Empty
                         icon={<Share2 className="size-4" />}
@@ -79,14 +82,14 @@ export function SharedItemsView({ withMe, byMe }: { withMe: SharedItem[]; byMe: 
                                 key={item.id}
                                 item={item}
                                 person={item.recipient ?? item.owner}
-                                label="With"
+                                label={t("sharedItems.with")}
                                 action={
                                     <Button
                                         size="icon"
                                         variant="ghost"
                                         disabled={busy === item.id}
-                                        title="Stop sharing"
-                                        aria-label={`Stop sharing ${item.name}`}
+                                        title={t("sharedItems.stopSharing")}
+                                        aria-label={t("sharedItems.stopNamed", { name: item.name })}
                                         onClick={() => void stop(item)}
                                     >
                                         <Trash2 className="size-4" />
@@ -113,6 +116,7 @@ function ItemRow({
     label: string;
     action?: React.ReactNode;
 }) {
+    const t = useTranslations("drive");
     const format = useDisplayFormat();
     const href = `/drive/open?c=${encodeURIComponent(item.connectionId)}&p=${encodeURIComponent(item.path)}`;
 
@@ -149,9 +153,9 @@ function ItemRow({
                             </p>
                         )}
                     </div>
-                    <Badge>{ROLE_LABELS[item.role]}</Badge>
+                    <Badge>{t(ROLE_LABELS[item.role])}</Badge>
                     {item.expiresAt && (
-                        <Badge variant="warning">Until {format.date(item.expiresAt)}</Badge>
+                        <Badge variant="warning">{t("sharedItems.until", { date: format.date(item.expiresAt) })}</Badge>
                     )}
                     {action}
                 </CardBody>

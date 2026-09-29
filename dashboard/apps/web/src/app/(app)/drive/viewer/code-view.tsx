@@ -16,6 +16,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button } from "@polaris/ui";
 import { Pencil, Search } from "lucide-react";
 import { FindBar } from "./find-bar";
@@ -39,6 +40,7 @@ export function CodeView({
     readOnly?: boolean;
     onSaved?: (name: string) => void;
 }) {
+    const t = useTranslations("driveViewer");
     const { file, error, setText } = useTextFile(src);
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState("");
@@ -54,7 +56,7 @@ export function CodeView({
     // answers by taking the viewer down as the file finishes loading.
     const matches = useMemo(() => findMatches(code, query), [code, query]);
 
-    if (error) return <ViewerError>This file could not be read.</ViewerError>;
+    if (error) return <ViewerError>{t("code.thisFileCouldNotBe")}</ViewerError>;
     if (!file) return <Loading />;
 
     const blocked = readOnlyReason(file);
@@ -93,10 +95,10 @@ export function CodeView({
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                 {editing ? (
                     <>
-                        <span className="text-xs font-medium text-muted-foreground">Editing</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("code.editing")}</span>
                         <div className="ml-auto flex items-center gap-2">
                             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-                                Cancel
+                                {t("code.cancel")}
                             </Button>
                             <EditorActions
                                 target={target}
@@ -109,20 +111,20 @@ export function CodeView({
                 ) : (
                     <>
                         <span className="text-xs font-medium text-muted-foreground">
-                            {blocked ?? language?.label ?? "Code"}
+                            {blocked ?? language?.label ?? t("code.code")}
                         </span>
                         <div className="ml-auto flex items-center gap-3">
                             {/* Nothing to copy honestly from a binary file, and a
                                 truncated one would hand over half of itself. */}
                             {blocked === null ? (
-                                <CopyButton value={file.text} label="file contents" />
+                                <CopyButton value={file.text} label={t("code.fileContents")} />
                             ) : null}
                             <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => find(!finding)}
-                                aria-label="Find in this file"
-                                title="Find in this file (Ctrl+F)"
+                                aria-label={t("code.findInThisFile")}
+                                title={t("code.findInThisFileCtrl")}
                             >
                                 <Search className="size-4" />
                             </Button>
@@ -136,7 +138,7 @@ export function CodeView({
                                     }}
                                 >
                                     <Pencil className="size-4" />
-                                    Edit
+                                    {t("code.edit")}
                                 </Button>
                             ) : null}
                         </div>

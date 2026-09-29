@@ -3,13 +3,15 @@
 /** The loading and failure states every viewer renders while fetching bytes. */
 
 import type { ReactNode } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Loader2 } from "lucide-react";
 
 export function Loading() {
+    const t = useTranslations("driveViewer");
     return (
         <div className="flex items-center justify-center gap-2 p-12 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
-            Loading preview...
+            {t("status.loadingPreview")}
         </div>
     );
 }

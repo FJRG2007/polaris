@@ -14,6 +14,7 @@
  */
 
 import { formatBytes } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { runAction } from "@/lib/run-action";
 import { AlertTriangle, File, Folder, Inbox } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
@@ -29,6 +30,7 @@ import {
 } from "./transfer-actions";
 
 export function TransfersPanel() {
+    const t = useTranslations("drive");
     const [waiting, setWaiting] = useState<TransferView[] | null>(null);
     const [sent, setSent] = useState<TransferView[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export function TransfersPanel() {
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Inbox className="size-4 shrink-0" />
-                    Files on the way
+                    {t("transfers.filesOnTheWay")}
                 </CardTitle>
             </CardHeader>
             <CardBody className="space-y-3">
@@ -91,8 +93,8 @@ export function TransfersPanel() {
                             </p>
                             <p className="text-xs text-muted-foreground">
                                 {offer.senderName} · {formatBytes(Number(offer.size))}
-                                {offer.mode === "move" ? " · they are giving it up" : null}
-                                {offer.recipientOrg ? " · to your organization" : null}
+                                {offer.mode === "move" ? t("transfers.givingUp") : null}
+                                {offer.recipientOrg ? t("transfers.toOrg") : null}
                             </p>
                             {offer.note ? (
                                 <p className="mt-1 text-xs text-muted-foreground">{offer.note}</p>
@@ -104,7 +106,7 @@ export function TransfersPanel() {
                                 disabled={busy}
                                 onClick={() => answer(() => acceptTransferAction(offer.id))}
                             >
-                                Accept
+                                {t("transfers.accept")}
                             </Button>
                             <Button
                                 size="sm"
@@ -112,7 +114,7 @@ export function TransfersPanel() {
                                 disabled={busy}
                                 onClick={() => answer(() => declineTransferAction(offer.id))}
                             >
-                                Decline
+                                {t("transfers.decline")}
                             </Button>
                         </div>
                     </div>
@@ -145,7 +147,7 @@ export function TransfersPanel() {
                                         answer(() => dismissTransferNoticeAction(offer.id))
                                     }
                                 >
-                                    Got it
+                                    {t("transfers.gotIt")}
                                 </Button>
                             </div>
                         ))}
@@ -155,7 +157,7 @@ export function TransfersPanel() {
                 {waitingToBeAnswered.length > 0 ? (
                     <div className="space-y-2 pt-1">
                         <p className="text-xs text-muted-foreground">
-                            Waiting to be answered. Nothing has left your Drive.
+                            {t("transfers.waitingToBeAnsweredNothing")}
                         </p>
                         {waitingToBeAnswered.map((offer) => (
                             <div key={offer.id} className="flex items-center gap-3 text-sm">
@@ -163,7 +165,7 @@ export function TransfersPanel() {
                                     {offer.name}
                                 </span>
                                 <Badge variant="neutral" className="shrink-0">
-                                    {offer.mode === "move" ? "Sending it" : "Copy"}
+                                    {offer.mode === "move" ? t("transfers.sendingIt") : t("transfers.copy")}
                                 </Badge>
                                 <Button
                                     size="sm"
@@ -171,7 +173,7 @@ export function TransfersPanel() {
                                     disabled={busy}
                                     onClick={() => answer(() => cancelTransferAction(offer.id))}
                                 >
-                                    Take back
+                                    {t("transfers.takeBack")}
                                 </Button>
                             </div>
                         ))}

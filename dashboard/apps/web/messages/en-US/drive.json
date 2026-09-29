@@ -751,7 +751,8 @@
         "noAccess": "No access yet.",
         "when": "When",
         "action": "Action",
-        "actionDenied": "{action} denied ({reason})"
+        "actionDenied": "{action} denied ({reason})",
+        "ip": "IP"
     },
     "pages": {
         "drive": {
@@ -922,7 +923,17 @@
         "noPoolsReported": "No pools reported.",
         "driveBays": "Drive bays",
         "disk": "Disk",
-        "refreshing": "Refreshing"
+        "refreshing": "Refreshing",
+        "lastReading": "Showing the last reading.",
+        "lastReadingFrom": "Showing the last reading from {time}.",
+        "free": "{count} free",
+        "since": "since {date}",
+        "bay": "Bay {n}",
+        "healthy": "healthy",
+        "empty": "empty",
+        "rpm": " - {rpm} rpm",
+        "firmware": " - firmware {version}",
+        "updated": "- updated {time}"
     },
     "trash": {
         "couldNotRestoreIt": "Could not restore it",
@@ -938,7 +949,9 @@
         "deletedItemsAreKeptHere": "Deleted items are kept here until you restore or permanently delete them.",
         "theTrashIsEmpty": "The Trash is empty.",
         "restore": "Restore",
-        "deleteForever": "Delete forever"
+        "deleteForever": "Delete forever",
+        "root": "(root)",
+        "deletedAt": "- deleted <time></time>"
     },
     "send": {
         "searchForAPerson": "Search for a person",
@@ -950,7 +963,10 @@
         "itLeavesYourDriveOnce": "It leaves your Drive once they accept it. Off, they get a copy and you keep yours.",
         "onlyWhenYouAreSending": "Only when you are sending to one person. Everybody else gets a copy.",
         "cancel": "Cancel",
-        "send": "Send"
+        "send": "Send",
+        "title": "Send {name}",
+        "removeNamed": "Remove {name}",
+        "sendTo": "Send to {count}"
     },
     "peopleShare": {
         "whoeverYouNameCanOpen": "Whoever you name can open this folder and everything in it.",
@@ -967,7 +983,9 @@
         "looking": "Looking",
         "onlyYouSoFar": "Only you, so far.",
         "lapsed": "Lapsed",
-        "stopSharing": "Stop sharing"
+        "stopSharing": "Stop sharing",
+        "title": "Share {name}",
+        "stopWith": "Stop sharing with {name}"
     },
     "zip": {
         "zip": "Zip",
@@ -982,7 +1000,8 @@
         "cancel": "Cancel",
         "creating": "Creating...",
         "createAndLink": "Create and link",
-        "createZip": "Create zip"
+        "createZip": "Create zip",
+        "description": "{count} {count, plural, one {item} other {items}} into a zip in this folder. Set a password to encrypt the archive itself."
     },
     "insights": {
         "nothingHere": "Nothing here.",
@@ -1000,5 +1019,83 @@
         "oneFileEachOpensThe": "One file each. Opens the folder it is in.",
         "whatTheFormatsWeigh": "What the formats weigh",
         "everyFileOfAKind": "Every file of a kind, added up."
+    },
+    "transfers": {
+        "filesOnTheWay": "Files on the way",
+        "accept": "Accept",
+        "decline": "Decline",
+        "gotIt": "Got it",
+        "waitingToBeAnsweredNothing": "Waiting to be answered. Nothing has left your Drive.",
+        "sendingIt": "Sending it",
+        "copy": "Copy",
+        "takeBack": "Take back",
+        "givingUp": " · they are giving it up",
+        "toOrg": " · to your organization"
+    },
+    "sharedItems": {
+        "stopSharing": "Stop sharing",
+        "sharedWithMe": "Shared with me",
+        "from": "From",
+        "sharedByMe": "Shared by me",
+        "with": "With",
+        "stopTitle": "Stop sharing {name}?",
+        "stopBody": "{name} will no longer be able to open it.",
+        "stopBodyThem": "them will no longer be able to open it.",
+        "until": "Until {date}",
+        "stopNamed": "Stop sharing {name}"
+    },
+    "recent": {
+        "addAStorageConnectionIn": "Add a storage connection in Files to see recent activity.",
+        "loading": "Loading...",
+        "noFilesOpenedHereYet": "No files opened here yet.",
+        "nothingHereYet": "Nothing here yet.",
+        "lens": {
+            "modified": "Modified",
+            "created": "Created",
+            "opened": "Opened"
+        }
+    },
+    "overview": {
+        "history": "History",
+        "noDevicesYetAddOne": "No devices yet. Add one from the Files page to see its metrics here.",
+        "browseFiles": "Browse files",
+        "metrics": {
+            "cpu": "CPU",
+            "temperature": "CPU temperature",
+            "memory": "Memory",
+            "storage": "Storage"
+        }
+    },
+    "tree": {
+        "loading": "Loading...",
+        "collapse": "Collapse",
+        "expand": "Expand",
+        "home": "Home"
+    },
+    "unifi": {
+        "openConsole": "Open console",
+        "openTheUnifiConsole": "Open the UniFi console",
+        "unifiCloudUnifiUiCom": "UniFi Cloud (unifi.ui.com)",
+        "thisDevice": "This device ({address})"
+    },
+    "picker": {
+        "findAPerson": "Find a person",
+        "orAGroup": "Or a group..."
+    },
+    "roles": {
+        "viewer": "Can view",
+        "editor": "Can edit",
+        "custom": "Custom access"
+    },
+    "hardware": {
+        "usedOf": "{used} used of {total}",
+        "properties": "Properties",
+        "name": "Name",
+        "type": "Type",
+        "hostAccess": "Host access",
+        "requiresHostDaemon": "requires host daemon",
+        "storageUsage": "Storage usage",
+        "theDiskYourFilesSit": "The disk your files sit on, not what your own drive takes up.",
+        "thisBackendDoesNotReport": "This backend does not report storage usage."
     }
 }

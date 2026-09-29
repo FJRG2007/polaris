@@ -140,7 +140,7 @@ export function SendDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[85vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
-                    <DialogTitle>Send {name}</DialogTitle>
+                    <DialogTitle>{t("send.title", { name })}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -163,8 +163,8 @@ export function SendDialog({
                                     <button
                                         type="button"
                                         onClick={() => pick(one)}
-                                        title={`Remove ${one.name}`}
-                                        aria-label={`Remove ${one.name}`}
+                                        title={t("send.removeNamed", { name: one.name })}
+                                        aria-label={t("send.removeNamed", { name: one.name })}
                                         className="flex max-w-52 items-center gap-1.5 rounded-full bg-primary/10 py-1 pl-2.5 pr-2 text-xs hover:bg-primary/20"
                                     >
                                         {one.isOrg ? (
@@ -253,7 +253,7 @@ export function SendDialog({
                         </Button>
                         <Button onClick={send} disabled={busy || chosen.length === 0}>
                             <Send className="size-4 shrink-0" />
-                            {chosen.length > 1 ? `Send to ${chosen.length}` : t("send.send")}
+                            {chosen.length > 1 ? t("send.sendTo", { count: chosen.length }) : t("send.send")}
                         </Button>
                     </div>
                 </div>

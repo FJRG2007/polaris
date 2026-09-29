@@ -5,13 +5,15 @@
  * asserted without a document, a canvas or a worker.
  */
 
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+
 /** Zoom settings that follow the window rather than naming a size. */
 export const ZOOM_PRESETS = [
-    { value: "auto", label: "Automatic" },
-    { value: "page-actual", label: "Actual size" },
-    { value: "page-fit", label: "Fit page" },
-    { value: "page-width", label: "Fit width" }
-] as const;
+    { value: "auto", label: "pdf.zoomPresets.auto" },
+    { value: "page-actual", label: "pdf.zoomPresets.actual" },
+    { value: "page-fit", label: "pdf.zoomPresets.fitPage" },
+    { value: "page-width", label: "pdf.zoomPresets.fitWidth" }
+] as const satisfies readonly { value: string; label: NamespaceKey<"driveViewer"> }[];
 
 /** Fixed magnifications, offered under the presets. */
 export const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4] as const;
@@ -21,9 +23,9 @@ export const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4] as const;
  * in force: stepping the zoom clears it, and the magnification itself is what
  * the reader wants to see from then on.
  */
-export function zoomLabel(scale: number, scaleValue?: string): string {
+export function zoomLabel(t: NamespaceTranslator<"driveViewer">, scale: number, scaleValue?: string): string {
     const preset = ZOOM_PRESETS.find((option) => option.value === scaleValue);
-    return preset ? preset.label : `${Math.round(scale * 100)}%`;
+    return preset ? t(preset.label) : `${Math.round(scale * 100)}%`;
 }
 
 /**
@@ -32,16 +34,17 @@ export function zoomLabel(scale: number, scaleValue?: string): string {
  * list rather than leaving the control showing nothing.
  */
 export function zoomChoices(
+    t: NamespaceTranslator<"driveViewer">,
     scale: number,
     scaleValue?: string
 ): { value: string; options: { value: string; label: string }[] } {
     const value = scaleValue ?? String(scale);
     const options = [
-        ...ZOOM_PRESETS.map((preset) => ({ value: preset.value, label: preset.label })),
+        ...ZOOM_PRESETS.map((preset) => ({ value: preset.value, label: t(preset.label) })),
         ...ZOOM_STEPS.map((step) => ({ value: String(step), label: `${Math.round(step * 100)}%` }))
     ];
     if (!options.some((option) => option.value === value))
-        options.push({ value, label: zoomLabel(scale, scaleValue) });
+        options.push({ value, label: zoomLabel(t, scale, scaleValue) });
     return { value, options };
 }
 
@@ -63,9 +66,14 @@ export type FindStatus = "idle" | "pending" | "found" | "not-found" | "wrapped";
  * document still being scanned read differently, and an empty box says nothing
  * at all rather than "no matches" over a query nobody typed.
  */
-export function matchSummary(status: FindStatus, current: number, total: number): string {
+export function matchSummary(
+    t: NamespaceTranslator<"driveViewer">,
+    status: FindStatus,
+    current: number,
+    total: number
+): string {
     if (status === "idle") return "";
-    if (status === "pending") return "Searching...";
-    if (status === "not-found" || total === 0) return "No matches";
-    return `${current} of ${total}`;
+    if (status === "pending") return t("pdf.searching");
+    if (status === "not-found" || total === 0) return t("pdf.noMatches");
+    return t("pdf.matchOf", { current, total });
 }

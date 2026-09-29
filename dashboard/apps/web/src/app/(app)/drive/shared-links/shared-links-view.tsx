@@ -546,7 +546,7 @@ function ShareLogsDialog({
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr>
                                     <th className="py-1 pr-3 font-medium">{t("sharedLinks.when")}</th>
-                                    <th className="py-1 pr-3 font-medium">IP</th>
+                                    <th className="py-1 pr-3 font-medium">{t("sharedLinks.ip")}</th>
                                     <th className="py-1 font-medium">{t("sharedLinks.action")}</th>
                                 </tr>
                             </thead>

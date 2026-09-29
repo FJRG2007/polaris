@@ -1,1 +1,200 @@
-{}
+{
+    "word": {
+        "makeADocumentInDrive": "Make a document in Drive.",
+        "useSaveACopyBeside": "Use Save a copy beside Save.",
+        "usePrint": "Use Print.",
+        "notAvailableHere": "Not available here.",
+        "notConnectedInPolaris": "Not connected in Polaris.",
+        "notConnected": "Not connected.",
+        "thisDocumentCouldNotBe": "This document could not be opened."
+    },
+    "textEditor": {
+        "thisFileCouldNotBe": "This file could not be read.",
+        "editing": "Editing",
+        "findInThisFile": "Find in this file",
+        "findInThisFileCtrl": "Find in this file (Ctrl+F)",
+        "cancel": "Cancel",
+        "plainText": "Plain text",
+        "edit": "Edit"
+    },
+    "doc": {
+        "thisDocumentCouldNotBe": "This document could not be rendered.",
+        "editing": "Editing",
+        "cancel": "Cancel",
+        "wordDocument": "Word document",
+        "edit": "Edit"
+    },
+    "richMarkdown": {
+        "useDownloadBesideSave": "Use Download beside Save.",
+        "notConnected": "Not connected."
+    },
+    "pptx": {
+        "thisPresentationHasNoSlides": "This presentation has no slides.",
+        "previousSlide": "Previous slide",
+        "nextSlide": "Next slide",
+        "slideN": "Slide {n}"
+    },
+    "pdfSidebar": {
+        "pages": "Pages",
+        "outline": "Outline",
+        "files": "Files",
+        "sidebarView": "Sidebar view"
+    },
+    "pdfDocument": {
+        "thisPdfCouldNotBe": "This PDF could not be opened. It may be damaged or password-protected.",
+        "loadingPreview": "Loading preview...",
+        "loadingPercent": "Loading {percent}%"
+    },
+    "media": {
+        "fitTheVideoAgain": "Fit the video again"
+    },
+    "status": {
+        "loadingPreview": "Loading preview..."
+    },
+    "markdownContent": {
+        "copied": "Copied"
+    },
+    "viewer": {
+        "previousFile": "Previous file",
+        "nextFile": "Next file",
+        "share": "Share",
+        "fetching": "Fetching",
+        "download": "Download",
+        "properties": "Properties",
+        "type": "Type",
+        "file": "File",
+        "size": "Size",
+        "modified": "Modified",
+        "location": "Location",
+        "kindFile": "{kind} file"
+    },
+    "pdf": {
+        "pagesAndOutline": "Pages and outline",
+        "previousPage": "Previous page",
+        "nextPage": "Next page",
+        "pageNumber": "Page number",
+        "zoomOut": "Zoom out",
+        "zoom": "Zoom",
+        "zoomIn": "Zoom in",
+        "findInDocument": "Find in document",
+        "viewOptions": "View options",
+        "rotate": "Rotate",
+        "scrolling": "Scrolling",
+        "pageLayout": "Page layout",
+        "fullScreen": "Full screen",
+        "print": "Print",
+        "searching": "Searching...",
+        "noMatches": "No matches",
+        "matchOf": "{current} of {total}",
+        "scroll": {
+            "vertical": "Vertical",
+            "horizontal": "Horizontal",
+            "wrapped": "Wrapped",
+            "page": "One page at a time"
+        },
+        "spread": {
+            "none": "Single page",
+            "odd": "Odd pages left",
+            "even": "Even pages left"
+        },
+        "zoomPresets": {
+            "auto": "Automatic",
+            "actual": "Actual size",
+            "fitPage": "Fit page",
+            "fitWidth": "Fit width"
+        }
+    },
+    "pdfTools": {
+        "textSize": "Text size",
+        "penWidth": "Pen width",
+        "highlighterWidth": "Highlighter width",
+        "clickAPageToPlace": "Click a page to place a picture.",
+        "done": "Done",
+        "tools": {
+            "select": "Select",
+            "text": "Text",
+            "draw": "Draw",
+            "highlight": "Highlight",
+            "image": "Image"
+        },
+        "colors": {
+            "black": "Black",
+            "red": "Red",
+            "amber": "Amber",
+            "green": "Green",
+            "blue": "Blue",
+            "violet": "Violet",
+            "yellow": "Yellow",
+            "pink": "Pink"
+        },
+        "widths": {
+            "thin": "Thin",
+            "medium": "Medium",
+            "thick": "Thick",
+            "heavy": "Heavy"
+        }
+    },
+    "pdfSearch": {
+        "findInDocument": "Find in document",
+        "previousMatch": "Previous match",
+        "nextMatch": "Next match",
+        "highlightAll": "Highlight all",
+        "all": "All",
+        "matchCase": "Match case",
+        "wholeWords": "Whole words",
+        "closeSearch": "Close search"
+    },
+    "editorActions": {
+        "preparing": "Preparing...",
+        "download": "Download",
+        "saveACopy": "Save a copy",
+        "saving": "Saving...",
+        "save": "Save",
+        "name": "Name",
+        "aFileWithThisName": "A file with this name already exists here and will be replaced.",
+        "cancel": "Cancel",
+        "replace": "Replace",
+        "saveCopy": "Save copy"
+    },
+    "find": {
+        "findInThisFile": "Find in this file",
+        "noMatches": "No matches",
+        "previousMatch": "Previous match",
+        "previousMatchShiftEnter": "Previous match (Shift+Enter)",
+        "nextMatch": "Next match",
+        "nextMatchEnter": "Next match (Enter)",
+        "closeFind": "Close find",
+        "closeEsc": "Close (Esc)",
+        "matchOf": "{current} of {total}"
+    },
+    "markdown": {
+        "thisFileCouldNotBe": "This file could not be read.",
+        "editing": "Editing",
+        "cancel": "Cancel",
+        "plainText": "Plain text",
+        "fullEditor": "Full editor",
+        "pretty": "Pretty",
+        "raw": "Raw",
+        "edit": "Edit"
+    },
+    "code": {
+        "thisFileCouldNotBe": "This file could not be read.",
+        "editing": "Editing",
+        "cancel": "Cancel",
+        "code": "Code",
+        "fileContents": "file contents",
+        "findInThisFile": "Find in this file",
+        "findInThisFileCtrl": "Find in this file (Ctrl+F)",
+        "edit": "Edit"
+    },
+    "sheet": {
+        "thisSpreadsheetCouldNotBe": "This spreadsheet could not be read.",
+        "spreadsheet": "Spreadsheet",
+        "previewOnlyLargeSheet": "Preview only (large sheet)",
+        "convertedCopy": "{kind} files are saved as a converted .xlsx copy; the original is left untouched."
+    },
+    "loading": {
+        "editor": "Opening the editor",
+        "document": "Opening the document"
+    }
+}

@@ -143,11 +143,13 @@ export function TrashView({ items }: { items: TrashRow[] }) {
                                     <div className="min-w-0">
                                         <p className="truncate text-sm font-medium">{row.name}</p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {row.connectionName} / {row.originalPath || "(root)"}
+                                            {row.connectionName} / {row.originalPath || t("trash.root")}
                                             {row.kind !== "dir"
                                                 ? ` - ${formatBytes(BigInt(row.size))}`
                                                 : ""}{" "}
-                                            - deleted <RelativeTime iso={row.deletedAt} />
+                                            {t.rich("trash.deletedAt", {
+                                                time: () => <RelativeTime key="time" iso={row.deletedAt} />
+                                            })}
                                         </p>
                                     </div>
                                 </div>

@@ -17,6 +17,7 @@
  */
 
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PdfTools } from "./pdf-tools";
 import { ViewerError } from "./status";
 import { PdfSearch } from "./pdf-search";
@@ -50,6 +51,7 @@ export default function PdfDocument({
     readOnly?: boolean;
     onSaved?: (name: string) => void;
 }) {
+    const t = useTranslations("driveViewer");
     const frameRef = useRef<HTMLDivElement>(null);
     const [progress, setProgress] = useState(0);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -168,7 +170,7 @@ export default function PdfDocument({
             ) : null}
             {error ? (
                 <ViewerError>
-                    This PDF could not be opened. It may be damaged or password-protected.
+                    {t("pdfDocument.thisPdfCouldNotBe")}
                 </ViewerError>
             ) : (
                 <div className="flex min-h-0 flex-1">
@@ -184,8 +186,8 @@ export default function PdfDocument({
                             <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
                                 <Loader2 className="size-4 animate-spin" />
                                 {progress > 0 && progress < 1
-                                    ? `Loading ${Math.round(progress * 100)}%`
-                                    : "Loading preview..."}
+                                    ? t("pdfDocument.loadingPercent", { percent: Math.round(progress * 100) })
+                                    : t("pdfDocument.loadingPreview")}
                             </div>
                         )}
                     </div>

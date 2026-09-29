@@ -11,6 +11,7 @@
  */
 
 import { useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Paperclip } from "lucide-react";
 import { PDFSlickThumbnails } from "@pdfslick/react";
 import { Button, SegmentedControl, cn } from "@polaris/ui";
@@ -29,15 +30,16 @@ export function PdfSidebar({
     thumbsRef: (instance: HTMLElement | null) => void;
     usePDFSlickStore: TUsePDFSlickStore;
 }) {
+    const t = useTranslations("driveViewer");
     const [tab, setTab] = useState<SidebarTab>("pages");
     const outline = usePDFSlickStore((state) => state.documentOutline);
     const attachments = usePDFSlickStore((state) => state.attachments);
     const pageNumber = usePDFSlickStore((state) => state.pageNumber);
 
     const tabs = [
-        { value: "pages" as const, label: "Pages" },
-        { value: "outline" as const, label: "Outline", disabled: !outline?.length },
-        { value: "files" as const, label: "Files", disabled: attachments.size === 0 }
+        { value: "pages" as const, label: t("pdfSidebar.pages") },
+        { value: "outline" as const, label: t("pdfSidebar.outline"), disabled: !outline?.length },
+        { value: "files" as const, label: t("pdfSidebar.files"), disabled: attachments.size === 0 }
     ];
     // A tab whose content the document does not carry falls back to the pages,
     // rather than showing an empty panel for something that will never fill.
@@ -55,7 +57,7 @@ export function PdfSidebar({
                 <div className="border-b border-border p-2">
                     <SegmentedControl
                         size="sm"
-                        aria-label="Sidebar view"
+                        aria-label={t("pdfSidebar.sidebarView")}
                         value={active}
                         onValueChange={setTab}
                         options={tabs}

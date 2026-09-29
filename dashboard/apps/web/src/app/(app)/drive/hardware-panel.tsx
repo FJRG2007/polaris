@@ -7,6 +7,7 @@
  */
 
 import { Database, HardDrive } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { formatBytes, isPersonalKind } from "@polaris/core";
 import { Badge, Card, CardBody, CardHeader, CardTitle, RadialGauge, Skeleton } from "@polaris/ui";
 import { useLiveResource } from "@/components/use-live-resource";
@@ -36,6 +37,7 @@ interface Usage {
 const USAGE_POLL_MS = 60_000;
 
 export function HardwarePanel({ connection }: { connection: ConnectionSummary }) {
+    const t = useTranslations("drive");
     // Seeded from the last snapshot so revisiting the page paints the gauge at
     // once, then kept current without a reload.
     const {
@@ -63,20 +65,20 @@ export function HardwarePanel({ connection }: { connection: ConnectionSummary })
         <div className="flex flex-col gap-4">
             <Card>
                 <CardHeader>
-                    <CardTitle>Properties</CardTitle>
+                    <CardTitle>{t("hardware.properties")}</CardTitle>
                 </CardHeader>
                 <CardBody>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <dt className="text-muted-foreground">Name</dt>
+                        <dt className="text-muted-foreground">{t("hardware.name")}</dt>
                         <dd className="truncate font-medium">{connection.name}</dd>
-                        <dt className="text-muted-foreground">Type</dt>
+                        <dt className="text-muted-foreground">{t("hardware.type")}</dt>
                         <dd className="font-medium">
                             {KIND_LABELS[connection.kind] ?? connection.kind}
                         </dd>
-                        <dt className="text-muted-foreground">Host access</dt>
+                        <dt className="text-muted-foreground">{t("hardware.hostAccess")}</dt>
                         <dd>
                             {connection.requiresHostd ? (
-                                <Badge variant="neutral">requires host daemon</Badge>
+                                <Badge variant="neutral">{t("hardware.requiresHostDaemon")}</Badge>
                             ) : (
                                 <span className="text-muted-foreground">in-process</span>
                             )}
@@ -87,12 +89,12 @@ export function HardwarePanel({ connection }: { connection: ConnectionSummary })
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Storage usage</CardTitle>
+                    <CardTitle>{t("hardware.storageUsage")}</CardTitle>
                 </CardHeader>
                 <CardBody>
                     {personal && (
                         <p className="mb-3 text-xs text-muted-foreground">
-                            The disk your files sit on, not what your own drive takes up.
+                            {t("hardware.theDiskYourFilesSit")}
                         </p>
                     )}
                     {loading ? (
@@ -113,8 +115,10 @@ export function HardwarePanel({ connection }: { connection: ConnectionSummary })
                             <div className="flex flex-col gap-1 text-sm">
                                 <span className="flex items-center gap-2">
                                     <Database className="size-4 text-muted-foreground" />
-                                    {formatBytes(BigInt(usage?.used ?? "0"))} used of{" "}
-                                    {formatBytes(BigInt(usage?.total ?? "0"))}
+                                    {t("hardware.usedOf", {
+                                        used: formatBytes(BigInt(usage?.used ?? "0")),
+                                        total: formatBytes(BigInt(usage?.total ?? "0"))
+                                    })}
                                 </span>
                                 {usage?.free ? (
                                     <span className="flex items-center gap-2 text-muted-foreground">
@@ -126,7 +130,7 @@ export function HardwarePanel({ connection }: { connection: ConnectionSummary })
                         </div>
                     ) : (
                         <p className="text-sm text-muted-foreground">
-                            This backend does not report storage usage.
+                            {t("hardware.thisBackendDoesNotReport")}
                         </p>
                     )}
                 </CardBody>

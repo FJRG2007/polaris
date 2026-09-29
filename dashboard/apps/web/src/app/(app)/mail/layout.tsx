@@ -49,7 +49,7 @@ export default async function MailLayout({ children }: { children: React.ReactNo
     );
 
     return (
-        <Messages namespaces={["mail", "mailCompose", "mailSettings"]}>
+        <Messages namespaces={["mail", "mailCompose", "mailSettings", "driveViewer"]}>
             <MailShell
                 accounts={accounts}
                 folders={folders}

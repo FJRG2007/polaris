@@ -16,6 +16,7 @@
  */
 
 import { Avatar } from "@/components/avatar";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ItemShare } from "./sharing-types";
 import { DRIVE_GRANT_NOTE_MAX } from "@polaris/core";
@@ -52,16 +53,16 @@ export interface PeopleShareTarget {
 }
 
 const ROLE_OPTIONS = [
-    { value: "viewer", label: "Can view" },
-    { value: "editor", label: "Can edit" }
-];
+    { value: "viewer", label: "roles.viewer" },
+    { value: "editor", label: "roles.editor" }
+] as const satisfies readonly { value: DriveShareRole; label: NamespaceKey<"drive"> }[];
 
 /** What a grant made outside this dialog reads as, so nothing is rounded up. */
-const ROLE_LABELS: Record<DriveShareRole | "custom", string> = {
-    viewer: "Can view",
-    editor: "Can edit",
-    custom: "Custom access"
-};
+const ROLE_LABELS = {
+    viewer: "roles.viewer",
+    editor: "roles.editor",
+    custom: "roles.custom"
+} as const satisfies Record<DriveShareRole | "custom", NamespaceKey<"drive">>;
 
 export function PeopleShareDialog({
     target,
@@ -174,7 +175,7 @@ export function PeopleShareDialog({
         <Dialog open onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Share {target.name}</DialogTitle>
+                    <DialogTitle>{t("peopleShare.title", { name: target.name })}</DialogTitle>
                     <DialogDescription>
                         {target.isDir
                             ? t("peopleShare.whoeverYouNameCanOpen")
@@ -212,7 +213,7 @@ export function PeopleShareDialog({
                             <Select
                                 value={role}
                                 onValueChange={(value) => setRole(value as DriveShareRole)}
-                                options={ROLE_OPTIONS}
+                                options={ROLE_OPTIONS.map((one) => ({ value: one.value, label: t(one.label) }))}
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
@@ -278,7 +279,7 @@ export function PeopleShareDialog({
                                             <span className="min-w-0 flex-1 truncate text-sm">
                                                 {holder.name}
                                             </span>
-                                            <Badge>{ROLE_LABELS[holder.role]}</Badge>
+                                            <Badge>{t(ROLE_LABELS[holder.role])}</Badge>
                                             {holder.expiresAt && (
                                                 <Badge variant={lapsed ? "neutral" : "warning"}>
                                                     {lapsed ? t("peopleShare.lapsed") : t("peopleShare.until")}{" "}
@@ -290,7 +291,7 @@ export function PeopleShareDialog({
                                                 variant="ghost"
                                                 disabled={busy}
                                                 title={t("peopleShare.stopSharing")}
-                                                aria-label={`Stop sharing with ${holder.name}`}
+                                                aria-label={t("peopleShare.stopWith", { name: holder.name })}
                                                 onClick={() => void stop(holder)}
                                             >
                                                 <Trash2 className="size-4" />

@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { createPortal } from "react-dom";
 import { CopyButton } from "@/components/copy-button";
 
@@ -25,6 +26,7 @@ interface Acknowledgement {
 }
 
 export function MarkdownContent({ html, className }: { html: string; className?: string }) {
+    const t = useTranslations("driveViewer");
     const container = useRef<HTMLDivElement>(null);
     const [hosts, setHosts] = useState<{ node: HTMLElement; code: string }[]>([]);
     const [copied, setCopied] = useState<Acknowledgement | null>(null);
@@ -91,7 +93,7 @@ export function MarkdownContent({ html, className }: { html: string; className?:
                     className="pointer-events-none absolute z-10 -translate-y-6 rounded border border-border bg-card px-1.5 py-0.5 text-[0.625rem] font-medium text-muted-foreground"
                     style={{ top: copied.top, left: copied.left }}
                 >
-                    Copied
+                    {t("markdownContent.copied")}
                 </span>
             ) : null}
         </div>

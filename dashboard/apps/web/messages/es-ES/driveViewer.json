@@ -1,1 +1,200 @@
-{}
+{
+    "word": {
+        "makeADocumentInDrive": "Crea un documento en Drive.",
+        "useSaveACopyBeside": "Usa Guardar una copia, junto a Guardar.",
+        "usePrint": "Usa Imprimir.",
+        "notAvailableHere": "No disponible aquí.",
+        "notConnectedInPolaris": "No conectado en Polaris.",
+        "notConnected": "No conectado.",
+        "thisDocumentCouldNotBe": "No se pudo abrir este documento."
+    },
+    "textEditor": {
+        "thisFileCouldNotBe": "No se pudo leer este archivo.",
+        "editing": "Editando",
+        "findInThisFile": "Buscar en este archivo",
+        "findInThisFileCtrl": "Buscar en este archivo (Ctrl+F)",
+        "cancel": "Cancelar",
+        "plainText": "Texto plano",
+        "edit": "Editar"
+    },
+    "doc": {
+        "thisDocumentCouldNotBe": "No se pudo mostrar este documento.",
+        "editing": "Editando",
+        "cancel": "Cancelar",
+        "wordDocument": "Documento de Word",
+        "edit": "Editar"
+    },
+    "richMarkdown": {
+        "useDownloadBesideSave": "Usa Descargar, junto a Guardar.",
+        "notConnected": "No conectado."
+    },
+    "pptx": {
+        "thisPresentationHasNoSlides": "Esta presentación no tiene diapositivas.",
+        "previousSlide": "Anterior",
+        "nextSlide": "Siguiente",
+        "slideN": "Diapositiva {n}"
+    },
+    "pdfSidebar": {
+        "pages": "Páginas",
+        "outline": "Esquema",
+        "files": "Archivos",
+        "sidebarView": "Vista lateral"
+    },
+    "pdfDocument": {
+        "thisPdfCouldNotBe": "No se pudo abrir este PDF. Puede estar dañado o protegido con contraseña.",
+        "loadingPreview": "Cargando vista previa...",
+        "loadingPercent": "Cargando {percent}%"
+    },
+    "media": {
+        "fitTheVideoAgain": "Volver a encajar"
+    },
+    "status": {
+        "loadingPreview": "Cargando vista previa..."
+    },
+    "markdownContent": {
+        "copied": "Copiado"
+    },
+    "viewer": {
+        "previousFile": "Archivo anterior",
+        "nextFile": "Siguiente",
+        "share": "Enlace",
+        "fetching": "Obteniendo",
+        "download": "Descargar",
+        "properties": "Propiedades",
+        "type": "Tipo",
+        "file": "Archivo",
+        "size": "Tamaño",
+        "modified": "Modificado",
+        "location": "Ubicación",
+        "kindFile": "Archivo {kind}"
+    },
+    "pdf": {
+        "pagesAndOutline": "Páginas y esquema",
+        "previousPage": "Página anterior",
+        "nextPage": "Siguiente",
+        "pageNumber": "Página",
+        "zoomOut": "Alejar",
+        "zoom": "Zoom",
+        "zoomIn": "Acercar",
+        "findInDocument": "Buscar en documento",
+        "viewOptions": "Opciones",
+        "rotate": "Girar",
+        "scrolling": "Desplazar",
+        "pageLayout": "Diseño",
+        "fullScreen": "Maximizar",
+        "print": "Imprimir",
+        "searching": "Buscando...",
+        "noMatches": "0 resultados",
+        "matchOf": "{current} de {total}",
+        "scroll": {
+            "vertical": "Vertical",
+            "horizontal": "Horizontal",
+            "wrapped": "En mosaico",
+            "page": "Página a página"
+        },
+        "spread": {
+            "none": "Una página",
+            "odd": "Dobles impares",
+            "even": "Dobles pares"
+        },
+        "zoomPresets": {
+            "auto": "Automático",
+            "actual": "Tamaño real",
+            "fitPage": "A la página",
+            "fitWidth": "Al ancho"
+        }
+    },
+    "pdfTools": {
+        "textSize": "Tamaño",
+        "penWidth": "Grosor",
+        "highlighterWidth": "Grosor del marcador",
+        "clickAPageToPlace": "Haz clic en una página para colocar una imagen.",
+        "done": "Hecho",
+        "tools": {
+            "select": "Elegir",
+            "text": "Texto",
+            "draw": "Dibujar",
+            "highlight": "Resaltar",
+            "image": "Imagen"
+        },
+        "colors": {
+            "black": "Negro",
+            "red": "Rojo",
+            "amber": "Ámbar",
+            "green": "Verde",
+            "blue": "Azul",
+            "violet": "Violeta",
+            "yellow": "Amarillo",
+            "pink": "Rosa"
+        },
+        "widths": {
+            "thin": "Fino",
+            "medium": "Medio",
+            "thick": "Grueso",
+            "heavy": "Máximo"
+        }
+    },
+    "pdfSearch": {
+        "findInDocument": "Buscar en documento",
+        "previousMatch": "Anterior",
+        "nextMatch": "Siguiente",
+        "highlightAll": "Resaltar todo",
+        "all": "Todo",
+        "matchCase": "Mayúsculas",
+        "wholeWords": "Palabra entera",
+        "closeSearch": "Cerrar búsqueda"
+    },
+    "editorActions": {
+        "preparing": "Preparando...",
+        "download": "Descargar",
+        "saveACopy": "Guardar copia",
+        "saving": "Guardando...",
+        "save": "Guardar",
+        "name": "Nombre",
+        "aFileWithThisName": "Ya hay aquí un archivo con este nombre y se sustituirá.",
+        "cancel": "Cancelar",
+        "replace": "Sustituir",
+        "saveCopy": "Guardar"
+    },
+    "find": {
+        "findInThisFile": "Buscar en este archivo",
+        "noMatches": "0 resultados",
+        "previousMatch": "Anterior",
+        "previousMatchShiftEnter": "Anterior (Mayús+Intro)",
+        "nextMatch": "Siguiente",
+        "nextMatchEnter": "Siguiente (Intro)",
+        "closeFind": "Cerrar",
+        "closeEsc": "Cerrar (Esc)",
+        "matchOf": "{current} de {total}"
+    },
+    "markdown": {
+        "thisFileCouldNotBe": "No se pudo leer este archivo.",
+        "editing": "Editando",
+        "cancel": "Cancelar",
+        "plainText": "Texto plano",
+        "fullEditor": "Editor",
+        "pretty": "Vista",
+        "raw": "Fuente",
+        "edit": "Editar"
+    },
+    "code": {
+        "thisFileCouldNotBe": "No se pudo leer este archivo.",
+        "editing": "Editando",
+        "cancel": "Cancelar",
+        "code": "Código",
+        "fileContents": "contenido",
+        "findInThisFile": "Buscar en este archivo",
+        "findInThisFileCtrl": "Buscar en este archivo (Ctrl+F)",
+        "edit": "Editar"
+    },
+    "sheet": {
+        "thisSpreadsheetCouldNotBe": "No se pudo leer esta hoja de cálculo.",
+        "spreadsheet": "Hoja",
+        "previewOnlyLargeSheet": "Solo vista (hoja grande)",
+        "convertedCopy": "Los archivos {kind} se guardan como una copia .xlsx convertida; el original no se toca."
+    },
+    "loading": {
+        "editor": "Abriendo el editor",
+        "document": "Abriendo el documento"
+    }
+}

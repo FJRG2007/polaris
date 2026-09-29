@@ -58,7 +58,10 @@ export function UnasMetrics({
                 <div className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm text-warning-ink">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                     <span>
-                        Showing the last reading{updatedAt !== null ? ` from ${format.time(updatedAt)}` : ""}. {stale}
+                        {updatedAt !== null
+                            ? t("unas.lastReadingFrom", { time: format.time(updatedAt) })
+                            : t("unas.lastReading")}{" "}
+                        {stale}
                     </span>
                 </div>
             ) : null}
@@ -98,13 +101,13 @@ export function UnasMetrics({
                     icon={<HardDrive className="size-4" />}
                     label={t("unas.baysInUse")}
                     value={`${metrics.slotsPopulated} / ${metrics.slotsTotal}`}
-                    hint={`${metrics.slotsTotal - metrics.slotsPopulated} free`}
+                    hint={t("unas.free", { count: metrics.slotsTotal - metrics.slotsPopulated })}
                 />
                 <Stat
                     icon={<Clock className="size-4" />}
                     label={t("unas.uptime")}
                     value={formatUptime(metrics.system.uptimeSeconds)}
-                    hint={`since ${format.dateTime(Date.now() - metrics.system.uptimeSeconds * 1000)}`}
+                    hint={t("unas.since", { date: format.dateTime(Date.now() - metrics.system.uptimeSeconds * 1000) })}
                 />
             </div>
 
@@ -161,14 +164,14 @@ export function UnasMetrics({
                                         <HardDrive
                                             className={`size-4 ${disk.present ? "text-primary" : "text-muted-foreground"}`}
                                         />
-                                        Bay {disk.slot}
+                                        {t("unas.bay", { n: disk.slot })}
                                     </span>
                                     {disk.present ? (
                                         <Badge variant={disk.healthy ? "success" : "danger"}>
-                                            {disk.healthy ? "healthy" : disk.state}
+                                            {disk.healthy ? t("unas.healthy") : disk.state}
                                         </Badge>
                                     ) : (
-                                        <span className="text-xs text-muted-foreground">empty</span>
+                                        <span className="text-xs text-muted-foreground">{t("unas.empty")}</span>
                                     )}
                                 </div>
                                 {disk.present ? (
@@ -177,7 +180,7 @@ export function UnasMetrics({
                                         <span>
                                             {formatBytes(disk.sizeBytes)}
                                             {disk.type ? ` ${disk.type}` : ""}
-                                            {disk.rpm ? ` - ${disk.rpm} rpm` : ""}
+                                            {disk.rpm ? t("unas.rpm", { rpm: disk.rpm }) : ""}
                                         </span>
                                         {disk.temperature !== null ? (
                                             <span>{format.temperature(disk.temperature)}</span>
@@ -193,12 +196,12 @@ export function UnasMetrics({
             <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                 <span>
                     {metrics.system.name} - {metrics.system.model}
-                    {metrics.system.firmware ? ` - firmware ${metrics.system.firmware}` : ""}
+                    {metrics.system.firmware ? t("unas.firmware", { version: metrics.system.firmware }) : ""}
                 </span>
                 {refreshing ? (
                     <RefreshCw className="size-3 animate-spin" aria-label={t("unas.refreshing")} />
                 ) : updatedAt !== null ? (
-                    <span>- updated {format.time(updatedAt)}</span>
+                    <span>{t("unas.updated", { time: format.time(updatedAt) })}</span>
                 ) : null}
             </p>
         </div>

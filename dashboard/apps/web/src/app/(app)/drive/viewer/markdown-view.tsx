@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Pencil } from "lucide-react";
 import { Button, cn } from "@polaris/ui";
 import { EditorActions } from "./editor-actions";
@@ -50,6 +51,7 @@ export function MarkdownView({
     readOnly?: boolean;
     onSaved?: (name: string) => void;
 }) {
+    const t = useTranslations("driveViewer");
     const { file, error, setText } = useTextFile(src);
     const [mode, setMode] = useState<"pretty" | "raw">("pretty");
     /** Whether the editing pane is the plain textarea or the full editor. The
@@ -81,7 +83,7 @@ export function MarkdownView({
         };
     }, [text, editing, mode]);
 
-    if (error) return <ViewerError>This file could not be read.</ViewerError>;
+    if (error) return <ViewerError>{t("markdown.thisFileCouldNotBe")}</ViewerError>;
     if (!file) return <Loading />;
 
     // Same guard as the plain-text editor: a truncated read, a lossy/non-UTF-8
@@ -104,17 +106,17 @@ export function MarkdownView({
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                 {editing ? (
                     <>
-                        <span className="text-xs font-medium text-muted-foreground">Editing</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("markdown.editing")}</span>
                         <div className="ml-auto flex items-center gap-2">
                             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-                                Cancel
+                                {t("markdown.cancel")}
                             </Button>
                             <button
                                 type="button"
                                 onClick={() => setRich((held) => !held)}
                                 className="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted"
                             >
-                                {rich ? "Plain text" : "Full editor"}
+                                {rich ? t("markdown.plainText") : t("markdown.fullEditor")}
                             </button>
                             <EditorActions
                                 target={target}
@@ -137,7 +139,7 @@ export function MarkdownView({
                                         : "text-muted-foreground"
                                 )}
                             >
-                                Pretty
+                                {t("markdown.pretty")}
                             </button>
                             <button
                                 type="button"
@@ -149,7 +151,7 @@ export function MarkdownView({
                                         : "text-muted-foreground"
                                 )}
                             >
-                                Raw
+                                {t("markdown.raw")}
                             </button>
                         </div>
                         {editable ? (
@@ -163,7 +165,7 @@ export function MarkdownView({
                                 }}
                             >
                                 <Pencil className="size-4" />
-                                Edit
+                                {t("markdown.edit")}
                             </Button>
                         ) : readOnly ? null : (
                             <span className="ml-auto text-xs text-muted-foreground">{blocked}</span>

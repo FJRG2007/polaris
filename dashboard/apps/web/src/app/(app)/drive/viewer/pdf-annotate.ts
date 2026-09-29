@@ -15,15 +15,16 @@ import type { PDFSlick } from "@pdfslick/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnnotationEditorParamsType, AnnotationEditorType } from "pdfjs-dist";
 import { Highlighter, ImagePlus, MousePointer2, PenLine, Type } from "lucide-react";
+import type { NamespaceKey } from "@/lib/i18n/types";
 
 export type EditorTool = "none" | "text" | "draw" | "highlight" | "image";
 
-export const TOOLS: { id: EditorTool; label: string; icon: typeof Type }[] = [
-    { id: "none", label: "Select", icon: MousePointer2 },
-    { id: "text", label: "Text", icon: Type },
-    { id: "draw", label: "Draw", icon: PenLine },
-    { id: "highlight", label: "Highlight", icon: Highlighter },
-    { id: "image", label: "Image", icon: ImagePlus }
+export const TOOLS: { id: EditorTool; label: NamespaceKey<"driveViewer">; icon: typeof Type }[] = [
+    { id: "none", label: "pdfTools.tools.select", icon: MousePointer2 },
+    { id: "text", label: "pdfTools.tools.text", icon: Type },
+    { id: "draw", label: "pdfTools.tools.draw", icon: PenLine },
+    { id: "highlight", label: "pdfTools.tools.highlight", icon: Highlighter },
+    { id: "image", label: "pdfTools.tools.image", icon: ImagePlus }
 ];
 
 const MODES: Record<EditorTool, number> = {
@@ -35,22 +36,22 @@ const MODES: Record<EditorTool, number> = {
 };
 
 /** Ink and text colors: dark by default, then the five a marker set carries. */
-export const DRAW_COLORS = [
-    { value: "#1c1c1e", label: "Black" },
-    { value: "#e02424", label: "Red" },
-    { value: "#f59e0b", label: "Amber" },
-    { value: "#16a34a", label: "Green" },
-    { value: "#2563eb", label: "Blue" },
-    { value: "#7c3aed", label: "Violet" }
+export const DRAW_COLORS: { value: string; label: NamespaceKey<"driveViewer"> }[] = [
+    { value: "#1c1c1e", label: "pdfTools.colors.black" },
+    { value: "#e02424", label: "pdfTools.colors.red" },
+    { value: "#f59e0b", label: "pdfTools.colors.amber" },
+    { value: "#16a34a", label: "pdfTools.colors.green" },
+    { value: "#2563eb", label: "pdfTools.colors.blue" },
+    { value: "#7c3aed", label: "pdfTools.colors.violet" }
 ];
 
 /** The highlighter colors pdf.js ships, which are the ones its editor renders best. */
-export const HIGHLIGHT_COLORS = [
-    { value: "#ffff98", label: "Yellow" },
-    { value: "#53ffbc", label: "Green" },
-    { value: "#80ebff", label: "Blue" },
-    { value: "#ffcbe6", label: "Pink" },
-    { value: "#ff4f5f", label: "Red" }
+export const HIGHLIGHT_COLORS: { value: string; label: NamespaceKey<"driveViewer"> }[] = [
+    { value: "#ffff98", label: "pdfTools.colors.yellow" },
+    { value: "#53ffbc", label: "pdfTools.colors.green" },
+    { value: "#80ebff", label: "pdfTools.colors.blue" },
+    { value: "#ffcbe6", label: "pdfTools.colors.pink" },
+    { value: "#ff4f5f", label: "pdfTools.colors.red" }
 ];
 
 export interface ToolParams {

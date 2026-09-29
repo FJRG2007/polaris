@@ -8,6 +8,8 @@
  */
 
 import { ScrollMode, SpreadMode } from "@pdfslick/react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { useEffect, useState, type ReactNode } from "react";
 import type { PDFSlick, TUsePDFSlickStore } from "@pdfslick/react";
 import { ZOOM_PRESETS, pageFromInput, zoomChoices } from "./pdf-controls";
@@ -41,17 +43,17 @@ import {
     cn
 } from "@polaris/ui";
 
-const SCROLL_MODES = [
-    { value: ScrollMode.VERTICAL, label: "Vertical" },
-    { value: ScrollMode.HORIZONTAL, label: "Horizontal" },
-    { value: ScrollMode.WRAPPED, label: "Wrapped" },
-    { value: ScrollMode.PAGE, label: "One page at a time" }
+const SCROLL_MODES: { value: number; label: NamespaceKey<"driveViewer"> }[] = [
+    { value: ScrollMode.VERTICAL, label: "pdf.scroll.vertical" },
+    { value: ScrollMode.HORIZONTAL, label: "pdf.scroll.horizontal" },
+    { value: ScrollMode.WRAPPED, label: "pdf.scroll.wrapped" },
+    { value: ScrollMode.PAGE, label: "pdf.scroll.page" }
 ];
 
-const SPREAD_MODES = [
-    { value: SpreadMode.NONE, label: "Single page" },
-    { value: SpreadMode.ODD, label: "Odd pages left" },
-    { value: SpreadMode.EVEN, label: "Even pages left" }
+const SPREAD_MODES: { value: number; label: NamespaceKey<"driveViewer"> }[] = [
+    { value: SpreadMode.NONE, label: "pdf.spread.none" },
+    { value: SpreadMode.ODD, label: "pdf.spread.odd" },
+    { value: SpreadMode.EVEN, label: "pdf.spread.even" }
 ];
 
 export function PdfToolbar({
@@ -72,6 +74,7 @@ export function PdfToolbar({
     /** The save actions, when the reader is allowed to write the file back. */
     actions?: ReactNode;
 }) {
+    const t = useTranslations("driveViewer");
     const pageNumber = usePDFSlickStore((state) => state.pageNumber);
     const numPages = usePDFSlickStore((state) => state.numPages);
     const scale = usePDFSlickStore((state) => state.scale);
@@ -87,7 +90,7 @@ export function PdfToolbar({
         setPageDraft(String(pageNumber));
     }, [pageNumber]);
 
-    const zoom = zoomChoices(scale, scaleValue);
+    const zoom = zoomChoices(t, scale, scaleValue);
 
     function setZoom(value: string) {
         if (!pdfSlick) return;
@@ -108,8 +111,8 @@ export function PdfToolbar({
                 size="icon-sm"
                 variant="ghost"
                 aria-pressed={sidebarOpen}
-                aria-label="Pages and outline"
-                title="Pages and outline"
+                aria-label={t("pdf.pagesAndOutline")}
+                title={t("pdf.pagesAndOutline")}
                 onClick={onSidebarToggle}
                 className={cn(sidebarOpen && "bg-muted text-foreground")}
             >
@@ -121,8 +124,8 @@ export function PdfToolbar({
                     size="icon-sm"
                     variant="ghost"
                     disabled={pageNumber <= 1}
-                    aria-label="Previous page"
-                    title="Previous page"
+                    aria-label={t("pdf.previousPage")}
+                    title={t("pdf.previousPage")}
                     onClick={() => pdfSlick?.gotoPage(pageNumber - 1)}
                 >
                     <ChevronUp />
@@ -131,8 +134,8 @@ export function PdfToolbar({
                     size="icon-sm"
                     variant="ghost"
                     disabled={pageNumber >= numPages}
-                    aria-label="Next page"
-                    title="Next page"
+                    aria-label={t("pdf.nextPage")}
+                    title={t("pdf.nextPage")}
                     onClick={() => pdfSlick?.gotoPage(pageNumber + 1)}
                 >
                     <ChevronDown />
@@ -149,7 +152,7 @@ export function PdfToolbar({
                         event.preventDefault();
                         goToDraft();
                     }}
-                    aria-label="Page number"
+                    aria-label={t("pdf.pageNumber")}
                     inputMode="numeric"
                     className="h-7 w-12 text-center tabular-nums"
                 />
@@ -162,8 +165,8 @@ export function PdfToolbar({
                 <Button
                     size="icon-sm"
                     variant="ghost"
-                    aria-label="Zoom out"
-                    title="Zoom out"
+                    aria-label={t("pdf.zoomOut")}
+                    title={t("pdf.zoomOut")}
                     onClick={() => pdfSlick?.decreaseScale()}
                 >
                     <ZoomOut />
@@ -172,14 +175,14 @@ export function PdfToolbar({
                     value={zoom.value}
                     onValueChange={setZoom}
                     options={zoom.options}
-                    aria-label="Zoom"
+                    aria-label={t("pdf.zoom")}
                     className="h-7 w-[124px]"
                 />
                 <Button
                     size="icon-sm"
                     variant="ghost"
-                    aria-label="Zoom in"
-                    title="Zoom in"
+                    aria-label={t("pdf.zoomIn")}
+                    title={t("pdf.zoomIn")}
                     onClick={() => pdfSlick?.increaseScale()}
                 >
                     <ZoomIn />
@@ -191,8 +194,8 @@ export function PdfToolbar({
                     size="icon-sm"
                     variant="ghost"
                     aria-pressed={searchOpen}
-                    aria-label="Find in document"
-                    title="Find in document"
+                    aria-label={t("pdf.findInDocument")}
+                    title={t("pdf.findInDocument")}
                     onClick={onSearchToggle}
                     className={cn(searchOpen && "bg-muted text-foreground")}
                 >
@@ -203,8 +206,8 @@ export function PdfToolbar({
                         <Button
                             size="icon-sm"
                             variant="ghost"
-                            aria-label="View options"
-                            title="View options"
+                            aria-label={t("pdf.viewOptions")}
+                            title={t("pdf.viewOptions")}
                         >
                             <MoreHorizontal />
                         </Button>
@@ -212,12 +215,12 @@ export function PdfToolbar({
                     <DropdownMenuContent align="end">
                         <DropdownMenuItem onSelect={() => pdfSlick?.setRotation(rotation + 90)}>
                             <RotateCw />
-                            Rotate
+                            {t("pdf.rotate")}
                         </DropdownMenuItem>
                         <DropdownMenuSub>
                             <DropdownMenuSubTrigger>
                                 <Rows3 />
-                                Scrolling
+                                {t("pdf.scrolling")}
                             </DropdownMenuSubTrigger>
                             <DropdownMenuSubContent>
                                 {SCROLL_MODES.map((mode) => (
@@ -228,7 +231,7 @@ export function PdfToolbar({
                                         <Check
                                             className={cn(mode.value !== scrollMode && "invisible")}
                                         />
-                                        {mode.label}
+                                        {t(mode.label)}
                                     </DropdownMenuItem>
                                 ))}
                             </DropdownMenuSubContent>
@@ -236,7 +239,7 @@ export function PdfToolbar({
                         <DropdownMenuSub>
                             <DropdownMenuSubTrigger>
                                 <Columns2 />
-                                Page layout
+                                {t("pdf.pageLayout")}
                             </DropdownMenuSubTrigger>
                             <DropdownMenuSubContent>
                                 {SPREAD_MODES.map((mode) => (
@@ -247,7 +250,7 @@ export function PdfToolbar({
                                         <Check
                                             className={cn(mode.value !== spreadMode && "invisible")}
                                         />
-                                        {mode.label}
+                                        {t(mode.label)}
                                     </DropdownMenuItem>
                                 ))}
                             </DropdownMenuSubContent>
@@ -255,14 +258,14 @@ export function PdfToolbar({
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onSelect={() => pdfSlick?.requestPresentationMode()}>
                             <Expand />
-                            Full screen
+                            {t("pdf.fullScreen")}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             disabled={!pdfSlick?.supportsPrinting}
                             onSelect={() => pdfSlick?.triggerPrinting()}
                         >
                             <Printer />
-                            Print
+                            {t("pdf.print")}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

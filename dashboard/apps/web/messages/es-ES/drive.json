@@ -751,7 +751,8 @@
         "noAccess": "Aún no ha accedido nadie.",
         "when": "Cuándo",
         "action": "Acción",
-        "actionDenied": "Denegado: {action} ({reason})"
+        "actionDenied": "Denegado: {action} ({reason})",
+        "ip": "IP"
     },
     "pages": {
         "drive": {
@@ -922,7 +923,17 @@
         "noPoolsReported": "No se ha informado de grupos.",
         "driveBays": "Bahías",
         "disk": "Disco",
-        "refreshing": "Actualizando"
+        "refreshing": "Actualizando",
+        "lastReading": "Mostrando la última lectura.",
+        "lastReadingFrom": "Mostrando la última lectura, de las {time}.",
+        "free": "{count} libres",
+        "since": "desde el {date}",
+        "bay": "Bahía {n}",
+        "healthy": "sano",
+        "empty": "vacía",
+        "rpm": " - {rpm} rpm",
+        "firmware": " - firmware {version}",
+        "updated": "- actualizado a las {time}"
     },
     "trash": {
         "couldNotRestoreIt": "No se pudo restaurar",
@@ -938,7 +949,9 @@
         "deletedItemsAreKeptHere": "Lo borrado se guarda aquí hasta que lo restaures o lo borres para siempre.",
         "theTrashIsEmpty": "La papelera está vacía.",
         "restore": "Restaurar",
-        "deleteForever": "Borrar del todo"
+        "deleteForever": "Borrar del todo",
+        "root": "(raíz)",
+        "deletedAt": "- borrado <time></time>"
     },
     "send": {
         "searchForAPerson": "Buscar una persona",
@@ -950,7 +963,10 @@
         "itLeavesYourDriveOnce": "Sale de tu Drive cuando lo acepten. Si no, reciben una copia y tú te quedas la tuya.",
         "onlyWhenYouAreSending": "Solo al enviar a una persona. Los demás reciben una copia.",
         "cancel": "Cancelar",
-        "send": "Enviar"
+        "send": "Enviar",
+        "title": "Enviar {name}",
+        "removeNamed": "Quitar {name}",
+        "sendTo": "Enviar a {count}"
     },
     "peopleShare": {
         "whoeverYouNameCanOpen": "Quien nombres puede abrir esta carpeta y todo lo que contiene.",
@@ -967,7 +983,9 @@
         "looking": "Buscando",
         "onlyYouSoFar": "Solo tú, por ahora.",
         "lapsed": "Caducado",
-        "stopSharing": "No compartir"
+        "stopSharing": "No compartir",
+        "title": "Compartir {name}",
+        "stopWith": "Dejar de compartir con {name}"
     },
     "zip": {
         "zip": "Zip",
@@ -982,7 +1000,8 @@
         "cancel": "Cancelar",
         "creating": "Creando...",
         "createAndLink": "Crear y enlazar",
-        "createZip": "Crear zip"
+        "createZip": "Crear zip",
+        "description": "{count, plural, one {# elemento} other {# elementos}} en un zip en esta carpeta. Pon una contraseña para cifrar el propio archivo."
     },
     "insights": {
         "nothingHere": "Aquí no hay nada.",
@@ -1000,5 +1019,83 @@
         "oneFileEachOpensThe": "Un archivo cada uno. Abre la carpeta donde está.",
         "whatTheFormatsWeigh": "Lo que pesa cada formato",
         "everyFileOfAKind": "Todos los archivos de un tipo, sumados."
+    },
+    "transfers": {
+        "filesOnTheWay": "Archivos en camino",
+        "accept": "Aceptar",
+        "decline": "Rechazar",
+        "gotIt": "Entendido",
+        "waitingToBeAnsweredNothing": "Esperando respuesta. No ha salido nada de tu Drive.",
+        "sendingIt": "Enviándolo",
+        "copy": "Copia",
+        "takeBack": "Retirar",
+        "givingUp": " · lo cede",
+        "toOrg": " · a tu organización"
+    },
+    "sharedItems": {
+        "stopSharing": "No compartir",
+        "sharedWithMe": "Conmigo",
+        "from": "De",
+        "sharedByMe": "Por mí",
+        "with": "Con",
+        "stopTitle": "¿Dejar de compartir {name}?",
+        "stopBody": "{name} ya no podrá abrirlo.",
+        "stopBodyThem": "Ya no podrá abrirlo.",
+        "until": "Hasta el {date}",
+        "stopNamed": "Dejar de compartir {name}"
+    },
+    "recent": {
+        "addAStorageConnectionIn": "Añade una conexión de almacenamiento en Archivos para ver la actividad reciente.",
+        "loading": "Cargando...",
+        "noFilesOpenedHereYet": "Aún no se ha abierto ningún archivo aquí.",
+        "nothingHereYet": "Aún no hay nada.",
+        "lens": {
+            "modified": "Modificados",
+            "created": "Creados",
+            "opened": "Abiertos"
+        }
+    },
+    "overview": {
+        "history": "Historial",
+        "noDevicesYetAddOne": "Aún no hay dispositivos. Añade uno desde Archivos para ver aquí sus métricas.",
+        "browseFiles": "Ver archivos",
+        "metrics": {
+            "cpu": "CPU",
+            "temperature": "Temperatura de CPU",
+            "memory": "Memoria",
+            "storage": "Disco"
+        }
+    },
+    "tree": {
+        "loading": "Cargando...",
+        "collapse": "Contraer",
+        "expand": "Expandir",
+        "home": "Inicio"
+    },
+    "unifi": {
+        "openConsole": "Abrir consola",
+        "openTheUnifiConsole": "Abrir la consola de UniFi",
+        "unifiCloudUnifiUiCom": "UniFi Cloud (unifi.ui.com)",
+        "thisDevice": "Este dispositivo ({address})"
+    },
+    "picker": {
+        "findAPerson": "Buscar persona",
+        "orAGroup": "O un grupo..."
+    },
+    "roles": {
+        "viewer": "Lector",
+        "editor": "Editor",
+        "custom": "A medida"
+    },
+    "hardware": {
+        "usedOf": "{used} usados de {total}",
+        "properties": "Propiedades",
+        "name": "Nombre",
+        "type": "Tipo",
+        "hostAccess": "Acceso al host",
+        "requiresHostDaemon": "necesita el servicio",
+        "storageUsage": "Uso del disco",
+        "theDiskYourFilesSit": "El disco donde están tus archivos, no lo que ocupa tu propio drive.",
+        "thisBackendDoesNotReport": "Este almacenamiento no informa de su uso."
     }
 }

@@ -21,6 +21,7 @@
 import * as core from "@polaris/core";
 import { getSession } from "@/lib/session";
 import { LinkedDocument } from "./linked-document";
+import { Messages } from "@/components/i18n/messages";
 import { readByLink } from "@/lib/office/documents";
 import { LinkPasswordForm } from "@/components/link-password-form";
 import { LinkUnavailable, PublicShell } from "@/components/public-shell";
@@ -69,13 +70,16 @@ export default async function LinkedOfficePage({
 
     return (
         <PublicShell signedIn={signedIn} className="max-w-none">
-            <LinkedDocument
-                documentId={found.id}
-                kind={found.kind}
-                title={found.title}
-                content={found.content ? Array.from(found.content) : null}
-                editable={core.officeRoleAtLeast(opened.role, "editor")}
-            />
+            {/* The editors are Office's, and say Office's words. */}
+            <Messages namespaces={["office"]}>
+                <LinkedDocument
+                    documentId={found.id}
+                    kind={found.kind}
+                    title={found.title}
+                    content={found.content ? Array.from(found.content) : null}
+                    editable={core.officeRoleAtLeast(opened.role, "editor")}
+                />
+            </Messages>
         </PublicShell>
     );
 }

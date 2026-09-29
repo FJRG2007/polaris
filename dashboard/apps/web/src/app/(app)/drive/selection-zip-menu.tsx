@@ -126,8 +126,7 @@ export function SelectionZipMenu({
                 <DialogHeader>
                     <DialogTitle>{withLink ? t("zip.zipAndShare") : t("zip.saveAsZip")}</DialogTitle>
                     <DialogDescription>
-                        {entries.length} item{entries.length === 1 ? "" : "s"} into a zip in this folder. Set a password
-                        to encrypt the archive itself.
+                        {t("zip.description", { count: entries.length })}
                     </DialogDescription>
                 </DialogHeader>
 

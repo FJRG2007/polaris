@@ -27,6 +27,7 @@
  */
 
 import dynamic from "next/dynamic";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Loading, ViewerError } from "./status";
 import { Button, cn, ScrollRow } from "@polaris/ui";
 import type { RenderSlide } from "@polaris/pptx-render";
@@ -121,6 +122,7 @@ function useDeckImages(slides: readonly RenderSlide[] | null): Map<string, HTMLI
 }
 
 export function PptxView({ src, token }: { src: string; token?: string }) {
+    const t = useTranslations("driveViewer");
     const [slides, setSlides] = useState<readonly RenderSlide[] | null>(null);
     const [failed, setFailed] = useState<string | null>(null);
     const [index, setIndex] = useState(0);
@@ -189,7 +191,7 @@ export function PptxView({ src, token }: { src: string; token?: string }) {
 
     if (failed) return <ViewerError>{failed}</ViewerError>;
     if (!slides) return <Loading />;
-    if (slides.length === 0) return <ViewerError>This presentation has no slides.</ViewerError>;
+    if (slides.length === 0) return <ViewerError>{t("pptx.thisPresentationHasNoSlides")}</ViewerError>;
 
     const slide = slides[Math.min(index, slides.length - 1)]!;
 
@@ -204,7 +206,7 @@ export function PptxView({ src, token }: { src: string; token?: string }) {
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Previous slide"
+                        aria-label={t("pptx.previousSlide")}
                         disabled={index === 0}
                         onClick={() => setIndex((current) => Math.max(current - 1, 0))}
                     >
@@ -216,7 +218,7 @@ export function PptxView({ src, token }: { src: string; token?: string }) {
                                 key={at}
                                 type="button"
                                 onClick={() => setIndex(at)}
-                                aria-label={`Slide ${at + 1}`}
+                                aria-label={t("pptx.slideN", { n: at + 1 })}
                                 aria-current={at === index}
                                 className={cn(
                                     "shrink-0 rounded border px-2 py-1 text-xs",
@@ -232,7 +234,7 @@ export function PptxView({ src, token }: { src: string; token?: string }) {
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Next slide"
+                        aria-label={t("pptx.nextSlide")}
                         disabled={index >= slides.length - 1}
                         onClick={() =>
                             setIndex((current) => Math.min(current + 1, slides.length - 1))

@@ -9,6 +9,8 @@
  */
 
 import Link from "next/link";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useMemo } from "react";
 import { isPersonalKind } from "@polaris/core";
 import { UnasMetrics } from "../unas-metrics";
@@ -45,11 +47,11 @@ function amountOf(used: number | null, total: number | null): string | null {
 /** Charts for a rich UniFi UNAS device: CPU, temperature, memory, storage. The
  *  temperature series is converted up front so the axis, not just the label,
  *  is in the unit the reader chose. */
-function unasMetrics(unit: TemperatureUnit): MetricSpec[] {
+function unasMetrics(unit: TemperatureUnit, t: NamespaceTranslator<"drive">): MetricSpec[] {
     return [
         {
             key: "cpu",
-            label: "CPU",
+            label: t("overview.metrics.cpu"),
             value: (point) => point.cpuPercent,
             format: percent,
             tone: "primary",
@@ -57,7 +59,7 @@ function unasMetrics(unit: TemperatureUnit): MetricSpec[] {
         },
         {
             key: "temp",
-            label: "CPU temperature",
+            label: t("overview.metrics.temperature"),
             value: (point) =>
                 point.cpuTempC === null ? null : toDisplayTemperature(point.cpuTempC, unit),
             format: (value) => `${Math.round(value)} ${temperatureSuffix(unit)}`,
@@ -65,39 +67,42 @@ function unasMetrics(unit: TemperatureUnit): MetricSpec[] {
         },
         {
             key: "mem",
-            label: "Memory",
+            label: t("overview.metrics.memory"),
             value: (point) => ratioPercent(point.memUsedBytes, point.memTotalBytes),
             describe: (point) => amountOf(point.memUsedBytes, point.memTotalBytes),
             format: percent,
             tone: "success",
             max: 100
         },
-        storageMetric
+        storageMetric(t)
     ];
 }
 
 /** Any other backend reports disk usage only. */
-const storageMetric: MetricSpec = {
-    key: "disk",
-    label: "Storage",
-    value: (point) => ratioPercent(point.diskUsedBytes, point.diskTotalBytes),
-    describe: (point) => amountOf(point.diskUsedBytes, point.diskTotalBytes),
-    format: percent,
-    tone: "primary",
-    max: 100
-};
+function storageMetric(t: NamespaceTranslator<"drive">): MetricSpec {
+    return {
+        key: "disk",
+        label: t("overview.metrics.storage"),
+        value: (point) => ratioPercent(point.diskUsedBytes, point.diskTotalBytes),
+        describe: (point) => amountOf(point.diskUsedBytes, point.diskTotalBytes),
+        format: percent,
+        tone: "primary",
+        max: 100
+    };
+}
 
 /** Consumption history for a device, below its live panel. */
 function DeviceHistory({ connection }: { connection: ConnectionSummary }) {
+    const t = useTranslations("drive");
     const { temperature } = useDisplayPreferences();
     const metrics = useMemo(
-        () => (connection.kind === "unifi-unas" ? unasMetrics(temperature) : [storageMetric]),
-        [connection.kind, temperature]
+        () => (connection.kind === "unifi-unas" ? unasMetrics(temperature, t) : [storageMetric(t)]),
+        [connection.kind, temperature, t]
     );
 
     return (
         <div>
-            <h3 className="mb-1 text-sm font-medium">History</h3>
+            <h3 className="mb-1 text-sm font-medium">{t("overview.history")}</h3>
             <MetricsHistory
                 endpoint={`/api/drive/metrics-history?c=${encodeURIComponent(connection.id)}`}
                 metrics={metrics}
@@ -149,11 +154,12 @@ function UnasSection({ connection }: { connection: ConnectionSummary }) {
 }
 
 export function OverviewView({ connections }: { connections: ConnectionSummary[] }) {
+    const t = useTranslations("drive");
     if (connections.length === 0) {
         return (
             <Card>
                 <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                    No devices yet. Add one from the Files page to see its metrics here.
+                    {t("overview.noDevicesYetAddOne")}
                 </CardBody>
             </Card>
         );
@@ -171,7 +177,7 @@ export function OverviewView({ connections }: { connections: ConnectionSummary[]
                         <Button asChild size="sm" variant="secondary">
                             <Link href={`/drive?c=${connection.id}`}>
                                 <FolderOpen className="size-4" />
-                                Browse files
+                                {t("overview.browseFiles")}
                             </Link>
                         </Button>
                     </div>

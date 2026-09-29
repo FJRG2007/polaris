@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Copy, Download, Save } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { downloadBytes } from "@/lib/download";
@@ -37,6 +38,7 @@ export function EditorActions({
     /** Called with the written name after a successful save, to refresh the listing. */
     onSaved?: (name: string) => void;
 }) {
+    const t = useTranslations("driveViewer");
     const [busy, setBusy] = useState<"save" | "download" | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [copyOpen, setCopyOpen] = useState(false);
@@ -78,7 +80,7 @@ export function EditorActions({
             {error ? <span className="text-xs text-danger">{error}</span> : null}
             <Button size="sm" variant="ghost" onClick={download} disabled={busy !== null}>
                 <Download className="size-4" />
-                {busy === "download" ? "Preparing..." : "Download"}
+                {busy === "download" ? t("editorActions.preparing") : t("editorActions.download")}
             </Button>
             <Button
                 size="sm"
@@ -87,12 +89,12 @@ export function EditorActions({
                 disabled={busy !== null}
             >
                 <Copy className="size-4" />
-                Save a copy
+                {t("editorActions.saveACopy")}
             </Button>
             {canOverwrite ? (
                 <Button size="sm" onClick={overwrite} disabled={!dirty || busy !== null}>
                     <Save className="size-4" />
-                    {busy === "save" ? "Saving..." : "Save"}
+                    {busy === "save" ? t("editorActions.saving") : t("editorActions.save")}
                 </Button>
             ) : null}
             <SaveCopyDialog
@@ -123,6 +125,7 @@ function SaveCopyDialog({
     defaultName: string;
     onSaved?: (name: string) => void;
 }) {
+    const t = useTranslations("driveViewer");
     const [name, setName] = useState(defaultName);
     const [taken, setTaken] = useState<Set<string>>(new Set());
     const [saving, setSaving] = useState(false);
@@ -169,11 +172,11 @@ function SaveCopyDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Save a copy</DialogTitle>
+                    <DialogTitle>{t("editorActions.saveACopy")}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={submit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5 text-sm">
-                        <span className="text-muted-foreground">Name</span>
+                        <span className="text-muted-foreground">{t("editorActions.name")}</span>
                         <Input
                             autoFocus
                             value={name}
@@ -185,7 +188,7 @@ function SaveCopyDialog({
                         <p className="text-xs text-danger">{problem}</p>
                     ) : replaces ? (
                         <p className="text-xs text-warning">
-                            A file with this name already exists here and will be replaced.
+                            {t("editorActions.aFileWithThisName")}
                         </p>
                     ) : null}
                     {error ? <p className="text-xs text-danger">{error}</p> : null}
@@ -197,10 +200,10 @@ function SaveCopyDialog({
                             onClick={() => onOpenChange(false)}
                             disabled={saving}
                         >
-                            Cancel
+                            {t("editorActions.cancel")}
                         </Button>
                         <Button type="submit" size="sm" disabled={!parsed.success || saving}>
-                            {saving ? "Saving..." : replaces ? "Replace" : "Save copy"}
+                            {saving ? t("editorActions.saving") : replaces ? t("editorActions.replace") : t("editorActions.saveCopy")}
                         </Button>
                     </div>
                 </form>

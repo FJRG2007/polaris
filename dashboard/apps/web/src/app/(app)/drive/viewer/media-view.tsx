@@ -13,6 +13,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useZoomPan } from "@/components/use-zoom-pan";
 import { MediaPlayer } from "@/components/media-player";
 
@@ -28,6 +29,7 @@ export function MediaView({
      *  arrives, not the toolbar above it. */
     download?: string;
 }) {
+    const t = useTranslations("driveViewer");
     const look = useZoomPan();
     if (kind === "audio") {
         return <MediaPlayer src={src} kind={kind} download={download} className="p-4" />;
@@ -54,8 +56,8 @@ export function MediaView({
                 <button
                     type="button"
                     onClick={look.reset}
-                    aria-label="Fit the video again"
-                    title="Fit the video again"
+                    aria-label={t("media.fitTheVideoAgain")}
+                    title={t("media.fitTheVideoAgain")}
                     className="absolute right-3 top-3 rounded bg-background/80 px-1.5 py-1 text-[0.6875rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
                 >
                     {look.zoom.scale.toFixed(1)}x

@@ -13,6 +13,7 @@
  */
 
 import { Button } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { FindBar } from "./find-bar";
 import type { ViewerTarget } from "./types";
 import { Pencil, Search } from "lucide-react";
@@ -33,6 +34,7 @@ export function PlainTextEditor({
     readOnly?: boolean;
     onSaved?: (name: string) => void;
 }) {
+    const t = useTranslations("driveViewer");
     const { file, error, setText } = useTextFile(src);
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState("");
@@ -46,7 +48,7 @@ export function PlainTextEditor({
     // rather than boxing where the words used to be.
     const matches = useMemo(() => findMatches(text, query), [text, query]);
 
-    if (error) return <ViewerError>This file could not be read.</ViewerError>;
+    if (error) return <ViewerError>{t("textEditor.thisFileCouldNotBe")}</ViewerError>;
     if (!file) return <Loading />;
 
     const blocked = readOnlyReason(file);
@@ -98,19 +100,19 @@ export function PlainTextEditor({
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                 {editing ? (
                     <>
-                        <span className="text-xs font-medium text-muted-foreground">Editing</span>
+                        <span className="text-xs font-medium text-muted-foreground">{t("textEditor.editing")}</span>
                         <div className="ml-auto flex items-center gap-2">
                             <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => find(!finding)}
-                                aria-label="Find in this file"
-                                title="Find in this file (Ctrl+F)"
+                                aria-label={t("textEditor.findInThisFile")}
+                                title={t("textEditor.findInThisFileCtrl")}
                             >
                                 <Search className="size-4" />
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-                                Cancel
+                                {t("textEditor.cancel")}
                             </Button>
                             <EditorActions
                                 target={target}
@@ -123,15 +125,15 @@ export function PlainTextEditor({
                 ) : (
                     <>
                         <span className="text-xs font-medium text-muted-foreground">
-                            {blocked ?? "Plain text"}
+                            {blocked ?? t("textEditor.plainText")}
                         </span>
                         <div className="ml-auto flex items-center gap-2">
                             <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => find(!finding)}
-                                aria-label="Find in this file"
-                                title="Find in this file (Ctrl+F)"
+                                aria-label={t("textEditor.findInThisFile")}
+                                title={t("textEditor.findInThisFileCtrl")}
                             >
                                 <Search className="size-4" />
                             </Button>
@@ -145,7 +147,7 @@ export function PlainTextEditor({
                                     }}
                                 >
                                     <Pencil className="size-4" />
-                                    Edit
+                                    {t("textEditor.edit")}
                                 </Button>
                             ) : null}
                         </div>

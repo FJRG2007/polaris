@@ -8,6 +8,8 @@
  */
 
 import Link from "next/link";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { formatBytes } from "@polaris/core";
 import { recentKey } from "../listing-cache";
@@ -30,10 +32,10 @@ interface RecentEntry {
 
 type Lens = "modified" | "created" | "opened";
 
-const LENSES: { id: Lens; label: string }[] = [
-    { id: "modified", label: "Modified" },
-    { id: "created", label: "Created" },
-    { id: "opened", label: "Opened" }
+const LENSES: { id: Lens; label: NamespaceKey<"drive"> }[] = [
+    { id: "modified", label: "recent.lens.modified" },
+    { id: "created", label: "recent.lens.created" },
+    { id: "opened", label: "recent.lens.opened" }
 ];
 
 /** Parent folder of a path ("a/b/c.txt" -> "a/b"). */
@@ -43,6 +45,7 @@ function parentOf(path: string): string {
 }
 
 export function RecentView({ connections }: { connections: { id: string; name: string }[] }) {
+    const t = useTranslations("drive");
     const [connectionId, setConnectionId] = useState(connections[0]?.id ?? "");
     const [lens, setLens] = useState<Lens>("modified");
     const [entries, setEntries] = useState<RecentEntry[]>([]);
@@ -94,7 +97,7 @@ export function RecentView({ connections }: { connections: { id: string; name: s
         return (
             <Card>
                 <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                    Add a storage connection in Files to see recent activity.
+                    {t("recent.addAStorageConnectionIn")}
                 </CardBody>
             </Card>
         );
@@ -114,7 +117,7 @@ export function RecentView({ connections }: { connections: { id: string; name: s
                                 lens === entry.id ? "bg-muted font-medium" : "text-muted-foreground"
                             )}
                         >
-                            {entry.label}
+                            {t(entry.label)}
                         </button>
                     ))}
                 </div>
@@ -134,12 +137,12 @@ export function RecentView({ connections }: { connections: { id: string; name: s
             <Card>
                 <CardBody className="p-0">
                     {loading ? (
-                        <p className="p-8 text-center text-sm text-muted-foreground">Loading...</p>
+                        <p className="p-8 text-center text-sm text-muted-foreground">{t("recent.loading")}</p>
                     ) : error ? (
                         <p className="p-8 text-center text-sm text-danger">{error}</p>
                     ) : entries.length === 0 ? (
                         <p className="p-8 text-center text-sm text-muted-foreground">
-                            {lens === "opened" ? "No files opened here yet." : "Nothing here yet."}
+                            {lens === "opened" ? t("recent.noFilesOpenedHereYet") : t("recent.nothingHereYet")}
                         </p>
                     ) : (
                         <ul>

@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { extName } from "@polaris/core";
 import { cn } from "@polaris/ui";
@@ -51,6 +52,7 @@ export function SheetEditor({
     readOnly?: boolean;
     onSaved?: (name: string) => void;
 }) {
+    const t = useTranslations("driveViewer");
     const [grids, setGrids] = useState<SheetGrid[] | null>(null);
     const [cells, setCells] = useState(0);
     const [active, setActive] = useState(0);
@@ -163,7 +165,7 @@ export function SheetEditor({
         [grid?.columns]
     );
 
-    if (error) return <ViewerError>This spreadsheet could not be read.</ViewerError>;
+    if (error) return <ViewerError>{t("sheet.thisSpreadsheetCouldNotBe")}</ViewerError>;
     if (!grids || !grid) return <Loading />;
 
     const gridWidth = ROW_HEADER_WIDTH + columns.length * COLUMN_WIDTH;
@@ -190,12 +192,12 @@ export function SheetEditor({
                         ))}
                     </div>
                 ) : (
-                    <span className="text-xs font-medium text-muted-foreground">Spreadsheet</span>
+                    <span className="text-xs font-medium text-muted-foreground">{t("sheet.spreadsheet")}</span>
                 )}
                 <div className="ml-auto flex items-center gap-2">
                     {!readOnly && cells > EDITABLE_CELL_LIMIT ? (
                         <span className="text-xs text-muted-foreground">
-                            Preview only (large sheet)
+                            {t("sheet.previewOnlyLargeSheet")}
                         </span>
                     ) : null}
                     {editable ? (
@@ -211,8 +213,7 @@ export function SheetEditor({
             </div>
             {exportExtension && editable ? (
                 <p className="border-b border-border bg-warning-soft px-3 py-1.5 text-xs text-muted-foreground">
-                    {sourceExtension.toUpperCase()} files are saved as a converted .xlsx copy; the
-                    original is left untouched.
+                    {t("sheet.convertedCopy", { kind: sourceExtension.toUpperCase() })}
                 </p>
             ) : null}
             <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto overscroll-contain">
