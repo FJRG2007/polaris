@@ -23,9 +23,14 @@ import { useMailLayout } from "@/app/(app)/mail/use-mail-layout";
 import { setMailPreferencesAction } from "@/app/(app)/mail/actions";
 import { useEffect, useState, type ReactNode } from "react";
 import { useBusy } from "@/app/(app)/mail/use-busy";
+import { mailOptionLabel } from "@/app/(app)/mail/option-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function GeneralView({ preferences }: { preferences: core.MailPreferences }) {
     const toast = useToast();
+    const t = useTranslations("mailSettings");
+    const tm = useTranslations("mail");
+    const tc = useTranslations("common");
     const [saving, startSaving] = useBusy();
     const [held, setHeld] = useState<core.MailPreferences>(preferences);
     const [layout, chooseLayout] = useMailLayout();
@@ -43,18 +48,18 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
         startSaving(async () => {
             const answer = await setMailPreferencesAction(held);
             const said = refusalOf(answer);
-            toast.show({ title: said ?? "Saved." });
+            toast.show({ title: said ?? t("general.saved") });
         });
     }
 
     return (
         <div className="space-y-5">
             <Field
-                label="Mailboxes to show"
-                hint="Mail normally follows the switch at the top of the screen, so you see your own mailboxes on your own shelf and a company's on its. Showing all of them puts every mailbox in one place, whichever is selected - and the counts and the new-mail notices follow whatever you choose here."
+                label={t("general.mailboxes")}
+                hint={t("general.mailboxesHint")}
             >
                 <Select
-                    aria-label="Mailboxes to show"
+                    aria-label={t("general.mailboxes")}
                     value={held.mailboxes}
                     onValueChange={(value) =>
                         setHeld((current) => ({
@@ -64,51 +69,51 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
                     }
                     options={core.MAIL_MAILBOX_SCOPES.map((scope) => ({
                         value: scope,
-                        label: core.MAIL_MAILBOX_SCOPE_LABELS[scope]
+                        label: mailOptionLabel(tm, "mailboxScope", scope)
                     }))}
                 />
             </Field>
 
             <Field
-                label="Sort lists by"
-                hint="What every list opens as. The buttons above a list still win for the page you are on, and that page is a link you can send."
+                label={t("general.sort")}
+                hint={t("general.sortHint")}
             >
                 <Select
-                    aria-label="Sort lists by"
+                    aria-label={t("general.sort")}
                     value={held.sort}
                     onValueChange={(value) =>
                         setHeld((current) => ({ ...current, sort: value as core.MailSort }))
                     }
                     options={core.MAIL_SORTS.map((sort) => ({
                         value: sort,
-                        label: core.MAIL_SORT_LABELS[sort]
+                        label: mailOptionLabel(tm, "sort", sort)
                     }))}
                 />
             </Field>
 
             <Field
-                label="Mark a message as read"
-                hint="Passing over a message in a reading pane is not the same as reading it, and a message marked read is a message lost."
+                label={t("general.markRead")}
+                hint={t("general.markReadHint")}
             >
                 <Select
-                    aria-label="Mark a message as read"
+                    aria-label={t("general.markRead")}
                     value={held.markRead}
                     onValueChange={(value) =>
                         setHeld((current) => ({ ...current, markRead: value as core.MailMarkRead }))
                     }
                     options={core.MAIL_MARK_READ.map((mode) => ({
                         value: mode,
-                        label: core.MAIL_MARK_READ_LABELS[mode]
+                        label: mailOptionLabel(tm, "markRead", mode)
                     }))}
                 />
             </Field>
 
             <Field
-                label="After archiving or deleting"
-                hint="Clearing four hundred messages by going back to the list each time is the job done twice."
+                label={t("general.afterFiling")}
+                hint={t("general.afterFilingHint")}
             >
                 <Select
-                    aria-label="After archiving or deleting"
+                    aria-label={t("general.afterFiling")}
                     value={held.afterFiling}
                     onValueChange={(value) =>
                         setHeld((current) => ({
@@ -118,34 +123,34 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
                     }
                     options={core.MAIL_AFTER_FILING.map((mode) => ({
                         value: mode,
-                        label: core.MAIL_AFTER_FILING_LABELS[mode]
+                        label: mailOptionLabel(tm, "afterFiling", mode)
                     }))}
                 />
             </Field>
 
             <Field
-                label="Undo send"
-                hint="How long a message waits before it actually goes. Off means Send is final."
+                label={t("general.undo")}
+                hint={t("general.undoHint")}
             >
                 <Select
-                    aria-label="Undo send"
+                    aria-label={t("general.undo")}
                     value={String(held.undoSeconds)}
                     onValueChange={(value) =>
                         setHeld((current) => ({ ...current, undoSeconds: Number(value) }))
                     }
                     options={core.MAIL_UNDO_SECONDS.map((seconds) => ({
                         value: String(seconds),
-                        label: core.mailUndoLabel(seconds)
+                        label: t("general.undoSeconds", { seconds })
                     }))}
                 />
             </Field>
 
             <div className="flex items-center gap-3">
                 <Button disabled={saving || !changed} onClick={save}>
-                    {saving ? "Saving..." : "Save"}
+                    {saving ? t("shortcuts.saving") : tc("actions.save")}
                 </Button>
                 {changed ? (
-                    <span className="text-[12px] text-muted-foreground">Not saved yet.</span>
+                    <span className="text-[12px] text-muted-foreground">{t("shortcuts.unsaved")}</span>
                 ) : null}
             </div>
 
@@ -155,18 +160,18 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
 
             <div className="border-t border-border pt-5">
                 <Field
-                    label="Reading layout"
-                    hint="Remembered for this browser rather than for your account: a phone and a desk are not the same shape."
+                    label={t("general.layout")}
+                    hint={t("general.layoutHint")}
                 >
                     <Select
-                        aria-label="Reading layout"
+                        aria-label={t("general.layout")}
                         value={layout}
                         onValueChange={(value) =>
                             chooseLayout(value === "split" ? "split" : "full")
                         }
                         options={[
-                            { value: "full", label: "The message fills the screen" },
-                            { value: "split", label: "A list beside the message" }
+                            { value: "full", label: t("general.layoutFull") },
+                            { value: "split", label: t("general.layoutSplit") }
                         ]}
                     />
                 </Field>
@@ -186,6 +191,7 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
  */
 function MailtoHandler() {
     const toast = useToast();
+    const t = useTranslations("mailSettings");
     const [supported, setSupported] = useState<boolean | null>(null);
     useEffect(() => {
         setSupported(typeof navigator !== "undefined" && "registerProtocolHandler" in navigator);
@@ -193,12 +199,12 @@ function MailtoHandler() {
 
     return (
         <Field
-            label="Email links"
-            hint="Opens every mailto link you click - an email us link on any site - as a new message here. Your browser asks you to confirm, and can undo it from its own settings."
+            label={t("general.mailto")}
+            hint={t("general.mailtoHint")}
         >
             {supported === false ? (
                 <p className="text-[13px] text-muted-foreground">
-                    This browser cannot hand email links to a website. Chrome, Edge and Firefox can.
+                    {t("general.mailtoUnsupported")}
                 </p>
             ) : (
                 <Button
@@ -210,17 +216,17 @@ function MailtoHandler() {
                                 "mailto",
                                 `${window.location.origin}/mail/compose?url=%s`
                             );
-                            toast.show({ title: "Confirm it in the bar your browser shows." });
+                            toast.show({ title: t("general.mailtoConfirm") });
                         } catch {
                             // Refused outright - most often because this page is
                             // not served over https, which a handler requires.
                             toast.show({
-                                title: "This browser refused. It only allows it on a page opened over https."
+                                title: t("general.mailtoRefused")
                             });
                         }
                     }}
                 >
-                    Open email links in Polaris
+                    {t("general.mailtoButton")}
                 </Button>
             )}
         </Field>

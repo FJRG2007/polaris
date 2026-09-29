@@ -28,6 +28,8 @@ import { MAIL_PALETTE } from "./palette";
 import { MAIL_DRAG_TYPE } from "./mail-actions";
 import { useMailRailOpen } from "./use-mail-rail";
 import { RefusedMailboxes } from "./refused-notice";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useMemo, useState } from "react";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import { refusedMailboxHref } from "@/lib/mailbox/refusals";
@@ -97,20 +99,21 @@ const FOLDER_ICONS: Record<core.FolderLook, LucideIcon> = {
 const FOLDER_COLORS = MAIL_PALETTE;
 
 /** The merged views, in the order a mail client is read in. */
-const MERGED: readonly { label: string; href: string; icon: LucideIcon; role?: string }[] = [
-    { label: "Inbox", href: "/mail", icon: Inbox, role: "inbox" },
-    { label: "Starred", href: "/mail/starred", icon: Star },
-    { label: "Important", href: "/mail/important", icon: Bookmark },
-    { label: "Snoozed", href: "/mail/snoozed", icon: Clock },
-    { label: "Drafts", href: "/mail/drafts", icon: FileText, role: "drafts" },
-    { label: "Sent", href: "/mail/sent", icon: SendHorizontal, role: "sent" },
-    { label: "Archive", href: "/mail/archive", icon: Archive, role: "archive" },
-    { label: "Spam", href: "/mail/junk", icon: Bug, role: "junk" },
-    { label: "Trash", href: "/mail/trash", icon: Trash2, role: "trash" },
+/** Each is named in `mail.rail.views.<id>`. */
+const MERGED: readonly { id: string; href: string; icon: LucideIcon; role?: string }[] = [
+    { id: "inbox", href: "/mail", icon: Inbox, role: "inbox" },
+    { id: "starred", href: "/mail/starred", icon: Star },
+    { id: "important", href: "/mail/important", icon: Bookmark },
+    { id: "snoozed", href: "/mail/snoozed", icon: Clock },
+    { id: "drafts", href: "/mail/drafts", icon: FileText, role: "drafts" },
+    { id: "sent", href: "/mail/sent", icon: SendHorizontal, role: "sent" },
+    { id: "archive", href: "/mail/archive", icon: Archive, role: "archive" },
+    { id: "junk", href: "/mail/junk", icon: Bug, role: "junk" },
+    { id: "trash", href: "/mail/trash", icon: Trash2, role: "trash" },
     // Last, and not a folder: it is the one entry here that lists senders rather
     // than mail. It sits in the rail all the same, because the way out of a
     // mailing list is only ever found by somebody who went looking for it.
-    { label: "Subscriptions", href: "/mail/subscriptions", icon: BellOff }
+    { id: "subscriptions", href: "/mail/subscriptions", icon: BellOff }
 ];
 
 export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
@@ -119,6 +122,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
     const search = useSearchParams();
     const router = useRouter();
     const toast = useToast();
+    const t = useTranslations("mail");
     // Remembered for this browser rather than held for this mount - see
     // `use-mail-rail`. It closed on every reload, and on every navigation that
     // remounted the rail. The mailboxes go in so what is remembered can be
@@ -158,7 +162,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
     return (
         <nav
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4"
-            aria-label="Mailboxes"
+            aria-label={t("shell.mailboxes")}
         >
             {/* Above everything, because a mailbox that has stopped accepting
                 its password is receiving nothing, and the rail is the one
@@ -166,7 +170,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
             <RefusedMailboxes accounts={accounts} className="pt-2" onNavigate={onNavigate} />
             {accounts.length > 1 ? (
                 <p className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
-                    All mailboxes
+                    {t("rail.all")}
                 </p>
             ) : null}
             <ul className="space-y-0.5">
@@ -174,7 +178,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                     <li key={entry.href}>
                         <RailLink
                             href={entry.href}
-                            label={entry.label}
+                            label={t(`rail.views.${entry.id}` as Parameters<typeof t>[0])}
                             icon={entry.icon}
                             count={entry.role === "inbox" ? mergedUnread : 0}
                             active={isActive(pathname, search, entry.href)}
@@ -186,14 +190,14 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
 
             <div className="mt-4 flex items-center justify-between px-2 pb-1">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
-                    Mailboxes
+                    {t("shell.mailboxes")}
                 </p>
                 <span className="flex items-center gap-2">
                     <Link
                         href="/mail/settings/accounts"
                         className="text-foreground-subtle hover:text-foreground"
-                        aria-label="Add a mailbox"
-                        title="Add a mailbox"
+                        aria-label={t("rail.add")}
+                        title={t("rail.add")}
                         onClick={onNavigate}
                     >
                         <Plus className="size-3.5 shrink-0" aria-hidden />
@@ -204,8 +208,8 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                     <Link
                         href="/mail/settings/general"
                         className="text-foreground-subtle hover:text-foreground"
-                        aria-label="Mail settings"
-                        title="Mail settings"
+                        aria-label={t("rail.settings")}
+                        title={t("rail.settings")}
                         onClick={onNavigate}
                     >
                         <Settings className="size-3.5 shrink-0" aria-hidden />
@@ -219,7 +223,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                     onClick={onNavigate}
                     className="mx-2 block rounded-md border border-dashed border-border px-3 py-3 text-[12px] text-muted-foreground hover:border-foreground-subtle hover:text-foreground"
                 >
-                    Connect your first mailbox to start reading mail here.
+                    {t("rail.first")}
                 </Link>
             ) : null}
 
@@ -236,8 +240,8 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                     aria-expanded={open}
                                     aria-label={
                                         open
-                                            ? `Hide ${account.address} folders`
-                                            : `Show ${account.address} folders`
+                                            ? t("rail.hideFolders", { address: account.address })
+                                            : t("rail.showFolders", { address: account.address })
                                     }
                                     onClick={() => toggleAccount(account.id)}
                                 >
@@ -257,7 +261,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                 <ul className="ml-6 space-y-0.5 border-l border-border pl-2">
                                     {own.length === 0 ? (
                                         <li className="px-2 py-1.5 text-[12px] text-foreground-subtle">
-                                            Nothing has been synced yet.
+                                            {t("rail.nothingSynced")}
                                         </li>
                                     ) : null}
                                     {own.map((folder) => (
@@ -305,8 +309,8 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                                             <button
                                                                 key={swatch.hex}
                                                                 type="button"
-                                                                title={swatch.name}
-                                                                aria-label={swatch.name}
+                                                                title={swatchName(t, swatch.name)}
+                                                                aria-label={swatchName(t, swatch.name)}
                                                                 onClick={() =>
                                                                     void colour(
                                                                         folder.id,
@@ -329,7 +333,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                                         disabled={!folder.color}
                                                         onSelect={() => void colour(folder.id, "")}
                                                     >
-                                                        No colour
+                                                        {t("rail.noColour")}
                                                     </ContextMenuItem>
                                                     {/* A folder this mailbox is
                                                         built out of - the inbox,
@@ -346,13 +350,13 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                                             <ContextMenuItem
                                                                 onSelect={() => setRenaming(folder)}
                                                             >
-                                                                Rename
+                                                                {t("rail.rename")}
                                                             </ContextMenuItem>
                                                             <ContextMenuItem
                                                                 className="text-danger"
                                                                 onSelect={() => setDeleting(folder)}
                                                             >
-                                                                Delete
+                                                                {t("rail.delete")}
                                                             </ContextMenuItem>
                                                         </>
                                                     ) : null}
@@ -370,7 +374,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
             {labels.length > 0 ? (
                 <>
                     <p className="mt-4 px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
-                        Labels
+                        {t("rail.labels")}
                     </p>
                     <ul className="space-y-0.5">
                         {labels.map((label) => (
@@ -417,13 +421,13 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                     onOpenChange={(next) => (next ? undefined : setDeleting(null))}
                     name={deleting.name}
                     kind="folder"
-                    title={`Delete ${deleting.name}?`}
+                    title={t("templates.deleteTitle", { name: deleting.name })}
                     // The one thing in Mail that destroys mail. Polaris holds a
                     // window onto this folder and the server holds the folder,
                     // so "delete" here is the server's delete and there is no
                     // copy of it anywhere.
-                    description="The folder and every message in it are deleted on the mail server. This cannot be undone from Polaris."
-                    confirmLabel="Delete it"
+                    description={t("rail.deleteBody")}
+                    confirmLabel={t("rail.deleteConfirm")}
                     onConfirm={() => {
                         // Gone from the rail now, and out of the folder if that
                         // is where they were standing. Deleting a folder is a
@@ -443,7 +447,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                 toast.show({ title: said });
                                 return;
                             }
-                            toast.show({ title: `${folder.name} is gone.` });
+                            toast.show({ title: t("templates.deleted", { name: folder.name }) });
                         })();
                     }}
                 />
@@ -462,6 +466,8 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
  */
 function RenameFolderDialog({ folder, onClose }: { folder: MailFolderView; onClose: () => void }) {
     const toast = useToast();
+    const t = useTranslations("mail");
+    const tc = useTranslations("common");
     const { patchFolder } = useMail();
     const [name, setName] = useState(folder.name);
     const wanted = name.trim();
@@ -471,7 +477,7 @@ function RenameFolderDialog({ folder, onClose }: { folder: MailFolderView; onClo
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Rename folder</DialogTitle>
+                    <DialogTitle>{t("rail.renameTitle")}</DialogTitle>
                 </DialogHeader>
                 <form
                     className="space-y-3"
@@ -495,26 +501,25 @@ function RenameFolderDialog({ folder, onClose }: { folder: MailFolderView; onClo
                 >
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            Name <span aria-hidden>*</span>
+                            {t("rail.name")} <span aria-hidden>*</span>
                         </span>
                         <Input
                             value={name}
                             autoFocus
                             maxLength={100}
                             onChange={(event) => setName(event.target.value)}
-                            aria-label="Folder name"
+                            aria-label={t("rail.folderName")}
                         />
                     </label>
                     <p className="text-[12px] text-foreground-subtle">
-                        It is renamed on the mail server, so every client you read this mailbox in
-                        follows.
+                        {t("rail.renameHint")}
                     </p>
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         <Button type="submit" disabled={!ready}>
-                            Rename
+                            {t("rail.rename")}
                         </Button>
                     </div>
                 </form>
@@ -632,6 +637,7 @@ function AccountLink({
     onNavigate?: () => void;
 }) {
     const { accountColor } = useMail();
+    const t = useTranslations("mail");
     const pathname = usePathname();
     const inbox = `/mail/a/${account.id}`;
     const broken = account.state === "auth" || account.state === "unreachable";
@@ -653,7 +659,7 @@ function AccountLink({
                     ? "bg-card font-medium text-foreground"
                     : "text-muted-foreground hover:bg-card hover:text-foreground"
             )}
-            title={broken ? whyBroken(account) : account.address}
+            title={broken ? whyBroken(t, account) : account.address}
         >
             <span
                 className="size-2 shrink-0 rounded-full"
@@ -666,7 +672,7 @@ function AccountLink({
             {broken ? (
                 <AlertTriangle
                     className="size-3.5 shrink-0 text-danger"
-                    aria-label={whyBroken(account)}
+                    aria-label={whyBroken(t, account)}
                 />
             ) : count > 0 ? (
                 <span className="shrink-0 text-[11px] font-medium tabular-nums text-foreground">
@@ -677,9 +683,12 @@ function AccountLink({
     );
 }
 
-function whyBroken(account: { state: string; auth: string }): string {
-    if (account.state !== "auth") return "Polaris cannot reach this mail server.";
-    return account.auth === "oauth"
-        ? "This mailbox needs connecting again."
-        : "This mailbox stopped accepting its password.";
+function whyBroken(t: NamespaceTranslator<"mail">, account: { state: string; auth: string }): string {
+    if (account.state !== "auth") return t("rail.unreachable");
+    return account.auth === "oauth" ? t("rail.needsConnecting") : t("rail.passwordRefused");
+}
+
+/** A palette colour's name in the reader's language, from `mail.palette`. */
+export function swatchName(t: NamespaceTranslator<"mail">, name: string): string {
+    return t(`palette.${name.toLowerCase()}` as Parameters<typeof t>[0]);
 }

@@ -20,6 +20,8 @@ import { refusalOf } from "@/app/(app)/mail/refusal";
 import { useMemo, useState, type KeyboardEvent } from "react";
 import { useBusy } from "@/app/(app)/mail/use-busy";
 import { setMailKeysAction } from "@/app/(app)/mail/actions";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { mailCommandLabel, mailKeyName } from "@/app/(app)/mail/option-label";
 
 /** Two keymaps are the same keyboard when every command lands on the same key. */
 function sameKeyboard(left: core.MailKeymap, right: core.MailKeymap): boolean {
@@ -37,6 +39,10 @@ function without(keymap: core.MailKeymap, command: core.MailKeyCommand): core.Ma
 
 export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
     const toast = useToast();
+    const t = useTranslations("mailSettings");
+    const tm = useTranslations("mail");
+    const tc = useTranslations("common");
+    const keyName = (key: string) => mailKeyName(tm, core.mailKeyLabel(key));
     const [saving, startSaving] = useBusy();
     const [stored, setStored] = useState<core.MailKeymap>(keymap);
     const [held, setHeld] = useState<core.MailKeymap>(keymap);
@@ -63,13 +69,13 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
         // modifier here; the others belong to the browser and never reach Mail.
         if (["Shift", "Control", "Alt", "Meta", "CapsLock"].includes(event.key)) return;
         if (event.ctrlKey || event.metaKey || event.altKey) {
-            setProblem({ command, message: "Use one key with nothing held down." });
+            setProblem({ command, message: t("shortcuts.oneKey") });
             return;
         }
         if (!core.isBindableMailKey(event.key)) {
             setProblem({
                 command,
-                message: "That key cannot be used. Enter, Escape, the arrows, Delete and Backspace keep their own jobs."
+                message: t("shortcuts.reserved")
             });
             return;
         }
@@ -81,7 +87,10 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
         if (clash) {
             setProblem({
                 command,
-                message: `${core.mailKeyLabel(event.key)} already does "${core.MAIL_KEY_DEFINITIONS[clash].label.toLowerCase()}". Move that one first.`
+                message: t("shortcuts.clash", {
+                    key: keyName(event.key),
+                    command: mailCommandLabel(tm, clash).toLowerCase()
+                })
             });
             return;
         }
@@ -102,15 +111,14 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
                 setStored(answer.keys);
                 setHeld(answer.keys);
             }
-            toast.show({ title: "Saved. The new keys work the next time you open a list." });
+            toast.show({ title: t("shortcuts.saved") });
         });
     }
 
     return (
         <div className="space-y-5">
             <p className="max-w-prose text-[13px] text-muted-foreground">
-                Press Change, then the key you want. Keys that already do something else are
-                refused, so nothing ends up doing two things.
+                {t("shortcuts.hint")}
             </p>
 
             <ul className="divide-y divide-border rounded-md border border-border">
@@ -122,11 +130,10 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
                     return (
                         <li key={command} className="flex flex-wrap items-center gap-3 px-3 py-2">
                             <div className="min-w-0 flex-1">
-                                <span className="block text-[13px]">{definition.label}</span>
+                                <span className="block text-[13px]">{mailCommandLabel(tm, command)}</span>
                                 {definition.fixed.length > 0 ? (
                                     <span className="block text-[12px] text-foreground-subtle">
-                                        Also {definition.fixed.map(core.mailKeyLabel).join(" and ")},
-                                        which do not move
+                                        {t("shortcuts.fixed", { keys: definition.fixed.map(keyName).join(tm("body.and")) })}
                                     </span>
                                 ) : null}
                                 {wrong ? (
@@ -141,15 +148,15 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
                                     key !== definition.key && "border-primary/50"
                                 )}
                             >
-                                {core.mailKeyLabel(key)}
+                                {keyName(key)}
                             </kbd>
                             <Button
                                 variant={listening ? "secondary" : "ghost"}
                                 size="sm"
                                 aria-label={
                                     listening
-                                        ? `Press a key for ${definition.label.toLowerCase()}, or Escape to cancel`
-                                        : `Change the key for ${definition.label.toLowerCase()}`
+                                        ? t("shortcuts.pressFor", { command: mailCommandLabel(tm, command).toLowerCase() })
+                                        : t("shortcuts.changeFor", { command: mailCommandLabel(tm, command).toLowerCase() })
                                 }
                                 onClick={() => {
                                     setProblem(null);
@@ -160,7 +167,7 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
                                     if (listening) setRecording(null);
                                 }}
                             >
-                                {listening ? "Press a key..." : "Change"}
+                                {listening ? t("shortcuts.press") : t("shortcuts.change")}
                             </Button>
                             {key !== definition.key ? (
                                 <Button
@@ -171,7 +178,7 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
                                         setProblem(null);
                                     }}
                                 >
-                                    Reset
+                                    {t("shortcuts.reset")}
                                 </Button>
                             ) : null}
                         </li>
@@ -181,7 +188,7 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
 
             <div className="flex flex-wrap items-center gap-3">
                 <Button disabled={saving || !changed} onClick={save}>
-                    {saving ? "Saving..." : "Save"}
+                    {saving ? t("shortcuts.saving") : tc("actions.save")}
                 </Button>
                 <Button
                     variant="ghost"
@@ -191,10 +198,10 @@ export function ShortcutsView({ keymap }: { keymap: core.MailKeymap }) {
                         setProblem(null);
                     }}
                 >
-                    Put every key back
+                    {t("shortcuts.resetAll")}
                 </Button>
                 {changed ? (
-                    <span className="text-[12px] text-muted-foreground">Not saved yet.</span>
+                    <span className="text-[12px] text-muted-foreground">{t("shortcuts.unsaved")}</span>
                 ) : null}
             </div>
         </div>

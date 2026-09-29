@@ -11,6 +11,8 @@
  */
 
 import * as core from "@polaris/core";
+import { mailRefusalText } from "@/lib/mailbox/refusal-text";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { useMemo, useState } from "react";
@@ -52,6 +54,7 @@ export function TemplatesView({
 }) {
     const router = useRouter();
     const toast = useToast();
+    const t = useTranslations("mailSettings");
     /** The template being written: null closed, "" a new one, an id one being changed. */
     const [editing, setEditing] = useState<string | null>(null);
     const [removing, setRemoving] = useState<MailTemplateView | null>(null);
@@ -59,28 +62,25 @@ export function TemplatesView({
 
     const accountLabel = (accountId: string | null): string =>
         accountId
-            ? (accounts.find((one) => one.id === accountId)?.label ?? "A mailbox you no longer have")
-            : "Every mailbox";
+            ? (accounts.find((one) => one.id === accountId)?.label ?? t("templates.goneMailbox"))
+            : t("templates.everyMailbox");
 
     return (
         <div className="space-y-4">
             <div className="flex flex-wrap items-start gap-3">
                 <div className="min-w-0 flex-1">
-                    <h2 className="text-[13px] font-medium">Templates</h2>
-                    <p className="text-[12px] text-muted-foreground">
-                        Insert one from the composer's toolbar. A template's subject fills the
-                        subject line when it is empty.
-                    </p>
+                    <h2 className="text-[13px] font-medium">{t("nav.templates")}</h2>
+                    <p className="text-[12px] text-muted-foreground">{t("templates.hint")}</p>
                 </div>
                 <Button onClick={() => setEditing("")}>
                     <Plus className="size-4 shrink-0" aria-hidden />
-                    New template
+                    {t("templates.new")}
                 </Button>
             </div>
 
             {templates.length === 0 ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
-                    No templates yet.
+                    {t("templates.empty")}
                 </p>
             ) : (
                 <ul className="space-y-1">
@@ -102,8 +102,8 @@ export function TemplatesView({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label={`Change the template ${template.name}`}
-                                title={`Change the template ${template.name}`}
+                                aria-label={t("templates.changeNamed", { name: template.name })}
+                                title={t("templates.changeNamed", { name: template.name })}
                                 onClick={() => setEditing(template.id)}
                             >
                                 <Pencil className="size-4 shrink-0" aria-hidden />
@@ -111,8 +111,8 @@ export function TemplatesView({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label={`Delete the template ${template.name}`}
-                                title={`Delete the template ${template.name}`}
+                                aria-label={t("templates.deleteNamed", { name: template.name })}
+                                title={t("templates.deleteNamed", { name: template.name })}
                                 onClick={() => setRemoving(template)}
                             >
                                 <Trash2 className="size-4 shrink-0" aria-hidden />
@@ -146,10 +146,10 @@ export function TemplatesView({
                     name={removing.name}
                     kind="template"
                     requireTyping={false}
-                    title={`Delete ${removing.name}?`}
-                    question={`Delete the template ${removing.name}?`}
-                    description="Messages already written with it are not touched."
-                    confirmLabel="Delete"
+                    title={t("templates.deleteTitle", { name: removing.name })}
+                    question={t("templates.deleteQuestion", { name: removing.name })}
+                    description={t("templates.deleteBody")}
+                    confirmLabel={t("templates.delete")}
                     pending={busy}
                     onOpenChange={(next) => (next ? undefined : setRemoving(null))}
                     onConfirm={() =>
@@ -160,7 +160,7 @@ export function TemplatesView({
                                 toast.show({ title: said });
                                 return;
                             }
-                            toast.show({ title: `${removing.name} is gone.` });
+                            toast.show({ title: t("templates.deleted", { name: removing.name }) });
                             setRemoving(null);
                             router.refresh();
                         })
@@ -185,6 +185,9 @@ function TemplateEditor({
     onSaved: () => void;
 }) {
     const toast = useToast();
+    const t = useTranslations("mailSettings");
+    const tm = useTranslations("mail");
+    const tc = useTranslations("common");
     const [draft, setDraft] = useState<Draft>(initial);
     const [problem, setProblem] = useState<{ field: string; message: string } | null>(null);
     const [saving, startSaving] = useBusy();
@@ -215,7 +218,7 @@ function TemplateEditor({
                 });
                 return;
             }
-            toast.show({ title: templateId ? "Template saved." : "Template made." });
+            toast.show({ title: templateId ? t("templates.saved") : t("templates.made") });
             onSaved();
         });
     }
@@ -224,23 +227,23 @@ function TemplateEditor({
         problem?.field === "name"
             ? problem.message
             : invalid?.path[0] === "name"
-              ? invalid.message
+              ? mailRefusalText(tm, invalid.message)
               : "";
 
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>{templateId ? "Change the template" : "New template"}</DialogTitle>
+                    <DialogTitle>{templateId ? t("templates.change") : t("templates.new")}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-3">
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            Name <span aria-hidden>*</span>
+                            {t("labels.name")} <span aria-hidden>*</span>
                         </span>
                         <Input
                             value={draft.name}
-                            placeholder="Invoice follow-up"
+                            placeholder={t("templates.namePlaceholder")}
                             aria-invalid={nameProblem ? true : undefined}
                             onChange={(event) => {
                                 setDraft((held) => ({ ...held, name: event.target.value }));
@@ -254,10 +257,10 @@ function TemplateEditor({
 
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            Offered when writing from
+                            {t("templates.offered")}
                         </span>
                         <Select
-                            aria-label="Which mailbox this template is offered for"
+                            aria-label={t("templates.offeredLabel")}
                             value={draft.accountId ?? EVERY}
                             onValueChange={(value) =>
                                 setDraft((held) => ({
@@ -266,7 +269,7 @@ function TemplateEditor({
                                 }))
                             }
                             options={[
-                                { value: EVERY, label: "Every mailbox" },
+                                { value: EVERY, label: t("templates.everyMailbox") },
                                 ...accounts.map((account) => ({
                                     value: account.id,
                                     label: account.label
@@ -276,10 +279,10 @@ function TemplateEditor({
                     </label>
 
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">Subject</span>
+                        <span className="mb-1 block text-[12px] text-muted-foreground">{tm("print.subject")}</span>
                         <Input
                             value={draft.subject}
-                            placeholder="Left empty, the subject line is not touched"
+                            placeholder={t("templates.subjectPlaceholder")}
                             onChange={(event) =>
                                 setDraft((held) => ({ ...held, subject: event.target.value }))
                             }
@@ -288,18 +291,18 @@ function TemplateEditor({
 
                     <div>
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            What it says <span aria-hidden>*</span>
+                            {t("away.body")} <span aria-hidden>*</span>
                         </span>
                         <div className="rounded-md border border-border px-2 py-1.5">
                             <RichTextEditor
                                 value={draft.body}
                                 onChange={(body) => setDraft((held) => ({ ...held, body }))}
-                                placeholder="Write the template"
+                                placeholder={t("templates.bodyPlaceholder")}
                                 className="min-h-[10rem]"
                             />
                         </div>
                         {invalid && invalid.path[0] === "body" ? (
-                            <span className="mt-1 block text-[12px] text-danger">{invalid.message}</span>
+                            <span className="mt-1 block text-[12px] text-danger">{mailRefusalText(tm, invalid.message)}</span>
                         ) : null}
                     </div>
 
@@ -312,10 +315,10 @@ function TemplateEditor({
                             disabled={saving || !complete || !dirty || Boolean(invalid)}
                             onClick={save}
                         >
-                            {saving ? "Saving..." : templateId ? "Save" : "Make it"}
+                            {saving ? t("shortcuts.saving") : templateId ? tc("actions.save") : t("labels.make")}
                         </Button>
                         <Button variant="ghost" onClick={onClose}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                     </div>
                 </div>

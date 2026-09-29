@@ -16,11 +16,16 @@ import { refusalOf } from "@/app/(app)/mail/refusal";
 import { editAccountAction } from "@/app/(app)/mail/actions";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import * as core from "@polaris/core";
+import { mailOptionLabel } from "@/app/(app)/mail/option-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Select, Switch, Textarea, useToast } from "@polaris/ui";
 
 export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
     const router = useRouter();
     const toast = useToast();
+    const t = useTranslations("mailSettings");
+    const tm = useTranslations("mail");
+    const tc = useTranslations("common");
     const [accountId, setAccountId] = useState(accounts[0]!.id);
     const account = accounts.find((one) => one.id === accountId) ?? accounts[0]!;
 
@@ -50,32 +55,32 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
             <div className="space-y-3">
                 <label className="block">
                     <span className="mb-1 block text-[12px] text-muted-foreground">
-                        Signed on every message from {account.address}
+                        {t("signature.signedFrom", { address: account.address })}
                     </span>
                     <Textarea
                         value={signature}
                         rows={6}
                         onChange={(event) => setSignature(event.target.value)}
-                        placeholder="Your name, and whatever else belongs at the bottom of your mail."
+                        placeholder={t("signature.placeholder")}
                     />
                 </label>
 
                 <label className="mb-3 block">
                     <span className="mb-1 block text-[12px] text-muted-foreground">
-                        When it goes in
+                        {t("signature.when")}
                     </span>
                     <Select
                         value={auto}
                         onValueChange={setAuto}
-                        aria-label="When the signature is added"
+                        aria-label={t("signature.whenLabel")}
                         className="w-64"
                         options={core.mailSignatureAuto.options.map((one) => ({
                             value: one,
-                            label: core.MAIL_SIGNATURE_AUTO_LABELS[one] ?? one
+                            label: one in core.MAIL_SIGNATURE_AUTO_LABELS ? mailOptionLabel(tm, "signatureAuto", one) : one
                         }))}
                     />
                     <span className="mt-1 block text-[12px] text-foreground-subtle">
-                        A signature you have to insert by hand every time is one you never send.
+                        {t("signature.whenHint")}
                     </span>
                 </label>
 
@@ -83,13 +88,12 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
                     <Switch
                         checked={above}
                         onChange={setAbove}
-                        aria-label="Put the signature above the quoted message"
+                        aria-label={t("signature.aboveLabel")}
                     />
-                    Above the quoted message
+                    {t("signature.above")}
                 </label>
                 <p className="text-[12px] text-foreground-subtle">
-                    Above is what most people expect on a reply. Below is what a mailing list
-                    expects.
+                    {t("signature.aboveHint")}
                 </p>
 
                 <Button
@@ -113,12 +117,12 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
                                 toast.show({ title: said });
                                 return;
                             }
-                            toast.show({ title: "Signature saved." });
+                            toast.show({ title: t("signature.saved") });
                             router.refresh();
                         })
                     }
                 >
-                    Save
+                    {tc("actions.save")}
                 </Button>
             </div>
         </div>

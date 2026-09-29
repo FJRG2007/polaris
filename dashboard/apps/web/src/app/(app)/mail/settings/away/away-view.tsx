@@ -18,6 +18,7 @@ import { refusalOf } from "@/app/(app)/mail/refusal";
 import { setVacationAction } from "@/app/(app)/mail/actions";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { Button, Input, Switch, Textarea, useToast } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 interface Vacation {
     enabled: boolean;
@@ -37,6 +38,8 @@ export function AwayView({
 }) {
     const router = useRouter();
     const toast = useToast();
+    const t = useTranslations("mailSettings");
+    const tc = useTranslations("common");
     const [accountId, setAccountId] = useState(accounts[0]!.id);
     const account = accounts.find((one) => one.id === accountId) ?? accounts[0]!;
     const held = vacations[account.id]!;
@@ -64,33 +67,33 @@ export function AwayView({
                     <Switch
                         checked={form.enabled}
                         onChange={(next) => setForm({ ...form, enabled: next })}
-                        aria-label="Send an away message"
+                        aria-label={t("away.toggleLabel")}
                     />
-                    Answer mail to {account.address} while I am away
+                    {t("away.toggle", { address: account.address })}
                 </label>
 
                 <label className="block">
                     <span className="mb-1 block text-[12px] text-muted-foreground">
-                        Subject, if you want one other than &quot;Re: their subject&quot;
+                        {t("away.subject")}
                     </span>
                     <Input value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} />
                 </label>
 
                 <label className="block">
                     <span className="mb-1 block text-[12px] text-muted-foreground">
-                        What it says {form.enabled ? <span aria-hidden>*</span> : null}
+                        {t("away.body")} {form.enabled ? <span aria-hidden>*</span> : null}
                     </span>
                     <Textarea
                         rows={5}
                         value={form.body}
                         onChange={(event) => setForm({ ...form, body: event.target.value })}
-                        placeholder="I am away until the 12th and will answer when I am back."
+                        placeholder={t("away.bodyPlaceholder")}
                     />
                 </label>
 
                 <div className="flex flex-wrap gap-3">
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">From</span>
+                        <span className="mb-1 block text-[12px] text-muted-foreground">{t("away.from")}</span>
                         <Input
                             type="date"
                             value={form.startsAt}
@@ -98,7 +101,7 @@ export function AwayView({
                         />
                     </label>
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">Until</span>
+                        <span className="mb-1 block text-[12px] text-muted-foreground">{t("away.until")}</span>
                         <Input
                             type="date"
                             value={form.endsAt}
@@ -107,7 +110,7 @@ export function AwayView({
                     </label>
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
-                            Answer the same person again after
+                            {t("away.repeat")}
                         </span>
                         <Input
                             type="number"
@@ -121,9 +124,7 @@ export function AwayView({
                 </div>
 
                 <p className="text-[12px] text-foreground-subtle">
-                    Never answered: a mailing list, a bounce, another away message, an address like no-reply, or
-                    anybody already answered inside the window above. Being blind-copied on something does not
-                    count as being written to.
+                    {t("away.never")}
                 </p>
 
                 {problem ? <p className="text-[13px] text-danger">{problem}</p> : null}
@@ -146,12 +147,12 @@ export function AwayView({
                                 setProblem(said);
                                 return;
                             }
-                            toast.show({ title: form.enabled ? "Away message is on." : "Away message is off." });
+                            toast.show({ title: form.enabled ? t("away.on") : t("away.off") });
                             router.refresh();
                         })
                     }
                 >
-                    Save
+                    {tc("actions.save")}
                 </Button>
             </div>
         </div>

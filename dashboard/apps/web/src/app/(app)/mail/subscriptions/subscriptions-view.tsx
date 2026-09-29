@@ -24,6 +24,7 @@ import { useMemo, useState } from "react";
 import { useBusy } from "../use-busy";
 import { UnsubscribeButton } from "../unsubscribe-button";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, EmptyState, Input, useToast } from "@polaris/ui";
 import type { MailSubscriptionView } from "@/lib/mailbox/subscriptions";
 
@@ -38,6 +39,7 @@ export function SubscriptionsView({
 }) {
     const { accounts, accountColor } = useMail();
     const format = useDisplayFormat();
+    const t = useTranslations("mail");
     const [query, setQuery] = useState("");
 
     const shown = useMemo(() => {
@@ -55,27 +57,26 @@ export function SubscriptionsView({
 
     return (
         <div className="mx-auto w-full max-w-4xl px-4 py-6">
-            <h1 className="text-[17px] font-semibold tracking-tight">Subscriptions</h1>
+            <h1 className="text-[17px] font-semibold tracking-tight">{t("subscriptions.title")}</h1>
             <p className="mt-1 text-[13px] text-muted-foreground">
-                Senders that publish a way off their list. Polaris notes them as their mail arrives,
-                so this is everything it has seen rather than everything you ever signed up to.
-                {capped ? " Only the ones that wrote most recently are shown." : ""}
+                {t("subscriptions.lead")}
+                {capped ? t("subscriptions.capped") : ""}
             </p>
 
             {accounts.length === 0 ? (
                 <div className="mt-6">
                     <EmptyState
                         icon={<MailX className="size-5 shrink-0" aria-hidden />}
-                        title="No mailbox yet"
-                        description="Connect one and the lists it receives appear here."
+                        title={t("subscriptions.noMailboxTitle")}
+                        description={t("subscriptions.noMailboxBody")}
                     />
                 </div>
             ) : subscriptions.length === 0 ? (
                 <div className="mt-6">
                     <EmptyState
                         icon={<MailX className="size-5 shrink-0" aria-hidden />}
-                        title="Nothing to leave yet"
-                        description="Newsletters and mailing lists appear here as they arrive."
+                        title={t("subscriptions.emptyTitle")}
+                        description={t("subscriptions.emptyBody")}
                     />
                 </div>
             ) : (
@@ -89,23 +90,21 @@ export function SubscriptionsView({
                             <Input
                                 value={query}
                                 onChange={(event) => setQuery(event.target.value)}
-                                placeholder="Find a sender"
-                                aria-label="Find a sender"
+                                placeholder={t("subscriptions.find")}
+                                aria-label={t("subscriptions.find")}
                                 className="pl-8"
                             />
                         </div>
                         {ignored > 0 ? (
                             <p className="text-[12px] text-warning">
-                                {ignored === 1
-                                    ? "1 sender kept writing after you asked."
-                                    : `${ignored} senders kept writing after you asked.`}
+                                {t("subscriptions.ignored", { count: ignored })}
                             </p>
                         ) : null}
                     </div>
 
                     {shown.length === 0 ? (
                         <p className="mt-4 text-[13px] text-muted-foreground">
-                            No sender matches that.
+                            {t("subscriptions.noMatch")}
                         </p>
                     ) : (
                         <ul className="mt-3 divide-y divide-border rounded-md border border-border">
@@ -152,11 +151,10 @@ function Row({
 }) {
     const router = useRouter();
     const toast = useToast();
+    const t = useTranslations("mail");
     const [busy, startBusy] = useBusy();
 
     const name = subscription.senderName || subscription.sender;
-    const messages =
-        subscription.messageCount === 1 ? "1 message" : `${subscription.messageCount} messages`;
 
     return (
         <li className="flex flex-wrap items-center gap-3 px-3 py-2.5">
@@ -174,7 +172,10 @@ function Row({
                 </span>
                 <span className="block truncate text-[12px] text-foreground-subtle">
                     {subscription.senderName ? `${subscription.sender} - ` : ""}
-                    {messages}, last on {format.date(subscription.lastMessageAt)}
+                    {t("subscriptions.messages", {
+                        count: subscription.messageCount,
+                        date: format.date(subscription.lastMessageAt)
+                    })}
                 </span>
                 {/* Which mailbox it arrives in, on a line of its own rather than
                     at the end of one that truncates - where it was the first
@@ -189,7 +190,7 @@ function Row({
                             aria-hidden
                         />
                         <span className="truncate" title={mailbox}>
-                            to {mailbox}
+                            {t("subscriptions.to", { mailbox })}
                         </span>
                     </span>
                 ) : null}
@@ -201,15 +202,16 @@ function Row({
                                 : "block text-[12px] text-foreground-subtle"
                         }
                     >
-                        {subscription.kind === "link"
-                            ? `Their page was opened on ${format.date(subscription.askedAt)}`
-                            : `Asked on ${format.date(subscription.askedAt)}`}
-                        {subscription.stillSending ? ", and they have written since." : "."}
+                        {t("subscriptions.asked", {
+                            kind: subscription.kind === "link" ? "link" : "mail",
+                            date: format.date(subscription.askedAt),
+                            since: subscription.stillSending ? "yes" : "no"
+                        })}
                     </span>
                 ) : null}
                 {subscription.source === "body" ? (
                     <span className="block text-[12px] text-foreground-subtle">
-                        Found in their message rather than published as a header.
+                        {t("subscriptions.fromBody")}
                     </span>
                 ) : null}
             </span>
@@ -231,14 +233,14 @@ function Row({
                                 return;
                             }
                             toast.show({
-                                title: `${subscription.sender} now goes straight to the trash.`
+                                title: t("subscriptions.blocked", { sender: subscription.sender })
                             });
                             router.refresh();
                         })
                     }
                 >
                     <BellOff className="size-3.5 shrink-0" aria-hidden />
-                    Block
+                    {t("subscriptions.block")}
                 </Button>
             ) : null}
 
@@ -250,7 +252,7 @@ function Row({
                     sender: name,
                     subscriptionId: subscription.id
                 }}
-                label={subscription.askedAt ? "Ask again" : "Unsubscribe"}
+                label={subscription.askedAt ? t("subscriptions.askAgain") : t("unsubscribe.label")}
             />
         </li>
     );

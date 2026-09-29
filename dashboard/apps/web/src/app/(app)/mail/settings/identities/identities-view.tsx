@@ -19,6 +19,7 @@ import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { Button, Input, Switch, Textarea, cn, useToast } from "@polaris/ui";
 import { deleteIdentityAction, saveIdentityAction } from "@/app/(app)/mail/actions";
 import { addressState } from "@/app/(app)/mail/address-state";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function IdentitiesView({
     accounts,
@@ -29,6 +30,7 @@ export function IdentitiesView({
 }) {
     const router = useRouter();
     const toast = useToast();
+    const t = useTranslations("mailSettings");
     const [accountId, setAccountId] = useState(accounts[0]!.id);
     const account = accounts.find((one) => one.id === accountId) ?? accounts[0]!;
     const mine = identities[account.id] ?? [];
@@ -41,22 +43,19 @@ export function IdentitiesView({
             <div className="mb-3 flex items-center justify-between">
                 <div>
                     <h2 className="text-[13px] font-medium">
-                        Addresses {account.address} can send as
+                        {t("identities.title", { address: account.address })}
                     </h2>
-                    <p className="text-[12px] text-muted-foreground">
-                        Whether the mail server accepts one is its decision. If it refuses, the
-                        message comes back with its reason.
-                    </p>
+                    <p className="text-[12px] text-muted-foreground">{t("identities.hint")}</p>
                 </div>
                 <Button variant="secondary" onClick={() => setAdding(true)}>
                     <Plus className="size-4 shrink-0" aria-hidden />
-                    Add one
+                    {t("identities.add")}
                 </Button>
             </div>
 
             {mine.length === 0 && !adding ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
-                    Everything is sent as {account.address}.
+                    {t("identities.empty", { address: account.address })}
                 </p>
             ) : null}
 
@@ -75,15 +74,15 @@ export function IdentitiesView({
                                     {identity.address}
                                 </p>
                                 <p className="truncate text-[12px] text-muted-foreground">
-                                    {identity.displayName || "No name set"}
-                                    {identity.isDefault ? " - used by default" : ""}
+                                    {identity.displayName || t("identities.noName")}
+                                    {identity.isDefault ? t("identities.default") : ""}
                                 </p>
                             </div>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label={`Remove ${identity.address}`}
-                                title={`Remove ${identity.address}`}
+                                aria-label={t("identities.remove", { address: identity.address })}
+                                title={t("identities.remove", { address: identity.address })}
                                 onClick={() =>
                                     void (async () => {
                                         const answer = await deleteIdentityAction(
@@ -139,6 +138,8 @@ function IdentityForm({
     onCancel: () => void;
 }) {
     const toast = useToast();
+    const t = useTranslations("mailSettings");
+    const tc = useTranslations("common");
     const [address, setAddress] = useState("");
     const [displayName, setDisplayName] = useState("");
     const [replyTo, setReplyTo] = useState("");
@@ -151,16 +152,16 @@ function IdentityForm({
     const state = addressState(address, taken);
     const wrong =
         state === "invalid"
-            ? "That is not an email address yet."
+            ? t("identities.invalid")
             : state === "taken"
-              ? "This mailbox can already send as that address."
+              ? t("identities.taken")
               : "";
 
     return (
         <div className="mt-3 space-y-2 rounded-md border border-border p-3">
             <label className="block">
                 <span className="mb-1 block text-[12px] text-muted-foreground">
-                    Address <span aria-hidden>*</span>
+                    {t("identities.address")} <span aria-hidden>*</span>
                 </span>
                 <Input
                     value={address}
@@ -179,12 +180,12 @@ function IdentityForm({
                         wrong ? "text-danger" : "text-foreground-subtle"
                     )}
                 >
-                    {wrong || "Mail sent from this address still goes out through this mailbox."}
+                    {wrong || t("identities.addressHint")}
                 </span>
             </label>
             <label className="block">
                 <span className="mb-1 block text-[12px] text-muted-foreground">
-                    Name people will see
+                    {t("identities.name")}
                 </span>
                 <Input
                     value={displayName}
@@ -193,13 +194,13 @@ function IdentityForm({
             </label>
             <label className="block">
                 <span className="mb-1 block text-[12px] text-muted-foreground">
-                    Replies go to, if not this address
+                    {t("identities.replyTo")}
                 </span>
                 <Input value={replyTo} onChange={(event) => setReplyTo(event.target.value)} />
             </label>
             <label className="block">
                 <span className="mb-1 block text-[12px] text-muted-foreground">
-                    Signature for this address
+                    {t("identities.signature")}
                 </span>
                 <Textarea
                     rows={3}
@@ -211,9 +212,9 @@ function IdentityForm({
                 <Switch
                     checked={isDefault}
                     onChange={setIsDefault}
-                    aria-label="Send from this address by default"
+                    aria-label={t("identities.defaultLabel")}
                 />
-                Send from this one by default
+                {t("identities.defaultToggle")}
             </label>
 
             {problem ? <p className="text-[13px] text-danger">{problem}</p> : null}
@@ -236,15 +237,15 @@ function IdentityForm({
                                 setProblem(said);
                                 return;
                             }
-                            toast.show({ title: `${address} can be sent from now.` });
+                            toast.show({ title: t("identities.added", { address }) });
                             onDone();
                         })
                     }
                 >
-                    Add it
+                    {t("identities.addIt")}
                 </Button>
                 <Button variant="ghost" onClick={onCancel}>
-                    Cancel
+                    {tc("actions.cancel")}
                 </Button>
             </div>
         </div>

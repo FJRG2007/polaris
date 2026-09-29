@@ -20,6 +20,7 @@ import { Printer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SandboxedHtml } from "@/app/(app)/mail/message-body";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PrintableThread } from "@/lib/mailbox/printable";
 
 /** How long the frames are given to lay out before the dialog opens. They
@@ -28,6 +29,7 @@ const SETTLE_MS = 1000;
 
 export function PrintView({ thread }: { thread: PrintableThread }) {
     const format = useDisplayFormat();
+    const t = useTranslations("mail");
     const [asked, setAsked] = useState(false);
 
     useEffect(() => {
@@ -46,7 +48,7 @@ export function PrintView({ thread }: { thread: PrintableThread }) {
             <main className="mx-auto max-w-3xl bg-white px-6 py-8 text-[#111111] print:max-w-none print:p-0">
                 <header className="mb-6 flex items-start gap-4 border-b border-[#dddddd] pb-4">
                     <h1 className="min-w-0 flex-1 text-[20px] font-semibold leading-tight">
-                        {thread.subject || "(no subject)"}
+                        {thread.subject || t("noSubject")}
                     </h1>
                     <button
                         type="button"
@@ -54,14 +56,13 @@ export function PrintView({ thread }: { thread: PrintableThread }) {
                         onClick={() => window.print()}
                     >
                         <Printer className="size-4 shrink-0" aria-hidden />
-                        Print
+                        {t("print.print")}
                     </button>
                 </header>
 
                 {thread.leftOut > 0 ? (
                     <p className="mb-4 text-[12px] text-[#555555]">
-                        The {thread.leftOut} oldest {thread.leftOut === 1 ? "message is" : "messages are"}{" "}
-                        not included.
+                        {t("print.leftOut", { count: thread.leftOut })}
                     </p>
                 ) : null}
 
@@ -69,22 +70,22 @@ export function PrintView({ thread }: { thread: PrintableThread }) {
                     {thread.messages.map((message) => (
                         <li key={message.id} className="break-inside-avoid-page">
                             <dl className="mb-3 grid grid-cols-[4rem_1fr] gap-x-2 gap-y-0.5 text-[12px]">
-                                <dt className="text-[#555555]">From</dt>
+                                <dt className="text-[#555555]">{t("print.from")}</dt>
                                 <dd>{core.formatAddressList(message.from)}</dd>
-                                <dt className="text-[#555555]">To</dt>
+                                <dt className="text-[#555555]">{t("print.to")}</dt>
                                 <dd>{core.formatAddressList(message.to) || "-"}</dd>
                                 {message.cc.length > 0 ? (
                                     <>
-                                        <dt className="text-[#555555]">Cc</dt>
+                                        <dt className="text-[#555555]">{t("print.cc")}</dt>
                                         <dd>{core.formatAddressList(message.cc)}</dd>
                                     </>
                                 ) : null}
-                                <dt className="text-[#555555]">Date</dt>
+                                <dt className="text-[#555555]">{t("print.date")}</dt>
                                 <dd>{format.dateTime(message.sentAt)}</dd>
                                 {message.subject !== thread.subject ? (
                                     <>
-                                        <dt className="text-[#555555]">Subject</dt>
-                                        <dd>{message.subject || "(no subject)"}</dd>
+                                        <dt className="text-[#555555]">{t("print.subject")}</dt>
+                                        <dd>{message.subject || t("noSubject")}</dd>
                                     </>
                                 ) : null}
                             </dl>
@@ -95,7 +96,7 @@ export function PrintView({ thread }: { thread: PrintableThread }) {
                                     paper="own"
                                 />
                             ) : (
-                                <p className="text-[13px] text-[#555555]">This message has nothing in it.</p>
+                                <p className="text-[13px] text-[#555555]">{t("body.empty")}</p>
                             )}
                         </li>
                     ))}
