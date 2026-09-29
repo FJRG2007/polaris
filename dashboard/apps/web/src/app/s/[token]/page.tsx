@@ -25,6 +25,7 @@ import { getDriverForConnection } from "@/lib/storage-service";
 import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
 import { Badge } from "@polaris/ui";
 import { Messages } from "@/components/i18n/messages";
+import { getTranslations } from "@/lib/i18n/request";
 import {
     logShareAccess,
     resolveShareByToken,
@@ -48,6 +49,7 @@ export default async function SharePage({
 }) {
     const { token } = await params;
     const { p } = await searchParams;
+    const t = await getTranslations("publicPages");
 
     // The visitor may or may not be a Polaris user; the session only tunes the
     // chrome (a shortcut back into the app), never the access decision.
@@ -63,7 +65,7 @@ export default async function SharePage({
         return (
             <LinkUnavailable
                 signedIn={signedIn}
-                message="This link does not exist or has been removed."
+                message={t("denied.notFound")}
             />
         );
 
@@ -71,10 +73,10 @@ export default async function SharePage({
     if (!usable.ok) {
         const message =
             usable.reason === "expired"
-                ? "This link has expired."
+                ? t("denied.expired")
                 : usable.reason === "exhausted"
-                  ? "This link has reached its download limit."
-                  : "This link has been revoked.";
+                  ? t("denied.downloadLimit")
+                  : t("denied.revoked");
         return <LinkUnavailable signedIn={signedIn} message={message} />;
     }
 
@@ -85,7 +87,7 @@ export default async function SharePage({
         return (
             <LinkUnavailable
                 signedIn={signedIn}
-                message="This link is not available from your network."
+                message={t("denied.network")}
             />
         );
     }
@@ -93,7 +95,7 @@ export default async function SharePage({
         return (
             <LinkUnavailable
                 signedIn={signedIn}
-                message="This link is not available from your location."
+                message={t("denied.location")}
             />
         );
     }
@@ -101,7 +103,7 @@ export default async function SharePage({
         return (
             <LinkUnavailable
                 signedIn={signedIn}
-                message="This link is not available from your network."
+                message={t("denied.network")}
             />
         );
     }
@@ -145,7 +147,7 @@ export default async function SharePage({
         return (
             <LinkUnavailable
                 signedIn={signedIn}
-                message="The shared item could not be read. It may have been moved or deleted."
+                message={t("share.unreadable")}
             />
         );
     } finally {
@@ -155,15 +157,17 @@ export default async function SharePage({
     return (
         <PublicShell signedIn={signedIn} className="max-w-6xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Shared with you</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("share.title")}</h1>
                 {share.maxDownloads !== null ? (
                     <Badge variant="neutral">
-                        {Math.max(0, share.maxDownloads - share.downloadCount)} download(s) left
+                        {t("share.downloadsLeft", {
+                            count: Math.max(0, share.maxDownloads - share.downloadCount)
+                        })}
                     </Badge>
                 ) : null}
             </div>
             {/* The Drive viewer inside, in the reader's words. */}
-            <Messages namespaces={["drive", "driveViewer"]}>
+            <Messages namespaces={["drive", "driveViewer", "publicPages"]}>
                 {isFile ? (
                     <ShareFileCard
                         token={token}

@@ -179,7 +179,7 @@ describe("gateSnippetRequest", () => {
 });
 
 describe("snippetDenialMessage", () => {
-    it("has words for every reason the gate can return", () => {
+    it("has words for every reason the gate can return", async () => {
         for (const reason of [
             "not_found",
             "revoked",
@@ -193,11 +193,11 @@ describe("snippetDenialMessage", () => {
             "not_invited",
             "password_required"
         ]) {
-            expect(snippetDenialMessage(reason)).not.toBe("This link is not available.");
+            expect(await snippetDenialMessage(reason)).not.toBe("This link is not available.");
         }
     });
 
-    it("falls back rather than leaking an unmapped reason", () => {
-        expect(snippetDenialMessage("something_new")).toBe("This link is not available.");
+    it("falls back rather than leaking an unmapped reason", async () => {
+        expect(await snippetDenialMessage("something_new")).toBe("This link is not available.");
     });
 });

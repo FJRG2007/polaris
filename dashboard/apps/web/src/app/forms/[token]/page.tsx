@@ -8,6 +8,8 @@
 
 import { PublicForm } from "./form-view";
 import { getSession } from "@/lib/session";
+import { Messages } from "@/components/i18n/messages";
+import { getTranslations } from "@/lib/i18n/request";
 import { getPublicForm } from "@/lib/tasks/form-service";
 
 export const dynamic = "force-dynamic";
@@ -16,23 +18,26 @@ export default async function PublicFormPage({ params }: { params: Promise<{ tok
     const { token } = await params;
     const form = await getPublicForm(token);
     const session = await getSession();
+    const t = await getTranslations("publicPages");
 
     return (
         <main className="flex min-h-dvh items-center justify-center bg-background p-6">
             {form ? (
-                <PublicForm
-                    token={token}
-                    name={form.name}
-                    intro={form.intro}
-                    fields={form.fields}
-                    requireLogin={form.requireLogin}
-                    signedIn={session?.user !== undefined}
-                />
+                <Messages namespaces={["publicPages"]}>
+                    <PublicForm
+                        token={token}
+                        name={form.name}
+                        intro={form.intro}
+                        fields={form.fields}
+                        requireLogin={form.requireLogin}
+                        signedIn={session?.user !== undefined}
+                    />
+                </Messages>
             ) : (
                 <div className="text-center">
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">This form is not available</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("form.unavailableTitle")}</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        The link may have expired, or the form may have been closed.
+                        {t("form.unavailable")}
                     </p>
                 </div>
             )}

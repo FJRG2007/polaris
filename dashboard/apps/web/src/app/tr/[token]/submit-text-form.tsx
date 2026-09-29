@@ -15,6 +15,7 @@
 
 import { useState, type FormEvent } from "react";
 import { PublicShell } from "@/components/public-shell";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Check, Copy, Loader2, Send } from "lucide-react";
 import { generateSealKey, seal } from "@/lib/browser-seal";
 import { submitTextAction } from "@/app/(app)/drive/drop-points/text-request-actions";
@@ -35,6 +36,7 @@ export function SubmitTextForm({
     allowSealed: boolean;
     signedIn: boolean;
 }) {
+    const t = useTranslations("publicPages");
     const [name, setName] = useState("");
     const [body, setBody] = useState("");
     const [sealed, setSealed] = useState(false);
@@ -72,31 +74,30 @@ export function SubmitTextForm({
             <PublicShell signedIn={signedIn}>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Sent</CardTitle>
+                        <CardTitle>{t("textDrop.sent")}</CardTitle>
                     </CardHeader>
                     <CardBody className="flex flex-col gap-3">
                         <p className="text-sm text-muted-foreground">
-                            It reached whoever asked for it. You can close this page.
+                            {t("textDrop.reached")}
                         </p>
                         {sentKey ? (
                             <>
                                 <p className="text-sm">
-                                    You sealed it, so they need this key to read it. Send it to them
-                                    some other way - it was never sent with the text.
+                                    {t("textDrop.sealedKey")}
                                 </p>
                                 <div className="flex items-center gap-2">
                                     <Input
                                         readOnly
                                         value={sentKey}
                                         className="font-mono text-xs"
-                                        aria-label="The key they need"
+                                        aria-label={t("textDrop.keyLabel")}
                                     />
                                     <Button
                                         type="button"
                                         size="icon"
                                         variant="secondary"
-                                        title="Copy the key"
-                                        aria-label="Copy the key"
+                                        title={t("textDrop.copyKey")}
+                                        aria-label={t("textDrop.copyKey")}
                                         onClick={async () => {
                                             await navigator.clipboard.writeText(sentKey);
                                             setCopied(true);
@@ -121,7 +122,7 @@ export function SubmitTextForm({
                                     setCopied(false);
                                 }}
                             >
-                                Send something else
+                                {t("textDrop.sendAnother")}
                             </Button>
                         </div>
                     </CardBody>
@@ -144,16 +145,16 @@ export function SubmitTextForm({
                             </p>
                         ) : null}
                         <label className="flex flex-col gap-1 text-sm">
-                            Name it (optional)
+                            {t("textDrop.name")}
                             <Input
                                 value={name}
                                 onChange={(event) => setName(event.target.value)}
-                                placeholder="e.g. .env.production"
+                                placeholder={t("textDrop.namePlaceholder")}
                                 className="font-mono text-xs"
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
-                            Text
+                            {t("textDrop.text")}
                             <Textarea
                                 value={body}
                                 onChange={(event) => setBody(event.target.value)}
@@ -161,13 +162,17 @@ export function SubmitTextForm({
                                 required
                                 spellCheck={false}
                                 className="font-mono text-xs"
-                                placeholder="Paste it here"
+                                placeholder={t("textDrop.textPlaceholder")}
                             />
                             <span
                                 className={`text-xs ${over ? "text-danger" : "text-muted-foreground"}`}
                             >
-                                {body.length.toLocaleString()} / {maxLength.toLocaleString()}
-                                {over ? " - too long to send" : ""}
+                                {over
+                                    ? t("textDrop.tooLong", {
+                                          count: body.length.toLocaleString(),
+                                          max: maxLength.toLocaleString()
+                                      })
+                                    : `${body.length.toLocaleString()} / ${maxLength.toLocaleString()}`}
                             </span>
                         </label>
                         {allowSealed ? (
@@ -179,10 +184,9 @@ export function SubmitTextForm({
                                     onChange={(event) => setSealed(event.target.checked)}
                                 />
                                 <span>
-                                    Seal it in this browser
+                                    {t("textDrop.seal")}
                                     <span className="block text-xs text-muted-foreground">
-                                        Polaris stores it unreadable and gives you a key to pass on
-                                        separately. Without the key nobody can open it.
+                                        {t("textDrop.sealHint")}
                                     </span>
                                 </span>
                             </label>
@@ -194,7 +198,7 @@ export function SubmitTextForm({
                             ) : (
                                 <Send className="size-4" />
                             )}
-                            Send
+                            {t("textDrop.send")}
                         </Button>
                     </form>
                 </CardBody>

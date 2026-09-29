@@ -285,7 +285,7 @@ export async function submitForm(
     // without looking the form up again.
     return {
         ok: true,
-        confirmation: form.confirmation || "Thanks. Your request has been received.",
+        confirmation: form.confirmation || t("forms.received"),
         spaceId: form.spaceId
     };
 }

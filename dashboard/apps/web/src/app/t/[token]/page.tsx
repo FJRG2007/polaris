@@ -17,24 +17,34 @@ import { LogIn } from "lucide-react";
 import * as core from "@polaris/core";
 import { getSession } from "@/lib/session";
 import { getPublicTask } from "@/lib/tasks/share-service";
+import { getTranslations } from "@/lib/i18n/request";
 import { getDisplayFormat } from "@/lib/display-prefs-service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
 
 export const dynamic = "force-dynamic";
 
-function Shell({ children, signedIn }: { children: React.ReactNode; signedIn: boolean }) {
+function Shell({
+    children,
+    signedIn,
+    signInLabel
+}: {
+    children: React.ReactNode;
+    signedIn: boolean;
+    signInLabel: string;
+}) {
     return (
         <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 p-6">
             <header className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-muted-foreground">
                     <PolarisMark className="size-6" />
+                    {/* i18n-ignore: the product's name */}
                     <span className="text-sm font-medium">Polaris</span>
                 </div>
                 {!signedIn && (
                     <Button asChild size="sm" variant="ghost">
                         <Link href="/oauth/login">
                             <LogIn className="size-4" />
-                            Sign in
+                            {signInLabel}
                         </Link>
                     </Button>
                 )}
@@ -56,20 +66,23 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export default async function PublicTaskPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
-    const [task, session, format] = await Promise.all([
+    const [task, session, format, t, tp, tt] = await Promise.all([
         getPublicTask(token),
         getSession(),
-        getDisplayFormat()
+        getDisplayFormat(),
+        getTranslations("publicPages"),
+        getTranslations("tasksDetail"),
+        getTranslations("tasks")
     ]);
     const signedIn = session?.user !== undefined;
 
     if (!task) {
         return (
-            <Shell signedIn={signedIn}>
+            <Shell signedIn={signedIn} signInLabel={t("task.signIn")}>
                 <div className="flex flex-1 flex-col items-center justify-center text-center">
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">This task is not available</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("task.unavailableTitle")}</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        The link may have been turned off, or the task may have been deleted.
+                        {t("task.unavailable")}
                     </p>
                 </div>
             </Shell>
@@ -79,7 +92,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
     const showDate = (iso: string | null): string => (iso ? (task.timed ? format.dateTime(iso) : format.date(iso)) : "-");
 
     return (
-        <Shell signedIn={signedIn}>
+        <Shell signedIn={signedIn} signInLabel={t("task.signIn")}>
             <Card>
                 <CardHeader className="flex flex-col gap-1">
                     <span className="font-mono text-xs text-muted-foreground">{task.reference}</span>
@@ -87,7 +100,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                 </CardHeader>
                 <CardBody className="flex flex-col gap-6">
                     <div className="flex flex-col">
-                        <Row label="Status">
+                        <Row label={tp("props.status")}>
                             <span className="inline-flex items-center gap-2">
                                 <span
                                     aria-hidden
@@ -99,22 +112,22 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                                 </span>
                             </span>
                         </Row>
-                        {task.assignees.length > 0 && <Row label="Assignees">{task.assignees.join(", ")}</Row>}
+                        {task.assignees.length > 0 && <Row label={tp("props.assignees")}>{task.assignees.join(", ")}</Row>}
                         {(task.startDate || task.dueDate) && (
-                            <Row label="Dates">
+                            <Row label={tp("props.dates")}>
                                 {showDate(task.startDate)} - {showDate(task.dueDate)}
                             </Row>
                         )}
                         {task.priority !== "none" && (
-                            <Row label="Priority">
+                            <Row label={tp("props.priority")}>
                                 <span style={{ color: core.TASK_PRIORITY_COLORS[task.priority] }}>
-                                    {core.TASK_PRIORITY_LABELS[task.priority]}
+                                    {tt(`labels.priority.${task.priority}`)}
                                 </span>
                             </Row>
                         )}
-                        {task.points !== null && <Row label="Points">{task.points}</Row>}
+                        {task.points !== null && <Row label={tp("props.points")}>{task.points}</Row>}
                         {task.tags.length > 0 && (
-                            <Row label="Tags">
+                            <Row label={tp("props.tags")}>
                                 <span className="flex flex-wrap gap-1">
                                     {task.tags.map((tag) => (
                                         <Badge
@@ -132,7 +145,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
 
                     {task.description && (
                         <section className="flex flex-col gap-1">
-                            <h2 className="text-sm font-medium">Description</h2>
+                            <h2 className="text-sm font-medium">{t("task.description")}</h2>
                             <p className="whitespace-pre-wrap break-words text-sm text-foreground/90">
                                 {task.description}
                             </p>
@@ -141,7 +154,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
 
                     {task.subtasks.length > 0 && (
                         <section className="flex flex-col gap-2">
-                            <h2 className="text-sm font-medium">Subtasks</h2>
+                            <h2 className="text-sm font-medium">{tp("subwork.subtasks")}</h2>
                             <ul className="divide-y divide-border rounded-md border border-border">
                                 {task.subtasks.map((subtask, index) => (
                                     <li key={index} className="flex items-center gap-2 px-3 py-2 text-sm">
@@ -182,7 +195,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
 
                     {task.comments && task.comments.length > 0 && (
                         <section className="flex flex-col gap-3">
-                            <h2 className="text-sm font-medium">Discussion</h2>
+                            <h2 className="text-sm font-medium">{t("task.discussion")}</h2>
                             {task.comments.map((comment, index) => (
                                 <div key={index} className="flex flex-col gap-0.5">
                                     <div className="flex items-center gap-2">
@@ -200,7 +213,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                     )}
 
                     <p className="text-[0.6875rem] text-muted-foreground">
-                        Last changed {format.dateTime(task.updatedAt)}. This is a read-only copy.
+                        {t("task.lastChanged", { time: format.dateTime(task.updatedAt) })}
                     </p>
                 </CardBody>
             </Card>

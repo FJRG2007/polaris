@@ -17,6 +17,7 @@ import * as core from "@polaris/core";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
 import * as links from "@/lib/office/links";
+import { getTranslations } from "@/lib/i18n/request";
 import { clientIp, hashForLog } from "@/lib/request-context";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 
@@ -43,18 +44,19 @@ export async function unlockOfficeLinkAction(
     token: string,
     password: string
 ): Promise<{ error?: string }> {
+    const t = await getTranslations("publicPages");
     const visit = await links.resolveLink(token);
-    if (!visit || visit.refusal) return { error: "This link is not available." };
+    if (!visit || visit.refusal) return { error: t("office.unavailable") };
 
     const parsed = core.officeLinkUnlockSchema.safeParse({ password });
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Type the password." };
+    if (!parsed.success) return { error: t("office.typePassword") };
 
     const limitKey = `office-unlock:${visit.linkId}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, UNLOCK_LIMIT, UNLOCK_WINDOW_MS)).ok) {
-        return { error: "Too many attempts. Wait a few minutes and try again." };
+        return { error: t("office.tooMany") };
     }
     if (!(await links.linkPasswordMatches(visit.linkId, parsed.data.password))) {
-        return { error: "Incorrect password." };
+        return { error: t("office.wrongPassword") };
     }
 
     await resetRateLimit(limitKey);
@@ -83,20 +85,21 @@ export async function unlockOfficeLinkAction(
 export async function openOfficeLinkAction(
     token: string
 ): Promise<{ ok: true; role: core.OfficeRole } | { error: string }> {
+    const t = await getTranslations("publicPages");
     const visit = await links.resolveLink(token);
-    if (!visit || visit.refusal) return { error: "This link is not available." };
+    if (!visit || visit.refusal) return { error: t("office.unavailable") };
 
     if (visit.needsPassword) {
         const solved = (await cookies()).get(links.linkUnlockCookie(visit.linkId))?.value;
         if (!links.linkUnlocked(visit.linkId, visit.passwordHash, solved)) {
-            return { error: "This link is not available." };
+            return { error: t("office.unavailable") };
         }
     }
 
     // Bounded in the statement, so two people arriving together on the last
     // opening cannot both be let in.
     if (!(await links.spendLink(visit.linkId))) {
-        return { error: "This link has been opened as many times as it was meant to be." };
+        return { error: t("office.denied.exhausted") };
     }
 
     const env = loadEnv();

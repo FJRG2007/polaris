@@ -11,6 +11,7 @@
  */
 
 import { getSession } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { clientIp } from "@/lib/request-context";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { publishTaskChange } from "@/lib/tasks/live";
@@ -26,7 +27,7 @@ export async function submitFormAction(
 ): Promise<{ confirmation?: string; error?: string }> {
     const ip = (await clientIp()) ?? "unknown";
     const allowed = await rateLimit(`tasks-form:${ip}`, SUBMISSIONS_PER_HOUR, 3_600_000);
-    if (!allowed.ok) return { error: "Too many submissions from here. Try again in a little while." };
+    if (!allowed.ok) return { error: (await getTranslations("publicPages"))("form.tooMany") };
 
     // A signed-in submitter is recorded, so a form used internally still shows
     // who filed what; an anonymous one simply has no author.
@@ -43,6 +44,6 @@ export async function submitFormAction(
         return { confirmation: result.confirmation };
     } catch (caught) {
         console.error(caught);
-        return { error: "The form could not be sent. Try again in a moment." };
+        return { error: (await getTranslations("publicPages"))("form.failed") };
     }
 }

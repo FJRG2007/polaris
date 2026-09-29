@@ -19,6 +19,7 @@ import { CallRoom } from "@/app/(app)/chat/call-room";
 import { CallAudio } from "@/app/(app)/chat/call-audio";
 import { useCallHotkeys } from "@/app/(app)/chat/call-hotkeys";
 import { PublicShell } from "@/components/public-shell";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
 import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
@@ -49,6 +50,7 @@ export function GuestCall({
      *  ask for: they arrive as themselves, which is the point of the setting. */
     asAccount?: boolean;
 }) {
+    const t = useTranslations("chat");
     const [name, setName] = useState(suggestedName);
     const [seat, setSeat] = useState<{ meetingId: string; admission: string } | null>(null);
     const [busy, setBusy] = useState(false);
@@ -62,7 +64,7 @@ export function GuestCall({
             : await joinAsGuestAction({ token, name });
         setBusy(false);
         if (result.error || !result.meetingId) {
-            setError(result.error ?? "That did not work");
+            setError(result.error ?? t("guestCall.failed"));
             return;
         }
         setSeat({ meetingId: result.meetingId, admission: result.admission ?? "admitted" });
@@ -87,11 +89,11 @@ export function GuestCall({
             if (me.admission === "admitted") setSeat({ ...seat, admission: "admitted" });
             if (me.admission === "denied") {
                 setSeat(null);
-                setError("Somebody in the call turned the request down.");
+                setError(t("guestCall.denied"));
             }
         }, LOBBY_POLL_MS);
         return () => clearInterval(timer);
-    }, [seat]);
+    }, [seat, t]);
 
     if (seat?.admission === "admitted") {
         return (
@@ -101,7 +103,7 @@ export function GuestCall({
                     meetingId={seat.meetingId}
                     onLeave={() => {
                         setSeat(null);
-                        setError("You have left the call.");
+                        setError(t("guestCall.left"));
                     }}
                 />
             </div>
@@ -112,28 +114,28 @@ export function GuestCall({
         <PublicShell signedIn={signedIn}>
             <Card>
                 <CardHeader>
-                    <CardTitle>{title || "Join the call"}</CardTitle>
+                    <CardTitle>{title || t("guestCall.title")}</CardTitle>
                 </CardHeader>
                 <CardBody>
                     {seat?.admission === "waiting" ? (
                         <p className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Loader2 className="size-4 animate-spin" />
-                            Waiting for somebody in the call to let you in.
+                            {t("guestCall.waiting")}
                         </p>
                     ) : (
                         <div className="flex flex-col gap-3">
                             <p className="text-sm text-muted-foreground">
                                 {asAccount
-                                    ? "The host asked for Polaris accounts, so you are joining under your own name."
-                                    : "No account needed. Say who you are, and whoever is in the call decides whether to let you in."}
+                                    ? t("guestCall.asAccount")
+                                    : t("guestCall.asGuest")}
                             </p>
                             {!asAccount && (
                                 <Input
                                     value={name}
                                     autoFocus
                                     maxLength={60}
-                                    aria-label="Your name"
-                                    placeholder="Your name"
+                                    aria-label={t("guestCall.name")}
+                                    placeholder={t("guestCall.name")}
                                     onChange={(event) => setName(event.target.value)}
                                     onKeyDown={(event) => {
                                         if (event.key === "Enter" && name.trim() && !busy) {
@@ -154,7 +156,7 @@ export function GuestCall({
                                 onClick={() => void join()}
                             >
                                 {busy && <Loader2 className="size-4 animate-spin" />}
-                                {asAccount ? "Join" : "Ask to join"}
+                                {asAccount ? t("guestCall.join") : t("guestCall.askToJoin")}
                             </Button>
                         </div>
                     )}
@@ -183,6 +185,7 @@ function GuestRoom({
     title: string;
     onLeave: () => void;
 }) {
+    const t = useTranslations("chat");
     const call = useCall(meetingId, { video: true });
     useCallHotkeys(call, true);
     return (
@@ -190,7 +193,7 @@ function GuestRoom({
             <header className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">
                 <Video className="size-4 text-muted-foreground" />
                 <span className="truncate text-sm font-medium">
-                    {call.meeting?.title || title || "Call"}
+                    {call.meeting?.title || title || t("guestCall.call")}
                 </span>
             </header>
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">

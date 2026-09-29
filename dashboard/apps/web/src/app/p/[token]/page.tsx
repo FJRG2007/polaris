@@ -12,6 +12,7 @@
 
 import { getSession } from "@/lib/session";
 import { SnippetReader } from "./snippet-reader";
+import { Messages } from "@/components/i18n/messages";
 import { noteActivity } from "@/lib/session-guard";
 import { LinkUnavailable } from "@/components/public-shell";
 import { LinkPasswordForm } from "@/components/link-password-form";
@@ -40,7 +41,7 @@ export default async function PublicSnippetPage({
         if (gate.reason === "password_required") {
             return <LinkPasswordForm token={token} unlock={unlockSnippetAction} />;
         }
-        return <LinkUnavailable signedIn={signedIn} message={snippetDenialMessage(gate.reason)} />;
+        return <LinkUnavailable signedIn={signedIn} message={await snippetDenialMessage(gate.reason)} />;
     }
 
     const { snippet } = gate;
@@ -53,10 +54,16 @@ export default async function PublicSnippetPage({
     };
 
     // A one-time snippet is not spent by rendering its page.
-    if (snippet.burnAfterRead) return <SnippetReader {...shared} oneTime files={null} />;
+    if (snippet.burnAfterRead) {
+        return (
+            <Messages namespaces={["publicPages"]}>
+                <SnippetReader {...shared} oneTime files={null} />
+            </Messages>
+        );
+    }
 
     if (!(await registerSnippetView(snippet.id))) {
-        return <LinkUnavailable signedIn={signedIn} message={snippetDenialMessage("exhausted")} />;
+        return <LinkUnavailable signedIn={signedIn} message={await snippetDenialMessage("exhausted")} />;
     }
     const files = await readSnippetFiles(snippet.id);
     await logSnippetAccess({
@@ -68,14 +75,16 @@ export default async function PublicSnippetPage({
     });
 
     return (
-        <SnippetReader
-            {...shared}
-            files={files.map((file) => ({
-                name: file.name,
-                language: file.language,
-                body: file.body,
-                size: file.size
-            }))}
-        />
+        <Messages namespaces={["publicPages"]}>
+            <SnippetReader
+                {...shared}
+                files={files.map((file) => ({
+                    name: file.name,
+                    language: file.language,
+                    body: file.body,
+                    size: file.size
+                }))}
+            />
+        </Messages>
     );
 }

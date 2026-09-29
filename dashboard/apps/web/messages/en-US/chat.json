@@ -1337,5 +1337,22 @@
         "noEngine": "Polaris cannot reach a container engine from here, so it cannot restart the call server itself.",
         "notRestarted": "The call server did not restart. Chat settings says what it is doing.",
         "restarting": "The call server is restarting and will ask for this network's address again. Calls can be made in a few seconds."
+    },
+    "guestCall": {
+        "unavailableTitle": "Call unavailable",
+        "unavailable": "This call has ended, or the link is no longer good.",
+        "meeting": "Meeting",
+        "accountOnly": "This meeting is only open to people signed in to Polaris. Sign in, then open the link again.",
+        "failed": "That did not work",
+        "denied": "Somebody in the call turned the request down.",
+        "left": "You have left the call.",
+        "title": "Join the call",
+        "waiting": "Waiting for somebody in the call to let you in.",
+        "asAccount": "The host asked for Polaris accounts, so you are joining under your own name.",
+        "asGuest": "No account needed. Say who you are, and whoever is in the call decides whether to let you in.",
+        "name": "Your name",
+        "join": "Join",
+        "askToJoin": "Ask to join",
+        "call": "Call"
     }
 }

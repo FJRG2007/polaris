@@ -20,6 +20,7 @@
 import dynamic from "next/dynamic";
 import * as core from "@polaris/core";
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** What every editor takes. The same four whichever kind this is. */
 interface Opened {
@@ -29,10 +30,11 @@ interface Opened {
 }
 
 function Waiting() {
+    const t = useTranslations("publicPages");
     return (
         <div className="flex min-h-[60vh] items-center justify-center">
             <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground" aria-hidden />
-            <span className="sr-only">Opening the document</span>
+            <span className="sr-only">{t("office.opening")}</span>
         </div>
     );
 }
@@ -76,6 +78,7 @@ export function LinkedDocument({
     content: number[] | null;
     editable: boolean;
 }) {
+    const t = useTranslations("publicPages");
     const Editor = EDITORS[kind];
     return (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -87,7 +90,7 @@ export function LinkedDocument({
                     starts typing. A viewer who thinks they are editing writes a
                     paragraph into nothing. */}
                 <span className="shrink-0 text-[12px] text-muted-foreground">
-                    {editable ? "You can edit this" : "You can read this"}
+                    {editable ? t("office.canEdit") : t("office.canRead")}
                 </span>
             </header>
             <Editor documentId={documentId} content={content} editable={editable} />

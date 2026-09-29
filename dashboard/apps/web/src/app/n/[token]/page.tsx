@@ -21,6 +21,7 @@ import { noteActivity } from "@/lib/session-guard";
 import { RichText } from "@/components/rich-text/rich-text";
 import { readPublishedNote } from "@/lib/notes/share-service";
 import { RICH_TEXT_PROSE } from "@/components/rich-text/prose";
+import { getTranslations } from "@/lib/i18n/request";
 import { getDisplayFormat } from "@/lib/display-prefs-service";
 import { unlockNoteShareAction } from "@/app/(app)/notes/actions";
 import { registerNoteShareView } from "@/lib/notes/share-service";
@@ -46,21 +47,22 @@ export default async function PublicNotePage({ params }: { params: Promise<{ tok
         if (gate.reason === "password_required") {
             return <LinkPasswordForm token={token} unlock={unlockNoteShareAction} />;
         }
-        return <LinkUnavailable signedIn={signedIn} message={noteDenialMessage(gate.reason)} />;
+        return <LinkUnavailable signedIn={signedIn} message={await noteDenialMessage(gate.reason)} />;
     }
 
     // Counted before it is served, and conditionally: two people opening the last
     // permitted view at the same moment must not both get it.
     if (!(await registerNoteShareView(gate.share.id))) {
-        return <LinkUnavailable signedIn={signedIn} message={noteDenialMessage("exhausted")} />;
+        return <LinkUnavailable signedIn={signedIn} message={await noteDenialMessage("exhausted")} />;
     }
 
     const note = await readPublishedNote(gate.share);
     if (!note) {
-        return <LinkUnavailable signedIn={signedIn} message={noteDenialMessage("not_found")} />;
+        return <LinkUnavailable signedIn={signedIn} message={await noteDenialMessage("not_found")} />;
     }
 
     const format = await getDisplayFormat();
+    const t = await getTranslations("publicPages");
 
     return (
         <PublicShell signedIn={signedIn} className="max-w-3xl">
@@ -68,7 +70,7 @@ export default async function PublicNotePage({ params }: { params: Promise<{ tok
                 <CardHeader className="flex flex-col gap-1">
                     <CardTitle className="text-xl">{note.title}</CardTitle>
                     <span className="text-xs text-muted-foreground">
-                        Last changed {format.dateTime(note.updatedAt)}
+                        {t("note.lastChanged", { time: format.dateTime(note.updatedAt) })}
                     </span>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-6">

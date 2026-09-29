@@ -1337,5 +1337,22 @@
         "noEngine": "Polaris no llega a un motor de contenedores desde aquí, así que no puede reiniciar el servidor de llamadas.",
         "notRestarted": "El servidor de llamadas no se reinició. Los ajustes del chat dicen qué está haciendo.",
         "restarting": "El servidor de llamadas se está reiniciando y volverá a pedir la dirección de esta red. Podrás llamar en unos segundos."
+    },
+    "guestCall": {
+        "unavailableTitle": "No disponible",
+        "unavailable": "Esta llamada ha terminado, o el enlace ya no vale.",
+        "meeting": "Reunión",
+        "accountOnly": "Esta reunión solo está abierta a quien haya iniciado sesión en Polaris. Inicia sesión y vuelve a abrir el enlace.",
+        "failed": "No ha funcionado",
+        "denied": "Alguien de la llamada ha rechazado la solicitud.",
+        "left": "Has salido de la llamada.",
+        "title": "Ir a la llamada",
+        "waiting": "Esperando a que alguien de la llamada te deje entrar.",
+        "asAccount": "Quien organiza pidió cuentas de Polaris, así que entras con tu propio nombre.",
+        "asGuest": "No hace falta cuenta. Di quién eres, y quien esté en la llamada decide si te deja entrar.",
+        "name": "Tu nombre",
+        "join": "Entrar",
+        "askToJoin": "Pedir acceso",
+        "call": "Llamada"
     }
 }

@@ -8,11 +8,16 @@
  */
 
 import { SendReader } from "./send-reader";
+import { Messages } from "@/components/i18n/messages";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export default async function PublicSendPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    return <SendReader accessId={id} />;
+    return (
+        <Messages namespaces={["publicPages"]}>
+            <SendReader accessId={id} />
+        </Messages>
+    );
 }

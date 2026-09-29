@@ -16,6 +16,7 @@ import { prisma } from "@polaris/db";
 import { GuestCall } from "./guest-call";
 import { getSession } from "@/lib/session";
 import { Messages } from "@/components/i18n/messages";
+import { getTranslations } from "@/lib/i18n/request";
 import { LinkUnavailable } from "@/components/public-shell";
 
 export const runtime = "nodejs";
@@ -24,6 +25,7 @@ export const dynamic = "force-dynamic";
 export default async function GuestMeetingPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
     const session = await getSession();
+    const t = await getTranslations("chat");
 
     const meeting = await prisma.meeting.findUnique({
         where: { guestToken: token },
@@ -34,8 +36,8 @@ export default async function GuestMeetingPage({ params }: { params: Promise<{ t
         return (
             <LinkUnavailable
                 signedIn={Boolean(session?.user)}
-                title="Call unavailable"
-                message="This call has ended, or the link is no longer good."
+                title={t("guestCall.unavailableTitle")}
+                message={t("guestCall.unavailable")}
             />
         );
     }
@@ -51,8 +53,8 @@ export default async function GuestMeetingPage({ params }: { params: Promise<{ t
         return (
             <LinkUnavailable
                 signedIn={false}
-                title={meeting.title || "Meeting"}
-                message="This meeting is only open to people signed in to Polaris. Sign in, then open the link again."
+                title={meeting.title || t("guestCall.meeting")}
+                message={t("guestCall.accountOnly")}
             />
         );
     }

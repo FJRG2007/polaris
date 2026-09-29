@@ -13,6 +13,7 @@
 
 import * as crypto from "@/lib/vault/crypto";
 import { PublicShell } from "@/components/public-shell";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useState } from "react";
 import { Check, Copy, Loader2, Lock } from "lucide-react";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
@@ -35,9 +36,10 @@ type State =
     | { kind: "loading" }
     | { kind: "password" }
     | { kind: "open"; name: string; text: string }
-    | { kind: "error"; message: string };
+    | { kind: "error"; reason: "incomplete" | "unavailable" | "mismatch" };
 
 export function SendReader({ accessId }: { accessId: string }) {
+    const t = useTranslations("publicPages");
     const [state, setState] = useState<State>({ kind: "loading" });
     const [password, setPassword] = useState("");
     const [checking, setChecking] = useState(false);
@@ -47,10 +49,7 @@ export function SendReader({ accessId }: { accessId: string }) {
         async (secret?: string) => {
             const urlKey = keyFromFragment();
             if (!urlKey) {
-                setState({
-                    kind: "error",
-                    message: "This link is incomplete. The part after the # is the key it needs."
-                });
+                setState({ kind: "error", reason: "incomplete" });
                 return;
             }
             const response = await fetch(
@@ -68,10 +67,7 @@ export function SendReader({ accessId }: { accessId: string }) {
                 return;
             }
             if (!response.ok) {
-                setState({
-                    kind: "error",
-                    message: "This link is not available. It may have expired or been used up."
-                });
+                setState({ kind: "error", reason: "unavailable" });
                 return;
             }
 
@@ -85,10 +81,7 @@ export function SendReader({ accessId }: { accessId: string }) {
                 ? ((await crypto.decrypt(body.text.text, sendKey)) ?? "")
                 : "";
             if (!text) {
-                setState({
-                    kind: "error",
-                    message: "This link could not be opened. Its key does not match."
-                });
+                setState({ kind: "error", reason: "mismatch" });
                 return;
             }
             setState({ kind: "open", name, text });
@@ -106,7 +99,7 @@ export function SendReader({ accessId }: { accessId: string }) {
                 <Card>
                     <CardBody className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
                         <Loader2 className="size-4 animate-spin" />
-                        Opening it...
+                        {t("send.opening")}
                     </CardBody>
                 </Card>
             ) : null}
@@ -116,7 +109,7 @@ export function SendReader({ accessId }: { accessId: string }) {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Lock className="size-4" />
-                            Password required
+                            {t("send.passwordTitle")}
                         </CardTitle>
                     </CardHeader>
                     <CardBody>
@@ -130,7 +123,7 @@ export function SendReader({ accessId }: { accessId: string }) {
                             }}
                         >
                             <p className="text-sm text-muted-foreground">
-                                Whoever sent this put a password on it.
+                                {t("send.passwordHint")}
                             </p>
                             <Input
                                 type="password"
@@ -138,11 +131,11 @@ export function SendReader({ accessId }: { accessId: string }) {
                                 required
                                 value={password}
                                 onChange={(event) => setPassword(event.target.value)}
-                                placeholder="Password"
-                                aria-label="Password"
+                                placeholder={t("send.password")}
+                                aria-label={t("send.password")}
                             />
                             <Button type="submit" disabled={checking || !password}>
-                                {checking ? "Checking..." : "Open it"}
+                                {checking ? t("send.checking") : t("send.open")}
                             </Button>
                         </form>
                     </CardBody>
@@ -152,7 +145,7 @@ export function SendReader({ accessId }: { accessId: string }) {
             {state.kind === "error" ? (
                 <Card>
                     <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                        {state.message}
+                        {t(`send.${state.reason}`)}
                     </CardBody>
                 </Card>
             ) : null}
@@ -160,7 +153,7 @@ export function SendReader({ accessId }: { accessId: string }) {
             {state.kind === "open" ? (
                 <Card>
                     <CardHeader>
-                        <CardTitle>{state.name || "A secret"}</CardTitle>
+                        <CardTitle>{state.name || t("send.untitled")}</CardTitle>
                     </CardHeader>
                     <CardBody className="flex flex-col gap-3">
                         <pre className="max-h-[50vh] overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-md border border-border bg-surface p-3 font-mono text-xs">
@@ -180,12 +173,11 @@ export function SendReader({ accessId }: { accessId: string }) {
                                 ) : (
                                     <Copy className="size-4" />
                                 )}
-                                Copy
+                                {t("send.copy")}
                             </Button>
                         </div>
                         <p className="text-center text-xs text-muted-foreground">
-                            This was sent through Polaris. It may stop working after a while, or
-                            after it has been opened a few times.
+                            {t("send.footer")}
                         </p>
                     </CardBody>
                 </Card>

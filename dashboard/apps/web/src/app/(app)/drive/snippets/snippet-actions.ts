@@ -194,11 +194,11 @@ export async function openBurnSnippetAction(
     token: string
 ): Promise<{ files?: PublicSnippetFile[]; error?: string }> {
     const gate = await gateSnippetRequest(token, "open");
-    if (!gate.ok) return { error: snippetDenialMessage(gate.reason) };
+    if (!gate.ok) return { error: await snippetDenialMessage(gate.reason) };
     if (!gate.snippet.burnAfterRead) return { error: (await getTranslations("drive"))("errors.notOneTime") };
 
     if (!(await snippetService.registerSnippetView(gate.snippet.id))) {
-        return { error: snippetDenialMessage("exhausted") };
+        return { error: await snippetDenialMessage("exhausted") };
     }
     const files = await snippetService.readSnippetFiles(gate.snippet.id);
     await snippetService.burnSnippet(gate.snippet.id);

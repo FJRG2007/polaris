@@ -12,6 +12,7 @@
  * must not be spent by a request that could have been a preview fetch.
  */
 
+import { getTranslations } from "@/lib/i18n/request";
 import { gateSnippetRequest, snippetDenialMessage } from "@/lib/snippet-access";
 import { logSnippetAccess, readSnippetFiles, registerSnippetView } from "@/lib/snippet-service";
 
@@ -33,26 +34,27 @@ export async function GET(
     const { token } = await params;
     const gate = await gateSnippetRequest(token, "raw");
     if (!gate.ok) {
-        return new Response(snippetDenialMessage(gate.reason), {
+        return new Response(await snippetDenialMessage(gate.reason), {
             status: gate.status,
             headers: TEXT_HEADERS
         });
     }
+    const t = await getTranslations("publicPages");
     if (gate.snippet.clientSealed) {
-        return new Response("This snippet is sealed. Open it in a browser with its link.", {
+        return new Response(t("snippet.rawSealed"), {
             status: 409,
             headers: TEXT_HEADERS
         });
     }
     if (gate.snippet.burnAfterRead) {
-        return new Response("This snippet can only be opened once, from its page.", {
+        return new Response(t("snippet.rawOnce"), {
             status: 409,
             headers: TEXT_HEADERS
         });
     }
 
     if (!(await registerSnippetView(gate.snippet.id))) {
-        return new Response(snippetDenialMessage("exhausted"), {
+        return new Response(await snippetDenialMessage("exhausted"), {
             status: 410,
             headers: TEXT_HEADERS
         });
@@ -66,7 +68,7 @@ export async function GET(
     const wanted = new URL(request.url).searchParams.get("f");
     const chosen = wanted ? files.filter((file) => file.name === wanted) : files;
     if (chosen.length === 0) {
-        return new Response("No file by that name.", { status: 404, headers: TEXT_HEADERS });
+        return new Response(t("snippet.rawNoFile"), { status: 404, headers: TEXT_HEADERS });
     }
 
     await logSnippetAccess({

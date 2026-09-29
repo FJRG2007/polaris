@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { Download, Eye, File } from "lucide-react";
 import { formatBytes } from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody } from "@polaris/ui";
 import { FileViewer, isViewable, type ViewerTarget } from "@/app/(app)/drive/file-viewer";
 
@@ -35,6 +36,8 @@ export function ShareFileCard({
     allowDownload: boolean;
     allowPreview: boolean;
 }) {
+    const t = useTranslations("publicPages");
+    const td = useTranslations("drive");
     const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
     const canPreview = allowPreview && isViewable(name);
 
@@ -53,18 +56,18 @@ export function ShareFileCard({
                         <Button
                             variant="secondary"
                             onClick={() =>
-                                setViewerTarget({ path, name, size, locationLabel: "Shared file" })
+                                setViewerTarget({ path, name, size, locationLabel: t("share.sharedFile") })
                             }
                         >
                             <Eye className="size-4" />
-                            Preview
+                            {t("share.preview")}
                         </Button>
                     ) : null}
                     {allowDownload ? (
                         <Button asChild>
                             <a href={fileUrl(token, path, false)} download={name}>
                                 <Download className="size-4" />
-                                Download
+                                {td("filesView.menu.download")}
                             </a>
                         </Button>
                     ) : null}

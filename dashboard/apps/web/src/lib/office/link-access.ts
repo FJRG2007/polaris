@@ -14,6 +14,7 @@
 import { cookies } from "next/headers";
 import { clientIp } from "@/lib/request-context";
 import * as links from "@/lib/office/links";
+import { getTranslations } from "@/lib/i18n/request";
 import { dymoIpAllowed } from "@/lib/dymo-service";
 
 /** Why a link would not open, in the words the screen turns into a sentence. */
@@ -69,19 +70,20 @@ export async function gateOfficeLink(token: string): Promise<OfficeLinkGate> {
 
 /** What to put on the card. Never why in detail: "this link no longer works" is
  *  the honest answer to every one of these from outside. */
-export function officeLinkDenial(reason: OfficeLinkDenial): string {
+export async function officeLinkDenial(reason: OfficeLinkDenial): Promise<string> {
+    const t = await getTranslations("publicPages");
     switch (reason) {
         case "expired":
-            return "This link has passed the date it was set to stop working.";
+            return t("office.denied.expired");
         case "exhausted":
-            return "This link has been opened as many times as it was meant to be.";
+            return t("office.denied.exhausted");
         case "revoked":
-            return "This link was stopped by whoever shared it.";
+            return t("office.denied.revoked");
         case "scheduled":
-            return "This link is not open yet.";
+            return t("office.denied.scheduled");
         case "ip_flagged":
-            return "This link cannot be opened from here.";
+            return t("office.denied.flagged");
         default:
-            return "This link no longer works. Ask whoever sent it for another.";
+            return t("office.denied.other");
     }
 }

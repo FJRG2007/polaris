@@ -14,6 +14,8 @@
 import { Button, cn } from "@polaris/ui";
 import { formatBytes } from "@polaris/core";
 import { gatherDropItems } from "@/lib/drop-items";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, Trash2, UploadCloud } from "lucide-react";
 
@@ -34,21 +36,21 @@ interface MyUpload {
 }
 
 /** Map a rejection status/body to a short human explanation. */
-function explain(status: number, body: string): string {
-    if (status === 413 || body === "too_large") return "Too large";
-    if (status === 422 && body === "extension") return "File type not allowed";
-    if (status === 422 && body === "denied") return "File type not allowed";
-    if (status === 422 && body === "size") return "Too large";
-    if (status === 422 && body === "too_small") return "Too small";
-    if (status === 422 && body === "file_rejected") return "Blocked by security scan";
-    if (status === 409 || body === "full") return "This drop point is full";
-    if (status === 403 && body === "user_not_allowed") return "Not allowed for your account";
-    if (status === 403 && body === "scheduled") return "Not open yet";
-    if (status === 401) return "Sign-in required";
-    if (status === 403 && body === "country_not_allowed") return "Not allowed from your location";
-    if (status === 403) return "Not allowed from your network";
-    if (status === 410) return "This drop point is closed";
-    return "Upload failed";
+function explain(t: NamespaceTranslator<"publicPages">, status: number, body: string): string {
+    if (status === 413 || body === "too_large") return t("dropPoint.reasons.tooLarge");
+    if (status === 422 && body === "extension") return t("dropPoint.reasons.type");
+    if (status === 422 && body === "denied") return t("dropPoint.reasons.type");
+    if (status === 422 && body === "size") return t("dropPoint.reasons.tooLarge");
+    if (status === 422 && body === "too_small") return t("dropPoint.reasons.tooSmall");
+    if (status === 422 && body === "file_rejected") return t("dropPoint.reasons.blocked");
+    if (status === 409 || body === "full") return t("dropPoint.reasons.full");
+    if (status === 403 && body === "user_not_allowed") return t("dropPoint.reasons.account");
+    if (status === 403 && body === "scheduled") return t("dropPoint.reasons.notOpen");
+    if (status === 401) return t("dropPoint.reasons.signIn");
+    if (status === 403 && body === "country_not_allowed") return t("dropPoint.reasons.location");
+    if (status === 403) return t("dropPoint.reasons.network");
+    if (status === 410) return t("dropPoint.reasons.closed");
+    return t("dropPoint.reasons.failed");
 }
 
 export function DropUploader({
@@ -68,6 +70,7 @@ export function DropUploader({
     allowUploaderDelete: boolean;
     deleteWindowSeconds: number | null;
 }) {
+    const t = useTranslations("publicPages");
     const inputRef = useRef<HTMLInputElement>(null);
     const [items, setItems] = useState<Item[]>([]);
     const [dragging, setDragging] = useState(false);
@@ -107,13 +110,13 @@ export function DropUploader({
             : undefined;
 
     function localReason(file: File): string | null {
-        if (file.size > maxSizeBytes) return "Too large";
-        if (minSizeBytes > 0 && file.size < minSizeBytes) return "Too small";
+        if (file.size > maxSizeBytes) return t("dropPoint.reasons.tooLarge");
+        if (minSizeBytes > 0 && file.size < minSizeBytes) return t("dropPoint.reasons.tooSmall");
         const dot = file.name.lastIndexOf(".");
         const extension = dot > 0 ? file.name.slice(dot + 1).toLowerCase() : "";
-        if (deniedExtensions.includes(extension)) return "File type not allowed";
+        if (deniedExtensions.includes(extension)) return t("dropPoint.reasons.type");
         if (allowedExtensions.length > 0 && !allowedExtensions.includes(extension)) {
-            return "File type not allowed";
+            return t("dropPoint.reasons.type");
         }
         return null;
     }
@@ -134,7 +137,7 @@ export function DropUploader({
                     item: {
                         file,
                         status: "error",
-                        message: explain(res.status, (await res.text()).trim())
+                        message: explain(t, res.status, (await res.text()).trim())
                     }
                 };
             }
@@ -154,7 +157,7 @@ export function DropUploader({
                     : undefined;
             return { item: { file, status: "done" }, mine: record };
         } catch {
-            return { item: { file, status: "error", message: "Upload failed" } };
+            return { item: { file, status: "error", message: t("dropPoint.reasons.failed") } };
         }
     }
 
@@ -240,8 +243,8 @@ export function DropUploader({
                 )}
             >
                 <UploadCloud className="size-8" />
-                <span className="font-medium">Drop files here, or click to choose</span>
-                <span className="text-xs">Up to {formatBytes(BigInt(maxSizeBytes))} each</span>
+                <span className="font-medium">{t("dropPoint.dropHere")}</span>
+                <span className="text-xs">{t("dropPoint.upTo", { size: formatBytes(BigInt(maxSizeBytes)) })}</span>
             </button>
             <input
                 ref={inputRef}
@@ -292,14 +295,14 @@ export function DropUploader({
                     onClick={() => setItems([])}
                     className="self-start"
                 >
-                    Upload more
+                    {t("dropPoint.uploadMore")}
                 </Button>
             ) : null}
 
             {mine.length > 0 ? (
                 <div className="flex flex-col gap-1.5">
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Your uploads
+                        {t("dropPoint.yourUploads")}
                     </p>
                     <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                         {mine.map((entry) => (
@@ -316,7 +319,7 @@ export function DropUploader({
                                         className="flex items-center gap-1 text-xs text-danger hover:underline"
                                     >
                                         <Trash2 className="size-3.5" />
-                                        Delete
+                                        {t("dropPoint.delete")}
                                     </button>
                                 ) : null}
                             </li>

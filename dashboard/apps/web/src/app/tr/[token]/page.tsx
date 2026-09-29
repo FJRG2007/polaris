@@ -18,6 +18,8 @@ import { linkAddressDenial } from "@/lib/link-guards";
 import * as textRequests from "@/lib/text-request-service";
 import { LinkUnavailable } from "@/components/public-shell";
 import { getDisplayFormat } from "@/lib/display-prefs-service";
+import { Messages } from "@/components/i18n/messages";
+import { getTranslations } from "@/lib/i18n/request";
 import { LinkPasswordForm } from "@/components/link-password-form";
 import { unlockTextRequestAction } from "@/app/(app)/drive/drop-points/text-request-actions";
 
@@ -30,9 +32,10 @@ export default async function TextDropPointPage({
     params: Promise<{ token: string }>;
 }) {
     const { token } = await params;
+    const t = await getTranslations("publicPages");
     const request = await textRequests.resolveTextRequestByToken(token);
     if (!request) {
-        return <LinkUnavailable message="This drop point does not exist or was removed." />;
+        return <LinkUnavailable message={t("dropPoint.notFound")} />;
     }
 
     const usable = textRequests.textRequestUsability(request);
@@ -41,22 +44,22 @@ export default async function TextDropPointPage({
             const format = await getDisplayFormat();
             return (
                 <LinkUnavailable
-                    title="Not open yet"
-                    message={`This drop point opens on ${format.date(request.startsAt)}.`}
+                    title={t("dropPoint.notOpenTitle")}
+                    message={t("dropPoint.opensOn", { date: format.date(request.startsAt) })}
                 />
             );
         }
         return (
             <LinkUnavailable
-                title="Closed"
-                message="This drop point is no longer accepting anything."
+                title={t("textDrop.closedTitle")}
+                message={t("textDrop.closed")}
             />
         );
     }
 
     const ip = await clientIp();
     if ((await linkAddressDenial(request, ip)) || !(await dymoIpAllowed(ip)).allowed) {
-        return <LinkUnavailable message="This drop point is not available from your network." />;
+        return <LinkUnavailable message={t("dropPoint.network")} />;
     }
 
     const session = await getSession();
@@ -68,8 +71,8 @@ export default async function TextDropPointPage({
         return (
             <LinkUnavailable
                 signedIn={false}
-                title="Sign in to continue"
-                message="Whoever set this up asked that senders identify themselves."
+                title={t("textDrop.signInTitle")}
+                message={t("textDrop.signIn")}
             />
         );
     }
@@ -77,7 +80,7 @@ export default async function TextDropPointPage({
         return (
             <LinkUnavailable
                 signedIn={signedIn}
-                message="This drop point does not accept submissions from your account."
+                message={t("textDrop.account")}
             />
         );
     }
@@ -103,20 +106,22 @@ export default async function TextDropPointPage({
         return (
             <LinkUnavailable
                 signedIn={signedIn}
-                title="Full"
-                message="This drop point has taken everything it was going to."
+                title={t("textDrop.fullTitle")}
+                message={t("textDrop.full")}
             />
         );
     }
 
     return (
-        <SubmitTextForm
-            token={token}
-            title={request.title}
-            instructions={request.instructions}
-            maxLength={request.maxLength}
-            allowSealed={request.allowSealed}
-            signedIn={signedIn}
-        />
+        <Messages namespaces={["publicPages"]}>
+            <SubmitTextForm
+                token={token}
+                title={request.title}
+                instructions={request.instructions}
+                maxLength={request.maxLength}
+                allowSealed={request.allowSealed}
+                signedIn={signedIn}
+            />
+        </Messages>
     );
 }

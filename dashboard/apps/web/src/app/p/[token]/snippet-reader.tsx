@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import { CodeSurface } from "@/components/code-surface";
 import { PublicShell } from "@/components/public-shell";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody, cn } from "@polaris/ui";
 import { keyFromFragment, unseal } from "@/lib/browser-seal";
 import { Check, Copy, Download, EyeOff, FileCode, Flame, Loader2 } from "lucide-react";
@@ -39,6 +40,7 @@ export function SnippetReader({
     files: PublicSnippetFile[] | null;
     oneTime?: boolean;
 }) {
+    const t = useTranslations("publicPages");
     const [shown, setShown] = useState<PublicSnippetFile[] | null>(files);
     const [active, setActive] = useState(0);
     const [pending, setPending] = useState(false);
@@ -55,7 +57,7 @@ export function SnippetReader({
             const key = keyFromFragment();
             if (!key) {
                 if (live) {
-                    setError("This link is incomplete. The part after the # is the key it needs.");
+                    setError(t("send.incomplete"));
                     setOpening(false);
                 }
                 return;
@@ -65,7 +67,7 @@ export function SnippetReader({
             );
             if (!live) return;
             if (opened.some((file) => file.body === "")) {
-                setError("This link could not be opened. Its key does not match.");
+                setError(t("send.mismatch"));
             } else {
                 setShown(opened);
             }
@@ -74,7 +76,7 @@ export function SnippetReader({
         return () => {
             live = false;
         };
-    }, [sealed, files]);
+    }, [sealed, files, t]);
 
     async function onOpenOnce() {
         setPending(true);
@@ -82,7 +84,7 @@ export function SnippetReader({
         const result = await openBurnSnippetAction(token);
         if (result.error || !result.files) {
             setPending(false);
-            setError(result.error ?? "This link is no longer available.");
+            setError(result.error ?? t("snippet.gone"));
             return;
         }
         if (!sealed) {
@@ -93,7 +95,7 @@ export function SnippetReader({
         const key = keyFromFragment();
         if (!key) {
             setPending(false);
-            setError("This link is incomplete. The part after the # is the key it needs.");
+            setError(t("send.incomplete"));
             return;
         }
         const opened = await Promise.all(
@@ -134,7 +136,7 @@ export function SnippetReader({
                     >
                         {title}
                         {sealed ? (
-                            <EyeOff className="size-4 text-muted-foreground" aria-label="Sealed" />
+                            <EyeOff className="size-4 text-muted-foreground" aria-label={t("snippet.sealed")} />
                         ) : null}
                     </h1>
                     {description ? (
@@ -148,23 +150,22 @@ export function SnippetReader({
                     <CardBody className="flex flex-col items-center gap-3 p-8 text-center">
                         <Flame className="size-5 text-muted-foreground" />
                         <div>
-                            <p className="text-sm font-medium">This can only be opened once</p>
+                            <p className="text-sm font-medium">{t("snippet.onceTitle")}</p>
                             <p className="text-sm text-muted-foreground">
-                                Opening it deletes it. Make sure you can keep what is inside before
-                                you do.
+                                {t("snippet.onceBody")}
                             </p>
                         </div>
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <Button onClick={onOpenOnce} disabled={pending}>
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-                            Open it
+                            {t("snippet.open")}
                         </Button>
                     </CardBody>
                 </Card>
             ) : opening ? (
                 <Card>
                     <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                        Opening it in your browser...
+                        {t("snippet.opening")}
                     </CardBody>
                 </Card>
             ) : error ? (
@@ -190,8 +191,8 @@ export function SnippetReader({
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    title="Copy"
-                                    aria-label={`Copy ${current.name}`}
+                                    title={t("snippet.copy")}
+                                    aria-label={t("snippet.copyNamed", { name: current.name })}
                                     onClick={() => onCopy(current)}
                                 >
                                     {copied === current.name ? (
@@ -203,8 +204,8 @@ export function SnippetReader({
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    title="Download"
-                                    aria-label={`Download ${current.name}`}
+                                    title={t("snippet.download")}
+                                    aria-label={t("snippet.downloadNamed", { name: current.name })}
                                     onClick={() => onDownload(current)}
                                 >
                                     <Download className="size-4" />
@@ -217,11 +218,11 @@ export function SnippetReader({
                                         asChild
                                         size="sm"
                                         variant="ghost"
-                                        title="Open the raw text"
+                                        title={t("snippet.raw")}
                                     >
                                         <a
                                             href={`/p/${token}/raw?f=${encodeURIComponent(current.name)}`}
-                                            aria-label={`Raw text of ${current.name}`}
+                                            aria-label={t("snippet.rawNamed", { name: current.name })}
                                         >
                                             <FileCode className="size-4" />
                                         </a>
@@ -243,7 +244,7 @@ export function SnippetReader({
 
             {oneTime && shown !== null ? (
                 <p className="text-center text-xs text-muted-foreground">
-                    This snippet has been deleted. Closing this page loses it.
+                    {t("snippet.deleted")}
                 </p>
             ) : null}
         </PublicShell>

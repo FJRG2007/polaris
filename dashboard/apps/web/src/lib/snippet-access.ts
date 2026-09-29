@@ -17,6 +17,7 @@ import { loadEnv } from "@polaris/config";
 import { getSession } from "@/lib/session";
 import { dymoIpAllowed } from "@/lib/dymo-service";
 import { linkAddressDenial } from "@/lib/link-guards";
+import { linkDenialMessage } from "@/lib/link-denial";
 import { clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
 import {
     logSnippetAccess,
@@ -40,24 +41,9 @@ export type SnippetGate =
       }
     | { ok: false; status: number; reason: string };
 
-/** Why a gate refused, in words a visitor can act on. */
-export const SNIPPET_DENIAL_MESSAGES: Readonly<Record<string, string>> = {
-    not_found: "This link does not exist or has been removed.",
-    revoked: "This link has been revoked.",
-    expired: "This link has expired.",
-    exhausted: "This link has already been opened as many times as it allows.",
-    scheduled: "This link is not open yet.",
-    ip_not_allowed: "This link is not available from your network.",
-    country_not_allowed: "This link is not available from your location.",
-    ip_flagged: "This link is not available from your network.",
-    sign_in_required: "This snippet was shared with specific people. Sign in to open it.",
-    not_invited: "This snippet was not shared with your account.",
-    password_required: "This link is protected."
-};
-
-/** The message for a denial, falling back to the generic one. */
-export function snippetDenialMessage(reason: string): string {
-    return SNIPPET_DENIAL_MESSAGES[reason] ?? "This link is not available.";
+/** Why a gate refused, in words the visitor can act on and in their language. */
+export async function snippetDenialMessage(reason: string): Promise<string> {
+    return linkDenialMessage(reason);
 }
 
 /**

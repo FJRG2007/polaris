@@ -458,7 +458,8 @@
         "empty": "No forms yet.",
         "filesInto": "Files into {list} - {count} {count, plural, one {submission} other {submissions}}",
         "copyLink": "Copy the form link",
-        "delete": "Delete form"
+        "delete": "Delete form",
+        "received": "Thanks. Your request has been received."
     },
     "notify": {
         "aTask": "A task",

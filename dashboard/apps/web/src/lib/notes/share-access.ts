@@ -19,6 +19,7 @@ import { loadEnv } from "@polaris/config";
 import { clientIp } from "@/lib/request-context";
 import { dymoIpAllowed } from "@/lib/dymo-service";
 import { linkAddressDenial } from "@/lib/link-guards";
+import { linkDenialMessage } from "@/lib/link-denial";
 import {
     noteShareUsability,
     noteUnlockCookie,
@@ -31,21 +32,9 @@ export type NoteShareGate =
     | { ok: true; share: NoteShareRecord }
     | { ok: false; status: number; reason: string };
 
-/** Why a gate refused, in words a visitor can act on. */
-export const NOTE_DENIAL_MESSAGES: Readonly<Record<string, string>> = {
-    not_found: "This link does not exist or has been removed.",
-    revoked: "This link has been revoked.",
-    expired: "This link has expired.",
-    exhausted: "This link has already been opened as many times as it allows.",
-    scheduled: "This link is not open yet.",
-    ip_not_allowed: "This link is not available from your network.",
-    country_not_allowed: "This link is not available from your location.",
-    ip_flagged: "This link is not available from your network.",
-    password_required: "This link is protected."
-};
-
-export function noteDenialMessage(reason: string): string {
-    return NOTE_DENIAL_MESSAGES[reason] ?? "This link is not available.";
+/** Why a gate refused, in words the visitor can act on and in their language. */
+export async function noteDenialMessage(reason: string): Promise<string> {
+    return linkDenialMessage(reason);
 }
 
 export async function gateNoteShareRequest(token: string): Promise<NoteShareGate> {

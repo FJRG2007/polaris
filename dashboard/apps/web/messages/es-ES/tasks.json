@@ -458,7 +458,8 @@
         "empty": "Todavía no hay formularios.",
         "filesInto": "Registra en {list} - {count} {count, plural, one {respuesta} other {respuestas}}",
         "copyLink": "Copiar enlace",
-        "delete": "Eliminar formulario"
+        "delete": "Eliminar formulario",
+        "received": "Gracias. Hemos recibido tu solicitud."
     },
     "notify": {
         "aTask": "Una tarea",

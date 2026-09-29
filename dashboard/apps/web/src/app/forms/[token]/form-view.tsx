@@ -12,6 +12,7 @@
 import { useState } from "react";
 import { CircleCheck } from "lucide-react";
 import { runAction } from "@/lib/run-action";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { submitFormAction } from "./actions";
 import type { FormField } from "@polaris/core";
 import { Card, Input, Button, Select, CardBody, Textarea } from "@polaris/ui";
@@ -31,6 +32,7 @@ export function PublicForm({
     requireLogin: boolean;
     signedIn: boolean;
 }) {
+    const t = useTranslations("publicPages");
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const [sending, setSending] = useState(false);
@@ -42,7 +44,7 @@ export function PublicForm({
     const submit = async () => {
         setTouched(Object.fromEntries(fields.map((field) => [field.id, true])));
         if (fields.some(missing)) {
-            setError("Fill in the required questions first.");
+            setError(t("form.fillRequired"));
             return;
         }
         setSending(true);
@@ -69,9 +71,9 @@ export function PublicForm({
             <Card className="mx-auto w-full max-w-lg">
                 <CardBody className="flex flex-col gap-3 p-8 text-center">
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">{name}</h1>
-                    <p className="text-sm text-muted-foreground">This form is only open to people with an account.</p>
+                    <p className="text-sm text-muted-foreground">{t("form.accountOnly")}</p>
                     <a href="/oauth/login" className="text-sm text-primary hover:underline">
-                        Sign in to continue
+                        {t("form.signIn")}
                     </a>
                 </CardBody>
             </Card>
@@ -113,7 +115,7 @@ export function PublicForm({
                                     value={value}
                                     onValueChange={set}
                                     options={field.options.map((option) => ({ value: option, label: option }))}
-                                    placeholder="Choose one"
+                                    placeholder={t("form.chooseOne")}
                                     aria-label={field.label}
                                 />
                             ) : field.type === "checkbox" ? (
@@ -141,7 +143,7 @@ export function PublicForm({
                                 />
                             )}
 
-                            {invalid && <span className="text-xs text-danger">This one is required.</span>}
+                            {invalid && <span className="text-xs text-danger">{t("form.required")}</span>}
                         </label>
                     );
                 })}
@@ -153,7 +155,7 @@ export function PublicForm({
                 )}
 
                 <Button disabled={sending} onClick={() => void submit()}>
-                    {sending ? "Sending" : "Send"}
+                    {sending ? t("form.sending") : t("form.send")}
                 </Button>
             </CardBody>
         </Card>

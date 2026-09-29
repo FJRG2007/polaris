@@ -14,6 +14,8 @@
  */
 
 import { saveFile, sendFile } from "@/components/transfers/move-file";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { TransfersView } from "@/components/transfers/transfers-view";
 import Fuse from "fuse.js";
 import { formatBytes } from "@polaris/core";
@@ -109,10 +111,10 @@ function zipUrl(token: string, paths: string[]): string {
  * visitor asking for a folder as a zip is waiting on the server building it, and
  * before this there was nothing on screen saying so.
  */
-function openHref(href: string, downloadName?: string) {
+function openHref(href: string, label: string, downloadName?: string) {
     // A file's own name where the caller has it; for a zip the server is building,
     // the name comes back with the answer.
-    saveFile(href, downloadName ?? "the folder", downloadName ? { as: downloadName } : {});
+    saveFile(href, downloadName ?? label, downloadName ? { as: downloadName } : {});
 }
 
 /** Parent folder path of a relative path ("a/b/c" -> "a/b"). */
@@ -122,15 +124,14 @@ function parentOf(path: string): string {
 }
 
 /** A short, non-leaky message for a failed write, from the route's status/reason. */
-function writeErrorMessage(status: number, reason: string): string {
-    if (reason.endsWith("_disabled") || status === 403)
-        return "That action is not allowed on this link.";
+function writeErrorMessage(t: NamespaceTranslator<"publicPages">, status: number, reason: string): string {
+    if (reason.endsWith("_disabled") || status === 403) return t("share.errors.notAllowed");
     if (reason === "cannot_rename_root" || reason === "cannot_delete_root") {
-        return "The shared folder itself cannot be changed.";
+        return t("share.errors.root");
     }
-    if (reason === "path_outside_share") return "That location is outside the shared folder.";
-    if (status === 410) return "This link is no longer available.";
-    return "The action could not be completed. The item may be in use or protected.";
+    if (reason === "path_outside_share") return t("share.errors.outside");
+    if (status === 410) return t("share.errors.gone");
+    return t("share.errors.inUse");
 }
 
 export function ShareExplorer({
@@ -156,6 +157,8 @@ export function ShareExplorer({
     allowDelete: boolean;
     allowCreateFolder: boolean;
 }) {
+    const t = useTranslations("publicPages");
+    const td = useTranslations("drive");
     const [path, setPath] = useState(initialPath);
     const [entries, setEntries] = useState<DriveEntry[]>([]);
     const [loading, setLoading] = useState(true);
@@ -244,13 +247,13 @@ export function ShareExplorer({
                 if (controller.signal.aborted) return;
                 if (!res.ok) {
                     setEntries([]);
-                    setError("This folder could not be opened.");
+                    setError(t("share.errors.folder"));
                     return;
                 }
                 setEntries(Array.isArray(body.entries) ? (body.entries as DriveEntry[]) : []);
             })
             .catch(() => {
-                if (!controller.signal.aborted) setError("This folder could not be opened.");
+                if (!controller.signal.aborted) setError(t("share.errors.folder"));
             })
             .finally(() => {
                 if (!controller.signal.aborted) {
@@ -259,7 +262,7 @@ export function ShareExplorer({
                 }
             });
         return () => controller.abort();
-    }, [token, path, rootPath, reloadKey]);
+    }, [token, path, rootPath, reloadKey, t]);
 
     // Drop selection whenever the folder or the searched result set changes.
     useEffect(() => {
@@ -406,21 +409,22 @@ export function ShareExplorer({
             return;
         }
         if (allowPreview && isViewable(entry.name)) openViewer(entry);
-        else if (allowDownload) openHref(fileUrl(token, entry.path, false), entry.name);
+        else if (allowDownload) openHref(fileUrl(token, entry.path, false), entry.name, entry.name);
     }
 
     /** Download a selection: a single file streams directly, anything else as one ZIP. */
     function downloadSelection(items: DriveEntry[]) {
         if (!allowDownload || items.length === 0) return;
         if (items.length === 1 && items[0] && items[0].kind !== "dir") {
-            openHref(fileUrl(token, items[0].path, false), items[0].name);
+            openHref(fileUrl(token, items[0].path, false), items[0].name, items[0].name);
             return;
         }
         openHref(
             zipUrl(
                 token,
                 items.map((entry) => entry.path)
-            )
+            ),
+            t("share.theFolder")
         );
     }
 
@@ -435,12 +439,12 @@ export function ShareExplorer({
             });
             if (!res.ok) {
                 const reason = await res.text().catch(() => "");
-                setOpError(writeErrorMessage(res.status, reason.trim()));
+                setOpError(writeErrorMessage(t, res.status, reason.trim()));
                 return false;
             }
             return true;
         } catch {
-            setOpError("The action could not be completed.");
+            setOpError(t("share.errors.failed"));
             return false;
         }
     }
@@ -482,13 +486,12 @@ export function ShareExplorer({
         }
         setUploading(false);
         if (fileInput.current) fileInput.current.value = "";
-        if (failed > 0)
-            setOpError(`${failed} file${failed === 1 ? "" : "s"} could not be uploaded.`);
+        if (failed > 0) setOpError(t("share.errors.uploadFailed", { count: failed }));
         else if (renamed.length > 0) {
             setOpError(
                 renamed.length === 1
-                    ? `That name was already here, so your file was saved as ${renamed[0]}.`
-                    : `${renamed.length} names were already here, so those files were saved alongside them.`
+                    ? t("share.errors.renamedOne", { name: renamed[0] ?? "" })
+                    : t("share.errors.renamedMany", { count: renamed.length })
             );
         }
         reload();
@@ -533,8 +536,7 @@ export function ShareExplorer({
             }
         }
         setSelected(new Set());
-        if (failed > 0)
-            setOpError(`${failed} item${failed === 1 ? "" : "s"} could not be deleted.`);
+        if (failed > 0) setOpError(t("share.errors.deleteFailed", { count: failed }));
         reload();
     }
 
@@ -660,7 +662,7 @@ export function ShareExplorer({
                         openViewer(entry);
                     }}
                     className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label={`Preview ${entry.name}`}
+                    aria-label={t("share.previewNamed", { name: entry.name })}
                 >
                     <Eye className="size-4" />
                 </button>
@@ -673,7 +675,7 @@ export function ShareExplorer({
                         downloadSelection([entry]);
                     }}
                     className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label={`Download ${entry.name}`}
+                    aria-label={t("share.downloadNamed", { name: entry.name })}
                 >
                     <Download className="size-4" />
                 </button>
@@ -686,23 +688,23 @@ export function ShareExplorer({
             <ContextMenuLabel>{entry.name}</ContextMenuLabel>
             <ContextMenuItem onSelect={() => openEntry(entry)}>
                 {entry.kind === "dir" ? <Folder className="size-4" /> : <Eye className="size-4" />}
-                Open
+                {td("filesView.menu.open")}
             </ContextMenuItem>
             {allowDownload ? (
                 <ContextMenuItem onSelect={() => downloadSelection([entry])}>
                     <Download className="size-4" />
-                    {entry.kind === "dir" ? "Download as ZIP" : "Download"}
+                    {entry.kind === "dir" ? td("filesView.menu.downloadZip") : td("filesView.menu.download")}
                 </ContextMenuItem>
             ) : null}
             {allowRename ? (
                 <ContextMenuItem onSelect={() => startRename(entry)}>
                     <Pencil className="size-4" />
-                    Rename
+                    {td("filesView.menu.rename")}
                 </ContextMenuItem>
             ) : null}
             <ContextMenuItem onSelect={() => void navigator.clipboard.writeText(entry.name)}>
                 <ClipboardCopy className="size-4" />
-                Copy name
+                {t("share.copyName")}
             </ContextMenuItem>
             {allowDelete ? (
                 <>
@@ -714,7 +716,7 @@ export function ShareExplorer({
                         }
                     >
                         <Trash2 className="size-4" />
-                        Delete
+                        {td("filesView.menu.delete")}
                     </ContextMenuItem>
                 </>
             ) : null}
@@ -758,7 +760,7 @@ export function ShareExplorer({
                     {allowCreateFolder ? (
                         <Button size="sm" variant="ghost" onClick={() => setNewFolderOpen(true)}>
                             <FolderPlus className="size-4" />
-                            New folder
+                            {td("filesView.toolbar.newFolder")}
                         </Button>
                     ) : null}
                     {allowUpload ? (
@@ -770,7 +772,7 @@ export function ShareExplorer({
                                 onClick={() => fileInput.current?.click()}
                             >
                                 <Upload className="size-4" />
-                                {uploading ? "Uploading..." : "Upload"}
+                                {uploading ? td("filesView.toolbar.uploading") : td("filesView.toolbar.upload")}
                             </Button>
                             <input
                                 ref={fileInput}
@@ -789,10 +791,10 @@ export function ShareExplorer({
                         <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => openHref(zipUrl(token, [path || rootPath]))}
+                            onClick={() => openHref(zipUrl(token, [path || rootPath]), t("share.theFolder"))}
                         >
                             <Download className="size-4" />
-                            Download all
+                            {t("share.downloadAll")}
                         </Button>
                     ) : null}
                 </div>
@@ -805,8 +807,8 @@ export function ShareExplorer({
                     <Input
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search - try *.pdf, ext:pptx,pdf, /regex/"
-                        title="Wildcards (*, ?), ext:pptx,pdf for extensions, /pattern/ for regex, or plain text for a fuzzy match"
+                        placeholder={td("filesView.search.placeholder")}
+                        title={td("filesView.search.help")}
                         className={cn("pl-8 pr-9", searchError && "border-danger")}
                     />
                     <button
@@ -814,11 +816,11 @@ export function ShareExplorer({
                         onClick={() =>
                             setSearchScope((prev) => (prev === "current" ? "recursive" : "current"))
                         }
-                        aria-label="Toggle search scope"
+                        aria-label={td("filesView.search.toggleScope")}
                         title={
                             searchScope === "recursive"
-                                ? "Searching this folder and all subfolders. Click to search only this folder."
-                                : "Searching only this folder. Click to search all subfolders too."
+                                ? td("filesView.search.recursive")
+                                : td("filesView.search.current")
                         }
                         className={cn(
                             "absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 transition-colors hover:bg-muted",
@@ -843,14 +845,14 @@ export function ShareExplorer({
                                 sortKey === key && "bg-muted font-medium"
                             )}
                         >
-                            {key}
+                            {t(`share.sort.${key}`)}
                         </button>
                     ))}
                     <button
                         type="button"
                         onClick={() => setSortDir((prev) => (prev === "asc" ? "desc" : "asc"))}
                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted"
-                        aria-label={`Sort ${sortDir === "asc" ? "descending" : "ascending"}`}
+                        aria-label={sortDir === "asc" ? t("share.sort.descending") : t("share.sort.ascending")}
                     >
                         {sortDir === "asc" ? (
                             <ArrowDownAZ className="size-4" />
@@ -863,7 +865,7 @@ export function ShareExplorer({
                     <button
                         type="button"
                         onClick={() => setViewMode("list")}
-                        aria-label="List view"
+                        aria-label={td("filesView.view.list")}
                         className={cn(
                             "rounded p-1 transition-colors hover:bg-muted",
                             viewMode === "list"
@@ -876,7 +878,7 @@ export function ShareExplorer({
                     <button
                         type="button"
                         onClick={() => setViewMode("grid")}
-                        aria-label="Grid view"
+                        aria-label={td("filesView.view.grid")}
                         className={cn(
                             "rounded p-1 transition-colors hover:bg-muted",
                             viewMode === "grid"
@@ -893,7 +895,7 @@ export function ShareExplorer({
                     onClick={() => setFiltersOpen((prev) => !prev)}
                 >
                     <SlidersHorizontal className="size-4" />
-                    Filters
+                    {td("filesView.filters.button")}
                     {hasFilters ? (
                         <Badge variant="neutral">{categories.size + (extFilter ? 1 : 0)}</Badge>
                     ) : null}
@@ -903,10 +905,11 @@ export function ShareExplorer({
             {searchScope === "recursive" && query.trim() ? (
                 <p className="mb-3 -mt-1 text-xs text-muted-foreground">
                     {searching
-                        ? "Searching this folder and all subfolders..."
-                        : `${visible.length} result${visible.length === 1 ? "" : "s"} across subfolders${
-                              searchTruncated ? " (first matches only - narrow your search)" : ""
-                          }`}
+                        ? td("filesView.search.searchingRecursive")
+                        : td("filesView.search.results", {
+                              count: visible.length,
+                              truncated: searchTruncated ? "yes" : "no"
+                          })}
                 </p>
             ) : null}
 
@@ -925,13 +928,13 @@ export function ShareExplorer({
                                         : "border-border text-muted-foreground hover:bg-muted"
                                 )}
                             >
-                                {category.label}
+                                {td(`fileCategories.${category.id}`)}
                             </button>
                         ))}
                     </div>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Extension
+                            {td("filesView.filters.extension")}
                             <Input
                                 value={extFilter}
                                 onChange={(e) => setExtFilter(e.target.value)}
@@ -939,7 +942,7 @@ export function ShareExplorer({
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Min size (MB)
+                            {td("filesView.filters.minSize")}
                             <Input
                                 value={minMb}
                                 onChange={(e) => setMinMb(e.target.value)}
@@ -948,7 +951,7 @@ export function ShareExplorer({
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Max size (MB)
+                            {td("filesView.filters.maxSize")}
                             <Input
                                 value={maxMb}
                                 onChange={(e) => setMaxMb(e.target.value)}
@@ -957,7 +960,7 @@ export function ShareExplorer({
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Modified after
+                            {td("filesView.filters.after")}
                             <Input
                                 value={dateFrom}
                                 onChange={(e) => setDateFrom(e.target.value)}
@@ -965,7 +968,7 @@ export function ShareExplorer({
                             />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Modified before
+                            {td("filesView.filters.before")}
                             <Input
                                 value={dateTo}
                                 onChange={(e) => setDateTo(e.target.value)}
@@ -986,7 +989,7 @@ export function ShareExplorer({
                             }}
                             className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
                         >
-                            Clear filters
+                            {td("filesView.filters.clear")}
                         </button>
                     ) : null}
                 </div>
@@ -1003,7 +1006,7 @@ export function ShareExplorer({
             >
                 {selectedEntries.length > 0 ? (
                     <>
-                        <span className="font-medium">{selectedEntries.length} selected</span>
+                        <span className="font-medium">{t("share.selected", { count: selectedEntries.length })}</span>
                         <div className="ml-auto flex items-center gap-1">
                             {allowDownload ? (
                                 <Button
@@ -1014,8 +1017,8 @@ export function ShareExplorer({
                                     <Download className="size-4" />
                                     {selectedEntries.length > 1 ||
                                     selectedEntries.some((entry) => entry.kind === "dir")
-                                        ? "Download ZIP"
-                                        : "Download"}
+                                        ? td("filesView.selection.downloadZip")
+                                        : td("filesView.selection.download")}
                                 </Button>
                             ) : null}
                             {allowRename && selectedEntries.length === 1 && selectedEntries[0] ? (
@@ -1025,7 +1028,7 @@ export function ShareExplorer({
                                     onClick={() => startRename(selectedEntries[0]!)}
                                 >
                                     <Pencil className="size-4" />
-                                    Rename
+                                    {td("filesView.menu.rename")}
                                 </Button>
                             ) : null}
                             {allowDelete ? (
@@ -1035,7 +1038,7 @@ export function ShareExplorer({
                                     onClick={() => setDeleteTargets(selectedEntries)}
                                 >
                                     <Trash2 className="size-4" />
-                                    Delete
+                                    {td("filesView.selection.delete")}
                                 </Button>
                             ) : null}
                             <Button
@@ -1044,17 +1047,17 @@ export function ShareExplorer({
                                 onClick={() => setSelected(new Set())}
                             >
                                 <X className="size-4" />
-                                Clear
+                                {td("filesView.selection.clear")}
                             </Button>
                         </div>
                     </>
                 ) : (
                     <span className="text-xs text-muted-foreground">
                         {allowUpload
-                            ? "Drop files here to upload, or open an item to preview."
+                            ? t("share.hint.upload")
                             : allowDownload
-                              ? "Select items to download, or open one to preview."
-                              : "Open an item to preview it."}
+                              ? t("share.hint.download")
+                              : t("share.hint.preview")}
                     </span>
                 )}
             </div>
@@ -1069,7 +1072,7 @@ export function ShareExplorer({
                 {dragUpload ? (
                     <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-md border-2 border-dashed border-primary bg-primary/5 text-sm font-medium text-primary">
                         <Upload className="mr-2 size-4" />
-                        Drop files to upload here
+                        {td("filesView.dropHere")}
                     </div>
                 ) : null}
 
@@ -1082,10 +1085,10 @@ export function ShareExplorer({
                 ) : visible.length === 0 ? (
                     <p className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         {query.trim()
-                            ? "No items match your search."
+                            ? t("share.empty.noMatches")
                             : allowUpload
-                              ? "This folder is empty. Drop files here or use Upload to add some."
-                              : "This folder is empty."}
+                              ? t("share.empty.dropHere")
+                              : td("filesView.empty.folderEmpty")}
                     </p>
                 ) : viewMode === "grid" ? (
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
@@ -1129,11 +1132,11 @@ export function ShareExplorer({
                                 checked={allSelected}
                                 indeterminate={!allSelected && selectedEntries.length > 0}
                                 onChange={toggleAll}
-                                aria-label="Select all"
+                                aria-label={td("filesView.selection.selectAll")}
                             />
-                            <span className="flex-1">Name</span>
-                            <span className="hidden w-40 sm:block">Modified</span>
-                            <span className="w-20 text-right">Size</span>
+                            <span className="flex-1">{td("filesView.details.name")}</span>
+                            <span className="hidden w-40 sm:block">{td("filesView.details.modified")}</span>
+                            <span className="w-20 text-right">{td("filesView.details.size")}</span>
                             <span className="w-16" />
                         </div>
                         <div
@@ -1178,7 +1181,7 @@ export function ShareExplorer({
                                                         checked={isSelected}
                                                         onClick={(event) => event.stopPropagation()}
                                                         onChange={() => toggleOne(entry.path)}
-                                                        aria-label={`Select ${entry.name}`}
+                                                        aria-label={td("filesView.selection.selectItem", { name: entry.name })}
                                                     />
                                                     <EntryIcon
                                                         entry={entry}
@@ -1214,9 +1217,9 @@ export function ShareExplorer({
             <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>New folder</DialogTitle>
+                        <DialogTitle>{td("explorer.newFolder.title")}</DialogTitle>
                         <DialogDescription>
-                            Create a folder in the current location.
+                            {td("explorer.newFolder.description")}
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submitNewFolder} className="flex flex-col gap-3">
@@ -1224,16 +1227,16 @@ export function ShareExplorer({
                             autoFocus
                             value={newFolderName}
                             onChange={(event) => setNewFolderName(event.target.value)}
-                            placeholder="Folder name"
+                            placeholder={td("explorer.newFolder.placeholder")}
                         />
                         <div className="flex justify-end gap-2">
                             <DialogClose asChild>
                                 <Button type="button" variant="ghost">
-                                    Cancel
+                                    {td("explorer.cancel")}
                                 </Button>
                             </DialogClose>
                             <Button type="submit" disabled={!newFolderName.trim()}>
-                                Create
+                                {td("explorer.create")}
                             </Button>
                         </div>
                     </form>
@@ -1247,7 +1250,7 @@ export function ShareExplorer({
             >
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Rename</DialogTitle>
+                        <DialogTitle>{td("filesView.menu.rename")}</DialogTitle>
                         <DialogDescription className="truncate">
                             {renameTarget?.name}
                         </DialogDescription>
@@ -1257,16 +1260,16 @@ export function ShareExplorer({
                             autoFocus
                             value={renameValue}
                             onChange={(event) => setRenameValue(event.target.value)}
-                            placeholder="New name"
+                            placeholder={t("share.newName")}
                         />
                         <div className="flex justify-end gap-2">
                             <DialogClose asChild>
                                 <Button type="button" variant="ghost">
-                                    Cancel
+                                    {td("explorer.cancel")}
                                 </Button>
                             </DialogClose>
                             <Button type="submit" disabled={!renameValue.trim()}>
-                                Rename
+                                {td("filesView.menu.rename")}
                             </Button>
                         </div>
                     </form>
@@ -1281,15 +1284,12 @@ export function ShareExplorer({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            Delete{" "}
-                            {deleteTargets && deleteTargets.length > 1
-                                ? `${deleteTargets.length} items`
-                                : "item"}
+                            {t("share.delete.title", { count: deleteTargets?.length ?? 1 })}
                         </DialogTitle>
                         <DialogDescription className="truncate">
                             {deleteTargets && deleteTargets.length === 1
-                                ? `${deleteTargets[0]?.name} will be permanently deleted. This cannot be undone.`
-                                : "The selected items will be permanently deleted. This cannot be undone."}
+                                ? t("share.delete.bodyOne", { name: deleteTargets[0]?.name ?? "" })
+                                : t("share.delete.bodyMany")}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2">
@@ -1298,10 +1298,10 @@ export function ShareExplorer({
                             variant="ghost"
                             onClick={() => setDeleteTargets(null)}
                         >
-                            Cancel
+                            {td("explorer.cancel")}
                         </Button>
                         <Button type="button" variant="danger" onClick={confirmDelete}>
-                            Delete
+                            {td("filesView.menu.delete")}
                         </Button>
                     </div>
                 </DialogContent>
@@ -1311,7 +1311,7 @@ export function ShareExplorer({
             {uploading ? (
                 <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-border-strong bg-elevated p-3 text-sm shadow-popover">
                     <Loader2 className="size-4 animate-spin text-primary" />
-                    Uploading...
+                    {td("filesView.toolbar.uploading")}
                 </div>
             ) : null}
 
@@ -1324,7 +1324,7 @@ export function ShareExplorer({
                         type="button"
                         onClick={() => setOpError(null)}
                         className="shrink-0 rounded p-0.5 hover:bg-danger-soft"
-                        aria-label="Dismiss"
+                        aria-label={td("explorer.dismiss")}
                     >
                         <X className="size-4" />
                     </button>

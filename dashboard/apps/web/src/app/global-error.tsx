@@ -9,8 +9,31 @@
 
 import "./globals.css";
 import "@polaris/ui/styles.css";
-import { useEffect } from "react";
+import esES from "../../messages/es-ES/common.json";
+import enUS from "../../messages/en-US/common.json";
+import { useEffect, useState } from "react";
+import { readLocaleCookie } from "@/lib/i18n/cookie";
 import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
+import { createTranslator, DEFAULT_LOCALE, negotiateLocale, type Locale } from "@polaris/core";
+
+/**
+ * This boundary replaces the root layout, and with it the provider every other
+ * screen reads its words from. So it carries its own: the `common` catalog of
+ * each language, which is small, and the language this browser was last shown
+ * Polaris in. Chosen after mount - the server drew this in English, and
+ * drawing something else before hydration would not match it.
+ */
+const COMMON = { "en-US": enUS, "es-ES": esES } as const satisfies Record<Locale, unknown>;
+
+function useReaderLocale(): Locale {
+    const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
+    useEffect(() => {
+        const chosen = readLocaleCookie(document.cookie) ?? negotiateLocale(navigator.languages) ?? DEFAULT_LOCALE;
+        setLocale(chosen);
+        document.documentElement.lang = chosen;
+    }, []);
+    return locale;
+}
 
 export default function GlobalError({
     error,
@@ -20,6 +43,8 @@ export default function GlobalError({
     reset: () => void;
 }) {
     const staleBuild = isStaleBuildError(error);
+    const locale = useReaderLocale();
+    const t = createTranslator(locale, COMMON[locale] as typeof enUS, { namespace: "common" });
 
     useEffect(() => {
         console.error(error);
@@ -40,13 +65,13 @@ export default function GlobalError({
                         <div className="flex flex-col gap-1">
                             <h1 className="text-sm font-medium">
                                 {staleBuild
-                                    ? "Polaris was updated while this page was open"
-                                    : "Polaris could not start this page"}
+                                    ? t("pages.globalError.updatedTitle")
+                                    : t("pages.globalError.brokeTitle")}
                             </h1>
                             <p className="text-sm text-muted-foreground">
                                 {staleBuild
-                                    ? "This tab is still running the old build. Reload to pick up the new one."
-                                    : "Reload to try again. If it keeps happening, this is what it failed with."}
+                                    ? t("pages.globalError.updatedBody")
+                                    : t("pages.globalError.brokeBody")}
                             </p>
                         </div>
                         {error.message && !staleBuild ? (
@@ -56,7 +81,7 @@ export default function GlobalError({
                         ) : null}
                         {error.digest && !staleBuild ? (
                             <p className="font-mono text-xs text-muted-foreground">
-                                Reference: {error.digest}
+                                {t("pages.globalError.reference", { digest: error.digest })}
                             </p>
                         ) : null}
                         <div className="flex gap-2">
@@ -65,7 +90,7 @@ export default function GlobalError({
                                 onClick={() => window.location.reload()}
                                 className="w-fit rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                             >
-                                Reload
+                                {t("pages.globalError.reload")}
                             </button>
                             {/* Retrying an old build only reproduces the failure. */}
                             {!staleBuild && (
@@ -74,7 +99,7 @@ export default function GlobalError({
                                     onClick={reset}
                                     className="w-fit rounded-md px-4 py-2 text-sm font-medium hover:bg-muted"
                                 >
-                                    Try again
+                                    {t("pages.globalError.tryAgain")}
                                 </button>
                             )}
                         </div>

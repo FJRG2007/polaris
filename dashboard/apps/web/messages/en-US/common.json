@@ -27,6 +27,15 @@
             "title": "There is nothing at this address",
             "description": "The link may be out of date, or the thing it pointed at may have been removed.",
             "toOverview": "Go to the overview"
+        },
+        "globalError": {
+            "updatedTitle": "Polaris was updated while this page was open",
+            "brokeTitle": "Polaris could not start this page",
+            "updatedBody": "This tab is still running the old build. Reload to pick up the new one.",
+            "brokeBody": "Reload to try again. If it keeps happening, this is what it failed with.",
+            "reference": "Reference: {digest}",
+            "reload": "Reload",
+            "tryAgain": "Try again"
         }
     },
     "share": {

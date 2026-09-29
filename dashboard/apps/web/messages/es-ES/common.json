@@ -27,6 +27,15 @@
             "title": "No hay nada en esta dirección",
             "description": "Puede que el enlace esté desactualizado o que lo que enlazaba se haya eliminado.",
             "toOverview": "Ir al resumen"
+        },
+        "globalError": {
+            "updatedTitle": "Polaris se actualizó con esta página abierta",
+            "brokeTitle": "Polaris no ha podido iniciar esta página",
+            "updatedBody": "Esta pestaña sigue con la versión anterior. Recarga para cargar la nueva.",
+            "brokeBody": "Recarga para volver a intentarlo. Si sigue pasando, este es el error con el que falló.",
+            "reference": "Referencia: {digest}",
+            "reload": "Recargar",
+            "tryAgain": "Reintentar"
         }
     },
     "share": {

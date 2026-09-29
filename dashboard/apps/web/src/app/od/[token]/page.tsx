@@ -22,6 +22,7 @@ import * as core from "@polaris/core";
 import { getSession } from "@/lib/session";
 import { LinkedDocument } from "./linked-document";
 import { Messages } from "@/components/i18n/messages";
+import { getTranslations } from "@/lib/i18n/request";
 import { readByLink } from "@/lib/office/documents";
 import { LinkPasswordForm } from "@/components/link-password-form";
 import { LinkUnavailable, PublicShell } from "@/components/public-shell";
@@ -47,11 +48,11 @@ export default async function LinkedOfficePage({
                 <LinkPasswordForm
                     token={token}
                     unlock={unlockOfficeLinkAction}
-                    description="This document is behind a password. Type it to open it."
+                    description={(await getTranslations("publicPages"))("office.passwordDescription")}
                 />
             );
         }
-        return <LinkUnavailable signedIn={signedIn} message={officeLinkDenial(gate.reason)} />;
+        return <LinkUnavailable signedIn={signedIn} message={await officeLinkDenial(gate.reason)} />;
     }
 
     // The opening is spent here, on the way in, and it is what writes the pass
@@ -65,13 +66,13 @@ export default async function LinkedOfficePage({
 
     const found = await readByLink(gate.visit.documentId);
     if (!found) {
-        return <LinkUnavailable signedIn={signedIn} message={officeLinkDenial("not_found")} />;
+        return <LinkUnavailable signedIn={signedIn} message={await officeLinkDenial("not_found")} />;
     }
 
     return (
         <PublicShell signedIn={signedIn} className="max-w-none">
             {/* The editors are Office's, and say Office's words. */}
-            <Messages namespaces={["office"]}>
+            <Messages namespaces={["office", "publicPages"]}>
                 <LinkedDocument
                     documentId={found.id}
                     kind={found.kind}
