@@ -14,7 +14,9 @@
 
 import { describeAccount, accountHost } from "@/lib/accounts";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { firstName, greetingFor, initials, tintFor } from "@polaris/core/faces";
+import { firstName, initials, tintFor } from "@polaris/core/faces";
+import { useWords } from "./words";
+import { ENGLISH, type Words } from "@/lib/words";
 import { askBackground, type Request, type VaultStatus } from "@/lib/messages";
 
 /** The sections the home screen offers. */
@@ -151,11 +153,12 @@ function ShelfPicker({
     status: VaultStatus;
     onChange: () => Promise<void>;
 }): React.JSX.Element | null {
+    const t = useWords();
     const [open, setOpen] = useState(false);
     const [refused, setRefused] = useState<string | null>(null);
     if (status.organizations.length === 0) return null;
 
-    const own = status.linkedAccount?.name ?? "Your account";
+    const own = status.linkedAccount?.name ?? t("shell.yourAccount");
     const current = status.organizations.find((org) => org.id === status.shelf) ?? null;
     const ownTint = status.linkedAccount?.id ?? own;
 
@@ -172,7 +175,7 @@ function ShelfPicker({
                 className="shelf"
                 aria-haspopup="menu"
                 aria-expanded={open}
-                aria-label={`Working in ${current?.name ?? own}`}
+                aria-label={t("shell.workingInLabel", { name: current?.name ?? own })}
                 onClick={() => setOpen(!open)}
             >
                 {current ? (
@@ -192,7 +195,7 @@ function ShelfPicker({
                 </svg>
             </button>
             <Menu open={open} onClose={() => setOpen(false)} align="start">
-                <p className="menu-label">Working in</p>
+                <p className="menu-label">{t("shell.workingIn")}</p>
                 <button className="menu-item" role="menuitem" onClick={() => void choose(null)}>
                     <Face image={status.face} name={own} tint={ownTint} size={18} />
                     <span className="menu-text">{own}</span>
@@ -231,9 +234,10 @@ function AccountMenu({
     status: VaultStatus;
     onChange: () => Promise<void>;
 }): React.JSX.Element {
+    const t = useWords();
     const [open, setOpen] = useState(false);
     const [refused, setRefused] = useState<string | null>(null);
-    const name = status.linkedAccount?.name ?? "Your account";
+    const name = status.linkedAccount?.name ?? t("shell.yourAccount");
     const tint = status.linkedAccount?.id ?? name;
     const others = status.accounts.filter((one) => one.id !== status.activeId);
 
@@ -250,7 +254,7 @@ function AccountMenu({
                 className="avatar-button"
                 aria-haspopup="menu"
                 aria-expanded={open}
-                aria-label={`${name}, account menu`}
+                aria-label={t("shell.accountMenu", { name })}
                 title={name}
                 onClick={() => setOpen(!open)}
             >
@@ -276,7 +280,7 @@ function AccountMenu({
                             window.close();
                         }}
                     >
-                        <span className="menu-text">Open Polaris</span>
+                        <span className="menu-text">{t("shell.openPolaris")}</span>
                     </button>
                 ) : null}
                 {others.map((one) => (
@@ -286,7 +290,7 @@ function AccountMenu({
                         role="menuitem"
                         onClick={() => void act({ kind: "switchAccount", id: one.id })}
                     >
-                        <span className="menu-text">Switch to {describeAccount(one)}</span>
+                        <span className="menu-text">{t("shell.switchTo", { name: describeAccount(one) })}</span>
                         <span className="muted small">{accountHost(one.origin)}</span>
                     </button>
                 ))}
@@ -296,7 +300,7 @@ function AccountMenu({
                         role="menuitem"
                         onClick={() => void act({ kind: "addAccount" })}
                     >
-                        <span className="menu-text">Add another account</span>
+                        <span className="menu-text">{t("shell.addAccount")}</span>
                     </button>
                 ) : null}
                 <hr />
@@ -305,7 +309,7 @@ function AccountMenu({
                     role="menuitem"
                     onClick={() => void act({ kind: "unlink" })}
                 >
-                    <span className="menu-text">Disconnect this browser</span>
+                    <span className="menu-text">{t("shell.disconnect")}</span>
                 </button>
             </Menu>
             {refused ? <p className="problem">{refused}</p> : null}
@@ -321,12 +325,12 @@ export function TopBar({
     status: VaultStatus;
     onChange: () => Promise<void>;
 }): React.JSX.Element {
+    const t = useWords();
     const name = status.linkedAccount?.name ? firstName(status.linkedAccount.name) : "";
-    const hello = greetingFor(new Date());
     return (
         <div className="topbar">
             <div className="topbar-left">
-                <p className="hello">{name ? `${hello}, ${name}` : hello}</p>
+                <p className="hello">{greeting(t, new Date(), name)}</p>
                 <ShelfPicker status={status} onChange={onChange} />
             </div>
             <AccountMenu status={status} onChange={onChange} />
@@ -334,12 +338,20 @@ export function TopBar({
     );
 }
 
+/** The greeting for the hour, as core's `greetingFor` draws the line, with the
+ *  name when there is one. */
+export function greeting(t: Words, date: Date, name: string): string {
+    const hour = date.getHours();
+    const part = hour < 6 ? "night" : hour < 12 ? "morning" : hour < 19 ? "afternoon" : "evening";
+    return t("shell.greeting", { part, hasName: name ? "yes" : "no", name });
+}
+
 /** What the vault is doing, in the words the home screen says it in. */
-export function vaultState(status: VaultStatus): string {
-    if (!status.canVault) return "This account has no vault";
-    if (!status.connected || !status.polarisSession) return "Not connected yet";
-    if (!status.unlocked) return "Locked";
-    return "Open";
+export function vaultState(status: VaultStatus, t: Words = ENGLISH): string {
+    if (!status.canVault) return t("shell.noVault");
+    if (!status.connected || !status.polarisSession) return t("shell.notConnected");
+    if (!status.unlocked) return t("shell.locked");
+    return t("shell.open");
 }
 
 /** The home screen: what this extension can do, one row per section. */
@@ -350,9 +362,10 @@ export function Home({
     status: VaultStatus;
     onOpen: (section: Section) => void;
 }): React.JSX.Element {
+    const t = useWords();
     return (
         <main>
-            <h2>Apps</h2>
+            <h2>{t("shell.apps")}</h2>
             <ul>
                 <li className="section-row">
                     <button className="section" onClick={() => onOpen("vault")}>
@@ -363,8 +376,8 @@ export function Home({
                             </svg>
                         </span>
                         <span className="section-text">
-                            <span className="strong">Vault</span>
-                            <span className="muted small">{vaultState(status)}</span>
+                            <span className="strong">{t("shell.vault")}</span>
+                            <span className="muted small">{vaultState(status, t)}</span>
                         </span>
                         <svg className="chevron-right" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="m9 18 6-6-6-6" />
@@ -384,12 +397,13 @@ export function SectionBar({
     title: string;
     onBack: () => void;
 }): React.JSX.Element {
+    const t = useWords();
     return (
         <div className="section-bar">
             <button
                 className="back"
-                aria-label="Back to the home screen"
-                title="Back"
+                aria-label={t("shell.backLabel")}
+                title={t("shell.back")}
                 onClick={onBack}
             >
                 <svg viewBox="0 0 24 24" aria-hidden="true">

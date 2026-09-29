@@ -427,6 +427,10 @@ li {
 
 footer {
     display: flex;
+    /* Three buttons and when the vault last synced, which in a longer language
+       than English is more than 360 pixels hold: the time goes to a line of its
+       own rather than being squeezed into a column a word wide. */
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
     padding: 10px 16px;

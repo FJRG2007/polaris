@@ -1,6 +1,6 @@
 import { storage } from "#imports";
 import { screenFor } from "@/lib/screen";
-import { TIMEOUT_CHOICES } from "@/lib/lock";
+import { timeoutChoices } from "@/lib/lock";
 import { EVERY_SITE } from "@/lib/injection";
 import { readIntendedLogin } from "@/lib/save";
 import type { UpdateNotice } from "@/lib/update";
@@ -9,6 +9,8 @@ import { accountHost, describeAccount } from "@/lib/accounts";
 import { GeneratorPanel } from "./generator";
 import { CheckMark, CopyMark } from "./marks";
 import { Home, SectionBar, TopBar, useSection } from "./shell";
+import { useWords } from "./words";
+import type { Words } from "@/lib/words";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askBackground, type ItemSummary, type Request, type VaultStatus } from "@/lib/messages";
 // The subpath rather than the package: `@polaris/core` is a barrel over the whole
@@ -116,32 +118,33 @@ function UpdateBanner({
     notice: UpdateNotice | null;
     server: string | null;
 }): React.JSX.Element | null {
+    const t = useWords();
     if (!notice) return null;
     if (notice.kind === "store") {
-        return (
-            <div className="notice small">
-                Version {notice.version} is out. Your browser installs it once the store has
-                reviewed it, so there is nothing to do here.
-            </div>
-        );
+        return <div className="notice small">{t("popup.update.store", { version: notice.version })}</div>;
     }
     return (
         <div className="notice small">
-            Version {notice.version} is out. This copy was loaded by hand, so it has to be loaded
-            again the same way.{" "}
-            <a
-                href={server ? `${server}/account/downloads` : notice.url}
-                target="_blank"
-                rel="noreferrer"
-            >
-                {server ? "The steps are on your Polaris" : "See what changed"}
-            </a>
-            .
+            {t.rich("popup.update.byHand", {
+                version: notice.version,
+                link: (chunks) => (
+                    <a
+                        key="link"
+                        href={server ? `${server}/account/downloads` : notice.url}
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        {chunks}
+                    </a>
+                ),
+                where: server ? "polaris" : "changes"
+            })}
         </div>
     );
 }
 
 export function App(): React.JSX.Element {
+    const t = useWords();
     const [status, refresh] = useStatus();
     const update = useUpdate();
     const [section, setSection] = useSection();
@@ -199,7 +202,7 @@ export function App(): React.JSX.Element {
                 <Home status={status} onOpen={setSection} />
             ) : (
                 <>
-                    <SectionBar title="Vault" onBack={() => setSection("home")} />
+                    <SectionBar title={t("shell.vault")} onBack={() => setSection("home")} />
                     {shown === "signIn" || (shown === "unlock" && onApproval) ? (
                         <SignIn
                             server={status.server}
@@ -239,6 +242,7 @@ function Problem({ text }: { text: string | null }): React.JSX.Element | null {
 }
 
 function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element {
+    const t = useWords();
     const [typed, setTyped] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [asking, setAsking] = useState(false);
@@ -250,7 +254,7 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
     const connect = async (): Promise<void> => {
         const origin = readOrigin(typed);
         if (!origin) {
-            setError("That does not look like an address.");
+            setError(t("errors.notAnAddress"));
             return;
         }
         setAsking(true);
@@ -269,7 +273,7 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
         }
         if (!granted) {
             setAsking(false);
-            setError("Without permission for that address, nothing can be read from it.");
+            setError(t("errors.noPermission"));
             return;
         }
 
@@ -284,11 +288,13 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
 
     return (
         <main className="pad">
+            {/* i18n-ignore the product's name */}
             <h1>Polaris</h1>
-            <p className="muted">The address you open the dashboard at.</p>
+            <p className="muted">{t("popup.connect.hint")}</p>
             <input
                 autoFocus
                 value={typed}
+                // i18n-ignore an example address, the same in every language
                 placeholder="polaris.example.com"
                 onChange={(event) => setTyped(event.target.value)}
                 onKeyDown={(event) => event.key === "Enter" && void connect()}
@@ -300,12 +306,9 @@ function Connect({ onDone }: { onDone: () => Promise<void> }): React.JSX.Element
                 that cannot exist - after which the reader is left with a refusal
                 and no way to tell it from a real one. */}
             <button disabled={asking || !usable} onClick={() => void connect()}>
-                {asking ? "Asking the browser" : "Continue"}
+                {asking ? t("popup.connect.asking") : t("popup.connect.continue")}
             </button>
-            <p className="muted small">
-                The browser will ask whether this extension may talk to that address. It is the only
-                one it ever reads.
-            </p>
+            <p className="muted small">{t("popup.connect.permission")}</p>
         </main>
     );
 }
@@ -327,6 +330,7 @@ function LinkPolaris({
     server: string;
     onDone: () => Promise<void>;
 }): React.JSX.Element {
+    const t = useWords();
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [waiting, setWaiting] = useState<{ userCode: string; pollMs: number } | null>(null);
@@ -368,12 +372,8 @@ function LinkPolaris({
             return;
         }
         if (reply.waiting === "none") return;
-        setError(
-            reply.waiting === "denied"
-                ? "That was turned down in Polaris."
-                : "That request ran out. Ask again."
-        );
-    }, [onDone]);
+        setError(reply.waiting === "denied" ? t("popup.link.denied") : t("popup.link.expired"));
+    }, [onDone, t]);
 
     // A request left in flight, found again on the way back in: opening this
     // popup is the only way back to it, since pressing the button opened a tab.
@@ -390,15 +390,10 @@ function LinkPolaris({
     if (waiting) {
         return (
             <main className="pad">
-                <h1>Waiting for Polaris</h1>
-                <p className="muted">
-                    Approve this in the tab that opened. The code there should read:
-                </p>
+                <h1>{t("popup.link.waitingTitle")}</h1>
+                <p className="muted">{t("popup.link.approveIn")}</p>
                 <code className="value">{waiting.userCode}</code>
-                <p className="muted small">
-                    Nothing is connected until somebody signed in to Polaris says yes. You can close
-                    this; it carries on without it.
-                </p>
+                <p className="muted small">{t("popup.link.nothingUntil")}</p>
                 <button
                     className="ghost"
                     onClick={() => {
@@ -406,7 +401,7 @@ function LinkPolaris({
                         void askBackground({ kind: "linkCancel" });
                     }}
                 >
-                    Cancel
+                    {t("popup.cancel")}
                 </button>
             </main>
         );
@@ -414,21 +409,18 @@ function LinkPolaris({
 
     return (
         <main className="pad">
-            <h1>Connect this browser</h1>
+            <h1>{t("popup.link.title")}</h1>
             <p className="muted">{new URL(server).host}</p>
             <Problem text={error} />
             <button disabled={busy} onClick={() => void ask()}>
-                {busy ? "Asking" : "Connect to Polaris"}
+                {busy ? t("popup.link.asking") : t("popup.link.connect")}
             </button>
-            <p className="muted small">
-                A tab opens on your Polaris and you approve it there. The connection appears under
-                Sessions, and you can end it from there at any time.
-            </p>
+            <p className="muted small">{t("popup.link.hint")}</p>
             <button
                 className="ghost"
                 onClick={() => void askBackground({ kind: "forgetServer" }).then(onDone)}
             >
-                Use a different Polaris
+                {t("popup.link.differentPolaris")}
             </button>
         </main>
     );
@@ -465,6 +457,7 @@ function SignIn({
      *  the locked vault, whose password field is still worth going back to. */
     onBack?: () => void;
 }): React.JSX.Element {
+    const t = useWords();
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     /** The request in flight: the code to show, and how often to ask about it. */
@@ -522,12 +515,8 @@ function SignIn({
             return;
         }
         if (reply.waiting === "none") return;
-        setError(
-            reply.waiting === "denied"
-                ? "That was turned down in Polaris."
-                : "That request ran out. Ask again."
-        );
-    }, [onDone]);
+        setError(reply.waiting === "denied" ? t("popup.link.denied") : t("popup.link.expired"));
+    }, [onDone, t]);
 
     // A request left in flight, found again on the way back in. Opening this popup
     // is the only way back to it: pressing the button opens a tab, and that is what
@@ -554,17 +543,12 @@ function SignIn({
     if (waiting) {
         return (
             <main className="pad">
-                <h1>Waiting for Polaris</h1>
-                <p className="muted">
-                    Approve this in the tab that opened. The code there should read:
-                </p>
+                <h1>{t("popup.link.waitingTitle")}</h1>
+                <p className="muted">{t("popup.link.approveIn")}</p>
                 <code className="value">{waiting.userCode}</code>
-                <p className="muted small">
-                    Nothing is handed over until somebody with the vault open says yes. You can
-                    close this; it carries on without it.
-                </p>
+                <p className="muted small">{t("popup.signIn.nothingUntil")}</p>
                 <button className="ghost" onClick={() => void cancel()}>
-                    Cancel
+                    {t("popup.cancel")}
                 </button>
             </main>
         );
@@ -573,10 +557,7 @@ function SignIn({
     if (!canVault) {
         return (
             <main className="pad">
-                <p className="muted small">
-                    This account does not have a vault on {new URL(server).host}, so there are no
-                    logins to fill here.
-                </p>
+                <p className="muted small">{t("popup.signIn.noVault", { host: new URL(server).host })}</p>
             </main>
         );
     }
@@ -585,7 +566,7 @@ function SignIn({
         <main className="pad">
             <Problem text={error} />
             <button disabled={busy} onClick={() => void ask()}>
-                {busy ? "Asking" : "Connect your vault"}
+                {busy ? t("popup.link.asking") : t("popup.signIn.connect")}
             </button>
             {/* What it needs, before what it does. The requirement was the last
                 clause of the sentence, under a button that said "Sign in with
@@ -593,11 +574,7 @@ function SignIn({
                 turned up as a surprise on the other tab. What this connects to is
                 the password vault; saying so is not a smaller promise, it is the
                 true one. */}
-            <p className="muted small">
-                Approving happens on your dashboard, with your vault open. The key is handed over
-                sealed, so only this extension can open it - and it is tied to this connection, so
-                disconnecting the browser closes the vault with it.
-            </p>
+            <p className="muted small">{t("popup.signIn.hint")}</p>
             {/* The master password is no longer a way in, and the button that
                 offered it is gone rather than left to fail: it opens the vault
                 without signing in to the account, which is the state the popup now
@@ -609,12 +586,12 @@ function SignIn({
                 happened to name first. */}
             {connected ? (
                 <button className="ghost" onClick={() => void leave({ kind: "signOut" })}>
-                    Sign out of the vault
+                    {t("popup.signIn.signOut")}
                 </button>
             ) : null}
             {onBack ? (
                 <button className="ghost" onClick={onBack}>
-                    Use the master password instead
+                    {t("popup.signIn.usePassword")}
                 </button>
             ) : null}
         </main>
@@ -630,6 +607,7 @@ function Unlock({
      *  standing in the way. */
     onApprove: () => void;
 }): React.JSX.Element {
+    const t = useWords();
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -648,25 +626,25 @@ function Unlock({
 
     return (
         <main className="pad">
-            <h1>Vault locked</h1>
+            <h1>{t("popup.unlock.title")}</h1>
             <input
                 autoFocus
                 type="password"
                 value={password}
-                placeholder="Vault master password"
+                placeholder={t("popup.unlock.placeholder")}
                 onChange={(event) => setPassword(event.target.value)}
                 onKeyDown={(event) => event.key === "Enter" && void unlock()}
             />
             <Problem text={error} />
             <button disabled={busy || password === ""} onClick={() => void unlock()}>
-                {busy ? "Opening" : "Unlock"}
+                {busy ? t("popup.unlock.opening") : t("popup.unlock.unlock")}
             </button>
             {/* The way out of the one screen that had none. A password field on
                 its own can only be read as "you have forgotten it", and two of
                 the three reasons this refuses have nothing to do with what was
                 typed - see `lib/unlock`. */}
             <button className="ghost" onClick={onApprove}>
-                Let me in from Polaris instead
+                {t("popup.unlock.fromPolaris")}
             </button>
         </main>
     );
@@ -689,7 +667,7 @@ const EVERYWHERE = storage.defineItem<boolean>("local:inline.everywhere", { fall
  * its own server. The browser's extension settings remove it for anybody who
  * wants it gone.
  */
-function useEverywhere(): {
+function useEverywhere(t: Words): {
     everywhere: boolean | null;
     possible: boolean;
     turn: (on: boolean) => Promise<string | null>;
@@ -713,7 +691,7 @@ function useEverywhere(): {
             } catch {
                 allowed = false;
             }
-            if (!allowed) return "Without permission for every site, Polaris stays where you turned it on.";
+            if (!allowed) return t("popup.sites.noEveryPermission");
         }
         await EVERYWHERE.setValue(on);
         const reply = await askBackground({ kind: "startInline" });
@@ -731,6 +709,7 @@ function OnEverySite({
     everywhere: boolean;
     turn: (on: boolean) => Promise<string | null>;
 }): React.JSX.Element {
+    const t = useWords();
     const [busy, setBusy] = useState(false);
     const [note, setNote] = useState<string | null>(null);
 
@@ -739,27 +718,23 @@ function OnEverySite({
         setNote(null);
         const problem = await turn(!everywhere);
         setBusy(false);
-        setNote(problem ?? (everywhere ? "Pages already open keep it until you reload them." : null));
+        setNote(problem ?? (everywhere ? t("popup.sites.reloadOpen") : null));
     };
 
     return (
         <>
             <div className="row">
                 <span className="muted small">
-                    {everywhere ? "Polaris appears on every site." : "Show Polaris under login boxes on every site."}
+                    {everywhere ? t("popup.sites.everywhereOn") : t("popup.sites.everywhereOff")}
                 </span>
                 <div className="acts">
                     <button
                         className="ghost"
                         disabled={busy}
-                        title={
-                            everywhere
-                                ? "Only show Polaris on the sites you turn it on for"
-                                : "Offer your logins and codes under the box on every site, like a password manager"
-                        }
+                        title={everywhere ? t("popup.sites.onlySomeHint") : t("popup.sites.everyHint")}
                         onClick={() => void press()}
                     >
-                        {everywhere ? "Only some sites" : "Every site"}
+                        {everywhere ? t("popup.sites.onlySome") : t("popup.sites.every")}
                     </button>
                 </div>
             </div>
@@ -796,6 +771,7 @@ function OnThisSite({
     host: string | null;
     server: string | null;
 }): React.JSX.Element | null {
+    const t = useWords();
     const [granted, setGranted] = useState<boolean | null>(null);
     const [busy, setBusy] = useState(false);
     const [note, setNote] = useState<string | null>(null);
@@ -827,7 +803,7 @@ function OnThisSite({
         }
         if (!allowed) {
             setBusy(false);
-            setNote("Without permission for this site, nothing can be drawn on it.");
+            setNote(t("popup.sites.noSitePermission"));
             return;
         }
         const reply = await askBackground({ kind: "startInline" });
@@ -852,29 +828,23 @@ function OnThisSite({
         // A script already running in a page cannot be taken back out of it, and
         // somebody who still sees the mark after switching this off would read
         // that as a switch that does nothing.
-        setNote(held ? null : "The mark goes when you reload the page.");
+        setNote(held ? null : t("popup.sites.reloadPage"));
     };
 
     return (
         <>
             <div className="row">
                 <span className="muted small">
-                    {granted
-                        ? `Polaris appears on ${host}.`
-                        : `Polaris is not shown on ${host}.`}
+                    {granted ? t("popup.sites.shownOn", { host }) : t("popup.sites.notShownOn", { host })}
                 </span>
                 <div className="acts">
                     <button
                         className="ghost"
                         disabled={busy}
-                        title={
-                            granted
-                                ? "Stop drawing anything inside this site's pages"
-                                : "Show the fill mark, the generator and the save offer on this site"
-                        }
+                        title={granted ? t("popup.sites.notHereHint") : t("popup.sites.showHereHint")}
                         onClick={() => void (granted ? turnOff() : turnOn())}
                     >
-                        {granted ? "Not here" : "Show it here"}
+                        {granted ? t("popup.sites.notHere") : t("popup.sites.showHere")}
                     </button>
                 </div>
             </div>
@@ -941,6 +911,7 @@ function useGeneratorOptions(): [GeneratorOptions, (next: GeneratorOptions) => v
  * hand a password to there is no "Use it" either, and copying is the whole of it.
  */
 function Generator({ onUse }: { onUse?: (value: string) => void }): React.JSX.Element {
+    const t = useWords();
     const [open, setOpen] = useState(false);
     const [options, setOptions] = useGeneratorOptions();
     const [value, setValue] = useState<string | null>(null);
@@ -973,11 +944,11 @@ function Generator({ onUse }: { onUse?: (value: string) => void }): React.JSX.El
         try {
             await navigator.clipboard.writeText(value);
         } catch {
-            setNote("The browser refused the clipboard. Try again.");
+            setNote(t("popup.clipboard.refused"));
             return;
         }
         markCopied("generated");
-        setNote("Copied. Cleared in 30 seconds if this stays open.");
+        setNote(t("popup.clipboard.copied", { seconds: CLEAR_AFTER_MS / 1000 }));
         if (clearing.current !== null) window.clearTimeout(clearing.current);
         clearing.current = window.setTimeout(() => {
             void navigator.clipboard.writeText("");
@@ -988,7 +959,7 @@ function Generator({ onUse }: { onUse?: (value: string) => void }): React.JSX.El
         return (
             <div className="row">
                 <button className="ghost" onClick={() => setOpen(true)}>
-                    Generate a password
+                    {t("menu.generate")}
                 </button>
             </div>
         );
@@ -1036,6 +1007,7 @@ function Generator({ onUse }: { onUse?: (value: string) => void }): React.JSX.El
  * the numbers are copied and the colours come from the tokens in `style.css`.
  */
 function CountdownRing({ left, of }: { left: number; of: number }): React.JSX.Element {
+    const t = useWords();
     const period = Math.max(1, of);
     const held = Math.max(0, Math.min(period, left));
     const radius = 9;
@@ -1043,7 +1015,7 @@ function CountdownRing({ left, of }: { left: number; of: number }): React.JSX.El
     const tone = held <= 5 ? "danger" : held <= Math.max(8, period / 3) ? "warning" : "success";
 
     return (
-        <span className={`ring ${tone}`} role="timer" aria-label={`${held} seconds left`}>
+        <span className={`ring ${tone}`} role="timer" aria-label={t("popup.items.secondsLeft", { count: held })}>
             <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle
                     cx="12"
@@ -1080,6 +1052,7 @@ function TotpCell({
     done: boolean;
     onCopy: () => void;
 }): React.JSX.Element | null {
+    const t = useWords();
     const [code, setCode] = useState<string | null>(null);
     const [left, setLeft] = useState(0);
 
@@ -1118,8 +1091,8 @@ function TotpCell({
         <button
             type="button"
             className="field code-field"
-            title="Copy the one-time code"
-            aria-label="Copy the one-time code"
+            title={t("popup.items.copyCode")}
+            aria-label={t("popup.items.copyCode")}
             onClick={onCopy}
         >
             <CountdownRing left={left} of={30} />
@@ -1139,13 +1112,14 @@ function TotpCell({
  * says so rather than drawing an empty line that looks pressable and is not.
  */
 function Field({
-    label,
+    copyLabel,
     shown,
     mono,
     done,
     onCopy
 }: {
-    label: string;
+    /** What pressing it does, said out loud: "Copy the username". */
+    copyLabel: string;
     shown: string;
     mono?: boolean;
     /** Whether this value was just copied. */
@@ -1163,8 +1137,8 @@ function Field({
         <button
             type="button"
             className="field"
-            title={`Copy the ${label.toLowerCase()}`}
-            aria-label={`Copy the ${label.toLowerCase()}`}
+            title={copyLabel}
+            aria-label={copyLabel}
             onClick={onCopy}
         >
             <span className={mono ? "shown mono" : "shown"}>{shown}</span>
@@ -1194,6 +1168,7 @@ function ChangePassword({
     onClose: () => void;
     onChange: () => Promise<void>;
 }): React.JSX.Element {
+    const t = useWords();
     const [password, setPassword] = useState("");
     const [refused, setRefused] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -1215,37 +1190,35 @@ function ChangePassword({
 
     return (
         <div className="row wrap">
-            <span className="muted small">New password for {item.name}</span>
+            <span className="muted small">{t("popup.change.for", { name: item.name })}</span>
             <input
                 autoFocus
                 value={password}
-                placeholder="The new password"
-                aria-label={`New password for ${item.name}`}
+                placeholder={t("popup.change.placeholder")}
+                aria-label={t("popup.change.for", { name: item.name })}
                 onChange={(event) => setPassword(event.target.value)}
                 onKeyDown={(event) => event.key === "Enter" && password !== "" && void submit()}
             />
             <div className="acts">
                 <button
                     className="ghost"
-                    title="Make one up"
+                    title={t("popup.change.makeOne")}
                     onClick={() => setPassword(generatePassword(options) ?? "")}
                 >
-                    Make one up
+                    {t("popup.change.makeOne")}
                 </button>
                 <button
                     className="ghost"
                     disabled={busy || password === ""}
                     onClick={() => void submit()}
                 >
-                    {busy ? "Saving" : "Save"}
+                    {busy ? t("popup.saving") : t("popup.save")}
                 </button>
                 <button className="ghost" onClick={onClose}>
-                    Cancel
+                    {t("popup.cancel")}
                 </button>
             </div>
-            <p className="muted small">
-                Change it on the site too, or you will be locked out of it.
-            </p>
+            <p className="muted small">{t("popup.change.onSiteToo")}</p>
             <Problem text={refused} />
         </div>
     );
@@ -1277,6 +1250,7 @@ function SaveLogin({
     onUsed: () => void;
     onChange: () => Promise<void>;
 }): React.JSX.Element {
+    const t = useWords();
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
     const [username, setUsername] = useState("");
@@ -1297,7 +1271,7 @@ function SaveLogin({
     }, [offered, host, onUsed]);
 
     const typed = { name, username, password, uri: url ?? "" };
-    const check = readIntendedLogin(typed);
+    const check = readIntendedLogin(typed, t);
     // Nothing is said until something has been typed: an error under an untouched
     // form is a complaint about not having started yet.
     const started = name !== "" || username !== "" || password !== "";
@@ -1335,7 +1309,7 @@ function SaveLogin({
                         setRefused(null);
                     }}
                 >
-                    {host ? "Save a login for this page" : "Save a login"}
+                    {host ? t("popup.saveLogin.forPage") : t("popup.saveLogin.open")}
                 </button>
             </div>
         );
@@ -1346,33 +1320,33 @@ function SaveLogin({
             <input
                 autoFocus
                 value={name}
-                placeholder="Name"
-                aria-label="Name"
+                placeholder={t("popup.saveLogin.name")}
+                aria-label={t("popup.saveLogin.name")}
                 onChange={(event) => setName(event.target.value)}
             />
             <input
                 value={username}
-                placeholder="Username"
-                aria-label="Username"
+                placeholder={t("popup.saveLogin.username")}
+                aria-label={t("popup.saveLogin.username")}
                 onChange={(event) => setUsername(event.target.value)}
             />
             <input
                 type="password"
                 value={password}
-                placeholder="Password"
-                aria-label="Password"
+                placeholder={t("popup.saveLogin.password")}
+                aria-label={t("popup.saveLogin.password")}
                 onChange={(event) => setPassword(event.target.value)}
                 onKeyDown={(event) => event.key === "Enter" && check.ok && void save()}
             />
             <span className="muted small">
-                {url ? `Saved for ${host ?? url}` : "Not tied to any page"}
+                {url ? t("popup.saveLogin.savedFor", { where: host ?? url }) : t("popup.saveLogin.noPage")}
             </span>
             <div className="acts">
                 <button className="ghost" disabled={busy || !check.ok} onClick={() => void save()}>
-                    {busy ? "Saving" : "Save"}
+                    {busy ? t("popup.saving") : t("popup.save")}
                 </button>
                 <button className="ghost" onClick={() => setOpen(false)}>
-                    Cancel
+                    {t("popup.cancel")}
                 </button>
             </div>
             <Problem text={problem} />
@@ -1396,10 +1370,11 @@ function Timeout({
     status: VaultStatus;
     onChange: () => Promise<void>;
 }): React.JSX.Element {
+    const t = useWords();
     return (
         <div className="row">
             <label className="muted small" htmlFor="vault-timeout">
-                Lock after
+                {t("popup.lockAfter")}
             </label>
             <div className="acts">
                 <select
@@ -1412,7 +1387,7 @@ function Timeout({
                         }).then(onChange);
                     }}
                 >
-                    {TIMEOUT_CHOICES.map((choice) => (
+                    {timeoutChoices(t).map((choice) => (
                         <option key={choice.ms} value={choice.ms}>
                             {choice.label}
                         </option>
@@ -1449,6 +1424,7 @@ function Accounts({
     status: VaultStatus;
     onChange: () => Promise<void>;
 }): React.JSX.Element | null {
+    const t = useWords();
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const [refused, setRefused] = useState<string | null>(null);
@@ -1477,20 +1453,23 @@ function Accounts({
     return (
         <div className="row wrap">
             <span className="muted small">
-                {active ? (
-                    <>
-                        Signed in as{" "}
-                        <span className="who-name" title={active.email ?? undefined}>
-                            {describeAccount(active)}
-                        </span>
-                    </>
-                ) : (
-                    "Signing in to another account"
-                )}
+                {active
+                    ? t.rich("popup.accounts.signedInAs", {
+                          who: () => (
+                              <span key="who" className="who-name" title={active.email ?? undefined}>
+                                  {describeAccount(active)}
+                              </span>
+                          )
+                      })
+                    : t("popup.accounts.signingIn")}
             </span>
             <div className="acts">
                 <button className="ghost" disabled={busy} onClick={() => setOpen(!open)}>
-                    {open ? "Hide" : others.length > 0 ? `Switch (${others.length})` : "Accounts"}
+                    {open
+                        ? t("generator.hide")
+                        : others.length > 0
+                          ? t("popup.accounts.switchCount", { count: others.length })
+                          : t("popup.accounts.accounts")}
                 </button>
             </div>
             {open ? (
@@ -1500,7 +1479,7 @@ function Accounts({
                             <button
                                 className="account"
                                 disabled={busy}
-                                title={`Switch to ${describeAccount(one)}`}
+                                title={t("shell.switchTo", { name: describeAccount(one) })}
                                 onClick={() => void act({ kind: "switchAccount", id: one.id })}
                             >
                                 <span className="shown">{describeAccount(one)}</span>
@@ -1518,7 +1497,7 @@ function Accounts({
                                 disabled={busy}
                                 onClick={() => void act({ kind: "addAccount" })}
                             >
-                                Add another account
+                                {t("shell.addAccount")}
                             </button>
                         </li>
                     ) : null}
@@ -1536,6 +1515,7 @@ function Items({
     status: VaultStatus;
     onChange: () => Promise<void>;
 }): React.JSX.Element {
+    const t = useWords();
     const [suggested, setSuggested] = useState<readonly ItemSummary[]>([]);
     const [found, setFound] = useState<readonly ItemSummary[]>([]);
     const [query, setQuery] = useState("");
@@ -1560,7 +1540,7 @@ function Items({
         host: null,
         blocked: false
     });
-    const inline = useEverywhere();
+    const inline = useEverywhere(t);
 
     useEffect(() => {
         void (async () => {
@@ -1606,14 +1586,14 @@ function Items({
         try {
             await navigator.clipboard.writeText(reply.value);
         } catch {
-            setNote("The browser refused the clipboard. Try again.");
+            setNote(t("popup.clipboard.refused"));
             return;
         }
         markCopied(`${item.id}:${field}`);
         setNote(
             field === "username"
-                ? "Username copied."
-                : "Copied. Cleared in 30 seconds if this stays open."
+                ? t("popup.clipboard.username")
+                : t("popup.clipboard.copied", { seconds: CLEAR_AFTER_MS / 1000 })
         );
         if (field !== "username") {
             if (clearing.current !== null) window.clearTimeout(clearing.current);
@@ -1652,19 +1632,19 @@ function Items({
                 <div className="head">
                     <span className="name">{item.name}</span>
                     {item.vault ? (
-                        <span className="vault" title={`Shared from ${item.vault}`}>
+                        <span className="vault" title={t("popup.items.sharedFrom", { vault: item.vault })}>
                             {item.vault}
                         </span>
                     ) : null}
                 </div>
                 <Field
-                    label="Username"
-                    shown={item.username ?? item.host ?? "No username"}
+                    copyLabel={t("popup.items.copyUsername")}
+                    shown={item.username ?? item.host ?? t("popup.items.noUsername")}
                     done={copied === `${item.id}:username`}
                     onCopy={item.username === null ? null : () => void copy(item, "username")}
                 />
                 <Field
-                    label="Password"
+                    copyLabel={t("popup.items.copyPassword")}
                     shown="••••••••••"
                     mono
                     done={copied === `${item.id}:password`}
@@ -1684,19 +1664,19 @@ function Items({
                 {offerFill ? (
                     <button
                         className="ghost"
-                        title="Fill this page"
+                        title={t("popup.items.fillHint")}
                         onClick={() => void fill(item)}
                     >
-                        Fill
+                        {t("popup.items.fill")}
                     </button>
                 ) : null}
                 <button
                     className="ghost"
-                    title="Replace the password"
-                    aria-label={`Replace the password for ${item.name}`}
+                    title={t("popup.items.replaceHint")}
+                    aria-label={t("popup.items.replaceFor", { name: item.name })}
                     onClick={() => setChanging(item)}
                 >
-                    New
+                    {t("popup.items.new")}
                 </button>
             </div>
         </li>
@@ -1708,24 +1688,22 @@ function Items({
                 <input
                     autoFocus
                     value={query}
-                    placeholder="Search your logins"
+                    placeholder={t("popup.items.search")}
                     onChange={(event) => setQuery(event.target.value)}
                 />
             </header>
 
             {suggested.length > 0 && query === "" ? (
                 <section>
-                    <h2>For this page</h2>
+                    <h2>{t("popup.items.forPage")}</h2>
                     <ul>{suggested.map((item) => row(item, true))}</ul>
                 </section>
             ) : null}
 
             <section>
-                <h2>{query === "" ? "Everything" : "Found"}</h2>
+                <h2>{query === "" ? t("popup.items.everything") : t("popup.items.found")}</h2>
                 {found.length === 0 ? (
-                    <p className="muted pad">
-                        {query === "" ? "No logins saved yet." : "Nothing matches that."}
-                    </p>
+                    <p className="muted pad">{query === "" ? t("popup.items.none") : t("popup.items.noMatch")}</p>
                 ) : (
                     <ul>{found.map((item) => row(item, false))}</ul>
                 )}
@@ -1752,8 +1730,8 @@ function Items({
                 <div className="row">
                     <span className="muted small">
                         {here.blocked
-                            ? `Switched off for ${here.host}.`
-                            : `Offering logins for ${here.host}.`}
+                            ? t("popup.items.offFor", { host: here.host })
+                            : t("popup.items.offeringFor", { host: here.host })}
                     </span>
                     <div className="acts">
                         <button
@@ -1769,7 +1747,7 @@ function Items({
                                 });
                             }}
                         >
-                            {here.blocked ? "Use it here again" : "Never on this site"}
+                            {here.blocked ? t("popup.items.useAgain") : t("popup.items.never")}
                         </button>
                     </div>
                 </div>
@@ -1792,24 +1770,24 @@ function Items({
                     className="ghost"
                     onClick={() => void askBackground({ kind: "sync" }).then(onChange)}
                 >
-                    Sync
+                    {t("popup.items.sync")}
                 </button>
                 <button
                     className="ghost"
                     onClick={() => void askBackground({ kind: "lock" }).then(onChange)}
                 >
-                    Lock
+                    {t("popup.items.lock")}
                 </button>
                 <button
                     className="ghost"
                     onClick={() => void askBackground({ kind: "signOut" }).then(onChange)}
                 >
-                    Sign out
+                    {t("popup.items.signOut")}
                 </button>
                 <span className="muted small grow">
                     {status.syncedAt
-                        ? `Synced ${new Date(status.syncedAt).toLocaleTimeString()}`
-                        : "Not synced yet"}
+                        ? t("popup.items.synced", { time: new Date(status.syncedAt).toLocaleTimeString(t.locale) })
+                        : t("popup.items.notSynced")}
                 </span>
             </footer>
         </main>

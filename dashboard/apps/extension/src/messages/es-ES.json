@@ -94,5 +94,162 @@
         "use": "Usarla",
         "closeLabel": "Cerrar el generador",
         "close": "Cerrar"
+    },
+    "shell": {
+        "yourAccount": "Tu cuenta",
+        "workingInLabel": "Trabajando en {name}",
+        "workingIn": "Trabajando en",
+        "accountMenu": "{name}, menú de la cuenta",
+        "openPolaris": "Abrir Polaris",
+        "switchTo": "Cambiar a {name}",
+        "addAccount": "Añadir otra cuenta",
+        "disconnect": "Desconectar este navegador",
+        "greeting": "{part, select, night {Buenas noches} morning {Buenos días} afternoon {Buenas tardes} other {Buenas noches}}{hasName, select, yes {, {name}} other {}}",
+        "noVault": "Esta cuenta no tiene bóveda",
+        "notConnected": "Aún sin conectar",
+        "locked": "Bloqueada",
+        "open": "Abierta",
+        "apps": "Apps",
+        "vault": "Bóveda",
+        "backLabel": "Volver a la pantalla de inicio",
+        "back": "Atrás"
+    },
+    "popup": {
+        "update": {
+            "store": "Ya está disponible la versión {version}. Tu navegador la instala en cuanto la tienda la revise, así que aquí no hay nada que hacer.",
+            "byHand": "Ya está disponible la versión {version}. Esta copia se cargó a mano, así que hay que volver a cargarla de la misma forma. <link>{where, select, polaris {Los pasos están en tu Polaris} other {Ver qué ha cambiado}}</link>."
+        },
+        "connect": {
+            "hint": "La dirección en la que abres el panel.",
+            "asking": "Preguntando al navegador",
+            "continue": "Continuar",
+            "permission": "El navegador preguntará si esta extensión puede comunicarse con esa dirección. Es la única que llega a leer."
+        },
+        "link": {
+            "denied": "Se rechazó en Polaris.",
+            "expired": "Esa solicitud caducó. Vuelve a pedirla.",
+            "waitingTitle": "Esperando a Polaris",
+            "approveIn": "Apruébalo en la pestaña que se abrió. El código de allí debería decir:",
+            "nothingUntil": "No se conecta nada hasta que alguien con la sesión iniciada en Polaris diga que sí. Puedes cerrar esto; sigue sin ello.",
+            "title": "Conectar este navegador",
+            "asking": "Pidiendo",
+            "connect": "Conectar con Polaris",
+            "hint": "Se abre una pestaña en tu Polaris y lo apruebas allí. La conexión aparece en Sesiones, y puedes cerrarla desde allí cuando quieras.",
+            "differentPolaris": "Usar otro Polaris"
+        },
+        "cancel": "Cancelar",
+        "signIn": {
+            "nothingUntil": "No se entrega nada hasta que alguien con la bóveda abierta diga que sí. Puedes cerrar esto; sigue sin ello.",
+            "noVault": "Esta cuenta no tiene bóveda en {host}, así que aquí no hay inicios de sesión que rellenar.",
+            "connect": "Conectar tu bóveda",
+            "hint": "La aprobación se hace en tu panel, con la bóveda abierta. La clave se entrega sellada, así que solo esta extensión puede abrirla, y queda ligada a esta conexión: desconectar el navegador cierra la bóveda con ella.",
+            "signOut": "Cerrar la sesión de la bóveda",
+            "usePassword": "Usar la contraseña maestra"
+        },
+        "unlock": {
+            "title": "Bóveda bloqueada",
+            "placeholder": "Contraseña maestra de la bóveda",
+            "opening": "Abriendo",
+            "unlock": "Desbloquear",
+            "fromPolaris": "Dejarme entrar desde Polaris"
+        },
+        "sites": {
+            "noEveryPermission": "Sin permiso para todos los sitios, Polaris se queda donde lo activaste.",
+            "reloadOpen": "Las páginas ya abiertas lo mantienen hasta que las recargues.",
+            "everywhereOn": "Polaris aparece en todos los sitios.",
+            "everywhereOff": "Mostrar Polaris bajo los campos de inicio de sesión en todos los sitios.",
+            "onlySomeHint": "Mostrar Polaris solo en los sitios donde lo actives",
+            "everyHint": "Ofrecer tus inicios de sesión y códigos bajo el campo en todos los sitios, como un gestor de contraseñas",
+            "onlySome": "Solo algunos sitios",
+            "every": "Todos los sitios",
+            "noSitePermission": "Sin permiso para este sitio, no se puede mostrar nada en él.",
+            "reloadPage": "La marca desaparece al recargar la página.",
+            "shownOn": "Polaris aparece en {host}.",
+            "notShownOn": "Polaris no se muestra en {host}.",
+            "notHereHint": "Dejar de mostrar nada dentro de las páginas de este sitio",
+            "showHereHint": "Mostrar la marca de relleno, el generador y la oferta de guardar en este sitio",
+            "notHere": "Aquí no",
+            "showHere": "Mostrarlo aquí"
+        },
+        "clipboard": {
+            "refused": "El navegador rechazó el portapapeles. Vuelve a intentarlo.",
+            "copied": "Copiado. Se borra en {seconds} segundos si esto sigue abierto.",
+            "username": "Usuario copiado."
+        },
+        "items": {
+            "secondsLeft": "{count, plural, one {Queda # segundo} other {Quedan # segundos}}",
+            "copyCode": "Copiar el código de un solo uso",
+            "sharedFrom": "Compartido desde {vault}",
+            "copyUsername": "Copiar el usuario",
+            "copyPassword": "Copiar la contraseña",
+            "noUsername": "Sin usuario",
+            "fillHint": "Rellenar esta página",
+            "fill": "Rellenar",
+            "replaceHint": "Sustituir la contraseña",
+            "replaceFor": "Sustituir la contraseña de {name}",
+            "new": "Nueva",
+            "search": "Busca tus inicios de sesión",
+            "forPage": "Para esta página",
+            "everything": "Todo",
+            "found": "Encontrados",
+            "none": "Aún no hay inicios de sesión guardados.",
+            "noMatch": "Nada coincide con eso.",
+            "offFor": "Desactivado en {host}.",
+            "offeringFor": "Ofreciendo inicios de sesión para {host}.",
+            "useAgain": "Volver a usarlo aquí",
+            "never": "Nunca en este sitio",
+            "sync": "Sincronizar",
+            "lock": "Bloquear",
+            "signOut": "Cerrar sesión",
+            "synced": "Sincronizado a las {time}",
+            "notSynced": "Aún sin sincronizar"
+        },
+        "change": {
+            "for": "Nueva contraseña para {name}",
+            "placeholder": "La nueva contraseña",
+            "makeOne": "Inventar una",
+            "onSiteToo": "Cámbiala también en el sitio, o te quedarás sin acceso."
+        },
+        "saving": "Guardando",
+        "save": "Guardar",
+        "saveLogin": {
+            "forPage": "Guardar un inicio de sesión para esta página",
+            "open": "Guardar un inicio de sesión",
+            "name": "Nombre",
+            "username": "Usuario",
+            "password": "Contraseña",
+            "savedFor": "Guardado para {where}",
+            "noPage": "Sin vincular a ninguna página"
+        },
+        "lockAfter": "Bloquear tras",
+        "accounts": {
+            "signedInAs": "Sesión iniciada como <who></who>",
+            "signingIn": "Iniciando sesión en otra cuenta",
+            "switchCount": "Cambiar ({count})",
+            "accounts": "Cuentas"
+        }
+    },
+    "inline": {
+        "marks": {
+            "login": "Rellenar desde Polaris",
+            "generate": "Generar una contraseña con Polaris",
+            "code": "Rellenar el código desde Polaris"
+        },
+        "unlock": "Desbloquear Polaris",
+        "noCodes": "Nada de aquí lleva un código de un solo uso.",
+        "nothingSaved": "No hay nada guardado para este sitio.",
+        "useEmail": "Usar mi correo",
+        "useName": "Usar mi nombre",
+        "makePassword": "Generar una contraseña",
+        "makePasswordDetail": "Una segura, para los dos campos de contraseña",
+        "again": "Otra",
+        "breachOne": "Esta contraseña ha aparecido en una filtración de datos. Elige otra.",
+        "breachMany": "Esta contraseña ha aparecido en {count} filtraciones. Elige otra.",
+        "updateSaved": "¿Actualizar la contraseña guardada para {name}?",
+        "thisLogin": "este inicio de sesión",
+        "saveThis": "¿Guardar este inicio de sesión en Polaris?",
+        "update": "Actualizar",
+        "notNow": "Ahora no",
+        "neverHere": "Aquí nunca"
     }
 }

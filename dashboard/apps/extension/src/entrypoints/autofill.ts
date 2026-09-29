@@ -46,7 +46,9 @@ import {
     type GeneratorOptions
 } from "@/lib/generator";
 import { readForm, type FieldFacts, type PageFields } from "@/lib/fields";
-import { askBackground, type ItemSummary, type OfferedCapture } from "@/lib/messages";
+import { askBackground, speakRepliesIn, type ItemSummary, type OfferedCapture } from "@/lib/messages";
+import { words } from "@/lib/locale-store";
+import { ENGLISH, type Words } from "@/lib/words";
 
 /** How long to wait for a page to stop changing before looking again. Logins
  *  arrive late on most sites now - a form is rendered after the framework has
@@ -70,12 +72,14 @@ type Role = "login" | "generate" | "code";
 /** Every one of them, to walk in a fixed order. */
 const ROLES = ["login", "generate", "code"] as const satisfies readonly Role[];
 
+/** The words this page is spoken to in: the account's language, read once when
+ *  the script starts, and English until then. */
+let t: Words = ENGLISH;
+
 /** What each mark says it is for, before anything is opened. */
-const TITLES: Record<Role, string> = {
-    login: "Fill from Polaris",
-    generate: "Make a password with Polaris",
-    code: "Fill the code from Polaris"
-};
+function markTitle(role: Role): string {
+    return t(`inline.marks.${role}`);
+}
 
 export default defineUnlistedScript({
     main() {
@@ -88,6 +92,8 @@ export default defineUnlistedScript({
 });
 
 async function start(): Promise<void> {
+    t = await words().catch(() => ENGLISH);
+    speakRepliesIn(t);
     // Two questions the page must not decide: whether this site was switched
     // off, and whether there is an open vault to offer anything from. Both are
     // the worker's, and both are re-asked whenever a menu opens rather than
@@ -262,7 +268,7 @@ async function start(): Promise<void> {
                     list(
                         field,
                         [
-                            choice("Unlock Polaris", reply.error, () => {
+                            choice(t("inline.unlock"), reply.error, () => {
                                 void askBackground({ kind: "openUnlock" });
                             })
                         ],
@@ -277,7 +283,7 @@ async function start(): Promise<void> {
             if (role === "code") {
                 const withCode = items.filter((item) => item.totp);
                 if (offered && withCode.length === 0) return;
-                menu(field, withCode, "Nothing here carries a one-time code.", async (item) => {
+                menu(field, withCode, t("inline.noCodes"), async (item) => {
                     const answer = await askBackground({ kind: "totpNow", id: item.id });
                     if (answer.ok && "code" in answer) putCode(codeBoxes(field), answer.code);
                 });
@@ -301,7 +307,7 @@ async function start(): Promise<void> {
                     void askBackground({ kind: "fill", id: item.id });
                 })
             );
-            list(field, [...logins, ...fresh], "Nothing saved for this site.");
+            list(field, [...logins, ...fresh], t("inline.nothingSaved"));
         } finally {
             open = false;
         }
@@ -359,14 +365,14 @@ async function start(): Promise<void> {
         if (details?.email && userBox) {
             const { email, name } = details;
             offered.push(
-                choice("Use my email", email, () => {
+                choice(t("inline.useEmail"), email, () => {
                     put(userBox, email);
                     if (name) fillName(name);
                 })
             );
         } else if (details?.name && (fields.fullName !== null || fields.givenName !== null)) {
             const { name } = details;
-            offered.push(choice("Use my name", name, () => fillName(name)));
+            offered.push(choice(t("inline.useName"), name, () => fillName(name)));
         }
 
         const passwordBox =
@@ -374,7 +380,7 @@ async function start(): Promise<void> {
         if (passwordBox) {
             const options = await savedOptions();
             offered.push(
-                choice("Make a password", "A strong one, for both password boxes", () =>
+                choice(t("inline.makePassword"), t("inline.makePasswordDetail"), () =>
                     offerGenerated(passwordBox, options, (value) => {
                         put(passwordBox, value);
                         const confirm = at(fields.confirmPassword);
@@ -613,8 +619,8 @@ function mark(role: Role, onPress: () => void): HTMLElement {
     const shadow = host.attachShadow({ mode: "closed" });
     const button = document.createElement("button");
     button.type = "button";
-    button.title = TITLES[role];
-    button.setAttribute("aria-label", TITLES[role]);
+    button.title = markTitle(role);
+    button.setAttribute("aria-label", markTitle(role));
     button.textContent = "P";
     button.style.cssText = `
         width: ${MARK}px;
@@ -848,13 +854,13 @@ function offerGenerated(
     row.style.cssText = "display:flex;gap:6px;padding:0 12px 10px;";
 
     const draw = (): void => {
-        shown.textContent = value ?? "Nothing can be made of that.";
+        shown.textContent = value ?? t("generator.nothing");
     };
     draw();
 
     row.append(
         action(
-            "Use it",
+            t("generator.use"),
             () => {
                 if (!value) return;
                 use(value);
@@ -862,7 +868,7 @@ function offerGenerated(
             },
             true
         ),
-        action("Again", () => {
+        action(t("inline.again"), () => {
             value = generatePassword(options);
             draw();
         })
@@ -924,9 +930,7 @@ function note(field: HTMLInputElement, count: number): HTMLElement {
     const shadow = host.attachShadow({ mode: "closed" });
     const line = document.createElement("p");
     line.textContent =
-        count === 1
-            ? "This password has appeared in a data breach. Pick a different one."
-            : `This password has appeared in ${count.toLocaleString()} breaches. Pick a different one.`;
+        count === 1 ? t("inline.breachOne") : t("inline.breachMany", { count: count.toLocaleString(t.locale) });
     line.style.cssText = `
         margin: 0;
         border: 1px solid hsl(0 60% 30%);
@@ -979,6 +983,7 @@ function bar(offer: OfferedCapture): void {
     // Named, because a bar that appears in the corner of somebody else's site
     // has to say whose it is to a reader who cannot see the violet.
     panel.setAttribute("role", "group");
+    // i18n-ignore the product's name
     panel.setAttribute("aria-label", "Polaris");
     panel.style.cssText = `
         border: 1px solid hsl(225 10% 16%);
@@ -999,8 +1004,8 @@ function bar(offer: OfferedCapture): void {
     title.style.cssText = "margin:0 0 2px;font-weight:600;";
     title.textContent =
         offer.kind === "update"
-            ? `Update the password saved for ${offer.name ?? "this login"}?`
-            : "Save this login in Polaris?";
+            ? t("inline.updateSaved", { name: offer.name ?? t("inline.thisLogin") })
+            : t("inline.saveThis");
 
     const who = document.createElement("p");
     who.style.cssText = "margin:0 0 10px;color:hsl(222 10% 66%);word-break:break-all;";
@@ -1012,7 +1017,7 @@ function bar(offer: OfferedCapture): void {
     row.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;";
     row.append(
         action(
-            offer.kind === "update" ? "Update" : "Save",
+            offer.kind === "update" ? t("inline.update") : t("popup.save"),
             () => {
                 void askBackground({ kind: "saveCaptured" }).then((reply) => {
                     if (reply.ok) {
@@ -1023,18 +1028,18 @@ function bar(offer: OfferedCapture): void {
                     // button and nothing happened otherwise. It keeps a way out -
                     // a bar that says why it failed and cannot be closed is worse
                     // than the failure.
-                    title.textContent = "error" in reply ? reply.error : "That could not be saved.";
+                    title.textContent = "error" in reply ? reply.error : t("errors.notSaved");
                     who.remove();
-                    row.replaceChildren(action("Close", close));
+                    row.replaceChildren(action(t("generator.close"), close));
                 });
             },
             true
         ),
-        action("Not now", () => {
+        action(t("inline.notNow"), () => {
             void askBackground({ kind: "dismissCapture", never: false });
             close();
         }),
-        action("Never here", () => {
+        action(t("inline.neverHere"), () => {
             void askBackground({ kind: "dismissCapture", never: true });
             close();
         })

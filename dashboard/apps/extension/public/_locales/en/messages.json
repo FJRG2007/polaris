@@ -1,0 +1,14 @@
+{
+    "extName": {
+        "message": "Polaris",
+        "description": "The extension's name, the product's own."
+    },
+    "extDescription": {
+        "message": "Polaris in your toolbar.",
+        "description": "One line under the name in the browser's extension list."
+    },
+    "commandFillLogin": {
+        "message": "Fill the login for this page",
+        "description": "The keyboard shortcut's name in the browser's shortcuts screen."
+    }
+}

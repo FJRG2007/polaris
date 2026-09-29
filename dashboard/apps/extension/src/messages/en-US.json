@@ -94,5 +94,162 @@
         "use": "Use it",
         "closeLabel": "Close the generator",
         "close": "Close"
+    },
+    "shell": {
+        "yourAccount": "Your account",
+        "workingInLabel": "Working in {name}",
+        "workingIn": "Working in",
+        "accountMenu": "{name}, account menu",
+        "openPolaris": "Open Polaris",
+        "switchTo": "Switch to {name}",
+        "addAccount": "Add another account",
+        "disconnect": "Disconnect this browser",
+        "greeting": "{part, select, night {Good night} morning {Good morning} afternoon {Good afternoon} other {Good evening}}{hasName, select, yes {, {name}} other {}}",
+        "noVault": "This account has no vault",
+        "notConnected": "Not connected yet",
+        "locked": "Locked",
+        "open": "Open",
+        "apps": "Apps",
+        "vault": "Vault",
+        "backLabel": "Back to the home screen",
+        "back": "Back"
+    },
+    "popup": {
+        "update": {
+            "store": "Version {version} is out. Your browser installs it once the store has reviewed it, so there is nothing to do here.",
+            "byHand": "Version {version} is out. This copy was loaded by hand, so it has to be loaded again the same way. <link>{where, select, polaris {The steps are on your Polaris} other {See what changed}}</link>."
+        },
+        "connect": {
+            "hint": "The address you open the dashboard at.",
+            "asking": "Asking the browser",
+            "continue": "Continue",
+            "permission": "The browser will ask whether this extension may talk to that address. It is the only one it ever reads."
+        },
+        "link": {
+            "denied": "That was turned down in Polaris.",
+            "expired": "That request ran out. Ask again.",
+            "waitingTitle": "Waiting for Polaris",
+            "approveIn": "Approve this in the tab that opened. The code there should read:",
+            "nothingUntil": "Nothing is connected until somebody signed in to Polaris says yes. You can close this; it carries on without it.",
+            "title": "Connect this browser",
+            "asking": "Asking",
+            "connect": "Connect to Polaris",
+            "hint": "A tab opens on your Polaris and you approve it there. The connection appears under Sessions, and you can end it from there at any time.",
+            "differentPolaris": "Use a different Polaris"
+        },
+        "cancel": "Cancel",
+        "signIn": {
+            "nothingUntil": "Nothing is handed over until somebody with the vault open says yes. You can close this; it carries on without it.",
+            "noVault": "This account does not have a vault on {host}, so there are no logins to fill here.",
+            "connect": "Connect your vault",
+            "hint": "Approving happens on your dashboard, with your vault open. The key is handed over sealed, so only this extension can open it - and it is tied to this connection, so disconnecting the browser closes the vault with it.",
+            "signOut": "Sign out of the vault",
+            "usePassword": "Use the master password instead"
+        },
+        "unlock": {
+            "title": "Vault locked",
+            "placeholder": "Vault master password",
+            "opening": "Opening",
+            "unlock": "Unlock",
+            "fromPolaris": "Let me in from Polaris instead"
+        },
+        "sites": {
+            "noEveryPermission": "Without permission for every site, Polaris stays where you turned it on.",
+            "reloadOpen": "Pages already open keep it until you reload them.",
+            "everywhereOn": "Polaris appears on every site.",
+            "everywhereOff": "Show Polaris under login boxes on every site.",
+            "onlySomeHint": "Only show Polaris on the sites you turn it on for",
+            "everyHint": "Offer your logins and codes under the box on every site, like a password manager",
+            "onlySome": "Only some sites",
+            "every": "Every site",
+            "noSitePermission": "Without permission for this site, nothing can be drawn on it.",
+            "reloadPage": "The mark goes when you reload the page.",
+            "shownOn": "Polaris appears on {host}.",
+            "notShownOn": "Polaris is not shown on {host}.",
+            "notHereHint": "Stop drawing anything inside this site's pages",
+            "showHereHint": "Show the fill mark, the generator and the save offer on this site",
+            "notHere": "Not here",
+            "showHere": "Show it here"
+        },
+        "clipboard": {
+            "refused": "The browser refused the clipboard. Try again.",
+            "copied": "Copied. Cleared in {seconds} seconds if this stays open.",
+            "username": "Username copied."
+        },
+        "items": {
+            "secondsLeft": "{count} seconds left",
+            "copyCode": "Copy the one-time code",
+            "sharedFrom": "Shared from {vault}",
+            "copyUsername": "Copy the username",
+            "copyPassword": "Copy the password",
+            "noUsername": "No username",
+            "fillHint": "Fill this page",
+            "fill": "Fill",
+            "replaceHint": "Replace the password",
+            "replaceFor": "Replace the password for {name}",
+            "new": "New",
+            "search": "Search your logins",
+            "forPage": "For this page",
+            "everything": "Everything",
+            "found": "Found",
+            "none": "No logins saved yet.",
+            "noMatch": "Nothing matches that.",
+            "offFor": "Switched off for {host}.",
+            "offeringFor": "Offering logins for {host}.",
+            "useAgain": "Use it here again",
+            "never": "Never on this site",
+            "sync": "Sync",
+            "lock": "Lock",
+            "signOut": "Sign out",
+            "synced": "Synced {time}",
+            "notSynced": "Not synced yet"
+        },
+        "change": {
+            "for": "New password for {name}",
+            "placeholder": "The new password",
+            "makeOne": "Make one up",
+            "onSiteToo": "Change it on the site too, or you will be locked out of it."
+        },
+        "saving": "Saving",
+        "save": "Save",
+        "saveLogin": {
+            "forPage": "Save a login for this page",
+            "open": "Save a login",
+            "name": "Name",
+            "username": "Username",
+            "password": "Password",
+            "savedFor": "Saved for {where}",
+            "noPage": "Not tied to any page"
+        },
+        "lockAfter": "Lock after",
+        "accounts": {
+            "signedInAs": "Signed in as <who></who>",
+            "signingIn": "Signing in to another account",
+            "switchCount": "Switch ({count})",
+            "accounts": "Accounts"
+        }
+    },
+    "inline": {
+        "marks": {
+            "login": "Fill from Polaris",
+            "generate": "Make a password with Polaris",
+            "code": "Fill the code from Polaris"
+        },
+        "unlock": "Unlock Polaris",
+        "noCodes": "Nothing here carries a one-time code.",
+        "nothingSaved": "Nothing saved for this site.",
+        "useEmail": "Use my email",
+        "useName": "Use my name",
+        "makePassword": "Make a password",
+        "makePasswordDetail": "A strong one, for both password boxes",
+        "again": "Again",
+        "breachOne": "This password has appeared in a data breach. Pick a different one.",
+        "breachMany": "This password has appeared in {count} breaches. Pick a different one.",
+        "updateSaved": "Update the password saved for {name}?",
+        "thisLogin": "this login",
+        "saveThis": "Save this login in Polaris?",
+        "update": "Update",
+        "notNow": "Not now",
+        "neverHere": "Never here"
     }
 }

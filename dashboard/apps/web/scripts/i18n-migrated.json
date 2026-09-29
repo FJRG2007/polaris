@@ -1442,6 +1442,20 @@
         "web/src/lib/network-advice.ts",
         "web/src/lib/domain-cert-service.ts",
         "web/src/lib/deploy/variable-links.ts",
-        "web/src/lib/deploy/variable-changes.ts"
+        "web/src/lib/deploy/variable-changes.ts",
+        "extension/src/entrypoints/background.ts",
+        "extension/src/entrypoints/autofill.ts",
+        "extension/src/entrypoints/popup/app.tsx",
+        "extension/src/entrypoints/popup/shell.tsx",
+        "extension/src/entrypoints/popup/generator.tsx",
+        "extension/src/entrypoints/popup/words.tsx",
+        "extension/src/lib/context-menu.ts",
+        "extension/src/lib/lock.ts",
+        "extension/src/lib/save.ts",
+        "extension/src/lib/unlock.ts",
+        "extension/src/lib/messages.ts",
+        "extension/src/lib/words.ts",
+        "extension/src/lib/locale-store.ts",
+        "web/src/app/api/extension/session/route.ts"
     ]
 }

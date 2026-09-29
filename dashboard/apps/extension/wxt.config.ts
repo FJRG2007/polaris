@@ -47,12 +47,17 @@ export default defineConfig({
         sourcesTemplate: "polaris-extension-sources.zip"
     },
     manifest: ({ browser, manifestVersion }) => ({
-        name: "Polaris",
+        // What the browser shows about the extension, in its own language: the
+        // words live in `public/_locales/<language>/messages.json`, English first.
+        // Everything inside the extension speaks the account's language instead
+        // (`src/lib/words.ts`); these are the few lines the browser draws itself.
+        default_locale: "en",
+        name: "__MSG_extName__",
         // Polaris, not "Polaris's vault". The logins are what it does today and
         // the only thing described here, but the extension is the product's
         // window in the toolbar rather than one feature of it - and a name that
         // says "vault" is one that has to be argued with every time it grows.
-        description: "Polaris in your toolbar.",
+        description: "__MSG_extDescription__",
         // Polaris's own mark. Without this the browser draws the grey puzzle
         // piece, which is what every extension nobody has looked at looks like.
         // One file at every size: the browsers pick the nearest and scale, and a
@@ -80,7 +85,7 @@ export default defineConfig({
         commands: {
             "fill-login": {
                 suggested_key: { default: "Ctrl+Shift+L", mac: "Command+Shift+L" },
-                description: "Fill the login for this page"
+                description: "__MSG_commandFillLogin__"
             }
         },
         // Every web page on version 3 (see the top of this file), and the
