@@ -16,6 +16,7 @@ import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import type { InGameChoice } from "@/lib/chat/in-game-choice";
 import { NotificationsView } from "./notifications-view";
 import { NotificationSettingsView } from "./notification-settings-view";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function NotificationsPageView({
     rules,
@@ -35,10 +36,11 @@ export function NotificationsPageView({
     inGameReady?: boolean;
 }) {
     const [tab, setTab] = useState<"history" | "settings">("history");
+    const t = useTranslations("accountNotifications");
 
     const tabs = [
-        { id: "history" as const, label: "History", icon: Bell },
-        { id: "settings" as const, label: "Delivery", icon: SlidersHorizontal }
+        { id: "history" as const, label: t("tabs.history"), icon: Bell },
+        { id: "settings" as const, label: t("tabs.delivery"), icon: SlidersHorizontal }
     ];
 
     return (

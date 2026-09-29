@@ -13,6 +13,8 @@
 
 import Link from "next/link";
 import { DeliveryLog } from "./delivery-log";
+import { eventDescription, eventLabel, groupLabel } from "./event-names";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DestinationsCard } from "./destinations-card";
 import {
     saveNotificationRuleAction,
@@ -41,7 +43,6 @@ import {
 } from "@/lib/desktop-notify";
 import {
     NOTICE_KINDS,
-    NOTICE_LABEL,
     noticeSettings,
     setNoticeAllowed,
     type NoticeKind
@@ -69,7 +70,6 @@ import {
 import {
     DEFAULT_FAVICON_STYLE,
     FAVICON_STYLES,
-    FAVICON_STYLE_LABEL,
     faviconBadge,
     faviconStyle,
     setFaviconStyle,
@@ -79,7 +79,6 @@ import {
     isMuted,
     NOTIFICATION_EVENTS,
     NOTIFICATION_GROUPS,
-    NOTIFICATION_GROUP_LABEL,
     type NotificationGroup,
     type NotificationRule
 } from "@polaris/core";
@@ -168,19 +167,10 @@ export function NotificationSettingsView({
  * this person is, not which machine they are at. Optimistic, and put back with
  * the reason if the save is refused.
  */
-const IN_GAME_LABEL: Record<inGame.InGameChoice, string> = {
-    auto: "Direct",
-    all: "Everything",
-    off: "Off"
-};
-
-const IN_GAME_HINT: Record<inGame.InGameChoice, string> = {
-    auto: `Direct messages and groups of up to ${inGame.SMALL_GROUP_SIZE} people`,
-    all: "Every conversation, channels and large groups included",
-    off: "None of them"
-};
-
 function InGameCard({ initial, ready }: { initial: inGame.InGameChoice; ready: boolean }) {
+    const t = useTranslations("accountNotifications");
+    const hint = (option: inGame.InGameChoice) =>
+        t(`inGame.hints.${option}` as const, { size: inGame.SMALL_GROUP_SIZE });
     const [choice, setChoice] = useState(initial);
     const [problem, setProblem] = useState<string | null>(null);
     const [, startSaving] = useTransition();
@@ -192,7 +182,7 @@ function InGameCard({ initial, ready }: { initial: inGame.InGameChoice; ready: b
         setProblem(null);
         startSaving(async () => {
             const result = await setMessagesInGameAction(next).catch(() => ({
-                error: "That could not be saved. Try again."
+                error: t("errors.notSavedTryAgain")
             }));
             if ("error" in result && result.error) {
                 setChoice(previous);
@@ -206,33 +196,31 @@ function InGameCard({ initial, ready }: { initial: inGame.InGameChoice; ready: b
             <CardBody className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">Messages in Minecraft</p>
+                        <p className="text-sm font-medium">{t("inGame.title")}</p>
                         <p className="text-xs text-muted-foreground">
-                            While you play on a server here, your Chat messages also appear in its
-                            game chat. Only you see them.
-                            {ready ? ` ${IN_GAME_HINT[choice]}.` : null}
+                            {ready
+                                ? t("inGame.descriptionWith", { hint: hint(choice) })
+                                : t("inGame.description")}
                         </p>
                     </div>
                     <SegmentedControl
                         value={choice}
                         onValueChange={choose}
-                        aria-label="Which Chat messages to show in Minecraft while I play"
+                        aria-label={t("inGame.label")}
                         className="shrink-0"
                         options={inGame.IN_GAME_CHOICES.map((option) => ({
                             value: option,
-                            label: IN_GAME_LABEL[option],
-                            title: ready ? IN_GAME_HINT[option] : inGame.IN_GAME_NOT_READY,
+                            label: t(`inGame.choices.${option}` as const),
+                            title: ready ? hint(option) : t("inGame.notReady"),
                             disabled: !ready
                         }))}
                     />
                 </div>
                 {ready ? null : (
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
-                        <p className="min-w-0 text-xs text-muted-foreground">
-                            {inGame.IN_GAME_NOT_READY}
-                        </p>
+                        <p className="min-w-0 text-xs text-muted-foreground">{t("inGame.notReady")}</p>
                         <Button asChild size="sm" variant="outline" className="shrink-0">
-                            <Link href="/account/connections">Connected accounts</Link>
+                            <Link href="/account/connections">{t("inGame.connectedAccounts")}</Link>
                         </Button>
                     </div>
                 )}
@@ -263,6 +251,7 @@ function InGameCard({ initial, ready }: { initial: inGame.InGameChoice; ready: b
  * permission, so there the switches stand and the prompt does not.
  */
 function BrowserNoticesCard() {
+    const t = useTranslations("accountNotifications");
     const [standing, setStanding] = useState<NoticeStanding>("unsupported");
     const [asking, setAsking] = useState(false);
     const [kinds, setKinds] = useState<Record<NoticeKind, boolean>>(
@@ -283,11 +272,11 @@ function BrowserNoticesCard() {
     }, []);
 
     const said: Record<NoticeStanding, string> = {
-        app: "The Polaris app draws these itself. Nothing to allow.",
-        granted: "Polaris can tell you about these while you are on another tab.",
-        denied: "This browser is blocking them. Allow notifications for this site in its settings to turn them back on.",
-        askable: "Let Polaris tell you about a call or a message while you are on another tab.",
-        unsupported: "This browser cannot show them."
+        app: t("browser.standing.app"),
+        granted: t("browser.standing.granted"),
+        denied: t("browser.standing.denied"),
+        askable: t("browser.standing.askable"),
+        unsupported: t("browser.standing.unsupported")
     };
 
     /** Whether the switches mean anything yet: refused or unsupported, nothing
@@ -311,32 +300,33 @@ function BrowserNoticesCard() {
      */
     async function test() {
         const notice = await notifyDesktop({
+            // i18n-ignore: the product's name, as the notice's sender
             title: "Polaris",
-            body: "This is what a notice from Polaris looks like.",
+            body: t("browser.testBody"),
             tag: "polaris:test"
         });
         setShown(
             notice
-                ? "Sent. If nothing appeared, the system is holding it back - check its own notification settings."
-                : "This browser would not draw it."
+                ? t("browser.testSent")
+                : t("browser.testRefused")
         );
     }
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Browser notifications</CardTitle>
+                <CardTitle>{t("browser.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-3">
                     <p className="min-w-0 text-xs text-muted-foreground">{said[standing]}</p>
                     <div className="flex shrink-0 items-center gap-2">
                         {standing === "granted" ? (
-                            <Badge variant="success">Allowed</Badge>
+                            <Badge variant="success">{t("browser.allowed")}</Badge>
                         ) : standing === "app" ? (
-                            <Badge variant="success">On</Badge>
+                            <Badge variant="success">{t("browser.on")}</Badge>
                         ) : standing === "denied" ? (
-                            <Badge variant="warning">Blocked</Badge>
+                            <Badge variant="warning">{t("browser.blocked")}</Badge>
                         ) : standing === "askable" ? (
                             <Button
                                 size="sm"
@@ -350,12 +340,12 @@ function BrowserNoticesCard() {
                                 }}
                             >
                                 <Bell className="size-4 shrink-0" aria-hidden />
-                                Allow
+                                {t("browser.allow")}
                             </Button>
                         ) : null}
                         {working ? (
                             <Button size="sm" variant="secondary" onClick={() => void test()}>
-                                Show me one
+                                {t("browser.showMe")}
                             </Button>
                         ) : null}
                     </div>
@@ -371,10 +361,10 @@ function BrowserNoticesCard() {
                         >
                             <div className="min-w-0">
                                 <p className={cn("text-sm", !working && "text-muted-foreground")}>
-                                    {NOTICE_LABEL[kind].title}
+                                    {t(`browser.kinds.${kind}.title` as const)}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                    {NOTICE_LABEL[kind].hint}
+                                    {t(`browser.kinds.${kind}.hint` as const)}
                                 </p>
                             </div>
                             <Switch
@@ -384,16 +374,13 @@ function BrowserNoticesCard() {
                                 // allowed, and a row of dead switches teaches
                                 // nobody which of them was on.
                                 onChange={(next) => choose(kind, next)}
-                                aria-label={`${NOTICE_LABEL[kind].title} outside the tab`}
+                                aria-label={t("browser.outsideTab", { kind: t(`browser.kinds.${kind}.title` as const) })}
                             />
                         </div>
                     ))}
                 </div>
 
-                <p className="text-xs text-muted-foreground">
-                    These are kept for this browser, not for your account - the same as the sound
-                    below. What reaches the bell, your mail and everything else is further down.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("browser.keptHere")}</p>
             </CardBody>
         </Card>
     );
@@ -408,6 +395,7 @@ function BrowserNoticesCard() {
 function SoundCard() {
     // Storage is not readable while the page is rendered on the server, so the
     // switch takes its real position on mount.
+    const t = useTranslations("accountNotifications");
     const [enabled, setEnabled] = useState(true);
     useEffect(() => setEnabled(notificationSoundEnabled()), []);
 
@@ -423,17 +411,14 @@ function SoundCard() {
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">Sound</p>
-                        <p className="text-xs text-muted-foreground">
-                            Play a chime when a notification or message arrives. Kept on this
-                            device.
-                        </p>
+                        <p className="text-sm font-medium">{t("sound.title")}</p>
+                        <p className="text-xs text-muted-foreground">{t("sound.description")}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
                         <button
                             type="button"
-                            aria-label="Hear it"
-                            title="Hear it"
+                            aria-label={t("sound.hear")}
+                            title={t("sound.hear")}
                             disabled={!enabled}
                             onClick={playNotificationSound}
                             className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
@@ -443,7 +428,7 @@ function SoundCard() {
                         <Switch
                             checked={enabled}
                             onChange={toggle}
-                            aria-label="Play a sound when a notification arrives"
+                            aria-label={t("sound.label")}
                         />
                     </div>
                 </div>
@@ -476,6 +461,7 @@ function VolumeSlider() {
         soundVolume,
         () => DEFAULT_SOUND_VOLUME
     );
+    const t = useTranslations("accountNotifications");
     const [error, setError] = useState<string | null>(null);
     /** The volume the server last accepted. Taken when the slider is first
      *  moved rather than at render: the first render on the server, and the one
@@ -496,13 +482,13 @@ function VolumeSlider() {
         const before = saved.current ?? next;
         saved.current = next;
         const result = await saveSoundVolumeAction({ volume: next }).catch(() => ({
-            error: "Could not save the volume. Try again."
+            error: t("sound.volumeNotSaved")
         }));
         if (!result.error) return;
         setError(result.error);
         saved.current = before;
         adoptSoundVolume(before);
-    }, []);
+    }, [t]);
 
     useEffect(
         () => () => {
@@ -524,7 +510,7 @@ function VolumeSlider() {
     return (
         <div className="flex flex-col gap-1">
             <span className="flex items-center justify-between gap-2 text-sm">
-                Volume
+                {t("sound.volume")}
                 <span className="tabular-nums text-muted-foreground">{volume}%</span>
             </span>
             <input
@@ -533,13 +519,11 @@ function VolumeSlider() {
                 max={100}
                 step={5}
                 value={volume}
-                aria-label="Sound volume"
+                aria-label={t("sound.volumeLabel")}
                 onChange={(event) => change(Number(event.target.value))}
                 className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
             />
-            <span className="text-xs text-muted-foreground">
-                For every Polaris sound: alerts, messages and calls. Saved to your account.
-            </span>
+            <span className="text-xs text-muted-foreground">{t("sound.volumeHint")}</span>
             {error ? <p className="text-xs text-danger">{error}</p> : null}
         </div>
     );
@@ -553,18 +537,13 @@ const PREVIEW_WAITING = 3;
  *  the icon rather than a blur of it. */
 const PREVIEW_SIZE = 64;
 
-const STYLE_HINT: Record<FaviconStyle, string> = {
-    count: "How many are waiting, on the tab icon.",
-    dot: "A dot on the tab icon, without the number.",
-    none: "The plain icon, whatever is waiting."
-};
-
 /**
  * What the tab icon says while you are somewhere else. Kept on this device
  * alongside the chime, for the same reason: it belongs to the screen being
  * looked at rather than to the account.
  */
 function TabIconCard() {
+    const t = useTranslations("accountNotifications");
     const [style, setStyle] = useState<FaviconStyle>(DEFAULT_FAVICON_STYLE);
     const [preview, setPreview] = useState<string | null>(null);
 
@@ -595,19 +574,19 @@ function TabIconCard() {
                         {preview ? <img src={preview} alt="" width={20} height={20} /> : null}
                     </span>
                     <div className="min-w-0">
-                        <p className="text-sm font-medium">Tab icon</p>
-                        <p className="text-xs text-muted-foreground">{STYLE_HINT[style]}</p>
+                        <p className="text-sm font-medium">{t("tabIcon.title")}</p>
+                        <p className="text-xs text-muted-foreground">{t(`tabIcon.styles.${style}.hint` as const)}</p>
                     </div>
                 </div>
                 <SegmentedControl
                     value={style}
                     onValueChange={choose}
-                    aria-label="What the tab icon shows when something is waiting"
+                    aria-label={t("tabIcon.label")}
                     className="shrink-0"
                     options={FAVICON_STYLES.map((option) => ({
                         value: option,
-                        label: FAVICON_STYLE_LABEL[option],
-                        title: STYLE_HINT[option]
+                        label: t(`tabIcon.styles.${option}.label` as const),
+                        title: t(`tabIcon.styles.${option}.hint` as const)
                     }))}
                 />
             </CardBody>
@@ -627,11 +606,12 @@ function EventGroup({
     onChange: (event: string, rule: NotificationRule) => void;
 }) {
     const events = NOTIFICATION_EVENTS.filter((entry) => entry.group === group);
+    const t = useTranslations("accountNotifications");
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>{NOTIFICATION_GROUP_LABEL[group]}</CardTitle>
+                <CardTitle>{groupLabel(t, group)}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-4 p-0">
                 <ul className="divide-y divide-border">
@@ -642,12 +622,12 @@ function EventGroup({
                             <li key={entry.id} className="flex flex-col gap-2 px-4 py-3">
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
-                                        <p className="text-sm font-medium">{entry.label}</p>
+                                        <p className="text-sm font-medium">{eventLabel(t, entry.id)}</p>
                                         <p className="text-xs text-muted-foreground">
-                                            {entry.description}
+                                            {eventDescription(t, entry.id)}
                                         </p>
                                     </div>
-                                    {isMuted(rule) ? <Badge>Muted</Badge> : null}
+                                    {isMuted(rule) ? <Badge>{t("rules.muted")}</Badge> : null}
                                 </div>
                                 <RuleChips
                                     eventId={entry.id}
@@ -679,6 +659,8 @@ function RuleChips({
     destinations: DestinationView[];
     onChange: (event: string, rule: NotificationRule) => void;
 }) {
+    const t = useTranslations("accountNotifications");
+
     function toggleDestination(id: string) {
         const on = rule.destinations.includes(id);
         onChange(eventId, {
@@ -693,17 +675,17 @@ function RuleChips({
         <div className="flex flex-wrap items-center gap-1.5">
             <Chip
                 icon={Bell}
-                label="In-app"
+                label={t("rules.inApp")}
                 on={rule.inapp}
                 // A security alert always leaves a record; only where else it goes
                 // is negotiable.
                 disabled={critical}
-                title={critical ? "Security alerts always appear in Polaris" : undefined}
+                title={critical ? t("rules.securityAlways") : undefined}
                 onClick={() => onChange(eventId, { ...rule, inapp: !rule.inapp })}
             />
             <Chip
                 icon={Mail}
-                label="Email"
+                label={t("rules.email")}
                 on={rule.email}
                 onClick={() => onChange(eventId, { ...rule, email: !rule.email })}
             />
@@ -717,7 +699,7 @@ function RuleChips({
                     title={
                         destination.enabled
                             ? destination.targetHint
-                            : "This destination is switched off"
+                            : t("rules.destinationOff")
                     }
                     onClick={() => toggleDestination(destination.id)}
                 />

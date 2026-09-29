@@ -6,6 +6,7 @@
  * safe place for it to stand is where a reader who has never touched it is.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -33,7 +34,7 @@ const { NotificationSettingsView } = await import(
 
 function render() {
     return renderToStaticMarkup(
-        <NotificationSettingsView rules={[]} destinations={[]} senders={[]} deliveries={[]} />
+        withMessages(<NotificationSettingsView rules={[]} destinations={[]} senders={[]} deliveries={[]} />)
     );
 }
 

@@ -4,5 +4,392 @@
             "title": "Notifications",
             "intro": "Alerts from Polaris and your integrations, and where each one is sent."
         }
+    },
+    "tabs": {
+        "history": "History",
+        "delivery": "Delivery"
+    },
+    "history": {
+        "allEvents": "All events",
+        "search": "Search notifications",
+        "filterEvent": "Filter by event",
+        "filterState": "Filter by state",
+        "order": "Order",
+        "states": {
+            "all": "Everything",
+            "unread": "Unread",
+            "read": "Read",
+            "action": "Action needed"
+        },
+        "orders": {
+            "newest": "Newest first",
+            "oldest": "Oldest first",
+            "unread": "Unread first"
+        },
+        "markAllRead": "Mark all read",
+        "clearAll": "Clear all",
+        "selected": "{count} selected",
+        "markRead": "Mark read",
+        "delete": "Delete",
+        "clearSelection": "Clear selection",
+        "noMatch": "Nothing here matches that.",
+        "empty": "You have no notifications.",
+        "selectAll": "Select everything listed",
+        "count": "{count, plural, one {# notification} other {# notifications}}",
+        "loadOlder": "Load older",
+        "selectRow": "Select {title}",
+        "markAsRead": "Mark as read"
+    },
+    "errors": {
+        "notSaved": "That could not be saved.",
+        "notSavedTryAgain": "That could not be saved. Try again.",
+        "volume": "Pick a volume between 0 and 100.",
+        "checkChoice": "Check the choice.",
+        "destinationGone": "One of those destinations no longer exists.",
+        "checkForm": "Check the form.",
+        "tooManyTests": "Too many tests. Wait a moment before sending another."
+    },
+    "inGame": {
+        "title": "Messages in Minecraft",
+        "description": "While you play on a server here, your Chat messages also appear in its game chat. Only you see them.",
+        "descriptionWith": "While you play on a server here, your Chat messages also appear in its game chat. Only you see them. {hint}.",
+        "label": "Which Chat messages to show in Minecraft while I play",
+        "choices": {
+            "auto": "Direct",
+            "all": "Everything",
+            "off": "Off"
+        },
+        "hints": {
+            "auto": "Direct messages and groups of up to {size} people",
+            "all": "Every conversation, channels and large groups included",
+            "off": "None of them"
+        },
+        "notReady": "No server knows which player is you yet. Add your Minecraft username in Connected accounts, or ask whoever runs the server to link your player to your account.",
+        "connectedAccounts": "Connected accounts"
+    },
+    "browser": {
+        "title": "Browser notifications",
+        "standing": {
+            "app": "The Polaris app draws these itself. Nothing to allow.",
+            "granted": "Polaris can tell you about these while you are on another tab.",
+            "denied": "This browser is blocking them. Allow notifications for this site in its settings to turn them back on.",
+            "askable": "Let Polaris tell you about a call or a message while you are on another tab.",
+            "unsupported": "This browser cannot show them."
+        },
+        "testBody": "This is what a notice from Polaris looks like.",
+        "testSent": "Sent. If nothing appeared, the system is holding it back - check its own notification settings.",
+        "testRefused": "This browser would not draw it.",
+        "allowed": "Allowed",
+        "on": "On",
+        "blocked": "Blocked",
+        "allow": "Allow",
+        "showMe": "Show me one",
+        "kinds": {
+            "calls": {
+                "title": "Calls",
+                "hint": "Somebody calling you. The one that rings."
+            },
+            "messages": {
+                "title": "Chat messages",
+                "hint": "A message in a conversation you follow, while you are on another tab."
+            },
+            "mail": {
+                "title": "Mail",
+                "hint": "Something arriving in a mailbox you read here."
+            },
+            "alerts": {
+                "title": "Everything else",
+                "hint": "A finished build, a server that stopped, anything the bell would carry."
+            }
+        },
+        "outsideTab": "{kind} outside the tab",
+        "keptHere": "These are kept for this browser, not for your account - the same as the sound below. What reaches the bell, your mail and everything else is further down."
+    },
+    "sound": {
+        "title": "Sound",
+        "description": "Play a chime when a notification or message arrives. Kept on this device.",
+        "hear": "Hear it",
+        "label": "Play a sound when a notification arrives",
+        "volumeNotSaved": "Could not save the volume. Try again.",
+        "volume": "Volume",
+        "volumeLabel": "Sound volume",
+        "volumeHint": "For every Polaris sound: alerts, messages and calls. Saved to your account."
+    },
+    "tabIcon": {
+        "title": "Tab icon",
+        "label": "What the tab icon shows when something is waiting",
+        "styles": {
+            "count": {
+                "label": "Count",
+                "hint": "How many are waiting, on the tab icon."
+            },
+            "dot": {
+                "label": "Dot",
+                "hint": "A dot on the tab icon, without the number."
+            },
+            "none": {
+                "label": "Nothing",
+                "hint": "The plain icon, whatever is waiting."
+            }
+        }
+    },
+    "rules": {
+        "muted": "Muted",
+        "inApp": "In-app",
+        "securityAlways": "Security alerts always appear in Polaris",
+        "email": "Email",
+        "destinationOff": "This destination is switched off"
+    },
+    "destinations": {
+        "title": "Destinations",
+        "description": "Webhooks and phone numbers you can route the events above to.",
+        "add": "Add",
+        "empty": "No destinations yet. Add a Discord or Slack webhook, or a number for texts.",
+        "failing": "Failing",
+        "working": "Working",
+        "switchOff": "Switch off",
+        "switchOn": "Switch on",
+        "test": "Send a test",
+        "remove": "Remove",
+        "smsNotReady": "Texts will not send until an SMS sender is connected under <link>Channels</link>.",
+        "testSent": "Test alert sent.",
+        "lastUsed": "Last used {time}",
+        "checkForm": "Check the form",
+        "dialog": {
+            "title": "Add a destination",
+            "description": "Somewhere alerts can go. Point events at it once it is added.",
+            "kind": "Kind",
+            "webhook": "Webhook (Discord, Slack, your own)",
+            "sms": "Text message",
+            "name": "Name",
+            "phonePlaceholder": "My phone",
+            "webhookPlaceholder": "Ops channel",
+            "url": "Webhook URL",
+            "urlHint": "Discord, Slack, Teams, or a Telegram bot as {example}. Anyone with this URL can post to the channel, so it is stored encrypted and never shown again.",
+            "format": "Format",
+            "detect": "Detect from the URL",
+            "rawJson": "Raw JSON",
+            "number": "Number",
+            "numberHint": "International form, including the country code."
+        }
+    },
+    "deliveries": {
+        "title": "Recent deliveries",
+        "description": "Every attempt to get an alert somewhere, and how it went.",
+        "failedCount": "{count} failed",
+        "empty": "Nothing sent yet.",
+        "kinds": {
+            "inapp": "In-app",
+            "email": "Email",
+            "webhook": "Webhook",
+            "sms": "Text"
+        },
+        "status": {
+            "failed": "Failed",
+            "skipped": "Skipped",
+            "sent": "Sent"
+        }
+    },
+    "events": {
+        "deployFailed": {
+            "label": "Deploy failed",
+            "description": "A build or deploy of a service or database did not come up."
+        },
+        "deploySucceeded": {
+            "label": "Deploy succeeded",
+            "description": "A service or database finished deploying and is serving."
+        },
+        "cronFailed": {
+            "label": "A scheduled job failed",
+            "description": "A service's scheduled command failed on its last try, or ran out of time."
+        },
+        "domainDown": {
+            "label": "A domain stopped serving",
+            "description": "A domain pointed at one of your services stopped answering."
+        },
+        "domainUp": {
+            "label": "A domain started serving again",
+            "description": "A domain that had stopped answering is reachable again."
+        },
+        "billingBudget": {
+            "label": "An organization's budget is running out",
+            "description": "What an organization you run spent this month reached 80% of its budget, or went past it."
+        },
+        "tasksAssigned": {
+            "label": "Assigned a task",
+            "description": "Somebody put a task in your name, or a rule did."
+        },
+        "tasksShared": {
+            "label": "A task sent to you",
+            "description": "Somebody sent you a task to look at."
+        },
+        "tasksComment": {
+            "label": "Comment on your work",
+            "description": "A comment on a task you are assigned to or watching."
+        },
+        "tasksMentioned": {
+            "label": "Mentioned by name",
+            "description": "Somebody wrote your name into a task, a comment or a page."
+        },
+        "tasksDue": {
+            "label": "Task reminder",
+            "description": "A reminder you set on a task, and work falling due today."
+        },
+        "watchAlarm": {
+            "label": "Alarm fired",
+            "description": "A watched service, domain or resource breached its condition."
+        },
+        "watchOk": {
+            "label": "Alarm cleared",
+            "description": "A watched target came back within its condition."
+        },
+        "accountSignin": {
+            "label": "Sign-in waiting for approval",
+            "description": "Someone signed in to your account and needs approving."
+        },
+        "accountRecovery": {
+            "label": "Someone locked out of their account",
+            "description": "A request to reset a password is waiting for a decision."
+        },
+        "accountSessionOpened": {
+            "label": "A session was opened",
+            "description": "Your account was signed in to, and from where."
+        },
+        "accountSessionClosed": {
+            "label": "A session ended",
+            "description": "A device was signed out, by you or by something else."
+        },
+        "accountSessionCompromised": {
+            "label": "A session was used by somebody else",
+            "description": "A session of yours was used from a device or an address it is not tied to, and was ended."
+        },
+        "adminSafetyCase": {
+            "label": "Something needs an administrator",
+            "description": "An account locked itself down, or somebody reported a person or a message. Only reaches administrators."
+        },
+        "accountLinkSuggested": {
+            "label": "Linking an account you already have",
+            "description": "Your address belongs to a service Polaris can sign you in with, and linking it would prove the address and give you a way in that is not a password."
+        },
+        "accountFriend": {
+            "label": "Friend requests",
+            "description": "Somebody asked to be added, or answered a request you sent."
+        },
+        "chatCallMissed": {
+            "label": "Missed calls",
+            "description": "Somebody called you and nobody picked it up."
+        },
+        "accountOrgInvite": {
+            "label": "Organization invitations",
+            "description": "You were invited to an organization, or somebody accepted yours."
+        },
+        "accountSecurity": {
+            "label": "Account security changed",
+            "description": "A password, a second factor, a passkey, a key or a sign-in rule changed."
+        },
+        "accountConnectionExpired": {
+            "label": "A connected account stopped working",
+            "description": "A token you linked ran out or was withdrawn, and what it was doing has stopped."
+        },
+        "accountConnectionScopes": {
+            "label": "A connected account needs authorizing again",
+            "description": "Polaris now asks a service for more than it did when you linked your account, and it cannot use the new part until you approve it."
+        },
+        "accountAiKeyExpiring": {
+            "label": "An AI provider key is about to expire",
+            "description": "A key you gave an end date runs out within the week."
+        },
+        "accountAiKeyExpired": {
+            "label": "An AI provider key expired",
+            "description": "A key reached its end date and is no longer used by anything."
+        },
+        "driveDropPointReceived": {
+            "label": "Something arrived at a drop point",
+            "description": "A file or a piece of text was sent to one of your drop points."
+        },
+        "scanDetection": {
+            "label": "Malware in an upload",
+            "description": "A file sent to one of your drop points was flagged."
+        },
+        "scanError": {
+            "label": "Upload could not be scanned",
+            "description": "The scanner did not finish. The file was kept."
+        },
+        "placesSighting": {
+            "label": "A camera saw something",
+            "description": "Somebody, a vehicle, an animal or a parcel came into view of a camera."
+        },
+        "placesAlert": {
+            "label": "An alert you wrote went off",
+            "description": "Something one of your alerts asked about happened."
+        },
+        "placesTamper": {
+            "label": "A camera was interfered with",
+            "description": "A camera reported being covered, moved or unplugged."
+        },
+        "placesOffline": {
+            "label": "A camera stopped answering",
+            "description": "A camera went quiet, or came back after being quiet."
+        },
+        "serverSpace": {
+            "label": "A server is running out of room",
+            "description": "Polaris freed everything nothing was using and the disk is still nearly full."
+        },
+        "mailserverInbound": {
+            "label": "Mail matched a rule",
+            "description": "A message arrived at a mail server you run and matched one of its rules."
+        },
+        "mailserverAttention": {
+            "label": "A mail server needs attention",
+            "description": "A mail server you run stopped answering, or answers again."
+        },
+        "mailAccountRefused": {
+            "label": "A mailbox stopped accepting its password",
+            "description": "A mailbox you connected refused its password or authorization, and Polaris paused checking it until you update it."
+        },
+        "mailMessageBounced": {
+            "label": "A message you sent did not arrive",
+            "description": "A delivery report came back about something you sent, saying it never reached the address it was for."
+        },
+        "mailMessageUnsent": {
+            "label": "A message could not be sent",
+            "description": "The outgoing server refused a message for good, or refused it for some of the people it was for."
+        },
+        "mailMessageUncopied": {
+            "label": "Sent messages are not being copied to Sent",
+            "description": "Your mail is going out, but the mail server would not keep a copy of it in your Sent folder."
+        },
+        "networkRouter": {
+            "label": "Network needs attention",
+            "description": "Something outside Polaris is stopping your services being reached."
+        },
+        "networkAddress": {
+            "label": "An address stopped answering",
+            "description": "One of the addresses this Polaris is reachable at went down, or came back."
+        },
+        "integrationAttention": {
+            "label": "An integration needs attention",
+            "description": "A service somebody tried to connect an account of refused the authorization."
+        },
+        "systemUpdate": {
+            "label": "Update available",
+            "description": "A new Polaris build is published and ready to install."
+        },
+        "systemUpdated": {
+            "label": "Update installed on its own",
+            "description": "A scheduled or automatic update ran, and how it went."
+        }
+    },
+    "groups": {
+        "deploy": "Deploy",
+        "watch": "Watch",
+        "tasks": "Tasks",
+        "security": "Security",
+        "drive": "Drive",
+        "places": "Places",
+        "mail": "Mail",
+        "network": "Network",
+        "people": "People",
+        "system": "Polaris"
     }
 }

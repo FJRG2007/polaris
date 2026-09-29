@@ -12,6 +12,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { testDestination } from "@/lib/notifications/dispatch";
 import { soundVolumeSchema } from "@/lib/notifications/sound-volume";
@@ -56,11 +57,11 @@ export async function setMessagesInGameAction(
 ): Promise<{ choice?: InGameChoice; error?: string }> {
     const user = await requireUser();
     const parsed = z.enum(IN_GAME_CHOICES).safeParse(choice);
-    if (!parsed.success) return { error: "That could not be saved." };
+    if (!parsed.success) return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
     // The same test the screen draws from: nothing to choose until a server
     // knows which of its players is this account.
     if (!(await chatRelayReady(user.id).catch(() => false))) {
-        return { error: IN_GAME_NOT_READY };
+        return { error: (await getTranslations("accountNotifications"))("inGame.notReady") };
     }
     await prisma.user.update({
         where: { id: user.id },
@@ -139,7 +140,7 @@ export async function loadNotificationHistoryAction(input: unknown): Promise<Not
 export async function saveSoundVolumeAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = z.object({ volume: soundVolumeSchema }).safeParse(input);
-    if (!parsed.success) return { error: "Pick a volume between 0 and 100." };
+    if (!parsed.success) return { error: (await getTranslations("accountNotifications"))("errors.volume") };
     await saveSoundVolume(user.id, parsed.data.volume);
     return {};
 }
@@ -157,10 +158,12 @@ const saveRuleSchema = z.object({
 export async function saveNotificationRuleAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = saveRuleSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the choice." };
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("accountNotifications"))("errors.checkChoice") };
+    }
 
     if (!(await ownsDestinations(user.id, parsed.data.rule.destinations))) {
-        return { error: "One of those destinations no longer exists." };
+        return { error: (await getTranslations("accountNotifications"))("errors.destinationGone") };
     }
 
     const preferences = await getNotificationPreferences(user.id);
@@ -177,7 +180,9 @@ export async function createDestinationAction(
 ): Promise<{ destination?: DestinationView; error?: string }> {
     const user = await requireUser();
     const parsed = destinationInputSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("accountNotifications"))("errors.checkForm") };
+    }
     const result = await createDestination(user.id, parsed.data);
     if (!result.error) revalidatePath("/account/notifications");
     return result;
@@ -204,7 +209,7 @@ export async function deleteDestinationAction(id: string): Promise<void> {
 export async function testDestinationAction(id: string): Promise<{ error?: string }> {
     const user = await requireUser();
     const throttle = await rateLimit(`notify-test:${user.id}`, TEST_LIMIT, TEST_WINDOW_MS);
-    if (!throttle.ok) return { error: "Too many tests. Wait a moment before sending another." };
+    if (!throttle.ok) return { error: (await getTranslations("accountNotifications"))("errors.tooManyTests") };
     const result = await testDestination(user.id, id);
     revalidatePath("/account/notifications");
     return result;

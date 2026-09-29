@@ -1,3 +1,4 @@
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -27,7 +28,7 @@ const { NotificationSettingsView } = await import(
 describe("the sound setting", () => {
     it("is offered switched on, so an alert is not silently missed", () => {
         const markup = renderToStaticMarkup(
-            <NotificationSettingsView rules={[]} destinations={[]} senders={[]} deliveries={[]} />
+            withMessages(<NotificationSettingsView rules={[]} destinations={[]} senders={[]} deliveries={[]} />)
         );
         const switchMarkup = markup.slice(markup.indexOf('aria-label="Play a sound when a notification arrives"') - 200);
         expect(markup).toContain("Play a chime when a notification or message arrives");
@@ -36,7 +37,7 @@ describe("the sound setting", () => {
 
     it("offers a volume, at full by default", () => {
         const markup = renderToStaticMarkup(
-            <NotificationSettingsView rules={[]} destinations={[]} senders={[]} deliveries={[]} />
+            withMessages(<NotificationSettingsView rules={[]} destinations={[]} senders={[]} deliveries={[]} />)
         );
         const slider = markup.slice(markup.indexOf('aria-label="Sound volume"') - 200);
         expect(slider).toContain('type="range"');
@@ -48,7 +49,7 @@ describe("the sound setting", () => {
         // The switch silences the chimes on this device; it does not silence a
         // call, so the only control over how loud that rings must stay usable.
         const markup = renderToStaticMarkup(
-            <NotificationSettingsView rules={[]} destinations={[]} senders={[]} deliveries={[]} />
+            withMessages(<NotificationSettingsView rules={[]} destinations={[]} senders={[]} deliveries={[]} />)
         );
         const slider = markup.slice(markup.indexOf('aria-label="Sound volume"') - 300);
         expect(slider.slice(0, slider.indexOf(">"))).not.toContain("disabled");

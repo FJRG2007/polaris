@@ -4,5 +4,392 @@
             "title": "Notificaciones",
             "intro": "Avisos de Polaris y de tus integraciones, y adónde se envía cada uno."
         }
+    },
+    "tabs": {
+        "history": "Historial",
+        "delivery": "Entrega"
+    },
+    "history": {
+        "allEvents": "Todos los eventos",
+        "search": "Buscar notificaciones",
+        "filterEvent": "Filtrar por evento",
+        "filterState": "Filtrar por estado",
+        "order": "Orden",
+        "states": {
+            "all": "Todo",
+            "unread": "Sin leer",
+            "read": "Leídas",
+            "action": "Requiere acción"
+        },
+        "orders": {
+            "newest": "Más recientes primero",
+            "oldest": "Más antiguas primero",
+            "unread": "Sin leer primero"
+        },
+        "markAllRead": "Marcar todo como leído",
+        "clearAll": "Borrar todo",
+        "selected": "{count, plural, one {# seleccionada} other {# seleccionadas}}",
+        "markRead": "Marcar como leídas",
+        "delete": "Eliminar",
+        "clearSelection": "Quitar la selección",
+        "noMatch": "Aquí no hay nada que coincida.",
+        "empty": "No tienes notificaciones.",
+        "selectAll": "Seleccionar todo lo que aparece",
+        "count": "{count, plural, one {# notificación} other {# notificaciones}}",
+        "loadOlder": "Cargar anteriores",
+        "selectRow": "Seleccionar {title}",
+        "markAsRead": "Marcar como leída"
+    },
+    "errors": {
+        "notSaved": "No se ha podido guardar.",
+        "notSavedTryAgain": "No se ha podido guardar. Vuelve a intentarlo.",
+        "volume": "Elige un volumen entre 0 y 100.",
+        "checkChoice": "Revisa la opción.",
+        "destinationGone": "Uno de esos destinos ya no existe.",
+        "checkForm": "Revisa el formulario.",
+        "tooManyTests": "Demasiadas pruebas. Espera un momento antes de enviar otra."
+    },
+    "inGame": {
+        "title": "Mensajes en Minecraft",
+        "description": "Mientras juegas en un servidor de aquí, tus mensajes de Chat también aparecen en el chat del juego. Solo los ves tú.",
+        "descriptionWith": "Mientras juegas en un servidor de aquí, tus mensajes de Chat también aparecen en el chat del juego. Solo los ves tú. {hint}.",
+        "label": "Qué mensajes de Chat mostrar en Minecraft mientras juego",
+        "choices": {
+            "auto": "Directos",
+            "all": "Todos",
+            "off": "Ninguno"
+        },
+        "hints": {
+            "auto": "Mensajes directos y grupos de hasta {size} personas",
+            "all": "Todas las conversaciones, incluidos los canales y los grupos grandes",
+            "off": "Ninguno"
+        },
+        "notReady": "Ningún servidor sabe todavía qué jugador eres. Añade tu nombre de usuario de Minecraft en Cuentas conectadas, o pide a quien gestiona el servidor que vincule tu jugador a tu cuenta.",
+        "connectedAccounts": "Cuentas conectadas"
+    },
+    "browser": {
+        "title": "Notificaciones del navegador",
+        "standing": {
+            "app": "La app de Polaris las muestra por sí misma. No hay nada que permitir.",
+            "granted": "Polaris puede avisarte de esto mientras estás en otra pestaña.",
+            "denied": "Este navegador las está bloqueando. Permite las notificaciones de este sitio en sus ajustes para volver a activarlas.",
+            "askable": "Deja que Polaris te avise de una llamada o un mensaje mientras estás en otra pestaña.",
+            "unsupported": "Este navegador no puede mostrarlas."
+        },
+        "testBody": "Así es un aviso de Polaris.",
+        "testSent": "Enviado. Si no ha aparecido nada, el sistema lo está reteniendo: revisa sus propios ajustes de notificaciones.",
+        "testRefused": "Este navegador no ha querido mostrarlo.",
+        "allowed": "Permitidas",
+        "on": "Activadas",
+        "blocked": "Bloqueadas",
+        "allow": "Permitir",
+        "showMe": "Enséñame una",
+        "kinds": {
+            "calls": {
+                "title": "Llamadas",
+                "hint": "Alguien te está llamando. La que suena."
+            },
+            "messages": {
+                "title": "Mensajes de Chat",
+                "hint": "Un mensaje en una conversación que sigues, mientras estás en otra pestaña."
+            },
+            "mail": {
+                "title": "Correo",
+                "hint": "Algo que llega a un buzón que lees aquí."
+            },
+            "alerts": {
+                "title": "Todo lo demás",
+                "hint": "Una compilación terminada, un servidor que se ha parado, cualquier cosa que llevaría la campana."
+            }
+        },
+        "outsideTab": "{kind} fuera de la pestaña",
+        "keptHere": "Esto se guarda para este navegador, no para tu cuenta, igual que el sonido de abajo. Lo que llega a la campana, a tu correo y a todo lo demás está más abajo."
+    },
+    "sound": {
+        "title": "Sonido",
+        "description": "Reproducir un aviso sonoro cuando llega una notificación o un mensaje. Se guarda en este dispositivo.",
+        "hear": "Escucharlo",
+        "label": "Reproducir un sonido cuando llega una notificación",
+        "volumeNotSaved": "No se ha podido guardar el volumen. Vuelve a intentarlo.",
+        "volume": "Volumen",
+        "volumeLabel": "Volumen del sonido",
+        "volumeHint": "Para todos los sonidos de Polaris: avisos, mensajes y llamadas. Se guarda en tu cuenta."
+    },
+    "tabIcon": {
+        "title": "Icono de la pestaña",
+        "label": "Qué muestra el icono de la pestaña cuando hay algo pendiente",
+        "styles": {
+            "count": {
+                "label": "Número",
+                "hint": "Cuántos hay pendientes, en el icono de la pestaña."
+            },
+            "dot": {
+                "label": "Punto",
+                "hint": "Un punto en el icono de la pestaña, sin el número."
+            },
+            "none": {
+                "label": "Nada",
+                "hint": "El icono normal, haya lo que haya pendiente."
+            }
+        }
+    },
+    "rules": {
+        "muted": "Silenciado",
+        "inApp": "En la app",
+        "securityAlways": "Los avisos de seguridad siempre aparecen en Polaris",
+        "email": "Correo",
+        "destinationOff": "Este destino está desactivado"
+    },
+    "destinations": {
+        "title": "Destinos",
+        "description": "Webhooks y números de teléfono a los que puedes enviar los eventos de arriba.",
+        "add": "Añadir",
+        "empty": "Todavía no hay destinos. Añade un webhook de Discord o de Slack, o un número para mensajes de texto.",
+        "failing": "Fallando",
+        "working": "Funciona",
+        "switchOff": "Desactivar",
+        "switchOn": "Activar",
+        "test": "Enviar una prueba",
+        "remove": "Quitar",
+        "smsNotReady": "Los mensajes de texto no se enviarán hasta que haya un remitente de SMS conectado en <link>Canales</link>.",
+        "testSent": "Aviso de prueba enviado.",
+        "lastUsed": "Último uso {time}",
+        "checkForm": "Revisa el formulario",
+        "dialog": {
+            "title": "Añadir un destino",
+            "description": "Un sitio al que pueden ir los avisos. Dirige eventos a él cuando lo hayas añadido.",
+            "kind": "Tipo",
+            "webhook": "Webhook (Discord, Slack, el tuyo propio)",
+            "sms": "Mensaje de texto",
+            "name": "Nombre",
+            "phonePlaceholder": "Mi móvil",
+            "webhookPlaceholder": "Canal de operaciones",
+            "url": "URL del webhook",
+            "urlHint": "Discord, Slack, Teams, o un bot de Telegram como {example}. Cualquiera con esta URL puede publicar en el canal, así que se guarda cifrada y no se vuelve a mostrar.",
+            "format": "Formato",
+            "detect": "Detectar a partir de la URL",
+            "rawJson": "JSON sin formato",
+            "number": "Número",
+            "numberHint": "En formato internacional, con el prefijo del país."
+        }
+    },
+    "deliveries": {
+        "title": "Entregas recientes",
+        "description": "Cada intento de hacer llegar un aviso a algún sitio, y cómo fue.",
+        "failedCount": "{count, plural, one {# fallida} other {# fallidas}}",
+        "empty": "Todavía no se ha enviado nada.",
+        "kinds": {
+            "inapp": "En la app",
+            "email": "Correo",
+            "webhook": "Webhook",
+            "sms": "Texto"
+        },
+        "status": {
+            "failed": "Fallida",
+            "skipped": "Omitida",
+            "sent": "Enviada"
+        }
+    },
+    "events": {
+        "deployFailed": {
+            "label": "Despliegue fallido",
+            "description": "Una compilación o un despliegue de un servicio o una base de datos no ha arrancado."
+        },
+        "deploySucceeded": {
+            "label": "Despliegue correcto",
+            "description": "Un servicio o una base de datos ha terminado de desplegarse y está funcionando."
+        },
+        "cronFailed": {
+            "label": "Ha fallado una tarea programada",
+            "description": "El comando programado de un servicio falló en su último intento o se quedó sin tiempo."
+        },
+        "domainDown": {
+            "label": "Un dominio ha dejado de funcionar",
+            "description": "Un dominio que apunta a uno de tus servicios ha dejado de responder."
+        },
+        "domainUp": {
+            "label": "Un dominio vuelve a funcionar",
+            "description": "Un dominio que había dejado de responder vuelve a estar accesible."
+        },
+        "billingBudget": {
+            "label": "Se está acabando el presupuesto de una organización",
+            "description": "Lo que ha gastado este mes una organización que gestionas ha llegado al 80 % de su presupuesto o lo ha superado."
+        },
+        "tasksAssigned": {
+            "label": "Te han asignado una tarea",
+            "description": "Alguien, o una regla, ha puesto una tarea a tu nombre."
+        },
+        "tasksShared": {
+            "label": "Te han enviado una tarea",
+            "description": "Alguien te ha enviado una tarea para que la veas."
+        },
+        "tasksComment": {
+            "label": "Comentario sobre tu trabajo",
+            "description": "Un comentario en una tarea que tienes asignada o que sigues."
+        },
+        "tasksMentioned": {
+            "label": "Te han mencionado",
+            "description": "Alguien ha escrito tu nombre en una tarea, un comentario o una página."
+        },
+        "tasksDue": {
+            "label": "Recordatorio de tarea",
+            "description": "Un recordatorio que pusiste en una tarea, y el trabajo que vence hoy."
+        },
+        "watchAlarm": {
+            "label": "Alarma disparada",
+            "description": "Un servicio, dominio o recurso vigilado ha incumplido su condición."
+        },
+        "watchOk": {
+            "label": "Alarma resuelta",
+            "description": "Un objetivo vigilado vuelve a cumplir su condición."
+        },
+        "accountSignin": {
+            "label": "Inicio de sesión pendiente de aprobación",
+            "description": "Alguien ha iniciado sesión en tu cuenta y necesita tu aprobación."
+        },
+        "accountRecovery": {
+            "label": "Alguien no puede entrar en su cuenta",
+            "description": "Hay una solicitud para restablecer una contraseña esperando una decisión."
+        },
+        "accountSessionOpened": {
+            "label": "Se ha abierto una sesión",
+            "description": "Se ha iniciado sesión en tu cuenta, y desde dónde."
+        },
+        "accountSessionClosed": {
+            "label": "Ha terminado una sesión",
+            "description": "Se ha cerrado la sesión de un dispositivo, porque lo hiciste tú o por otro motivo."
+        },
+        "accountSessionCompromised": {
+            "label": "Otra persona ha usado una sesión",
+            "description": "Una sesión tuya se ha usado desde un dispositivo o una dirección a los que no está atada, y se ha terminado."
+        },
+        "adminSafetyCase": {
+            "label": "Algo necesita a un administrador",
+            "description": "Una cuenta se ha bloqueado a sí misma, o alguien ha denunciado a una persona o un mensaje. Solo llega a los administradores."
+        },
+        "accountLinkSuggested": {
+            "label": "Vincular una cuenta que ya tienes",
+            "description": "Tu dirección pertenece a un servicio con el que Polaris puede iniciar tu sesión, y vincularla demostraría la dirección y te daría una forma de entrar que no es una contraseña."
+        },
+        "accountFriend": {
+            "label": "Solicitudes de amistad",
+            "description": "Alguien ha pedido que le añadas, o ha respondido a una solicitud que enviaste."
+        },
+        "chatCallMissed": {
+            "label": "Llamadas perdidas",
+            "description": "Alguien te ha llamado y nadie ha contestado."
+        },
+        "accountOrgInvite": {
+            "label": "Invitaciones a organizaciones",
+            "description": "Te han invitado a una organización, o alguien ha aceptado la tuya."
+        },
+        "accountSecurity": {
+            "label": "Ha cambiado la seguridad de la cuenta",
+            "description": "Ha cambiado una contraseña, un segundo factor, una llave de acceso, una clave o una regla de inicio de sesión."
+        },
+        "accountConnectionExpired": {
+            "label": "Una cuenta conectada ha dejado de funcionar",
+            "description": "Un token que vinculaste ha caducado o se ha retirado, y lo que hacía se ha detenido."
+        },
+        "accountConnectionScopes": {
+            "label": "Una cuenta conectada necesita autorizarse de nuevo",
+            "description": "Polaris ahora pide a un servicio más de lo que pedía cuando vinculaste tu cuenta, y no puede usar la parte nueva hasta que la apruebes."
+        },
+        "accountAiKeyExpiring": {
+            "label": "Una clave de proveedor de IA está a punto de caducar",
+            "description": "Una clave a la que pusiste fecha de fin caduca esta semana."
+        },
+        "accountAiKeyExpired": {
+            "label": "Ha caducado una clave de proveedor de IA",
+            "description": "Una clave ha llegado a su fecha de fin y ya no la usa nada."
+        },
+        "driveDropPointReceived": {
+            "label": "Ha llegado algo a un punto de entrega",
+            "description": "Se ha enviado un archivo o un texto a uno de tus puntos de entrega."
+        },
+        "scanDetection": {
+            "label": "Malware en una subida",
+            "description": "Se ha marcado un archivo enviado a uno de tus puntos de entrega."
+        },
+        "scanError": {
+            "label": "No se ha podido analizar una subida",
+            "description": "El analizador no terminó. El archivo se ha conservado."
+        },
+        "placesSighting": {
+            "label": "Una cámara ha visto algo",
+            "description": "Una persona, un vehículo, un animal o un paquete ha entrado en el campo de una cámara."
+        },
+        "placesAlert": {
+            "label": "Ha saltado una alerta tuya",
+            "description": "Ha pasado algo de lo que preguntaba una de tus alertas."
+        },
+        "placesTamper": {
+            "label": "Han manipulado una cámara",
+            "description": "Una cámara ha informado de que la han tapado, movido o desconectado."
+        },
+        "placesOffline": {
+            "label": "Una cámara ha dejado de responder",
+            "description": "Una cámara se ha quedado en silencio, o ha vuelto después de estarlo."
+        },
+        "serverSpace": {
+            "label": "Un servidor se está quedando sin espacio",
+            "description": "Polaris ha liberado todo lo que no usaba nada y el disco sigue casi lleno."
+        },
+        "mailserverInbound": {
+            "label": "Un correo ha coincidido con una regla",
+            "description": "Ha llegado un mensaje a un servidor de correo que gestionas y ha coincidido con una de sus reglas."
+        },
+        "mailserverAttention": {
+            "label": "Un servidor de correo necesita atención",
+            "description": "Un servidor de correo que gestionas ha dejado de responder, o vuelve a responder."
+        },
+        "mailAccountRefused": {
+            "label": "Un buzón ha dejado de aceptar su contraseña",
+            "description": "Un buzón que conectaste ha rechazado su contraseña o su autorización, y Polaris ha dejado de consultarlo hasta que la actualices."
+        },
+        "mailMessageBounced": {
+            "label": "No ha llegado un mensaje que enviaste",
+            "description": "Ha vuelto un informe de entrega sobre algo que enviaste, diciendo que nunca llegó a la dirección a la que iba."
+        },
+        "mailMessageUnsent": {
+            "label": "No se ha podido enviar un mensaje",
+            "description": "El servidor de salida ha rechazado un mensaje definitivamente, o lo ha rechazado para algunos de sus destinatarios."
+        },
+        "mailMessageUncopied": {
+            "label": "Los mensajes enviados no se copian en Enviados",
+            "description": "Tu correo sale, pero el servidor de correo no guarda una copia en tu carpeta de Enviados."
+        },
+        "networkRouter": {
+            "label": "La red necesita atención",
+            "description": "Algo fuera de Polaris impide que se llegue a tus servicios."
+        },
+        "networkAddress": {
+            "label": "Una dirección ha dejado de responder",
+            "description": "Una de las direcciones en las que se llega a este Polaris se ha caído, o ha vuelto."
+        },
+        "integrationAttention": {
+            "label": "Una integración necesita atención",
+            "description": "Un servicio en el que alguien intentó conectar una cuenta ha rechazado la autorización."
+        },
+        "systemUpdate": {
+            "label": "Actualización disponible",
+            "description": "Se ha publicado una nueva compilación de Polaris lista para instalar."
+        },
+        "systemUpdated": {
+            "label": "Actualización instalada automáticamente",
+            "description": "Se ha ejecutado una actualización programada o automática, y cómo ha ido."
+        }
+    },
+    "groups": {
+        "deploy": "Despliegues",
+        "watch": "Vigilancia",
+        "tasks": "Tareas",
+        "security": "Seguridad",
+        "drive": "Drive",
+        "places": "Lugares",
+        "mail": "Correo",
+        "network": "Red",
+        "people": "Personas",
+        "system": "Polaris"
     }
 }

@@ -5,6 +5,7 @@
  * the server refuses it, and not saved at all when it ends where it started.
  */
 
+import { MessagesWrapper } from "../setup/i18n";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -48,7 +49,7 @@ beforeEach(() => {
     save.mockClear();
     save.mockImplementation(async () => ({}));
     sound.adoptSoundVolume(100);
-    render(<NotificationSettingsView rules={[]} destinations={[]} senders={[]} deliveries={[]} />);
+    render(<NotificationSettingsView rules={[]} destinations={[]} senders={[]} deliveries={[]} />, { wrapper: MessagesWrapper });
 });
 
 afterEach(() => {

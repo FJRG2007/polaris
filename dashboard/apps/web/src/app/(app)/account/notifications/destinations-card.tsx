@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { RelativeTime } from "@/components/relative-time";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Plus, Send, Smartphone, Trash2, Webhook } from "lucide-react";
 import type { DestinationView } from "@/lib/notifications/destinations";
 import { destinationInputSchema, WEBHOOK_FORMAT_LABEL, WEBHOOK_FORMATS } from "@polaris/core";
@@ -45,6 +46,7 @@ export function DestinationsCard({
     smsReady: boolean;
 }) {
     const router = useRouter();
+    const t = useTranslations("accountNotifications");
     const [adding, setAdding] = useState(false);
     const [testResult, setTestResult] = useState<{ id: string; error: string | null } | null>(null);
     const [pending, startTransition] = useTransition();
@@ -62,20 +64,18 @@ export function DestinationsCard({
         <Card>
             <CardHeader className="flex-row items-center justify-between gap-3">
                 <div>
-                    <CardTitle>Destinations</CardTitle>
-                    <p className="text-xs text-muted-foreground">
-                        Webhooks and phone numbers you can route the events above to.
-                    </p>
+                    <CardTitle>{t("destinations.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("destinations.description")}</p>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>
                     <Plus className="size-4" />
-                    Add
+                    {t("destinations.add")}
                 </Button>
             </CardHeader>
             <CardBody className="p-0">
                 {destinations.length === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                        No destinations yet. Add a Discord or Slack webhook, or a number for texts.
+                        {t("destinations.empty")}
                     </p>
                 ) : (
                     <ul className="divide-y divide-border">
@@ -98,9 +98,9 @@ export function DestinationsCard({
                                     </div>
                                     <div className="flex shrink-0 items-center gap-1.5">
                                         {destination.status === "error" ? (
-                                            <Badge variant="danger">Failing</Badge>
+                                            <Badge variant="danger">{t("destinations.failing")}</Badge>
                                         ) : destination.status === "ok" ? (
-                                            <Badge variant="success">Working</Badge>
+                                            <Badge variant="success">{t("destinations.working")}</Badge>
                                         ) : null}
                                         <Switch
                                             checked={destination.enabled}
@@ -110,12 +110,12 @@ export function DestinationsCard({
                                                     router.refresh();
                                                 })
                                             }
-                                            aria-label={destination.enabled ? "Switch off" : "Switch on"}
+                                            aria-label={destination.enabled ? t("destinations.switchOff") : t("destinations.switchOn")}
                                         />
                                         <button
                                             type="button"
-                                            aria-label="Send a test"
-                                            title="Send a test"
+                                            aria-label={t("destinations.test")}
+                                            title={t("destinations.test")}
                                             disabled={pending || !destination.enabled}
                                             onClick={() => test(destination.id)}
                                             className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
@@ -124,8 +124,8 @@ export function DestinationsCard({
                                         </button>
                                         <button
                                             type="button"
-                                            aria-label="Remove"
-                                            title="Remove"
+                                            aria-label={t("destinations.remove")}
+                                            title={t("destinations.remove")}
                                             onClick={() =>
                                                 startTransition(async () => {
                                                     await deleteDestinationAction(destination.id);
@@ -140,22 +140,26 @@ export function DestinationsCard({
                                 </div>
                                 {destination.kind === "sms" && !smsReady ? (
                                     <p className="text-xs text-warning">
-                                        Texts will not send until an SMS sender is connected under{" "}
-                                        <Link href="/admin/inbox/channels" className="underline">
-                                            Channels
-                                        </Link>
-                                        .
+                                        {t.rich("destinations.smsNotReady", {
+                                            link: (chunks) => (
+                                                <Link key="link" href="/admin/inbox/channels" className="underline">
+                                                    {chunks}
+                                                </Link>
+                                            )
+                                        })}
                                     </p>
                                 ) : null}
                                 {testResult?.id === destination.id ? (
                                     <p className={testResult.error ? "text-xs text-danger" : "text-xs text-success"}>
-                                        {testResult.error ?? "Test alert sent."}
+                                        {testResult.error ?? t("destinations.testSent")}
                                     </p>
                                 ) : destination.lastError ? (
                                     <p className="text-xs text-danger">{destination.lastError}</p>
                                 ) : destination.lastUsedAt ? (
                                     <p className="text-xs text-muted-foreground">
-                                        Last used <RelativeTime iso={destination.lastUsedAt} />
+                                        {t.rich("destinations.lastUsed", {
+                                            time: <RelativeTime key="time" iso={destination.lastUsedAt} />
+                                        })}
                                     </p>
                                 ) : null}
                             </li>
@@ -178,6 +182,8 @@ export function DestinationsCard({
 }
 
 function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
+    const t = useTranslations("accountNotifications");
+    const tc = useTranslations("common");
     const [pending, startTransition] = useTransition();
     const [kind, setKind] = useState<"webhook" | "sms">("webhook");
     const [label, setLabel] = useState("");
@@ -205,7 +211,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
         setError(null);
         const parsed = checked;
         if (!parsed.success) {
-            setError(parsed.error.issues[0]?.message ?? "Check the form");
+            setError(parsed.error.issues[0]?.message ?? t("destinations.checkForm"));
             return;
         }
         startTransition(async () => {
@@ -222,57 +228,57 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add a destination</DialogTitle>
-                    <DialogDescription>
-                        Somewhere alerts can go. Point events at it once it is added.
-                    </DialogDescription>
+                    <DialogTitle>{t("destinations.dialog.title")}</DialogTitle>
+                    <DialogDescription>{t("destinations.dialog.description")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Kind</span>
+                        <span className="font-medium">{t("destinations.dialog.kind")}</span>
                         <Select
                             value={kind}
                             onValueChange={(value) => setKind(value as "webhook" | "sms")}
                             options={[
-                                { value: "webhook", label: "Webhook (Discord, Slack, your own)" },
-                                { value: "sms", label: "Text message" }
+                                { value: "webhook", label: t("destinations.dialog.webhook") },
+                                { value: "sms", label: t("destinations.dialog.sms") }
                             ]}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Name</span>
+                        <span className="font-medium">{t("destinations.dialog.name")}</span>
                         <Input
                             value={label}
                             onChange={(event) => setLabel(event.target.value)}
-                            placeholder={kind === "sms" ? "My phone" : "Ops channel"}
+                            placeholder={kind === "sms" ? t("destinations.dialog.phonePlaceholder") : t("destinations.dialog.webhookPlaceholder")}
                         />
                     </label>
                     {kind === "webhook" ? (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Webhook URL</span>
+                                <span className="font-medium">{t("destinations.dialog.url")}</span>
                                 <Input
                                     value={url}
                                     onChange={(event) => setUrl(event.target.value)}
                                     placeholder="https://discord.com/api/webhooks/..."
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    Discord, Slack, Teams, or a Telegram bot as
-                                    https://api.telegram.org/bot&lt;token&gt;/sendMessage?chat_id=&lt;chat id&gt;.
-                                    Anyone with this URL can post to the channel, so it is stored encrypted and
-                                    never shown again.
+                                    {t("destinations.dialog.urlHint", {
+                                        example: "https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat id>"
+                                    })}
                                 </span>
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">Format</span>
+                                <span className="font-medium">{t("destinations.dialog.format")}</span>
                                 <Select
                                     value={format}
                                     onValueChange={setFormat}
                                     options={[
-                                        { value: "auto", label: "Detect from the URL" },
+                                        { value: "auto", label: t("destinations.dialog.detect") },
                                         ...WEBHOOK_FORMATS.map((entry) => ({
                                             value: entry,
-                                            label: WEBHOOK_FORMAT_LABEL[entry]
+                                            label:
+                                                entry === "generic"
+                                                    ? t("destinations.dialog.rawJson")
+                                                    : WEBHOOK_FORMAT_LABEL[entry]
                                         }))
                                     ]}
                                 />
@@ -280,28 +286,26 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                         </>
                     ) : (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Number</span>
+                            <span className="font-medium">{t("destinations.dialog.number")}</span>
                             <Input
                                 value={phone}
                                 onChange={(event) => setPhone(event.target.value)}
                                 placeholder="+34600111222"
                             />
-                            <span className="text-xs text-muted-foreground">
-                                International form, including the country code.
-                            </span>
+                            <span className="text-xs text-muted-foreground">{t("destinations.dialog.numberHint")}</span>
                         </label>
                     )}
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
-                            Cancel
+                            {tc("actions.cancel")}
                         </Button>
                         {/* Held until the form is one the schema accepts, which is
                             the same check the press used to make - so the button
                             says what the press would have said, before it is
                             pressed. */}
                         <Button onClick={submit} disabled={pending || !checked.success}>
-                            Add
+                            {t("destinations.add")}
                         </Button>
                     </div>
                 </div>

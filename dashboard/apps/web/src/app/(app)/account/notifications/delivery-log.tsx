@@ -9,20 +9,18 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Badge, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
-import { notificationEvent } from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
+import { eventLabel } from "./event-names";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DeliveryView } from "@/lib/notification-service";
 
-const KIND_LABEL: Record<string, string> = {
-    inapp: "In-app",
-    email: "Email",
-    webhook: "Webhook",
-    sms: "Text"
-};
+/** How each kind of delivery is named on a row. */
+const KIND_KEYS = new Set(["inapp", "email", "webhook", "sms"]);
 
 /** Collapsed by default: it is a diagnostic, not something to read daily. */
 export function DeliveryLog({ deliveries }: { deliveries: DeliveryView[] }) {
     const [open, setOpen] = useState(false);
+    const t = useTranslations("accountNotifications");
     const failures = deliveries.filter((row) => row.status === "failed").length;
 
     return (
@@ -40,19 +38,17 @@ export function DeliveryLog({ deliveries }: { deliveries: DeliveryView[] }) {
                         <ChevronRight className="size-4 text-muted-foreground" />
                     )}
                     <div className="flex-1">
-                        <CardTitle>Recent deliveries</CardTitle>
-                        <p className="text-xs text-muted-foreground">
-                            Every attempt to get an alert somewhere, and how it went.
-                        </p>
+                        <CardTitle>{t("deliveries.title")}</CardTitle>
+                        <p className="text-xs text-muted-foreground">{t("deliveries.description")}</p>
                     </div>
-                    {failures > 0 ? <Badge variant="danger">{failures} failed</Badge> : null}
+                    {failures > 0 ? <Badge variant="danger">{t("deliveries.failedCount", { count: failures })}</Badge> : null}
                 </button>
             </CardHeader>
             {open ? (
                 <CardBody className="p-0">
                     {deliveries.length === 0 ? (
                         <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                            Nothing sent yet.
+                            {t("deliveries.empty")}
                         </p>
                     ) : (
                         <ul className="divide-y divide-border">
@@ -61,10 +57,10 @@ export function DeliveryLog({ deliveries }: { deliveries: DeliveryView[] }) {
                                     <div className="flex flex-wrap items-center gap-1.5 text-xs">
                                         <StatusBadge status={row.status} />
                                         <span className="font-medium">
-                                            {notificationEvent(row.event)?.label ?? row.event}
+                                            {eventLabel(t, row.event) ?? row.event}
                                         </span>
                                         <span className="text-muted-foreground">
-                                            {KIND_LABEL[row.kind] ?? row.kind}
+                                            {KIND_KEYS.has(row.kind) ? t(`deliveries.kinds.${row.kind}` as "deliveries.kinds.inapp") : row.kind}
                                             {row.destinationHint ? ` - ${row.destinationHint}` : ""}
                                         </span>
                                         <span className="ml-auto text-muted-foreground/70">
@@ -85,7 +81,8 @@ export function DeliveryLog({ deliveries }: { deliveries: DeliveryView[] }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-    if (status === "failed") return <Badge variant="danger">Failed</Badge>;
-    if (status === "skipped") return <Badge>Skipped</Badge>;
-    return <Badge variant="success">Sent</Badge>;
+    const t = useTranslations("accountNotifications");
+    if (status === "failed") return <Badge variant="danger">{t("deliveries.status.failed")}</Badge>;
+    if (status === "skipped") return <Badge>{t("deliveries.status.skipped")}</Badge>;
+    return <Badge variant="success">{t("deliveries.status.sent")}</Badge>;
 }

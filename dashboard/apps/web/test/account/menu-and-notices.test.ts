@@ -49,10 +49,12 @@ describe("the menu behind your own face", () => {
 });
 
 describe("letting the browser draw a notice", () => {
-    const settings = readFile(
-        `${SRC}app/(app)/account/notifications/notification-settings-view.tsx`,
-        "utf8"
-    );
+    // The card and the English it draws, which lives in the catalog since the
+    // screen was translated.
+    const settings = Promise.all([
+        readFile(`${SRC}app/(app)/account/notifications/notification-settings-view.tsx`, "utf8"),
+        readFile(`${SRC}../messages/en-US/accountNotifications.json`, "utf8")
+    ]).then((parts) => parts.join(" "));
     /** Where the standing itself is worked out, for the two screens that show
      *  it: this card, and the missed call that offers to mend it. */
     const notify = readFile(`${SRC}lib/desktop-notify.ts`, "utf8");

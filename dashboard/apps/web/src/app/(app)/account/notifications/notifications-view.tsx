@@ -21,9 +21,11 @@
 import Fuse from "fuse.js";
 import Link from "next/link";
 import { RelativeTime } from "@/components/relative-time";
+import { eventLabel } from "./event-names";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { loadNotificationHistoryAction } from "./actions";
 import type { NotificationView } from "@/lib/notification-service";
-import { NOTIFICATION_EVENTS, notificationEvent } from "@polaris/core";
+import { NOTIFICATION_EVENTS } from "@polaris/core";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { NotificationFace } from "@/components/notifications/notification-face";
 import { describeAudience } from "@/components/notifications/notification-visuals";
@@ -38,22 +40,13 @@ import { Bell, Check, CheckCheck, ChevronDown, Loader2, Search, Trash2, X } from
 const ALL_EVENTS = "*";
 
 /** What a row is, beyond which event it came from. */
-const STATES = [
-    { value: "all", label: "Everything" },
-    { value: "unread", label: "Unread" },
-    { value: "read", label: "Read" },
-    { value: "action", label: "Action needed" }
-] as const;
+const STATES = ["all", "unread", "read", "action"] as const;
 
-type StateFilter = (typeof STATES)[number]["value"];
+type StateFilter = (typeof STATES)[number];
 
-const ORDERS = [
-    { value: "newest", label: "Newest first" },
-    { value: "oldest", label: "Oldest first" },
-    { value: "unread", label: "Unread first" }
-] as const;
+const ORDERS = ["newest", "oldest", "unread"] as const;
 
-type Order = (typeof ORDERS)[number]["value"];
+type Order = (typeof ORDERS)[number];
 
 /** A row with the name of its event folded in, which is what the search reads
  *  and what the row prints. Worked out once: twice is how the two come to
@@ -83,6 +76,7 @@ function searchIndex(rows: readonly SearchableRow[]): Fuse<SearchableRow> {
 export function NotificationsView() {
     const { items, unread, markRead, markAllRead, remove, clearAll, markManyRead, removeMany } =
         useNotificationFeed();
+    const t = useTranslations("accountNotifications");
     const [older, setOlder] = useState<NotificationView[]>([]);
     const [ended, setEnded] = useState(false);
     const [loading, startLoading] = useTransition();
@@ -99,9 +93,9 @@ export function NotificationsView() {
         const live = new Set(items.map((row) => row.id));
         return [...items, ...older.filter((row) => !live.has(row.id))].map((row) => ({
             ...row,
-            eventLabel: notificationEvent(row.type)?.label ?? ""
+            eventLabel: eventLabel(t, row.type) ?? ""
         }));
-    }, [items, older]);
+    }, [items, older, t]);
 
     const narrowed = useMemo(
         () =>
@@ -160,8 +154,8 @@ export function NotificationsView() {
     }
 
     const eventOptions = [
-        { value: ALL_EVENTS, label: "All events" },
-        ...NOTIFICATION_EVENTS.map((entry) => ({ value: entry.id, label: entry.label }))
+        { value: ALL_EVENTS, label: t("history.allEvents") },
+        ...NOTIFICATION_EVENTS.map((entry) => ({ value: entry.id, label: eventLabel(t, entry.id) ?? entry.label }))
     ];
 
     return (
@@ -177,8 +171,8 @@ export function NotificationsView() {
                     <Input
                         value={query}
                         onChange={(changed) => setQuery(changed.target.value)}
-                        placeholder="Search notifications"
-                        aria-label="Search notifications"
+                        placeholder={t("history.search")}
+                        aria-label={t("history.search")}
                         className="pl-8"
                     />
                 </label>
@@ -194,15 +188,15 @@ export function NotificationsView() {
                             setEnded(false);
                         }}
                         options={eventOptions}
-                        aria-label="Filter by event"
+                        aria-label={t("history.filterEvent")}
                     />
                 </div>
                 <div className="w-full sm:w-40">
                     <Select
                         value={state}
                         onValueChange={(value) => setState(value as StateFilter)}
-                        options={STATES.map((entry) => ({ value: entry.value, label: entry.label }))}
-                        aria-label="Filter by state"
+                        options={STATES.map((value) => ({ value, label: t(`history.states.${value}` as const) }))}
+                        aria-label={t("history.filterState")}
                     />
                 </div>
                 <div className="w-full sm:w-40">
@@ -212,17 +206,17 @@ export function NotificationsView() {
                         // A search ranks by how well each row matched, so a
                         // position among those rows is not one anybody chose.
                         disabled={needle !== ""}
-                        options={ORDERS.map((entry) => ({ value: entry.value, label: entry.label }))}
-                        aria-label="Order"
+                        options={ORDERS.map((value) => ({ value, label: t(`history.orders.${value}` as const) }))}
+                        aria-label={t("history.order")}
                     />
                 </div>
                 <Button size="sm" variant="ghost" onClick={markAllRead} disabled={unread === 0}>
                     <CheckCheck className="size-4" />
-                    <span className="hidden sm:inline">Mark all read</span>
+                    <span className="hidden sm:inline">{t("history.markAllRead")}</span>
                 </Button>
                 <Button size="sm" variant="ghost" onClick={clearAll} disabled={items.length === 0}>
                     <Trash2 className="size-4" />
-                    <span className="hidden sm:inline">Clear all</span>
+                    <span className="hidden sm:inline">{t("history.clearAll")}</span>
                 </Button>
             </div>
 
@@ -234,7 +228,7 @@ export function NotificationsView() {
             {selected.length > 0 ? (
                 <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface/40 px-3 py-2">
                     <span className="text-sm">
-                        {selected.length === 1 ? "1 selected" : `${selected.length} selected`}
+                        {t("history.selected", { count: selected.length })}
                     </span>
                     <span className="flex-1" />
                     <Button
@@ -246,7 +240,7 @@ export function NotificationsView() {
                         }}
                     >
                         <Check className="size-4" />
-                        Mark read
+                        {t("history.markRead")}
                     </Button>
                     <Button
                         size="sm"
@@ -257,11 +251,11 @@ export function NotificationsView() {
                         }}
                     >
                         <Trash2 className="size-4" />
-                        Delete
+                        {t("history.delete")}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setPicked(new Set())}>
                         <X className="size-4" />
-                        Clear selection
+                        {t("history.clearSelection")}
                     </Button>
                 </div>
             ) : null}
@@ -270,7 +264,7 @@ export function NotificationsView() {
                 <Card>
                     <CardBody className="flex flex-col items-center gap-2 p-10 text-center text-sm text-muted-foreground">
                         <Bell className="size-6" />
-                        {narrowing ? "Nothing here matches that." : "You have no notifications."}
+                        {narrowing ? t("history.noMatch") : t("history.empty")}
                     </CardBody>
                 </Card>
             ) : (
@@ -282,10 +276,10 @@ export function NotificationsView() {
                             onChange={() =>
                                 setPicked(allShownPicked ? new Set() : new Set(rows.map((row) => row.id)))
                             }
-                            aria-label={allShownPicked ? "Clear selection" : "Select everything listed"}
+                            aria-label={allShownPicked ? t("history.clearSelection") : t("history.selectAll")}
                         />
                         <span className="text-xs text-muted-foreground">
-                            {rows.length === 1 ? "1 notification" : `${rows.length} notifications`}
+                            {t("history.count", { count: rows.length })}
                         </span>
                     </div>
                     <ul className="divide-y divide-border">
@@ -309,7 +303,7 @@ export function NotificationsView() {
                 <div className="flex justify-center">
                     <Button size="sm" variant="ghost" onClick={loadOlder} disabled={loading}>
                         {loading ? <Loader2 className="size-4 animate-spin" /> : <ChevronDown className="size-4" />}
-                        Load older
+                        {t("history.loadOlder")}
                     </Button>
                 </div>
             ) : null}
@@ -330,8 +324,9 @@ function NotificationRow({
     onRead: () => void;
     onRemove: () => void;
 }) {
+    const t = useTranslations("accountNotifications");
     const audience = describeAudience(row.audience, row.audienceLabel);
-    const label = notificationEvent(row.type)?.label ?? null;
+    const label = eventLabel(t, row.type);
 
     return (
         <li
@@ -345,7 +340,7 @@ function NotificationRow({
                 checked={picked}
                 onChange={onPick}
                 className="mt-0.5"
-                aria-label={`Select ${row.title}`}
+                aria-label={t("history.selectRow", { title: row.title })}
             />
             <NotificationFace row={row} className="mt-0.5" />
             <div className="min-w-0 flex-1">
@@ -372,18 +367,18 @@ function NotificationRow({
                     ) : null}
                     {row.actionRequired ? (
                         <Badge variant="warning" className="px-1.5 py-0 text-[0.625rem]">
-                            Action needed
+                            {t("history.states.action")}
                         </Badge>
                     ) : null}
                 </p>
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
                 {!row.read ? (
-                    <RowAction label="Mark as read" onClick={onRead} className="hover:text-success">
+                    <RowAction label={t("history.markAsRead")} onClick={onRead} className="hover:text-success">
                         <Check className="size-3.5" />
                     </RowAction>
                 ) : null}
-                <RowAction label="Delete" onClick={onRemove} className="hover:text-danger">
+                <RowAction label={t("history.delete")} onClick={onRemove} className="hover:text-danger">
                     <X className="size-3.5" />
                 </RowAction>
             </div>

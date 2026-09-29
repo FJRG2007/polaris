@@ -35,8 +35,8 @@ describe("the search box", () => {
         // The fix is where the search sits, not the loss of a filter: all three
         // are still there, on the line underneath.
         const source = await view;
-        expect(source).toContain('aria-label="Filter by event"');
-        expect(source).toContain('aria-label="Filter by state"');
-        expect(source).toContain('aria-label="Order"');
+        expect(source).toContain('aria-label={t("history.filterEvent")}');
+        expect(source).toContain('aria-label={t("history.filterState")}');
+        expect(source).toContain('aria-label={t("history.order")}');
     });
 });

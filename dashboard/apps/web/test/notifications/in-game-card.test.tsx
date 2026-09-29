@@ -7,6 +7,7 @@
  * where it is done.
  */
 
+import { withMessages } from "../setup/i18n";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -26,14 +27,14 @@ const { IN_GAME_NOT_READY } = await import("@/lib/chat/in-game-choice");
 
 function card(ready: boolean): string {
     const markup = renderToStaticMarkup(
-        <NotificationSettingsView
+        withMessages(<NotificationSettingsView
             rules={[]}
             destinations={[]}
             senders={[]}
             deliveries={[]}
             messagesInGame="auto"
             inGameReady={ready}
-        />
+        />)
     );
     const start = markup.indexOf("Messages in Minecraft");
     expect(start).toBeGreaterThan(-1);
