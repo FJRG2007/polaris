@@ -15,6 +15,7 @@
  */
 
 import { parseDotEnv } from "@/lib/deploy/dotenv";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { EnvVarView } from "@/lib/env-var-service";
 import type { VariableLink } from "@/lib/deploy/variable-links";
 import { listEnvVarsAction, revealEnvVarAction } from "./actions";
@@ -38,8 +39,9 @@ const NO_ROWS: EnvVarView[] = [];
 
 /** A masked value placeholder: fixed-width dots, so secrets never render as text. */
 function SecretMask() {
+    const t = useTranslations("deployConfig");
     return (
-        <span role="img" className="inline-flex items-center gap-0.5 align-middle" aria-label="Hidden value">
+        <span role="img" className="inline-flex items-center gap-0.5 align-middle" aria-label={t("variables.hiddenValue")}>
             {Array.from({ length: 8 }).map((_, index) => (
                 <span key={index} className="size-1 rounded-full bg-muted-foreground/50" />
             ))}
@@ -48,23 +50,24 @@ function SecretMask() {
 }
 
 function LinkBadge({ link }: { link: VariableLink }) {
+    const t = useTranslations("deployConfig");
     if (!link.target) {
         return (
             <Badge variant="warning" title={link.written}>
-                <TriangleAlert className="size-3" /> Nothing called {link.name} here
+                <TriangleAlert className="size-3" /> {t("variables.link.missing", { name: link.name })}
             </Badge>
         );
     }
     if (!link.keyKnown) {
         return (
             <Badge variant="warning" title={link.written}>
-                <TriangleAlert className="size-3" /> {link.target.label} has no {link.key}
+                <TriangleAlert className="size-3" /> {t("variables.link.noKey", { target: link.target.label, key: link.key })}
             </Badge>
         );
     }
     return (
         <Badge variant="primary" title={link.written}>
-            <Link2 className="size-3" /> Linked: {link.target.label} {link.key}
+            <Link2 className="size-3" /> {t("variables.link.linked", { target: link.target.label, key: link.key })}
         </Badge>
     );
 }
@@ -83,6 +86,7 @@ export function VariablesEditor({
     /** What a redeploy reaches, in words: "this service", "the services in Production". */
     redeployTarget: string;
 }) {
+    const t = useTranslations("deployConfig");
     const [rows, setRows] = useState<EnvVarView[] | null>(null);
     const [links, setLinks] = useState<Record<string, VariableLink[]>>({});
     const [draft, setDraft] = useState<VariableDraft>(EMPTY_DRAFT);
@@ -178,7 +182,7 @@ export function VariablesEditor({
     function stageRaw(): void {
         const parsed = parseDotEnv(raw);
         if (parsed.length === 0) {
-            setError("No KEY=value lines found");
+            setError(t("variables.noLines"));
             return;
         }
         setError(null);
@@ -191,7 +195,7 @@ export function VariablesEditor({
         setError(null);
         startTransition(async () => {
             const result = await saveEnvVarChangesAction({ scope, scopeId, ...changes, redeploy }).catch(() => ({
-                error: "Could not save the variables",
+                error: t("variables.saveFailed"),
                 redeployed: false
             }));
             if (result.error) {
@@ -209,7 +213,7 @@ export function VariablesEditor({
         setError(null);
         startTransition(async () => {
             const result = await redeployEnvScopeAction({ scope, scopeId }).catch(() => ({
-                error: "Could not start the redeploy"
+                error: t("variables.redeployFailed")
             }));
             if (result.error) setError(result.error);
             else setNotice("redeploying");
@@ -220,24 +224,29 @@ export function VariablesEditor({
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-medium">
-                    {rows ? rows.length : 0} {rows?.length === 1 ? "variable" : "variables"}
+                    {t("variables.count", { count: rows ? rows.length : 0 })}
                 </span>
                 {canWrite && (
                     <div className="flex items-center gap-2">
                         <Button variant="ghost" size="sm" onClick={() => setRawOpen((open) => !open)}>
-                            {"{ } Raw editor"}
+                            {t("variables.rawEditor")}
                         </Button>
                         <Button size="sm" onClick={addRow}>
-                            <Plus className="size-4" /> New variable
+                            <Plus className="size-4" /> {t("variables.newVariable")}
                         </Button>
                     </div>
                 )}
             </div>
             <p className="text-xs text-muted-foreground">
-                Point at another service instead of copying its value:{" "}
-                <code className="font-mono">{"${{postgres.DATABASE_URL}}"}</code> or{" "}
-                <code className="font-mono">{"${{shared.KEY}}"}</code>. References are read on every deploy,
-                and a copied environment resolves them to its own services.
+                {t.rich("variables.referencesHint", {
+                    service: "${{postgres.DATABASE_URL}}",
+                    shared: "${{shared.KEY}}",
+                    code: (chunks) => (
+                        <code key={String(chunks)} className="font-mono">
+                            {chunks}
+                        </code>
+                    )
+                })}
             </p>
 
             {notice === "pending" && (
@@ -246,39 +255,39 @@ export function VariablesEditor({
                     className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-warning-edge bg-warning-soft px-3 py-2"
                 >
                     <p className="min-w-0 flex-1 basis-56 text-xs text-muted-foreground">
-                        Saved. What is running keeps the old values until {redeployTarget} redeploys.
+                        {t("variables.savedPending", { target: redeployTarget })}
                     </p>
                     {canDeploy && (
                         <Button size="sm" variant="outline" disabled={pending} onClick={redeployNow}>
-                            <RotateCw className="size-4" /> Redeploy now
+                            <RotateCw className="size-4" /> {t("variables.redeployNow")}
                         </Button>
                     )}
                 </div>
             )}
             {notice === "redeploying" && (
                 <p role="status" className="text-xs text-success-ink">
-                    Saved. Redeploying {redeployTarget}.
+                    {t("variables.savedRedeploying", { target: redeployTarget })}
                 </p>
             )}
 
             {rawOpen && (
                 <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3">
                     <span className="text-xs font-medium text-muted-foreground">
-                        Paste a .env - KEY=value per line. Quotes, `export` and # comments are handled.
-                        Nothing is saved until you save.
+                        {t("variables.rawHint")}
                     </span>
                     <Textarea
                         value={raw}
                         onChange={(event) => setRaw(event.target.value)}
                         rows={6}
                         spellCheck={false}
+                        // i18n-ignore: an example .env
                         placeholder={'DATABASE_URL="postgres://user:pass@host:5432/db"\nexport NODE_ENV=production'}
                         className="font-mono text-xs"
                     />
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-3">
                             <label className="cursor-pointer text-xs text-primary hover:underline">
-                                Upload a .env file
+                                {t("variables.upload")}
                                 <input
                                     type="file"
                                     accept=".env,text/plain"
@@ -291,11 +300,11 @@ export function VariablesEditor({
                             </label>
                             <label className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <Checkbox checked={rawSecret} onChange={(event) => setRawSecret(event.target.checked)} />
-                                New ones are secrets
+                                {t("variables.newAreSecrets")}
                             </label>
                         </div>
                         <Button size="sm" onClick={stageRaw} disabled={!raw.trim()}>
-                            Add to changes
+                            {t("variables.addToChanges")}
                         </Button>
                     </div>
                 </div>
@@ -307,7 +316,7 @@ export function VariablesEditor({
                 </div>
             ) : rows.length === 0 && draft.added.length === 0 ? (
                 <p className="py-4 text-center text-sm text-muted-foreground">
-                    No variables yet.{canWrite ? " Add one or paste a .env." : ""}
+                    {canWrite ? t("variables.emptyWritable") : t("variables.empty")}
                 </p>
             ) : (
                 <ul className="flex flex-col">
@@ -321,8 +330,9 @@ export function VariablesEditor({
                                     value={item.key}
                                     onChange={(event) => patchAdded(item.tempId, { key: event.target.value })}
                                     onBlur={(event) => patchAdded(item.tempId, { key: event.target.value.trim() })}
+                                    // i18n-ignore: a variable name placeholder
                                     placeholder="KEY"
-                                    aria-label="Name"
+                                    aria-label={t("variables.name")}
                                     aria-invalid={errors[item.tempId] ? true : undefined}
                                     className="h-8 font-mono text-xs"
                                     autoFocus
@@ -334,19 +344,19 @@ export function VariablesEditor({
                             <Input
                                 value={item.value}
                                 onChange={(event) => patchAdded(item.tempId, { value: event.target.value })}
-                                placeholder="value"
-                                aria-label={`Value of ${item.key || "the new variable"}`}
+                                placeholder={t("variables.valuePlaceholder")}
+                                aria-label={t("variables.valueOf", { name: item.key || t("variables.theNewVariable") })}
                                 className="h-8 min-w-0 flex-1 font-mono text-xs"
                             />
                             <div className="flex shrink-0 items-center gap-2 sm:h-8">
-                                <Badge variant="primary">New</Badge>
+                                <Badge variant="primary">{t("variables.new")}</Badge>
                                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                     <Switch
                                         checked={item.isSecret}
                                         onChange={(isSecret) => patchAdded(item.tempId, { isSecret })}
-                                        aria-label="Secret"
+                                        aria-label={t("variables.secret")}
                                     />
-                                    Secret
+                                    {t("variables.secret")}
                                 </label>
                                 <button
                                     type="button"
@@ -356,7 +366,7 @@ export function VariablesEditor({
                                             added: current.added.filter((one) => one.tempId !== item.tempId)
                                         }))
                                     }
-                                    aria-label="Drop this new variable"
+                                    aria-label={t("variables.dropNew")}
                                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                 >
                                     <X className="size-4" />
@@ -382,7 +392,7 @@ export function VariablesEditor({
                                         {(changed || removed) && (
                                             <span
                                                 role="img"
-                                                aria-label={removed ? "Removed when you save" : "Changed, not saved"}
+                                                aria-label={removed ? t("variables.removedOnSave") : t("variables.changedUnsaved")}
                                                 className={cn("size-1.5 shrink-0 rounded-full", removed ? "bg-danger-solid" : "bg-primary")}
                                             />
                                         )}
@@ -410,18 +420,22 @@ export function VariablesEditor({
                                             value={change?.value ?? (row.isSecret ? (shown ?? "") : (row.value ?? ""))}
                                             onChange={(event) => edit(row.id, { value: event.target.value })}
                                             type={row.isSecret && shown === undefined ? "password" : "text"}
-                                            placeholder={row.isSecret && shown === undefined ? "New value - leave empty to keep it" : "value"}
-                                            aria-label={`Value of ${row.key}`}
+                                            placeholder={
+                                                row.isSecret && shown === undefined
+                                                    ? t("variables.newValuePlaceholder")
+                                                    : t("variables.valuePlaceholder")
+                                            }
+                                            aria-label={t("variables.valueOf", { name: row.key })}
                                             className="h-8 font-mono text-xs"
                                         />
                                     ) : (
                                         <span className="block truncate font-mono text-xs text-muted-foreground">
                                             {shown !== undefined ? (
-                                                shown || <span className="text-foreground-subtle">(empty)</span>
+                                                shown || <span className="text-foreground-subtle">{t("variables.emptyValue")}</span>
                                             ) : row.isSecret ? (
                                                 <SecretMask />
                                             ) : (
-                                                row.value || <span className="text-foreground-subtle">(empty)</span>
+                                                row.value || <span className="text-foreground-subtle">{t("variables.emptyValue")}</span>
                                             )}
                                         </span>
                                     )}
@@ -432,17 +446,17 @@ export function VariablesEditor({
                                             <Switch
                                                 checked={isSecret}
                                                 onChange={(next) => edit(row.id, { isSecret: next })}
-                                                aria-label={`${row.key} is a secret`}
+                                                aria-label={t("variables.isSecret", { name: row.key })}
                                             />
-                                            Secret
+                                            {t("variables.secret")}
                                         </label>
                                     )}
                                     {row.isSecret && canWrite && !removed && !editing && (
                                         <button
                                             type="button"
                                             onClick={() => edit(row.id, { value: "" })}
-                                            aria-label={`Replace the value of ${row.key}`}
-                                            title="Replace"
+                                            aria-label={t("variables.replaceValueOf", { name: row.key })}
+                                            title={t("variables.replace")}
                                             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                         >
                                             <Pencil className="size-3.5" />
@@ -452,8 +466,12 @@ export function VariablesEditor({
                                         <button
                                             type="button"
                                             onClick={() => toggleReveal(row)}
-                                            aria-label={shown !== undefined ? `Hide ${row.key}` : `Reveal ${row.key}`}
-                                            title={shown !== undefined ? "Hide" : "Reveal"}
+                                            aria-label={
+                                                shown !== undefined
+                                                    ? t("variables.hideNamed", { name: row.key })
+                                                    : t("variables.revealNamed", { name: row.key })
+                                            }
+                                            title={shown !== undefined ? t("variables.hide") : t("variables.reveal")}
                                             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                         >
                                             {shown !== undefined ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
@@ -463,8 +481,12 @@ export function VariablesEditor({
                                         <button
                                             type="button"
                                             onClick={() => toggleRemoved(row.id)}
-                                            aria-label={removed ? `Keep ${row.key}` : `Remove ${row.key}`}
-                                            title={removed ? "Keep" : "Remove"}
+                                            aria-label={
+                                                removed
+                                                    ? t("variables.keepNamed", { name: row.key })
+                                                    : t("variables.removeNamed", { name: row.key })
+                                            }
+                                            title={removed ? t("variables.keep") : t("variables.remove")}
                                             className={cn(
                                                 "rounded p-1 text-muted-foreground transition-colors hover:bg-muted",
                                                 removed ? "hover:text-foreground" : "hover:text-danger-ink"
@@ -485,11 +507,11 @@ export function VariablesEditor({
             {canWrite && (count > 0 || draft.added.length > 0) && (
                 <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-border-strong bg-elevated px-3 py-2 shadow-popover">
                     <span className="text-sm">
-                        {count} unsaved {count === 1 ? "change" : "changes"}
+                        {t("variables.unsaved", { count })}
                     </span>
                     <div className="ml-auto flex flex-wrap items-center gap-2">
                         <Button variant="ghost" size="sm" disabled={pending} onClick={() => setDraft(EMPTY_DRAFT)}>
-                            Discard
+                            {t("variables.discard")}
                         </Button>
                         <Button
                             variant={canDeploy ? "outline" : "primary"}
@@ -497,16 +519,16 @@ export function VariablesEditor({
                             disabled={blocked || count === 0}
                             onClick={() => save(false)}
                         >
-                            {pending ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+                            {pending ? <Loader2 className="size-4 animate-spin" /> : t("variables.save")}
                         </Button>
                         {canDeploy && (
                             <Button
                                 size="sm"
                                 disabled={blocked || count === 0}
                                 onClick={() => save(true)}
-                                title={`Save, then redeploy ${redeployTarget}`}
+                                title={t("variables.saveRedeployTitle", { target: redeployTarget })}
                             >
-                                Save and redeploy
+                                {t("variables.saveRedeploy")}
                             </Button>
                         )}
                     </div>

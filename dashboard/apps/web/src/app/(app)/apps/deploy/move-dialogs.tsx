@@ -32,6 +32,8 @@ import * as actions from "@/app/(app)/apps/deploy/external-actions";
 import type { MoveHomePlan, MoveOutPlan } from "@/lib/deploy/migrate";
 import type { ProviderChoice } from "@/lib/deploy/providers/contract";
 import type { ExternalServiceView } from "@/lib/deploy/external-services";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     Button,
     Checkbox,
@@ -121,14 +123,17 @@ function Tick({
  */
 function variableNote(
     plan: { variableCount: number; variableKeys: readonly string[] },
-    canCopy: boolean
+    canCopy: boolean,
+    t: NamespaceTranslator<"deploy">
 ): string {
-    const many = `${plan.variableCount} variable${plan.variableCount === 1 ? "" : "s"}`;
-    if (plan.variableCount === 0) return "There are no variables to carry across.";
-    if (!canCopy) return `${many} stay where they are: copying them is not part of your access here.`;
-    if (plan.variableKeys.length === 0) return `${many} can travel.`;
+    const count = plan.variableCount;
+    if (count === 0) return t("move.variables.none");
+    if (!canCopy) return t("move.variables.stay", { count });
+    if (plan.variableKeys.length === 0) return t("move.variables.travel", { count });
     const listed = plan.variableKeys.slice(0, 6).join(", ");
-    return `${many} can travel: ${listed}${plan.variableKeys.length > 6 ? ", and more" : ""}.`;
+    return plan.variableKeys.length > 6
+        ? t("move.variables.travelListedMore", { count, names: listed })
+        : t("move.variables.travelListed", { count, names: listed });
 }
 
 function Problem({ text }: { text: string }) {
@@ -154,6 +159,7 @@ export function MoveOutDialog({
     onClose: () => void;
     onMoved: () => void;
 }) {
+    const t = useTranslations("deploy");
     const [plan, setPlan] = useState<MoveOutPlan | null>(null);
     const [accounts, setAccounts] = useState<ProviderAccount[] | null>(null);
     const [account, setAccount] = useState("");
@@ -260,16 +266,14 @@ export function MoveOutDialog({
         const moved = result.result;
         setDone(
             [
-                moved.copied > 0
-                    ? `${moved.copied} variable${moved.copied === 1 ? "" : "s"} copied across.`
-                    : "No variables were copied.",
+                moved.copied > 0 ? t("move.out.copied", { count: moved.copied }) : t("move.out.noneCopied"),
                 moved.stopped
-                    ? "It is stopped here."
+                    ? t("move.out.stopped")
                     : moved.stopError
-                      ? `It is still running here: ${moved.stopError}`
-                      : "It is still running here.",
+                      ? t("move.out.stillRunningError", { error: moved.stopError })
+                      : t("move.out.stillRunning"),
                 moved.domains.length > 0
-                    ? `${moved.domains.join(", ")} still points at this server - repoint it at ${provider} when you are ready.`
+                    ? t("move.out.domainsStay", { domains: moved.domains.join(", "), provider })
                     : ""
             ]
                 .filter(Boolean)
@@ -282,21 +286,14 @@ export function MoveOutDialog({
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Move {application.name} to Vercel or Railway</DialogTitle>
-                    <DialogDescription>
-                        The provider builds and serves it from then on. Polaris keeps it on this
-                        project&apos;s board and can release it again.
-                    </DialogDescription>
+                    <DialogTitle>{t("move.out.title", { name: application.name })}</DialogTitle>
+                    <DialogDescription>{t("move.out.description")}</DialogDescription>
                 </DialogHeader>
 
                 {done ? (
                     <div className="flex flex-col gap-3">
                         <p className="text-sm">{done}</p>
-                        <p className="text-xs text-muted-foreground">
-                            Everything it had here is exactly where it was: its variables, its
-                            history and its containers. Starting it again is one button on its own
-                            screen.
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("move.out.doneHint")}</p>
                     </div>
                 ) : (
                     <div className="flex flex-col gap-4">
@@ -306,22 +303,20 @@ export function MoveOutDialog({
                             <ul className="flex flex-col gap-1.5 rounded-md border border-border p-3">
                                 <Note>
                                     {plan.repoUrl
-                                        ? `Built from ${plan.repoUrl}${plan.branch ? ` on ${plan.branch}` : ""}. The provider builds it from the same repository, so connect it there first if you have not.`
-                                        : "This service is not built from a repository, so there is nothing for a provider to build. Point the provider's project at the code first."}
+                                        ? plan.branch
+                                            ? t("move.out.builtFromBranch", { repo: plan.repoUrl, branch: plan.branch })
+                                            : t("move.out.builtFrom", { repo: plan.repoUrl })
+                                        : t("move.out.noRepo")}
                                 </Note>
-                                <Note>{variableNote(plan, canCopy)}</Note>
+                                <Note>{variableNote(plan, canCopy, t)}</Note>
                                 {plan.volumes.length > 0 && (
                                     <Note>
-                                        Its volumes stay here and are not copied: {plan.volumes.join(", ")}.
-                                        A provider that builds from a repository has nowhere to put
-                                        them.
+                                        {t("move.out.volumes", { volumes: plan.volumes.join(", ") })}
                                     </Note>
                                 )}
                                 {plan.domains.length > 0 && (
                                     <Note>
-                                        {plan.domains.join(", ")} points at this server and will go on
-                                        pointing at it. Moving a name is a DNS record at whoever holds
-                                        it.
+                                        {t("move.out.domains", { domains: plan.domains.join(", ") })}
                                     </Note>
                                 )}
                             </ul>
@@ -329,14 +324,13 @@ export function MoveOutDialog({
 
                         {accounts !== null && accounts.length === 0 && (
                             <p className="text-xs text-muted-foreground">
-                                No Vercel or Railway account is linked to your profile yet. Connect
-                                one under Connected accounts and it will be offered here.
+                                {t("move.out.noAccount")}
                             </p>
                         )}
 
                         {accounts !== null && accounts.length > 0 && (
                             <>
-                                <Field label="Account">
+                                <Field label={t("move.out.account")}>
                                     <Select
                                         value={account}
                                         onValueChange={setAccount}
@@ -344,17 +338,16 @@ export function MoveOutDialog({
                                             value: entry.id,
                                             label: `${entry.label} (${entry.provider})`
                                         }))}
-                                        aria-label="Account"
+                                        aria-label={t("move.out.account")}
                                     />
                                 </Field>
 
-                                <Field label="Project there" required>
+                                <Field label={t("move.out.projectThere")} required>
                                     {choices === null ? (
                                         <Skeleton className="h-8 w-full" />
                                     ) : choices.length === 0 ? (
                                         <span className="text-xs text-muted-foreground">
-                                            That account has no projects Polaris can see. Make the
-                                            project there first, connected to the same repository.
+                                            {t("move.out.noProjects")}
                                         </span>
                                     ) : (
                                         <Select
@@ -367,16 +360,16 @@ export function MoveOutDialog({
                                                 value: entry.id,
                                                 label: entry.name
                                             }))}
-                                            aria-label="Project there"
+                                            aria-label={t("move.out.projectThere")}
                                         />
                                     )}
                                 </Field>
 
                                 {asksForChild && project && (
-                                    <Field label="Service" required>
+                                    <Field label={t("move.out.service")} required>
                                         {children.length === 0 ? (
                                             <span className="text-xs text-muted-foreground">
-                                                That project has no services yet.
+                                                {t("move.out.noServices")}
                                             </span>
                                         ) : (
                                             <Select
@@ -386,39 +379,39 @@ export function MoveOutDialog({
                                                     value: entry.id,
                                                     label: entry.name
                                                 }))}
-                                                aria-label="Service"
+                                                aria-label={t("move.out.service")}
                                             />
                                         )}
                                     </Field>
                                 )}
 
-                                <Field label="Name on this board" required>
+                                <Field label={t("move.out.nameOnBoard")} required>
                                     <Input
                                         value={name}
                                         maxLength={60}
                                         onChange={(event) => setName(event.target.value)}
-                                        aria-label="Name on this board"
+                                        aria-label={t("move.out.nameOnBoard")}
                                     />
                                 </Field>
 
                                 <div className="flex flex-col gap-2">
                                     {canCopy && (
                                         <Tick
-                                            label="Copy the variables across"
-                                            hint="Anything of the same name there is replaced. Nothing else it has is touched."
+                                            label={t("move.out.copyVariables")}
+                                            hint={t("move.out.copyVariablesHint")}
                                             checked={copyVariables}
                                             onChange={setCopyVariables}
                                         />
                                     )}
                                     <Tick
-                                        label="Ask them to build it now"
-                                        hint="A project that has never built there has nothing to repeat yet; push to it instead."
+                                        label={t("move.out.buildNow")}
+                                        hint={t("move.out.buildNowHint")}
                                         checked={releaseThere}
                                         onChange={setReleaseThere}
                                     />
                                     <Tick
-                                        label="Stop it here"
-                                        hint="The container comes down. Nothing is deleted, and one button starts it again."
+                                        label={t("move.out.stopHere")}
+                                        hint={t("move.out.stopHereHint")}
                                         checked={stopHere}
                                         onChange={setStopHere}
                                     />
@@ -432,11 +425,11 @@ export function MoveOutDialog({
 
                 <DialogFooter>
                     {done ? (
-                        <Button onClick={onClose}>Done</Button>
+                        <Button onClick={onClose}>{t("move.done")}</Button>
                     ) : (
                         <>
                             <Button variant="ghost" onClick={onClose} disabled={saving}>
-                                Cancel
+                                {t("move.cancel")}
                             </Button>
                             <Button
                                 onClick={() => void submit()}
@@ -444,7 +437,7 @@ export function MoveOutDialog({
                                 aria-disabled={!ready || saving}
                             >
                                 {saving && <Loader2 className="size-4 shrink-0 animate-spin" />}
-                                {saving ? "Moving" : "Move it"}
+                                {saving ? t("move.out.moving") : t("move.out.submit")}
                             </Button>
                         </>
                     )}
@@ -471,6 +464,7 @@ export function MoveHomeDialog({
     onClose: () => void;
     onMoved: () => void;
 }) {
+    const t = useTranslations("deploy");
     const [plan, setPlan] = useState<MoveHomePlan | null>(null);
     const [targets, setTargets] = useState<{ id: string; name: string }[]>([]);
     const [environment, setEnvironment] = useState(service.environmentId || environments[0]?.id || "");
@@ -543,10 +537,8 @@ export function MoveHomeDialog({
         const moved = result.result;
         setDone(
             [
-                moved.deploying ? "Polaris is building it now." : "It is created and ready to deploy.",
-                moved.copied > 0
-                    ? `${moved.copied} variable${moved.copied === 1 ? "" : "s"} came with it.`
-                    : "No variables came with it.",
+                moved.deploying ? t("move.home.building") : t("move.home.created"),
+                moved.copied > 0 ? t("move.home.copied", { count: moved.copied }) : t("move.home.noneCopied"),
                 moved.variablesError ?? ""
             ]
                 .filter(Boolean)
@@ -564,20 +556,16 @@ export function MoveHomeDialog({
                             slug={service.provider}
                             className="size-4 w-5 shrink-0 object-contain"
                         />
-                        Run {service.name} on a Polaris server
+                        {t("move.home.title", { name: service.name })}
                     </DialogTitle>
-                    <DialogDescription>
-                        Polaris builds it from the same repository and runs it on one of your
-                        servers. The project at {service.provider} is left exactly as it is.
-                    </DialogDescription>
+                    <DialogDescription>{t("move.home.description", { provider: service.provider })}</DialogDescription>
                 </DialogHeader>
 
                 {done ? (
                     <div className="flex flex-col gap-3">
                         <p className="text-sm">{done}</p>
                         <p className="text-xs text-muted-foreground">
-                            {service.name} is still running at {service.provider} and still on this
-                            board. Turn it off there once this one is answering.
+                            {t("move.home.doneHint", { name: service.name, provider: service.provider })}
                         </p>
                     </div>
                 ) : (
@@ -588,55 +576,56 @@ export function MoveHomeDialog({
                             <ul className="flex flex-col gap-1.5 rounded-md border border-border p-3">
                                 <Note>
                                     {plan.source
-                                        ? `They build ${plan.source.repo}${plan.source.branch ? ` on ${plan.source.branch}` : ""}.`
-                                        : `${service.provider} does not say which repository it builds, so Polaris needs the address below.`}
+                                        ? plan.source.branch
+                                            ? t("move.home.buildsBranch", { repo: plan.source.repo, branch: plan.source.branch })
+                                            : t("move.home.builds", { repo: plan.source.repo })
+                                        : t("move.home.noSource", { provider: service.provider })}
                                 </Note>
                                 <Note>
-                                    {plan.variablesError ?? variableNote(plan, canCopy)}
+                                    {plan.variablesError ?? variableNote(plan, canCopy, t)}
                                 </Note>
                                 <Note>
-                                    Whatever domain it answers on there keeps answering there.
-                                    Pointing a name at this server is a DNS record and a domain on
-                                    the service once it is up.
+                                    {t("move.home.domains")}
                                 </Note>
                             </ul>
                         )}
 
-                        <Field label="Repository" required>
+                        <Field label={t("move.home.repository")} required>
                             <Input
                                 value={repoUrl}
                                 maxLength={500}
+                                // i18n-ignore: an example repository address
                                 placeholder="https://github.com/owner/repo.git"
                                 onChange={(event) => setRepoUrl(event.target.value)}
-                                aria-label="Repository"
+                                aria-label={t("move.home.repository")}
                             />
                         </Field>
 
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <Field label="Branch">
+                            <Field label={t("move.home.branch")}>
                                 <Input
                                     value={branch}
                                     maxLength={200}
                                     placeholder="main"
                                     onChange={(event) => setBranch(event.target.value)}
-                                    aria-label="Branch"
+                                    aria-label={t("move.home.branch")}
                                 />
                             </Field>
-                            <Field label="Name here" required>
+                            <Field label={t("move.home.nameHere")} required>
                                 <Input
                                     value={name}
                                     maxLength={60}
                                     onChange={(event) => setName(event.target.value)}
-                                    aria-label="Name here"
+                                    aria-label={t("move.home.nameHere")}
                                 />
                             </Field>
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <Field label="Server" required>
+                            <Field label={t("move.home.server")} required>
                                 {targets.length === 0 ? (
                                     <span className="text-xs text-muted-foreground">
-                                        There is no server to run it on yet. Add one under Servers.
+                                        {t("move.home.noServer")}
                                     </span>
                                 ) : (
                                     <Select
@@ -646,11 +635,11 @@ export function MoveHomeDialog({
                                             value: entry.id,
                                             label: entry.name
                                         }))}
-                                        aria-label="Server"
+                                        aria-label={t("move.home.server")}
                                     />
                                 )}
                             </Field>
-                            <Field label="Environment">
+                            <Field label={t("move.home.environment")}>
                                 <Select
                                     value={environment}
                                     onValueChange={setEnvironment}
@@ -658,7 +647,7 @@ export function MoveHomeDialog({
                                         value: entry.id,
                                         label: entry.name
                                     }))}
-                                    aria-label="Environment"
+                                    aria-label={t("move.home.environment")}
                                 />
                             </Field>
                         </div>
@@ -666,15 +655,15 @@ export function MoveHomeDialog({
                         <div className="flex flex-col gap-2">
                             {canCopy && (
                                 <Tick
-                                    label="Bring the variables with it"
-                                    hint="Stored as secrets here, except the prefixes that mean a value is compiled into the browser bundle."
+                                    label={t("move.home.copyVariables")}
+                                    hint={t("move.home.copyVariablesHint")}
                                     checked={copyVariables}
                                     onChange={setCopyVariables}
                                 />
                             )}
                             <Tick
-                                label="Build it now"
-                                hint="Otherwise it is created and waits for you to press Deploy."
+                                label={t("move.home.buildNow")}
+                                hint={t("move.home.buildNowHint")}
                                 checked={deployNow}
                                 onChange={setDeployNow}
                             />
@@ -683,8 +672,7 @@ export function MoveHomeDialog({
                         {plan?.variablesError && (
                             <p className="flex items-start gap-2 text-xs text-warning">
                                 <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                                Anything that could not be read has to be set by hand on the
-                                service&apos;s Variables tab.
+                                {t("move.home.setByHand")}
                             </p>
                         )}
 
@@ -694,11 +682,11 @@ export function MoveHomeDialog({
 
                 <DialogFooter>
                     {done ? (
-                        <Button onClick={onClose}>Done</Button>
+                        <Button onClick={onClose}>{t("move.done")}</Button>
                     ) : (
                         <>
                             <Button variant="ghost" onClick={onClose} disabled={saving}>
-                                Cancel
+                                {t("move.cancel")}
                             </Button>
                             <Button
                                 onClick={() => void submit()}
@@ -706,7 +694,7 @@ export function MoveHomeDialog({
                                 aria-disabled={!ready || saving}
                             >
                                 {saving && <Loader2 className="size-4 shrink-0 animate-spin" />}
-                                {saving ? "Setting it up" : "Run it here"}
+                                {saving ? t("move.home.settingUp") : t("move.home.submit")}
                             </Button>
                         </>
                     )}

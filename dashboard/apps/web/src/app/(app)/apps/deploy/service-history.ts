@@ -6,6 +6,7 @@
  */
 
 import type { ActivityLine } from "@/lib/activity/activity";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { AUTOSCALE_IDLE_AFTER, AUTOSCALE_SIGNALS, AUTOSCALED_ACTION_PREFIX } from "@polaris/core";
 
 /**
@@ -13,75 +14,84 @@ import { AUTOSCALE_IDLE_AFTER, AUTOSCALE_SIGNALS, AUTOSCALED_ACTION_PREFIX } fro
  * line written by a later release with a signal this one does not know still
  * says what happened, without the why.
  */
-function autoscaleReason(action: string, up: boolean): string {
+type ServiceT = NamespaceTranslator<"deployService">;
+
+function autoscaleReason(action: string, up: boolean, t: ServiceT): string {
     const signal = AUTOSCALE_SIGNALS.find((known) => action === `${AUTOSCALED_ACTION_PREFIX}${known}`);
     switch (signal) {
         case undefined:
             return "";
         case "range":
-            return " to fit its range";
+            return t("history.reason.range");
         case "idle":
-            return ` after ${AUTOSCALE_IDLE_AFTER} minutes with no requests`;
+            return t("history.reason.idle", { minutes: AUTOSCALE_IDLE_AFTER });
         case "cpu":
-            return up ? ": CPU was over its target" : ": CPU stayed low";
+            return up ? t("history.reason.cpuUp") : t("history.reason.cpuDown");
         case "traffic":
-            return up ? ": requests were over their target" : ": requests stayed low";
+            return up ? t("history.reason.trafficUp") : t("history.reason.trafficDown");
         case "both":
-            return up ? ": CPU and requests were over their targets" : ": CPU and requests stayed low";
+            return up ? t("history.reason.bothUp") : t("history.reason.bothDown");
     }
 }
 
-function describeAutoscale(line: ActivityLine, who: string): string {
+function describeAutoscale(line: ActivityLine, who: string, t: ServiceT): string {
     const from = Number(line.fromValue);
     const to = Number(line.toValue);
     if (!line.fromValue || !line.toValue || !Number.isInteger(from) || !Number.isInteger(to)) {
-        return `${who} scaled it by itself`;
+        return t("history.autoscaled", { who });
     }
-    const reason = autoscaleReason(line.action, to > from);
-    return `${who} scaled it from ${from} to ${to} ${to === 1 ? "copy" : "copies"}${reason}`;
+    const reason = autoscaleReason(line.action, to > from, t);
+    return t("history.autoscaledFromTo", { who, from, to, reason });
 }
 
 /** One line of a service's history, as a sentence. */
-export function describeServiceEvent(line: ActivityLine): string {
+export function describeServiceEvent(line: ActivityLine, t: ServiceT): string {
+    // i18n-ignore: the product's name stands in for a person
     const who = line.authorName ?? "Polaris";
-    if (line.action.startsWith(AUTOSCALED_ACTION_PREFIX)) return describeAutoscale(line, who);
+    if (line.action.startsWith(AUTOSCALED_ACTION_PREFIX)) return describeAutoscale(line, who, t);
     switch (line.action) {
         case "deployed":
-            return `${who} deployed it`;
+            return t("history.deployed", { who });
         case "restarted":
-            return `${who} restarted it`;
+            return t("history.restarted", { who });
         case "started":
-            return `${who} started it`;
+            return t("history.started", { who });
         case "stopped":
-            return `${who} stopped it`;
+            return t("history.stopped", { who });
         case "torn down":
-            return `${who} tore down the running deployment`;
+            return t("history.tornDown", { who });
         case "duplicated":
-            return `${who} duplicated it`;
+            return t("history.duplicated", { who });
         case "variable":
             // The name, never the value: a feed anybody with the service open can
             // read is not where a secret goes.
-            return line.toValue ? `${who} changed the ${line.toValue} variable` : `${who} changed a variable`;
+            return line.toValue
+                ? t("history.variableNamed", { who, name: line.toValue })
+                : t("history.variable", { who });
         case "variables-imported":
-            return `${who} imported ${line.toValue ?? "some"} variables`;
+            return line.toValue
+                ? t("history.variablesImported", { who, count: line.toValue })
+                : t("history.variablesImportedSome", { who });
         case "variable-removed":
-            return `${who} removed a variable`;
+            return t("history.variableRemoved", { who });
         case "port":
-            return `${who} set the port to ${line.toValue}`;
+            return t("history.port", { who, port: line.toValue ?? "" });
         // A one-click service's setup. What a step printed is its last line with
         // the service's secrets masked, written that way before it was stored.
         case "setup":
-            return `${who} ran "${line.fromValue}"${line.toValue ? `: ${line.toValue}` : ""}`;
+            return line.toValue
+                ? t("history.setupWithOutput", { who, step: line.fromValue ?? "", output: line.toValue })
+                : t("history.setup", { who, step: line.fromValue ?? "" });
         case "setup-failed":
-            return `${who} could not run "${line.fromValue}": ${line.toValue}`;
+            return t("history.setupFailed", { who, step: line.fromValue ?? "", output: line.toValue ?? "" });
         case "setup-blocked":
-            return `${who} did not deploy it, because ${line.fromValue} did not come up: ${line.toValue}`;
+            return t("history.setupBlocked", { who, companion: line.fromValue ?? "", output: line.toValue ?? "" });
         case "first-deploy-failed":
-            return `${who} could not start its first deploy: ${line.toValue}`;
+            return t("history.firstDeployFailed", { who, output: line.toValue ?? "" });
         case "secrets-withheld":
-            return `${who} did not copy these secrets into the preview: ${line.toValue}`;
+            return t("history.secretsWithheld", { who, names: line.toValue ?? "" });
         default:
-            return `${who} changed it`;
+            return t("history.changed", { who });
     }
 }
 

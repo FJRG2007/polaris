@@ -13,6 +13,7 @@ import * as core from "@polaris/core";
 import { useProjectCan } from "./access-context";
 import { relativeTime } from "@/lib/relative-time";
 import { useDisplayFormat } from "@/components/display-format";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ServiceCronRunView, ServiceCronView } from "@/lib/deploy/service-cron";
 import {
@@ -42,11 +43,11 @@ import {
 
 /** Schedules offered with one click, because most jobs are one of these. */
 const PRESETS = [
-    { label: "Every 15 minutes", schedule: "*/15 * * * *" },
-    { label: "Hourly", schedule: "0 * * * *" },
-    { label: "Daily at 03:00", schedule: "0 3 * * *" },
-    { label: "Mondays at 09:00", schedule: "0 9 * * 1" },
-    { label: "Monthly", schedule: "0 0 1 * *" }
+    { label: "cron.presets.every15", schedule: "*/15 * * * *" },
+    { label: "cron.presets.hourly", schedule: "0 * * * *" },
+    { label: "cron.presets.daily", schedule: "0 3 * * *" },
+    { label: "cron.presets.mondays", schedule: "0 9 * * 1" },
+    { label: "cron.presets.monthly", schedule: "0 0 1 * *" }
 ] as const;
 
 interface Draft {
@@ -119,16 +120,18 @@ const STATUS_TONE: Record<string, string> = {
     skipped: "bg-muted text-muted-foreground"
 };
 
-const STATUS_LABEL: Record<string, string> = {
-    succeeded: "Succeeded",
-    running: "Running",
-    failed: "Failed",
-    timed_out: "Timed out",
-    skipped: "Skipped"
-};
+const STATUS_LABEL = {
+    succeeded: "cron.status.succeeded",
+    running: "cron.status.running",
+    failed: "cron.status.failed",
+    timed_out: "cron.status.timedOut",
+    skipped: "cron.status.skipped"
+} as const;
 
 function StatusChip({ status }: { status: string | null }) {
-    if (!status) return <span className="text-xs text-muted-foreground">Never run</span>;
+    const t = useTranslations("deployConfig");
+    if (!status) return <span className="text-xs text-muted-foreground">{t("cron.neverRun")}</span>;
+    const label = status in STATUS_LABEL ? t(STATUS_LABEL[status as keyof typeof STATUS_LABEL]) : status;
     return (
         <span
             className={cn(
@@ -136,12 +139,13 @@ function StatusChip({ status }: { status: string | null }) {
                 STATUS_TONE[status] ?? "bg-muted text-muted-foreground"
             )}
         >
-            {STATUS_LABEL[status] ?? status}
+            {label}
         </span>
     );
 }
 
 export function CronPanel({ applicationId }: { applicationId: string }) {
+    const t = useTranslations("deployConfig");
     const can = useProjectCan();
     const manage = can("console.use");
     const [crons, setCrons] = useState<ServiceCronView[] | null>(null);
@@ -154,7 +158,7 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
     function reload() {
         void listServiceCronsAction(applicationId).then((result) => {
             if (result.crons) setCrons(result.crons);
-            else setError(result.error ?? "Could not read the scheduled jobs");
+            else setError(result.error ?? t("cron.unreadable"));
         });
     }
     useEffect(reload, [applicationId]);
@@ -186,14 +190,12 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
         <div className="flex flex-col gap-4 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <p className="text-sm font-medium">Scheduled jobs</p>
-                    <p className="text-xs text-muted-foreground">
-                        Commands this service runs on a schedule, inside its own container.
-                    </p>
+                    <p className="text-sm font-medium">{t("cron.title")}</p>
+                    <p className="text-xs text-muted-foreground">{t("cron.intro")}</p>
                 </div>
                 {manage && !draft && (
                     <Button size="sm" onClick={() => setDraft(emptyDraft())}>
-                        <Plus className="size-4" /> New job
+                        <Plus className="size-4" /> {t("cron.newJob")}
                     </Button>
                 )}
             </div>
@@ -220,7 +222,7 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
             ) : crons.length === 0 ? (
                 !draft && (
                     <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
-                        No scheduled jobs yet. A cleanup, a report or a queue drain can run here on a schedule.
+                        {t("cron.empty")}
                     </p>
                 )
             ) : (
@@ -244,11 +246,12 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
                                         <span className="block truncate text-sm font-medium" title={cron.name}>{cron.name}</span>
                                         <span className="block truncate text-xs text-muted-foreground">
                                             {cron.scheduleText}
+                                            {/* i18n-ignore: a time zone name */}
                                             {cron.timezone !== "UTC" ? ` (${cron.timezone})` : " (UTC)"}
                                             {cron.enabled && cron.nextRunAt ? (
                                                 <NextRun at={cron.nextRunAt} />
                                             ) : (
-                                                " - paused"
+                                                t("cron.paused")
                                             )}
                                         </span>
                                     </span>
@@ -259,15 +262,15 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
                                         <Switch
                                             checked={cron.enabled}
                                             onChange={(next) => toggle(cron, next)}
-                                            aria-label={cron.enabled ? `Pause ${cron.name}` : `Resume ${cron.name}`}
+                                            aria-label={cron.enabled ? t("cron.pause", { name: cron.name }) : t("cron.resume", { name: cron.name })}
                                         />
                                         <Button
                                             variant="ghost"
                                             size="icon"
                                             disabled={pending}
                                             onClick={() => run(cron)}
-                                            aria-label={`Run ${cron.name} now`}
-                                            title="Run now"
+                                            aria-label={t("cron.runNamed", { name: cron.name })}
+                                            title={t("cron.runNow")}
                                         >
                                             <Play className="size-4" />
                                         </Button>
@@ -275,8 +278,8 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
                                             variant="ghost"
                                             size="icon"
                                             onClick={() => setDraft(draftOf(cron))}
-                                            aria-label={`Edit ${cron.name}`}
-                                            title="Edit"
+                                            aria-label={t("cron.editNamed", { name: cron.name })}
+                                            title={t("cron.edit")}
                                         >
                                             <Pencil className="size-4" />
                                         </Button>
@@ -284,8 +287,8 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
                                             variant="ghost"
                                             size="icon"
                                             onClick={() => setDeleting(cron)}
-                                            aria-label={`Delete ${cron.name}`}
-                                            title="Delete"
+                                            aria-label={t("cron.deleteNamed", { name: cron.name })}
+                                            title={t("cron.delete")}
                                         >
                                             <Trash2 className="size-4" />
                                         </Button>
@@ -303,13 +306,12 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
                 onOpenChange={(open) => !open && setDeleting(null)}
                 name={deleting?.name ?? ""}
                 requireTyping={false}
-                kind="scheduled job"
-                question={
-                    <>
-                        Delete the scheduled job <strong>{deleting?.name}</strong>?
-                    </>
-                }
-                description="It stops running, and the record of its past runs goes with it."
+                kind={t("cron.kind")}
+                question={t.rich("cron.deleteQuestion", {
+                    name: deleting?.name ?? "",
+                    strong: (chunks) => <strong key="name">{chunks}</strong>
+                })}
+                description={t("cron.deleteDescription")}
                 pending={pending}
                 onConfirm={() => {
                     const target = deleting;
@@ -327,8 +329,9 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
 }
 
 function NextRun({ at }: { at: string }) {
+    const t = useTranslations("deployConfig");
     const format = useDisplayFormat();
-    return <span title={format.dateTime(at)}> - next {relativeTime(at, format)}</span>;
+    return <span title={format.dateTime(at)}>{t("cron.next", { when: relativeTime(at, format) })}</span>;
 }
 
 function CronForm({
@@ -344,6 +347,7 @@ function CronForm({
     onCancel: () => void;
     onSaved: () => void;
 }) {
+    const t = useTranslations("deployConfig");
     const format = useDisplayFormat();
     const [problem, setProblem] = useState<string | null>(null);
     const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -391,17 +395,17 @@ function CronForm({
 
     return (
         <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-surface p-4">
-            <p className="text-sm font-medium">{draft.id ? "Edit job" : "New job"}</p>
+            <p className="text-sm font-medium">{draft.id ? t("cron.editJob") : t("cron.newJob")}</p>
             <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-muted-foreground">
-                    Name <span aria-hidden>*</span>
+                    {t("cron.name")} <span aria-hidden>*</span>
                 </span>
-                <Input value={draft.name} onChange={(event) => set("name", event.target.value)} onBlur={leave("name")} placeholder="Nightly cleanup" />
+                <Input value={draft.name} onChange={(event) => set("name", event.target.value)} onBlur={leave("name")} placeholder={t("cron.namePlaceholder")} />
                 {shown("name") && <span className="text-xs text-danger">{shown("name")}</span>}
             </label>
             <div className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-muted-foreground">
-                    Schedule <span aria-hidden>*</span>
+                    {t("cron.schedule")} <span aria-hidden>*</span>
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                     {PRESETS.map((preset) => (
@@ -416,7 +420,7 @@ function CronForm({
                                     : "border-border text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            {preset.label}
+                            {t(preset.label)}
                         </button>
                     ))}
                 </div>
@@ -427,14 +431,15 @@ function CronForm({
                         onBlur={leave("schedule")}
                         className="font-mono"
                         spellCheck={false}
-                        aria-label="Cron expression"
+                        aria-label={t("cron.expression")}
                     />
                     <Input
                         value={draft.timezone}
                         onChange={(event) => set("timezone", event.target.value)}
                         onBlur={leave("timezone")}
                         spellCheck={false}
-                        aria-label="Time zone"
+                        aria-label={t("cron.timezone")}
+                        // i18n-ignore: a time zone name
                         placeholder="UTC"
                     />
                 </div>
@@ -443,13 +448,13 @@ function CronForm({
                 ) : (
                     <span className="text-xs text-muted-foreground">
                         {core.describeCron(draft.schedule)}
-                        {next ? ` - next ${format.dateTime(next.toISOString())}` : ""}
+                        {next ? t("cron.next", { when: format.dateTime(next.toISOString()) }) : ""}
                     </span>
                 )}
             </div>
             <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-muted-foreground">
-                    Command <span aria-hidden>*</span>
+                    {t("cron.command")} <span aria-hidden>*</span>
                 </span>
                 <Textarea
                     value={draft.command}
@@ -458,29 +463,30 @@ function CronForm({
                     rows={3}
                     className="font-mono text-xs"
                     spellCheck={false}
+                    // i18n-ignore: an example command
                     placeholder="npm run cleanup"
                 />
                 {shown("command") ? (
                     <span className="text-xs text-danger">{shown("command")}</span>
                 ) : (
                     <span className="text-xs text-muted-foreground">
-                        Runs with sh inside the running container, with the service&apos;s variables.
+                        {t("cron.commandHint")}
                     </span>
                 )}
             </label>
             <div className="grid gap-3 sm:grid-cols-3">
-                <NumberField label="Stop after (seconds)" value={draft.timeoutSeconds} error={shown("timeoutSeconds")} onChange={(value) => set("timeoutSeconds", value)} onBlur={leave("timeoutSeconds")} />
-                <NumberField label="Tries" value={draft.maxAttempts} error={shown("maxAttempts")} onChange={(value) => set("maxAttempts", value)} onBlur={leave("maxAttempts")} />
-                <NumberField label="Wait between tries (seconds)" value={draft.retryDelaySeconds} error={shown("retryDelaySeconds")} onChange={(value) => set("retryDelaySeconds", value)} onBlur={leave("retryDelaySeconds")} />
+                <NumberField label={t("cron.timeout")} value={draft.timeoutSeconds} error={shown("timeoutSeconds")} onChange={(value) => set("timeoutSeconds", value)} onBlur={leave("timeoutSeconds")} />
+                <NumberField label={t("cron.tries")} value={draft.maxAttempts} error={shown("maxAttempts")} onChange={(value) => set("maxAttempts", value)} onBlur={leave("maxAttempts")} />
+                <NumberField label={t("cron.retryDelay")} value={draft.retryDelaySeconds} error={shown("retryDelaySeconds")} onChange={(value) => set("retryDelaySeconds", value)} onBlur={leave("retryDelaySeconds")} />
             </div>
             {problem && <p className="text-sm text-danger">{problem}</p>}
             <div className="flex justify-end gap-2">
                 <Button variant="ghost" onClick={onCancel}>
-                    Cancel
+                    {t("cron.cancel")}
                 </Button>
                 <Button onClick={save} disabled={pending} aria-disabled={!parsed.success}>
                     {pending ? <Loader2 className="size-4 animate-spin" /> : <Clock className="size-4" />}
-                    {draft.id ? "Save" : "Schedule it"}
+                    {draft.id ? t("cron.save") : t("cron.scheduleIt")}
                 </Button>
             </div>
         </div>
@@ -510,6 +516,7 @@ function NumberField({
 }
 
 function CronRuns({ applicationId, cronId }: { applicationId: string; cronId: string }) {
+    const t = useTranslations("deployConfig");
     const format = useDisplayFormat();
     const [runs, setRuns] = useState<ServiceCronRunView[] | null>(null);
     const [open, setOpen] = useState<string | null>(null);
@@ -541,7 +548,7 @@ function CronRuns({ applicationId, cronId }: { applicationId: string; cronId: st
         );
     }
     if (runs.length === 0) {
-        return <p className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">It has not run yet.</p>;
+        return <p className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">{t("cron.notRunYet")}</p>;
     }
     return (
         <ul className="divide-y divide-border/40 border-t border-border/60">
@@ -563,18 +570,22 @@ function CronRuns({ applicationId, cronId }: { applicationId: string; cronId: st
                                 {relativeTime(run.startedAt, format)}
                             </span>
                             <span className="text-muted-foreground">
-                                {run.trigger === "manual" ? "run by hand" : run.trigger === "retry" ? `try ${run.attempt}` : "on schedule"}
+                                {run.trigger === "manual"
+                                    ? t("cron.byHand")
+                                    : run.trigger === "retry"
+                                      ? t("cron.try", { attempt: run.attempt })
+                                      : t("cron.onSchedule")}
                             </span>
-                            {took !== null && <span className="text-muted-foreground">- {took}s</span>}
+                            {took !== null && <span className="text-muted-foreground">{t("cron.took", { seconds: took })}</span>}
                             {run.exitCode !== null && run.exitCode !== 0 && (
-                                <span className="text-muted-foreground">- exit {run.exitCode}</span>
+                                <span className="text-muted-foreground">{t("cron.exit", { code: run.exitCode })}</span>
                             )}
                         </button>
                         {open === run.id && (
                             <div className="mt-2 flex flex-col gap-1">
                                 {run.error && <p className="text-xs text-danger">{run.error}</p>}
                                 <pre className="max-h-64 overflow-auto overscroll-contain whitespace-pre-wrap rounded-md bg-muted/40 p-2 font-mono text-[0.6875rem]">
-                                    {run.output || "It printed nothing."}
+                                    {run.output || t("cron.noOutput")}
                                 </pre>
                             </div>
                         )}

@@ -8,7 +8,11 @@
 
 import { describe, expect, it } from "vitest";
 import type { ActivityLine } from "../../src/lib/activity/activity";
-import { describeServiceEvent, unresolvedSetupFailure } from "../../src/app/(app)/apps/deploy/service-history";
+import { webCatalogs } from "../../messages";
+import { describeServiceEvent as describeWith, unresolvedSetupFailure } from "../../src/app/(app)/apps/deploy/service-history";
+
+const t = webCatalogs.translator("en-US", "deployService");
+const describeServiceEvent = (entry: ActivityLine) => describeWith(entry, t);
 
 function line(overrides: Partial<ActivityLine> = {}): ActivityLine {
     return {

@@ -6,6 +6,7 @@
 
 import { cn } from "@polaris/ui";
 import type { ServiceAttention } from "@/lib/deploy/attention";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 export function TabAttentionDot({ label, className }: { label: string; className?: string }) {
     return (
@@ -19,11 +20,14 @@ export function TabAttentionDot({ label, className }: { label: string; className
 }
 
 /** Which of a service's tabs has something to show for it, and what. */
-export function tabAttention(attention: ServiceAttention | null | undefined): Partial<Record<string, string>> {
+export function tabAttention(
+    attention: ServiceAttention | null | undefined,
+    t: NamespaceTranslator<"deployService">
+): Partial<Record<string, string>> {
     if (!attention) return {};
     return {
-        ...(attention.deployFailed ? { Deployments: "The last deploy failed" } : {}),
-        ...(attention.domainDown ? { Settings: "An address is down" } : {}),
-        ...(attention.cronFailing ? { Cron: "A scheduled job is failing" } : {})
+        ...(attention.deployFailed ? { Deployments: t("attention.deployFailed") } : {}),
+        ...(attention.domainDown ? { Settings: t("attention.domainDown") } : {}),
+        ...(attention.cronFailing ? { Cron: t("attention.cronFailing") } : {})
     };
 }

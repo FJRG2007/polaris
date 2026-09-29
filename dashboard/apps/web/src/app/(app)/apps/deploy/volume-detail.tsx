@@ -22,6 +22,8 @@
  */
 
 import { FilesPanel } from "./files-panel";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { VolumeForm, type EditVolume } from "./volume-form";
@@ -59,6 +61,14 @@ const TABS = ["Metrics", "Files", "Settings"] as const;
 export type VolumeTab = (typeof TABS)[number];
 type Tab = VolumeTab;
 
+type DataT = NamespaceTranslator<"deployData">;
+
+const TAB_LABEL = {
+    Metrics: "volume.tabs.metrics",
+    Files: "volume.tabs.files",
+    Settings: "volume.tabs.settings"
+} as const satisfies Record<Tab, string>;
+
 function formatBytes(bytes: number): string {
     const units = ["B", "KB", "MB", "GB", "TB"];
     let value = bytes;
@@ -73,14 +83,17 @@ function formatBytes(bytes: number): string {
 /** The usage chart. One series: how much is in the volume over time. The declared
  *  cap rides along as the reading beside it, so a number has something to be big
  *  relative to. */
-const VOLUME_METRICS: MetricSpec[] = [
+const volumeMetrics = (t: DataT): MetricSpec[] => [
     {
         key: "disk",
-        label: "Volume usage",
+        label: t("volume.metrics.usage"),
         value: (point) => point.diskUsedBytes,
         describe: (point) =>
             point.diskTotalBytes && point.diskUsedBytes
-                ? `${Math.round((point.diskUsedBytes / point.diskTotalBytes) * 100)}% of ${formatBytes(point.diskTotalBytes)}`
+                ? t("volume.metrics.percentOf", {
+                      percent: Math.round((point.diskUsedBytes / point.diskTotalBytes) * 100),
+                      total: formatBytes(point.diskTotalBytes)
+                  })
                 : null,
         format: formatBytes,
         tone: "primary"
@@ -120,6 +133,7 @@ export function VolumeDetailDialog({
     onChanged: () => void;
 }) {
     const router = useRouter();
+    const t = useTranslations("deployData");
     const [tab, setTab] = useState<Tab>(openOn);
     const [full, setFull] = useState(false);
     const [data, setData] = useState<{ volume: VolumeDetail; canManage: boolean } | null>(null);
@@ -138,7 +152,7 @@ export function VolumeDetailDialog({
         void volumeDetailAction(volumeId).then((result) => {
             if (!active) return;
             if (result.error || !result.volume) {
-                setError(result.error ?? "Could not load the volume");
+                setError(result.error ?? t("volume.loadFailed"));
                 return;
             }
             setData({ volume: result.volume, canManage: result.canManage ?? false });
@@ -202,21 +216,21 @@ export function VolumeDetailDialog({
                     />
                     <div className="min-w-0 flex-1">
                         <DialogTitle className="truncate text-base font-semibold">
-                            {volume?.name ?? "Volume"}
+                            {volume?.name ?? t("volume.fallbackName")}
                         </DialogTitle>
                         {volume && (
                             <p className="truncate text-xs text-muted-foreground">
                                 {volume.applicationName
-                                    ? `Mounted in ${volume.applicationName} at ${volume.mountPath}`
-                                    : `Mounted at ${volume.mountPath}`}
+                                    ? t("volume.mountedIn", { service: volume.applicationName, path: volume.mountPath })
+                                    : t("volume.mountedAt", { path: volume.mountPath })}
                             </p>
                         )}
                     </div>
                     <button
                         type="button"
                         onClick={() => setFull((value) => !value)}
-                        title={full ? "Exit full screen" : "Full screen"}
-                        aria-label={full ? "Exit full screen" : "Full screen"}
+                        title={full ? t("volume.exitFullScreen") : t("volume.fullScreen")}
+                        aria-label={full ? t("volume.exitFullScreen") : t("volume.fullScreen")}
                         className="mr-8 shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         {full ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
@@ -237,7 +251,7 @@ export function VolumeDetailDialog({
                                     : "border-transparent text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            {entry}
+                            {t(TAB_LABEL[entry])}
                         </button>
                     ))}
                 </div>
@@ -287,19 +301,18 @@ function toEditVolume(volume: VolumeDetail): EditVolume {
  * wander out into the rest of the container.
  */
 function FilesTab({ volume }: { volume: VolumeDetail }) {
+    const t = useTranslations("deployData");
     if (!volume.applicationId) {
-        return (
-            <Notice
-                title="Nothing to browse through"
-                body="This volume is not attached to a service, and its data is only reachable from inside the container that mounts it."
-            />
-        );
+        return <Notice title={t("volume.files.unattachedTitle")} body={t("volume.files.unattachedBody")} />;
     }
     if (!volume.serviceRunning) {
         return (
             <Notice
-                title="The service is not running"
-                body={`Files are read from inside ${volume.applicationName ?? "the service"}. Deploy it to browse ${volume.mountPath}.`}
+                title={t("volume.files.stoppedTitle")}
+                body={t("volume.files.stoppedBody", {
+                    service: volume.applicationName ?? t("volume.files.theService"),
+                    path: volume.mountPath
+                })}
             />
         );
     }
@@ -308,8 +321,8 @@ function FilesTab({ volume }: { volume: VolumeDetail }) {
             <FilesPanel applicationId={volume.applicationId} root={volume.mountPath} />
             <p className="text-xs text-muted-foreground">
                 {volume.applicationName
-                    ? `Read from inside ${volume.applicationName} at ${volume.mountPath}.`
-                    : `Read from inside the service at ${volume.mountPath}.`}
+                    ? t("volume.files.readInside", { service: volume.applicationName, path: volume.mountPath })
+                    : t("volume.files.readInsideService", { path: volume.mountPath })}
             </p>
         </div>
     );
@@ -325,62 +338,62 @@ function Notice({ title, body }: { title: string; body: string }) {
 }
 
 function MetricsTab({ volume, usage }: { volume: VolumeDetail; usage: Usage }) {
+    const t = useTranslations("deployData");
     const measuring = usage.state === "measuring";
     const usedBytes = usage.bytes;
     return (
         <div className="flex flex-col gap-4">
             <div className="grid gap-3 sm:grid-cols-3">
                 <Stat
-                    label="In use"
+                    label={t("volume.metrics.inUse")}
                     // The last size stands while a fresh measurement runs: a number
                     // being re-read is worth more than the word "Measuring".
                     value={
                         usedBytes != null
                             ? formatBytes(usedBytes)
                             : measuring
-                              ? "Measuring"
-                              : "Not measurable"
+                              ? t("volume.metrics.measuring")
+                              : t("volume.metrics.notMeasurable")
                     }
                     pending={measuring && usedBytes == null}
                     hint={
                         measuring
-                            ? "Reading the volume from inside the service"
+                            ? t("volume.metrics.reading")
                             : usedBytes == null
                               ? volume.serviceRunning
-                                  ? "The image has no du, so its size cannot be read."
-                                  : "The service is not running."
+                                  ? t("volume.metrics.noDu")
+                                  : t("volume.metrics.serviceStopped")
                               : volume.sizeLimit
-                                ? `of ${volume.sizeLimit}`
-                                : "No size cap set"
+                                ? t("volume.metrics.ofLimit", { limit: volume.sizeLimit })
+                                : t("volume.metrics.noCap")
                     }
                 />
-                <Stat label="Kind" value={kindLabel(volume)} hint={volume.source} />
+                <Stat label={t("volume.metrics.kind")} value={kindLabel(volume, t)} hint={volume.source} />
                 <Stat
-                    label="Server"
+                    label={t("volume.server")}
                     value={volume.serverName}
-                    hint={volume.serverKind === "local" ? "This host" : "Remote"}
+                    hint={volume.serverKind === "local" ? t("volume.metrics.thisHost") : t("volume.metrics.remote")}
                 />
             </div>
 
             <div>
-                <h3 className="mb-1 text-sm font-medium">History</h3>
+                <h3 className="mb-1 text-sm font-medium">{t("volume.metrics.history")}</h3>
                 <MetricsHistory
                     endpoint={`/api/deploy/volumes/${volume.id}/metrics/history`}
                     live={`/api/deploy/volumes/${volume.id}/metrics/stream`}
-                    metrics={VOLUME_METRICS}
+                    metrics={volumeMetrics(t)}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                    Usage is measured from inside the service that mounts the volume, so a stopped
-                    service leaves gaps.
+                    {t("volume.metrics.gaps")}
                 </p>
             </div>
         </div>
     );
 }
 
-function kindLabel(volume: VolumeDetail): string {
-    if (volume.kind === "nas") return volume.connectionName ?? "NAS";
-    return volume.kind === "bind" ? "Server folder" : "Named volume";
+function kindLabel(volume: VolumeDetail, t: DataT): string {
+    if (volume.kind === "nas") return volume.connectionName ?? t("volume.kinds.nas");
+    return volume.kind === "bind" ? t("volume.kinds.bind") : t("volume.kinds.named");
 }
 
 function Stat({
@@ -427,6 +440,7 @@ function SettingsTab({
     onChanged: () => void;
     onClosed: () => void;
 }) {
+    const t = useTranslations("deployData");
     const [wiping, setWiping] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [wipeOnDelete, setWipeOnDelete] = useState(false);
@@ -437,7 +451,7 @@ function SettingsTab({
     // last thing providing it is a decision about the service, not about the
     // volume, so it is refused here and pointed at the service instead.
     const blockedReason = !volume.applicationId
-        ? "This volume is not attached to a service."
+        ? t("volume.settings.unattached")
         : null;
 
     // The mount is editable in place, not through a dialog on top of the panel -
@@ -478,8 +492,8 @@ function SettingsTab({
     return (
         <div className="flex flex-col gap-5">
             <Section
-                title="Mount"
-                hint="Where this volume comes from and where the service sees it. Changes apply the next time the service is recreated."
+                title={t("volume.settings.mount")}
+                hint={t("volume.settings.mountHint")}
             >
                 {editable ? (
                     <VolumeForm
@@ -490,12 +504,12 @@ function SettingsTab({
                 ) : (
                     <Rows>
                         <Row
-                            label="Mount path"
+                            label={t("volume.settings.mountPath")}
                             value={volume.mountPath}
                             icon={<HardDrive className="size-4" />}
                         />
                         <Row
-                            label="Source"
+                            label={t("volume.settings.source")}
                             value={volume.source}
                             icon={
                                 volume.kind === "nas" ? (
@@ -506,8 +520,8 @@ function SettingsTab({
                             }
                         />
                         <Row
-                            label="Size limit"
-                            value={volume.sizeLimit ?? "No limit"}
+                            label={t("volume.settings.sizeLimit")}
+                            value={volume.sizeLimit ?? t("volume.settings.noLimit")}
                             icon={<HardDrive className="size-4" />}
                         />
                     </Rows>
@@ -515,12 +529,12 @@ function SettingsTab({
             </Section>
 
             <Section
-                title="Region"
-                hint="Volumes live on the same server as the service that mounts them."
+                title={t("volume.settings.region")}
+                hint={t("volume.settings.regionHint")}
             >
                 <Rows>
                     <Row
-                        label="Server"
+                        label={t("volume.server")}
                         value={volume.serverName}
                         icon={<Server className="size-4" />}
                     />
@@ -531,15 +545,13 @@ function SettingsTab({
                 <>
                     <div className="flex flex-col gap-3 rounded-lg border border-danger-edge bg-danger-soft p-3">
                         <p className="flex items-center gap-1.5 text-sm font-medium text-danger">
-                            <TriangleAlert className="size-4" /> Danger
+                            <TriangleAlert className="size-4" /> {t("volume.settings.danger")}
                         </p>
 
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="min-w-0">
-                                <p className="text-sm">Wipe volume</p>
-                                <p className="text-xs text-muted-foreground">
-                                    Destroys everything inside it and keeps the volume itself.
-                                </p>
+                                <p className="text-sm">{t("volume.settings.wipe")}</p>
+                                <p className="text-xs text-muted-foreground">{t("volume.settings.wipeHint")}</p>
                             </div>
                             <Button
                                 variant="danger"
@@ -548,24 +560,21 @@ function SettingsTab({
                                 title={
                                     volume.serviceRunning
                                         ? undefined
-                                        : "The service has to be running to reach the data"
+                                        : t("volume.settings.wipeNeedsRunning")
                                 }
                                 onClick={() => setWiping(true)}
                             >
-                                <Eraser className="size-4" /> Wipe
+                                <Eraser className="size-4" /> {t("volume.settings.wipeButton")}
                             </Button>
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-danger-edge pt-3">
                             <div className="min-w-0">
-                                <p className="text-sm">Delete volume</p>
-                                <p className="text-xs text-muted-foreground">
-                                    Detaches the mount from the service. The next deploy starts
-                                    without it.
-                                </p>
+                                <p className="text-sm">{t("volume.settings.delete")}</p>
+                                <p className="text-xs text-muted-foreground">{t("volume.settings.deleteHint")}</p>
                             </div>
                             <Button variant="danger" size="sm" onClick={() => setDeleting(true)}>
-                                <Trash2 className="size-4" /> Delete
+                                <Trash2 className="size-4" /> {t("volume.settings.deleteButton")}
                             </Button>
                         </div>
 
@@ -578,9 +587,9 @@ function SettingsTab({
                 open={wiping}
                 onOpenChange={setWiping}
                 name={volume.name}
-                kind="volume contents"
-                confirmLabel="Wipe volume"
-                description="Everything in this volume is destroyed. The volume itself stays, so the service keeps its mount."
+                kind={t("volume.settings.contentsKind")}
+                confirmLabel={t("volume.settings.wipe")}
+                description={t("volume.settings.wipeDescription")}
                 error={error}
                 pending={pending}
                 onConfirm={wipe}
@@ -590,9 +599,9 @@ function SettingsTab({
                 open={deleting}
                 onOpenChange={setDeleting}
                 name={volume.name}
-                kind="volume"
-                confirmLabel="Stage removal"
-                description="The mount is detached from the service. Whether the data goes with it is up to you."
+                kind={t("volume.settings.kind")}
+                confirmLabel={t("volume.settings.stageRemoval")}
+                description={t("volume.settings.deleteDescription")}
                 blockedReason={blockedReason}
                 error={error}
                 pending={pending}
@@ -600,16 +609,13 @@ function SettingsTab({
             >
                 <label className="flex items-start justify-between gap-3 rounded-md border border-border/60 p-3">
                     <span className="min-w-0">
-                        <span className="block text-sm">Also destroy the data</span>
-                        <span className="block text-xs text-muted-foreground">
-                            Off by default. Detaching a volume and destroying what is in it are two
-                            different intentions, and only one of them can be taken back.
-                        </span>
+                        <span className="block text-sm">{t("volume.settings.destroyData")}</span>
+                        <span className="block text-xs text-muted-foreground">{t("volume.settings.destroyDataHint")}</span>
                     </span>
                     <Switch
                         checked={wipeOnDelete}
                         onChange={setWipeOnDelete}
-                        aria-label="Also destroy the data"
+                        aria-label={t("volume.settings.destroyData")}
                     />
                 </label>
             </ConfirmDeleteDialog>

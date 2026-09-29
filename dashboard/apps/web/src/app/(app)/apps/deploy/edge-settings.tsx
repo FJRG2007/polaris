@@ -19,6 +19,8 @@ import * as deployActions from "./actions";
 import { Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { Button, Input, SegmentedControl, Select, Switch, Textarea, useToast } from "@polaris/ui";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
 type Config = core.AppEdgeConfig;
 type Headers = core.EdgeHeaders;
@@ -33,35 +35,42 @@ interface Facts {
     readonly guardChallenge: boolean | null;
 }
 
-const PERIOD_OPTIONS = [
-    { value: "1s", label: "per second" },
-    { value: "1m", label: "per minute" },
-    { value: "1h", label: "per hour" }
+type Option = { readonly value: string; readonly label: NamespaceKey<"deployConfig"> };
+
+const PERIOD_OPTIONS: readonly Option[] = [
+    { value: "1s", label: "edge.periods.second" },
+    { value: "1m", label: "edge.periods.minute" },
+    { value: "1h", label: "edge.periods.hour" }
 ];
 
-const KEY_OPTIONS = [
-    { value: "ip", label: "By visitor address" },
-    { value: "header", label: "By request header" }
+const KEY_OPTIONS: readonly Option[] = [
+    { value: "ip", label: "edge.keys.ip" },
+    { value: "header", label: "edge.keys.header" }
 ];
 
-const HSTS_OPTIONS = [
-    { value: "0", label: "Not sent" },
-    { value: "15552000", label: "6 months" },
-    { value: "31536000", label: "1 year" },
-    { value: "63072000", label: "2 years" }
+const HSTS_OPTIONS: readonly Option[] = [
+    { value: "0", label: "edge.hsts.off" },
+    { value: "15552000", label: "edge.hsts.months6" },
+    { value: "31536000", label: "edge.hsts.year1" },
+    { value: "63072000", label: "edge.hsts.years2" }
 ];
 
-const REDIRECT_OPTIONS = [
-    { value: "www-to-apex", label: "www to the bare domain" },
-    { value: "apex-to-www", label: "The bare domain to www" },
-    { value: "regex", label: "Matching a pattern" }
+const REDIRECT_OPTIONS: readonly Option[] = [
+    { value: "www-to-apex", label: "edge.redirectKinds.wwwToApex" },
+    { value: "apex-to-www", label: "edge.redirectKinds.apexToWww" },
+    { value: "regex", label: "edge.redirectKinds.regex" }
 ];
 
-const REWRITE_OPTIONS = [
-    { value: "strip-prefix", label: "Remove a path prefix" },
-    { value: "add-prefix", label: "Add a path prefix" },
-    { value: "replace-path", label: "Rewrite the path by pattern" }
+const REWRITE_OPTIONS: readonly Option[] = [
+    { value: "strip-prefix", label: "edge.rewriteKinds.stripPrefix" },
+    { value: "add-prefix", label: "edge.rewriteKinds.addPrefix" },
+    { value: "replace-path", label: "edge.rewriteKinds.replacePath" }
 ];
+
+/** A list of options with its labels in the reader's language. */
+function translated(t: NamespaceTranslator<"deployConfig">, options: readonly Option[]) {
+    return options.map((option) => ({ value: option.value, label: t(option.label) }));
+}
 
 /** The preset headers a removal switches off, by the override that does it. The
  *  value is what "do not send" is for that field. */
@@ -90,6 +99,7 @@ export function EdgeSettings({
     onChanged: () => void;
 }) {
     const toast = useToast();
+    const t = useTranslations("deployConfig");
     const [saved, setSaved] = useState<Config | null>(null);
     const [draft, setDraft] = useState<Config | null>(null);
     const [facts, setFacts] = useState<Facts | null>(null);
@@ -125,14 +135,14 @@ export function EdgeSettings({
     // Checked against the same schema the server applies, on every change, so what
     // Save would refuse is said beside the form rather than after pressing it.
     const verdict = useMemo(() => (draft ? core.appEdgeConfigSchema.safeParse(draft) : null), [draft]);
-    const invalid = verdict && !verdict.success ? (verdict.error.issues[0]?.message ?? "Check the values") : null;
+    const invalid = verdict && !verdict.success ? (verdict.error.issues[0]?.message ?? t("edge.checkValues")) : null;
     // Dirty means the values differ from what is saved, not that a field was touched.
     const dirty = Boolean(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved));
     const preview = useMemo(() => (draft ? core.securityHeaderMap(draft.headers) : {}), [draft]);
 
     if (loadError) return <p className="text-xs text-danger">{loadError}</p>;
     if (!draft || !facts) {
-        return <div className="h-40 animate-pulse rounded-md bg-muted/40" aria-label="Loading the edge settings" />;
+        return <div className="h-40 animate-pulse rounded-md bg-muted/40" aria-label={t("edge.loading")} />;
     }
 
     const update = (next: Partial<Config>) => setDraft({ ...draft, ...next });
@@ -150,7 +160,7 @@ export function EdgeSettings({
             }
             setSaved(next);
             setDraft(next);
-            toast.show({ title: "Saved. The edge is using it now." });
+            toast.show({ title: t("edge.saved") });
             onChanged();
         });
     }
@@ -170,9 +180,9 @@ export function EdgeSettings({
             toast.show({
                 title: result.redeployed
                     ? publish
-                        ? "Opening the port. The service is redeploying."
-                        : "Closing the port. The service is redeploying."
-                    : "Saved."
+                        ? t("edge.opening")
+                        : t("edge.closing")
+                    : t("edge.savedShort")
             });
             onChanged();
         });
@@ -186,25 +196,25 @@ export function EdgeSettings({
                 <section className="flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                            <h3 className="text-sm font-medium">Reachable on the server&apos;s address</h3>
+                            <h3 className="text-sm font-medium">{t("edge.publishPort")}</h3>
                             <p className="text-xs text-muted-foreground">
                                 {facts.publishPort
-                                    ? "The container port is open on the server's own address, so anyone who can reach the server can reach the service without its domains."
-                                    : "Closed. The service is reached only through its domains and tunnels, where the firewall and these settings apply."}
+                                    ? t("edge.publishPortOpen")
+                                    : t("edge.publishPortClosed")}
                             </p>
                         </div>
                         <Switch
                             checked={facts.publishPort}
                             onChange={togglePort}
                             disabled={toggling || (portLocked && facts.publishPort)}
-                            aria-label="Reachable on the server's address"
+                            aria-label={t("edge.publishPort")}
                         />
                     </div>
                     {portLocked && facts.publishPort && (
                         <p className="text-xs text-foreground-subtle">
                             {facts.catalog
-                                ? "Polaris reaches this installed app on its port, so it stays open."
-                                : "Polaris serves this service's domains from here and reaches it on its server's port. Switch its domains to be served by its own server to close it."}
+                                ? t("edge.lockedCatalog")
+                                : t("edge.lockedPolaris")}
                         </p>
                     )}
                 </section>
@@ -212,16 +222,16 @@ export function EdgeSettings({
 
             <section className="flex flex-col gap-3">
                 <div>
-                    <h3 className="text-sm font-medium">Traffic protection</h3>
+                    <h3 className="text-sm font-medium">{t("edge.traffic")}</h3>
                     <p className="text-xs text-muted-foreground">
-                        Applied at the edge, before a request reaches the service.
+                        {t("edge.trafficHint")}
                     </p>
                 </div>
 
                 <div className="flex flex-col gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">Rate limits</span>
+                    <span className="text-xs font-medium text-muted-foreground">{t("edge.rateLimits")}</span>
                     {draft.rateLimits.length === 0 && (
-                        <p className="text-xs text-foreground-subtle">No limit. Every request is let through.</p>
+                        <p className="text-xs text-foreground-subtle">{t("edge.noLimit")}</p>
                     )}
                     {draft.rateLimits.map((limit, index) => (
                         <div key={index} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
@@ -234,8 +244,8 @@ export function EdgeSettings({
                                         )
                                     })
                                 }
-                                placeholder="Every path"
-                                aria-label="Path this limit applies to"
+                                placeholder={t("edge.everyPath")}
+                                aria-label={t("edge.limitPath")}
                                 className="h-8 w-32 text-xs"
                                 disabled={!canEdit}
                             />
@@ -249,7 +259,7 @@ export function EdgeSettings({
                                     })
                                 }
                                 inputMode="numeric"
-                                aria-label="Requests allowed"
+                                aria-label={t("edge.requestsAllowed")}
                                 className="h-8 w-20 text-xs"
                                 disabled={!canEdit}
                             />
@@ -262,13 +272,13 @@ export function EdgeSettings({
                                         )
                                     })
                                 }
-                                options={PERIOD_OPTIONS}
-                                aria-label="Period"
+                                options={translated(t, PERIOD_OPTIONS)}
+                                aria-label={t("edge.period")}
                                 className="h-8 w-32 text-xs"
                                 disabled={!canEdit}
                             />
                             <label className="flex items-center gap-1 text-xs text-muted-foreground">
-                                burst
+                                {t("edge.burstLabel")}
                                 <Input
                                     value={String(limit.burst)}
                                     onChange={(event) =>
@@ -279,7 +289,7 @@ export function EdgeSettings({
                                         })
                                     }
                                     inputMode="numeric"
-                                    aria-label="Burst"
+                                    aria-label={t("edge.burst")}
                                     className="h-8 w-20 text-xs"
                                     disabled={!canEdit}
                                 />
@@ -293,8 +303,8 @@ export function EdgeSettings({
                                         )
                                     })
                                 }
-                                options={KEY_OPTIONS}
-                                aria-label="Counted"
+                                options={translated(t, KEY_OPTIONS)}
+                                aria-label={t("edge.counted")}
                                 className="h-8 w-44 text-xs"
                                 disabled={!canEdit}
                             />
@@ -308,8 +318,9 @@ export function EdgeSettings({
                                             )
                                         })
                                     }
+                                    // i18n-ignore: an example header name
                                     placeholder="X-Api-Key"
-                                    aria-label="Header counted by"
+                                    aria-label={t("edge.headerCounted")}
                                     className="h-8 w-32 text-xs"
                                     disabled={!canEdit}
                                 />
@@ -318,8 +329,8 @@ export function EdgeSettings({
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    aria-label="Remove this limit"
-                                    title="Remove this limit"
+                                    aria-label={t("edge.removeLimit")}
+                                    title={t("edge.removeLimit")}
                                     onClick={() => update({ rateLimits: draft.rateLimits.filter((_, at) => at !== index) })}
                                 >
                                     <Trash2 className="size-4 shrink-0" aria-hidden />
@@ -338,19 +349,19 @@ export function EdgeSettings({
                                 })
                             }
                         >
-                            <Plus className="size-4 shrink-0" aria-hidden /> Add a limit
+                            <Plus className="size-4 shrink-0" aria-hidden /> {t("edge.addLimit")}
                         </Button>
                     )}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">Requests in progress at once</span>
+                    <span className="text-xs font-medium text-muted-foreground">{t("edge.concurrency")}</span>
                     <Input
                         value={draft.concurrency === 0 ? "" : String(draft.concurrency)}
                         onChange={(event) => update({ concurrency: Number(event.target.value) || 0 })}
-                        placeholder="No cap"
+                        placeholder={t("edge.noCap")}
                         inputMode="numeric"
-                        aria-label="Requests in progress at once"
+                        aria-label={t("edge.concurrency")}
                         className="h-8 w-24 text-xs"
                         disabled={!canEdit}
                     />
@@ -359,41 +370,38 @@ export function EdgeSettings({
                         value={draft.concurrencyScope}
                         onValueChange={(scope) => update({ concurrencyScope: scope })}
                         options={[
-                            { value: "client", label: "Per visitor" },
-                            { value: "service", label: "Whole service" }
+                            { value: "client", label: t("edge.perVisitor") },
+                            { value: "service", label: t("edge.wholeService") }
                         ]}
-                        aria-label="Who the cap counts"
+                        aria-label={t("edge.capScope")}
                     />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">Browser check</span>
+                    <span className="text-xs font-medium text-muted-foreground">{t("edge.browserCheck")}</span>
                     <SegmentedControl
                         size="sm"
                         value={draft.challenge}
                         onValueChange={(challenge) => update({ challenge })}
                         options={[
-                            { value: "off", label: "Off" },
-                            { value: "auto", label: "When flooded" },
-                            { value: "on", label: "Always" }
+                            { value: "off", label: t("edge.off") },
+                            { value: "auto", label: t("edge.whenFlooded") },
+                            { value: "on", label: t("edge.always") }
                         ]}
-                        aria-label="Browser check"
+                        aria-label={t("edge.browserCheck")}
                     />
                     <p className="text-xs text-foreground-subtle">
-                        Visitors&apos; browsers solve a short calculation before they get through, which scripts
-                        flooding the service cannot skip. Webhooks and APIs need a firewall rule that skips the
-                        browser check for their path.
+                        {t("edge.browserCheckHint")}
                     </p>
                     {draft.challenge === "auto" && facts.flooded && (
                         <p className="flex items-center gap-1.5 text-xs text-warning">
                             <ShieldAlert className="size-3.5 shrink-0" aria-hidden />
-                            Flooded right now, so visitors are being checked.
+                            {t("edge.floodedNow")}
                         </p>
                     )}
                     {draft.challenge !== "off" && facts.guardChallenge === false && (
                         <p className="text-xs text-danger">
-                            The firewall on this server is older than the browser check and will not run it. Update
-                            Polaris from Settings to switch it on.
+                            {t("edge.guardTooOld")}
                         </p>
                     )}
                 </div>
@@ -401,30 +409,31 @@ export function EdgeSettings({
 
             <section className="flex flex-col gap-3">
                 <div>
-                    <h3 className="text-sm font-medium">Security headers</h3>
-                    <p className="text-xs text-muted-foreground">Sent with every answer the service gives.</p>
+                    <h3 className="text-sm font-medium">{t("edge.headers")}</h3>
+                    <p className="text-xs text-muted-foreground">{t("edge.headersHint")}</p>
                 </div>
                 <SegmentedControl
                     size="sm"
                     value={draft.headers.preset}
                     onValueChange={(preset) => updateHeaders({ preset })}
                     options={[
-                        { value: "off", label: "Off" },
-                        { value: "recommended", label: "Recommended", title: "Safe in front of any app" },
-                        { value: "strict", label: "Strict", title: "Full isolation. Test the app with it first." }
+                        { value: "off", label: t("edge.off") },
+                        { value: "recommended", label: t("edge.recommended"), title: t("edge.recommendedTitle") },
+                        { value: "strict", label: t("edge.strict"), title: t("edge.strictTitle") }
                     ]}
-                    aria-label="Security headers"
+                    aria-label={t("edge.headers")}
                 />
                 <div className="flex flex-wrap items-center gap-3">
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {/* i18n-ignore: a header name */}
                         HSTS
                         <Select
                             // Read back from what would actually be sent, so the preset's own
                             // lifetime shows until somebody picks another.
                             value={/max-age=(\d+)/.exec(preview["Strict-Transport-Security"] ?? "")?.[1] ?? "0"}
                             onValueChange={(value) => updateHeaders({ hstsMaxAge: Number(value) })}
-                            options={HSTS_OPTIONS}
-                            aria-label="HSTS lifetime"
+                            options={translated(t, HSTS_OPTIONS)}
+                            aria-label={t("edge.hstsLifetime")}
                             className="h-8 w-32 text-xs"
                             disabled={!canEdit}
                         />
@@ -434,26 +443,26 @@ export function EdgeSettings({
                             checked={"Strict-Transport-Security" in preview && preview["Strict-Transport-Security"]!.includes("includeSubDomains")}
                             onChange={(checked) => updateHeaders({ hstsIncludeSubdomains: checked })}
                             disabled={!canEdit}
-                            aria-label="Include subdomains"
+                            aria-label={t("edge.includeSubdomains")}
                         />
-                        Subdomains
+                        {t("edge.subdomains")}
                     </label>
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Switch
                             checked={"Strict-Transport-Security" in preview && preview["Strict-Transport-Security"]!.includes("preload")}
                             onChange={(checked) => updateHeaders({ hstsPreload: checked })}
                             disabled={!canEdit}
-                            aria-label="Preload"
+                            aria-label={t("edge.preload")}
                         />
-                        Preload
+                        {t("edge.preload")}
                     </label>
                 </div>
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                    Content Security Policy
+                    {t("edge.csp")}
                     <Textarea
                         value={draft.headers.contentSecurityPolicy ?? ""}
                         onChange={(event) => updateHeaders({ contentSecurityPolicy: event.target.value || undefined })}
-                        placeholder={preview["Content-Security-Policy"] ?? "Not sent"}
+                        placeholder={preview["Content-Security-Policy"] ?? t("edge.hsts.off")}
                         rows={2}
                         className="font-mono text-xs"
                         disabled={!canEdit}
@@ -471,8 +480,8 @@ export function EdgeSettings({
                                     {canEdit && (preset || custom) && name !== "Strict-Transport-Security" && (
                                         <button
                                             type="button"
-                                            aria-label={`Stop sending ${name}`}
-                                            title={`Stop sending ${name}`}
+                                            aria-label={t("edge.stopSending", { name })}
+                                            title={t("edge.stopSending", { name })}
                                             className="text-foreground-subtle hover:text-foreground"
                                             onClick={() =>
                                                 custom
@@ -493,15 +502,15 @@ export function EdgeSettings({
                         <Input
                             value={headerName}
                             onChange={(event) => setHeaderName(event.target.value)}
-                            placeholder="Header"
-                            aria-label="Header name"
+                            placeholder={t("edge.header")}
+                            aria-label={t("edge.headerName")}
                             className="h-8 w-44 text-xs"
                         />
                         <Input
                             value={headerValue}
                             onChange={(event) => setHeaderValue(event.target.value)}
-                            placeholder="Value"
-                            aria-label="Header value"
+                            placeholder={t("edge.value")}
+                            aria-label={t("edge.headerValue")}
                             className="h-8 min-w-0 flex-1 text-xs"
                         />
                         <Button
@@ -520,7 +529,7 @@ export function EdgeSettings({
                                 setHeaderValue("");
                             }}
                         >
-                            <Plus className="size-4 shrink-0" aria-hidden /> Add header
+                            <Plus className="size-4 shrink-0" aria-hidden /> {t("edge.addHeader")}
                         </Button>
                     </div>
                 )}
@@ -528,9 +537,9 @@ export function EdgeSettings({
 
             <section className="flex flex-col gap-3">
                 <div>
-                    <h3 className="text-sm font-medium">Redirects and rewrites</h3>
+                    <h3 className="text-sm font-medium">{t("edge.redirects")}</h3>
                     <p className="text-xs text-muted-foreground">
-                        A www or bare-domain redirect only applies once the service has both names.
+                        {t("edge.redirectsHint")}
                     </p>
                 </div>
                 {draft.redirects.map((redirect, index) => (
@@ -544,8 +553,8 @@ export function EdgeSettings({
                                     )
                                 })
                             }
-                            options={REDIRECT_OPTIONS}
-                            aria-label="Redirect"
+                            options={translated(t, REDIRECT_OPTIONS)}
+                            aria-label={t("edge.redirect")}
                             className="h-8 w-56 text-xs"
                             disabled={!canEdit}
                         />
@@ -560,8 +569,9 @@ export function EdgeSettings({
                                             )
                                         })
                                     }
+                                    // i18n-ignore: an example pattern
                                     placeholder="^https://example.com/old/(.*)"
-                                    aria-label="Pattern"
+                                    aria-label={t("edge.pattern")}
                                     className="h-8 min-w-0 flex-1 font-mono text-xs"
                                     disabled={!canEdit}
                                 />
@@ -574,8 +584,9 @@ export function EdgeSettings({
                                             )
                                         })
                                     }
+                                    // i18n-ignore: an example replacement
                                     placeholder="https://example.com/new/${1}"
-                                    aria-label="Goes to"
+                                    aria-label={t("edge.goesTo")}
                                     className="h-8 min-w-0 flex-1 font-mono text-xs"
                                     disabled={!canEdit}
                                 />
@@ -590,16 +601,16 @@ export function EdgeSettings({
                                     })
                                 }
                                 disabled={!canEdit}
-                                aria-label="Permanent"
+                                aria-label={t("edge.permanent")}
                             />
-                            Permanent
+                            {t("edge.permanent")}
                         </label>
                         {canEdit && (
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label="Remove this redirect"
-                                title="Remove this redirect"
+                                aria-label={t("edge.removeRedirect")}
+                                title={t("edge.removeRedirect")}
                                 onClick={() => update({ redirects: draft.redirects.filter((_, at) => at !== index) })}
                             >
                                 <Trash2 className="size-4 shrink-0" aria-hidden />
@@ -618,8 +629,8 @@ export function EdgeSettings({
                                     )
                                 })
                             }
-                            options={REWRITE_OPTIONS}
-                            aria-label="Rewrite"
+                            options={translated(t, REWRITE_OPTIONS)}
+                            aria-label={t("edge.rewrite")}
                             className="h-8 w-56 text-xs"
                             disabled={!canEdit}
                         />
@@ -634,8 +645,9 @@ export function EdgeSettings({
                                             )
                                         })
                                     }
+                                    // i18n-ignore: an example pattern
                                     placeholder="^/api/v1/(.*)"
-                                    aria-label="Pattern"
+                                    aria-label={t("edge.pattern")}
                                     className="h-8 min-w-0 flex-1 font-mono text-xs"
                                     disabled={!canEdit}
                                 />
@@ -648,8 +660,9 @@ export function EdgeSettings({
                                             )
                                         })
                                     }
+                                    // i18n-ignore: an example replacement
                                     placeholder="/v1/${1}"
-                                    aria-label="Rewritten to"
+                                    aria-label={t("edge.rewrittenTo")}
                                     className="h-8 min-w-0 flex-1 font-mono text-xs"
                                     disabled={!canEdit}
                                 />
@@ -664,8 +677,9 @@ export function EdgeSettings({
                                         )
                                     })
                                 }
+                                // i18n-ignore: an example path
                                 placeholder="/api"
-                                aria-label="Path prefix"
+                                aria-label={t("edge.pathPrefix")}
                                 className="h-8 w-40 font-mono text-xs"
                                 disabled={!canEdit}
                             />
@@ -674,8 +688,8 @@ export function EdgeSettings({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                aria-label="Remove this rewrite"
-                                title="Remove this rewrite"
+                                aria-label={t("edge.removeRewrite")}
+                                title={t("edge.removeRewrite")}
                                 onClick={() => update({ rewrites: draft.rewrites.filter((_, at) => at !== index) })}
                             >
                                 <Trash2 className="size-4 shrink-0" aria-hidden />
@@ -691,7 +705,7 @@ export function EdgeSettings({
                                 size="sm"
                                 onClick={() => update({ redirects: [...draft.redirects, { kind: "www-to-apex", permanent: true }] })}
                             >
-                                <Plus className="size-4 shrink-0" aria-hidden /> Add a redirect
+                                <Plus className="size-4 shrink-0" aria-hidden /> {t("edge.addRedirect")}
                             </Button>
                         )}
                         {draft.rewrites.length < core.EDGE_REWRITES_MAX && (
@@ -700,7 +714,7 @@ export function EdgeSettings({
                                 size="sm"
                                 onClick={() => update({ rewrites: [...draft.rewrites, { kind: "strip-prefix" }] })}
                             >
-                                <Plus className="size-4 shrink-0" aria-hidden /> Add a rewrite
+                                <Plus className="size-4 shrink-0" aria-hidden /> {t("edge.addRewrite")}
                             </Button>
                         )}
                     </div>
@@ -710,11 +724,11 @@ export function EdgeSettings({
             {canEdit && (
                 <div className="flex items-center gap-3">
                     <Button size="sm" onClick={save} disabled={!dirty || Boolean(invalid) || pending} aria-disabled={!dirty || Boolean(invalid) || pending}>
-                        {pending ? "Saving..." : "Save"}
+                        {pending ? t("edge.saving") : t("edge.save")}
                     </Button>
                     {dirty && (
                         <Button variant="ghost" size="sm" onClick={() => setDraft(saved)} disabled={pending}>
-                            Discard
+                            {t("edge.discard")}
                         </Button>
                     )}
                     {dirty && invalid && <span className="text-xs text-danger">{invalid}</span>}

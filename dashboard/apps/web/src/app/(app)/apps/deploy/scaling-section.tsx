@@ -13,6 +13,8 @@ import * as core from "@polaris/core";
 import { Loader2 } from "lucide-react";
 import { Button, Input, Switch } from "@polaris/ui";
 import { describeServiceEvent } from "./service-history";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { RelativeTime } from "@/components/relative-time";
 import { mergeUnchanged } from "@/lib/structural-merge";
 import { useKeptSnapshot } from "@/components/use-live-resource";
@@ -57,7 +59,7 @@ function draftOf(view: ServiceScalingView): Draft {
 }
 
 /** The draft as the server takes it, or the first thing wrong with it. */
-function parse(draft: Draft) {
+function parse(draft: Draft, t: NamespaceTranslator<"deployService">) {
     const input = {
         replicas: Number(draft.replicas),
         autoscale: draft.autoscale
@@ -87,7 +89,7 @@ function parse(draft: Draft) {
         .safeParse(input);
     return parsed.success
         ? { input: parsed.data, problem: null }
-        : { input: null, problem: parsed.error.issues[0]?.message ?? "Check these settings" };
+        : { input: null, problem: parsed.error.issues[0]?.message ?? t("scaling.checkSettings") };
 }
 
 /** How old a kept copy may be and still paint the first frame. */
@@ -100,6 +102,7 @@ export function ScalingSection({
     applicationId: string;
     onChanged: () => void;
 }) {
+    const t = useTranslations("deployService");
     const [view, setView] = useState<ServiceScalingView | null>(null);
     const [draft, setDraft] = useState<Draft | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -131,14 +134,14 @@ export function ScalingSection({
                 setView((current) => (current ? mergeUnchanged(current, fresh) : fresh));
                 setDraft(draftOf(fresh));
                 setKept(false);
-            } else setError(result.error ?? "Could not read how this service is scaled");
+            } else setError(result.error ?? t("scaling.unreadable"));
         });
         return () => {
             active = false;
         };
     }, [applicationId, cacheKey]);
 
-    const checked = useMemo(() => (draft ? parse(draft) : null), [draft]);
+    const checked = useMemo(() => (draft ? parse(draft, t) : null), [draft, t]);
     const set = (patch: Partial<Draft>) =>
         setDraft((current) => (current ? { ...current, ...patch } : current));
     const copies = Number(draft?.autoscale ? draft.max : draft?.replicas) || 1;
@@ -159,8 +162,8 @@ export function ScalingSection({
             dropSnapshots(cacheKey);
             setNote(
                 result.redeployed
-                    ? "Saved. The service is being started again with the new settings."
-                    : "Saved."
+                    ? t("scaling.savedRedeploying")
+                    : t("scaling.saved")
             );
             onChanged();
         });
@@ -168,7 +171,7 @@ export function ScalingSection({
 
     return (
         <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">Scaling</h3>
+            <h3 className="text-sm font-medium">{t("scaling.title")}</h3>
             {/* A failed read shows only why, as it did before anything was kept. */}
             {!draft || !view || (kept && error) ? (
                 error ? (
@@ -183,7 +186,7 @@ export function ScalingSection({
                 >
                     {view.single && <p className="text-xs text-muted-foreground">{view.single}</p>}
                     <label className="flex flex-col gap-1">
-                        <span className="font-medium">Copies</span>
+                        <span className="font-medium">{t("scaling.copies")}</span>
                         <Input
                             type="number"
                             min={1}
@@ -194,36 +197,29 @@ export function ScalingSection({
                             className="w-28"
                         />
                         <span className="text-xs text-muted-foreground">
-                            How many copies of the service run at once, up to {core.REPLICAS_MAX}.
-                            The edge spreads requests over them.
+                            {t("scaling.copiesHint", { max: core.REPLICAS_MAX })}
                         </span>
                     </label>
 
                     <div className="flex items-start justify-between gap-3">
                         <span>
-                            <span className="font-medium">Scale by itself</span>
+                            <span className="font-medium">{t("scaling.autoscale")}</span>
                             <span className="block text-xs text-muted-foreground">
-                                Add a copy when CPU or requests per copy stay above their target for
-                                three minutes, and take one away after ten minutes with both low.
-                                With a requests target, {core.AUTOSCALE_IDLE_AFTER} minutes with no
-                                requests at all drops straight to the fewest. CPU is each
-                                copy&apos;s share of the machine, the same figure the Metrics tab
-                                shows.
-                                {view.engine === "swarm" &&
-                                    " Not on a swarm machine, which keeps its own count."}
+                                {t("scaling.autoscaleHint", { minutes: core.AUTOSCALE_IDLE_AFTER })}
+                                {view.engine === "swarm" && t("scaling.notOnSwarm")}
                             </span>
                         </span>
                         <Switch
                             checked={draft.autoscale}
                             onChange={(value) => set({ autoscale: value })}
                             disabled={view.single !== null || view.engine === "swarm"}
-                            aria-label="Scale by itself"
+                            aria-label={t("scaling.autoscale")}
                         />
                     </div>
                     {draft.autoscale && (
                         <div className="flex flex-wrap gap-3">
                             <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Fewest</span>
+                                <span className="text-xs text-muted-foreground">{t("scaling.fewest")}</span>
                                 <Input
                                     type="number"
                                     min={1}
@@ -234,7 +230,7 @@ export function ScalingSection({
                                 />
                             </label>
                             <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Most</span>
+                                <span className="text-xs text-muted-foreground">{t("scaling.most")}</span>
                                 <Input
                                     type="number"
                                     min={1}
@@ -246,7 +242,7 @@ export function ScalingSection({
                             </label>
                             <label className="flex flex-col gap-1">
                                 <span className="text-xs text-muted-foreground">
-                                    CPU target (%)
+                                    {t("scaling.cpuTarget")}
                                 </span>
                                 <Input
                                     type="number"
@@ -259,7 +255,7 @@ export function ScalingSection({
                             </label>
                             <label className="flex flex-col gap-1">
                                 <span className="text-xs text-muted-foreground">
-                                    Requests per copy (a minute)
+                                    {t("scaling.requestsPerCopy")}
                                 </span>
                                 <Input
                                     type="number"
@@ -274,7 +270,7 @@ export function ScalingSection({
                                     onChange={(event) =>
                                         set({ requestsPerCopy: event.target.value })
                                     }
-                                    placeholder="CPU only"
+                                    placeholder={t("scaling.cpuOnly")}
                                     className="w-44"
                                 />
                             </label>
@@ -285,7 +281,7 @@ export function ScalingSection({
                     )}
                     {draft.autoscale && view.lastAutoscale && (
                         <p className="text-xs text-muted-foreground">
-                            {describeServiceEvent(view.lastAutoscale)}{" "}
+                            {describeServiceEvent(view.lastAutoscale, t)}{" "}
                             <span className="text-foreground-subtle">
                                 <RelativeTime iso={view.lastAutoscale.createdAt} />
                             </span>
@@ -294,12 +290,10 @@ export function ScalingSection({
 
                     <div className="flex items-start justify-between gap-3">
                         <span>
-                            <span className="font-medium">Sleep when nobody visits</span>
+                            <span className="font-medium">{t("scaling.sleep")}</span>
                             <span className="block text-xs text-muted-foreground">
-                                Stop the service after a stretch with no visits, and start it on the
-                                next one. The first visitor sees a page saying it is waking up for
-                                the few seconds that takes.
-                                {view.asleep && " It is asleep now."}
+                                {t("scaling.sleepHint")}
+                                {view.asleep && t("scaling.asleep")}
                                 {view.sleepBlocked && ` ${view.sleepBlocked}`}
                             </span>
                         </span>
@@ -307,13 +301,13 @@ export function ScalingSection({
                             checked={draft.sleeps}
                             onChange={(value) => set({ sleeps: value })}
                             disabled={view.sleepBlocked !== null && !draft.sleeps}
-                            aria-label="Sleep when nobody visits"
+                            aria-label={t("scaling.sleep")}
                         />
                     </div>
                     {draft.sleeps && (
                         <label className="flex flex-col gap-1">
                             <span className="text-xs text-muted-foreground">
-                                After (minutes without a visit)
+                                {t("scaling.sleepAfter")}
                             </span>
                             <Input
                                 type="number"
@@ -327,58 +321,55 @@ export function ScalingSection({
                     )}
 
                     <div className="flex flex-col gap-1">
-                        <span className="font-medium">Resources per copy</span>
+                        <span className="font-medium">{t("scaling.resources")}</span>
                         <div className="flex flex-wrap gap-3">
                             <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">CPU (cores)</span>
+                                <span className="text-xs text-muted-foreground">{t("scaling.cpus")}</span>
                                 <Input
                                     type="number"
                                     min={0.05}
                                     step={0.05}
                                     value={draft.cpus}
                                     onChange={(event) => set({ cpus: event.target.value })}
-                                    placeholder="No limit"
+                                    placeholder={t("scaling.noLimit")}
                                     className="w-28"
                                 />
                             </label>
                             <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">Memory (MB)</span>
+                                <span className="text-xs text-muted-foreground">{t("scaling.memory")}</span>
                                 <Input
                                     type="number"
                                     min={16}
                                     step={64}
                                     value={draft.memoryMb}
                                     onChange={(event) => set({ memoryMb: event.target.value })}
-                                    placeholder="No limit"
+                                    placeholder={t("scaling.noLimit")}
                                     className="w-28"
                                 />
                             </label>
                         </div>
                         <span className="text-xs text-muted-foreground">
-                            A copy past its memory is stopped and started again; one past its CPU is
-                            slowed. Blank = no limit.
+                            {t("scaling.resourcesHint")}
                         </span>
                     </div>
 
                     <div className="flex items-start justify-between gap-3">
                         <span>
-                            <span className="font-medium">Keep each visitor on one copy</span>
-                            <span className="block text-xs text-muted-foreground">
-                                For WebSockets and sessions kept in memory. A cookie pins the
-                                visitor to the copy that answered them first.
-                            </span>
+                            <span className="font-medium">{t("scaling.sticky")}</span>
+                            <span className="block text-xs text-muted-foreground">{t("scaling.stickyHint")}</span>
                         </span>
                         <Switch
                             checked={draft.sticky}
                             onChange={(value) => set({ sticky: value })}
-                            aria-label="Keep each visitor on one copy"
+                            aria-label={t("scaling.sticky")}
                         />
                     </div>
                     <label className="flex flex-col gap-1">
-                        <span className="font-medium">Health check path</span>
+                        <span className="font-medium">{t("scaling.healthPath")}</span>
                         <Input
                             value={draft.healthPath}
                             onChange={(event) => set({ healthPath: event.target.value })}
+                            // i18n-ignore: an example path
                             placeholder="/healthz"
                             autoCapitalize="none"
                             autoCorrect="off"
@@ -386,14 +377,12 @@ export function ScalingSection({
                             className="max-w-xs"
                         />
                         <span className="text-xs text-muted-foreground">
-                            Asked of every copy every 10 seconds. One that stops answering is left
-                            out until it answers again. Blank = no check.
+                            {t("scaling.healthPathHint")}
                         </span>
                     </label>
                     {copies > 1 && (
                         <p className="text-xs text-muted-foreground">
-                            With more than one copy the edge balances between them itself, so email
-                            addresses in its pages are not hidden from scrapers.
+                            {t("scaling.emailShield")}
                         </p>
                     )}
 
@@ -402,7 +391,7 @@ export function ScalingSection({
                     {note && <p className="text-xs text-muted-foreground">{note}</p>}
                     <div className="flex justify-end">
                         <Button onClick={save} disabled={pending || kept || !checked?.input}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} Save scaling
+                            {pending && <Loader2 className="size-4 animate-spin" />} {t("scaling.save")}
                         </Button>
                     </div>
                 </fieldset>

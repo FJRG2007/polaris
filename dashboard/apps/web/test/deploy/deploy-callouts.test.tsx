@@ -26,6 +26,8 @@ vi.mock("@/components/relative-time", () => ({
 const { DeployCallouts } = await import("@/app/(app)/apps/deploy/deploy-callouts");
 const { ProjectGlanceBar } = await import("@/app/(app)/apps/deploy/project-glance-bar");
 const { TabAttentionDot, tabAttention } = await import("@/app/(app)/apps/deploy/attention-dot");
+const { webCatalogs } = await import("../../messages");
+const serviceT = webCatalogs.translator("en-US", "deployService");
 
 function deployment(overrides: Partial<DeploymentSummary>): DeploymentSummary {
     return {
@@ -132,11 +134,11 @@ describe("the project summary line", () => {
 
 describe("the attention dots", () => {
     it("names the tab each problem belongs to", () => {
-        expect(tabAttention({ deployFailed: true, domainDown: true, cronFailing: false })).toEqual({
+        expect(tabAttention({ deployFailed: true, domainDown: true, cronFailing: false }, serviceT)).toEqual({
             Deployments: "The last deploy failed",
             Settings: "An address is down"
         });
-        expect(tabAttention(undefined)).toEqual({});
+        expect(tabAttention(undefined, serviceT)).toEqual({});
     });
 
     it("is named by its reason, not only its colour", () => {

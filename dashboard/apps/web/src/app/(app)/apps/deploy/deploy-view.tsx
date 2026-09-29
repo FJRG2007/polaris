@@ -13,6 +13,8 @@ import * as deployActions from "./actions";
 import { NewFolderForm } from "./upload-source";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { LogViewer } from "@/components/log-viewer";
 import type { ImportedConfig } from "@polaris/deploy";
 import { DatabaseManageDialog } from "./database-panel";
@@ -226,6 +228,7 @@ export function EnvironmentServices({
     onChanged: () => void;
     onOpenService?: (app: ProjectApp) => void;
 }) {
+    const t = useTranslations("deploy");
     const isEmpty = environment.applications.length === 0 && environment.databases.length === 0;
 
     return (
@@ -246,10 +249,10 @@ export function EnvironmentServices({
                         <Rocket className="size-5" />
                     </span>
                     <div className="relative">
-                        <p className="text-sm font-medium">No services in this environment yet</p>
+                        <p className="text-sm font-medium">{t("view.emptyEnvironment")}</p>
                         {canManage && (
                             <p className="mt-1 text-xs text-muted-foreground">
-                                Add a GitHub repository, a Docker image, or a database.
+                                {t("view.emptyEnvironmentHint")}
                             </p>
                         )}
                     </div>
@@ -294,6 +297,7 @@ function AppCard({
     onChanged: () => void;
     onOpen?: () => void;
 }) {
+    const t = useTranslations("deploy");
     const can = useProjectCan();
     const [busy, startTransition] = useTransition();
     const [showTerminal, setShowTerminal] = useState(false);
@@ -344,18 +348,18 @@ function AppCard({
                 </button>
                 <StatusPill
                     tone={dbTone(app.deployStatus ?? "")}
-                    label={app.deployStatus ?? "Not deployed"}
+                    label={app.deployStatus ?? t("view.notDeployed")}
                 />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
                 {staged && (
                     <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[0.625rem] font-medium text-primary">
-                        Removal pending
+                        {t("view.removalPending")}
                     </span>
                 )}
                 <Badge>{app.sourceType === "dockerfile" ? "git" : app.sourceType}</Badge>
-                {app.autoDeploy && <Badge>auto-deploy</Badge>}
+                {app.autoDeploy && <Badge>{t("view.autoDeployBadge")}</Badge>}
                 <MetricsBadge applicationId={app.id} />
             </div>
 
@@ -373,10 +377,10 @@ function AppCard({
                     </a>
                     {isLocalDomain(primary) && (
                         <span
-                            title="Resolves only on your local network"
+                            title={t("view.lanTitle")}
                             className="shrink-0 rounded bg-warning-soft px-1 text-[0.625rem] font-medium text-warning-ink"
                         >
-                            LAN
+                            {t("view.lan")}
                         </span>
                     )}
                     {app.domains.length > 1 && (
@@ -404,7 +408,7 @@ function AppCard({
                             ) : (
                                 <Rocket className="size-4" />
                             )}{" "}
-                            Deploy
+                            {t("view.deploy")}
                         </Button>
                     )}
                     {isGit && can("service.configure") && (
@@ -412,8 +416,8 @@ function AppCard({
                             variant="ghost"
                             size="icon"
                             onClick={() => setShowAutoDeploy(true)}
-                            title="Auto-deploy"
-                            aria-label="Auto-deploy"
+                            title={t("view.autoDeploy")}
+                            aria-label={t("view.autoDeploy")}
                         >
                             <GitBranch className="size-4" />
                         </Button>
@@ -423,8 +427,8 @@ function AppCard({
                             variant="ghost"
                             size="icon"
                             onClick={() => setShowFiles(true)}
-                            title="Files"
-                            aria-label="Files"
+                            title={t("view.files")}
+                            aria-label={t("view.files")}
                         >
                             <FolderOpen className="size-4" />
                         </Button>
@@ -434,8 +438,8 @@ function AppCard({
                             variant="ghost"
                             size="icon"
                             onClick={() => setShowTerminal(true)}
-                            title="Terminal"
-                            aria-label="Terminal"
+                            title={t("view.terminal")}
+                            aria-label={t("view.terminal")}
                         >
                             <TerminalSquare className="size-4" />
                         </Button>
@@ -445,8 +449,8 @@ function AppCard({
                             variant="ghost"
                             size="icon"
                             onClick={() => setShowDomain(true)}
-                            title="Domains"
-                            aria-label="Domains"
+                            title={t("view.domains")}
+                            aria-label={t("view.domains")}
                         >
                             <Globe className="size-4" />
                         </Button>
@@ -457,7 +461,7 @@ function AppCard({
             <Dialog open={showTerminal} onOpenChange={setShowTerminal}>
                 <DialogContent className="max-w-3xl">
                     <DialogHeader>
-                        <DialogTitle>Terminal - {app.name}</DialogTitle>
+                        <DialogTitle>{t("view.terminalTitle", { name: app.name })}</DialogTitle>
                     </DialogHeader>
                     {showTerminal && (
                         <TerminalPanel
@@ -471,7 +475,7 @@ function AppCard({
             <Dialog open={showFiles} onOpenChange={setShowFiles}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Files - {app.name}</DialogTitle>
+                        <DialogTitle>{t("view.filesTitle", { name: app.name })}</DialogTitle>
                     </DialogHeader>
                     {showFiles && <FilesPanel applicationId={app.id} />}
                 </DialogContent>
@@ -496,7 +500,7 @@ function AppCard({
             <Dialog open={logsFor !== null} onOpenChange={(open) => !open && setLogsFor(null)}>
                 <DialogContent className="max-w-3xl">
                     <DialogHeader>
-                        <DialogTitle>Deployment - {app.name}</DialogTitle>
+                        <DialogTitle>{t("view.deploymentTitle", { name: app.name })}</DialogTitle>
                     </DialogHeader>
                     {logsFor && <DeploymentLogs deploymentId={logsFor} onDone={onChanged} />}
                 </DialogContent>
@@ -516,6 +520,7 @@ function DatabaseCard({
     staged: boolean;
     onChanged: () => void;
 }) {
+    const t = useTranslations("deploy");
     const can = useProjectCan();
     const [pending, startTransition] = useTransition();
     const [confirming, setConfirming] = useState(false);
@@ -555,17 +560,12 @@ function DatabaseCard({
             <div className="flex flex-wrap items-center gap-2">
                 {staged && (
                     <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[0.625rem] font-medium text-primary">
-                        Removal pending
+                        {t("view.removalPending")}
                     </span>
                 )}
                 <Badge>{dbEngineLabel(database.engine)}</Badge>
-                {database.hostedOnInstance && <Badge>On a shared instance</Badge>}
-                {database.hostedCount ? (
-                    <Badge>
-                        Hosts {database.hostedCount}{" "}
-                        {database.hostedCount === 1 ? "database" : "databases"}
-                    </Badge>
-                ) : null}
+                {database.hostedOnInstance && <Badge>{t("view.sharedInstance")}</Badge>}
+                {database.hostedCount ? <Badge>{t("view.hosts", { count: database.hostedCount })}</Badge> : null}
             </div>
 
             {error && <p className="text-xs text-danger">{error}</p>}
@@ -589,13 +589,13 @@ function DatabaseCard({
                         ) : (
                             <Rocket className="size-4" />
                         )}{" "}
-                        Provision
+                        {t("view.provision")}
                     </Button>
                     <Button
                         variant="ghost"
                         size="icon"
-                        title="Connection details"
-                        aria-label="Connection details"
+                        title={t("view.connectionDetails")}
+                        aria-label={t("view.connectionDetails")}
                         onClick={() => setConnecting(true)}
                     >
                         <Plug className="size-4" />
@@ -603,8 +603,8 @@ function DatabaseCard({
                     <Button
                         variant="ghost"
                         size="icon"
-                        title="Manage"
-                        aria-label="Manage"
+                        title={t("view.manage")}
+                        aria-label={t("view.manage")}
                         onClick={() => setManaging(true)}
                     >
                         <Settings2 className="size-4" />
@@ -612,8 +612,8 @@ function DatabaseCard({
                     <Button
                         variant="ghost"
                         size="icon"
-                        title={staged ? "Removal pending" : "Delete database"}
-                        aria-label="Delete database"
+                        title={staged ? t("view.removalPending") : t("view.deleteDatabase")}
+                        aria-label={t("view.deleteDatabase")}
                         disabled={staged}
                         onClick={() => setConfirming(true)}
                     >
@@ -635,14 +635,14 @@ function DatabaseCard({
                 open={confirming}
                 onOpenChange={setConfirming}
                 name={database.name}
-                kind="database"
-                confirmLabel="Stage removal"
+                kind={t("view.databaseKind")}
+                confirmLabel={t("view.stageRemoval")}
                 description={
                     database.hostedOnInstance
-                        ? "The database and its user are dropped from the instance hosting them. The instance itself is untouched."
+                        ? t("view.removeHosted")
                         : database.hostedCount
-                          ? `The container goes, and with it the ${database.hostedCount} ${database.hostedCount === 1 ? "database" : "databases"} hosted inside it. The named volume holding the data is left on the server so it can still be recovered by hand.`
-                          : "The container goes; the named volume holding its data is left on the server so it can still be recovered by hand."
+                          ? t("view.removeHost", { count: database.hostedCount })
+                          : t("view.removeContainer")
                 }
                 error={error}
                 pending={pending}
@@ -669,6 +669,7 @@ function DatabaseConnectionDialog({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const t = useTranslations("deploy");
     const [connection, setConnection] = useState<DbConnection | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [revealed, setRevealed] = useState(false);
@@ -682,7 +683,7 @@ function DatabaseConnectionDialog({
         void deployActions.databaseConnectionAction(database.id).then((result) => {
             if (!active) return;
             if (result.connection) setConnection(result.connection);
-            else setError(result.error ?? "Could not read the connection details");
+            else setError(result.error ?? t("view.connection.unreadable"));
         });
         return () => {
             active = false;
@@ -709,19 +710,19 @@ function DatabaseConnectionDialog({
                 {connection && (
                     <div className="flex flex-col gap-3">
                         <Field
-                            label="Reference"
-                            hint="Paste into a service's variable. It resolves to this database's address on every deploy, and to the copy's database in a copied environment."
+                            label={t("view.connection.reference")}
+                            hint={t("view.connection.referenceHint")}
                         >
                             <CopyRow value={connection.reference} />
                         </Field>
                         <Field
-                            label="Connection URI"
+                            label={t("view.connection.uri")}
                             hint={
                                 connection.cluster
-                                    ? "One node of the cluster, reachable by name from any service in this environment."
+                                    ? t("view.connection.uriCluster")
                                     : connection.hosts.length > 1
-                                      ? `Lists all ${connection.hosts.length} members, so a client finds the primary wherever it is.`
-                                      : "Reachable by name from any service in this environment."
+                                      ? t("view.connection.uriMembers", { count: connection.hosts.length })
+                                      : t("view.connection.uriHint")
                             }
                         >
                             <CopyRow value={connection.uri} secret={!revealed} />
@@ -729,14 +730,14 @@ function DatabaseConnectionDialog({
                         {connection.cluster && (
                             <>
                                 <Field
-                                    label="Cluster nodes"
-                                    hint={`A Redis cluster of ${connection.cluster.masters} masters and ${connection.cluster.masters} replicas. Connect with a client in cluster mode and give it these nodes; it is sent to the right one for each key.`}
+                                    label={t("view.connection.nodes")}
+                                    hint={t("view.connection.nodesHint", { masters: connection.cluster.masters })}
                                 >
                                     <CopyRow value={connection.cluster.nodes.join(",")} />
                                 </Field>
                                 <Field
-                                    label="Nodes reference"
-                                    hint="Resolves to the list above, for a client that takes every node."
+                                    label={t("view.connection.nodesReference")}
+                                    hint={t("view.connection.nodesReferenceHint")}
                                 >
                                     <CopyRow value={connection.cluster.reference} />
                                 </Field>
@@ -744,27 +745,29 @@ function DatabaseConnectionDialog({
                         )}
                         {connection.readUri && (
                             <Field
-                                label="Read replicas URI"
-                                hint={`Reads only, spread over the replicas. As a reference: ${connection.reference.replace("DATABASE_URL", "READ_URL")}`}
+                                label={t("view.connection.readUri")}
+                                hint={t("view.connection.readUriHint", {
+                                    reference: connection.reference.replace("DATABASE_URL", "READ_URL")
+                                })}
                             >
                                 <CopyRow value={connection.readUri} secret={!revealed} />
                             </Field>
                         )}
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <Field label="Host">
+                            <Field label={t("view.connection.host")}>
                                 <CopyRow value={connection.host} />
                             </Field>
-                            <Field label="Port">
+                            <Field label={t("view.connection.port")}>
                                 <CopyRow value={String(connection.port)} />
                             </Field>
-                            <Field label="Database">
+                            <Field label={t("view.connection.database")}>
                                 <CopyRow value={connection.database} />
                             </Field>
-                            <Field label="User">
+                            <Field label={t("view.connection.user")}>
                                 <CopyRow value={connection.username} />
                             </Field>
                         </div>
-                        <Field label="Password">
+                        <Field label={t("view.connection.password")}>
                             <CopyRow
                                 value={revealed ? connection.password : hidden}
                                 copyValue={connection.password}
@@ -781,11 +784,11 @@ function DatabaseConnectionDialog({
                                 ) : (
                                     <Eye className="size-4" />
                                 )}
-                                {revealed ? "Hide password" : "Show password"}
+                                {revealed ? t("view.connection.hidePassword") : t("view.connection.showPassword")}
                             </Button>
                             {connection.exposedPort && (
                                 <span className="text-xs text-muted-foreground">
-                                    Also published on the server at port {connection.exposedPort}
+                                    {t("view.connection.exposed", { port: connection.exposedPort })}
                                 </span>
                             )}
                         </div>
@@ -806,6 +809,7 @@ export function CopyRow({
     secret?: boolean;
     copyValue?: string;
 }) {
+    const t = useTranslations("deploy");
     const [copied, setCopied] = useState(false);
     const shown = secret ? value.replace(/:\/\/([^:]*):[^@]*@/, "://$1:********@") : value;
 
@@ -824,8 +828,8 @@ export function CopyRow({
             <button
                 type="button"
                 onClick={copy}
-                title="Copy"
-                aria-label="Copy"
+                title={t("view.copy")}
+                aria-label={t("view.copy")}
                 className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
                 {copied ? (
@@ -839,22 +843,22 @@ export function CopyRow({
 }
 
 export const SERVICE_TYPES = [
-    { id: "github", label: "GitHub Repository", icon: <GitHubMark className="size-5" /> },
-    { id: "docker", label: "Docker Image", icon: <DockerMark className="size-5" /> },
-    { id: "folder", label: "Upload a folder", icon: <FolderUp className="size-5" /> },
-    { id: "template", label: "Template", icon: <LayoutTemplate className="size-5" /> },
-    { id: "database", label: "Database", icon: <Database className="size-5" /> }
+    { id: "github", label: "view.types.github", icon: <GitHubMark className="size-5" /> },
+    { id: "docker", label: "view.types.docker", icon: <DockerMark className="size-5" /> },
+    { id: "folder", label: "view.types.folder", icon: <FolderUp className="size-5" /> },
+    { id: "template", label: "view.types.template", icon: <LayoutTemplate className="size-5" /> },
+    { id: "database", label: "view.types.database", icon: <Database className="size-5" /> }
 ] as const;
 
 export type ServiceView = "list" | "github" | "docker" | "folder" | "template" | "database";
 
-const SERVICE_TITLES: Record<Exclude<ServiceView, "list">, string> = {
-    github: "GitHub Repository",
-    docker: "Docker Image",
-    folder: "Upload a folder",
-    template: "From a template",
-    database: "Database"
-};
+const SERVICE_TITLES = {
+    github: "view.types.github",
+    docker: "view.types.docker",
+    folder: "view.types.folder",
+    template: "view.types.fromTemplate",
+    database: "view.types.database"
+} as const satisfies Record<Exclude<ServiceView, "list">, string>;
 
 /** The service-creation dialog as a controlled component, so any trigger (the header
  *  button or the canvas context menu) can open it at a chosen step. */
@@ -873,6 +877,8 @@ export function NewServiceDialog({
     onViewChange: (view: ServiceView) => void;
     onChanged: () => void;
 }) {
+    const t = useTranslations("deploy");
+
     function done() {
         onOpenChange(false);
         onChanged();
@@ -888,12 +894,12 @@ export function NewServiceDialog({
                                 type="button"
                                 onClick={() => onViewChange("list")}
                                 className="-ml-1 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                aria-label="Back"
+                                aria-label={t("view.back")}
                             >
                                 <ArrowLeft className="size-4" />
                             </button>
                         )}
-                        {view === "list" ? "New service" : SERVICE_TITLES[view]}
+                        {view === "list" ? t("view.newService") : t(SERVICE_TITLES[view])}
                     </DialogTitle>
                 </DialogHeader>
                 {view === "list" ? (
@@ -921,6 +927,7 @@ export function NewServiceButton({
     environmentId: string;
     onChanged: () => void;
 }) {
+    const t = useTranslations("deploy");
     const [open, setOpen] = useState(false);
     const [view, setView] = useState<ServiceView>("list");
 
@@ -934,7 +941,7 @@ export function NewServiceButton({
                     setOpen(true);
                 }}
             >
-                <Plus className="size-4" /> New service
+                <Plus className="size-4" /> {t("view.newService")}
             </Button>
             <NewServiceDialog
                 environmentId={environmentId}
@@ -949,6 +956,7 @@ export function NewServiceButton({
 }
 
 function ServiceTypeList({ onPick }: { onPick: (view: Exclude<ServiceView, "list">) => void }) {
+    const t = useTranslations("deploy");
     const can = useProjectCan();
     // Starting a database is its own grant, so it is offered only to whoever
     // holds it - the form behind it would refuse anyway.
@@ -965,7 +973,7 @@ function ServiceTypeList({ onPick }: { onPick: (view: Exclude<ServiceView, "list
                     <span className="flex size-5 shrink-0 items-center justify-center">
                         {type.icon}
                     </span>
-                    <span className="flex-1 text-sm font-medium">{type.label}</span>
+                    <span className="flex-1 text-sm font-medium">{t(type.label)}</span>
                     <ChevronRight className="size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
                 </button>
             ))}
@@ -1014,14 +1022,15 @@ function ServerField({
     value: string;
     onChange: (id: string) => void;
 }) {
+    const t = useTranslations("deploy");
     if (servers.length === 0) return null;
     return (
-        <Field label="Server" hint="Where this service runs. Connect more under Servers.">
+        <Field label={t("view.server")} hint={t("view.serverHint")}>
             <Select
                 value={value}
                 onValueChange={onChange}
                 options={servers.map((server) => ({ value: server.id, label: server.name }))}
-                aria-label="Server"
+                aria-label={t("view.server")}
             />
         </Field>
     );
@@ -1041,15 +1050,16 @@ function NewUploadForm({ environmentId, onDone }: { environmentId: string; onDon
 }
 
 /** What a template creates besides its own service, in the picker's words. */
-function templateExtra(template: ServiceTemplate): string | null {
-    if (template.database) return dbEngineLabel(template.database.engine);
-    if (template.companion) return `a ${template.companion.label}`;
+function templateExtra(template: ServiceTemplate): { engine: string } | { companion: string } | null {
+    if (template.database) return { engine: dbEngineLabel(template.database.engine) };
+    if (template.companion) return { companion: template.companion.label };
     return null;
 }
 
 /** A one-click service: pick a template, name it, and it deploys with its
  *  volumes and variables already set. */
 function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+    const t = useTranslations("deploy");
     const [picked, setPicked] = useState<ServiceTemplate | null>(null);
     const [name, setName] = useState("");
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
@@ -1087,11 +1097,17 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
                         <span className="min-w-0 flex-1">
                             <span className="block text-sm font-medium text-foreground">
                                 {template.name}
-                                {templateExtra(template) && (
-                                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                                        with {templateExtra(template)}
-                                    </span>
-                                )}
+                                {(() => {
+                                    const extra = templateExtra(template);
+                                    if (!extra) return null;
+                                    return (
+                                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                            {"engine" in extra
+                                                ? t("view.template.withEngine", { engine: extra.engine })
+                                                : t("view.template.withCompanion", { companion: extra.companion })}
+                                        </span>
+                                    );
+                                })()}
                             </span>
                             <span
                                 className="block truncate text-xs text-muted-foreground"
@@ -1112,7 +1128,7 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
             <p className="text-sm text-muted-foreground">
                 {picked.description} <span className="font-mono text-xs">{picked.image}</span>
             </p>
-            <Field label="Name">
+            <Field label={t("view.name")}>
                 <Input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
@@ -1122,31 +1138,26 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
             <ServerField servers={servers} value={serverId} onChange={setServerId} />
             {picked.database && (
                 <p className="text-xs text-muted-foreground">
-                    Creates a {dbEngineLabel(picked.database.engine)} database beside it too, named
-                    after the service. Its variables point at the database, so no password is
-                    copied.
+                    {t("view.template.createsDatabase", { engine: dbEngineLabel(picked.database.engine) })}
                 </p>
             )}
             {picked.companion && (
                 <p className="text-xs text-muted-foreground">
-                    Creates a second service beside it for the {picked.companion.label}, reachable
-                    only from this environment.
+                    {t("view.template.createsCompanion", { companion: picked.companion.label })}
                 </p>
             )}
             <p className="text-xs text-muted-foreground">
                 {picked.firstRun}
-                {picked.secrets.length > 0 && " Generated secrets are in the service's Variables."}
-                {picked.prepare?.length
-                    ? " Setup runs inside it once it is up, and the service says how it went."
-                    : ""}
+                {picked.secrets.length > 0 && t("view.template.secrets")}
+                {picked.prepare?.length ? t("view.template.setup") : ""}
             </p>
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-between gap-2">
                 <Button variant="ghost" onClick={() => setPicked(null)} disabled={pending}>
-                    Other templates
+                    {t("view.template.other")}
                 </Button>
                 <Button onClick={submit} disabled={pending}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} Deploy
+                    {pending && <Loader2 className="size-4 animate-spin" />} {t("view.deploy")}
                 </Button>
             </div>
         </div>
@@ -1154,6 +1165,7 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
 }
 
 function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+    const t = useTranslations("deploy");
     const [name, setName] = useState("");
     const [image, setImage] = useState("");
     const [port, setPort] = useState("");
@@ -1180,32 +1192,28 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
 
     return (
         <div className="flex flex-col gap-3">
-            <Field label="Name">
+            <Field label={t("view.name")}>
                 <Input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
+                    // i18n-ignore: an example service name
                     placeholder="my-app"
                     autoFocus
                 />
             </Field>
-            <Field
-                label="Image"
-                hint="Docker Hub, GHCR, Quay, GitLab or MCR. Private images: add a login under Registries."
-            >
+            <Field label={t("view.image.label")} hint={t("view.image.hint")}>
                 <Input
                     value={image}
                     onChange={(event) => setImage(event.target.value)}
+                    // i18n-ignore: an example image reference
                     placeholder="ghcr.io/user/repo:latest"
                 />
             </Field>
-            <Field
-                label="Port"
-                hint="The port the container listens on. Leave empty to detect it from the image; set it (e.g. 5601 for OpenSearch Dashboards) only if the image exposes several ports or none."
-            >
+            <Field label={t("view.image.port")} hint={t("view.image.portHint")}>
                 <Input
                     value={port}
                     onChange={(event) => setPort(event.target.value)}
-                    placeholder="Auto (from image)"
+                    placeholder={t("view.image.portPlaceholder")}
                     inputMode="numeric"
                 />
             </Field>
@@ -1213,7 +1221,7 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !name.trim() || !image.trim()}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} Deploy image
+                    {pending && <Loader2 className="size-4 animate-spin" />} {t("view.image.deploy")}
                 </Button>
             </div>
         </div>
@@ -1231,9 +1239,10 @@ interface RepoChoice {
 
 type Builder = "dockerfile" | "nixpacks";
 
-const BUILDER_OPTIONS: SelectOption[] = [
+const builderOptions = (t: NamespaceTranslator<"deploy">): SelectOption[] => [
+    // i18n-ignore: a file name
     { value: "dockerfile", label: "Dockerfile" },
-    { value: "nixpacks", label: "Auto-detect (Nixpacks)" }
+    { value: "nixpacks", label: t("view.github.nixpacks") }
 ];
 
 /** The service name a plain git URL suggests: its last path segment. */
@@ -1251,6 +1260,7 @@ function nameFromUrl(url: string): string {
 function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     // Null until the picker's first read answers, so the "not connected" notice
     // does not flash before anybody has been asked.
+    const t = useTranslations("deploy");
     const [connected, setConnected] = useState<boolean | null>(null);
     const [choice, setChoice] = useState<RepoChoice | null>(null);
     const [name, setName] = useState("");
@@ -1349,11 +1359,13 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
         <div className="flex flex-col gap-3">
             {connected === false && (
                 <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
-                    Searching public repositories.{" "}
-                    <a href="/account/connections" className="text-primary hover:underline">
-                        Connect your GitHub account
-                    </a>{" "}
-                    to reach private ones and your own list.
+                    {t.rich("view.github.publicOnly", {
+                        link: (chunks) => (
+                            <a key="link" href="/account/connections" className="text-primary hover:underline">
+                                {chunks}
+                            </a>
+                        )
+                    })}
                 </p>
             )}
 
@@ -1372,7 +1384,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                     </span>
                     {choice.private && <Lock className="size-3.5 shrink-0 text-muted-foreground" />}
                     <Button type="button" variant="ghost" size="sm" onClick={clearChoice}>
-                        Change
+                        {t("view.github.change")}
                     </Button>
                 </div>
             ) : (
@@ -1389,14 +1401,15 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
             {choice && (
                 <>
                     <div className="grid grid-cols-2 gap-3">
-                        <Field label="Name">
+                        <Field label={t("view.name")}>
                             <Input
                                 value={name}
                                 onChange={(event) => setName(event.target.value)}
+                                // i18n-ignore: an example service name
                                 placeholder="my-app"
                             />
                         </Field>
-                        <Field label="Branch">
+                        <Field label={t("view.github.branch")}>
                             <Input
                                 value={branch}
                                 onChange={(event) => setBranch(event.target.value)}
@@ -1408,24 +1421,24 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                         </Field>
                     </div>
                     <Field
-                        label="Builder"
+                        label={t("view.github.builder")}
                         hint={
                             inspecting
-                                ? "Detecting the stack..."
+                                ? t("view.github.detecting")
                                 : framework
-                                  ? `Detected ${framework}.`
-                                  : "No Dockerfile found - Nixpacks auto-builds from the source."
+                                  ? t("view.github.detected", { framework })
+                                  : t("view.github.noDockerfile")
                         }
                     >
                         <Select
                             value={builder}
                             onValueChange={(value) => setBuilder(value as Builder)}
-                            options={BUILDER_OPTIONS}
+                            options={builderOptions(t)}
                         />
                     </Field>
                     <Field
-                        label="Root directory"
-                        hint="For a repository holding several apps. The build still gets the whole repository, so shared packages and the lockfile above it are available."
+                        label={t("view.github.rootDirectory")}
+                        hint={t("view.github.rootDirectoryHint")}
                     >
                         <Input
                             value={rootDirectory}
@@ -1438,16 +1451,17 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                     </Field>
                     {builder === "dockerfile" && (
                         <Field
-                            label="Dockerfile path"
+                            label={t("view.github.dockerfilePath")}
                             hint={
                                 rootDirectory.trim()
-                                    ? `Relative to ${rootDirectory.trim()}.`
+                                    ? t("view.github.relativeTo", { directory: rootDirectory.trim() })
                                     : undefined
                             }
                         >
                             <Input
                                 value={dockerfilePath}
                                 onChange={(event) => setDockerfilePath(event.target.value)}
+                                // i18n-ignore: a file name
                                 placeholder="Dockerfile"
                             />
                         </Field>
@@ -1466,7 +1480,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !canSubmit}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} Deploy repository
+                    {pending && <Loader2 className="size-4 animate-spin" />} {t("view.github.deploy")}
                 </Button>
             </div>
         </div>
@@ -1478,23 +1492,24 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
 /** Picking this means "start an instance of its own", the default. */
 const DEDICATED = "__dedicated__";
 
-const PRIVILEGE_OPTIONS: SelectOption[] = [
-    { value: "owner", label: "Owner - full control of this database" },
-    { value: "readwrite", label: "Read and write - no schema changes" },
-    { value: "readonly", label: "Read only" }
+const privilegeOptions = (t: NamespaceTranslator<"deploy">): SelectOption[] => [
+    { value: "owner", label: t("view.database.privilegeOwner") },
+    { value: "readwrite", label: t("view.database.privilegeReadWrite") },
+    { value: "readonly", label: t("view.database.privilegeReadOnly") }
 ];
 
 /** How a new Redis runs: one instance, or a cluster of so many masters. */
 const SINGLE = "single";
-const REDIS_TOPOLOGY_OPTIONS: SelectOption[] = [
-    { value: SINGLE, label: "A single instance" },
+const redisTopologyOptions = (t: NamespaceTranslator<"deploy">): SelectOption[] => [
+    { value: SINGLE, label: t("view.database.redisSingle") },
     ...REDIS_CLUSTER_MASTERS.map((masters) => ({
         value: String(masters),
-        label: `A cluster - ${masters} masters, ${masters} replicas`
+        label: t("view.database.redisCluster", { masters })
     }))
 ];
 
 function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+    const t = useTranslations("deploy");
     const [name, setName] = useState("");
     const [engine, setEngine] = useState<ManagedEngine>("postgres");
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
@@ -1583,15 +1598,16 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
 
     return (
         <div className="flex flex-col gap-3">
-            <Field label="Name">
+            <Field label={t("view.name")}>
                 <Input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
+                    // i18n-ignore: an example database name
                     placeholder="my-db"
                     autoFocus
                 />
             </Field>
-            <Field label="Engine">
+            <Field label={t("view.database.engine")}>
                 <Select
                     value={engine}
                     onValueChange={(value) => setEngine(value as ManagedEngine)}
@@ -1600,17 +1616,17 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
             </Field>
             {engine === "redis" && (
                 <Field
-                    label="Runs as"
+                    label={t("view.database.runsAs")}
                     hint={
                         clusterMasters === undefined
-                            ? "One Redis, reached at one address."
-                            : `Keys are spread over ${clusterMasters} masters on this server, each with a replica that takes over if it stops. Clients connect in cluster mode.`
+                            ? t("view.database.redisSingleHint")
+                            : t("view.database.redisClusterHint", { masters: clusterMasters })
                     }
                 >
                     <Select
                         value={redisLayout}
                         onValueChange={setRedisLayout}
-                        options={REDIS_TOPOLOGY_OPTIONS}
+                        options={redisTopologyOptions(t)}
                     />
                 </Field>
             )}
@@ -1627,28 +1643,29 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                 <ChevronRight
                     className={`size-3.5 transition-transform ${advanced ? "rotate-90" : ""}`}
                 />
-                Advanced
+                {t("view.database.advanced")}
             </button>
 
             {advanced && (
                 <div className="flex flex-col gap-3 rounded-md border border-border/60 p-3">
                     {info.namedDatabases && (
                         <Field
-                            label="Runs on"
-                            hint={
-                                hosted
-                                    ? "Created inside an instance that is already running, sharing its memory and its server."
-                                    : "Starts a container of its own, with its own data volume."
-                            }
+                            label={t("view.database.runsOn")}
+                            hint={hosted ? t("view.database.runsOnShared") : t("view.database.runsOnOwn")}
                         >
                             <Select
                                 value={instanceId}
                                 onValueChange={setInstanceId}
                                 options={[
-                                    { value: DEDICATED, label: `A new ${info.label} instance` },
+                                    { value: DEDICATED, label: t("view.database.newInstance", { engine: info.label }) },
                                     ...instances.map((instance) => ({
                                         value: instance.id,
-                                        label: `${instance.name} (${info.label} ${instance.version}, ${instance.databases} ${instance.databases === 1 ? "database" : "databases"})`
+                                        label: t("view.database.instanceOption", {
+                                            name: instance.name,
+                                            engine: info.label,
+                                            version: instance.version,
+                                            count: instance.databases
+                                        })
                                     }))
                                 ]}
                             />
@@ -1658,13 +1675,13 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                     {!hosted && (
                         <>
                             <Field
-                                label="Version"
+                                label={t("view.database.version")}
                                 hint={dbVersionCaveat(engine, version) ?? undefined}
                             >
                                 <Select
                                     value={version}
                                     onValueChange={setVersion}
-                                    placeholder="Latest tested"
+                                    placeholder={t("view.database.latestTested")}
                                     options={info.versions.map((entry) => ({
                                         value: entry,
                                         label: `${info.label} ${entry}`
@@ -1677,11 +1694,11 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                                 resolves: neither is ever published. */}
                             {clusterMasters === undefined && layout.topology !== "replicaSet" && (
                                 <Field
-                                    label="Published port"
+                                    label={t("view.database.publishedPort")}
                                     hint={
                                         layout.topology === "sharded"
-                                            ? "Publishes the cluster's router. Blank keeps it reachable only by the services in this environment."
-                                            : "Blank keeps it reachable only by the services in this environment, which is what most databases want."
+                                            ? t("view.database.publishedPortSharded")
+                                            : t("view.database.publishedPortHint")
                                     }
                                 >
                                     <Input
@@ -1698,17 +1715,19 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
 
                     {info.namedUsers && (
                         <>
-                            <Field label="Database name" hint="Defaults to the name above.">
+                            <Field label={t("view.database.databaseName")} hint={t("view.database.databaseNameHint")}>
                                 <Input
                                     value={databaseName}
                                     onChange={(event) => setDatabaseName(event.target.value)}
+                                    // i18n-ignore: an example database name
                                     placeholder="my_db"
                                 />
                             </Field>
-                            <Field label="User">
+                            <Field label={t("view.connection.user")}>
                                 <Input
                                     value={username}
                                     onChange={(event) => setUsername(event.target.value)}
+                                    // i18n-ignore: example user names
                                     placeholder={hosted ? "my_db" : "polaris"}
                                 />
                             </Field>
@@ -1717,13 +1736,13 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                                 down; the choice only exists on a shared instance. */}
                             {hosted && (
                                 <Field
-                                    label="Privileges"
-                                    hint="What this user may do inside its own database."
+                                    label={t("view.database.privileges")}
+                                    hint={t("view.database.privilegesHint")}
                                 >
                                     <Select
                                         value={privileges}
                                         onValueChange={setPrivileges}
-                                        options={PRIVILEGE_OPTIONS}
+                                        options={privilegeOptions(t)}
                                     />
                                 </Field>
                             )}
@@ -1733,14 +1752,14 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                     {/* An object store's account is an S3 key pair, always generated. */}
                     {!info.storage && (
                         <Field
-                            label="Password"
-                            hint="Blank generates a strong one and stores it encrypted."
+                            label={t("view.connection.password")}
+                            hint={t("view.database.passwordHint")}
                         >
                             <Input
                                 type="password"
                                 value={password}
                                 onChange={(event) => setPassword(event.target.value)}
-                                placeholder="Generated"
+                                placeholder={t("view.database.generated")}
                             />
                         </Field>
                     )}
@@ -1751,7 +1770,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !name.trim() || !parsed.success}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} Add database
+                    {pending && <Loader2 className="size-4 animate-spin" />} {t("view.database.add")}
                 </Button>
             </div>
         </div>
@@ -1769,6 +1788,7 @@ function AutoDeployDialog({
     onOpenChange: (open: boolean) => void;
     onChanged: () => void;
 }) {
+    const t = useTranslations("deploy");
     const [enabled, setEnabled] = useState(app.autoDeploy);
     const [branch, setBranch] = useState(app.deployBranch ?? "");
     const [filter, setFilter] = useState(app.commitFilter ?? "");
@@ -1798,26 +1818,23 @@ function AutoDeployDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Auto-deploy - {app.name}</DialogTitle>
+                    <DialogTitle>{t("view.autoDeployDialog.title", { name: app.name })}</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>
-                            <span className="font-medium">Deploy on push</span>
-                            <span className="block text-xs text-muted-foreground">
-                                Rebuild and deploy automatically when a matching commit is pushed.
-                                Needs GitHub App webhooks reaching this instance (public domain).
-                            </span>
+                            <span className="font-medium">{t("view.autoDeployDialog.onPush")}</span>
+                            <span className="block text-xs text-muted-foreground">{t("view.autoDeployDialog.onPushHint")}</span>
                         </span>
                         <Switch
                             checked={enabled}
                             onChange={setEnabled}
-                            aria-label="Deploy on push"
+                            aria-label={t("view.autoDeployDialog.onPush")}
                         />
                     </div>
                     <Field
-                        label="Branch"
-                        hint="Only this branch triggers a deploy. Blank uses the app's branch."
+                        label={t("view.github.branch")}
+                        hint={t("view.autoDeployDialog.branchHint")}
                     >
                         <Input
                             value={branch}
@@ -1826,8 +1843,8 @@ function AutoDeployDialog({
                         />
                     </Field>
                     <Field
-                        label="Commit filter"
-                        hint='Deploy only when the commit message contains this (e.g. "build:"), or "regex:<pattern>". Blank = any commit.'
+                        label={t("view.autoDeployDialog.commitFilter")}
+                        hint={t("view.autoDeployDialog.commitFilterHint", { pattern: "regex:<pattern>" })}
                     >
                         <Input
                             value={filter}
@@ -1836,12 +1853,13 @@ function AutoDeployDialog({
                         />
                     </Field>
                     <Field
-                        label="Watch paths"
-                        hint="One glob per line. Deploy only when the push touched one of them, so a repository holding several services rebuilds just the ones that changed. Prefix with ! to exclude. Blank = any change."
+                        label={t("view.autoDeployDialog.watchPaths")}
+                        hint={t("view.autoDeployDialog.watchPathsHint")}
                     >
                         <Textarea
                             value={watchPaths}
                             onChange={(event) => setWatchPaths(event.target.value)}
+                            // i18n-ignore: example globs
                             placeholder={"apps/web/**\npackages/ui/**\n!**/*.md"}
                             rows={4}
                             autoCapitalize="none"
@@ -1852,10 +1870,10 @@ function AutoDeployDialog({
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
+                            {t("view.cancel")}
                         </Button>
                         <Button onClick={submit} disabled={pending}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} Save
+                            {pending && <Loader2 className="size-4 animate-spin" />} {t("view.save")}
                         </Button>
                     </div>
                 </div>
@@ -1875,6 +1893,7 @@ function DomainDialog({
     onOpenChange: (open: boolean) => void;
     onChanged: () => void;
 }) {
+    const t = useTranslations("deploy");
     const [hostname, setHostname] = useState("");
     const [port, setPort] = useState("80");
     const [error, setError] = useState<string | null>(null);
@@ -1901,7 +1920,7 @@ function DomainDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Domains - {app.name}</DialogTitle>
+                    <DialogTitle>{t("view.domainDialog.title", { name: app.name })}</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     {app.domains.length > 0 && (
@@ -1934,21 +1953,22 @@ function DomainDialog({
                                             })
                                         }
                                         aria-label={
-                                            domain.enabled ? "Disable domain" : "Enable domain"
+                                            domain.enabled ? t("view.domainDialog.disable") : t("view.domainDialog.enable")
                                         }
                                     />
                                 </div>
                             ))}
                         </div>
                     )}
-                    <Field label="Custom domain" hint="Leave blank for a free subdomain.">
+                    <Field label={t("view.domainDialog.custom")} hint={t("view.domainDialog.customHint")}>
                         <Input
                             value={hostname}
                             onChange={(event) => setHostname(event.target.value)}
+                            // i18n-ignore: an example hostname
                             placeholder="app.example.com"
                         />
                     </Field>
-                    <Field label="Target port">
+                    <Field label={t("view.domainDialog.targetPort")}>
                         <Input
                             value={port}
                             onChange={(event) => setPort(event.target.value)}
@@ -1959,7 +1979,7 @@ function DomainDialog({
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end">
                         <Button onClick={submit} disabled={pending}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} Add domain
+                            {pending && <Loader2 className="size-4 animate-spin" />} {t("view.domainDialog.add")}
                         </Button>
                     </div>
                 </div>
@@ -2026,6 +2046,7 @@ export function DeploymentLogs({
     deploymentId: string;
     onDone: () => void;
 }) {
+    const t = useTranslations("deploy");
     const [log, setLog] = useState("");
     const [status, setStatus] = useState("queued");
     // Keep onDone out of the effect deps: it is recreated every render, and calling
@@ -2069,7 +2090,7 @@ export function DeploymentLogs({
         <LogViewer
             log={log}
             name={deploymentId}
-            header={<StatusPill tone={dbTone(status)} label={`Status: ${status}`} />}
+            header={<StatusPill tone={dbTone(status)} label={t("view.status", { status })} />}
         />
     );
 }
@@ -2078,11 +2099,12 @@ export function DeploymentLogs({
  *  reading the tab held for it, then kept current - a badge that appears a second
  *  after the card it belongs to is a card that moves under the pointer. */
 function MetricsBadge({ applicationId }: { applicationId: string }) {
+    const t = useTranslations("deploy");
     const { data } = useServiceMetrics(applicationId, SERVICE_LIST_METRICS_MS);
 
     if (!data?.state) return null;
     const parts = [data.state];
-    if (typeof data.cpuPercent === "number") parts.push(`${data.cpuPercent.toFixed(0)}% cpu`);
-    if (typeof data.memPercent === "number") parts.push(`${data.memPercent.toFixed(0)}% mem`);
+    if (typeof data.cpuPercent === "number") parts.push(t("view.metricCpu", { percent: data.cpuPercent.toFixed(0) }));
+    if (typeof data.memPercent === "number") parts.push(t("view.metricMem", { percent: data.memPercent.toFixed(0) }));
     return <Badge>{parts.join(" · ")}</Badge>;
 }
