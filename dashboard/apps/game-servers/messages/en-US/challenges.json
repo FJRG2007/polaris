@@ -158,7 +158,41 @@
         "catchUp": "Last two weeks pay x1.5 below the middle tier",
         "shared": "Share one season with other servers",
         "sharedHint": "Players linked to a Polaris account add up their points and streak across every server of yours with the same group name. Everybody else stays per server.",
-        "group": "Group name"
+        "group": "Group name",
+        "groups": {
+            "schedule": {
+                "title": "Language and time",
+                "hint": "What players read, and when a new day and a new week start."
+            },
+            "layers": {
+                "title": "What runs",
+                "hint": "Switch off any part you do not want on this server."
+            },
+            "difficulty": {
+                "title": "Difficulty",
+                "hint": "How big the targets are, and how many times a player may swap one."
+            },
+            "who": {
+                "title": "Who takes part",
+                "hint": "Players only get challenges once they meet these."
+            },
+            "shown": {
+                "title": "What players see",
+                "hint": "Messages and bars in the game."
+            },
+            "cheats": {
+                "title": "Anti-cheat",
+                "hint": "What stops a challenge from being farmed."
+            },
+            "season": {
+                "title": "Season pass",
+                "hint": "How long a season lasts and how points turn into tiers."
+            },
+            "shared": {
+                "title": "Other servers",
+                "hint": "Count a season across several of your servers."
+            }
+        }
     },
     "rewards": {
         "title": "Rewards",
@@ -180,7 +214,29 @@
         "item": "Item",
         "count": "How many",
         "addItem": "Add an item",
-        "removeItem": "Remove this item"
+        "removeItem": "Remove this item",
+        "groups": {
+            "daily": {
+                "title": "Daily challenges",
+                "hint": "What each finished daily pays, by difficulty."
+            },
+            "weekly": {
+                "title": "Weekly challenges",
+                "hint": "What each finished weekly pays, by difficulty."
+            },
+            "bonus": {
+                "title": "Bonuses",
+                "hint": "Finishing all of a day's or a week's, and the bingo card."
+            },
+            "streak": {
+                "title": "Streaks",
+                "hint": "Points for playing on consecutive days, and for coming back."
+            },
+            "milestones": {
+                "title": "Season milestones",
+                "hint": "Items and levels given on reaching a tier."
+            }
+        }
     },
     "catalogue": {
         "title": "Challenges on offer",
@@ -212,5 +268,23 @@
         "hours": "{value} h",
         "hearts": "{value} hearts",
         "percent": "{value}%"
+    },
+    "nav": {
+        "label": "Part of the challenges",
+        "overview": "Summary",
+        "players": "Players",
+        "goals": "Community",
+        "settings": "Settings",
+        "rewards": "Rewards",
+        "catalogue": "Catalogue"
+    },
+    "stats": {
+        "today": "Today's challenges",
+        "week": "This week's",
+        "season": "Season",
+        "daysLeft": "{left, plural, one {# day left} other {# days left}}",
+        "players": "Players with challenges",
+        "notDrawn": "Not drawn yet",
+        "nothingWaiting": "No rewards waiting"
     }
 }

@@ -158,7 +158,41 @@
         "catchUp": "Las dos últimas semanas pagan x1,5 por debajo del nivel medio",
         "shared": "Compartir una temporada con otros servidores",
         "sharedHint": "Los jugadores vinculados a una cuenta de Polaris suman puntos y racha en todos tus servidores con el mismo nombre de grupo. Los demás siguen por servidor.",
-        "group": "Grupo"
+        "group": "Grupo",
+        "groups": {
+            "schedule": {
+                "title": "Idioma y horario",
+                "hint": "Qué leen los jugadores y cuándo empiezan el día y la semana nuevos."
+            },
+            "layers": {
+                "title": "Qué funciona",
+                "hint": "Apaga la parte que no quieras en este servidor."
+            },
+            "difficulty": {
+                "title": "Dificultad",
+                "hint": "Lo grandes que son los objetivos y cuántas veces puede cambiar uno un jugador."
+            },
+            "who": {
+                "title": "Quién participa",
+                "hint": "Los jugadores solo reciben retos cuando cumplen esto."
+            },
+            "shown": {
+                "title": "Qué ven",
+                "hint": "Mensajes y barras dentro del juego."
+            },
+            "cheats": {
+                "title": "Antitrampas",
+                "hint": "Lo que impide completar un reto con trucos."
+            },
+            "season": {
+                "title": "Temporada",
+                "hint": "Cuánto dura una temporada y cómo los puntos se convierten en niveles."
+            },
+            "shared": {
+                "title": "Otros servidores",
+                "hint": "Contar una temporada entre varios de tus servidores."
+            }
+        }
     },
     "rewards": {
         "title": "Premios",
@@ -180,7 +214,29 @@
         "item": "Objeto",
         "count": "Cantidad",
         "addItem": "Añadir objeto",
-        "removeItem": "Quitar este objeto"
+        "removeItem": "Quitar este objeto",
+        "groups": {
+            "daily": {
+                "title": "Retos diarios",
+                "hint": "Lo que paga cada diario completado, según la dificultad."
+            },
+            "weekly": {
+                "title": "Retos semanales",
+                "hint": "Lo que paga cada semanal completado, según la dificultad."
+            },
+            "bonus": {
+                "title": "Extras",
+                "hint": "Completar todos los del día o de la semana, y el cartón de bingo."
+            },
+            "streak": {
+                "title": "Rachas",
+                "hint": "Puntos por jugar días seguidos y por volver."
+            },
+            "milestones": {
+                "title": "Hitos de temporada",
+                "hint": "Objetos y niveles al llegar a un nivel del pase."
+            }
+        }
     },
     "catalogue": {
         "title": "Retos disponibles",
@@ -212,5 +268,23 @@
         "hours": "{value} h",
         "hearts": "{value} corazones",
         "percent": "{value}%"
+    },
+    "nav": {
+        "label": "Parte de los retos",
+        "overview": "Resumen",
+        "players": "Jugadores",
+        "goals": "Comunidad",
+        "settings": "Ajustes",
+        "rewards": "Premios",
+        "catalogue": "Catálogo"
+    },
+    "stats": {
+        "today": "Retos de hoy",
+        "week": "De la semana",
+        "season": "Temporada",
+        "daysLeft": "{left, plural, one {Queda # día} other {Quedan # días}}",
+        "players": "Jugadores con retos",
+        "notDrawn": "Aún sin sortear",
+        "nothingWaiting": "Ningún premio pendiente"
     }
 }

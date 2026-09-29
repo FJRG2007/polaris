@@ -105,17 +105,21 @@ afterEach(() => {
     cleanup();
     saved.length = 0;
     locale = "en-US";
+    // The part last opened is remembered per browser; every test starts on the summary.
+    globalThis.localStorage?.clear();
 });
 
 describe("the Challenges tab", () => {
     it("draws its sections before the server answers", () => {
         render(<MinecraftChallenges installedAppId={ID} canManage />);
         expect(screen.getByText("Challenges")).toBeTruthy();
+        // The summary opens first; every other part is one press away.
         expect(screen.getByText("Season and bingo")).toBeTruthy();
-        expect(screen.getByText("Community goals")).toBeTruthy();
-        expect(screen.getByText("Players")).toBeTruthy();
-        expect(screen.getByText("Settings")).toBeTruthy();
-        expect(screen.getByText("Challenges on offer")).toBeTruthy();
+        for (const part of ["Summary", "Players", "Community", "Settings", "Rewards", "Catalogue"]) {
+            expect(screen.getByText(part)).toBeTruthy();
+        }
+        expect(screen.getByText("Today's challenges")).toBeTruthy();
+        expect(screen.queryByText("Challenges on offer")).toBeNull();
         expect(screen.queryByText("Alba")).toBeNull();
     });
 
@@ -133,6 +137,7 @@ describe("the Challenges tab", () => {
 
     it("lists the players with where they stand", async () => {
         render(<MinecraftChallenges installedAppId={ID} canManage />);
+        fireEvent.click(screen.getByText("Players"));
         answerRead({ view });
         await waitFor(() => expect(screen.getAllByText("Alba").length).toBeGreaterThan(0));
         expect(screen.getByText("2/9")).toBeTruthy();
@@ -152,6 +157,7 @@ describe("the Challenges tab", () => {
 
     it("explains every challenge in the catalogue", async () => {
         render(<MinecraftChallenges installedAppId={ID} canManage />);
+        fireEvent.click(screen.getByText("Catalogue"));
         answerRead({ view });
         await waitFor(() => expect(screen.getByText("Mining")).toBeTruthy());
         fireEvent.click(screen.getByText("Mining"));
@@ -170,7 +176,11 @@ describe("the Challenges tab", () => {
         );
         expect(screen.getByText("Versión del servidor: 1.21.4")).toBeTruthy();
         expect(screen.getByText("1 de 2")).toBeTruthy();
+        expect(screen.getByText("Retos de hoy")).toBeTruthy();
+        // The week's day is chosen under Ajustes, in the reader's words.
+        fireEvent.click(screen.getByText("Ajustes"));
         expect(screen.getAllByText("lunes").length).toBeGreaterThan(0);
+        expect(screen.getByText("Idioma y horario")).toBeTruthy();
     });
 
     it("says why a Bedrock server cannot run them, and changes nothing there", async () => {
@@ -184,6 +194,7 @@ describe("the Challenges tab", () => {
 
     it("refuses a time zone nobody can compute in, in words, before saving", async () => {
         render(<MinecraftChallenges installedAppId={ID} canManage />);
+        fireEvent.click(screen.getByText("Settings"));
         answerRead({ view });
         const zone = await screen.findByDisplayValue("UTC");
         fireEvent.change(zone, { target: { value: "Mars/Olympus" } });
