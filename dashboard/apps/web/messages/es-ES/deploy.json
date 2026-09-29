@@ -270,5 +270,29 @@
         "deploy": "Desplegarlo cuando se cree",
         "cancel": "Cancelar",
         "create": "Crear"
+    },
+    "canvas": {
+        "dockerImage": "Imagen de Docker",
+        "gitRepository": "Repositorio Git",
+        "volume": "Volumen",
+        "empty": "Aún no hay nada desplegado",
+        "emptyManage": "Haz clic derecho en el tablero o usa Nuevo servicio para añadir uno - aparecerá aquí como un nodo que puedes colocar y conectar.",
+        "emptyView": "Añade un servicio y aparecerá aquí como un nodo que puedes colocar y conectar.",
+        "saving": "Guardando",
+        "removeLink": "Quitar el enlace",
+        "online": "En línea",
+        "dragToLink": "Arrastra a otro servicio para enlazarlos",
+        "openService": "Abrir el servicio",
+        "duplicate": "Duplicar",
+        "delete": "Eliminar",
+        "nas": "NAS",
+        "server": "Servidor",
+        "volumeSettings": "Ajustes del volumen",
+        "browseFiles": "Explorar archivos",
+        "viewInDrive": "Ver en Drive",
+        "editMount": "Editar el montaje",
+        "hint": "Arrastra los nodos para colocarlos. Arrastra desde el tirador derecho de un nodo hasta otro servicio para enlazarlos. Haz clic derecho en el tablero para añadir un servicio, o en un servicio para ver más.",
+        "serviceKind": "servicio",
+        "removeService": "Esto elimina el servicio, su contenedor, sus dominios y sus variables."
     }
 }

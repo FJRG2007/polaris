@@ -293,5 +293,45 @@
             "destroyData": "Also destroy the data",
             "destroyDataHint": "Off by default. Detaching a volume and destroying what is in it are two different intentions, and only one of them can be taken back."
         }
+    },
+    "volumeForm": {
+        "kinds": {
+            "volume": "Docker volume",
+            "bind": "Server folder",
+            "nas": "NAS folder"
+        },
+        "help": {
+            "volume": "A named volume managed by Docker. Good for opaque data like a database's files.",
+            "bind": "A folder on this service's server. Persists across redeploys and is browsable in the Files tab.",
+            "nas": "A folder on a host-mounted storage connection - it lives on the NAS and can be managed as a Drive folder."
+        },
+        "pickService": "Pick a service for this volume",
+        "service": "Service",
+        "kindLabel": "Kind of storage",
+        "name": "Name",
+        "namePlaceholder": "secrets",
+        "mountPath": "Mount path (in container)",
+        "sizeLimit": "Size limit (optional)",
+        "connection": "Storage connection",
+        "selectConnection": "Select a NAS connection",
+        "notConnected": "{name} (not connected)",
+        "noConnections": "No NAS connections found. Add an NFS, SMB, or UniFi UNAS connection in Drive first.",
+        "whereLabel": "Where the folder lives",
+        "auto": "Auto",
+        "choose": "Choose folder",
+        "autoPath": "Polaris creates and organizes it under <code>{path}</code>.",
+        "namePart": "name",
+        "folderNas": "Folder on the NAS",
+        "folderServer": "Folder on the server",
+        "folderPlaceholder": "data/uploads",
+        "browseFolders": "Browse folders",
+        "selectConnectionFirst": "Select a NAS connection first",
+        "browse": "Browse",
+        "subpathHint": "A subpath (no leading slash, no `..`). Created if it does not exist.",
+        "cancel": "Cancel",
+        "save": "Save changes",
+        "add": "Add volume",
+        "newTitle": "New volume",
+        "noServices": "Add a service first - a volume mounts into a service's container."
     }
 }

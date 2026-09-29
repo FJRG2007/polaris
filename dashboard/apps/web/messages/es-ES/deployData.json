@@ -293,5 +293,45 @@
             "destroyData": "Destruir también los datos",
             "destroyDataHint": "Desactivado por defecto. Desconectar un volumen y destruir lo que contiene son dos intenciones distintas, y solo una se puede deshacer."
         }
+    },
+    "volumeForm": {
+        "kinds": {
+            "volume": "Volumen de Docker",
+            "bind": "Carpeta del servidor",
+            "nas": "Carpeta del NAS"
+        },
+        "help": {
+            "volume": "Un volumen con nombre gestionado por Docker. Adecuado para datos opacos, como los archivos de una base de datos.",
+            "bind": "Una carpeta en el servidor de este servicio. Se mantiene entre despliegues y se puede explorar en la pestaña Archivos.",
+            "nas": "Una carpeta en una conexión de almacenamiento montada en el equipo - vive en el NAS y se puede gestionar como una carpeta de Drive."
+        },
+        "pickService": "Elige un servicio para este volumen",
+        "service": "Servicio",
+        "kindLabel": "Tipo de almacenamiento",
+        "name": "Nombre",
+        "namePlaceholder": "secretos",
+        "mountPath": "Ruta de montaje (en el contenedor)",
+        "sizeLimit": "Límite de tamaño (opcional)",
+        "connection": "Conexión de almacenamiento",
+        "selectConnection": "Elige una conexión NAS",
+        "notConnected": "{name} (sin conectar)",
+        "noConnections": "No se encontraron conexiones NAS. Añade antes una conexión NFS, SMB o UniFi UNAS en Drive.",
+        "whereLabel": "Dónde está la carpeta",
+        "auto": "Automática",
+        "choose": "Elegir carpeta",
+        "autoPath": "Polaris la crea y la organiza en <code>{path}</code>.",
+        "namePart": "nombre",
+        "folderNas": "Carpeta en el NAS",
+        "folderServer": "Carpeta en el servidor",
+        "folderPlaceholder": "datos/subidas",
+        "browseFolders": "Explorar carpetas",
+        "selectConnectionFirst": "Elige antes una conexión NAS",
+        "browse": "Explorar",
+        "subpathHint": "Una subruta (sin barra inicial ni `..`). Se crea si no existe.",
+        "cancel": "Cancelar",
+        "save": "Guardar cambios",
+        "add": "Añadir volumen",
+        "newTitle": "Nuevo volumen",
+        "noServices": "Añade antes un servicio - un volumen se monta en el contenedor de un servicio."
     }
 }

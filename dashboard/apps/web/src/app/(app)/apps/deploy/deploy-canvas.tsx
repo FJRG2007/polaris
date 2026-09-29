@@ -9,6 +9,8 @@
  */
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { primaryDomain } from "./domain-rank";
 import { dbEngineLabel } from "@polaris/core";
 import { NewVolumeDialog } from "./volume-form";
@@ -95,7 +97,10 @@ interface Layout {
     links: Link[];
 }
 
-function nodesFromEnvironment(environment: ProjectSummary["environments"][number]): CanvasNode[] {
+function nodesFromEnvironment(
+    environment: ProjectSummary["environments"][number],
+    t: NamespaceTranslator<"deploy">
+): CanvasNode[] {
     const apps = environment.applications.map(
         (app): CanvasNode => ({
             id: app.id,
@@ -103,9 +108,9 @@ function nodesFromEnvironment(environment: ProjectSummary["environments"][number
             kind: serviceKindOf(app.sourceType),
             subtitle:
                 primaryDomain(app.domains)?.hostname ??
-                (app.sourceType === "image" ? "Docker image" : "Git repository"),
+                (app.sourceType === "image" ? t("canvas.dockerImage") : t("canvas.gitRepository")),
             tone: dbTone(app.deployStatus ?? ""),
-            statusLabel: app.deployStatus ?? "Not deployed",
+            statusLabel: app.deployStatus ?? t("view.notDeployed"),
             volumes: app.volumes
         })
     );
@@ -232,7 +237,8 @@ export function DeployCanvas({
     stagedIds?: ReadonlySet<string>;
     onOpenService?: (app: ProjectApp) => void;
 }) {
-    const nodes = useMemo(() => nodesFromEnvironment(environment), [environment]);
+    const t = useTranslations("deploy");
+    const nodes = useMemo(() => nodesFromEnvironment(environment, t), [environment, t]);
     const nodeIds = useMemo(() => new Set(nodes.map((node) => node.id)), [nodes]);
 
     const initial = useMemo(() => {
@@ -574,7 +580,7 @@ export function DeployCanvas({
                 <ContextMenuContent>
                     <ContextMenuSub>
                         <ContextMenuSubTrigger>
-                            <Plus className="size-4" /> New service
+                            <Plus className="size-4" /> {t("view.newService")}
                         </ContextMenuSubTrigger>
                         <ContextMenuSubContent>
                             {SERVICE_TYPES.map((type) => (
@@ -585,7 +591,7 @@ export function DeployCanvas({
                                     <span className="flex size-4 items-center justify-center [&_svg]:size-4">
                                         {type.icon}
                                     </span>
-                                    {type.label}
+                                    {t(type.label)}
                                 </ContextMenuItem>
                             ))}
                             <ContextMenuSeparator />
@@ -596,7 +602,7 @@ export function DeployCanvas({
                                 <span className="flex size-4 items-center justify-center [&_svg]:size-4">
                                     <HardDrive className="size-5" />
                                 </span>
-                                Volume
+                                {t("canvas.volume")}
                             </ContextMenuItem>
                         </ContextMenuSubContent>
                     </ContextMenuSub>
@@ -637,11 +643,11 @@ export function DeployCanvas({
                             <span className="grid size-12 place-items-center rounded-xl border border-border bg-card text-muted-foreground">
                                 <HardDrive className="size-5" />
                             </span>
-                            <p className="text-sm font-medium">Nothing deployed yet</p>
+                            <p className="text-sm font-medium">{t("canvas.empty")}</p>
                             <p className="max-w-xs text-xs text-muted-foreground">
                                 {canManage
-                                    ? "Right-click the board or use New service to add one - it appears here as a node you can arrange and connect."
-                                    : "Add a service and it appears here as a node you can arrange and connect."}
+                                    ? t("canvas.emptyManage")
+                                    : t("canvas.emptyView")}
                             </p>
                         </div>
                     </div>
@@ -655,7 +661,7 @@ export function DeployCanvas({
         <div className="relative">
             {saving && (
                 <span className="absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-md bg-card/80 px-2 py-1 text-xs text-muted-foreground">
-                    <Loader2 className="size-3 animate-spin" /> Saving
+                    <Loader2 className="size-3 animate-spin" /> {t("canvas.saving")}
                 </span>
             )}
             {boardMenu(
@@ -699,7 +705,7 @@ export function DeployCanvas({
                                                     className="cursor-pointer fill-card stroke-border"
                                                     onClick={() => removeLink(index)}
                                                 >
-                                                    <title>Remove link</title>
+                                                    <title>{t("canvas.removeLink")}</title>
                                                 </circle>
                                             )}
                                         </g>
@@ -719,7 +725,7 @@ export function DeployCanvas({
 
                             {nodes.map((node) => {
                                 const p = pos[node.id] ?? { x: 0, y: 0 };
-                                const label = node.tone === "success" ? "Online" : node.statusLabel;
+                                const label = node.tone === "success" ? t("canvas.online") : node.statusLabel;
                                 const pulsing = node.tone === "warning";
                                 const app = environment.applications.find(
                                     (item) => item.id === node.id
@@ -776,7 +782,7 @@ export function DeployCanvas({
                                                     <>
                                                         <span className="size-2 rounded-full bg-primary" />
                                                         <span className="text-primary">
-                                                            Removal pending
+                                                            {t("view.removalPending")}
                                                         </span>
                                                     </>
                                                 ) : (
@@ -796,7 +802,7 @@ export function DeployCanvas({
                                         {canManage && (
                                             <button
                                                 type="button"
-                                                title="Drag to another service to link"
+                                                title={t("canvas.dragToLink")}
                                                 onPointerDown={(event) =>
                                                     onHandlePointerDown(event, node.id)
                                                 }
@@ -821,13 +827,13 @@ export function DeployCanvas({
                                                                 }
                                                             >
                                                                 <ScrollText className="size-4" />{" "}
-                                                                Open service
+                                                                {t("canvas.openService")}
                                                             </ContextMenuItem>
                                                             <ContextMenuItem
                                                                 onSelect={() => duplicate(app)}
                                                             >
                                                                 <Copy className="size-4" />{" "}
-                                                                Duplicate
+                                                                {t("canvas.duplicate")}
                                                             </ContextMenuItem>
                                                         </>
                                                     )}
@@ -841,7 +847,7 @@ export function DeployCanvas({
                                                                 })
                                                             }
                                                         >
-                                                            <Settings2 className="size-4" /> Manage
+                                                            <Settings2 className="size-4" /> {t("view.manage")}
                                                         </ContextMenuItem>
                                                     )}
                                                     <ContextMenuSeparator />
@@ -858,7 +864,7 @@ export function DeployCanvas({
                                                         }
                                                     >
                                                         <Trash2 className="size-4" />
-                                                        {removing ? "Removal pending" : "Delete"}
+                                                        {removing ? t("view.removalPending") : t("canvas.delete")}
                                                     </ContextMenuItem>
                                                 </ContextMenuContent>
                                             </ContextMenu>
@@ -911,10 +917,10 @@ export function DeployCanvas({
                                                         </span>
                                                         <span className="ml-auto shrink-0 truncate text-[0.625rem] text-muted-foreground/70">
                                                             {vol.kind === "nas"
-                                                                ? (vol.connectionName ?? "NAS")
+                                                                ? (vol.connectionName ?? t("canvas.nas"))
                                                                 : vol.kind === "bind"
-                                                                  ? "Server"
-                                                                  : "Volume"}
+                                                                  ? t("canvas.server")
+                                                                  : t("canvas.volume")}
                                                         </span>
                                                     </button>
                                                 </ContextMenuTrigger>
@@ -927,8 +933,7 @@ export function DeployCanvas({
                                                             })
                                                         }
                                                     >
-                                                        <Settings2 className="size-4" /> Volume
-                                                        settings
+                                                        <Settings2 className="size-4" /> {t("canvas.volumeSettings")}
                                                     </ContextMenuItem>
                                                     <ContextMenuItem
                                                         onSelect={() =>
@@ -938,7 +943,7 @@ export function DeployCanvas({
                                                             })
                                                         }
                                                     >
-                                                        <Files className="size-4" /> Browse files
+                                                        <Files className="size-4" /> {t("canvas.browseFiles")}
                                                     </ContextMenuItem>
                                                     <ContextMenuItem
                                                         onSelect={() =>
@@ -947,8 +952,7 @@ export function DeployCanvas({
                                                             )
                                                         }
                                                     >
-                                                        <HardDrive className="size-4" /> View in
-                                                        Drive
+                                                        <HardDrive className="size-4" /> {t("canvas.viewInDrive")}
                                                     </ContextMenuItem>
                                                     {canManage && (
                                                         <ContextMenuItem
@@ -959,8 +963,7 @@ export function DeployCanvas({
                                                                 })
                                                             }
                                                         >
-                                                            <ScrollText className="size-4" /> Edit
-                                                            mount
+                                                            <ScrollText className="size-4" /> {t("canvas.editMount")}
                                                         </ContextMenuItem>
                                                     )}
                                                 </ContextMenuContent>
@@ -979,8 +982,7 @@ export function DeployCanvas({
             )}
             {canManage && (
                 <p className="mt-2 text-xs text-muted-foreground/70">
-                    Drag nodes to arrange them. Drag from a node's right handle onto another service
-                    to link them. Right-click the board to add a service, or a service for more.
+                    {t("canvas.hint")}
                 </p>
             )}
 
@@ -993,15 +995,15 @@ export function DeployCanvas({
                     }
                 }}
                 name={deleteTarget?.name ?? ""}
-                kind={deleteTarget?.kind ?? "service"}
+                kind={deleteTarget?.kind === "database" ? t("view.databaseKind") : t("canvas.serviceKind")}
                 description={
                     deleteTarget?.kind === "database"
                         ? deleteTarget.hostedCount
-                            ? `The container goes, and with it the ${deleteTarget.hostedCount} ${deleteTarget.hostedCount === 1 ? "database" : "databases"} hosted inside it. The named volume holding the data is left on the server so it can still be recovered by hand.`
-                            : "The container goes; the named volume holding its data is left on the server so it can still be recovered by hand."
-                        : "This removes the service, its container, domains, and variables."
+                            ? t("view.removeHost", { count: deleteTarget.hostedCount })
+                            : t("view.removeContainer")
+                        : t("canvas.removeService")
                 }
-                confirmLabel="Stage removal"
+                confirmLabel={t("view.stageRemoval")}
                 error={deleteError}
                 pending={acting}
                 onConfirm={confirmDelete}

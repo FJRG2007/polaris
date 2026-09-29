@@ -10,6 +10,7 @@
 
 import { FolderSearch } from "lucide-react";
 import { FolderPicker } from "./folder-picker";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, useTransition } from "react";
 import { createVolumeAction, updateVolumeAction, listNasConnectionsAction } from "./actions";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, SegmentedControl, Select } from "@polaris/ui";
@@ -27,17 +28,17 @@ export interface EditVolume {
     sizeLimit: string | null;
 }
 
-const KIND_LABELS: Record<Kind, string> = {
-    volume: "Docker volume",
-    bind: "Server folder",
-    nas: "NAS folder"
-};
+const KIND_LABELS = {
+    volume: "volumeForm.kinds.volume",
+    bind: "volumeForm.kinds.bind",
+    nas: "volumeForm.kinds.nas"
+} as const satisfies Record<Kind, string>;
 
-const KIND_HELP: Record<Kind, string> = {
-    volume: "A named volume managed by Docker. Good for opaque data like a database's files.",
-    bind: "A folder on this service's server. Persists across redeploys and is browsable in the Files tab.",
-    nas: "A folder on a host-mounted storage connection - it lives on the NAS and can be managed as a Drive folder."
-};
+const KIND_HELP = {
+    volume: "volumeForm.help.volume",
+    bind: "volumeForm.help.bind",
+    nas: "volumeForm.help.nas"
+} as const satisfies Record<Kind, string>;
 
 export function VolumeForm({
     applicationId,
@@ -55,6 +56,7 @@ export function VolumeForm({
     onSaved: () => void;
     onCancel?: () => void;
 }) {
+    const t = useTranslations("deployData");
     const editing = Boolean(volume);
     const [serviceId, setServiceId] = useState(applicationId ?? services?.[0]?.id ?? "");
     const [connections, setConnections] = useState<NasConnection[]>([]);
@@ -90,7 +92,7 @@ export function VolumeForm({
         setError(null);
         const targetId = applicationId ?? serviceId;
         if (!targetId) {
-            setError("Pick a service for this volume");
+            setError(t("volumeForm.pickService"));
             return;
         }
         startTransition(async () => {
@@ -151,67 +153,69 @@ export function VolumeForm({
         <div className="flex flex-col gap-3">
             {needsService && (
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                    Service
+                    {t("volumeForm.service")}
                     <Select
                         value={serviceId}
                         onValueChange={setServiceId}
-                        aria-label="Service"
+                        aria-label={t("volumeForm.service")}
                         options={(services ?? []).map((service) => ({ value: service.id, label: service.name }))}
                     />
                 </label>
             )}
 
             {editing ? (
-                <p className="text-xs text-muted-foreground">{KIND_LABELS[kind]} - {KIND_HELP[kind]}</p>
+                <p className="text-xs text-muted-foreground">{t(KIND_LABELS[kind])} - {t(KIND_HELP[kind])}</p>
             ) : (
                 <>
                     <SegmentedControl
-                        aria-label="Kind of storage"
+                        aria-label={t("volumeForm.kindLabel")}
                         className="flex"
                         value={kind}
                         onValueChange={setKind}
                         options={(Object.keys(KIND_LABELS) as Kind[]).map((value) => ({
                             value,
-                            label: KIND_LABELS[value],
-                            title: KIND_HELP[value]
+                            label: t(KIND_LABELS[value]),
+                            title: t(KIND_HELP[value])
                         }))}
                     />
-                    <p className="text-xs text-muted-foreground">{KIND_HELP[kind]}</p>
+                    <p className="text-xs text-muted-foreground">{t(KIND_HELP[kind])}</p>
                 </>
             )}
 
             <div className="grid gap-2 sm:grid-cols-2">
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                    Name
-                    <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="secrets" />
+                    {t("volumeForm.name")}
+                    <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={t("volumeForm.namePlaceholder")} />
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                    Mount path (in container)
+                    {t("volumeForm.mountPath")}
+                    {/* i18n-ignore: an example path */}
                     <Input value={mountPath} onChange={(event) => setMountPath(event.target.value)} placeholder="/app/secrets" />
                 </label>
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                    Size limit (optional)
+                    {t("volumeForm.sizeLimit")}
+                    {/* i18n-ignore: an example size */}
                     <Input value={sizeLimit} onChange={(event) => setSizeLimit(event.target.value)} placeholder="10G" />
                 </label>
             </div>
 
             {kind === "nas" && (
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                    Storage connection
+                    {t("volumeForm.connection")}
                     <Select
                         value={connectionId}
                         onValueChange={setConnectionId}
-                        placeholder="Select a NAS connection"
-                        aria-label="Storage connection"
+                        placeholder={t("volumeForm.selectConnection")}
+                        aria-label={t("volumeForm.connection")}
                         options={connections.map((connection) => ({
                             value: connection.id,
-                            label: connection.active ? connection.name : `${connection.name} (not connected)`,
+                            label: connection.active ? connection.name : t("volumeForm.notConnected", { name: connection.name }),
                             disabled: !connection.active
                         }))}
                     />
                     {connections.length === 0 && (
                         <span className="text-[0.6875rem] text-muted-foreground">
-                            No NAS connections found. Add an NFS, SMB, or UniFi UNAS connection in Drive first.
+                            {t("volumeForm.noConnections")}
                         </span>
                     )}
                 </label>
@@ -221,25 +225,33 @@ export function VolumeForm({
                 <div className="flex flex-col gap-2">
                     {!editing && (
                         <SegmentedControl
-                            aria-label="Where the folder lives"
+                            aria-label={t("volumeForm.whereLabel")}
                             className="flex"
                             value={pathMode}
                             onValueChange={setPathMode}
                             options={[
-                                { value: "auto", label: "Auto" },
-                                { value: "custom", label: "Choose folder" }
+                                { value: "auto", label: t("volumeForm.auto") },
+                                { value: "custom", label: t("volumeForm.choose") }
                             ]}
                         />
                     )}
                     {!usesCustomPath ? (
                         <p className="text-[0.6875rem] text-muted-foreground">
-                            Polaris creates and organizes it under <code className="text-foreground">polaris/deploy/&lt;project&gt;/&lt;service&gt;/{name.trim() || "name"}</code>.
+                            {t.rich("volumeForm.autoPath", {
+                                // i18n-ignore: a path template
+                                path: `polaris/deploy/<project>/<service>/${name.trim() || t("volumeForm.namePart")}`,
+                                code: (chunks) => (
+                                    <code key="path" className="text-foreground">
+                                        {chunks}
+                                    </code>
+                                )
+                            })}
                         </p>
                     ) : (
                         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                            {kind === "nas" ? "Folder on the NAS" : "Folder on the server"}
+                            {kind === "nas" ? t("volumeForm.folderNas") : t("volumeForm.folderServer")}
                             <div className="flex items-center gap-2">
-                                <Input value={source} onChange={(event) => setSource(event.target.value)} placeholder="data/uploads" />
+                                <Input value={source} onChange={(event) => setSource(event.target.value)} placeholder={t("volumeForm.folderPlaceholder")} />
                                 {kind === "nas" && (
                                     <Button
                                         type="button"
@@ -247,13 +259,13 @@ export function VolumeForm({
                                         size="sm"
                                         disabled={!connectionId}
                                         onClick={() => setPickerOpen(true)}
-                                        title={connectionId ? "Browse folders" : "Select a NAS connection first"}
+                                        title={connectionId ? t("volumeForm.browseFolders") : t("volumeForm.selectConnectionFirst")}
                                     >
-                                        <FolderSearch className="size-4" /> Browse
+                                        <FolderSearch className="size-4" /> {t("volumeForm.browse")}
                                     </Button>
                                 )}
                             </div>
-                            <span className="text-[0.6875rem] text-muted-foreground">A subpath (no leading slash, no `..`). Created if it does not exist.</span>
+                            <span className="text-[0.6875rem] text-muted-foreground">{t("volumeForm.subpathHint")}</span>
                         </label>
                     )}
                     {kind === "nas" && connectionId && (
@@ -274,11 +286,11 @@ export function VolumeForm({
             <div className="flex items-center justify-end gap-2">
                 {onCancel && (
                     <Button variant="ghost" size="sm" onClick={onCancel} disabled={pending}>
-                        Cancel
+                        {t("volumeForm.cancel")}
                     </Button>
                 )}
                 <Button size="sm" onClick={save} disabled={pending || !canSave}>
-                    {editing ? "Save changes" : "Add volume"}
+                    {editing ? t("volumeForm.save") : t("volumeForm.add")}
                 </Button>
             </div>
         </div>
@@ -297,14 +309,15 @@ export function NewVolumeDialog({
     onOpenChange: (open: boolean) => void;
     onCreated: () => void;
 }) {
+    const t = useTranslations("deployData");
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>New volume</DialogTitle>
+                    <DialogTitle>{t("volumeForm.newTitle")}</DialogTitle>
                 </DialogHeader>
                 {services.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Add a service first - a volume mounts into a service's container.</p>
+                    <p className="text-sm text-muted-foreground">{t("volumeForm.noServices")}</p>
                 ) : (
                     <VolumeForm
                         services={services}

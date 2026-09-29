@@ -270,5 +270,29 @@
         "deploy": "Deploy it once it is created",
         "cancel": "Cancel",
         "create": "Create"
+    },
+    "canvas": {
+        "dockerImage": "Docker image",
+        "gitRepository": "Git repository",
+        "volume": "Volume",
+        "empty": "Nothing deployed yet",
+        "emptyManage": "Right-click the board or use New service to add one - it appears here as a node you can arrange and connect.",
+        "emptyView": "Add a service and it appears here as a node you can arrange and connect.",
+        "saving": "Saving",
+        "removeLink": "Remove link",
+        "online": "Online",
+        "dragToLink": "Drag to another service to link",
+        "openService": "Open service",
+        "duplicate": "Duplicate",
+        "delete": "Delete",
+        "nas": "NAS",
+        "server": "Server",
+        "volumeSettings": "Volume settings",
+        "browseFiles": "Browse files",
+        "viewInDrive": "View in Drive",
+        "editMount": "Edit mount",
+        "hint": "Drag nodes to arrange them. Drag from a node's right handle onto another service to link them. Right-click the board to add a service, or a service for more.",
+        "serviceKind": "service",
+        "removeService": "This removes the service, its container, domains, and variables."
     }
 }
